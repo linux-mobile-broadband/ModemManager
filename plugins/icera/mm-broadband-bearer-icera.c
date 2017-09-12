@@ -227,45 +227,31 @@ get_ip_config_3gpp (MMBroadbandBearer *_self,
 /*****************************************************************************/
 /* 3GPP disconnection */
 
-typedef struct {
-    MMBroadbandBearerIcera *self;
-    GSimpleAsyncResult *result;
-} Disconnect3gppContext;
-
-static void
-disconnect_3gpp_context_complete_and_free (Disconnect3gppContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 disconnect_3gpp_finish (MMBroadbandBearer *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
 disconnect_3gpp_timed_out_cb (MMBroadbandBearerIcera *self)
 {
-    Disconnect3gppContext *ctx;
+    GTask *task;
 
-    /* Recover context */
-    ctx = self->priv->disconnect_pending;
+    /* Recover disconnection task */
+    task = self->priv->disconnect_pending;
 
     self->priv->disconnect_pending = NULL;
     self->priv->disconnect_pending_id = 0;
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_SERIAL_ERROR,
-                                     MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
-                                     "Disconnection attempt timed out");
+    g_task_return_new_error (task,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
+                             "Disconnection attempt timed out");
+    g_object_unref (task);
 
-    disconnect_3gpp_context_complete_and_free (ctx);
     return G_SOURCE_REMOVE;
 }
 
@@ -273,12 +259,12 @@ static void
 report_disconnect_status (MMBroadbandBearerIcera *self,
                           MMBearerConnectionStatus status)
 {
-    Disconnect3gppContext *ctx;
+    GTask *task;
 
-    /* Recover context */
-    ctx = self->priv->disconnect_pending;
+    /* Recover disconnection task */
+    task = self->priv->disconnect_pending;
     self->priv->disconnect_pending = NULL;
-    g_assert (ctx != NULL);
+    g_assert (task != NULL);
 
     /* Cleanup timeout, if any */
     if (self->priv->disconnect_pending_id) {
@@ -288,19 +274,19 @@ report_disconnect_status (MMBroadbandBearerIcera *self,
 
     /* Received 'CONNECTED' during a disconnection attempt? */
     if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Disconnection failed");
-        disconnect_3gpp_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Disconnection failed");
+        g_object_unref (task);
         return;
     }
 
     /* Received 'DISCONNECTED' during a disconnection attempt? */
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED ||
         status == MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED) {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disconnect_3gpp_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -313,17 +299,17 @@ disconnect_ipdpact_ready (MMBaseModem *modem,
                           GAsyncResult *res,
                           MMBroadbandBearerIcera *self)
 {
-    Disconnect3gppContext *ctx;
+    GTask *task;
     GError *error = NULL;
 
-    /* Try to recover the disconnection context. If none found, it means the
-     * context was already completed and we have nothing else to do. */
-    ctx = self->priv->disconnect_pending;
+    /* Try to recover the disconnection task. If none found, it means the
+     * task was already completed and we have nothing else to do. */
+    task = self->priv->disconnect_pending;
 
     /* Balance refcount with the extra ref we passed to command_full() */
     g_object_unref (self);
 
-    if (!ctx) {
+    if (!task) {
         mm_dbg ("Disconnection context was finished already by an unsolicited message");
 
         /* Run _finish() to finalize the async call, even if we don't care
@@ -335,8 +321,8 @@ disconnect_ipdpact_ready (MMBaseModem *modem,
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         self->priv->disconnect_pending = NULL;
-        g_simple_async_result_take_error (ctx->result, error);
-        disconnect_3gpp_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -358,23 +344,18 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
 {
     MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (bearer);
     gchar *command;
-    Disconnect3gppContext *ctx;
+    GTask *task;
 
-    ctx = g_new0 (Disconnect3gppContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disconnect_3gpp);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* The unsolicited response to %IPDPACT may come before the OK does.
-     * We will keep the disconnection context in the bearer private data so
+     * We will keep the disconnection task in the bearer private data so
      * that it is accessible from the unsolicited message handler. Note
-     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
+     * also that we do NOT pass the task to the GAsyncReadyCallback, as it
      * may not be valid any more when the callback is called (it may be
      * already completed in the unsolicited handling) */
-    g_assert (ctx->self->priv->disconnect_pending == NULL);
-    ctx->self->priv->disconnect_pending = ctx;
+    g_assert (self->priv->disconnect_pending == NULL);
+    self->priv->disconnect_pending = task;
 
     command = g_strdup_printf ("%%IPDPACT=%d,0", cid);
     mm_base_modem_at_command_full (
@@ -386,7 +367,7 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
         FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_ipdpact_ready,
-        g_object_ref (ctx->self)); /* we pass the bearer object! */
+        g_object_ref (self)); /* we pass the bearer object! */
     g_free (command);
 }
 
