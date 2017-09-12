@@ -723,35 +723,33 @@ modem_3gpp_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
                                                      GAsyncResult *res,
                                                      GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 own_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                      GAsyncResult *res,
-                                     GSimpleAsyncResult *simple)
+                                     GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                         GAsyncResult *res,
-                                        GSimpleAsyncResult *simple)
+                                        GTask *task)
 {
     GError *error = NULL;
 
     if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -762,7 +760,7 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
         3,
         FALSE,
         (GAsyncReadyCallback)own_enable_unsolicited_events_ready,
-        simple);
+        task);
 }
 
 static void
@@ -774,38 +772,33 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
     iface_modem_3gpp_parent->enable_unsolicited_events (
         self,
         (GAsyncReadyCallback)parent_enable_unsolicited_events_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   modem_3gpp_enable_unsolicited_events));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 static void
 parent_disable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                          GAsyncResult *res,
-                                         GSimpleAsyncResult *simple)
+                                         GTask *task)
 {
     GError *error = NULL;
 
     if (!iface_modem_3gpp_parent->disable_unsolicited_events_finish (self, res, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 own_disable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                       GAsyncResult *res,
-                                      GSimpleAsyncResult *simple)
+                                      GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -813,7 +806,7 @@ own_disable_unsolicited_events_ready (MMIfaceModem3gpp *self,
     iface_modem_3gpp_parent->disable_unsolicited_events (
         MM_IFACE_MODEM_3GPP (self),
         (GAsyncReadyCallback)parent_disable_unsolicited_events_ready,
-        simple);
+        task);
 }
 
 static void
@@ -827,10 +820,7 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
         3,
         FALSE,
         (GAsyncReadyCallback)own_disable_unsolicited_events_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   modem_3gpp_disable_unsolicited_events));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
