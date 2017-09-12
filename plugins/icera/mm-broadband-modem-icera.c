@@ -1424,7 +1424,6 @@ modem_load_current_bands (MMIfaceModem *self,
 /* Set current bands (Modem interface) */
 
 typedef struct {
-    GSimpleAsyncResult *result;
     guint bandbits;
     guint enablebits;
     guint disablebits;
@@ -1442,42 +1441,37 @@ modem_set_current_bands_finish (MMIfaceModem *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void set_one_band (MMIfaceModem *self, SetCurrentBandsContext *ctx);
-
-static void
-set_current_bands_context_complete_and_free (SetCurrentBandsContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_slice_free (SetCurrentBandsContext, ctx);
-}
+static void set_one_band (MMIfaceModem *self, GTask *task);
 
 static void
 set_current_bands_next (MMIfaceModem *self,
                         GAsyncResult *res,
-                        SetCurrentBandsContext *ctx)
+                        GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
         mm_dbg ("Couldn't set current bands: '%s'", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        set_current_bands_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    set_one_band (self, ctx);
+    set_one_band (self, task);
 }
 
 static void
 set_one_band (MMIfaceModem *self,
-              SetCurrentBandsContext *ctx)
+              GTask *task)
 {
+    SetCurrentBandsContext *ctx;
     guint enable, band;
     gchar *command;
+
+    ctx = g_task_get_task_data (task);
 
     /* Find the next band to enable or disable, always doing enables first */
     enable = 1;
@@ -1488,8 +1482,8 @@ set_one_band (MMIfaceModem *self,
     }
     if (band == 0) {
         /* Both enabling and disabling are done */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_current_bands_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -1514,7 +1508,7 @@ set_one_band (MMIfaceModem *self,
         10,
         FALSE,
         (GAsyncReadyCallback)set_current_bands_next,
-        ctx);
+        task);
     g_free (command);
 }
 
@@ -1542,24 +1536,26 @@ band_array_to_bandbits (GArray *bands)
 static void
 set_current_bands_got_current_bands (MMIfaceModem *self,
                                      GAsyncResult *res,
-                                     SetCurrentBandsContext *ctx)
+                                     GTask *task)
 {
+    SetCurrentBandsContext *ctx;
     GArray *bands;
     GError *error = NULL;
     guint currentbits;
 
     bands = modem_load_current_bands_finish (self, res, &error);
     if (!bands) {
-        g_simple_async_result_take_error (ctx->result, error);
-        set_current_bands_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
     currentbits = band_array_to_bandbits (bands);
     ctx->enablebits = ctx->bandbits & ~currentbits;
     ctx->disablebits = currentbits & ~ctx->bandbits;
 
-    set_one_band (self, ctx);
+    set_one_band (self, task);
 }
 
 static void
@@ -1569,13 +1565,13 @@ modem_set_current_bands (MMIfaceModem *self,
                          gpointer user_data)
 {
     SetCurrentBandsContext *ctx;
+    GTask *task;
 
-    ctx = g_slice_new0 (SetCurrentBandsContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_set_current_bands);
+    ctx = g_new0 (SetCurrentBandsContext, 1);
     ctx->bandbits = band_array_to_bandbits (bands_array);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
 
     /*
      * If ANY is requested, simply enable ANY to activate all bands except for
@@ -1583,13 +1579,13 @@ modem_set_current_bands (MMIfaceModem *self,
     if (ctx->bandbits & modem_band_any_bit) {
         ctx->enablebits = modem_band_any_bit;
         ctx->disablebits = 0;
-        set_one_band (self, ctx);
+        set_one_band (self, task);
         return;
     }
 
     modem_load_current_bands (self,
                               (GAsyncReadyCallback)set_current_bands_got_current_bands,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
