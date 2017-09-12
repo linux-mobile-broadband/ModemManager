@@ -355,46 +355,18 @@ connect_3gpp (MMBroadbandBearer *self,
 /* 3GPP Disonnection sequence */
 
 typedef struct {
-    MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     MMPort *data;
-    GSimpleAsyncResult *result;
     gint retries;
 } DetailedDisconnectContext;
 
-static DetailedDisconnectContext *
-detailed_disconnect_context_new (MMBroadbandBearer *self,
-                                 MMBroadbandModem *modem,
-                                 MMPortSerialAt *primary,
-                                 MMPort *data,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
-{
-    DetailedDisconnectContext *ctx;
-
-    ctx = g_new0 (DetailedDisconnectContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
-    ctx->primary = g_object_ref (primary);
-    ctx->data = g_object_ref (data);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             detailed_disconnect_context_new);
-    ctx->retries = 60;
-    return ctx;
-}
-
 static void
-detailed_disconnect_context_complete_and_free (DetailedDisconnectContext *ctx)
+detailed_disconnect_context_free (DetailedDisconnectContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -403,16 +375,17 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static gboolean disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx);
+static gboolean disconnect_3gpp_qmistatus (GTask *task);
 
 static void
 disconnect_3gpp_status_ready (MMBaseModem *modem,
                               GAsyncResult *res,
-                              DetailedDisconnectContext *ctx)
+                              GTask *task)
 {
+    DetailedDisconnectContext *ctx;
     const gchar *result;
     GError *error = NULL;
     gboolean is_connected = FALSE;
@@ -421,8 +394,8 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
     if (result) {
         mm_dbg ("QMI connection status: %s", result);
         if (is_qmistatus_disconnected (result)) {
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-            detailed_disconnect_context_complete_and_free (ctx);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
             return;
         } else if (is_qmistatus_connected (result)) {
             is_connected = TRUE;
@@ -433,11 +406,13 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
         result = "Unknown error";
     }
 
+    ctx = g_task_get_task_data (task);
+
     if (ctx->retries > 0) {
         ctx->retries--;
         mm_dbg ("Retrying status check in a second. %d retries left.",
                 ctx->retries);
-        g_timeout_add_seconds (1, (GSourceFunc)disconnect_3gpp_qmistatus, ctx);
+        g_timeout_add_seconds (1, (GSourceFunc)disconnect_3gpp_qmistatus, task);
         return;
     }
 
@@ -448,21 +423,25 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
         gchar *normalized_result;
 
         normalized_result = normalize_qmistatus (result);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "QMI disconnect failed: %s",
-                                         normalized_result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "QMI disconnect failed: %s",
+                                 normalized_result);
         g_free (normalized_result);
     } else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    detailed_disconnect_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static gboolean
-disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx)
+disconnect_3gpp_qmistatus (GTask *task)
 {
+    DetailedDisconnectContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     mm_base_modem_at_command_full (
         ctx->modem,
         ctx->primary,
@@ -472,7 +451,7 @@ disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx)
         FALSE, /* is_raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_3gpp_status_ready,
-        ctx); /* user_data */
+        task); /* user_data */
     return G_SOURCE_REMOVE;
 }
 
@@ -480,7 +459,7 @@ disconnect_3gpp_qmistatus (DetailedDisconnectContext *ctx)
 static void
 disconnect_3gpp_check_status (MMBaseModem *modem,
                               GAsyncResult *res,
-                              DetailedDisconnectContext *ctx)
+                              GTask *task)
 {
     GError *error = NULL;
 
@@ -490,7 +469,7 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    disconnect_3gpp_qmistatus (ctx);
+    disconnect_3gpp_qmistatus (task);
 }
 
 static void
@@ -504,8 +483,16 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
+    GTask *task;
 
-    ctx = detailed_disconnect_context_new (self, modem, primary, data, callback, user_data);
+    ctx = g_new0 (DetailedDisconnectContext, 1);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->data = g_object_ref (data);
+    ctx->retries = 60;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_disconnect_context_free);
 
     mm_base_modem_at_command_full (
         ctx->modem,
@@ -516,7 +503,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
         FALSE, /* is_raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_3gpp_check_status,
-        ctx); /* user_data */
+        task); /* user_data */
 }
 
 /*****************************************************************************/
