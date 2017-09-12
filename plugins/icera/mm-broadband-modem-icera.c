@@ -1751,11 +1751,7 @@ modem_time_check_support_finish (MMIfaceModemTime *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    /* We assume Icera devices always support *TLTS, since they appear
-     * to return ERROR if the modem is not powered up, and thus we cannot
-     * check for *TLTS support during modem initialization.
-     */
-    return TRUE;
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -1763,15 +1759,16 @@ modem_time_check_support (MMIfaceModemTime *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_time_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    /* We assume Icera devices always support *TLTS, since they appear
+     * to return ERROR if the modem is not powered up, and thus we cannot
+     * check for *TLTS support during modem initialization.
+     */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
