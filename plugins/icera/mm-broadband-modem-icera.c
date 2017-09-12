@@ -942,13 +942,13 @@ modem_power_up_finish (MMIfaceModem *self,
                        GAsyncResult *res,
                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 cfun_enable_ready (MMBaseModem *self,
                    GAsyncResult *res,
-                   GSimpleAsyncResult *simple)
+                   GTask *task)
 {
     GError *error = NULL;
 
@@ -957,13 +957,14 @@ cfun_enable_ready (MMBaseModem *self,
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED))
-            g_simple_async_result_take_error (simple, error);
-        else
+            g_task_return_error (task, error);
+        else {
             g_error_free (error);
+            g_task_return_boolean (task, TRUE);
+        }
     }
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -971,19 +972,12 @@ modem_power_up (MMIfaceModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_power_up);
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CFUN=1",
                               10,
                               FALSE,
                               (GAsyncReadyCallback)cfun_enable_ready,
-                              result);
+                              g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
