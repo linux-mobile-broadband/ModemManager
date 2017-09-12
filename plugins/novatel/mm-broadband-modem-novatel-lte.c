@@ -347,17 +347,13 @@ load_current_bands_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
-                                       G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 load_current_bands_done (MMIfaceModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *operation_result)
+                         GTask *task)
 {
     GArray *bands;
     const gchar *response;
@@ -368,9 +364,8 @@ load_current_bands_done (MMIfaceModem *self,
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
         mm_dbg ("Couldn't query supported bands: '%s'", error->message);
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete_in_idle (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -386,11 +381,8 @@ load_current_bands_done (MMIfaceModem *self,
             g_array_append_val(bands, bandbits[i]);
     }
 
-    g_simple_async_result_set_op_res_gpointer (operation_result,
-                                               bands,
-                                               (GDestroyNotify)g_array_unref);
-    g_simple_async_result_complete_in_idle (operation_result);
-    g_object_unref (operation_result);
+    g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
 }
 
 static void
@@ -398,20 +390,13 @@ load_current_bands (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_current_bands);
-
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         "$NWBAND?",
         3,
         FALSE,
         (GAsyncReadyCallback)load_current_bands_done,
-        result);
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
