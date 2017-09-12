@@ -221,6 +221,7 @@ typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_PACKET_SERVICE,
     CONNECT_STEP_PROVISIONED_CONTEXTS,
+    CONNECT_STEP_ENSURE_DISCONNECTED,
     CONNECT_STEP_CONNECT,
     CONNECT_STEP_IP_CONFIGURATION,
     CONNECT_STEP_LAST
@@ -638,6 +639,23 @@ connect_set_ready (MbimDevice *device,
 }
 
 static void
+ensure_disconnected_ready (MbimDevice     *device,
+                           GAsyncResult   *res,
+                           ConnectContext *ctx)
+{
+    MbimMessage *response;
+
+    /* Ignore all errors, just go on */
+    response = mbim_device_command_finish (device, res, NULL);
+    if (response)
+        mbim_message_unref (response);
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (ctx);
+}
+
+static void
 provisioned_contexts_query_ready (MbimDevice *device,
                                   GAsyncResult *res,
                                   ConnectContext *ctx)
@@ -814,6 +832,37 @@ connect_context_step (ConnectContext *ctx)
                              ctx);
         mbim_message_unref (message);
         return;
+
+    case CONNECT_STEP_ENSURE_DISCONNECTED: {
+        MbimMessage *message;
+        GError *error = NULL;
+
+        message = (mbim_message_connect_set_new (
+                       ctx->self->priv->session_id,
+                       MBIM_ACTIVATION_COMMAND_DEACTIVATE,
+                       "",
+                       "",
+                       "",
+                       MBIM_COMPRESSION_NONE,
+                       MBIM_AUTH_PROTOCOL_NONE,
+                       MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                       mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                       &error));
+        if (!message) {
+            g_simple_async_result_take_error (ctx->result, error);
+            connect_context_complete_and_free (ctx);
+            return;
+        }
+
+        mbim_device_command (ctx->device,
+                             message,
+                             30,
+                             NULL,
+                             (GAsyncReadyCallback)ensure_disconnected_ready,
+                             ctx);
+        mbim_message_unref (message);
+        return;
+    }
 
     case CONNECT_STEP_CONNECT: {
         const gchar *apn;
