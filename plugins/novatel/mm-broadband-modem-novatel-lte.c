@@ -311,9 +311,7 @@ load_supported_bands_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    /* Never fails */
-    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
-                                       G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -321,14 +319,11 @@ load_supported_bands (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     GArray *bands;
     guint i;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_bands);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /*
      * The modem doesn't support telling us what bands are supported;
@@ -340,11 +335,8 @@ load_supported_bands (MMIfaceModem *self,
             g_array_append_val(bands, bandbits[i]);
     }
 
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               bands,
-                                               (GDestroyNotify)g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
