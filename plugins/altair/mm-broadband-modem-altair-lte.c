@@ -509,41 +509,55 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Register in network (3GPP interface) */
 
-static void
-modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
-                                const gchar *operator_id,
-                                GCancellable *cancellable,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data)
+static gboolean
+modem_3gpp_register_in_network_finish (MMIfaceModem3gpp  *self,
+                                       GAsyncResult      *res,
+                                       GError           **error)
 {
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+cmatt_ready (MMBaseModem  *self,
+             GAsyncResult *res,
+             GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
+                                const gchar         *operator_id,
+                                GCancellable        *cancellable,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
     if (operator_id) {
         /* Currently only VZW is supported */
-        g_simple_async_report_error_in_idle (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_UNSUPPORTED,
-                                             "Setting a specific operator Id is not supported");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Setting a specific operator ID is not supported");
+        g_object_unref (task);
         return;
     }
 
-    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
-                                   "%CMATT=1",
-                                   3,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   cancellable,
-                                   callback,
-                                   user_data);
-}
-
-static gboolean
-modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
-                                       GAsyncResult *res,
-                                       GError **error)
-{
-    return !!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, error);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "%CMATT=1",
+                              3,
+                              FALSE, /* allow cached */
+                              (GAsyncReadyCallback)cmatt_ready,
+                              task);
 }
 
 /*****************************************************************************/
