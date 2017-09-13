@@ -147,40 +147,39 @@ supported_storages_result_free (SupportedStoragesResult *result)
 }
 
 static gboolean
-modem_messaging_load_supported_storages_finish (MMIfaceModemMessaging *self,
-                                                GAsyncResult *res,
-                                                GArray **mem1,
-                                                GArray **mem2,
-                                                GArray **mem3,
-                                                GError **error)
+modem_messaging_load_supported_storages_finish (MMIfaceModemMessaging  *self,
+                                                GAsyncResult           *res,
+                                                GArray                **mem1,
+                                                GArray                **mem2,
+                                                GArray                **mem3,
+                                                GError                **error)
 {
     SupportedStoragesResult *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return FALSE;
 
-    result = (SupportedStoragesResult *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *mem1 = g_array_ref (result->mem1);
     *mem2 = g_array_ref (result->mem2);
     *mem3 = g_array_ref (result->mem3);
-
+    supported_storages_result_free (result);
     return TRUE;
 }
 
 static void
-cpms_format_check_ready (MMBroadbandModem *self,
+cpms_format_check_ready (MMBaseModem  *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask        *task)
 {
-    const gchar *response;
-    GError *error = NULL;
+    const gchar             *response;
+    GError                  *error = NULL;
     SupportedStoragesResult *result;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -191,43 +190,32 @@ cpms_format_check_ready (MMBroadbandModem *self,
                                                    &result->mem1,
                                                    &result->mem2,
                                                    &result->mem3)) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't parse supported storages reply: '%s'",
-                                         response);
         supported_storages_result_free (result);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't parse supported storages reply: '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
 
-    g_simple_async_result_set_op_res_gpointer (simple,
-                                               result,
-                                               (GDestroyNotify)supported_storages_result_free);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, result, (GDestroyNotify) supported_storages_result_free);
+    g_object_unref (task);
 }
 
 static void
 modem_messaging_load_supported_storages (MMIfaceModemMessaging *self,
-                                         GAsyncReadyCallback callback,
-                                         gpointer user_data)
+                                         GAsyncReadyCallback    callback,
+                                         gpointer               user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_load_supported_storages);
-
     /* Check support storages */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CPMS=?",
                               3,
                               TRUE,
                               (GAsyncReadyCallback)cpms_format_check_ready,
-                              result);
+                              g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
