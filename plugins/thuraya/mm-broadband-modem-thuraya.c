@@ -48,37 +48,43 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemThuraya, mm_broadband_modem_thuraya, MM_
 /* Operator Code and Name loading (3GPP interface) */
 
 static gchar *
-load_operator_code_finish (MMIfaceModem3gpp *self,
-                           GAsyncResult *res,
-                           GError **error)
+load_operator_code_finish (MMIfaceModem3gpp  *self,
+                           GAsyncResult      *res,
+                           GError           **error)
 {
-    /* Only "90103" operator code is assumed */
-    return g_strdup ("90106");
-}
-
-static gchar *
-load_operator_name_finish (MMIfaceModem3gpp *self,
-                           GAsyncResult *res,
-                           GError **error)
-{
-    /* Only "THURAYA" operator name is assumed */
-    return g_strdup ("THURAYA");
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-load_operator_name_or_code (MMIfaceModem3gpp *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+load_operator_code (MMIfaceModem3gpp    *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_operator_name_or_code);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, g_strdup ("90106"), g_free);
+    g_object_unref (task);
+}
+
+static gchar *
+load_operator_name_finish (MMIfaceModem3gpp  *self,
+                           GAsyncResult      *res,
+                           GError           **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+load_operator_name (MMIfaceModem3gpp    *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, g_strdup ("THURAYA"), g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -267,9 +273,9 @@ static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     /* Fixed operator code and name to be reported */
-    iface->load_operator_name = load_operator_name_or_code;
+    iface->load_operator_name = load_operator_name;
     iface->load_operator_name_finish = load_operator_name_finish;
-    iface->load_operator_code = load_operator_name_or_code;
+    iface->load_operator_code = load_operator_code;
     iface->load_operator_code_finish = load_operator_code_finish;
 
     /* Don't try to scan networks with AT+COPS=?.
