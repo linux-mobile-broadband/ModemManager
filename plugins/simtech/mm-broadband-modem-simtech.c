@@ -360,36 +360,38 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 /* Load access technologies (Modem interface) */
 
 static gboolean
-load_access_technologies_finish (MMIfaceModem *self,
-                                 GAsyncResult *res,
-                                 MMModemAccessTechnology *access_technologies,
-                                 guint *mask,
-                                 GError **error)
+load_access_technologies_finish (MMIfaceModem             *self,
+                                 GAsyncResult             *res,
+                                 MMModemAccessTechnology  *access_technologies,
+                                 guint                    *mask,
+                                 GError                  **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+    GError *inner_error = NULL;
+    gssize  act;
 
-    *access_technologies = (MMModemAccessTechnology) GPOINTER_TO_UINT (
-        g_simple_async_result_get_op_res_gpointer (
-            G_SIMPLE_ASYNC_RESULT (res)));
+    act = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *access_technologies = (MMModemAccessTechnology) act;
     *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
     return TRUE;
 }
 
 static void
-cnsmod_query_ready (MMBroadbandModemSimtech *self,
+cnsmod_query_ready (MMBaseModem  *self,
                     GAsyncResult *res,
-                    GSimpleAsyncResult *operation_result)
+                    GTask        *task)
 {
     const gchar *response, *p;
-    GError *error = NULL;
+    GError      *error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -398,42 +400,30 @@ cnsmod_query_ready (MMBroadbandModemSimtech *self,
         p = strchr (p, ',');
 
     if (!p || !isdigit (*(p + 1)))
-        g_simple_async_result_set_error (
-            operation_result,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Failed to parse the +CNSMOD response: '%s'",
             response);
     else
-        g_simple_async_result_set_op_res_gpointer (
-            operation_result,
-            GUINT_TO_POINTER (simtech_act_to_mm_act (atoi (p + 1))),
-            NULL);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+        g_task_return_int (task, simtech_act_to_mm_act (atoi (p + 1)));
+    g_object_unref (task);
 }
 
 static void
-load_access_technologies (MMIfaceModem *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+load_access_technologies (MMIfaceModem        *self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_access_technologies);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Launch query only for 3GPP modems */
     if (!mm_iface_modem_is_3gpp (self)) {
-        g_simple_async_result_set_op_res_gpointer (
-            result,
-            GUINT_TO_POINTER (MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN),
-            NULL);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_int (task, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        g_object_unref (task);
         return;
     }
 
@@ -443,7 +433,7 @@ load_access_technologies (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)cnsmod_query_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
