@@ -536,70 +536,61 @@ typedef struct {
 } LoadCurrentModesResult;
 
 typedef struct {
-    MMBroadbandModemSimtech *self;
-    GSimpleAsyncResult *result;
     gint acqord;
     gint modepref;
 } LoadCurrentModesContext;
 
-static void
-load_current_modes_context_complete_and_free (LoadCurrentModesContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
-load_current_modes_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           MMModemMode *allowed,
-                           MMModemMode *preferred,
-                           GError **error)
+load_current_modes_finish (MMIfaceModem  *self,
+                           GAsyncResult  *res,
+                           MMModemMode   *allowed,
+                           MMModemMode   *preferred,
+                           GError       **error)
 {
     LoadCurrentModesResult *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return FALSE;
 
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    *allowed = result->allowed;
+    *allowed   = result->allowed;
     *preferred = result->preferred;
+    g_free (result);
     return TRUE;
 }
 
 static void
 cnmp_query_ready (MMBroadbandModemSimtech *self,
-                  GAsyncResult *res,
-                  LoadCurrentModesContext *ctx)
+                  GAsyncResult            *res,
+                  GTask                   *task)
 {
-    LoadCurrentModesResult *result;
-    const gchar *response, *p;
-    GError *error = NULL;
+    LoadCurrentModesContext *ctx;
+    LoadCurrentModesResult  *result;
+    const gchar             *response, *p;
+    GError                  *error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (ctx->result, error);
-        load_current_modes_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
+
     p = mm_strip_tag (response, "+CNMP:");
     if (!p) {
-        g_simple_async_result_set_error (
-            ctx->result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Failed to parse the mode preference response: '%s'",
-            response);
-        load_current_modes_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse the mode preference response: '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
 
     result = g_new (LoadCurrentModesResult, 1);
-    result->allowed = MM_MODEM_MODE_NONE;
+    result->allowed   = MM_MODEM_MODE_NONE;
     result->preferred = MM_MODEM_MODE_NONE;
 
     ctx->modepref = atoi (p);
@@ -620,13 +611,13 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
             result->preferred = MM_MODEM_MODE_3G;
             break;
         default:
-            g_simple_async_result_set_error (
-                ctx->result,
+            g_task_return_new_error (
+                task,
                 MM_CORE_ERROR,
                 MM_CORE_ERROR_FAILED,
                 "Unknown acquisition order preference: '%d'",
                 ctx->acqord);
-            load_current_modes_context_complete_and_free (ctx);
+            g_object_unref (task);
             return;
         }
         break;
@@ -644,51 +635,50 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
         break;
 
     default:
-        g_simple_async_result_set_error (
-            ctx->result,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Unknown mode preference: '%d'",
             ctx->modepref);
-        load_current_modes_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
-    /* Set final result and complete */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               result,
-                                               g_free);
-    load_current_modes_context_complete_and_free (ctx);
+    g_task_return_pointer (task, result, g_free);
+    g_object_unref (task);
 }
 
 static void
-cnaop_query_ready (MMBroadbandModemSimtech *self,
+cnaop_query_ready (MMBaseModem  *self,
                    GAsyncResult *res,
-                   LoadCurrentModesContext *ctx)
+                   GTask        *task)
 {
-    const gchar *response, *p;
-    GError *error = NULL;
+    LoadCurrentModesContext *ctx;
+    const gchar             *response, *p;
+    GError                  *error = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (ctx->result, error);
-        load_current_modes_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     p = mm_strip_tag (response, "+CNAOP:");
     if (p)
         ctx->acqord = atoi (p);
 
     if (ctx->acqord < 0 || ctx->acqord > 2) {
-        g_simple_async_result_set_error (
-            ctx->result,
+        g_task_return_new_error (
+            task,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Failed to parse the acquisition order response: '%s'",
             response);
-        load_current_modes_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
@@ -698,24 +688,23 @@ cnaop_query_ready (MMBroadbandModemSimtech *self,
         3,
         FALSE,
         (GAsyncReadyCallback)cnmp_query_ready,
-        ctx);
+        task);
 }
 
 static void
-load_current_modes (MMIfaceModem *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+load_current_modes (MMIfaceModem        *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
 {
+    GTask                   *task;
     LoadCurrentModesContext *ctx;
 
     ctx = g_new (LoadCurrentModesContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_current_modes);
-    ctx->acqord = -1;
+    ctx->acqord   = -1;
     ctx->modepref = -1;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
 
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
@@ -723,7 +712,7 @@ load_current_modes (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)cnaop_query_ready,
-        ctx);
+        task);
 }
 
 /*****************************************************************************/
