@@ -91,26 +91,23 @@ load_operator_name (MMIfaceModem3gpp    *self,
 /* Load supported modes (Modem inteface) */
 
 static GArray *
-load_supported_modes_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+load_supported_modes_finish (MMIfaceModem  *self,
+                             GAsyncResult  *res,
+                             GError       **error)
 {
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-load_supported_modes (MMIfaceModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+load_supported_modes (MMIfaceModem        *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
-    GArray *combinations;
-    MMModemModeCombination mode;
+    GTask                  *task;
+    GArray                 *combinations;
+    MMModemModeCombination  mode;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Build list of combinations */
     combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
@@ -120,9 +117,8 @@ load_supported_modes (MMIfaceModem *self,
     mode.preferred = MM_MODEM_MODE_NONE;
     g_array_append_val (combinations, mode);
 
-    g_simple_async_result_set_op_res_gpointer (result, combinations, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
