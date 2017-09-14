@@ -136,6 +136,9 @@ ATTRS{idVendor}=="0425", ATTRS{idProduct}=="0408", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0716", ENV{ID_MM_DEVICE_IGNORE}="1"
 ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0801", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Intel coredump downloader device
+ATTRS{idVendor}=="1519", ATTRS{idProduct}=="f000", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 # GW Instek AFG-2225 arbitrary function generator
 ATTRS{idVendor}=="2184", ATTRS{idProduct}=="001c", ENV{ID_MM_DEVICE_IGNORE}="1"
 
