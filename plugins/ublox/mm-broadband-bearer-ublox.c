@@ -51,9 +51,10 @@ typedef enum {
 } FeatureSupport;
 
 struct _MMBroadbandBearerUbloxPrivate {
-    MMUbloxUsbProfile     profile;
-    MMUbloxNetworkingMode mode;
-    FeatureSupport        statistics;
+    MMUbloxUsbProfile        profile;
+    MMUbloxNetworkingMode    mode;
+    MMUbloxBearerAllowedAuth allowed_auths;
+    FeatureSupport           statistics;
 };
 
 /*****************************************************************************/
@@ -393,59 +394,76 @@ uauthreq_ready (MMBaseModem  *modem,
 static void
 authenticate_3gpp (GTask *task)
 {
-    const gchar          *user;
-    const gchar          *password;
-    MMBearerAllowedAuth   allowed_auth;
-    CommonConnectContext *ctx;
-    gchar                *cmd;
+    MMBroadbandBearerUblox *self;
+    CommonConnectContext   *ctx;
+    gchar                  *cmd = NULL;
+    MMBearerAllowedAuth     allowed_auth;
+    gint                    ublox_auth = -1;
 
+    self = g_task_get_source_object (task);
     ctx = (CommonConnectContext *) g_task_get_task_data (task);
 
-    user         = mm_bearer_properties_get_user         (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-    password     = mm_bearer_properties_get_password     (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
     allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
 
-    /* Flag whether authentication is required. If it isn't, we won't fail
-     * connection attempt if the +UAUTHREQ command fails */
-    ctx->auth_required = (user && password && allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE);
     if (!ctx->auth_required) {
         mm_dbg ("Not using authentication");
-        cmd = g_strdup_printf ("+UAUTHREQ=%u,0", ctx->cid);
-    } else {
-        gchar *quoted_user;
-        gchar *quoted_password;
-        guint  ublox_auth;
+        ublox_auth = 0;
+        goto out;
+    }
 
-        if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN || allowed_auth == (MM_BEARER_ALLOWED_AUTH_PAP | MM_BEARER_ALLOWED_AUTH_CHAP)) {
-            mm_dbg ("Using automatic authentication method");
+    if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN || allowed_auth == (MM_BEARER_ALLOWED_AUTH_PAP | MM_BEARER_ALLOWED_AUTH_CHAP)) {
+        mm_dbg ("Using automatic authentication method");
+        if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_AUTO)
             ublox_auth = 3;
-        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
-            mm_dbg ("Using PAP authentication method");
+        else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_PAP)
             ublox_auth = 1;
-        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
-            mm_dbg ("Using CHAP authentication method");
+        else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_CHAP)
             ublox_auth = 2;
-        } else {
-            gchar *str;
+        else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_NONE)
+            ublox_auth = 0;
+    } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
+        mm_dbg ("Using PAP authentication method");
+        ublox_auth = 1;
+    } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
+        mm_dbg ("Using CHAP authentication method");
+        ublox_auth = 2;
+    }
 
-            str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                     "Cannot use any of the specified authentication methods (%s)", str);
-            g_object_unref (task);
-            g_free (str);
-            return;
-        }
+out:
 
-        quoted_user = mm_port_serial_at_quote_string (user);
+    if (ublox_auth < 0) {
+        gchar *str;
+
+        str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot use any of the specified authentication methods (%s)", str);
+        g_object_unref (task);
+        g_free (str);
+        return;
+    }
+
+    if (ublox_auth > 0) {
+        const gchar *user;
+        const gchar *password;
+        gchar       *quoted_user;
+        gchar       *quoted_password;
+
+        user     = mm_bearer_properties_get_user     (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+        password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+
+        quoted_user     = mm_port_serial_at_quote_string (user);
         quoted_password = mm_port_serial_at_quote_string (password);
+
         cmd = g_strdup_printf ("+UAUTHREQ=%u,%u,%s,%s",
                                ctx->cid,
                                ublox_auth,
                                quoted_password,
                                quoted_user);
+
         g_free (quoted_user);
         g_free (quoted_password);
-    }
+    } else
+        cmd = g_strdup_printf ("+UAUTHREQ=%u,0", ctx->cid);
 
     mm_dbg ("setting up authentication preferences in PDP context #%u...", ctx->cid);
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
@@ -455,6 +473,78 @@ authenticate_3gpp (GTask *task)
                               (GAsyncReadyCallback) uauthreq_ready,
                               task);
     g_free (cmd);
+}
+
+static void
+uauthreq_test_ready (MMBaseModem  *modem,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    MMBroadbandBearerUblox *self;
+    const gchar            *response;
+    GError                 *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!response)
+        goto out;
+
+    self->priv->allowed_auths = mm_ublox_parse_uauthreq_test (response, &error);
+out:
+    if (error) {
+        CommonConnectContext *ctx;
+
+        ctx = (CommonConnectContext *) g_task_get_task_data (task);
+        /* If authentication required and the +UAUTHREQ test failed, abort */
+        if (ctx->auth_required) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+        /* Otherwise, ignore and jump to activate_3gpp directly as no auth setup
+         * is needed */
+        g_error_free (error);
+        activate_3gpp (task);
+        return;
+    }
+
+    authenticate_3gpp (task);
+}
+
+static void
+check_supported_authentication_methods (GTask *task)
+{
+    MMBroadbandBearerUblox *self;
+    CommonConnectContext   *ctx;
+    const gchar            *user;
+    const gchar            *password;
+    MMBearerAllowedAuth     allowed_auth;
+
+    self = g_task_get_source_object (task);
+    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+
+    user         = mm_bearer_properties_get_user         (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    password     = mm_bearer_properties_get_password     (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+
+    /* Flag whether authentication is required. If it isn't, we won't fail
+     * connection attempt if the +UAUTHREQ command fails */
+    ctx->auth_required = (user && password && allowed_auth != MM_BEARER_ALLOWED_AUTH_NONE);
+
+    /* If we already cached the support, not do it again */
+    if (self->priv->allowed_auths != MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN) {
+        authenticate_3gpp (task);
+        return;
+    }
+
+    mm_dbg ("checking supported authentication methods...");
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
+                              "+UAUTHREQ=?",
+                              10,
+                              TRUE, /* allow cached */
+                              (GAsyncReadyCallback) uauthreq_test_ready,
+                              task);
 }
 
 static void
@@ -478,7 +568,7 @@ dial_3gpp (MMBroadbandBearer   *self,
                                           user_data)))
         return;
 
-    authenticate_3gpp (task);
+    check_supported_authentication_methods (task);
 }
 
 /*****************************************************************************/
@@ -785,9 +875,10 @@ mm_broadband_bearer_ublox_init (MMBroadbandBearerUblox *self)
                                               MMBroadbandBearerUbloxPrivate);
 
     /* Defaults */
-    self->priv->profile    = MM_UBLOX_USB_PROFILE_UNKNOWN;
-    self->priv->mode       = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
-    self->priv->statistics = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->profile       = MM_UBLOX_USB_PROFILE_UNKNOWN;
+    self->priv->mode          = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
+    self->priv->allowed_auths = MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN;
+    self->priv->statistics    = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
