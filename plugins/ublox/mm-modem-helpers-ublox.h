@@ -148,6 +148,20 @@ gchar *mm_ublox_build_urat_set_command (MMModemMode   allowed,
                                         GError      **error);
 
 /*****************************************************************************/
+/* +UAUTHREQ=? test parser */
+
+typedef enum { /*< underscore_name=mm_ublox_bearer_allowed_auth >*/
+    MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN = 0,
+    MM_UBLOX_BEARER_ALLOWED_AUTH_NONE    = 1 << 0,
+    MM_UBLOX_BEARER_ALLOWED_AUTH_PAP     = 1 << 1,
+    MM_UBLOX_BEARER_ALLOWED_AUTH_CHAP    = 1 << 2,
+    MM_UBLOX_BEARER_ALLOWED_AUTH_AUTO    = 1 << 3,
+} MMUbloxBearerAllowedAuth;
+
+MMUbloxBearerAllowedAuth mm_ublox_parse_uauthreq_test (const char  *response,
+                                                       GError     **error);
+
+/*****************************************************************************/
 /* +UGCNTRD response parser */
 
 gboolean mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,

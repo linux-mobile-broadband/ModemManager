@@ -951,6 +951,49 @@ test_uact_request_4g (void)
 }
 
 /*****************************************************************************/
+/* Test +UAUTHREQ=? responses */
+
+static void
+common_validate_uauthreq_test (const gchar              *str,
+                               MMUbloxBearerAllowedAuth  expected_allowed_auths)
+{
+    GError                   *error = NULL;
+    MMUbloxBearerAllowedAuth  allowed_auths;
+
+    allowed_auths = mm_ublox_parse_uauthreq_test (str, &error);
+    g_assert_no_error (error);
+    g_assert_cmpuint (allowed_auths, ==, expected_allowed_auths);
+}
+
+static void
+test_uauthreq_tobyl4 (void)
+{
+    common_validate_uauthreq_test ("+UAUTHREQ: (1-4),(0-2),,",
+                                   (MM_UBLOX_BEARER_ALLOWED_AUTH_NONE |
+                                    MM_UBLOX_BEARER_ALLOWED_AUTH_PAP |
+                                    MM_UBLOX_BEARER_ALLOWED_AUTH_CHAP));
+}
+
+static void
+test_uauthreq_with_auto (void)
+{
+    common_validate_uauthreq_test ("+UAUTHREQ: (1-4),(0-3),,",
+                                   (MM_UBLOX_BEARER_ALLOWED_AUTH_NONE |
+                                    MM_UBLOX_BEARER_ALLOWED_AUTH_PAP |
+                                    MM_UBLOX_BEARER_ALLOWED_AUTH_CHAP |
+                                    MM_UBLOX_BEARER_ALLOWED_AUTH_AUTO));
+}
+
+static void
+test_uauthreq_less_fields (void)
+{
+    common_validate_uauthreq_test ("+UAUTHREQ: (1-4),(0-2)",
+                                   (MM_UBLOX_BEARER_ALLOWED_AUTH_NONE |
+                                    MM_UBLOX_BEARER_ALLOWED_AUTH_PAP |
+                                    MM_UBLOX_BEARER_ALLOWED_AUTH_CHAP));
+}
+
+/*****************************************************************************/
 /* Test +UGCNTRD responses */
 
 typedef struct {
@@ -1092,6 +1135,9 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/ublox/uact/request/2g",  test_uact_request_2g);
     g_test_add_func ("/MM/ublox/uact/request/3g",  test_uact_request_3g);
     g_test_add_func ("/MM/ublox/uact/request/4g",  test_uact_request_4g);
+    g_test_add_func ("/MM/ublox/uauthreq/test/tobyl4", test_uauthreq_tobyl4);
+    g_test_add_func ("/MM/ublox/uauthreq/test/with-auto", test_uauthreq_with_auto);
+    g_test_add_func ("/MM/ublox/uauthreq/test/less-fields", test_uauthreq_less_fields);
     g_test_add_func ("/MM/ublox/ugcntrd/response", test_ugcntrd_response);
 
     return g_test_run ();

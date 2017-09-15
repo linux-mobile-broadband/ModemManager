@@ -1296,6 +1296,83 @@ mm_ublox_build_urat_set_command (MMModemMode   allowed,
 }
 
 /*****************************************************************************/
+/* +UAUTHREQ=? test parser */
+
+MMUbloxBearerAllowedAuth
+mm_ublox_parse_uauthreq_test (const char  *response,
+                              GError     **error)
+{
+    MMUbloxBearerAllowedAuth   mask = MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN;
+    GError                    *inner_error = NULL;
+    GArray                    *allowed_auths = NULL;
+    gchar                    **split;
+    guint                      split_len;
+
+    /*
+     * Response may be like:
+     *   AT+UAUTHREQ=?
+     *   +UAUTHREQ: (1-4),(0-2),,
+     */
+    response = mm_strip_tag (response, "+UAUTHREQ:");
+    split = mm_split_string_groups (response);
+    split_len = g_strv_length (split);
+    if (split_len < 2) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Unexpected number of groups in +UAUTHREQ=? response: %u", g_strv_length (split));
+        goto out;
+    }
+
+    allowed_auths = mm_parse_uint_list (split[1], &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (allowed_auths) {
+        guint i;
+
+        for (i = 0; i < allowed_auths->len; i++) {
+            guint val;
+
+            val = g_array_index (allowed_auths, guint, i);
+            switch (val) {
+                case 0:
+                    mask |= MM_UBLOX_BEARER_ALLOWED_AUTH_NONE;
+                    break;
+                case 1:
+                    mask |= MM_UBLOX_BEARER_ALLOWED_AUTH_PAP;
+                    break;
+                case 2:
+                    mask |= MM_UBLOX_BEARER_ALLOWED_AUTH_CHAP;
+                    break;
+                case 3:
+                    mask |= MM_UBLOX_BEARER_ALLOWED_AUTH_AUTO;
+                    break;
+                default:
+                    mm_warn ("Unexpected +UAUTHREQ value: %u", val);
+                    break;
+            }
+        }
+    }
+
+    if (!mask) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "No supported authentication methods in +UAUTHREQ=? response");
+        goto out;
+    }
+
+out:
+    g_strfreev (split);
+
+    if (inner_error) {
+        if (allowed_auths)
+            g_array_unref (allowed_auths);
+        g_propagate_error (error, inner_error);
+        return MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN;
+    }
+
+    return mask;
+}
+
+/*****************************************************************************/
 /* +UGCNTRD response parser */
 
 gboolean
