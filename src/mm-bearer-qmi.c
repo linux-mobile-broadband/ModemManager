@@ -1579,11 +1579,33 @@ reset_bearer_connection (MMBearerQmi *self,
                          gboolean reset_ipv6)
 {
     if (reset_ipv4) {
+        if (self->priv->client_ipv4) {
+            if (self->priv->packet_service_status_ipv4_indication_id)
+                common_setup_cleanup_packet_service_status_unsolicited_events (self,
+                                                                               self->priv->client_ipv4,
+                                                                               FALSE,
+                                                                               &self->priv->packet_service_status_ipv4_indication_id);
+            if (self->priv->event_report_ipv4_indication_id)
+                cleanup_event_report_unsolicited_events (self,
+                                                         self->priv->client_ipv4,
+                                                         &self->priv->event_report_ipv4_indication_id);
+        }
         self->priv->packet_data_handle_ipv4 = 0;
         g_clear_object (&self->priv->client_ipv4);
     }
 
     if (reset_ipv6) {
+        if (self->priv->client_ipv6) {
+            if (self->priv->packet_service_status_ipv6_indication_id)
+                common_setup_cleanup_packet_service_status_unsolicited_events (self,
+                                                                               self->priv->client_ipv6,
+                                                                               FALSE,
+                                                                               &self->priv->packet_service_status_ipv6_indication_id);
+            if (self->priv->event_report_ipv6_indication_id)
+                cleanup_event_report_unsolicited_events (self,
+                                                         self->priv->client_ipv6,
+                                                         &self->priv->event_report_ipv6_indication_id);
+        }
         self->priv->packet_data_handle_ipv6 = 0;
         g_clear_object (&self->priv->client_ipv6);
     }
