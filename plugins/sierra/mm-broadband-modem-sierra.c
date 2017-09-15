@@ -1133,22 +1133,21 @@ modem_power_down_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 modem_power_down_ready (MMBaseModem *self,
-                       GAsyncResult *res,
-                       GSimpleAsyncResult *simple)
+                        GAsyncResult *res,
+                        GTask *task)
 {
     /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
      * at!pcstate or 3GPP devices support +CFUN=4.
      */
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -1156,12 +1155,9 @@ modem_power_down (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_power_down);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* For CDMA modems, run !pcstate */
     if (mm_iface_modem_is_cdma_only (self)) {
@@ -1170,7 +1166,7 @@ modem_power_down (MMIfaceModem *self,
                                   5,
                                   FALSE,
                                   (GAsyncReadyCallback)modem_power_down_ready,
-                                  result);
+                                  task);
         return;
     }
 
@@ -1180,7 +1176,7 @@ modem_power_down (MMIfaceModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)modem_power_down_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
