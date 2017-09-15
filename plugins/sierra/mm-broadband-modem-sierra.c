@@ -954,28 +954,24 @@ modem_load_own_numbers_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_load_own_numbers_ready (MMIfaceModem *self,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     GError *error = NULL;
     GStrv numbers;
 
     numbers = iface_modem_parent->load_own_numbers_finish (self, res, &error);
     if (error)
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, numbers, NULL);
+        g_task_return_pointer (task, numbers, (GDestroyNotify)g_strfreev);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 #define MDN_TAG  "MDN: "
@@ -983,7 +979,7 @@ parent_load_own_numbers_ready (MMIfaceModem *self,
 static void
 own_numbers_ready (MMBaseModem *self,
                    GAsyncResult *res,
-                   GSimpleAsyncResult *simple)
+                   GTask *task)
 {
     const gchar *response, *p;
     const gchar *numbers[2] = { NULL, NULL };
@@ -1013,11 +1009,10 @@ own_numbers_ready (MMBaseModem *self,
         goto fallback;
     }
 
-    g_simple_async_result_set_op_res_gpointer (simple,
-                                               g_strdupv ((gchar **) numbers),
-                                               NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task,
+                           g_strdupv ((gchar **) numbers),
+                           (GDestroyNotify)g_strfreev);
+    g_object_unref (task);
     return;
 
 fallback:
@@ -1025,7 +1020,7 @@ fallback:
     iface_modem_parent->load_own_numbers (
         MM_IFACE_MODEM (self),
         (GAsyncReadyCallback)parent_load_own_numbers_ready,
-        simple);
+        task);
 }
 
 static void
@@ -1033,20 +1028,17 @@ modem_load_own_numbers (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     mm_dbg ("loading own numbers (Sierra)...");
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_own_numbers);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* 3GPP modems can just run parent's own number loading */
     if (mm_iface_modem_is_3gpp (self)) {
         iface_modem_parent->load_own_numbers (
             self,
             (GAsyncReadyCallback)parent_load_own_numbers_ready,
-            result);
+            task);
         return;
     }
 
@@ -1059,7 +1051,7 @@ modem_load_own_numbers (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)own_numbers_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
