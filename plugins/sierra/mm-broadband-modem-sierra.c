@@ -1496,18 +1496,17 @@ modem_time_check_support_finish (MMIfaceModemTime *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 modem_time_check_ready (MMBaseModem *self,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask *task)
 {
     GError *error = NULL;
     GVariant *result;
-
-    g_simple_async_result_set_op_res_gboolean (simple, FALSE);
+    gboolean supported = FALSE;
 
     result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
     if (!error && result) {
@@ -1515,12 +1514,12 @@ modem_time_check_ready (MMBaseModem *self,
 
         sierra->priv->time_method = g_variant_get_uint32 (result);
         if (sierra->priv->time_method != TIME_METHOD_UNKNOWN)
-            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+            supported = TRUE;
     }
     g_clear_error (&error);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, supported);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -1556,20 +1555,13 @@ modem_time_check_support (MMIfaceModemTime *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_time_check_support);
-
     mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
         time_check_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         (GAsyncReadyCallback)modem_time_check_ready,
-        result);
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
