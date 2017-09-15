@@ -1272,22 +1272,6 @@ typedef struct {
     MMModemCdmaRegistrationState detailed_evdo_state;
 } DetailedRegistrationStateResults;
 
-typedef struct {
-    MMBroadbandModemSierra *self;
-    GSimpleAsyncResult *result;
-    DetailedRegistrationStateResults state;
-} DetailedRegistrationStateContext;
-
-static void
-detailed_registration_state_context_complete_and_free (DetailedRegistrationStateContext *ctx)
-{
-    /* Always not in idle! we're passing a struct in stack as result */
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 get_detailed_registration_state_finish (MMIfaceModemCdma *self,
                                         GAsyncResult *res,
@@ -1297,42 +1281,39 @@ get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 {
     DetailedRegistrationStateResults *results;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    results = g_task_propagate_pointer (G_TASK (res), error);
+    if (!results)
         return FALSE;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *detailed_cdma1x_state = results->detailed_cdma1x_state;
     *detailed_evdo_state = results->detailed_evdo_state;
+    g_free (results);
     return TRUE;
 }
 
 static void
 status_ready (MMIfaceModemCdma *self,
               GAsyncResult *res,
-              DetailedRegistrationStateContext *ctx)
+              GTask *task)
 {
+    DetailedRegistrationStateResults *results;
     GError *error = NULL;
     const gchar *response;
 
+    results = g_task_get_task_data (task);
+
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     /* If error, leave superclass' reg state alone if AT!STATUS isn't supported. */
-    if (error) {
+    if (error)
         g_error_free (error);
+    else
+        parse_status (response,
+                      &(results->detailed_cdma1x_state),
+                      &(results->detailed_evdo_state),
+                      NULL);
 
-        /* NOTE: always complete NOT in idle here */
-        g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
-        detailed_registration_state_context_complete_and_free (ctx);
-        return;
-    }
-
-    parse_status (response,
-                  &(ctx->state.detailed_cdma1x_state),
-                  &(ctx->state.detailed_evdo_state),
-                  NULL);
-
-    /* NOTE: always complete NOT in idle here */
-    g_simple_async_result_set_op_res_gpointer (ctx->result, &ctx->state, NULL);
-    detailed_registration_state_context_complete_and_free (ctx);
+    g_task_return_pointer (task, g_memdup (results, sizeof (*results)), g_free);
+    g_object_unref (task);
 }
 
 static void
@@ -1342,24 +1323,22 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    DetailedRegistrationStateContext *ctx;
+    DetailedRegistrationStateResults *results;
+    GTask *task;
 
-    /* Setup context */
-    ctx = g_new0 (DetailedRegistrationStateContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             get_detailed_registration_state);
-    ctx->state.detailed_cdma1x_state = cdma1x_state;
-    ctx->state.detailed_evdo_state = evdo_state;
+    results = g_new0 (DetailedRegistrationStateResults, 1);
+    results->detailed_cdma1x_state = cdma1x_state;
+    results->detailed_evdo_state = evdo_state;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, results, g_free);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "!STATUS",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)status_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
