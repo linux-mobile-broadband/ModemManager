@@ -651,46 +651,38 @@ modem_after_power_up_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
-after_power_up_wait_cb (GSimpleAsyncResult *result)
+after_power_up_wait_cb (GTask *task)
 {
-    MMBroadbandModemOption *option;
+    MMBroadbandModemOption *self;
 
-    option = MM_BROADBAND_MODEM_OPTION (g_async_result_get_source_object (G_ASYNC_RESULT (result)));
+    self = g_task_get_source_object (task);
+    self->priv->after_power_up_wait_id = 0;
 
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete (result);
-    g_object_unref (result);
-
-    option->priv->after_power_up_wait_id = 0;
-    g_object_unref (option);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 
     return G_SOURCE_REMOVE;
 }
 
 static void
-modem_after_power_up (MMIfaceModem *self,
+modem_after_power_up (MMIfaceModem *_self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    MMBroadbandModemOption *option = MM_BROADBAND_MODEM_OPTION (self);
-    GSimpleAsyncResult *result;
+    MMBroadbandModemOption *self = MM_BROADBAND_MODEM_OPTION (_self);
 
     /* Some Option devices return OK on +CFUN=1 right away but need some time
      * to finish initialization.
      */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_after_power_up);
-    g_warn_if_fail (option->priv->after_power_up_wait_id == 0);
-    option->priv->after_power_up_wait_id =
+    g_warn_if_fail (self->priv->after_power_up_wait_id == 0);
+    self->priv->after_power_up_wait_id =
         g_timeout_add_seconds (10,
                                (GSourceFunc)after_power_up_wait_cb,
-                               result);
+                               g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
