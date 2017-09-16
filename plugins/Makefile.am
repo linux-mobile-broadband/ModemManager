@@ -350,6 +350,8 @@ libmm_plugin_option_hso_la_LIBADD   = $(OPTION_COMMON_LIBADD_FLAGS)
 # plugin: sierra (new QMI or MBIM modems)
 ################################################################################
 
+dist_udevrules_DATA += sierra/77-mm-sierra.rules
+
 pkglib_LTLIBRARIES += libmm-plugin-sierra.la
 libmm_plugin_sierra_la_SOURCES = \
 	sierra/mm-plugin-sierra.c \
