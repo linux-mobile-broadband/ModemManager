@@ -216,6 +216,163 @@ reload_stats (MMBaseBearer *self,
 }
 
 /*****************************************************************************/
+/* Connection status polling */
+
+typedef enum {
+    CONNECTION_STATUS_CONTEXT_STEP_FIRST,
+    CONNECTION_STATUS_CONTEXT_STEP_IPV4,
+    CONNECTION_STATUS_CONTEXT_STEP_IPV6,
+    CONNECTION_STATUS_CONTEXT_STEP_LAST,
+} ConnectionStatusContextStep;
+
+typedef struct {
+    ConnectionStatusContextStep step;
+} ConnectionStatusContext;
+
+static MMBearerConnectionStatus
+load_connection_status_finish (MMBaseBearer  *self,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    gint val;
+
+    val = g_task_propagate_int (G_TASK (res), error);
+    if (val < 0)
+        return MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+
+    return (MMBearerConnectionStatus) val;
+}
+
+static void connection_status_context_step (GTask *task);
+
+static void
+get_packet_service_status_ready (QmiClientWds *client,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    GError                                    *error = NULL;
+    QmiMessageWdsGetPacketServiceStatusOutput *output;
+    QmiWdsConnectionStatus                     status = QMI_WDS_CONNECTION_STATUS_UNKNOWN;
+    ConnectionStatusContext                   *ctx;
+
+    output = qmi_client_wds_get_packet_service_status_finish (client, res, &error);
+    if (!output)
+        goto out;
+
+    if (!qmi_message_wds_get_packet_service_status_output_get_result (output, &error))
+        goto out;
+
+    qmi_message_wds_get_packet_service_status_output_get_connection_status (
+        output,
+        &status,
+        NULL);
+
+ out:
+    if (output)
+        qmi_message_wds_get_packet_service_status_output_unref (output);
+
+    /* An error checking status is reported right away */
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Report disconnection right away */
+    if (status != QMI_WDS_CONNECTION_STATUS_CONNECTED) {
+        g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+        g_object_unref (task);
+        return;
+    }
+
+    /* we're reported as connected, go on to next check if any */
+    ctx = g_task_get_task_data (task);
+    ctx->step++;
+    connection_status_context_step (task);
+}
+
+static void
+connection_status_context_step (GTask *task)
+{
+    MMBearerQmi             *self;
+    ConnectionStatusContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+        case CONNECTION_STATUS_CONTEXT_STEP_FIRST:
+            /* Connection status polling is an optional feature that must be
+             * enabled explicitly via udev tags. If not set, out as unsupported */
+            if (self->priv->data &&
+                !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (self->priv->data),
+                                                                  "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) {
+                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                         "Connection status polling not required");
+                g_object_unref (task);
+                return;
+            }
+            /* If no clients ready on start, assume disconnected */
+            if (!self->priv->client_ipv4 && !self->priv->client_ipv6) {
+                g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+                g_object_unref (task);
+                return;
+            }
+            ctx->step++;
+            /* fall down to next step */
+
+        case CONNECTION_STATUS_CONTEXT_STEP_IPV4:
+            if (self->priv->client_ipv4) {
+                qmi_client_wds_get_packet_service_status (self->priv->client_ipv4,
+                                                          NULL,
+                                                          10,
+                                                          NULL,
+                                                          (GAsyncReadyCallback)get_packet_service_status_ready,
+                                                          task);
+                return;
+            }
+            ctx->step++;
+            /* fall down to next step */
+
+        case CONNECTION_STATUS_CONTEXT_STEP_IPV6:
+            if (self->priv->client_ipv6) {
+                qmi_client_wds_get_packet_service_status (self->priv->client_ipv6,
+                                                          NULL,
+                                                          10,
+                                                          NULL,
+                                                          (GAsyncReadyCallback)get_packet_service_status_ready,
+                                                          task);
+                return;
+            }
+            ctx->step++;
+            /* fall down to next step */
+
+        case CONNECTION_STATUS_CONTEXT_STEP_LAST:
+            /* All available clients are connected */
+            g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_CONNECTED);
+            g_object_unref (task);
+            return;
+    }
+}
+
+static void
+load_connection_status (MMBaseBearer        *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    GTask *task;
+    ConnectionStatusContext *ctx;
+
+    ctx = g_new (ConnectionStatusContext, 1);
+    ctx->step = CONNECTION_STATUS_CONTEXT_STEP_FIRST;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    connection_status_context_step (task);
+}
+
+/*****************************************************************************/
 /* Connect */
 
 static void common_setup_cleanup_packet_service_status_unsolicited_events (MMBearerQmi *self,
@@ -1903,6 +2060,6 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     base_bearer_class->report_connection_status = report_connection_status;
     base_bearer_class->reload_stats = reload_stats;
     base_bearer_class->reload_stats_finish = reload_stats_finish;
-    base_bearer_class->load_connection_status = NULL;
-    base_bearer_class->load_connection_status_finish = NULL;
+    base_bearer_class->load_connection_status = load_connection_status;
+    base_bearer_class->load_connection_status_finish = load_connection_status_finish;
 }
