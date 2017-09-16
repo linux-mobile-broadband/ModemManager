@@ -1,0 +1,108 @@
+# Slovak translation for ModemManager.
+# Copyright (C) 2017 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Dušan Kazik <prescott66@gmail.com>, 2017.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2017-09-16 10:32-0700\n"
+"PO-Revision-Date: 2017-09-16 08:51+0200\n"
+"Last-Translator: Dušan Kazik <prescott66@gmail.com>\n"
+"Language-Team: Slovak <gnome-sk-list@gnome.org>\n"
+"Language: sk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 1 : (n>=2 && n<=4) ? 2 : 0;\n"
+"X-Generator: Poedit 2.0.3\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Ovládanie služby správcu modemov"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Politika systému zabraňuje ovládaniu správcu modemov."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Odomknutie a ovládanie mobilného širokopásmového zariadenia"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Politika systému zabraňuje odomknutiu alebo ovládaniu mobilného "
+"širokopásmového zariadenia."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr ""
+"Pridanie, úprava a odstránenie kontaktov mobilného širokopásmového zariadenia"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Politika systému zabraňuje pridaniu, úprave, alebo odstráneniu kontaktov v "
+"tomto zariadení."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Odoslanie, uloženie, úprava a odstránenie textových správ"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Politika systému zabraňuje odoslaniu, alebo manipulácii textových správ v "
+"tomto zariadení."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr ""
+"Prijatie prichádzajúcich hovorov, alebo zahájenie odchádzajúcich hlasových "
+"hovorov."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Politika systému zabraňuje hlasovým hovorom."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr "Povolenie a zobrazenie geografickej polohy a informácií o pozícii"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Politika systému zabraňuje povoleniu, alebo zobrazeniu informácií o "
+"geografickej polohe."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Požadovanie a spracovanie sieťových informácií a služieb"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Politika systému zabraňuje požadovaniu, alebo spracovaniu sieťových "
+"informácií a službám."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Požadovanie a správa firmvéru mobilného širokopásmového zariadenia"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Politika systému zabraňuje požadovaniu, alebo správe firmvéru tohto "
+"zariadenia."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "Služba ModemManager vyžaduje obnovenie zariadení"
