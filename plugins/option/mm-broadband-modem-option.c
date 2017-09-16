@@ -308,24 +308,13 @@ typedef enum {
 } AccessTechnologiesStep;
 
 typedef struct {
-    MMBroadbandModemOption *self;
-    GSimpleAsyncResult *result;
     MMModemAccessTechnology access_technology;
     gboolean check_2g;
     gboolean check_3g;
     AccessTechnologiesStep step;
 } AccessTechnologiesContext;
 
-static void load_access_technologies_step (AccessTechnologiesContext *ctx);
-
-static void
-access_technologies_context_complete_and_free (AccessTechnologiesContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
+static void load_access_technologies_step (GTask *task);
 
 static gboolean
 load_access_technologies_finish (MMIfaceModem *self,
@@ -334,12 +323,17 @@ load_access_technologies_finish (MMIfaceModem *self,
                                  guint *mask,
                                  GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    GError *inner_error = NULL;
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return FALSE;
+    }
 
     /* We are reporting ALL 3GPP access technologies here */
-    *access_technologies = (MMModemAccessTechnology) GPOINTER_TO_UINT (
-        g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    *access_technologies = (MMModemAccessTechnology) value;
     *mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
     return TRUE;
 }
@@ -399,9 +393,12 @@ parse_ossys_response (const gchar *response,
 static void
 ossys_query_ready (MMBaseModem *self,
                    GAsyncResult *res,
-                   AccessTechnologiesContext *ctx)
+                   GTask *task)
 {
+    AccessTechnologiesContext *ctx;
     const gchar *response;
+
+    ctx = g_task_get_task_data (task);
 
     /* If for some reason the OSSYS request failed, still try to check
      * explicit 2G/3G mode with OCTI and OWCTI; maybe we'll get something.
@@ -421,7 +418,7 @@ ossys_query_ready (MMBaseModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    load_access_technologies_step (ctx);
+    load_access_technologies_step (task);
 }
 
 static gboolean
@@ -479,10 +476,13 @@ parse_octi_response (const gchar *response,
 static void
 octi_query_ready (MMBaseModem *self,
                   GAsyncResult *res,
-                  AccessTechnologiesContext *ctx)
+                  GTask *task)
 {
+    AccessTechnologiesContext *ctx;
     MMModemAccessTechnology octi = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     const gchar *response;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (self, res, NULL);
     if (response &&
@@ -496,7 +496,7 @@ octi_query_ready (MMBaseModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    load_access_technologies_step (ctx);
+    load_access_technologies_step (task);
 }
 
 static gboolean
@@ -536,10 +536,13 @@ parse_owcti_response (const gchar *response,
 static void
 owcti_query_ready (MMBaseModem *self,
                    GAsyncResult *res,
-                   AccessTechnologiesContext *ctx)
+                   GTask *task)
 {
+    AccessTechnologiesContext *ctx;
     MMModemAccessTechnology owcti = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     const gchar *response;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (self, res, NULL);
     if (response &&
@@ -549,34 +552,40 @@ owcti_query_ready (MMBaseModem *self,
 
     /* Go on to next step */
     ctx->step++;
-    load_access_technologies_step (ctx);
+    load_access_technologies_step (task);
 }
 
 static void
-load_access_technologies_step (AccessTechnologiesContext *ctx)
+load_access_technologies_step (GTask *task)
 {
+    MMBroadbandModemOption *self;
+    AccessTechnologiesContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case ACCESS_TECHNOLOGIES_STEP_FIRST:
         /* Go on to next step */
         ctx->step++;
 
     case ACCESS_TECHNOLOGIES_STEP_OSSYS:
-        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "_OSSYS?",
                                   3,
                                   FALSE,
                                   (GAsyncReadyCallback)ossys_query_ready,
-                                  ctx);
+                                  task);
         break;
 
     case ACCESS_TECHNOLOGIES_STEP_OCTI:
         if (ctx->check_2g) {
-            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       "_OCTI?",
                                       3,
                                       FALSE,
                                       (GAsyncReadyCallback)octi_query_ready,
-                                      ctx);
+                                      task);
             return;
         }
         /* Go on to next step */
@@ -584,12 +593,12 @@ load_access_technologies_step (AccessTechnologiesContext *ctx)
 
     case ACCESS_TECHNOLOGIES_STEP_OWCTI:
         if (ctx->check_3g) {
-            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       "_OWCTI?",
                                       3,
                                       FALSE,
                                       (GAsyncReadyCallback)owcti_query_ready,
-                                      ctx);
+                                      task);
             return;
         }
         /* Go on to next step */
@@ -597,10 +606,8 @@ load_access_technologies_step (AccessTechnologiesContext *ctx)
 
     case ACCESS_TECHNOLOGIES_STEP_LAST:
         /* All done, set result and complete */
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   GUINT_TO_POINTER (ctx->access_technology),
-                                                   NULL);
-        access_technologies_context_complete_and_free (ctx);
+        g_task_return_int (task, ctx->access_technology);
+        g_object_unref (task);
         break;
     }
 }
@@ -614,19 +621,18 @@ run_access_technology_loading_sequence (MMIfaceModem *self,
                                         gpointer user_data)
 {
     AccessTechnologiesContext *ctx;
+    GTask *task;
 
     ctx = g_new (AccessTechnologiesContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             run_access_technology_loading_sequence);
     ctx->step = first;
     ctx->check_2g = check_2g;
     ctx->check_3g = check_3g;
     ctx->access_technology = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
-    load_access_technologies_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    load_access_technologies_step (task);
 }
 
 static void
