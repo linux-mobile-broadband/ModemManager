@@ -56,27 +56,20 @@ typedef enum {
 } Dial3gppStep;
 
 typedef struct {
-    MMBroadbandBearerSierra *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     guint cid;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     MMPort *data;
     Dial3gppStep step;
 } Dial3gppContext;
 
 static void
-dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
+dial_3gpp_context_free (Dial3gppContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->result);
     if (ctx->data)
         g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (Dial3gppContext, ctx);
 }
 
@@ -85,97 +78,108 @@ dial_3gpp_finish (MMBroadbandBearer *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return MM_PORT (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static void dial_3gpp_context_step (Dial3gppContext *ctx);
+static void dial_3gpp_context_step (GTask *task);
 
 static void
 parent_dial_3gpp_ready (MMBroadbandBearer *self,
                         GAsyncResult *res,
-                        Dial3gppContext *ctx)
+                        GTask *task)
 {
+    Dial3gppContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     ctx->data = MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_sierra_parent_class)->dial_3gpp_finish (self, res, &error);
     if (!ctx->data) {
-        g_simple_async_result_take_error (ctx->result, error);
-        dial_3gpp_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on */
     ctx->step++;
-    dial_3gpp_context_step (ctx);
+    dial_3gpp_context_step (task);
 }
 
 static void
 scact_ready (MMBaseModem *modem,
              GAsyncResult *res,
-             Dial3gppContext *ctx)
+             GTask *task)
 {
+    Dial3gppContext *ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
+
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        dial_3gpp_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on */
     ctx->step++;
-    dial_3gpp_context_step (ctx);
+    dial_3gpp_context_step (task);
 }
 
 static void
 authenticate_ready (MMBaseModem *modem,
                     GAsyncResult *res,
-                    Dial3gppContext *ctx)
+                    GTask *task)
 {
+    Dial3gppContext *ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
+
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        dial_3gpp_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on */
     ctx->step++;
-    dial_3gpp_context_step (ctx);
+    dial_3gpp_context_step (task);
 }
 
 static void
 cgatt_ready (MMBaseModem *modem,
              GAsyncResult *res,
-             Dial3gppContext *ctx)
+             GTask *task)
 {
+    Dial3gppContext *ctx;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
+
     if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        dial_3gpp_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* Go on */
     ctx->step++;
-    dial_3gpp_context_step (ctx);
+    dial_3gpp_context_step (task);
 }
 
 static void
-dial_3gpp_context_step (Dial3gppContext *ctx)
+dial_3gpp_context_step (GTask *task)
 {
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-         g_simple_async_result_set_error (ctx->result,
-                                          MM_CORE_ERROR,
-                                          MM_CORE_ERROR_CANCELLED,
-                                          "Dial operation has been cancelled");
-         dial_3gpp_context_complete_and_free (ctx);
-         return;
+    MMBroadbandBearerSierra *self;
+    Dial3gppContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
     }
 
     switch (ctx->step) {
@@ -192,7 +196,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)cgatt_ready,
-                                       ctx);
+                                       task);
         return;
 
     case DIAL_3GPP_STEP_AUTHENTICATE:
@@ -202,13 +206,13 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
             const gchar *password;
             MMBearerAllowedAuth allowed_auth;
 
-            user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-            password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-            allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+            user = mm_bearer_properties_get_user (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+            password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+            allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
             if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
                 mm_dbg ("Not using authentication");
-                if (ctx->self->priv->is_icera)
+                if (self->priv->is_icera)
                     command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
                 else
                     command = g_strdup_printf ("$QCPDPP=%d,0", ctx->cid);
@@ -230,20 +234,20 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                     gchar *str;
 
                     str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
-                    g_simple_async_result_set_error (
-                        ctx->result,
+                    g_task_return_new_error (
+                        task,
                         MM_CORE_ERROR,
                         MM_CORE_ERROR_UNSUPPORTED,
                         "Cannot use any of the specified authentication methods (%s)",
                         str);
                     g_free (str);
-                    dial_3gpp_context_complete_and_free (ctx);
+                    g_object_unref (task);
                     return;
                 }
 
                 quoted_user = mm_port_serial_at_quote_string (user);
                 quoted_password = mm_port_serial_at_quote_string (password);
-                if (ctx->self->priv->is_icera) {
+                if (self->priv->is_icera) {
                     command = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
                                                ctx->cid,
                                                sierra_auth,
@@ -269,7 +273,7 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                                            FALSE, /* raw */
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)authenticate_ready,
-                                           ctx);
+                                           task);
             g_free (command);
             return;
         }
@@ -292,27 +296,27 @@ dial_3gpp_context_step (Dial3gppContext *ctx)
                                            FALSE, /* raw */
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)scact_ready,
-                                           ctx);
+                                           task);
             g_free (command);
             return;
         }
 
         /* Chain up parent's dialling if we don't have a net port */
         MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_sierra_parent_class)->dial_3gpp (
-            MM_BROADBAND_BEARER (ctx->self),
+            MM_BROADBAND_BEARER (self),
             ctx->modem,
             ctx->primary,
             ctx->cid,
-            ctx->cancellable,
+            g_task_get_cancellable (task),
             (GAsyncReadyCallback)parent_dial_3gpp_ready,
-            ctx);
+            task);
         return;
 
     case DIAL_3GPP_STEP_LAST:
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   g_object_ref (ctx->data),
-                                                   g_object_unref);
-        dial_3gpp_context_complete_and_free (ctx);
+        g_task_return_pointer (task,
+                               g_object_ref (ctx->data),
+                               g_object_unref);
+        g_object_unref (task);
         return;
     }
 }
@@ -327,22 +331,20 @@ dial_3gpp (MMBroadbandBearer *self,
            gpointer user_data)
 {
     Dial3gppContext *ctx;
+    GTask *task;
 
     g_assert (primary != NULL);
 
     ctx = g_slice_new0 (Dial3gppContext);
-    ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
     ctx->primary = g_object_ref (primary);
     ctx->cid = cid;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             dial_3gpp);
-    ctx->cancellable = g_object_ref (cancellable);
     ctx->step = DIAL_3GPP_STEP_FIRST;
 
-    dial_3gpp_context_step (ctx);
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)dial_3gpp_context_free);
+
+    dial_3gpp_context_step (task);
 }
 
 /*****************************************************************************/
@@ -353,13 +355,13 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_disconnect_3gpp_ready (MMBroadbandBearer *self,
                               GAsyncResult *res,
-                              GSimpleAsyncResult *simple)
+                              GTask *task)
 {
     GError *error = NULL;
 
@@ -368,15 +370,14 @@ parent_disconnect_3gpp_ready (MMBroadbandBearer *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 disconnect_scact_ready (MMBaseModem *modem,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask *task)
 {
     GError *error = NULL;
 
@@ -387,9 +388,8 @@ disconnect_scact_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -402,14 +402,11 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     g_assert (primary != NULL);
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        disconnect_3gpp);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (!MM_IS_PORT_SERIAL_AT (data)) {
         gchar *command;
@@ -424,7 +421,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                        FALSE, /* raw */
                                        NULL, /* cancellable */
                                        (GAsyncReadyCallback)disconnect_scact_ready,
-                                       result);
+                                       task);
         g_free (command);
         return;
     }
@@ -438,7 +435,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
         data,
         cid,
         (GAsyncReadyCallback)parent_disconnect_3gpp_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/

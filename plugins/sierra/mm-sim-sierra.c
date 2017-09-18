@@ -41,20 +41,13 @@ load_sim_identifier_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    gchar *iccid;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    iccid = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("loaded SIM identifier: %s", iccid);
-    return g_strdup (iccid);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 iccid_read_ready (MMBaseModem *modem,
                   GAsyncResult *res,
-                  GSimpleAsyncResult *simple)
+                  GTask *task)
 {
     GError *error = NULL;
     const gchar *response;
@@ -64,32 +57,29 @@ iccid_read_ready (MMBaseModem *modem,
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     p = mm_strip_tag (response, "!ICCID:");
     if (!p) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Failed to parse !ICCID response: '%s'",
-                                         response);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse !ICCID response: '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
 
     parsed = mm_3gpp_parse_iccid (p, &local);
     if (parsed)
-        g_simple_async_result_set_op_res_gpointer (simple, parsed, g_free);
+        g_task_return_pointer (task, parsed, g_free);
     else
-        g_simple_async_result_take_error (simple, local);
+        g_task_return_error (task, local);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -98,10 +88,13 @@ load_sim_identifier (MMBaseSim *self,
                      gpointer user_data)
 {
     MMBaseModem *modem = NULL;
+    GTask *task;
 
     g_object_get (self,
                   MM_BASE_SIM_MODEM, &modem,
                   NULL);
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_dbg ("loading (Sierra) SIM identifier...");
     mm_base_modem_at_command (
@@ -110,10 +103,7 @@ load_sim_identifier (MMBaseSim *self,
         3,
         FALSE,
         (GAsyncReadyCallback)iccid_read_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_sim_identifier));
+        task);
     g_object_unref (modem);
 }
 
