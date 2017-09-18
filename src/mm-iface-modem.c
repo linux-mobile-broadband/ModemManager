@@ -2926,6 +2926,27 @@ set_lock_status (MMIfaceModem *self,
     }
 }
 
+MMUnlockRetries *
+mm_iface_modem_get_unlock_retries (MMIfaceModem *self)
+{
+    MmGdbusModem *skeleton = NULL;
+    MMUnlockRetries *unlock_retries;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (skeleton) {
+        GVariant *dictionary;
+
+        dictionary = mm_gdbus_modem_get_unlock_retries (skeleton);
+        unlock_retries = mm_unlock_retries_new_from_dictionary (dictionary);
+        g_object_unref (skeleton);
+    } else
+        unlock_retries = mm_unlock_retries_new ();
+
+    return unlock_retries;
+}
+
 void
 mm_iface_modem_update_unlock_retries (MMIfaceModem *self,
                                       MMUnlockRetries *unlock_retries)
