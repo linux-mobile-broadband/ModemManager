@@ -99,6 +99,9 @@ gchar             *mm_modem_dup_model                (MMModem *self);
 const gchar       *mm_modem_get_revision             (MMModem *self);
 gchar             *mm_modem_dup_revision             (MMModem *self);
 
+const gchar       *mm_modem_get_hardware_revision    (MMModem *self);
+gchar             *mm_modem_dup_hardware_revision    (MMModem *self);
+
 const gchar       *mm_modem_get_device_identifier    (MMModem *self);
 gchar             *mm_modem_dup_device_identifier    (MMModem *self);
 

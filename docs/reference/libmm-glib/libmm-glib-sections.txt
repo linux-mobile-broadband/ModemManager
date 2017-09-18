@@ -130,6 +130,8 @@ mm_modem_get_model
 mm_modem_dup_model
 mm_modem_get_revision
 mm_modem_dup_revision
+mm_modem_get_hardware_revision
+mm_modem_dup_hardware_revision
 mm_modem_get_drivers
 mm_modem_dup_drivers
 mm_modem_get_plugin
