@@ -84,6 +84,14 @@ struct _MMIfaceModem {
                                      GAsyncResult *res,
                                      GError **error);
 
+    /* Loading of the HardwareRevision property */
+    void (*load_hardware_revision) (MMIfaceModem *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    gchar * (*load_hardware_revision_finish) (MMIfaceModem *self,
+                                              GAsyncResult *res,
+                                              GError **error);
+
     /* Loading of the EquipmentIdentifier property */
     void (*load_equipment_identifier) (MMIfaceModem *self,
                                        GAsyncReadyCallback callback,

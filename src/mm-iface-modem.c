@@ -3810,6 +3810,7 @@ typedef enum {
     INITIALIZATION_STEP_MANUFACTURER,
     INITIALIZATION_STEP_MODEL,
     INITIALIZATION_STEP_REVISION,
+    INITIALIZATION_STEP_HARDWARE_REVISION,
     INITIALIZATION_STEP_EQUIPMENT_ID,
     INITIALIZATION_STEP_DEVICE_ID,
     INITIALIZATION_STEP_SUPPORTED_MODES,
@@ -4029,6 +4030,7 @@ load_supported_capabilities_ready (MMIfaceModem *self,
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
 STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
+STR_REPLY_READY_FN (hardware_revision, "HardwareRevision")
 STR_REPLY_READY_FN (equipment_identifier, "Equipment Identifier")
 STR_REPLY_READY_FN (device_identifier, "Device Identifier")
 
@@ -4560,6 +4562,22 @@ interface_initialization_step (GTask *task)
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_revision (
                 self,
                 (GAsyncReadyCallback)load_revision_ready,
+                task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_HARDWARE_REVISION:
+        /* HardwareRevision is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_hardware_revision (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_hardware_revision &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_hardware_revision_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_hardware_revision (
+                self,
+                (GAsyncReadyCallback)load_hardware_revision_ready,
                 task);
             return;
         }
