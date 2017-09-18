@@ -75,6 +75,7 @@ struct _MMBroadbandModemMbimPrivate {
     guint caps_max_sessions;
     gchar *caps_device_id;
     gchar *caps_firmware_info;
+    gchar *caps_hardware_info;
 
     /* Process unsolicited notifications */
     guint notification_id;
@@ -171,7 +172,7 @@ device_caps_query_ready (MbimDevice *device,
             NULL, /* custom_data_class */
             &self->priv->caps_device_id,
             &self->priv->caps_firmware_info,
-            NULL, /* hardware_info */
+            &self->priv->caps_hardware_info,
             &error)) {
         /* Build mask of modem capabilities */
         mask = 0;
@@ -303,6 +304,38 @@ modem_load_revision (MMIfaceModem *_self,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "Firmware revision information not given in device capabilities");
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Hardware Revision loading (Modem interface) */
+
+static gchar *
+modem_load_hardware_revision_finish (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+modem_load_hardware_revision (MMIfaceModem *_self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    if (self->priv->caps_hardware_info)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->caps_hardware_info),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Hardware revision information not given in device capabilities");
     g_object_unref (task);
 }
 
@@ -3298,6 +3331,7 @@ finalize (GObject *object)
 
     g_free (self->priv->caps_device_id);
     g_free (self->priv->caps_firmware_info);
+    g_free (self->priv->caps_hardware_info);
     g_free (self->priv->current_operator_id);
     g_free (self->priv->current_operator_name);
 
@@ -3316,6 +3350,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_model_finish = modem_load_model_finish;
     iface->load_revision = modem_load_revision;
     iface->load_revision_finish = modem_load_revision_finish;
+    iface->load_hardware_revision = modem_load_hardware_revision;
+    iface->load_hardware_revision_finish = modem_load_hardware_revision_finish;
     iface->load_equipment_identifier = modem_load_equipment_identifier;
     iface->load_equipment_identifier_finish = modem_load_equipment_identifier_finish;
     iface->load_device_identifier = modem_load_device_identifier;
