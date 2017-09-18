@@ -93,9 +93,6 @@ struct _MMBroadbandModemMbimPrivate {
 
     /* For notifying when the mbim-proxy connection is dead */
     gulong mbim_device_removed_id;
-
-    /* Previously observed SIM-PIN remaining retries */
-    guint sim_pin_retries;
 };
 
 /*****************************************************************************/
@@ -713,7 +710,7 @@ pin_query_unlock_retries_ready (MbimDevice *device,
             NULL,
             &remaining_attempts,
             &error)) {
-        MMBroadbandModemMbim *self;
+        MMIfaceModem *self;
         MMModemLock lock;
         MMUnlockRetries *retries;
 
@@ -737,22 +734,24 @@ pin_query_unlock_retries_ready (MbimDevice *device,
          * PIN1. Here we thus carry over any existing information on PIN1 from
          * MMIfaceModem's MMUnlockRetries if the MBIM_CID_PIN query reports
          * something other than PIN1. */
-        if (lock != MM_MODEM_LOCK_SIM_PIN &&
-            self->priv->sim_pin_retries != MM_UNLOCK_RETRIES_UNKNOWN) {
-            mm_unlock_retries_set (retries,
-                                   MM_MODEM_LOCK_SIM_PIN,
-                                   self->priv->sim_pin_retries);
+        if (lock != MM_MODEM_LOCK_SIM_PIN) {
+            MMUnlockRetries *previous_retries;
+            guint previous_sim_pin_retries;
+
+            previous_retries = mm_iface_modem_get_unlock_retries (self);
+            previous_sim_pin_retries = mm_unlock_retries_get (previous_retries,
+                                                              MM_MODEM_LOCK_SIM_PIN);
+            if (previous_sim_pin_retries != MM_UNLOCK_RETRIES_UNKNOWN) {
+                mm_unlock_retries_set (retries,
+                                       MM_MODEM_LOCK_SIM_PIN,
+                                       previous_sim_pin_retries);
+            }
         }
 
         /* According to the MBIM specification, RemainingAttempts is set to
          * 0xffffffff if the device does not support this information. */
         if (remaining_attempts != G_MAXUINT32)
             mm_unlock_retries_set (retries, lock, remaining_attempts);
-        else
-            remaining_attempts = MM_UNLOCK_RETRIES_UNKNOWN;
-
-        if (lock == MM_MODEM_LOCK_SIM_PIN)
-            self->priv->sim_pin_retries = remaining_attempts;
 
         g_task_return_pointer (task, retries, g_object_unref);
     } else
@@ -3274,8 +3273,6 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_MBIM,
                                               MMBroadbandModemMbimPrivate);
-
-    self->priv->sim_pin_retries = MM_UNLOCK_RETRIES_UNKNOWN;
 }
 
 static void
