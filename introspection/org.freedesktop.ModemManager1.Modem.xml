@@ -286,6 +286,13 @@
     <property name="Revision" type="s" access="read" />
 
     <!--
+        HardwareRevision:
+
+        The revision identification of the hardware, as reported by the modem.
+    -->
+    <property name="HardwareRevision" type="s" access="read" />
+
+    <!--
         DeviceIdentifier:
 
         A best-effort device identifier based on various device information like
