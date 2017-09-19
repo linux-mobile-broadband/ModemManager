@@ -48,21 +48,16 @@ struct _MMBroadbandBearerHsoPrivate {
 /* 3GPP IP config retrieval (sub-step of the 3GPP Connection sequence) */
 
 typedef struct {
-    MMBroadbandBearerHso *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     guint cid;
-    GSimpleAsyncResult *result;
 } GetIpConfig3gppContext;
 
 static void
-get_ip_config_context_complete_and_free (GetIpConfig3gppContext *ctx)
+get_ip_config_context_free (GetIpConfig3gppContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (GetIpConfig3gppContext, ctx);
 }
 
@@ -75,12 +70,12 @@ get_ip_config_3gpp_finish (MMBroadbandBearer *self,
 {
     MMBearerIpConfig *ip_config;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    ip_config = g_task_propagate_pointer (G_TASK (res), error);
+    if (!ip_config)
         return FALSE;
 
     /* No IPv6 for now */
-    ip_config = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    *ipv4_config = g_object_ref (ip_config);
+    *ipv4_config = ip_config; /* Transfer ownership */
     *ipv6_config = NULL;
     return TRUE;
 }
@@ -90,8 +85,9 @@ get_ip_config_3gpp_finish (MMBroadbandBearer *self,
 static void
 ip_config_ready (MMBaseModem *modem,
                  GAsyncResult *res,
-                 GetIpConfig3gppContext *ctx)
+                 GTask *task)
 {
+    GetIpConfig3gppContext *ctx;
     MMBearerIpConfig *ip_config = NULL;
     const gchar *response;
     GError *error = NULL;
@@ -102,8 +98,8 @@ ip_config_ready (MMBaseModem *modem,
 
     response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        get_ip_config_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -111,15 +107,16 @@ ip_config_ready (MMBaseModem *modem,
 
     /* Check result */
     if (!g_str_has_prefix (response, OWANDATA_TAG)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get IP config: invalid response '%s'",
-                                         response);
-        get_ip_config_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get IP config: invalid response '%s'",
+                                 response);
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
     response = mm_strip_tag (response, OWANDATA_TAG);
     items = g_strsplit (response, ", ", 0);
 
@@ -159,24 +156,22 @@ ip_config_ready (MMBaseModem *modem,
 
     if (!ip_config) {
         if (error)
-            g_simple_async_result_take_error (ctx->result, error);
+            g_task_return_error (task, error);
         else
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't get IP config: couldn't parse response '%s'",
-                                             response);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Couldn't get IP config: couldn't parse response '%s'",
+                                     response);
     } else {
         /* If we got DNS entries, set them in the IP config */
         if (dns[0])
             mm_bearer_ip_config_set_dns (ip_config, (const gchar **)dns);
 
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   ip_config,
-                                                   g_object_unref);
+        g_task_return_pointer (task, ip_config, g_object_unref);
     }
 
-    get_ip_config_context_complete_and_free (ctx);
+    g_object_unref (task);
     g_strfreev (items);
 }
 
@@ -192,17 +187,16 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
                     gpointer user_data)
 {
     GetIpConfig3gppContext *ctx;
+    GTask *task;
     gchar *command;
 
     ctx = g_slice_new0 (GetIpConfig3gppContext);
-    ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (modem);
     ctx->primary = g_object_ref (primary);
     ctx->cid = cid;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             get_ip_config_3gpp);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)get_ip_config_context_free);
 
     command = g_strdup_printf ("AT_OWANDATA=%d", cid);
     mm_base_modem_at_command_full (
@@ -214,7 +208,7 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
         FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)ip_config_ready,
-        ctx);
+        task);
     g_free (command);
 }
 
