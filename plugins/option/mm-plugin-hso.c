@@ -46,7 +46,7 @@ hso_custom_init_finish (MMPortProbe *probe,
                         GAsyncResult *result,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+    return g_task_propagate_boolean (G_TASK (result), error);
 }
 
 static void
@@ -57,7 +57,7 @@ hso_custom_init (MMPortProbe *probe,
                  gpointer user_data)
 {
     MMKernelDevice *kernel_port;
-    GSimpleAsyncResult *result;
+    GTask *task;
     const gchar *subsys, *sysfs_path;
 
     subsys = mm_port_probe_get_port_subsys (probe);
@@ -102,13 +102,9 @@ hso_custom_init (MMPortProbe *probe,
         g_free (hsotype_path);
     }
 
-    result = g_simple_async_result_new (G_OBJECT (probe),
-                                        callback,
-                                        user_data,
-                                        hso_custom_init);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (probe, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
