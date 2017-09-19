@@ -541,6 +541,9 @@ mm_iface_modem_signal_initialize (MMIfaceModemSignal *self,
 void
 mm_iface_modem_signal_shutdown (MMIfaceModemSignal *self)
 {
+    /* Teardown refresh context */
+    teardown_refresh_context (self);
+
     /* Unexport DBus interface and remove the skeleton */
     mm_gdbus_object_skeleton_set_modem_signal (MM_GDBUS_OBJECT_SKELETON (self), NULL);
     g_object_set (self,
