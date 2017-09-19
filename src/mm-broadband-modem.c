@@ -10544,6 +10544,7 @@ sim_hot_swap_enabled:
                 mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
                 mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (ctx->self));
                 mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (ctx->self));
+                mm_iface_modem_signal_shutdown (MM_IFACE_MODEM_SIGNAL (ctx->self));
                 mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (ctx->self));
                 mm_iface_modem_voice_shutdown (MM_IFACE_MODEM_VOICE (ctx->self));
                 mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
@@ -11066,6 +11067,11 @@ dispose (GObject *object)
     if (self->priv->modem_location_dbus_skeleton) {
         mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (object));
         g_clear_object (&self->priv->modem_location_dbus_skeleton);
+    }
+
+    if (self->priv->modem_signal_dbus_skeleton) {
+        mm_iface_modem_signal_shutdown (MM_IFACE_MODEM_SIGNAL (object));
+        g_clear_object (&self->priv->modem_signal_dbus_skeleton);
     }
 
     if (self->priv->modem_messaging_dbus_skeleton) {
