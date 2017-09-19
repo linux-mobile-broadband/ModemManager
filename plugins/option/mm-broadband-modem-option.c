@@ -218,13 +218,13 @@ set_current_modes_finish (MMIfaceModem *self,
 }
 
 static void
-allowed_mode_update_ready (MMBroadbandModemOption *self,
+allowed_mode_update_ready (MMBaseModem *self,
                            GAsyncResult *res,
                            GTask *task)
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    mm_base_modem_at_command_finish (self, res, &error);
     if (error)
         /* Let the error be critical. */
         g_task_return_error (task, error);
