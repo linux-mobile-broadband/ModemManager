@@ -698,19 +698,14 @@ dial_3gpp (MMBroadbandBearer *self,
 /* 3GPP disconnect */
 
 typedef struct {
-    MMBroadbandBearerHso *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
-    GSimpleAsyncResult *result;
 } DisconnectContext;
 
 static void
-disconnect_context_complete_and_free (DisconnectContext *ctx)
+disconnect_context_free (DisconnectContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->primary);
-    g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
     g_free (ctx);
 }
@@ -720,13 +715,13 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
                         GAsyncResult *res,
                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 disconnect_owancall_ready (MMBaseModem *modem,
                            GAsyncResult *res,
-                           DisconnectContext *ctx)
+                           GTask *task)
 {
     GError *error = NULL;
 
@@ -737,8 +732,8 @@ disconnect_owancall_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    disconnect_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -753,17 +748,16 @@ disconnect_3gpp (MMBroadbandBearer *self,
 {
     gchar *command;
     DisconnectContext *ctx;
+    GTask *task;
 
     g_assert (primary != NULL);
 
     ctx = g_new0 (DisconnectContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disconnect_3gpp);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)disconnect_context_free);
 
     /* Use specific CID */
     command = g_strdup_printf ("AT_OWANCALL=%d,0,0", cid);
@@ -775,7 +769,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)disconnect_owancall_ready,
-                                   ctx);
+                                   task);
     g_free (command);
 }
 
