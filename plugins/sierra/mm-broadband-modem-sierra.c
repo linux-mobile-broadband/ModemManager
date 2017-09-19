@@ -421,7 +421,7 @@ access_tech_3gpp_ready (MMBaseModem *self,
     GError *error = NULL;
     const gchar *response;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response)
         g_task_return_error (task, error);
     else {
@@ -451,14 +451,14 @@ access_tech_3gpp_ready (MMBaseModem *self,
 }
 
 static void
-access_tech_cdma_ready (MMIfaceModemCdma *self,
+access_tech_cdma_ready (MMBaseModem *self,
                         GAsyncResult *res,
                         GTask *task)
 {
     GError *error = NULL;
     const gchar *response;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response)
         g_task_return_error (task, error);
     else {
@@ -647,7 +647,7 @@ selrat_query_ready (MMBaseModem *self,
     GRegex *r = NULL;
     GMatchInfo *match_info = NULL;
 
-    response = mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_full_finish (self, res, &error);
     if (!response) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -800,7 +800,7 @@ selrat_set_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error))
+    if (!mm_base_modem_at_command_full_finish (self, res, &error))
         /* Let the error be critical. */
         g_task_return_error (task, error);
     else
@@ -1144,7 +1144,7 @@ modem_power_down_ready (MMBaseModem *self,
     /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
      * at!pcstate or 3GPP devices support +CFUN=4.
      */
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    mm_base_modem_at_command_finish (self, res, NULL);
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -1292,7 +1292,7 @@ get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 }
 
 static void
-status_ready (MMIfaceModemCdma *self,
+status_ready (MMBaseModem *self,
               GAsyncResult *res,
               GTask *task)
 {
@@ -1302,7 +1302,7 @@ status_ready (MMIfaceModemCdma *self,
     results = g_task_get_task_data (task);
 
     /* If error, leave superclass' reg state alone if AT!STATUS isn't supported. */
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    response = mm_base_modem_at_command_finish (self, res, NULL);
     if (response)
         parse_status (response,
                       &(results->detailed_cdma1x_state),
