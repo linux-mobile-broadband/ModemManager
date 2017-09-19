@@ -340,26 +340,29 @@ location_load_capabilities_finish (MMIfaceModemLocation *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCATION_SOURCE_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemLocationSource) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                         G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCATION_SOURCE_NONE;
+    }
+    return (MMModemLocationSource)value;
 }
 
 static void
 parent_load_capabilities_ready (MMIfaceModemLocation *self,
                                 GAsyncResult *res,
-                                GSimpleAsyncResult *simple)
+                                GTask *task)
 {
     MMModemLocationSource sources;
     GError *error = NULL;
 
     sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -383,11 +386,8 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
                     MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
 
     /* So we're done, complete */
-    g_simple_async_result_set_op_res_gpointer (simple,
-                                               GUINT_TO_POINTER (sources),
-                                               NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_int (task, sources);
+    g_object_unref (task);
 }
 
 static void
@@ -395,18 +395,11 @@ location_load_capabilities (MMIfaceModemLocation *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        location_load_capabilities);
-
     /* Chain up parent's setup */
     iface_modem_location_parent->load_capabilities (
         self,
         (GAsyncReadyCallback)parent_load_capabilities_ready,
-        result);
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
