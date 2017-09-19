@@ -1297,16 +1297,13 @@ status_ready (MMIfaceModemCdma *self,
               GTask *task)
 {
     DetailedRegistrationStateResults *results;
-    GError *error = NULL;
     const gchar *response;
 
     results = g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     /* If error, leave superclass' reg state alone if AT!STATUS isn't supported. */
-    if (error)
-        g_error_free (error);
-    else
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    if (response)
         parse_status (response,
                       &(results->detailed_cdma1x_state),
                       &(results->detailed_evdo_state),
