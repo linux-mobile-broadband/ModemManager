@@ -475,6 +475,14 @@ kernel_device_get_physdev_pid (MMKernelDevice *self)
     return MM_KERNEL_DEVICE_GENERIC (self)->priv->physdev_pid;
 }
 
+static const gchar *
+kernel_device_get_physdev_manufacturer (MMKernelDevice *self)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_GENERIC (self), 0);
+
+    return MM_KERNEL_DEVICE_GENERIC (self)->priv->physdev_manufacturer;
+}
+
 static gboolean
 kernel_device_is_candidate (MMKernelDevice *_self,
                             gboolean        manual_scan)
@@ -1054,21 +1062,22 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
-    kernel_device_class->get_subsystem           = kernel_device_get_subsystem;
-    kernel_device_class->get_name                = kernel_device_get_name;
-    kernel_device_class->get_driver              = kernel_device_get_driver;
-    kernel_device_class->get_sysfs_path          = kernel_device_get_sysfs_path;
-    kernel_device_class->get_physdev_uid         = kernel_device_get_physdev_uid;
-    kernel_device_class->get_physdev_vid         = kernel_device_get_physdev_vid;
-    kernel_device_class->get_physdev_pid         = kernel_device_get_physdev_pid;
-    kernel_device_class->get_parent_sysfs_path   = kernel_device_get_parent_sysfs_path;
-    kernel_device_class->is_candidate            = kernel_device_is_candidate;
-    kernel_device_class->cmp                     = kernel_device_cmp;
-    kernel_device_class->has_property            = kernel_device_has_property;
-    kernel_device_class->get_property            = kernel_device_get_property;
-    kernel_device_class->get_property_as_boolean = kernel_device_get_property_as_boolean;
-    kernel_device_class->get_property_as_int     = kernel_device_get_property_as_int;
-    kernel_device_class->get_property_as_int_hex = kernel_device_get_property_as_int_hex;
+    kernel_device_class->get_subsystem            = kernel_device_get_subsystem;
+    kernel_device_class->get_name                 = kernel_device_get_name;
+    kernel_device_class->get_driver               = kernel_device_get_driver;
+    kernel_device_class->get_sysfs_path           = kernel_device_get_sysfs_path;
+    kernel_device_class->get_physdev_uid          = kernel_device_get_physdev_uid;
+    kernel_device_class->get_physdev_vid          = kernel_device_get_physdev_vid;
+    kernel_device_class->get_physdev_pid          = kernel_device_get_physdev_pid;
+    kernel_device_class->get_physdev_manufacturer = kernel_device_get_physdev_manufacturer;
+    kernel_device_class->get_parent_sysfs_path    = kernel_device_get_parent_sysfs_path;
+    kernel_device_class->is_candidate             = kernel_device_is_candidate;
+    kernel_device_class->cmp                      = kernel_device_cmp;
+    kernel_device_class->has_property             = kernel_device_has_property;
+    kernel_device_class->get_property             = kernel_device_get_property;
+    kernel_device_class->get_property_as_boolean  = kernel_device_get_property_as_boolean;
+    kernel_device_class->get_property_as_int      = kernel_device_get_property_as_int;
+    kernel_device_class->get_property_as_int_hex  = kernel_device_get_property_as_int_hex;
 
     /* Device-wide properties are stored per-port in the generic backend */
     kernel_device_class->has_global_property            = kernel_device_has_property;

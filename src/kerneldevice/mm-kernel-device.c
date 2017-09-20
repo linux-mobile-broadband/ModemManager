@@ -89,6 +89,16 @@ mm_kernel_device_get_physdev_pid (MMKernelDevice *self)
             0);
 }
 
+const gchar *
+mm_kernel_device_get_physdev_manufacturer (MMKernelDevice *self)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), NULL);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_manufacturer ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_manufacturer (self) :
+            NULL);
+}
+
 gboolean
 mm_kernel_device_is_candidate (MMKernelDevice *self,
                                gboolean        manual_scan)
