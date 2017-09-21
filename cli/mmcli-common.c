@@ -26,14 +26,23 @@
 
 #include "mmcli-common.h"
 
+/******************************************************************************/
+/* Manager */
+
+MMManager *
+mmcli_get_manager_finish (GAsyncResult *res)
+{
+    return g_task_propagate_pointer (G_TASK (res), NULL);
+}
+
 static void
 manager_new_ready (GDBusConnection *connection,
-                   GAsyncResult *res,
-                   GSimpleAsyncResult *simple)
+                   GAsyncResult    *res,
+                   GTask           *task)
 {
     MMManager *manager;
-    gchar *name_owner;
-    GError *error = NULL;
+    gchar     *name_owner;
+    GError    *error = NULL;
 
     manager = mm_manager_new_finish (res, &error);
     if (!manager) {
@@ -51,36 +60,25 @@ manager_new_ready (GDBusConnection *connection,
     g_debug ("ModemManager process found at '%s'", name_owner);
     g_free (name_owner);
 
-
-
-    g_simple_async_result_set_op_res_gpointer (simple, manager, NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-MMManager *
-mmcli_get_manager_finish (GAsyncResult *res)
-{
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    g_task_return_pointer (task, manager, g_object_unref);
+    g_object_unref (task);
 }
 
 void
-mmcli_get_manager (GDBusConnection *connection,
-                   GCancellable *cancellable,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+mmcli_get_manager (GDBusConnection     *connection,
+                   GCancellable        *cancellable,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (connection),
-                                        callback,
-                                        user_data,
-                                        mmcli_get_manager);
+    task = g_task_new (connection, cancellable, callback, user_data);
+
     mm_manager_new (connection,
                     G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
                     cancellable,
                     (GAsyncReadyCallback)manager_new_ready,
-                    result);
+                    task);
 }
 
 MMManager *

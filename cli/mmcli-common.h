@@ -26,12 +26,12 @@
 #define _LIBMM_INSIDE_MMCLI
 #include <libmm-glib.h>
 
-void       mmcli_get_manager        (GDBusConnection *connection,
-                                     GCancellable *cancellable,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data);
-MMManager *mmcli_get_manager_finish (GAsyncResult *res);
-MMManager *mmcli_get_manager_sync   (GDBusConnection *connection);
+void       mmcli_get_manager        (GDBusConnection     *connection,
+                                     GCancellable        *cancellable,
+                                     GAsyncReadyCallback  callback,
+                                     gpointer             user_data);
+MMManager *mmcli_get_manager_finish (GAsyncResult        *res);
+MMManager *mmcli_get_manager_sync   (GDBusConnection     *connection);
 
 
 void     mmcli_get_modem         (GDBusConnection *connection,
