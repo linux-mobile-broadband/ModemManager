@@ -1199,59 +1199,49 @@ load_supported_bands (MMIfaceModem        *self,
 /* Load current bands (Modem interface) */
 
 static GArray *
-load_current_bands_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           GError **error)
+load_current_bands_finish (MMIfaceModem  *self,
+                           GAsyncResult  *res,
+                           GError       **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
-                                       G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-get_band_ready (MMBroadbandModemCinterion *self,
+get_band_ready (MMBaseModem  *self,
                 GAsyncResult *res,
-                GSimpleAsyncResult *simple)
+                GTask        *task)
 {
     const gchar *response;
-    GError *error = NULL;
-    GArray *bands = NULL;
+    GError      *error = NULL;
+    GArray      *bands = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response)
-        g_simple_async_result_take_error (simple, error);
-    else if (!mm_cinterion_parse_scfg_response (response,
-                                                mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
-                                                &bands,
-                                                &error))
-        g_simple_async_result_take_error (simple, error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response ||
+        !mm_cinterion_parse_scfg_response (response,
+                                           mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
+                                           &bands,
+                                           &error))
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, bands, (GDestroyNotify)g_array_unref);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 static void
-load_current_bands (MMIfaceModem *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+load_current_bands (MMIfaceModem        *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_current_bands);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "AT^SCFG=\"Radio/Band\"",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)get_band_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
