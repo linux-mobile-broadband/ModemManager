@@ -1556,48 +1556,40 @@ typedef enum {
 } CinterionSimStatus;
 
 typedef struct {
-    MMBroadbandModemCinterion *self;
-    GSimpleAsyncResult *result;
     guint retries;
     guint timeout_id;
 } AfterSimUnlockContext;
 
-static void
-after_sim_unlock_context_complete_and_free (AfterSimUnlockContext *ctx)
+static gboolean
+after_sim_unlock_finish (MMIfaceModem  *self,
+                         GAsyncResult  *res,
+                         GError       **error)
 {
-    g_assert (ctx->timeout_id == 0);
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (AfterSimUnlockContext, ctx);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static gboolean
-after_sim_unlock_finish (MMIfaceModem *self,
-                         GAsyncResult *res,
-                         GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void after_sim_unlock_context_step (AfterSimUnlockContext *ctx);
+static void after_sim_unlock_context_step (GTask *task);
 
 static gboolean
-simstatus_timeout_cb (AfterSimUnlockContext *ctx)
+simstatus_timeout_cb (GTask *task)
 {
+    AfterSimUnlockContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     ctx->timeout_id = 0;
-    after_sim_unlock_context_step (ctx);
+    after_sim_unlock_context_step (task);
     return G_SOURCE_REMOVE;
 }
 
 static void
-simstatus_check_ready (MMBaseModem *self,
+simstatus_check_ready (MMBaseModem  *self,
                        GAsyncResult *res,
-                       AfterSimUnlockContext *ctx)
+                       GTask        *task)
 {
-    const gchar *response;
+    AfterSimUnlockContext *ctx;
+    const gchar           *response;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    response = mm_base_modem_at_command_finish (self, res, NULL);
     if (response) {
         gchar *descr = NULL;
         guint val = 0;
@@ -1607,8 +1599,8 @@ simstatus_check_ready (MMBaseModem *self,
             val == CINTERION_SIM_STATUS_INIT_COMPLETED) {
             /* SIM ready! */
             g_free (descr);
-            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-            after_sim_unlock_context_complete_and_free (ctx);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
             return;
         }
 
@@ -1616,46 +1608,51 @@ simstatus_check_ready (MMBaseModem *self,
     }
 
     /* Need to retry after 1 sec */
+    ctx = g_task_get_task_data (task);
     g_assert (ctx->timeout_id == 0);
-    ctx->timeout_id = g_timeout_add_seconds (1, (GSourceFunc)simstatus_timeout_cb, ctx);
+    ctx->timeout_id = g_timeout_add_seconds (1, (GSourceFunc)simstatus_timeout_cb, task);
 }
 
 static void
-after_sim_unlock_context_step (AfterSimUnlockContext *ctx)
+after_sim_unlock_context_step (GTask *task)
 {
+    MMBroadbandModemCinterion *self;
+    AfterSimUnlockContext     *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     if (ctx->retries == 0) {
         /* Too much wait, go on anyway */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        after_sim_unlock_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     /* Recheck */
     ctx->retries--;
-    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SIND=\"simstatus\",2",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)simstatus_check_ready,
-                              ctx);
+                              task);
 }
 
 static void
-after_sim_unlock (MMIfaceModem *self,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+after_sim_unlock (MMIfaceModem        *self,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
 {
+    GTask                 *task;
     AfterSimUnlockContext *ctx;
 
-    ctx = g_slice_new0 (AfterSimUnlockContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             after_sim_unlock);
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_new0 (AfterSimUnlockContext, 1);
     ctx->retries = MAX_AFTER_SIM_UNLOCK_RETRIES;
+    g_task_set_task_data (task, ctx, g_free);
 
-    after_sim_unlock_context_step (ctx);
+    after_sim_unlock_context_step (task);
 }
 
 /*****************************************************************************/
