@@ -287,71 +287,69 @@ messaging_check_support (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
-/* MODEM POWER DOWN */
+/* Power down */
 
 static gboolean
-modem_power_down_finish (MMIfaceModem *self,
-                         GAsyncResult *res,
-                         GError **error)
+modem_power_down_finish (MMIfaceModem  *self,
+                         GAsyncResult  *res,
+                         GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-sleep_ready (MMBaseModem *self,
+sleep_ready (MMBaseModem  *self,
              GAsyncResult *res,
-             GSimpleAsyncResult *operation_result)
+             GTask        *task)
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-
-    /* Ignore errors */
-    if (error) {
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
+        /* Ignore errors */
         mm_dbg ("Couldn't send power down command: '%s'", error->message);
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-send_sleep_mode_command (MMBroadbandModemCinterion *self,
-                         GSimpleAsyncResult *operation_result)
+send_sleep_mode_command (GTask *task)
 {
-    if (self->priv->sleep_mode_cmd &&
-        self->priv->sleep_mode_cmd[0]) {
+    MMBroadbandModemCinterion *self;
+
+    self = g_task_get_source_object (task);
+
+    if (self->priv->sleep_mode_cmd && self->priv->sleep_mode_cmd[0]) {
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   self->priv->sleep_mode_cmd,
                                   5,
                                   FALSE,
                                   (GAsyncReadyCallback)sleep_ready,
-                                  operation_result);
+                                  task);
         return;
     }
 
     /* No default command; just finish without sending anything */
-    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-    g_simple_async_result_complete_in_idle (operation_result);
-    g_object_unref (operation_result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-supported_functionality_status_query_ready (MMBroadbandModemCinterion *self,
+supported_functionality_status_query_ready (MMBaseModem  *_self,
                                             GAsyncResult *res,
-                                            GSimpleAsyncResult *operation_result)
+                                            GTask        *task)
 {
-    const gchar *response;
-    GError *error = NULL;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    const gchar               *response;
+    GError                    *error = NULL;
 
     g_assert (self->priv->sleep_mode_cmd == NULL);
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response) {
-        mm_warn ("Couldn't query supported functionality status: '%s'",
-                 error->message);
+        mm_warn ("Couldn't query supported functionality status: '%s'", error->message);
         g_error_free (error);
         self->priv->sleep_mode_cmd = g_strdup ("");
     } else {
@@ -377,26 +375,22 @@ supported_functionality_status_query_ready (MMBroadbandModemCinterion *self,
         }
     }
 
-    send_sleep_mode_command (self, operation_result);
+    send_sleep_mode_command (task);
 }
 
 static void
-modem_power_down (MMIfaceModem *self,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+modem_power_down (MMIfaceModem        *_self,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
 {
-    MMBroadbandModemCinterion *cinterion = MM_BROADBAND_MODEM_CINTERION (self);
-    GSimpleAsyncResult *result;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GTask                     *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_power_down);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If sleep command already decided, use it. */
-    if (cinterion->priv->sleep_mode_cmd)
-        send_sleep_mode_command (MM_BROADBAND_MODEM_CINTERION (self),
-                                 result);
+    if (self->priv->sleep_mode_cmd)
+        send_sleep_mode_command (task);
     else
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
@@ -404,7 +398,7 @@ modem_power_down (MMIfaceModem *self,
             3,
             FALSE,
             (GAsyncReadyCallback)supported_functionality_status_query_ready,
-            result);
+            task);
 }
 
 /*****************************************************************************/
