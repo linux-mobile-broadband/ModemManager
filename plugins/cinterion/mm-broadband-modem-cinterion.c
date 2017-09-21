@@ -1086,66 +1086,44 @@ set_current_modes (MMIfaceModem        *_self,
 /*****************************************************************************/
 /* Register in network (3GPP interface) */
 
-typedef struct {
-    MMBroadbandModemCinterion *self;
-    GSimpleAsyncResult *result;
-    gchar *operator_id;
-} RegisterInNetworkContext;
-
-static void
-register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx->operator_id);
-    g_slice_free (RegisterInNetworkContext, ctx);
-}
-
 static gboolean
-register_in_network_finish (MMIfaceModem3gpp *self,
-                            GAsyncResult *res,
-                            GError **error)
+register_in_network_finish (MMIfaceModem3gpp  *self,
+                            GAsyncResult      *res,
+                            GError           **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-cops_write_ready (MMBaseModem *self,
+cops_write_ready (MMBaseModem  *_self,
                   GAsyncResult *res,
-                  RegisterInNetworkContext *ctx)
+                  GTask        *task)
 {
-    GError *error = NULL;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GError                    *error = NULL;
 
-    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error))
-        g_simple_async_result_take_error (ctx->result, error);
+    if (!mm_base_modem_at_command_full_finish (_self, res, &error))
+        g_task_return_error (task, error);
     else {
-        /* Update cached */
-        g_free (ctx->self->priv->manual_operator_id);
-        ctx->self->priv->manual_operator_id = g_strdup (ctx->operator_id);
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_free (self->priv->manual_operator_id);
+        self->priv->manual_operator_id = g_strdup (g_task_get_task_data (task));
+        g_task_return_boolean (task, TRUE);
     }
-
-    register_in_network_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
-register_in_network (MMIfaceModem3gpp *self,
-                     const gchar *operator_id,
-                     GCancellable *cancellable,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+register_in_network (MMIfaceModem3gpp    *self,
+                     const gchar         *operator_id,
+                     GCancellable        *cancellable,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
-    RegisterInNetworkContext *ctx;
+    GTask *task;
     gchar *command;
 
-    ctx = g_slice_new (RegisterInNetworkContext);
-    ctx->self = g_object_ref (self);
-    ctx->operator_id = g_strdup (operator_id);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             register_in_network);
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, g_strdup (operator_id), g_free);
 
     /* If the user sent a specific network to use, lock it in. */
     if (operator_id)
@@ -1161,7 +1139,7 @@ register_in_network (MMIfaceModem3gpp *self,
                                    FALSE, /* raw */
                                    cancellable,
                                    (GAsyncReadyCallback)cops_write_ready,
-                                   ctx);
+                                   task);
     g_free (command);
 }
 
