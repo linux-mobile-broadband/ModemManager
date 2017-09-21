@@ -1658,88 +1658,69 @@ after_sim_unlock (MMIfaceModem        *self,
 /*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
-typedef struct {
-    MMBroadbandModemCinterion *self;
-    GSimpleAsyncResult        *result;
-    MMBearerProperties        *properties;
-} CreateBearerContext;
-
-static void
-create_bearer_context_complete_and_free (CreateBearerContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->properties);
-    g_slice_free (CreateBearerContext, ctx);
-}
-
 static MMBaseBearer *
 cinterion_modem_create_bearer_finish (MMIfaceModem  *self,
                                       GAsyncResult  *res,
                                       GError       **error)
 {
-    MMBaseBearer *bearer;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
-    return g_object_ref (bearer);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-broadband_bearer_cinterion_new_ready (GObject             *source,
-                                      GAsyncResult        *res,
-                                      CreateBearerContext *ctx)
+broadband_bearer_cinterion_new_ready (GObject      *unused,
+                                      GAsyncResult *res,
+                                      GTask        *task)
 {
     MMBaseBearer *bearer;
-    GError *error = NULL;
+    GError       *error = NULL;
 
     bearer = mm_broadband_bearer_cinterion_new_finish (res, &error);
     if (!bearer)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
-    create_bearer_context_complete_and_free (ctx);
+        g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 static void
-broadband_bearer_new_ready (GObject             *source,
-                            GAsyncResult        *res,
-                            CreateBearerContext *ctx)
+broadband_bearer_new_ready (GObject      *unused,
+                            GAsyncResult *res,
+                            GTask        *task)
 {
     MMBaseBearer *bearer;
-    GError *error = NULL;
+    GError       *error = NULL;
 
     bearer = mm_broadband_bearer_new_finish (res, &error);
     if (!bearer)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, g_object_unref);
-    create_bearer_context_complete_and_free (ctx);
+        g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 static void
-common_create_bearer (CreateBearerContext *ctx)
+common_create_bearer (GTask *task)
 {
-    switch (ctx->self->priv->swwan_support) {
+    MMBroadbandModemCinterion *self;
+
+    self = g_task_get_source_object (task);
+
+    switch (self->priv->swwan_support) {
     case FEATURE_NOT_SUPPORTED:
         mm_dbg ("^SWWAN not supported, creating default bearer...");
-        mm_broadband_bearer_new (MM_BROADBAND_MODEM (ctx->self),
-                                 ctx->properties,
+        mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
+                                 g_task_get_task_data (task),
                                  NULL, /* cancellable */
                                  (GAsyncReadyCallback)broadband_bearer_new_ready,
-                                 ctx);
+                                 task);
         return;
     case FEATURE_SUPPORTED:
         mm_dbg ("^SWWAN supported, creating cinterion bearer...");
-        mm_broadband_bearer_cinterion_new (MM_BROADBAND_MODEM_CINTERION (ctx->self),
-                                           ctx->properties,
+        mm_broadband_bearer_cinterion_new (MM_BROADBAND_MODEM_CINTERION (self),
+                                           g_task_get_task_data (task),
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)broadband_bearer_cinterion_new_ready,
-                                           ctx);
+                                           task);
         return;
     default:
         g_assert_not_reached ();
@@ -1747,64 +1728,61 @@ common_create_bearer (CreateBearerContext *ctx)
 }
 
 static void
-swwan_test_ready (MMBaseModem         *self,
-                  GAsyncResult        *res,
-                  CreateBearerContext *ctx)
+swwan_test_ready (MMBaseModem  *_self,
+                  GAsyncResult *res,
+                  GTask        *task)
 {
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+
     /* Fetch the result to the SWWAN test. If no response given (error triggered),
      * assume unsupported */
-    if (!mm_base_modem_at_command_finish (self, res, NULL)) {
+    if (!mm_base_modem_at_command_finish (_self, res, NULL)) {
         mm_dbg ("SWWAN unsupported");
-        ctx->self->priv->swwan_support = FEATURE_NOT_SUPPORTED;
+        self->priv->swwan_support = FEATURE_NOT_SUPPORTED;
     } else {
         mm_dbg ("SWWAN supported");
-        ctx->self->priv->swwan_support = FEATURE_SUPPORTED;
+        self->priv->swwan_support = FEATURE_SUPPORTED;
     }
 
     /* Go on and create the bearer */
-    g_assert (ctx->self->priv->swwan_support != FEATURE_SUPPORT_UNKNOWN);
-    common_create_bearer (ctx);
+    common_create_bearer (task);
 }
 
 static void
-cinterion_modem_create_bearer (MMIfaceModem        *self,
+cinterion_modem_create_bearer (MMIfaceModem        *_self,
                                MMBearerProperties  *properties,
                                GAsyncReadyCallback  callback,
                                gpointer             user_data)
 {
-    CreateBearerContext *ctx;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GTask                     *task;
 
-    ctx = g_slice_new0 (CreateBearerContext);
-    ctx->self = g_object_ref (self);
-    ctx->properties = g_object_ref (properties);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             cinterion_modem_create_bearer);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_object_ref (properties), g_object_unref);
 
     /* Newer Cinterion modems may support SWWAN, which is the same as WWAN.
      * Check to see if current modem supports it.*/
-    if (ctx->self->priv->swwan_support == FEATURE_SUPPORT_UNKNOWN) {
-        /* If we don't have a data port, don't even bother checking for ^SWWAN
-         * support. */
-        if (!mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET)) {
-            mm_dbg ("skipping ^SWWAN check as no data port is available");
-            ctx->self->priv->swwan_support = FEATURE_NOT_SUPPORTED;
-        } else {
-            mm_dbg ("checking ^SWWAN support...");
-            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
-                                      "^SWWAN=?",
-                                      6,
-                                      TRUE, /* may be cached */
-                                      (GAsyncReadyCallback) swwan_test_ready,
-                                      ctx);
-            return;
-        }
+    if (self->priv->swwan_support != FEATURE_SUPPORT_UNKNOWN) {
+        common_create_bearer (task);
+        return;
     }
 
-    /* Go on and create the bearer */
-    g_assert (ctx->self->priv->swwan_support != FEATURE_SUPPORT_UNKNOWN);
-    common_create_bearer (ctx);
+    /* If we don't have a data port, don't even bother checking for ^SWWAN
+     * support. */
+    if (!mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET)) {
+        mm_dbg ("skipping ^SWWAN check as no data port is available");
+        self->priv->swwan_support = FEATURE_NOT_SUPPORTED;
+        common_create_bearer (task);
+        return;
+    }
+
+    mm_dbg ("checking ^SWWAN support...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SWWAN=?",
+                              6,
+                              TRUE, /* may be cached */
+                              (GAsyncReadyCallback) swwan_test_ready,
+                              task);
 }
 
 /*****************************************************************************/
