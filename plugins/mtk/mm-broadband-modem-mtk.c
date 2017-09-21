@@ -59,15 +59,13 @@ load_unlock_retries_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-    return (MMUnlockRetries *) g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 load_unlock_retries_ready (MMBaseModem *self,
                            GAsyncResult *res,
-                           GSimpleAsyncResult *operation_result)
+                           GTask *task)
 {
     const gchar *response;
     GError *error = NULL;
@@ -80,9 +78,8 @@ load_unlock_retries_ready (MMBaseModem *self,
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
         mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -103,18 +100,16 @@ load_unlock_retries_ready (MMBaseModem *self,
                          MM_CORE_ERROR_FAILED,
                          "Failed to match EPINC response: %s", response);
         }
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_error (task, error);
     } else if (!mm_get_int_from_match_info (match_info, 1, &pin1) ||
                !mm_get_int_from_match_info (match_info, 2, &pin2) ||
                !mm_get_int_from_match_info (match_info, 3, &puk1) ||
                !mm_get_int_from_match_info (match_info, 4, &puk2)) {
-        g_set_error (&error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Failed to parse the EPINC response: '%s'",
-                     response);
-
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse the EPINC response: '%s'",
+                                 response);
     } else {
         retries = mm_unlock_retries_new ();
 
@@ -123,18 +118,13 @@ load_unlock_retries_ready (MMBaseModem *self,
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK, puk1);
         mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, puk2);
 
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                        retries,
-                                        g_object_unref);
+        g_task_return_pointer (task, retries, g_object_unref);
     }
+    g_object_unref (task);
 
     if (match_info)
         g_match_info_free (match_info);
     g_regex_unref (r);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-    return;
 }
 
 static void
@@ -148,10 +138,7 @@ load_unlock_retries (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)load_unlock_retries_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   load_unlock_retries));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
