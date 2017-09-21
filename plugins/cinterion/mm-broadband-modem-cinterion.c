@@ -89,27 +89,25 @@ struct _MMBroadbandModemCinterionPrivate {
 /* Enable unsolicited events (SMS indications) (Messaging interface) */
 
 static gboolean
-messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
-                                            GAsyncResult *res,
-                                            GError **error)
+messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging  *self,
+                                            GAsyncResult           *res,
+                                            GError               **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-cnmi_test_ready (MMBaseModem *self,
+cnmi_test_ready (MMBaseModem  *self,
                  GAsyncResult *res,
-                 GSimpleAsyncResult *simple)
+                 GTask        *task)
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error)
-        g_simple_async_result_take_error (simple, error);
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -130,84 +128,79 @@ value_supported (const GArray *array,
 
 static void
 messaging_enable_unsolicited_events (MMIfaceModemMessaging *_self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
+                                     GAsyncReadyCallback    callback,
+                                     gpointer               user_data)
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
-    GString *cmd;
-    GError *error = NULL;
-    GSimpleAsyncResult *simple;
+    GString                   *cmd;
+    GError                    *error = NULL;
+    GTask                     *task;
 
-    simple = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_enable_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* AT+CNMI=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]] */
     cmd = g_string_new ("+CNMI=");
 
     /* Mode 2 or 1 */
-    if (!error) {
-        if (value_supported (self->priv->cnmi_supported_mode, 2))
-            g_string_append_printf (cmd, "%u,", 2);
-        else if (value_supported (self->priv->cnmi_supported_mode, 1))
-            g_string_append_printf (cmd, "%u,", 1);
-        else
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "SMS settings don't accept [2,1] <mode>");
+    if (value_supported (self->priv->cnmi_supported_mode, 2))
+        g_string_append_printf (cmd, "%u,", 2);
+    else if (value_supported (self->priv->cnmi_supported_mode, 1))
+        g_string_append_printf (cmd, "%u,", 1);
+    else {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "SMS settings don't accept [2,1] <mode>");
+        goto out;
     }
 
     /* mt 2 or 1 */
-    if (!error) {
-        if (value_supported (self->priv->cnmi_supported_mt, 2))
-            g_string_append_printf (cmd, "%u,", 2);
-        else if (value_supported (self->priv->cnmi_supported_mt, 1))
-            g_string_append_printf (cmd, "%u,", 1);
-        else
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "SMS settings don't accept [2,1] <mt>");
+    if (value_supported (self->priv->cnmi_supported_mt, 2))
+        g_string_append_printf (cmd, "%u,", 2);
+    else if (value_supported (self->priv->cnmi_supported_mt, 1))
+        g_string_append_printf (cmd, "%u,", 1);
+    else {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "SMS settings don't accept [2,1] <mt>");
+        goto out;
     }
 
     /* bm 2 or 0 */
-    if (!error) {
-        if (value_supported (self->priv->cnmi_supported_bm, 2))
-            g_string_append_printf (cmd, "%u,", 2);
-        else if (value_supported (self->priv->cnmi_supported_bm, 0))
-            g_string_append_printf (cmd, "%u,", 0);
-        else
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "SMS settings don't accept [2,0] <bm>");
+    if (value_supported (self->priv->cnmi_supported_bm, 2))
+        g_string_append_printf (cmd, "%u,", 2);
+    else if (value_supported (self->priv->cnmi_supported_bm, 0))
+        g_string_append_printf (cmd, "%u,", 0);
+    else {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "SMS settings don't accept [2,0] <bm>");
+        goto out;
     }
 
     /* ds 2, 1 or 0 */
-    if (!error) {
-        if (value_supported (self->priv->cnmi_supported_ds, 2))
-            g_string_append_printf (cmd, "%u,", 2);
-        else if (value_supported (self->priv->cnmi_supported_ds, 1))
-            g_string_append_printf (cmd, "%u,", 1);
-        else if (value_supported (self->priv->cnmi_supported_ds, 0))
-            g_string_append_printf (cmd, "%u,", 0);
-        else
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "SMS settings don't accept [2,1,0] <ds>");
+    if (value_supported (self->priv->cnmi_supported_ds, 2))
+        g_string_append_printf (cmd, "%u,", 2);
+    else if (value_supported (self->priv->cnmi_supported_ds, 1))
+        g_string_append_printf (cmd, "%u,", 1);
+    else if (value_supported (self->priv->cnmi_supported_ds, 0))
+        g_string_append_printf (cmd, "%u,", 0);
+    else {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "SMS settings don't accept [2,1,0] <ds>");
+        goto out;
     }
 
     /* bfr 1 */
-    if (!error) {
-        if (value_supported (self->priv->cnmi_supported_bfr, 1))
-            g_string_append_printf (cmd, "%u", 1);
-        /* otherwise, skip setting it */
-    }
+    if (value_supported (self->priv->cnmi_supported_bfr, 1))
+        g_string_append_printf (cmd, "%u", 1);
+    /* otherwise, skip setting it */
 
+out:
     /* Early error report */
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete_in_idle (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         g_string_free (cmd, TRUE);
         return;
     }
@@ -217,7 +210,7 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *_self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cnmi_test_ready,
-                              simple);
+                              task);
     g_string_free (cmd, TRUE);
 }
 
