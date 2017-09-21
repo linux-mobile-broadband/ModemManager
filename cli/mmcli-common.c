@@ -110,8 +110,11 @@ mmcli_get_manager_sync (GDBusConnection *connection)
     return manager;
 }
 
+/******************************************************************************/
+/* Modem */
+
 static MMObject *
-find_modem (MMManager *manager,
+find_modem (MMManager   *manager,
             const gchar *modem_path,
             const gchar *modem_uid)
 {
@@ -156,15 +159,13 @@ find_modem (MMManager *manager,
 }
 
 typedef struct {
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     gchar *modem_path;
     gchar *modem_uid;
 } GetModemContext;
 
 typedef struct {
     MMManager *manager;
-    MMObject *object;
+    MMObject  *object;
 } GetModemResults;
 
 static void
@@ -176,48 +177,44 @@ get_modem_results_free (GetModemResults *results)
 }
 
 static void
-get_modem_context_complete_and_free (GetModemContext *ctx)
+get_modem_context_free (GetModemContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     g_free (ctx->modem_path);
     g_free (ctx->modem_uid);
     g_free (ctx);
 }
 
 MMObject *
-mmcli_get_modem_finish (GAsyncResult *res,
-                        MMManager **o_manager)
+mmcli_get_modem_finish (GAsyncResult  *res,
+                        MMManager    **o_manager)
 {
     GetModemResults *results;
+    MMObject        *obj;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    results = g_task_propagate_pointer (G_TASK (res), NULL);
+    g_assert (results);
     if (o_manager)
         *o_manager = g_object_ref (results->manager);
-
-    return g_object_ref (results->object);
+    obj = g_object_ref (results->object);
+    get_modem_results_free (results);
+    return obj;
 }
 
 static void
 get_manager_ready (GDBusConnection *connection,
-                   GAsyncResult *res,
-                   GetModemContext *ctx)
+                   GAsyncResult    *res,
+                   GTask           *task)
 {
     GetModemResults *results;
+    GetModemContext *ctx;
+
+    ctx = g_task_get_task_data (task);
 
     results = g_new (GetModemResults, 1);
     results->manager = mmcli_get_manager_finish (res);
     results->object = find_modem (results->manager, ctx->modem_path, ctx->modem_uid);
-
-    /* Set operation results */
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        results,
-        (GDestroyNotify)get_modem_results_free);
-
-    get_modem_context_complete_and_free (ctx);
+    g_task_return_pointer (task, results, (GDestroyNotify)get_modem_results_free);
+    g_object_unref (task);
 }
 
 static void
@@ -269,32 +266,32 @@ get_modem_path_or_uid (const gchar  *str,
 }
 
 void
-mmcli_get_modem (GDBusConnection *connection,
-                 const gchar *modem_str,
-                 GCancellable *cancellable,
-                 GAsyncReadyCallback callback,
-                 gpointer user_data)
+mmcli_get_modem (GDBusConnection     *connection,
+                 const gchar         *modem_str,
+                 GCancellable        *cancellable,
+                 GAsyncReadyCallback  callback,
+                 gpointer             user_data)
 {
+    GTask           *task;
     GetModemContext *ctx;
+
+    task = g_task_new (connection, cancellable, callback, user_data);
 
     ctx = g_new0 (GetModemContext, 1);
     get_modem_path_or_uid (modem_str, &ctx->modem_path, &ctx->modem_uid);
     g_assert (ctx->modem_path || ctx->modem_uid);
-    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
-                                             callback,
-                                             user_data,
-                                             mmcli_get_modem);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) get_modem_context_free);
 
     mmcli_get_manager (connection,
                        cancellable,
                        (GAsyncReadyCallback)get_manager_ready,
-                       ctx);
+                       task);
 }
 
 MMObject *
-mmcli_get_modem_sync (GDBusConnection *connection,
-                      const gchar *modem_str,
-                      MMManager **o_manager)
+mmcli_get_modem_sync (GDBusConnection  *connection,
+                      const gchar      *modem_str,
+                      MMManager       **o_manager)
 {
     MMManager *manager;
     MMObject *found;
