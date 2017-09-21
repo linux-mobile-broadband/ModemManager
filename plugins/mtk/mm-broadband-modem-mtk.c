@@ -180,7 +180,7 @@ modem_after_sim_unlock (MMIfaceModem *self,
 static void
 get_supported_modes_ready (MMBaseModem *self,
                            GAsyncResult *res,
-                           GSimpleAsyncResult *simple)
+                           GTask *task)
 
 {
     const gchar *response;
@@ -195,9 +195,8 @@ get_supported_modes_ready (MMBaseModem *self,
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
         mm_dbg ("Fail to get response %s", response);
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -280,12 +279,8 @@ get_supported_modes_ready (MMBaseModem *self,
     * +GCAP, +WS64 not support completely, generic filter will filter
     * out 4G modes.
     */
-    g_simple_async_result_set_op_res_gpointer (simple,
-                                               combinations,
-                                               (GDestroyNotify)g_array_unref);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, combinations, (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
 
     g_regex_unref (r);
     if (match_info)
@@ -298,17 +293,12 @@ load_supported_modes (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    mm_base_modem_at_command (
-                MM_BASE_MODEM (self),
-                "+EGMR=0,0",
-                3,
-                FALSE,
-                (GAsyncReadyCallback)get_supported_modes_ready,
-                g_simple_async_result_new (
-                        G_OBJECT (self),
-                        callback,
-                        user_data,
-                        load_supported_modes));
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+EGMR=0,0",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)get_supported_modes_ready,
+                              g_task_new (self, NULL, callback, user_data));
 }
 
 static GArray *
@@ -316,10 +306,7 @@ load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 /*****************************************************************************/
