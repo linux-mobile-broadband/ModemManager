@@ -1248,48 +1248,45 @@ load_current_bands (MMIfaceModem        *self,
 /* Set current bands (Modem interface) */
 
 static gboolean
-set_current_bands_finish (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GError **error)
+set_current_bands_finish (MMIfaceModem  *self,
+                          GAsyncResult  *res,
+                          GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-scfg_set_ready (MMBaseModem *self,
+scfg_set_ready (MMBaseModem  *self,
                 GAsyncResult *res,
-                GSimpleAsyncResult *operation_result)
+                GTask        *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
-        /* Let the error be critical */
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-set_bands_3g (MMIfaceModem *_self,
-              GArray *bands_array,
-              GSimpleAsyncResult *simple)
+set_bands_3g (GTask  *task,
+              GArray *bands_array)
 {
-    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
-    GError *error = NULL;
-    guint band = 0;
-    gchar *cmd;
+    MMBroadbandModemCinterion *self;
+    GError                    *error = NULL;
+    guint                      band = 0;
+    gchar                     *cmd;
+
+    self = g_task_get_source_object (task);
 
     if (!mm_cinterion_build_band (bands_array,
                                   self->priv->supported_bands,
                                   FALSE, /* 2G and 3G */
                                   &band,
                                   &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete_in_idle (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1308,29 +1305,29 @@ set_bands_3g (MMIfaceModem *_self,
                               15,
                               FALSE,
                               (GAsyncReadyCallback)scfg_set_ready,
-                              simple);
+                              task);
     g_free (cmd);
 }
 
 static void
-set_bands_2g (MMIfaceModem *_self,
-              GArray *bands_array,
-              GSimpleAsyncResult *simple)
+set_bands_2g (GTask  *task,
+              GArray *bands_array)
 {
-    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
-    GError *error = NULL;
-    guint band = 0;
-    gchar *cmd;
-    gchar *bandstr;
+    MMBroadbandModemCinterion *self;
+    GError                    *error = NULL;
+    guint                      band = 0;
+    gchar                     *cmd;
+    gchar                     *bandstr;
+
+    self = g_task_get_source_object (task);
 
     if (!mm_cinterion_build_band (bands_array,
                                   self->priv->supported_bands,
                                   TRUE, /* 2G only */
                                   &band,
                                   &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete_in_idle (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1338,12 +1335,11 @@ set_bands_2g (MMIfaceModem *_self,
     bandstr = g_strdup_printf ("%u", band);
     bandstr = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr);
     if (!bandstr) {
-        g_simple_async_result_set_error (simple,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Couldn't convert band set to current charset");
-        g_simple_async_result_complete_in_idle (simple);
-        g_object_unref (simple);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Couldn't convert band set to current charset");
+        g_object_unref (task);
         return;
     }
 
@@ -1360,19 +1356,19 @@ set_bands_2g (MMIfaceModem *_self,
                               15,
                               FALSE,
                               (GAsyncReadyCallback)scfg_set_ready,
-                              simple);
+                              task);
 
     g_free (cmd);
     g_free (bandstr);
 }
 
 static void
-set_current_bands (MMIfaceModem *self,
-                   GArray *bands_array,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+set_current_bands (MMIfaceModem        *self,
+                   GArray              *bands_array,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     /* The bands that we get here are previously validated by the interface, and
      * that means that ALL the bands given here were also given in the list of
@@ -1380,15 +1376,11 @@ set_current_bands (MMIfaceModem *self,
      * will end up being valid, as not all combinations are possible. E.g,
      * Cinterion modems supporting only 2G have specific combinations allowed.
      */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_current_bands);
-
+    task = g_task_new (self, NULL, callback, user_data);
     if (mm_iface_modem_is_3g (self))
-        set_bands_3g (self, bands_array, result);
+        set_bands_3g (task, bands_array);
     else
-        set_bands_2g (self, bands_array, result);
+        set_bands_2g (task, bands_array);
 }
 
 /*****************************************************************************/
