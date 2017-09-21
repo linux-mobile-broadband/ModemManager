@@ -1432,14 +1432,12 @@ setup_flow_control (MMIfaceModem        *self,
 /* Load unlock retries (Modem interface) */
 
 typedef struct {
-    MMBroadbandModemCinterion *self;
-    GSimpleAsyncResult *result;
     MMUnlockRetries *retries;
-    guint i;
+    guint            i;
 } LoadUnlockRetriesContext;
 
 typedef struct {
-    MMModemLock lock;
+    MMModemLock  lock;
     const gchar *command;
 } UnlockRetriesMap;
 
@@ -1455,35 +1453,32 @@ static const UnlockRetriesMap unlock_retries_map [] = {
 };
 
 static void
-load_unlock_retries_context_complete_and_free (LoadUnlockRetriesContext *ctx)
+load_unlock_retries_context_free (LoadUnlockRetriesContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->retries);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (LoadUnlockRetriesContext, ctx);
 }
 
 static MMUnlockRetries *
-load_unlock_retries_finish (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GError **error)
+load_unlock_retries_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-    return (MMUnlockRetries *) g_object_ref (g_simple_async_result_get_op_res_gpointer (
-                                                 G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static void load_unlock_retries_context_step (LoadUnlockRetriesContext *ctx);
+static void load_unlock_retries_context_step (GTask *task);
 
 static void
-spic_ready (MMBaseModem *self,
+spic_ready (MMBaseModem  *self,
             GAsyncResult *res,
-            LoadUnlockRetriesContext *ctx)
+            GTask        *task)
 {
-    const gchar *response;
-    GError *error = NULL;
+    LoadUnlockRetriesContext *ctx;
+    const gchar              *response;
+    GError                   *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
@@ -1504,46 +1499,49 @@ spic_ready (MMBaseModem *self,
 
     /* Go to next lock value */
     ctx->i++;
-    load_unlock_retries_context_step (ctx);
+    load_unlock_retries_context_step (task);
 }
 
 static void
-load_unlock_retries_context_step (LoadUnlockRetriesContext *ctx)
+load_unlock_retries_context_step (GTask *task)
 {
+    MMBroadbandModemCinterion *self;
+    LoadUnlockRetriesContext  *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     if (ctx->i == G_N_ELEMENTS (unlock_retries_map)) {
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   g_object_ref (ctx->retries),
-                                                   g_object_unref);
-        load_unlock_retries_context_complete_and_free (ctx);
+        g_task_return_pointer (task, g_object_ref (ctx->retries), g_object_unref);
+        g_object_unref (task);
         return;
     }
 
     mm_base_modem_at_command (
-        MM_BASE_MODEM (ctx->self),
+        MM_BASE_MODEM (self),
         unlock_retries_map[ctx->i].command,
         3,
         FALSE,
         (GAsyncReadyCallback)spic_ready,
-        ctx);
+        task);
 }
 
 static void
-load_unlock_retries (MMIfaceModem *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+load_unlock_retries (MMIfaceModem        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
+    GTask                    *task;
     LoadUnlockRetriesContext *ctx;
 
+    task = g_task_new (self, NULL, callback, user_data);
+
     ctx = g_slice_new0 (LoadUnlockRetriesContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_unlock_retries);
     ctx->retries = mm_unlock_retries_new ();
     ctx->i = 0;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_unlock_retries_context_free);
 
-    load_unlock_retries_context_step (ctx);
+    load_unlock_retries_context_step (task);
 }
 
 /*****************************************************************************/
