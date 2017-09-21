@@ -218,26 +218,26 @@ out:
 /* Check if Messaging supported (Messaging interface) */
 
 static gboolean
-messaging_check_support_finish (MMIfaceModemMessaging *self,
-                                GAsyncResult *res,
-                                GError **error)
+messaging_check_support_finish (MMIfaceModemMessaging  *self,
+                                GAsyncResult           *res,
+                                GError                **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-cnmi_format_check_ready (MMBroadbandModemCinterion *self,
+cnmi_format_check_ready (MMBaseModem  *_self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask        *task)
 {
-    GError *error = NULL;
-    const gchar *response;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GError                    *error = NULL;
+    const gchar               *response;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -254,32 +254,26 @@ cnmi_format_check_ready (MMBroadbandModemCinterion *self,
     }
 
     /* CNMI command is supported; assume we have full messaging capabilities */
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 messaging_check_support (MMIfaceModemMessaging *self,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
+                         GAsyncReadyCallback    callback,
+                         gpointer               user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* We assume that CDMA-only modems don't have messaging capabilities */
     if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_UNSUPPORTED,
-            "CDMA-only modems don't have messaging capabilities");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "CDMA-only modems don't have messaging capabilities");
+        g_object_unref (task);
         return;
     }
 
@@ -289,7 +283,7 @@ messaging_check_support (MMIfaceModemMessaging *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)cnmi_format_check_ready,
-                              result);
+                              task);
 }
 
 /*****************************************************************************/
