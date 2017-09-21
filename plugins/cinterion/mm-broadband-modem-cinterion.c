@@ -407,18 +407,16 @@ modem_power_down (MMIfaceModem        *_self,
 #define MAX_POWER_OFF_WAIT_TIME_SECS 20
 
 typedef struct {
-    MMBroadbandModemCinterion *self;
     MMPortSerialAt *port;
-    GSimpleAsyncResult *result;
-    GRegex *shutdown_regex;
-    gboolean shutdown_received;
-    gboolean smso_replied;
-    gboolean serial_open;
-    guint timeout_id;
+    GRegex         *shutdown_regex;
+    gboolean        shutdown_received;
+    gboolean        smso_replied;
+    gboolean        serial_open;
+    guint           timeout_id;
 } PowerOffContext;
 
 static void
-power_off_context_complete_and_free (PowerOffContext *ctx)
+power_off_context_free (PowerOffContext *ctx)
 {
     if (ctx->serial_open)
         mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
@@ -426,99 +424,118 @@ power_off_context_complete_and_free (PowerOffContext *ctx)
         g_source_remove (ctx->timeout_id);
     mm_port_serial_at_add_unsolicited_msg_handler (ctx->port, ctx->shutdown_regex, NULL, NULL, NULL);
     g_object_unref (ctx->port);
-    g_object_unref (ctx->self);
     g_regex_unref (ctx->shutdown_regex);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_slice_free (PowerOffContext, ctx);
 }
 
 static gboolean
-modem_power_off_finish (MMIfaceModem *self,
-                        GAsyncResult *res,
-                        GError **error)
+modem_power_off_finish (MMIfaceModem  *self,
+                        GAsyncResult  *res,
+                        GError       **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-complete_power_off (PowerOffContext *ctx)
+complete_power_off (GTask *task)
 {
+    PowerOffContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     if (!ctx->shutdown_received || !ctx->smso_replied)
         return;
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    power_off_context_complete_and_free (ctx);
+    /* remove timeout right away */
+    g_assert (ctx->timeout_id);
+    g_source_remove (ctx->timeout_id);
+    ctx->timeout_id = 0;
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-smso_ready (MMBaseModem *self,
+smso_ready (MMBaseModem  *self,
             GAsyncResult *res,
-            PowerOffContext *ctx)
+            GTask        *task)
 {
-    GError *error = NULL;
+    PowerOffContext *ctx;
+    GError          *error = NULL;
 
-    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        power_off_context_complete_and_free (ctx);
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    /* Set as replied */
+    /* Set as replied and see if we can complete */
     ctx->smso_replied = TRUE;
-    complete_power_off (ctx);
+    complete_power_off (task);
 }
 
 static void
 shutdown_received (MMPortSerialAt *port,
-                   GMatchInfo *match_info,
-                   PowerOffContext *ctx)
+                   GMatchInfo     *match_info,
+                   GTask          *task)
 {
-    /* Cleanup handler */
+    PowerOffContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    /* Cleanup handler right away, we don't want it called any more */
     mm_port_serial_at_add_unsolicited_msg_handler (port, ctx->shutdown_regex, NULL, NULL, NULL);
-    /* Set as received */
+
+    /* Set as received and see if we can complete */
     ctx->shutdown_received = TRUE;
-    complete_power_off (ctx);
+    complete_power_off (task);
 }
 
 static gboolean
-power_off_timeout_cb (PowerOffContext *ctx)
+power_off_timeout_cb (GTask *task)
 {
+    PowerOffContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     ctx->timeout_id = 0;
 
     /* The SMSO reply should have come earlier */
     g_warn_if_fail (ctx->smso_replied == TRUE);
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Power off operation timed out");
-    power_off_context_complete_and_free (ctx);
+    /* Cleanup handler right away, we no longer want to receive it */
+    mm_port_serial_at_add_unsolicited_msg_handler (ctx->port, ctx->shutdown_regex, NULL, NULL, NULL);
+
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Power off operation timed out");
+    g_object_unref (task);
 
     return G_SOURCE_REMOVE;
 }
 
 static void
-modem_power_off (MMIfaceModem *self,
-                 GAsyncReadyCallback callback,
-                 gpointer user_data)
+modem_power_off (MMIfaceModem        *self,
+                 GAsyncReadyCallback  callback,
+                 gpointer             user_data)
 {
+    GTask           *task;
     PowerOffContext *ctx;
-    GError *error = NULL;
+    GError          *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     ctx = g_slice_new0 (PowerOffContext);
-    ctx->self = g_object_ref (self);
     ctx->port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_power_off);
     ctx->shutdown_regex = g_regex_new ("\\r\\n\\^SHUTDOWN\\r\\n",
                                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     ctx->timeout_id = g_timeout_add_seconds (MAX_POWER_OFF_WAIT_TIME_SECS,
                                              (GSourceFunc)power_off_timeout_cb,
-                                             ctx);
+                                             task);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) power_off_context_free);
 
     /* We'll need to wait for a ^SHUTDOWN before returning the action, which is
      * when the modem tells us that it is ready to be shutdown */
@@ -526,15 +543,15 @@ modem_power_off (MMIfaceModem *self,
         ctx->port,
         ctx->shutdown_regex,
         (MMPortSerialAtUnsolicitedMsgFn)shutdown_received,
-        ctx,
+        task,
         NULL);
 
     /* In order to get the ^SHUTDOWN notification, we must keep the port open
      * during the wait time */
     ctx->serial_open = mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error);
     if (G_UNLIKELY (error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        power_off_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -550,7 +567,7 @@ modem_power_off (MMIfaceModem *self,
                                    FALSE, /* is_raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)smso_ready,
-                                   ctx);
+                                   task);
 }
 
 /*****************************************************************************/
