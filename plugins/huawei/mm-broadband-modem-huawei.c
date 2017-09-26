@@ -2308,6 +2308,7 @@ peek_port_at_for_data (MMBroadbandModemHuawei *self,
 {
     GList *cdc_wdm_at_ports, *l;
     const gchar *net_port_parent_path;
+    MMPortSerialAt *found = NULL;
 
     g_warn_if_fail (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET);
     net_port_parent_path = mm_port_get_parent_path (port);
@@ -2321,16 +2322,17 @@ peek_port_at_for_data (MMBroadbandModemHuawei *self,
                                                  MM_PORT_SUBSYS_USB,
                                                  MM_PORT_TYPE_AT,
                                                  NULL);
-    for (l = cdc_wdm_at_ports; l; l = g_list_next (l)) {
+    for (l = cdc_wdm_at_ports; l && !found; l = g_list_next (l)) {
         const gchar  *wdm_port_parent_path;
 
         g_assert (MM_IS_PORT_SERIAL_AT (l->data));
         wdm_port_parent_path = mm_port_get_parent_path (MM_PORT (l->data));
         if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
-            return MM_PORT_SERIAL_AT (l->data);
+            found = MM_PORT_SERIAL_AT (l->data);
     }
 
-    return NULL;
+    g_list_free_full (cdc_wdm_at_ports, g_object_unref);
+    return found;
 }
 
 
