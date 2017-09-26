@@ -385,37 +385,23 @@ set_current_modes (MMIfaceModem *self,
 /*****************************************************************************/
 /* Initializing the modem (during first enabling) */
 
-typedef struct {
-    GSimpleAsyncResult *result;
-    MMBroadbandModemMbm *self;
-} EnablingModemInitContext;
-
-static void
-enabling_modem_init_context_complete_and_free (EnablingModemInitContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (EnablingModemInitContext, ctx);
-}
-
 static gboolean
 enabling_modem_init_finish (MMBroadbandModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 enabling_init_sequence_ready (MMBaseModem *self,
                               GAsyncResult *res,
-                              EnablingModemInitContext *ctx)
+                              GTask *task)
 {
     /* Ignore errors */
     mm_base_modem_at_sequence_full_finish (self, res, NULL, NULL);
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enabling_modem_init_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static const MMBaseModemAtCommand enabling_modem_init_sequence[] = {
@@ -427,24 +413,29 @@ static const MMBaseModemAtCommand enabling_modem_init_sequence[] = {
 };
 
 static void
-run_enabling_init_sequence (EnablingModemInitContext *ctx)
+run_enabling_init_sequence (GTask *task)
 {
-    mm_base_modem_at_sequence_full (MM_BASE_MODEM (ctx->self),
-                                    mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+    MMBaseModem *self;
+
+    self = g_task_get_source_object (task);
+    mm_base_modem_at_sequence_full (self,
+                                    mm_base_modem_peek_port_primary (self),
                                     enabling_modem_init_sequence,
                                     NULL,  /* response_processor_context */
                                     NULL,  /* response_processor_context_free */
                                     NULL, /* cancellable */
                                     (GAsyncReadyCallback)enabling_init_sequence_ready,
-                                    ctx);
+                                    task);
 }
 
 static void
 emrdy_ready (MMBaseModem *self,
              GAsyncResult *res,
-             EnablingModemInitContext *ctx)
+             GTask *task)
 {
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     /* EMRDY unsolicited response might have happened between the command
      * submission and the response.  This was seen once:
@@ -461,30 +452,26 @@ emrdy_ready (MMBaseModem *self,
                              MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
             mm_warn ("timed out waiting for EMRDY response.");
         else
-            ctx->self->priv->have_emrdy = TRUE;
+            MM_BROADBAND_MODEM_MBM (self)->priv->have_emrdy = TRUE;
         g_error_free (error);
     }
 
-    run_enabling_init_sequence (ctx);
+    run_enabling_init_sequence (task);
 }
 
 static void
-enabling_modem_init (MMBroadbandModem *self,
+enabling_modem_init (MMBroadbandModem *_self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    EnablingModemInitContext *ctx;
+    MMBroadbandModemMbm *self = MM_BROADBAND_MODEM_MBM (_self);
+    GTask *task;
 
-    ctx = g_slice_new0 (EnablingModemInitContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enabling_modem_init);
-    ctx->self = g_object_ref (self);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Modem is ready?, no need to check EMRDY */
-    if (ctx->self->priv->have_emrdy) {
-        run_enabling_init_sequence (ctx);
+    if (self->priv->have_emrdy) {
+        run_enabling_init_sequence (task);
         return;
     }
 
@@ -493,7 +480,7 @@ enabling_modem_init (MMBroadbandModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)emrdy_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
