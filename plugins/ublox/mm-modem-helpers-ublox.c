@@ -1362,9 +1362,10 @@ mm_ublox_parse_uauthreq_test (const char  *response,
 out:
     g_strfreev (split);
 
+    if (allowed_auths)
+        g_array_unref (allowed_auths);
+
     if (inner_error) {
-        if (allowed_auths)
-            g_array_unref (allowed_auths);
         g_propagate_error (error, inner_error);
         return MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN;
     }
