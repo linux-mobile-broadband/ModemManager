@@ -293,45 +293,37 @@ load_current_modes (MMIfaceModem *self,
 /* Set allowed modes (Modem interface) */
 
 typedef struct {
-    MMBroadbandModemMbm *self;
-    GSimpleAsyncResult *result;
     gint mbm_mode;
 } SetCurrentModesContext;
-
-static void
-set_current_modes_context_complete_and_free (SetCurrentModesContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (SetCurrentModesContext, ctx);
-}
 
 static gboolean
 set_current_modes_finish (MMIfaceModem *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 allowed_mode_update_ready (MMBaseModem *self,
                            GAsyncResult *res,
-                           SetCurrentModesContext *ctx)
+                           GTask *task)
 {
+    SetCurrentModesContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_finish (self, res, &error);
     if (error)
         /* Let the error be critical. */
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else {
         /* Cache current allowed mode */
-        ctx->self->priv->mbm_mode = ctx->mbm_mode;
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        MM_BROADBAND_MODEM_MBM (self)->priv->mbm_mode = ctx->mbm_mode;
+        g_task_return_boolean (task, TRUE);
     }
-    set_current_modes_context_complete_and_free (ctx);
+    g_object_unref (task);
 }
 
 static void
@@ -342,15 +334,14 @@ set_current_modes (MMIfaceModem *self,
                    gpointer user_data)
 {
     SetCurrentModesContext *ctx;
+    GTask *task;
     gchar *command;
 
-    ctx = g_slice_new (SetCurrentModesContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             set_current_modes);
+    ctx = g_new (SetCurrentModesContext, 1);
     ctx->mbm_mode = -1;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
 
     if (allowed == MM_MODEM_MODE_2G)
         ctx->mbm_mode = MBM_NETWORK_MODE_2G;
@@ -367,17 +358,16 @@ set_current_modes (MMIfaceModem *self,
 
         allowed_str = mm_modem_mode_build_string_from_mask (allowed);
         preferred_str = mm_modem_mode_build_string_from_mask (preferred);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Requested mode (allowed: '%s', preferred: '%s') not "
-                                         "supported by the modem.",
-                                         allowed_str,
-                                         preferred_str);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Requested mode (allowed: '%s', preferred: '%s') not "
+                                 "supported by the modem.",
+                                 allowed_str,
+                                 preferred_str);
+        g_object_unref (task);
         g_free (allowed_str);
         g_free (preferred_str);
-
-        set_current_modes_context_complete_and_free (ctx);
         return;
     }
 
@@ -388,7 +378,7 @@ set_current_modes (MMIfaceModem *self,
         3,
         FALSE,
         (GAsyncReadyCallback)allowed_mode_update_ready,
-        ctx);
+        task);
     g_free (command);
 }
 
