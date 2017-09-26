@@ -131,7 +131,7 @@ mm_sms_dup_text (MMSms *self)
  *
  * Gets the message data.
  *
- * Returns: (transfer none): The message data, or %NULL if it doesn't contain any (e.g. contains text instead).
+ * Returns: (transfer none) (array length=data_len) (element-type guint8): The message data, or %NULL if it doesn't contain any (e.g. contains text instead).
  */
 const guint8 *
 mm_sms_get_data (MMSms *self,
@@ -158,7 +158,7 @@ mm_sms_get_data (MMSms *self,
  *
  * Gets the message data.
  *
- * Returns: (transfer full): The message data, or %NULL if it doesn't contain any (e.g. contains text instead). The returned value should be freed with g_free().
+ * Returns: (transfer full) (array length=data_len) (element-type guint8): The message data, or %NULL if it doesn't contain any (e.g. contains text instead). The returned value should be freed with g_free().
  */
 guint8 *
 mm_sms_dup_data (MMSms *self,
