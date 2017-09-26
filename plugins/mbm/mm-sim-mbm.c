@@ -34,20 +34,15 @@ G_DEFINE_TYPE (MMSimMbm, mm_sim_mbm, MM_TYPE_BASE_SIM)
 /* SEND PIN/PUK (Generic implementation) */
 
 typedef struct {
-    MMSimMbm *self;
     MMBaseModem *modem;
-    GSimpleAsyncResult *result;
     MMModemLock expected;
     guint retries;
 } SendPinPukContext;
 
 static void
-send_pin_puk_context_complete_and_free (SendPinPukContext *ctx)
+send_pin_puk_context_free (SendPinPukContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->self);
     g_slice_free (SendPinPukContext, ctx);
 }
 
@@ -56,15 +51,15 @@ common_send_pin_puk_finish (MMBaseSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void wait_for_unlocked_status (SendPinPukContext *ctx);
+static void wait_for_unlocked_status (GTask *task);
 
 static void
 cpin_query_ready (MMBaseModem *modem,
                   GAsyncResult *res,
-                  SendPinPukContext *ctx)
+                  GTask *task)
 {
 
     const gchar *result;
@@ -72,64 +67,73 @@ cpin_query_ready (MMBaseModem *modem,
     result = mm_base_modem_at_command_finish (modem, res, NULL);
     if (result && strstr (result, "READY")) {
         /* All done! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        send_pin_puk_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     /* Need to recheck */
-    wait_for_unlocked_status (ctx);
+    wait_for_unlocked_status (task);
 }
 
 static gboolean
-cpin_query_cb (SendPinPukContext *ctx)
+cpin_query_cb (GTask *task)
 {
+    SendPinPukContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     mm_base_modem_at_command (ctx->modem,
                               "+CPIN?",
                               20,
                               FALSE,
                               (GAsyncReadyCallback)cpin_query_ready,
-                              ctx);
+                              task);
     return G_SOURCE_REMOVE;
 }
 
 static void
-wait_for_unlocked_status (SendPinPukContext *ctx)
+wait_for_unlocked_status (GTask *task)
 {
+    SendPinPukContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     /* Oops... :/ */
     if (ctx->retries == 0) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "PIN was sent but modem didn't report unlocked");
-        send_pin_puk_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "PIN was sent but modem didn't report unlocked");
+        g_object_unref (task);
         return;
     }
 
     /* Check status */
     ctx->retries--;
     mm_dbg ("Scheduling lock state check...");
-    g_timeout_add_seconds (1, (GSourceFunc)cpin_query_cb, ctx);
+    g_timeout_add_seconds (1, (GSourceFunc)cpin_query_cb, task);
 }
 
 static void
 send_pin_puk_ready (MMBaseModem *modem,
                     GAsyncResult *res,
-                    SendPinPukContext *ctx)
+                    GTask *task)
 {
+    SendPinPukContext *ctx;
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        send_pin_puk_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* No explicit error sending the PIN/PUK, now check status until we have the
      * expected lock status */
+    ctx = g_task_get_task_data (task);
     ctx->retries = 3;
-    wait_for_unlocked_status (ctx);
+    wait_for_unlocked_status (task);
 }
 
 static void
@@ -140,17 +144,16 @@ common_send_pin_puk (MMBaseSim *self,
                      gpointer user_data)
 {
     SendPinPukContext *ctx;
+    GTask *task;
     gchar *command;
 
     ctx = g_slice_new (SendPinPukContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             common_send_pin_puk);
-    g_object_get (ctx->self,
+    g_object_get (self,
                   MM_BASE_SIM_MODEM, &ctx->modem,
                   NULL);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)send_pin_puk_context_free);
 
     command = (puk ?
                g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin) :
@@ -160,7 +163,7 @@ common_send_pin_puk (MMBaseSim *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)send_pin_puk_ready,
-                              ctx);
+                              task);
     g_free (command);
 }
 
