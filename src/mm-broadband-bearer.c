@@ -643,7 +643,7 @@ dial_3gpp (MMBroadbandBearer *self,
  */
 
 static void
-get_ip_config_3gpp_ready (MMBroadbandModem *modem,
+get_ip_config_3gpp_ready (MMBroadbandBearer *self,
                           GAsyncResult *res,
                           DetailedConnectContext *ctx)
 {
@@ -651,11 +651,11 @@ get_ip_config_3gpp_ready (MMBroadbandModem *modem,
     MMBearerIpConfig *ipv6_config = NULL;
     GError *error = NULL;
 
-    if (!MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp_finish (ctx->self,
-                                                                               res,
-                                                                               &ipv4_config,
-                                                                               &ipv6_config,
-                                                                               &error)) {
+    if (!MM_BROADBAND_BEARER_GET_CLASS (self)->get_ip_config_3gpp_finish (self,
+                                                                          res,
+                                                                          &ipv4_config,
+                                                                          &ipv6_config,
+                                                                          &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         detailed_connect_context_complete_and_free (ctx);
         return;
@@ -678,7 +678,7 @@ get_ip_config_3gpp_ready (MMBroadbandModem *modem,
 }
 
 static void
-dial_3gpp_ready (MMBroadbandModem *modem,
+dial_3gpp_ready (MMBroadbandBearer *self,
                  GAsyncResult *res,
                  DetailedConnectContext *ctx)
 {
@@ -687,10 +687,10 @@ dial_3gpp_ready (MMBroadbandModem *modem,
     MMBearerIpConfig *ipv6_config = NULL;
     GError *error = NULL;
 
-    ctx->data = MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp_finish (ctx->self, res, &error);
+    ctx->data = MM_BROADBAND_BEARER_GET_CLASS (self)->dial_3gpp_finish (self, res, &error);
     if (!ctx->data) {
         /* Clear CID when it failed to connect. */
-        ctx->self->priv->cid = 0;
+        self->priv->cid = 0;
         g_simple_async_result_take_error (ctx->result, error);
         detailed_connect_context_complete_and_free (ctx);
         return;
@@ -701,11 +701,11 @@ dial_3gpp_ready (MMBroadbandModem *modem,
     if (MM_IS_PORT_SERIAL_AT (ctx->data))
         ctx->close_data_on_exit = TRUE;
 
-    if (MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp &&
-        MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp_finish) {
+    if (MM_BROADBAND_BEARER_GET_CLASS (self)->get_ip_config_3gpp &&
+        MM_BROADBAND_BEARER_GET_CLASS (self)->get_ip_config_3gpp_finish) {
         /* Launch specific IP config retrieval */
-        MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp (
-            ctx->self,
+        MM_BROADBAND_BEARER_GET_CLASS (self)->get_ip_config_3gpp (
+            self,
             MM_BROADBAND_MODEM (ctx->modem),
             ctx->primary,
             ctx->secondary,
