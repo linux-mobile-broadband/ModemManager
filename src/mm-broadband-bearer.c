@@ -960,17 +960,15 @@ cid_selection_3gpp (MMBroadbandBearer   *self,
  */
 
 static void
-get_ip_config_3gpp_ready (MMBroadbandModem *modem,
-                          GAsyncResult *res,
-                          GTask *task)
+get_ip_config_3gpp_ready (MMBroadbandBearer *self,
+                          GAsyncResult      *res,
+                          GTask             *task)
 {
-    MMBroadbandBearer *self;
     DetailedConnectContext *ctx;
     MMBearerIpConfig *ipv4_config = NULL;
     MMBearerIpConfig *ipv6_config = NULL;
     GError *error = NULL;
 
-    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (self)->get_ip_config_3gpp_finish (self,
@@ -1000,18 +998,16 @@ get_ip_config_3gpp_ready (MMBroadbandModem *modem,
 }
 
 static void
-dial_3gpp_ready (MMBroadbandModem *modem,
-                 GAsyncResult *res,
-                 GTask *task)
+dial_3gpp_ready (MMBroadbandBearer *self,
+                 GAsyncResult      *res,
+                 GTask             *task)
 {
-    MMBroadbandBearer *self;
     DetailedConnectContext *ctx;
     MMBearerIpMethod ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
     MMBearerIpConfig *ipv4_config = NULL;
     MMBearerIpConfig *ipv6_config = NULL;
     GError *error = NULL;
 
-    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     ctx->data = MM_BROADBAND_BEARER_GET_CLASS (self)->dial_3gpp_finish (self, res, &error);
@@ -1079,15 +1075,13 @@ dial_3gpp_ready (MMBroadbandModem *modem,
 }
 
 static void
-cid_selection_3gpp_ready (MMBroadbandModem *modem,
-                          GAsyncResult *res,
-                          GTask *task)
+cid_selection_3gpp_ready (MMBroadbandBearer *self,
+                          GAsyncResult      *res,
+                          GTask             *task)
 {
-    MMBroadbandBearer *self;
     DetailedConnectContext *ctx;
     GError *error = NULL;
 
-    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     /* Keep CID around after initializing the PDP context in order to
