@@ -1,0 +1,104 @@
+# Hungarian translation for modemmanager
+# Copyright (C) 2017. Free Software Foundation, Inc.
+# This file is distributed under the same license as the modemmanager package.
+# Gabor Kelemen <kelemeng at ubuntu dot com>, 2017.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: modemmanager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2017-09-27 21:46+0200\n"
+"PO-Revision-Date: 2017-09-26 22:02+0000\n"
+"Last-Translator: Gabor Kelemen <kelemeng@openscope.org>\n"
+"Language-Team: Hungarian <hu@li.org>\n"
+"Language: hu\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Modemkezelő démon vezérlése"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "A rendszer házirendje nem teszi lehetővé a Modemkezelő vezérlését."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Mobil széles sávú készülék feloldása és vezérlése"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"A rendszer házirendje nem teszi lehetővé a mobil széles sávú készülék "
+"feloldását vagy vezérlését."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Névjegyek hozzáadása, módosítása és eltávolítása"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"A rendszer házirendje nem teszi lehetővé ezen az eszközön a névjegyek "
+"hozzáadását, módosítását és eltávolítását."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Szöveges üzenetek küldése, mentése, módosítása és törlése"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"A rendszer házirendje nem teszi lehetővé a szöveges üzenetek küldését vagy "
+"kezelését."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Bejövő hívások fogadása vagy kimenő hívások indítása."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "A rendszer házirendje nem teszi lehetővé a hívásokat."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"Földrajzi helyzetmeghatározás bekapcsolása és az információk megtekintése"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"A rendszer házirendje nem teszi lehetővé a földrajzi helyzetmeghatározás "
+"bekapcsolását vagy az információk megtekintését."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Hálózati információk és szolgáltatások lekérdezése és használata"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"A rendszer házirendje nem teszi lehetővé a hálózati információk és "
+"szolgáltatások lekérdezését és használatát."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Firmware lekérdezése és kezelése a mobil széles sávú eszközön"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"A rendszer lekérdezése és használata lehetővé a firmware lekérdezését és "
+"kezelését az eszközön."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "A Modemkezelőnek alapállapotba kell állítania eszközöket"
