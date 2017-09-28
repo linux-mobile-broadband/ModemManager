@@ -39,40 +39,31 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
 /* Custom init */
 
 typedef struct {
-    MMPortProbe *probe;
     MMPortSerialAt *port;
-    GCancellable *cancellable;
-    GSimpleAsyncResult *result;
     guint retries;
 } X22xCustomInitContext;
 
 static void
-x22x_custom_init_context_complete_and_free (X22xCustomInitContext *ctx)
+x22x_custom_init_context_free (X22xCustomInitContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     g_object_unref (ctx->port);
-    g_object_unref (ctx->probe);
-    g_object_unref (ctx->result);
     g_slice_free (X22xCustomInitContext, ctx);
 }
 
 static gboolean
 x22x_custom_init_finish (MMPortProbe *probe,
-                              GAsyncResult *result,
-                              GError **error)
+                         GAsyncResult *result,
+                         GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+    return g_task_propagate_boolean (G_TASK (result), error);
 }
 
-static void x22x_custom_init_step (X22xCustomInitContext *ctx);
+static void x22x_custom_init_step (GTask *task);
 
 static void
 gmr_ready (MMPortSerialAt *port,
            GAsyncResult *res,
-           X22xCustomInitContext *ctx)
+           GTask *task)
 {
     const gchar *p;
     const gchar *response;
@@ -80,9 +71,10 @@ gmr_ready (MMPortSerialAt *port,
 
     response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
+        g_error_free (error);
         /* Just retry... */
-        x22x_custom_init_step (ctx);
-        goto out;
+        x22x_custom_init_step (task);
+        return;
     }
 
     /* Note the lack of a ':' on the GMR; the X200 doesn't send one */
@@ -93,42 +85,43 @@ gmr_ready (MMPortSerialAt *port,
          * So use that to determine if the device is an X200, which this plugin
          * does supports.
          */
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "Not supported with the X22X plugin");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Not supported with the X22X plugin");
     } else {
         mm_dbg ("(X22X) device is supported by this plugin");
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_task_return_boolean (task, TRUE);
     }
-
-    x22x_custom_init_context_complete_and_free (ctx);
-
-out:
-    if (error)
-        g_error_free (error);
+    g_object_unref (task);
 }
 
 static void
-x22x_custom_init_step (X22xCustomInitContext *ctx)
+x22x_custom_init_step (GTask *task)
 {
+    X22xCustomInitContext *ctx;
+    GCancellable *cancellable;
+
+    ctx = g_task_get_task_data (task);
+    cancellable = g_task_get_cancellable (task);
+
     /* If cancelled, end */
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+    if (g_cancellable_is_cancelled (cancellable)) {
         mm_dbg ("(X22X) no need to keep on running custom init in (%s)",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        x22x_custom_init_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     if (ctx->retries == 0) {
         /* In this case, we need the AT command result to decide whether we can
          * support this modem or not, so really fail if we didn't get it. */
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't get device revision information");
-        x22x_custom_init_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get device revision information");
+        g_object_unref (task);
         return;
     }
 
@@ -139,9 +132,9 @@ x22x_custom_init_step (X22xCustomInitContext *ctx)
         3,
         FALSE, /* raw */
         FALSE, /* allow_cached */
-        ctx->cancellable,
+        cancellable,
         (GAsyncReadyCallback)gmr_ready,
-        ctx);
+        task);
 }
 
 static void
@@ -153,16 +146,15 @@ x22x_custom_init (MMPortProbe *probe,
 {
     MMDevice *device;
     X22xCustomInitContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new (X22xCustomInitContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (probe),
-                                             callback,
-                                             user_data,
-                                             x22x_custom_init);
-    ctx->probe = g_object_ref (probe);
     ctx->port = g_object_ref (port);
-    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
     ctx->retries = 3;
+
+    task = g_task_new (probe, cancellable, callback, user_data);
+    g_task_set_check_cancellable (task, FALSE);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)x22x_custom_init_context_free);
 
     /* TCT/Alcatel in their infinite wisdom assigned the same USB VID/PID to
      * the x060s (Longcheer firmware) and the x200 (X22X, this plugin) and thus
@@ -177,12 +169,12 @@ x22x_custom_init (MMPortProbe *probe,
     if (mm_device_get_vendor (device) != 0x1bbb ||
         mm_device_get_product (device) != 0x0000) {
         /* If not exactly this vendor/product, just skip */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        x22x_custom_init_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
-    x22x_custom_init_step (ctx);
+    x22x_custom_init_step (task);
 }
 
 /*****************************************************************************/
