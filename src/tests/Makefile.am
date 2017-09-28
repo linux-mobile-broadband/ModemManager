@@ -20,12 +20,15 @@ AM_CFLAGS = \
 	-DTESTUDEVRULESDIR=\"${top_srcdir}/src/\" \
 	$(NULL)
 
-AM_LDFLAGS = \
-	$(MM_LIBS) \
-	$(CODE_COVERAGE_LDFLAGS) \
+LDADD = \
 	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/src/libport.la \
 	$(top_builddir)/src/libkerneldevice.la \
+	$(NULL)
+
+AM_LDFLAGS = \
+	$(MM_LIBS) \
+	$(CODE_COVERAGE_LDFLAGS) \
 	-lutil \
 	$(NULL)
 
