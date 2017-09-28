@@ -435,8 +435,6 @@ emrdy_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    self = g_task_get_source_object (task);
-
     /* EMRDY unsolicited response might have happened between the command
      * submission and the response.  This was seen once:
      *
