@@ -35,7 +35,6 @@ G_DEFINE_TYPE (MMSimMbm, mm_sim_mbm, MM_TYPE_BASE_SIM)
 
 typedef struct {
     MMBaseModem *modem;
-    MMModemLock expected;
     guint retries;
 } SendPinPukContext;
 
