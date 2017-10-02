@@ -304,7 +304,7 @@ ip_configuration_query_ready (MbimDevice *device,
         mm_dbg ("IPv4 configuration available: '%s'", str);
         g_free (str);
 
-        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) {
+        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv4addresscount) {
             guint i;
 
             mm_dbg ("  IP addresses (%u)", ipv4addresscount);
@@ -317,7 +317,7 @@ ip_configuration_query_ready (MbimDevice *device,
             }
         }
 
-        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv4gateway) {
             addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
             str = g_inet_address_to_string (addr);
             mm_dbg ("  Gateway: '%s'", str);
@@ -325,7 +325,7 @@ ip_configuration_query_ready (MbimDevice *device,
             g_object_unref (addr);
         }
 
-        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) {
+        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv4dnsservercount) {
             guint i;
 
             mm_dbg ("  DNS addresses (%u)", ipv4dnsservercount);
@@ -340,7 +340,7 @@ ip_configuration_query_ready (MbimDevice *device,
             }
         }
 
-        if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) {
+        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv4mtu) {
             mm_dbg ("  MTU: '%u'", ipv4mtu);
         }
 
@@ -350,7 +350,7 @@ ip_configuration_query_ready (MbimDevice *device,
         mm_dbg ("IPv6 configuration available: '%s'", str);
         g_free (str);
 
-        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) {
+        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv6addresscount) {
             guint i;
 
             mm_dbg ("  IP addresses (%u)", ipv6addresscount);
@@ -363,7 +363,7 @@ ip_configuration_query_ready (MbimDevice *device,
             }
         }
 
-        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
+        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv6gateway) {
             addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
             str = g_inet_address_to_string (addr);
             mm_dbg ("  Gateway: '%s'", str);
@@ -371,7 +371,7 @@ ip_configuration_query_ready (MbimDevice *device,
             g_object_unref (addr);
         }
 
-        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) {
+        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv6dnsservercount) {
             guint i;
 
             mm_dbg ("  DNS addresses (%u)", ipv6dnsservercount);
@@ -386,7 +386,7 @@ ip_configuration_query_ready (MbimDevice *device,
             }
         }
 
-        if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) {
+        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv6mtu) {
             mm_dbg ("  MTU: '%u'", ipv6mtu);
         }
 
