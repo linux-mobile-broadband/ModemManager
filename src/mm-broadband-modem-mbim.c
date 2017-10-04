@@ -235,9 +235,17 @@ modem_load_manufacturer (MMIfaceModem *self,
                          gpointer user_data)
 {
     GTask *task;
-    gchar *manufacturer;
+    gchar *manufacturer = NULL;
+    MMPortMbim *port;
 
-    manufacturer = g_strdup (mm_base_modem_get_plugin (MM_BASE_MODEM (self)));
+    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    if (port) {
+        manufacturer = g_strdup (mm_kernel_device_get_physdev_manufacturer (
+            mm_port_peek_kernel_device (MM_PORT (port))));
+    }
+
+    if (!manufacturer)
+        manufacturer = g_strdup (mm_base_modem_get_plugin (MM_BASE_MODEM (self)));
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_return_pointer (task, manufacturer, g_free);
