@@ -611,11 +611,12 @@ check_condition (MMKernelDeviceGeneric *self,
 
     /* Device sysfs path checks; we allow both a direct match and a prefix patch */
     if (g_str_equal (match->parameter, "DEVPATH")) {
-        const gchar *sysfs_path;
-        gchar       *prefix_match = NULL;
-        gboolean     result = FALSE;
+        gchar    *prefix_match = NULL;
+        gboolean  result = FALSE;
 
-        sysfs_path   = mm_kernel_device_get_sysfs_path (MM_KERNEL_DEVICE (self));
+        /* If sysfs path invalid (e.g. path doesn't exist), no match */
+        if (!self->priv->sysfs_path)
+            return FALSE;
 
         /* If not already doing a prefix match, do an implicit one. This is so that
          * we can add properties to the usb_device owning all ports, and then apply
@@ -623,22 +624,22 @@ check_condition (MMKernelDeviceGeneric *self,
         if (match->value[0] && match->value[strlen (match->value) - 1] != '*')
             prefix_match = g_strdup_printf ("%s/*", match->value);
 
-        if (string_match (sysfs_path, match->value) == condition_equal) {
+        if (string_match (self->priv->sysfs_path, match->value) == condition_equal) {
             result = TRUE;
             goto out;
         }
 
-        if (prefix_match && string_match (sysfs_path, prefix_match) == condition_equal) {
+        if (prefix_match && string_match (self->priv->sysfs_path, prefix_match) == condition_equal) {
             result = TRUE;
             goto out;
         }
 
-        if (g_str_has_prefix (sysfs_path, "/sys")) {
-            if (string_match (&sysfs_path[4], match->value) == condition_equal) {
+        if (g_str_has_prefix (self->priv->sysfs_path, "/sys")) {
+            if (string_match (&self->priv->sysfs_path[4], match->value) == condition_equal) {
                 result = TRUE;
                 goto out;
             }
-            if (prefix_match && string_match (&sysfs_path[4], prefix_match) == condition_equal) {
+            if (prefix_match && string_match (&self->priv->sysfs_path[4], prefix_match) == condition_equal) {
                 result = TRUE;
                 goto out;
             }
