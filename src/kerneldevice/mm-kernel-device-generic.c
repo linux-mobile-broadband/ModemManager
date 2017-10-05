@@ -1028,6 +1028,7 @@ dispose (GObject *object)
     g_clear_pointer (&self->priv->physdev_sysfs_path,   g_free);
     g_clear_pointer (&self->priv->interface_sysfs_path, g_free);
     g_clear_pointer (&self->priv->sysfs_path,           g_free);
+    g_clear_pointer (&self->priv->driver,               g_free);
     g_clear_pointer (&self->priv->rules,                g_array_unref);
     g_clear_object  (&self->priv->properties);
 
