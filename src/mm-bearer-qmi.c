@@ -1585,10 +1585,12 @@ reset_bearer_connection (MMBearerQmi *self,
                                                                                self->priv->client_ipv4,
                                                                                FALSE,
                                                                                &self->priv->packet_service_status_ipv4_indication_id);
+#if QMI_CHECK_VERSION (1,18,0)
             if (self->priv->event_report_ipv4_indication_id)
                 cleanup_event_report_unsolicited_events (self,
                                                          self->priv->client_ipv4,
                                                          &self->priv->event_report_ipv4_indication_id);
+#endif
         }
         self->priv->packet_data_handle_ipv4 = 0;
         g_clear_object (&self->priv->client_ipv4);
@@ -1601,10 +1603,12 @@ reset_bearer_connection (MMBearerQmi *self,
                                                                                self->priv->client_ipv6,
                                                                                FALSE,
                                                                                &self->priv->packet_service_status_ipv6_indication_id);
+#if QMI_CHECK_VERSION (1,18,0)
             if (self->priv->event_report_ipv6_indication_id)
                 cleanup_event_report_unsolicited_events (self,
                                                          self->priv->client_ipv6,
                                                          &self->priv->event_report_ipv6_indication_id);
+#endif
         }
         self->priv->packet_data_handle_ipv6 = 0;
         g_clear_object (&self->priv->client_ipv6);
