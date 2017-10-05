@@ -540,25 +540,28 @@ port_context_cancel (PortContext *port_context)
     mm_dbg ("[plugin manager) task %s: cancellation requested",
             port_context->name);
 
-    /* The port context is cancelled now */
-    g_cancellable_cancel (port_context->cancellable);
+    /* Make sure we hold a port context reference while cancelling, as the
+     * cancellable signal handlers may end up unref-ing our last reference
+     * otherwise. */
+    port_context_ref (port_context);
+    {
+        /* The port context is cancelled now */
+        g_cancellable_cancel (port_context->cancellable);
 
-    /* If the task was deferred, we can cancel and complete it right away */
-    if (port_context->defer_id) {
-        g_source_remove (port_context->defer_id);
-        port_context->defer_id = 0;
-        port_context_complete (port_context);
-        return TRUE;
+        /* If the task was deferred, we can cancel and complete it right away */
+        if (port_context->defer_id) {
+            g_source_remove (port_context->defer_id);
+            port_context->defer_id = 0;
+            port_context_complete (port_context);
+        }
+        /* If the task was deferred until a result is suggested, we can also
+         * complete it right away */
+        else if (port_context->defer_until_suggested)
+            port_context_complete (port_context);
+        /* else, the task may be currently checking support with a given plugin */
     }
+    port_context_unref (port_context);
 
-    /* If the task was deferred until a result is suggested, we can also
-     * complete it right away */
-    if (port_context->defer_until_suggested) {
-        port_context_complete (port_context);
-        return TRUE;
-    }
-
-    /* The task may be currently checking support with a given plugin */
     return TRUE;
 }
 
