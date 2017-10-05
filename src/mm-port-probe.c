@@ -1276,10 +1276,12 @@ serial_open_at (MMPortProbe *self)
 }
 
 static void
-at_cancellable_cancel (GCancellable *main_cancellable,
-                       GCancellable *at_cancellable)
+at_cancellable_cancel (GCancellable        *cancellable,
+                       PortProbeRunContext *ctx)
 {
-    g_cancellable_cancel (at_cancellable);
+    /* Avoid trying to disconnect cancellable on the handler, or we'll deadlock */
+    ctx->at_probing_cancellable_linked = 0;
+    g_cancellable_cancel (ctx->at_probing_cancellable);
 }
 
 gboolean
@@ -1396,8 +1398,8 @@ mm_port_probe_run (MMPortProbe                *self,
         if (cancellable)
             ctx->at_probing_cancellable_linked = g_cancellable_connect (cancellable,
                                                                         (GCallback) at_cancellable_cancel,
-                                                                        g_object_ref (ctx->at_probing_cancellable),
-                                                                        (GDestroyNotify) g_object_unref);
+                                                                        ctx,
+                                                                        NULL);
         ctx->source_id = g_idle_add ((GSourceFunc) serial_open_at, self);
         return;
     }
