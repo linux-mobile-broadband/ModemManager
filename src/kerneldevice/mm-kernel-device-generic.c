@@ -189,6 +189,7 @@ preload_interface_sysfs_path (MMKernelDeviceGeneric *self)
                 g_free (subsystem_name);
                 break;
             }
+            g_free (subsystem_name);
         } else
             g_free (subsystem_filepath);
 
