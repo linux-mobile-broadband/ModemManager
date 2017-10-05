@@ -255,8 +255,11 @@ port_context_complete (PortContext *port_context)
 {
     GTask *task;
 
-    /* Steal the task from the task */
-    g_assert (port_context->task);
+    /* If already completed, do nothing */
+    if (!port_context->task)
+        return;
+
+    /* Steal the task from the context, we only will complete once */
     task = port_context->task;
     port_context->task = NULL;
 
