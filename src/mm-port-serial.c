@@ -850,21 +850,25 @@ port_serial_queue_process (gpointer data)
 
     /* Setup the cancellable so that we can stop waiting for a response */
     if (ctx->cancellable) {
+        gulong cancellable_id;
+
         self->priv->cancellable = g_object_ref (ctx->cancellable);
-        self->priv->cancellable_id = (g_cancellable_connect (
-                                          ctx->cancellable,
-                                          (GCallback)port_serial_response_wait_cancelled,
-                                          self,
-                                          NULL));
-        if (!self->priv->cancellable_id) {
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_CANCELLED,
-                                 "Won't wait for the reply");
-            /* Note: may complete last operation and unref the MMPortSerial */
-            port_serial_got_response (self, NULL, error);
-            g_error_free (error);
+
+        /* If the GCancellable is already cancelled here, the callback will be
+         * called right away, and a GError will be propagated as response. In
+         * this case we need to completely avoid doing anything else with the
+         * MMPortSerial, as it may already be disposed.
+         * So, use an intermediate variable to store the cancellable id, and
+         * just return without further processing if we're already cancelled.
+         */
+        cancellable_id = g_cancellable_connect (ctx->cancellable,
+                                                (GCallback)port_serial_response_wait_cancelled,
+                                                self,
+                                                NULL);
+        if (!cancellable_id)
             return G_SOURCE_REMOVE;
-        }
+
+        self->priv->cancellable_id = cancellable_id;
     }
 
     /* If the command is finished being sent, schedule the timeout */
