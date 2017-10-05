@@ -561,6 +561,7 @@ process_initial_kernel_events (MMBaseManager *self)
                 g_clear_error (&error);
             } else
                 g_debug ("Processed initial kernel event:' %s'", line);
+            g_clear_object (&properties);
         }
 
         line = next;
