@@ -285,12 +285,7 @@ create_bearer_finish (MMIfaceModem *self,
                       GAsyncResult *res,
                       GError **error)
 {
-    MMBaseBearer *bearer;
-
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New Iridium bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
-
-    return g_object_ref (bearer);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -300,20 +295,14 @@ create_bearer (MMIfaceModem *self,
                gpointer user_data)
 {
     MMBaseBearer *bearer;
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        create_bearer);
     mm_dbg ("Creating Iridium bearer...");
     bearer = mm_bearer_iridium_new (MM_BROADBAND_MODEM_IRIDIUM (self),
                                     properties);
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               bearer,
-                                               g_object_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
