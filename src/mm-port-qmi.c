@@ -132,6 +132,16 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
 {
     AllocateClientContext *ctx;
 
+    if (!mm_port_qmi_is_open (self)) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_WRONG_STATE,
+                                             "Port is closed");
+        return;
+    }
+
     if (!!mm_port_qmi_peek_client (self, service, flag)) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
