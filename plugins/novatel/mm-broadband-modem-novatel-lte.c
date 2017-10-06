@@ -400,6 +400,69 @@ load_current_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load unlock retries (Modem interface) */
+
+static MMUnlockRetries *
+load_unlock_retries_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+load_unlock_retries_ready (MMBaseModem *self,
+                           GAsyncResult *res,
+                           GTask *task)
+{
+    const gchar *response;
+    GError *error = NULL;
+    gint pin_num, pin_value;
+    int scan_count;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    response = mm_strip_tag (response, "$NWPINR:");
+
+    scan_count = sscanf (response, "PIN%d, %d", &pin_num, &pin_value);
+    if (scan_count != 2 || (pin_num != 1 && pin_num != 2)) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Invalid unlock retries response: '%s'",
+                                 response);
+    } else {
+        MMUnlockRetries *retries;
+
+        retries = mm_unlock_retries_new ();
+        mm_unlock_retries_set (retries,
+                               pin_num == 1 ? MM_MODEM_LOCK_SIM_PIN : MM_MODEM_LOCK_SIM_PIN2,
+                               pin_value);
+        g_task_return_pointer (task, retries, g_object_unref);
+    }
+    g_object_unref (task);
+}
+
+static void
+load_unlock_retries (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "$NWPINR?",
+                              20,
+                              FALSE,
+                              (GAsyncReadyCallback)load_unlock_retries_ready,
+                              g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 static gboolean
@@ -616,6 +679,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
     iface->load_current_bands_finish = load_current_bands_finish;
+    iface->load_unlock_retries = load_unlock_retries;
+    iface->load_unlock_retries_finish = load_unlock_retries_finish;
     /* No support for setting bands, as it destabilizes the modem. */
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
