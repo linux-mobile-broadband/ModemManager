@@ -132,15 +132,20 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
     AllocateClientContext *ctx;
     GTask *task;
 
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    if (!mm_port_qmi_is_open (self)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Port is closed");
+        g_object_unref (task);
+        return;
+    }
+
     if (!!mm_port_qmi_peek_client (self, service, flag)) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_port_qmi_allocate_client,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_EXISTS,
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_EXISTS,
                                  "Client for service '%s' already allocated",
                                  qmi_service_get_string (service));
+        g_object_unref (task);
         return;
     }
 
@@ -148,11 +153,7 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
     ctx->info = g_new0 (ServiceInfo, 1);
     ctx->info->service = service;
     ctx->info->flag = flag;
-
-    task = g_task_new (self, cancellable, callback, user_data);
-    g_task_set_task_data (task,
-                          ctx,
-                          (GDestroyNotify)allocate_client_context_free);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)allocate_client_context_free);
 
     qmi_device_allocate_client (self->priv->qmi_device,
                                 service,
