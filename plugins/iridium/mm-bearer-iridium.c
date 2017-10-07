@@ -66,7 +66,6 @@ connect_report_ready (MMBaseModem *modem,
 {
     ConnectContext *ctx;
     const gchar *result;
-    GError *error = NULL;
 
     /* If cancelled, complete */
     if (g_task_return_error_if_cancelled (task)) {
@@ -79,16 +78,15 @@ connect_report_ready (MMBaseModem *modem,
     /* If we got a proper extended reply, build the new error to be set */
     result = mm_base_modem_at_command_full_finish (modem, res, NULL);
     if (result && g_str_has_prefix (result, "+CEER: ") && strlen (result) > 7) {
-        error = g_error_new (ctx->saved_error->domain,
-                             ctx->saved_error->code,
-                             "%s", &result[7]);
-        g_error_free (ctx->saved_error);
-    } else
+        g_task_return_new_error (task,
+                                 ctx->saved_error->domain,
+                                 ctx->saved_error->code,
+                                 "%s", &result[7]);
+    } else {
         /* Otherwise, take the original error as it was */
-        g_propagate_error (&error, ctx->saved_error);
-
-    ctx->saved_error = NULL;
-    g_task_return_error (task, error);
+        g_task_return_error (task, ctx->saved_error);
+        ctx->saved_error = NULL;
+    }
     g_object_unref (task);
 }
 
