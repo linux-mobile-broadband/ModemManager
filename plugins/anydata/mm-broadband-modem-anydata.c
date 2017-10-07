@@ -50,7 +50,6 @@ typedef struct {
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    MMPortSerialAt *port;
     MMModemCdmaRegistrationState cdma1x_state;
     MMModemCdmaRegistrationState evdo_state;
     GError *error;
@@ -71,7 +70,6 @@ detailed_registration_state_context_complete_and_free (DetailedRegistrationState
     }
 
     g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->port);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
     g_free (ctx);
