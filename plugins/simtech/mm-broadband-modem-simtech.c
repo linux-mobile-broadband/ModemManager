@@ -565,6 +565,7 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
                 "Unknown acquisition order preference: '%d'",
                 ctx->acqord);
             g_object_unref (task);
+            g_free (result);
             return;
         }
         break;
@@ -589,6 +590,7 @@ cnmp_query_ready (MMBroadbandModemSimtech *self,
             "Unknown mode preference: '%d'",
             ctx->modepref);
         g_object_unref (task);
+        g_free (result);
         return;
     }
 
