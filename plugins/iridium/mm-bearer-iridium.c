@@ -37,24 +37,17 @@ G_DEFINE_TYPE (MMBearerIridium, mm_bearer_iridium, MM_TYPE_BASE_BEARER);
 /* Connect */
 
 typedef struct {
-    MMBearerIridium *self;
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
     MMPortSerialAt *primary;
     GError *saved_error;
 } ConnectContext;
 
 static void
-connect_context_complete_and_free (ConnectContext *ctx)
+connect_context_free (ConnectContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->saved_error)
         g_error_free (ctx->saved_error);
     if (ctx->primary)
         g_object_unref (ctx->primary);
-    g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -63,57 +56,51 @@ connect_finish (MMBaseBearer *self,
                 GAsyncResult *res,
                 GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return mm_bearer_connect_result_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 connect_report_ready (MMBaseModem *modem,
                       GAsyncResult *res,
-                      ConnectContext *ctx)
+                      GTask *task)
 {
+    ConnectContext *ctx;
     const gchar *result;
+    GError *error = NULL;
 
     /* If cancelled, complete */
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "Connection setup operation has been cancelled");
-        connect_context_complete_and_free (ctx);
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* If we got a proper extended reply, build the new error to be set */
     result = mm_base_modem_at_command_full_finish (modem, res, NULL);
-    if (result &&
-        g_str_has_prefix (result, "+CEER: ") &&
-        strlen (result) > 7) {
-        g_simple_async_result_set_error (ctx->result,
-                                         ctx->saved_error->domain,
-                                         ctx->saved_error->code,
-                                         "%s", &result[7]);
+    if (result && g_str_has_prefix (result, "+CEER: ") && strlen (result) > 7) {
+        error = g_error_new (ctx->saved_error->domain,
+                             ctx->saved_error->code,
+                             "%s", &result[7]);
         g_error_free (ctx->saved_error);
-        ctx->saved_error = NULL;
-        connect_context_complete_and_free (ctx);
-        return;
-    }
+    } else
+        /* Otherwise, take the original error as it was */
+        g_propagate_error (&error, ctx->saved_error);
 
-    /* Take the original error as it was */
-    g_simple_async_result_take_error (ctx->result,
-                                      ctx->saved_error);
     ctx->saved_error = NULL;
-    connect_context_complete_and_free (ctx);
+    g_task_return_error (task, error);
+    g_object_unref (task);
 }
 
 static void
 dial_ready (MMBaseModem *modem,
             GAsyncResult *res,
-            ConnectContext *ctx)
+            GTask *task)
 {
+    ConnectContext *ctx;
     MMBearerIpConfig *config;
+
+    ctx = g_task_get_task_data (task);
 
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
@@ -130,7 +117,7 @@ dial_ready (MMBaseModem *modem,
             FALSE, /* raw */
             NULL, /* cancellable */
             (GAsyncReadyCallback)connect_report_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -141,38 +128,36 @@ dial_ready (MMBaseModem *modem,
     config = mm_bearer_ip_config_new ();
     mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_PPP);
 
-    /* Set operation result */
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
+    /* Return operation result */
+    g_task_return_pointer (
+        task,
         mm_bearer_connect_result_new (MM_PORT (ctx->primary), config, NULL),
         (GDestroyNotify)mm_bearer_connect_result_unref);
+    g_object_unref (task);
     g_object_unref (config);
-
-    connect_context_complete_and_free (ctx);
 }
 
 static void
 service_type_ready (MMBaseModem *modem,
                     GAsyncResult *res,
-                    ConnectContext *ctx)
+                    GTask *task)
 {
+    ConnectContext *ctx;
     GError *error = NULL;
 
     /* If cancelled, complete */
-    if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "Connection setup operation has been cancelled");
-        connect_context_complete_and_free (ctx);
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Errors setting the service type will be critical */
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        connect_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -188,7 +173,7 @@ service_type_ready (MMBaseModem *modem,
         FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)dial_ready,
-        ctx);
+        task);
 }
 
 static void
@@ -198,6 +183,7 @@ connect (MMBaseBearer *self,
          gpointer user_data)
 {
     ConnectContext *ctx;
+    GTask *task;
     MMBaseModem *modem  = NULL;
 
     g_object_get (self,
@@ -210,13 +196,10 @@ connect (MMBaseBearer *self,
 
     /* In this context, we only keep the stuff we'll need later */
     ctx = g_new0 (ConnectContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->primary = mm_base_modem_get_port_primary (modem);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             connect);
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) connect_context_free);
 
     /* Bearer service type set to 9600bps (V.110), which behaves better than the
      * default 9600bps (V.32). */
@@ -229,7 +212,7 @@ connect (MMBaseBearer *self,
         FALSE, /* raw */
         NULL, /* cancellable */
         (GAsyncReadyCallback)service_type_ready,
-        ctx);
+        task);
 
     g_object_unref (modem);
 }

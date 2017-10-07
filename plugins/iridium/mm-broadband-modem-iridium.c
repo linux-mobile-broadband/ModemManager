@@ -44,40 +44,51 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 /*****************************************************************************/
-/* Operator Code and Name loading (3GPP interface) */
+/* Operator Code loading (3GPP interface) */
 
 static gchar *
 load_operator_code_finish (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    /* Only "90103" operator code is assumed */
-    return g_strdup ("90103");
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
+
+static void
+load_operator_code (MMIfaceModem3gpp *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    /* Only "90103" operator code is assumed */
+    g_task_return_pointer (task, g_strdup ("90103"), g_free);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Operator Name loading (3GPP interface) */
 
 static gchar *
 load_operator_name_finish (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    /* Only "IRIDIUM" operator name is assumed */
-    return g_strdup ("IRIDIUM");
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-load_operator_name_or_code (MMIfaceModem3gpp *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+load_operator_name (MMIfaceModem3gpp *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_operator_name_or_code);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    /* Only "IRIDIUM" operator name is assumed */
+    g_task_return_pointer (task, g_strdup ("IRIDIUM"), g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -168,25 +179,24 @@ setup_flow_control_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 setup_flow_control_ready (MMBroadbandModemIridium *self,
                           GAsyncResult *res,
-                          GSimpleAsyncResult *operation_result)
+                          GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
         /* Let the error be critical. We DO need RTS/CTS in order to have
          * proper modem disabling. */
-        g_simple_async_result_take_error (operation_result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+        g_task_return_boolean (task, TRUE);
 
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
+    g_object_unref (task);
 }
 
 static void
@@ -194,13 +204,6 @@ setup_flow_control (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        setup_flow_control);
-
     /* Enable RTS/CTS flow control.
      * Other available values:
      *   AT&K0: Disable flow control
@@ -213,7 +216,7 @@ setup_flow_control (MMIfaceModem *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)setup_flow_control_ready,
-                              result);
+                              g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
@@ -224,7 +227,7 @@ load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -232,14 +235,9 @@ load_supported_modes (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     GArray *combinations;
     MMModemModeCombination mode;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_modes);
+    GTask *task;
 
     /* Build list of combinations */
     combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
@@ -249,9 +247,9 @@ load_supported_modes (MMIfaceModem *self,
     mode.preferred = MM_MODEM_MODE_NONE;
     g_array_append_val (combinations, mode);
 
-    g_simple_async_result_set_op_res_gpointer (result, combinations, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -285,12 +283,7 @@ create_bearer_finish (MMIfaceModem *self,
                       GAsyncResult *res,
                       GError **error)
 {
-    MMBaseBearer *bearer;
-
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New Iridium bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
-
-    return g_object_ref (bearer);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -300,20 +293,14 @@ create_bearer (MMIfaceModem *self,
                gpointer user_data)
 {
     MMBaseBearer *bearer;
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        create_bearer);
     mm_dbg ("Creating Iridium bearer...");
     bearer = mm_bearer_iridium_new (MM_BROADBAND_MODEM_IRIDIUM (self),
                                     properties);
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               bearer,
-                                               g_object_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -409,9 +396,9 @@ static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     /* Fixed operator code and name to be reported */
-    iface->load_operator_name = load_operator_name_or_code;
+    iface->load_operator_name = load_operator_name;
     iface->load_operator_name_finish = load_operator_name_finish;
-    iface->load_operator_code = load_operator_name_or_code;
+    iface->load_operator_code = load_operator_code;
     iface->load_operator_code_finish = load_operator_code_finish;
 
     /* Don't try to scan networks with AT+COPS=?.
