@@ -224,19 +224,8 @@ load_supported_charsets (MMIfaceModem *self,
 /* Initializing the modem (during first enabling) */
 
 typedef struct {
-    GSimpleAsyncResult *result;
-    MMBroadbandModemNokia *self;
     guint retries;
 } EnablingModemInitContext;
-
-static void
-enabling_modem_init_context_complete_and_free (EnablingModemInitContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (EnablingModemInitContext, ctx);
-}
 
 static gboolean
 enabling_modem_init_finish (MMBroadbandModem *self,
@@ -244,17 +233,20 @@ enabling_modem_init_finish (MMBroadbandModem *self,
                             GError **error)
 
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void retry_atz (EnablingModemInitContext *ctx);
+static void retry_atz (GTask *task);
 
 static void
 atz_ready (MMBaseModem *self,
            GAsyncResult *res,
-           EnablingModemInitContext *ctx)
+           GTask *task)
 {
+    EnablingModemInitContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     /* One retry less */
     ctx->retries--;
@@ -262,34 +254,38 @@ atz_ready (MMBaseModem *self,
     if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
         /* Consumed all retries... */
         if (ctx->retries == 0) {
-            g_simple_async_result_take_error (ctx->result, error);
-            enabling_modem_init_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
         /* Retry... */
         g_error_free (error);
-        retry_atz (ctx);
+        retry_atz (task);
         return;
     }
 
     /* Good! */
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enabling_modem_init_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-retry_atz (EnablingModemInitContext *ctx)
+retry_atz (GTask *task)
 {
-    mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
-                                   mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self)),
+    MMBaseModem *self;
+
+    self = g_task_get_source_object (task);
+
+    mm_base_modem_at_command_full (self,
+                                   mm_base_modem_peek_port_primary (self),
                                    "Z",
                                    6,
                                    FALSE,
                                    FALSE,
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)atz_ready,
-                                   ctx);
+                                   task);
 }
 
 static void
@@ -298,20 +294,20 @@ enabling_modem_init (MMBroadbandModem *self,
                      gpointer user_data)
 {
     EnablingModemInitContext *ctx;
+    GTask *task;
 
-    ctx = g_slice_new0 (EnablingModemInitContext);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enabling_modem_init);
-    ctx->self = g_object_ref (self);
+    ctx = g_new (EnablingModemInitContext, 1);
 
     /* Send the init command twice; some devices (Nokia N900) appear to take a
      * few commands before responding correctly.  Instead of penalizing them for
      * being stupid the first time by failing to enable the device, just
      * try again. */
     ctx->retries = 2;
-    retry_atz (ctx);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    retry_atz (task);
 }
 
 /*****************************************************************************/
