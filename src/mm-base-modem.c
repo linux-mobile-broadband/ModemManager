@@ -563,6 +563,7 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
 {
     GList *cdc_wdm_qmi_ports, *l;
     const gchar *net_port_parent_path;
+    MMPortQmi *found = NULL;
 
     g_warn_if_fail (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
     net_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (data));
@@ -580,21 +581,25 @@ mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self,
                                                   MM_PORT_SUBSYS_USB,
                                                   MM_PORT_TYPE_QMI,
                                                   NULL);
-    for (l = cdc_wdm_qmi_ports; l; l = g_list_next (l)) {
+    for (l = cdc_wdm_qmi_ports; l && !found; l = g_list_next (l)) {
         const gchar *wdm_port_parent_path;
 
         g_assert (MM_IS_PORT_QMI (l->data));
         wdm_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (MM_PORT (l->data)));
         if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
-            return MM_PORT_QMI (l->data);
+            found = MM_PORT_QMI (l->data);
     }
 
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_NOT_FOUND,
-                 "Couldn't find associated QMI port for 'net/%s'",
-                 mm_port_get_device (data));
-    return NULL;
+    g_list_free_full (cdc_wdm_qmi_ports, g_object_unref);
+
+    if (!found)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "Couldn't find associated QMI port for 'net/%s'",
+                     mm_port_get_device (data));
+
+    return found;
 }
 
 #endif /* WITH_QMI */
@@ -637,6 +642,7 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
 {
     GList *cdc_wdm_mbim_ports, *l;
     const gchar *net_port_parent_path;
+    MMPortMbim *found = NULL;
 
     g_warn_if_fail (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
     net_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (data));
@@ -654,21 +660,26 @@ mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self,
                                                   MM_PORT_SUBSYS_USB,
                                                   MM_PORT_TYPE_MBIM,
                                                   NULL);
-    for (l = cdc_wdm_mbim_ports; l; l = g_list_next (l)) {
+
+    for (l = cdc_wdm_mbim_ports; l && !found; l = g_list_next (l)) {
         const gchar *wdm_port_parent_path;
 
         g_assert (MM_IS_PORT_MBIM (l->data));
         wdm_port_parent_path = mm_kernel_device_get_parent_sysfs_path (mm_port_peek_kernel_device (MM_PORT (l->data)));
         if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
-            return MM_PORT_MBIM (l->data);
+            found = MM_PORT_MBIM (l->data);
     }
 
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_NOT_FOUND,
-                 "Couldn't find associated MBIM port for 'net/%s'",
-                 mm_port_get_device (data));
-    return NULL;
+    g_list_free_full (cdc_wdm_mbim_ports, g_object_unref);
+
+    if (!found)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "Couldn't find associated MBIM port for 'net/%s'",
+                     mm_port_get_device (data));
+
+    return found;
 }
 
 #endif /* WITH_MBIM */
