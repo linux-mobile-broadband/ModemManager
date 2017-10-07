@@ -305,13 +305,14 @@ wwsm_read_ready (MMBaseModem  *self,
         }
     }
 
-    if (result->allowed == MM_MODEM_MODE_NONE)
+    if (result->allowed == MM_MODEM_MODE_NONE) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "Unknown wireless data service reply: '%s'",
                                  response);
-    else
+        g_free (result);
+    } else
         g_task_return_pointer (task, result, g_free);
     g_object_unref (task);
 
