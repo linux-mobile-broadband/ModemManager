@@ -787,6 +787,7 @@ pin_query_unlock_retries_ready (MbimDevice *device,
                                        MM_MODEM_LOCK_SIM_PIN,
                                        previous_sim_pin_retries);
             }
+            g_object_unref (previous_retries);
         }
 
         /* According to the MBIM specification, RemainingAttempts is set to
