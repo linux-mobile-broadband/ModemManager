@@ -313,59 +313,66 @@ mmcli_get_modem_sync (GDBusConnection  *connection,
     return found;
 }
 
+/******************************************************************************/
+/* Bearer */
+
 typedef struct {
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-    gchar *bearer_path;
+    gchar     *bearer_path;
     MMManager *manager;
-    GList *modems;
-    MMObject *current;
-    MMBearer *bearer;
+    GList     *modems;
+    MMObject  *current;
 } GetBearerContext;
+
+typedef struct {
+    MMManager *manager;
+    MMObject  *object;
+    MMBearer  *bearer;
+} GetBearerResults;
+
+static void
+get_bearer_results_free (GetBearerResults *results)
+{
+    g_object_unref (results->manager);
+    g_object_unref (results->object);
+    g_object_unref (results->bearer);
+    g_free (results);
+}
 
 static void
 get_bearer_context_free (GetBearerContext *ctx)
 {
     if (ctx->current)
         g_object_unref (ctx->current);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     if (ctx->manager)
         g_object_unref (ctx->manager);
-    if (ctx->bearer)
-        g_object_unref (ctx->bearer);
     g_list_free_full (ctx->modems, g_object_unref);
     g_free (ctx->bearer_path);
     g_free (ctx);
 }
 
-static void
-get_bearer_context_complete (GetBearerContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    ctx->result = NULL;
-}
-
 MMBearer *
-mmcli_get_bearer_finish (GAsyncResult *res,
-                         MMManager **o_manager,
-                         MMObject **o_object)
+mmcli_get_bearer_finish (GAsyncResult  *res,
+                         MMManager    **o_manager,
+                         MMObject     **o_object)
 {
-    GetBearerContext *ctx;
+    GetBearerResults *results;
+    MMBearer         *obj;
 
-    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    results = g_task_propagate_pointer (G_TASK (res), NULL);
+    g_assert (results);
     if (o_manager)
-        *o_manager = g_object_ref (ctx->manager);
+        *o_manager = g_object_ref (results->manager);
     if (o_object)
-        *o_object = g_object_ref (ctx->current);
-    return g_object_ref (ctx->bearer);
+        *o_object = g_object_ref (results->object);
+    obj = g_object_ref (results->bearer);
+    get_bearer_results_free (results);
+    return obj;
 }
 
-static void look_for_bearer_in_modem (GetBearerContext *ctx);
+static void look_for_bearer_in_modem (GTask *task);
 
 static MMBearer *
-find_bearer_in_list (GList *list,
+find_bearer_in_list (GList       *list,
                      const gchar *bearer_path)
 {
     GList *l;
@@ -383,12 +390,17 @@ find_bearer_in_list (GList *list,
 }
 
 static void
-list_bearers_ready (MMModem *modem,
+list_bearers_ready (MMModem      *modem,
                     GAsyncResult *res,
-                    GetBearerContext *ctx)
+                    GTask        *task)
 {
-    GList *bearers;
-    GError *error = NULL;
+    GetBearerContext *ctx;
+    GetBearerResults *results;
+    MMBearer         *found;
+    GList            *bearers;
+    GError           *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     bearers = mm_modem_list_bearers_finish (modem, res, &error);
     if (error) {
@@ -398,27 +410,31 @@ list_bearers_ready (MMModem *modem,
         exit (EXIT_FAILURE);
     }
 
-    ctx->bearer = find_bearer_in_list (bearers, ctx->bearer_path);
+    found = find_bearer_in_list (bearers, ctx->bearer_path);
     g_list_free_full (bearers, g_object_unref);
 
-    /* Found! */
-    if (ctx->bearer) {
-        g_simple_async_result_set_op_res_gpointer (
-            ctx->result,
-            ctx,
-            (GDestroyNotify)get_bearer_context_free);
-        get_bearer_context_complete (ctx);
+    if (!found) {
+        /* Not found, try with next modem */
+        look_for_bearer_in_modem (task);
         return;
     }
 
-    /* Not found, try with next modem */
-    look_for_bearer_in_modem (ctx);
+    /* Found! */
+    results = g_new (GetBearerResults, 1);
+    results->manager = g_object_ref (ctx->manager);
+    results->object  = g_object_ref (ctx->current);
+    results->bearer  = found;
+    g_task_return_pointer (task, results, (GDestroyNotify) get_bearer_results_free);
+    g_object_unref (task);
 }
 
 static void
-look_for_bearer_in_modem (GetBearerContext *ctx)
+look_for_bearer_in_modem (GTask *task)
 {
-    MMModem *modem;
+    GetBearerContext *ctx;
+    MMModem          *modem;
+
+    ctx = g_task_get_task_data (task);
 
     if (!ctx->modems) {
         g_printerr ("error: couldn't find bearer at '%s': 'not found in any modem'\n",
@@ -438,7 +454,7 @@ look_for_bearer_in_modem (GetBearerContext *ctx)
                  "(not fully initialized)",
                  mm_object_get_path (ctx->current));
         g_object_unref (modem);
-        look_for_bearer_in_modem (ctx);
+        look_for_bearer_in_modem (task);
         return;
     }
 
@@ -447,17 +463,21 @@ look_for_bearer_in_modem (GetBearerContext *ctx)
              mm_object_get_path (ctx->current));
 
     mm_modem_list_bearers (modem,
-                           ctx->cancellable,
+                           g_task_get_cancellable (task),
                            (GAsyncReadyCallback)list_bearers_ready,
-                           ctx);
+                           task);
     g_object_unref (modem);
 }
 
 static void
 get_bearer_manager_ready (GDBusConnection *connection,
-                          GAsyncResult *res,
-                          GetBearerContext *ctx)
+                          GAsyncResult    *res,
+                          GTask           *task)
 {
+    GetBearerContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     ctx->manager = mmcli_get_manager_finish (res);
     ctx->modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
     if (!ctx->modems) {
@@ -466,7 +486,7 @@ get_bearer_manager_ready (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    look_for_bearer_in_modem (ctx);
+    look_for_bearer_in_modem (task);
 }
 
 static gchar *
@@ -498,33 +518,32 @@ get_bearer_path (const gchar *path_or_index)
 }
 
 void
-mmcli_get_bearer (GDBusConnection *connection,
-                  const gchar *path_or_index,
-                  GCancellable *cancellable,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+mmcli_get_bearer (GDBusConnection     *connection,
+                  const gchar         *path_or_index,
+                  GCancellable        *cancellable,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
 {
+    GTask            *task;
     GetBearerContext *ctx;
+
+    task = g_task_new (connection, cancellable, callback, user_data);
 
     ctx = g_new0 (GetBearerContext, 1);
     ctx->bearer_path = get_bearer_path (path_or_index);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
-                                             callback,
-                                             user_data,
-                                             mmcli_get_bearer);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) get_bearer_context_free);
+
     mmcli_get_manager (connection,
                        cancellable,
                        (GAsyncReadyCallback)get_bearer_manager_ready,
-                       ctx);
+                       task);
 }
 
 MMBearer *
-mmcli_get_bearer_sync (GDBusConnection *connection,
-                       const gchar *path_or_index,
-                       MMManager **o_manager,
-                       MMObject **o_object)
+mmcli_get_bearer_sync (GDBusConnection  *connection,
+                       const gchar      *path_or_index,
+                       MMManager       **o_manager,
+                       MMObject        **o_object)
 {
     MMManager *manager;
     GList *modems;
