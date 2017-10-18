@@ -839,59 +839,66 @@ mmcli_get_sim_sync (GDBusConnection *connection,
     return found;
 }
 
+/******************************************************************************/
+/* SMS */
+
 typedef struct {
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-    gchar *sms_path;
+    gchar     *sms_path;
     MMManager *manager;
-    GList *modems;
-    MMObject *current;
-    MMSms *sms;
+    GList     *modems;
+    MMObject  *current;
 } GetSmsContext;
+
+typedef struct {
+    MMManager *manager;
+    MMObject  *object;
+    MMSms     *sms;
+} GetSmsResults;
+
+static void
+get_sms_results_free (GetSmsResults *results)
+{
+    g_object_unref (results->manager);
+    g_object_unref (results->object);
+    g_object_unref (results->sms);
+    g_free (results);
+}
 
 static void
 get_sms_context_free (GetSmsContext *ctx)
 {
     if (ctx->current)
         g_object_unref (ctx->current);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
     if (ctx->manager)
         g_object_unref (ctx->manager);
-    if (ctx->sms)
-        g_object_unref (ctx->sms);
     g_list_free_full (ctx->modems, g_object_unref);
     g_free (ctx->sms_path);
     g_free (ctx);
 }
 
-static void
-get_sms_context_complete (GetSmsContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    ctx->result = NULL;
-}
-
 MMSms *
-mmcli_get_sms_finish (GAsyncResult *res,
-                      MMManager **o_manager,
-                      MMObject **o_object)
+mmcli_get_sms_finish (GAsyncResult  *res,
+                      MMManager    **o_manager,
+                      MMObject     **o_object)
 {
-    GetSmsContext *ctx;
+    GetSmsResults *results;
+    MMSms         *obj;
 
-    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    results = g_task_propagate_pointer (G_TASK (res), NULL);
+    g_assert (results);
     if (o_manager)
-        *o_manager = g_object_ref (ctx->manager);
+        *o_manager = g_object_ref (results->manager);
     if (o_object)
-        *o_object = g_object_ref (ctx->current);
-    return g_object_ref (ctx->sms);
+        *o_object = g_object_ref (results->object);
+    obj = g_object_ref (results->sms);
+    get_sms_results_free (results);
+    return obj;
 }
 
-static void look_for_sms_in_modem (GetSmsContext *ctx);
+static void look_for_sms_in_modem (GTask *task);
 
 static MMSms *
-find_sms_in_list (GList *list,
+find_sms_in_list (GList       *list,
                   const gchar *sms_path)
 {
     GList *l;
@@ -910,11 +917,16 @@ find_sms_in_list (GList *list,
 
 static void
 list_sms_ready (MMModemMessaging *modem,
-                GAsyncResult *res,
-                GetSmsContext *ctx)
+                GAsyncResult     *res,
+                GTask            *task)
 {
-    GList *sms_list;
-    GError *error = NULL;
+    GetSmsContext *ctx;
+    GetSmsResults *results;
+    MMSms         *found;
+    GList         *sms_list;
+    GError        *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     sms_list = mm_modem_messaging_list_finish (modem, res, &error);
     if (error) {
@@ -924,27 +936,31 @@ list_sms_ready (MMModemMessaging *modem,
         exit (EXIT_FAILURE);
     }
 
-    ctx->sms = find_sms_in_list (sms_list, ctx->sms_path);
+    found = find_sms_in_list (sms_list, ctx->sms_path);
     g_list_free_full (sms_list, g_object_unref);
 
-    /* Found! */
-    if (ctx->sms) {
-        g_simple_async_result_set_op_res_gpointer (
-            ctx->result,
-            ctx,
-            (GDestroyNotify)get_sms_context_free);
-        get_sms_context_complete (ctx);
+    if (!found) {
+        /* Not found, try with next modem */
+        look_for_sms_in_modem (task);
         return;
     }
 
-    /* Not found, try with next modem */
-    look_for_sms_in_modem (ctx);
+    /* Found! */
+    results = g_new (GetSmsResults, 1);
+    results->manager = g_object_ref (ctx->manager);
+    results->object  = g_object_ref (ctx->current);
+    results->sms     = found;
+    g_task_return_pointer (task, results, (GDestroyNotify) get_sms_results_free);
+    g_object_unref (task);
 }
 
 static void
-look_for_sms_in_modem (GetSmsContext *ctx)
+look_for_sms_in_modem (GTask *task)
 {
+    GetSmsContext    *ctx;
     MMModemMessaging *modem;
+
+    ctx = g_task_get_task_data (task);
 
     if (!ctx->modems) {
         g_printerr ("error: couldn't find SMS at '%s': 'not found in any modem'\n",
@@ -957,27 +973,31 @@ look_for_sms_in_modem (GetSmsContext *ctx)
     ctx->modems = g_list_delete_link (ctx->modems, ctx->modems);
 
     modem = mm_object_get_modem_messaging (ctx->current);
-    if (modem) {
-        g_debug ("Looking for sms '%s' in modem '%s'...",
-                 ctx->sms_path,
-                 mm_object_get_path (ctx->current));
-        mm_modem_messaging_list (modem,
-                                 ctx->cancellable,
-                                 (GAsyncReadyCallback)list_sms_ready,
-                                 ctx);
-        g_object_unref (modem);
+    if (!modem) {
+        /* Current modem has no messaging capabilities, try with next modem */
+        look_for_sms_in_modem (task);
         return;
     }
 
-    /* Current modem has no messaging capabilities, try with next modem */
-    look_for_sms_in_modem (ctx);
+    g_debug ("Looking for sms '%s' in modem '%s'...",
+             ctx->sms_path,
+             mm_object_get_path (ctx->current));
+    mm_modem_messaging_list (modem,
+                             g_task_get_cancellable (task),
+                             (GAsyncReadyCallback)list_sms_ready,
+                             task);
+    g_object_unref (modem);
 }
 
 static void
 get_sms_manager_ready (GDBusConnection *connection,
-                       GAsyncResult *res,
-                       GetSmsContext *ctx)
+                       GAsyncResult    *res,
+                       GTask           *task)
 {
+    GetSmsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     ctx->manager = mmcli_get_manager_finish (res);
     ctx->modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
     if (!ctx->modems) {
@@ -986,7 +1006,7 @@ get_sms_manager_ready (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    look_for_sms_in_modem (ctx);
+    look_for_sms_in_modem (task);
 }
 
 static gchar *
@@ -1018,33 +1038,32 @@ get_sms_path (const gchar *path_or_index)
 }
 
 void
-mmcli_get_sms (GDBusConnection *connection,
-               const gchar *path_or_index,
-               GCancellable *cancellable,
-               GAsyncReadyCallback callback,
-               gpointer user_data)
+mmcli_get_sms (GDBusConnection     *connection,
+               const gchar         *path_or_index,
+               GCancellable        *cancellable,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
 {
+    GTask         *task;
     GetSmsContext *ctx;
+
+    task = g_task_new (connection, cancellable, callback, user_data);
 
     ctx = g_new0 (GetSmsContext, 1);
     ctx->sms_path = get_sms_path (path_or_index);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
-                                             callback,
-                                             user_data,
-                                             mmcli_get_sms);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) get_sms_context_free);
+
     mmcli_get_manager (connection,
                        cancellable,
                        (GAsyncReadyCallback)get_sms_manager_ready,
-                       ctx);
+                       task);
 }
 
 MMSms *
-mmcli_get_sms_sync (GDBusConnection *connection,
-                    const gchar *path_or_index,
-                    MMManager **o_manager,
-                    MMObject **o_object)
+mmcli_get_sms_sync (GDBusConnection  *connection,
+                    const gchar      *path_or_index,
+                    MMManager       **o_manager,
+                    MMObject        **o_object)
 {
     MMManager *manager;
     GList *modems;

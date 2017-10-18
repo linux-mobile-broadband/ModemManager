@@ -70,18 +70,18 @@ MMSim *mmcli_get_sim_sync   (GDBusConnection *connection,
                              MMManager **manager,
                              MMObject **object);
 
-void   mmcli_get_sms        (GDBusConnection *connection,
-                             const gchar *path_or_index,
-                             GCancellable *cancellable,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data);
-MMSms *mmcli_get_sms_finish (GAsyncResult *res,
-                             MMManager **manager,
-                             MMObject **object);
-MMSms *mmcli_get_sms_sync   (GDBusConnection *connection,
-                             const gchar *path_or_index,
-                             MMManager **manager,
-                             MMObject **object);
+void   mmcli_get_sms        (GDBusConnection     *connection,
+                             const gchar         *path_or_index,
+                             GCancellable        *cancellable,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data);
+MMSms *mmcli_get_sms_finish (GAsyncResult        *res,
+                             MMManager          **manager,
+                             MMObject           **object);
+MMSms *mmcli_get_sms_sync   (GDBusConnection     *connection,
+                             const gchar         *path_or_index,
+                             MMManager          **manager,
+                             MMObject           **object);
 
 void    mmcli_get_call        (GDBusConnection *connection,
                                const gchar *path_or_index,
