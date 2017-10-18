@@ -57,18 +57,18 @@ MMBearer *mmcli_get_bearer_sync   (GDBusConnection      *connection,
                                    MMManager           **manager,
                                    MMObject            **object);
 
-void   mmcli_get_sim        (GDBusConnection *connection,
-                             const gchar *path_or_index,
-                             GCancellable *cancellable,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data);
-MMSim *mmcli_get_sim_finish (GAsyncResult *res,
-                             MMManager **manager,
-                             MMObject **object);
-MMSim *mmcli_get_sim_sync   (GDBusConnection *connection,
-                             const gchar *path_or_index,
-                             MMManager **manager,
-                             MMObject **object);
+void   mmcli_get_sim        (GDBusConnection      *connection,
+                             const gchar          *path_or_index,
+                             GCancellable         *cancellable,
+                             GAsyncReadyCallback   callback,
+                             gpointer              user_data);
+MMSim *mmcli_get_sim_finish (GAsyncResult         *res,
+                             MMManager           **manager,
+                             MMObject            **object);
+MMSim *mmcli_get_sim_sync   (GDBusConnection      *connection,
+                             const gchar          *path_or_index,
+                             MMManager           **manager,
+                             MMObject            **object);
 
 void   mmcli_get_sms        (GDBusConnection     *connection,
                              const gchar         *path_or_index,

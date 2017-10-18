@@ -613,61 +613,73 @@ mmcli_get_bearer_sync (GDBusConnection  *connection,
     return found;
 }
 
+/******************************************************************************/
+/* SIM */
+
 typedef struct {
-    GSimpleAsyncResult *result;
-    GCancellable *cancellable;
-    gchar *sim_path;
+    gchar     *sim_path;
     MMManager *manager;
-    MMObject *modem;
-    MMSim *sim;
+    MMObject  *current;
 } GetSimContext;
+
+typedef struct {
+    MMManager *manager;
+    MMObject  *object;
+    MMSim     *sim;
+} GetSimResults;
+
+static void
+get_sim_results_free (GetSimResults *results)
+{
+    g_object_unref (results->manager);
+    g_object_unref (results->object);
+    g_object_unref (results->sim);
+    g_free (results);
+}
 
 static void
 get_sim_context_free (GetSimContext *ctx)
 {
-    if (ctx->modem)
-        g_object_unref (ctx->modem);
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
+    if (ctx->current)
+        g_object_unref (ctx->current);
     if (ctx->manager)
         g_object_unref (ctx->manager);
-    if (ctx->sim)
-        g_object_unref (ctx->sim);
     g_free (ctx->sim_path);
     g_free (ctx);
 }
 
-static void
-get_sim_context_complete (GetSimContext *ctx)
+MMSim *
+mmcli_get_sim_finish (GAsyncResult  *res,
+                      MMManager    **o_manager,
+                      MMObject     **o_object)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    ctx->result = NULL;
+    GetSimResults *results;
+    MMSim         *obj;
+
+    results = g_task_propagate_pointer (G_TASK (res), NULL);
+    g_assert (results);
+    if (o_manager)
+        *o_manager = g_object_ref (results->manager);
+    if (o_object)
+        *o_object = g_object_ref (results->object);
+    obj = g_object_ref (results->sim);
+    get_sim_results_free (results);
+    return obj;
 }
 
-MMSim *
-mmcli_get_sim_finish (GAsyncResult *res,
-                      MMManager **o_manager,
-                      MMObject **o_object)
+static void
+get_sim_ready (MMModem      *modem,
+               GAsyncResult *res,
+               GTask        *task)
 {
     GetSimContext *ctx;
+    GetSimResults *results;
+    MMSim         *sim;
+    GError        *error = NULL;
 
-    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    if (o_manager)
-        *o_manager = g_object_ref (ctx->manager);
-    if (o_object)
-        *o_object = g_object_ref (ctx->modem);
-    return g_object_ref (ctx->sim);
-}
+    ctx = g_task_get_task_data (task);
 
-static void
-get_sim_ready (MMModem *modem,
-               GAsyncResult *res,
-               GetSimContext *ctx)
-{
-    GError *error = NULL;
-
-    ctx->sim = mm_modem_get_sim_finish (modem, res, &error);
+    sim = mm_modem_get_sim_finish (modem, res, &error);
     if (error) {
         g_printerr ("error: couldn't get sim '%s' at '%s': '%s'\n",
                     ctx->sim_path,
@@ -676,20 +688,25 @@ get_sim_ready (MMModem *modem,
         exit (EXIT_FAILURE);
     }
 
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        ctx,
-        (GDestroyNotify)get_sim_context_free);
-    get_sim_context_complete (ctx);
+    /* Found! */
+    results = g_new (GetSimResults, 1);
+    results->manager = g_object_ref (ctx->manager);
+    results->object  = g_object_ref (ctx->current);
+    results->sim     = sim;
+    g_task_return_pointer (task, results, (GDestroyNotify) get_sim_results_free);
+    g_object_unref (task);
 }
 
 static void
 get_sim_manager_ready (GDBusConnection *connection,
-                       GAsyncResult *res,
-                       GetSimContext *ctx)
+                       GAsyncResult    *res,
+                       GTask           *task)
 {
-    GList *l;
-    GList *modems;
+    GetSimContext *ctx;
+    GList         *l;
+    GList         *modems;
+
+    ctx = g_task_get_task_data (task);
 
     ctx->manager = mmcli_get_manager_finish (res);
 
@@ -700,30 +717,28 @@ get_sim_manager_ready (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    for (l = modems; l; l = g_list_next (l)) {
+    for (l = modems; l && !ctx->current; l = g_list_next (l)) {
         MMObject *object;
-        MMModem *modem;
+        MMModem  *modem;
 
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
         if (g_str_equal (ctx->sim_path, mm_modem_get_sim_path (modem))) {
-            ctx->modem  = g_object_ref (object);
+            ctx->current = g_object_ref (object);
             mm_modem_get_sim (modem,
-                              ctx->cancellable,
+                              g_task_get_cancellable (task),
                               (GAsyncReadyCallback)get_sim_ready,
-                              ctx);
-            break;
+                              task);
         }
         g_object_unref (modem);
     }
+    g_list_free_full (modems, g_object_unref);
 
-    if (!ctx->modem) {
+    if (!ctx->current) {
         g_printerr ("error: couldn't find sim at '%s'\n",
                     ctx->sim_path);
         exit (EXIT_FAILURE);
     }
-
-    g_list_free_full (modems, g_object_unref);
 }
 
 static gchar *
@@ -755,33 +770,32 @@ get_sim_path (const gchar *path_or_index)
 }
 
 void
-mmcli_get_sim (GDBusConnection *connection,
-                  const gchar *path_or_index,
-                  GCancellable *cancellable,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+mmcli_get_sim (GDBusConnection     *connection,
+               const gchar         *path_or_index,
+               GCancellable        *cancellable,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
 {
+    GTask         *task;
     GetSimContext *ctx;
+
+    task = g_task_new (connection, cancellable, callback, user_data);
 
     ctx = g_new0 (GetSimContext, 1);
     ctx->sim_path = get_sim_path (path_or_index);
-    if (cancellable)
-        ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
-                                             callback,
-                                             user_data,
-                                             mmcli_get_sim);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) get_sim_context_free);
+
     mmcli_get_manager (connection,
                        cancellable,
                        (GAsyncReadyCallback)get_sim_manager_ready,
-                       ctx);
+                       task);
 }
 
 MMSim *
-mmcli_get_sim_sync (GDBusConnection *connection,
-                    const gchar *path_or_index,
-                    MMManager **o_manager,
-                    MMObject **o_object)
+mmcli_get_sim_sync (GDBusConnection  *connection,
+                    const gchar      *path_or_index,
+                    MMManager       **o_manager,
+                    MMObject        **o_object)
 {
     MMManager *manager;
     GList *modems;
