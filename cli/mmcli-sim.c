@@ -124,6 +124,9 @@ mmcli_sim_options_enabled (void)
         exit (EXIT_FAILURE);
     }
 
+    if (info_flag)
+        mmcli_force_sync_operation ();
+
     checked = TRUE;
     return !!n_actions;
 }
