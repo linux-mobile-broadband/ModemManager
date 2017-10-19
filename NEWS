@@ -1,4 +1,55 @@
 
+ModemManager 1.6.10
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Blacklist:
+   ** Ignored Silicon Labs USB Zigbee dongles.
+   ** Ignored Garmin ANT+ sticks.
+   ** Ignored Intel coredump downloader device.
+
+ * QMI:
+   ** Fixed potential user-after-free issues.
+   ** Fixed missing handler cleanups on network-initiated disconnects.
+
+ * MBIM:
+   ** Fix invalid session_id and nw_error reads.
+   ** Avoid calling mbim_message_unref() on NULL message.
+   ** Fixed invalid object access due to handlers not being removed correctly.
+   ** Ensure session is disconnected before trying to connect.
+   ** Fixed t crash when modem doesn't send gateways.
+
+ * udev:
+   ** Removed default ID_MM_PLATFORM_DRIVER_PROBE whitelist. Devices exposed
+      via the 'atmel_usart' driver aren't probed automatically any more.
+
+ * Core:
+   ** Fixed running init sequence after port flashing in disconnection.
+   ** Fixed "forbidden product strings" check in plugins.
+   ** Fixed multiple memory leaks and invalid memory read/writes.
+   ** Fixed multiple async operation completions in event handlers.
+   ** Fixed multiple potential NULL dereferences.
+   ** Fixed deadlock when trying to disconnect cancellable.
+   ** Fixed reporting TX/RX stats (numbers were swapped).
+   ** Ignored USB interface removal events.
+
+ * libmm-glib:
+   ** Fix NULL dereference on firmware unique_id checks.
+
+ * polkit:
+   ** Added missing Location interface method rules.
+
+ * Plugins:
+   ** MBM: set data port for Dell DW5560.
+   ** Simtech: fix error reporting in 3gpp unsolicited events enabling.
+   ** Fixed multiple memory leaks.
+
+ * systemd:
+   ** Drop After=syslog.target rule
+
+
 ModemManager 1.6.8
 -------------------------------------------
 This is a new bugfix release of ModemManager.
