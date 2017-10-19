@@ -182,8 +182,8 @@ reload_stats_ready (MMBaseBearer *self,
 
     /* We only update stats if they were retrieved properly */
     mm_bearer_stats_set_duration (self->priv->stats, (guint32) g_timer_elapsed (self->priv->duration_timer, NULL));
-    mm_bearer_stats_set_tx_bytes (self->priv->stats, rx_bytes);
-    mm_bearer_stats_set_rx_bytes (self->priv->stats, tx_bytes);
+    mm_bearer_stats_set_tx_bytes (self->priv->stats, tx_bytes);
+    mm_bearer_stats_set_rx_bytes (self->priv->stats, rx_bytes);
     bearer_update_interface_stats (self);
 }
 
