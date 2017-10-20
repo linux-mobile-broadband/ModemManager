@@ -316,26 +316,24 @@ modem_cdma_setup_cleanup_unsolicited_events_finish (MMIfaceModemCdma *self,
                                                     GAsyncResult *res,
                                                     GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_cdma_setup_unsolicited_events_ready (MMIfaceModemCdma *self,
                                             GAsyncResult *res,
-                                            GSimpleAsyncResult *simple)
+                                            GTask *task)
 {
     GError *error = NULL;
 
     if (!iface_modem_cdma_parent->setup_unsolicited_events_finish (self, res, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
         /* Our own setup now */
         set_unsolicited_events_handlers (MM_BROADBAND_MODEM_VIA (self), TRUE);
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
     }
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -343,33 +341,26 @@ modem_cdma_setup_unsolicited_events (MMIfaceModemCdma *self,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_setup_unsolicited_events);
-
     /* Chain up parent's setup */
     iface_modem_cdma_parent->setup_unsolicited_events (
         self,
         (GAsyncReadyCallback)parent_cdma_setup_unsolicited_events_ready,
-        result);
+        g_task_new (self, NULL, callback, user_data));
 }
 
 static void
 parent_cdma_cleanup_unsolicited_events_ready (MMIfaceModemCdma *self,
                                               GAsyncResult *res,
-                                              GSimpleAsyncResult *simple)
+                                              GTask *task)
 {
     GError *error = NULL;
 
     if (!iface_modem_cdma_parent->cleanup_unsolicited_events_finish (self, res, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
 }
 
 static void
@@ -377,13 +368,6 @@ modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_cleanup_unsolicited_events);
-
     /* Our own cleanup first */
     set_unsolicited_events_handlers (MM_BROADBAND_MODEM_VIA (self), FALSE);
 
@@ -391,7 +375,7 @@ modem_cdma_cleanup_unsolicited_events (MMIfaceModemCdma *self,
     iface_modem_cdma_parent->cleanup_unsolicited_events (
         self,
         (GAsyncReadyCallback)parent_cdma_cleanup_unsolicited_events_ready,
-        result);
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
