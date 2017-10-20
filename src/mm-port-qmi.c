@@ -72,6 +72,16 @@ mm_port_qmi_get_client (MMPortQmi *self,
 
 /*****************************************************************************/
 
+QmiDevice *
+mm_port_qmi_peek_device (MMPortQmi *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_QMI (self), NULL);
+
+    return self->priv->qmi_device;
+}
+
+/*****************************************************************************/
+
 typedef struct {
     ServiceInfo *info;
 } AllocateClientContext;

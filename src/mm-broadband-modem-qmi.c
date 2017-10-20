@@ -126,6 +126,9 @@ struct _MMBroadbandModemQmiPrivate {
     /* Firmware helpers */
     GList *firmware_list;
     MMFirmwareProperties *current_firmware;
+
+    /* For notifying when the qmi-proxy connection is dead */
+    guint qmi_device_removed_id;
 };
 
 /*****************************************************************************/
@@ -11198,6 +11201,54 @@ parent_initialization_started (GTask *task)
         task);
 }
 
+static void
+qmi_device_removed_cb (QmiDevice *device,
+                       MMBroadbandModemQmi *self)
+{
+    /* Reprobe the modem here so we can get notifications back. */
+    mm_info ("Connection to qmi-proxy for %s lost, reprobing",
+             qmi_device_get_path_display (device));
+
+    g_signal_handler_disconnect (device, self->priv->qmi_device_removed_id);
+    self->priv->qmi_device_removed_id = 0;
+
+    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
+    mm_base_modem_set_valid (MM_BASE_MODEM (self), FALSE);
+}
+
+static void
+track_qmi_device_removed (MMBroadbandModemQmi *self,
+                          MMPortQmi* qmi)
+{
+    QmiDevice *device;
+
+    device = mm_port_qmi_peek_device (qmi);
+    g_assert (device);
+
+    self->priv->qmi_device_removed_id = g_signal_connect (
+        device,
+        QMI_DEVICE_SIGNAL_REMOVED,
+        G_CALLBACK (qmi_device_removed_cb),
+        self);
+}
+
+static void
+untrack_qmi_device_removed (MMBroadbandModemQmi *self,
+                            MMPortQmi* qmi)
+{
+    QmiDevice *device;
+
+    if (self->priv->qmi_device_removed_id == 0)
+        return;
+
+    device = mm_port_qmi_peek_device (qmi);
+    if (!device)
+        return;
+
+    g_signal_handler_disconnect (device, self->priv->qmi_device_removed_id);
+    self->priv->qmi_device_removed_id = 0;
+}
+
 static void allocate_next_client (GTask *task);
 
 static void
@@ -11225,11 +11276,14 @@ static void
 allocate_next_client (GTask *task)
 {
     InitializationStartedContext *ctx;
+    MMBroadbandModemQmi *self;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     if (ctx->services[ctx->service_index] == QMI_SERVICE_UNKNOWN) {
-        /* Done we are, launch parent's callback */
+        /* Done we are, track device removal and launch parent's callback */
+        track_qmi_device_removed (self, ctx->qmi);
         parent_initialization_started (task);
         return;
     }
@@ -11312,7 +11366,9 @@ initialization_started (MMBroadbandModem *self,
     }
 
     if (mm_port_qmi_is_open (ctx->qmi)) {
-        /* Nothing to be done, just launch parent's callback */
+        /* Nothing to be done, just track device removal and launch parent's
+         * callback */
+        track_qmi_device_removed (MM_BROADBAND_MODEM_QMI (self), ctx->qmi);
         parent_initialization_started (task);
         return;
     }
@@ -11368,10 +11424,12 @@ finalize (GObject *object)
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (object);
 
     qmi = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
-    /* If we did open the QMI port during initialization, close it now */
-    if (qmi &&
-        mm_port_qmi_is_open (qmi)) {
-        mm_port_qmi_close (qmi);
+    if (qmi) {
+        /* Disconnect signal handler for qmi-proxy disappearing, if it exists */
+        untrack_qmi_device_removed (self, qmi);
+        /* If we did open the QMI port during initialization, close it now */
+        if (mm_port_qmi_is_open (qmi))
+            mm_port_qmi_close (qmi);
     }
 
     g_free (self->priv->imei);
