@@ -298,12 +298,7 @@ modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    MMBaseBearer *bearer;
-
-    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    mm_dbg ("New bearer created at DBus path '%s'", mm_base_bearer_get_path (bearer));
-
-    return g_object_ref (bearer);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -313,18 +308,14 @@ modem_create_bearer (MMIfaceModem *self,
                      gpointer user_data)
 {
     MMBaseBearer *bearer;
-    GSimpleAsyncResult *result;
-    /* Set a new ref to the bearer object as result */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_create_bearer);
+    GTask *task;
 
     /* We just create a MMBearerQmi */
     bearer = mm_bearer_qmi_new (MM_BROADBAND_MODEM_QMI (self), properties);
-    g_simple_async_result_set_op_res_gpointer (result, bearer, g_object_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, bearer, g_object_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -1382,14 +1373,7 @@ modem_load_device_identifier_finish (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    gchar *device_identifier;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    device_identifier = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded device identifier: %s", device_identifier);
-    return device_identifier;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -1397,23 +1381,18 @@ modem_load_device_identifier (MMIfaceModem *self,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     gchar *device_identifier;
+    GTask *task;
 
     mm_dbg ("loading device identifier...");
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_device_identifier);
 
     /* Just use dummy ATI/ATI1 replies, all the other internal info should be
      * enough for uniqueness */
     device_identifier = mm_broadband_modem_create_device_identifier (MM_BROADBAND_MODEM (self), "", "");
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               device_identifier,
-                                               g_free);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, device_identifier, g_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -1504,35 +1483,28 @@ typedef enum {
 } LoadUnlockRequiredStep;
 
 typedef struct {
-    MMBroadbandModemQmi *self;
-    GSimpleAsyncResult *result;
     LoadUnlockRequiredStep step;
     QmiClient *dms;
     QmiClient *uim;
 } LoadUnlockRequiredContext;
-
-static void
-load_unlock_required_context_complete_and_free (LoadUnlockRequiredContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_slice_free (LoadUnlockRequiredContext, ctx);
-}
 
 static MMModemLock
 modem_load_unlock_required_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCK_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                               G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+    return (MMModemLock)value;
 }
 
-static void load_unlock_required_context_step (LoadUnlockRequiredContext *ctx);
+static void load_unlock_required_context_step (GTask *task);
 
 /* Used also when loading unlock retries left */
 static gboolean
@@ -1767,7 +1739,7 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
 static void
 unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            GAsyncResult *res,
-                                           LoadUnlockRequiredContext *ctx)
+                                           GTask *task)
 {
     QmiMessageUimGetCardStatusOutput *output;
     GError *error = NULL;
@@ -1776,8 +1748,8 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
     output = qmi_client_uim_get_card_status_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1786,19 +1758,21 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            NULL, NULL, NULL, NULL,
                                            &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     } else
-        g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (lock), NULL);
+        g_task_return_int (task, lock);
+    g_object_unref (task);
 
     qmi_message_uim_get_card_status_output_unref (output);
-    load_unlock_required_context_complete_and_free (ctx);
 }
 
 static void
 dms_uim_get_pin_status_ready (QmiClientDms *client,
                               GAsyncResult *res,
-                              LoadUnlockRequiredContext *ctx)
+                              GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    LoadUnlockRequiredContext *ctx;
     QmiMessageDmsUimGetPinStatusOutput *output;
     GError *error = NULL;
     MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
@@ -1807,10 +1781,13 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
     output = qmi_client_dms_uim_get_pin_status_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_unlock_required_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     if (!qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
         /* We get InvalidQmiCommand on newer devices which don't like the legacy way */
@@ -1823,9 +1800,9 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
             g_error_free (error);
             qmi_message_dms_uim_get_pin_status_output_unref (output);
             /* Flag that the command is unsupported, and try with the new way */
-            ctx->self->priv->dms_uim_deprecated = TRUE;
+            self->priv->dms_uim_deprecated = TRUE;
             ctx->step++;
-            load_unlock_required_context_step (ctx);
+            load_unlock_required_context_step (task);
             return;
         }
 
@@ -1836,22 +1813,22 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
             g_error_matches (error,
                              QMI_PROTOCOL_ERROR,
                              QMI_PROTOCOL_ERROR_UIM_UNINITIALIZED)) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_RETRY,
-                                             "Couldn't get PIN status (retry): %s",
-                                             error->message);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_RETRY,
+                                     "Couldn't get PIN status (retry): %s",
+                                     error->message);
+            g_object_unref (task);
             g_error_free (error);
             qmi_message_dms_uim_get_pin_status_output_unref (output);
-            load_unlock_required_context_complete_and_free (ctx);
             return;
         }
 
         /* Other errors, just propagate them */
         g_prefix_error (&error, "Couldn't get PIN status: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_dms_uim_get_pin_status_output_unref (output);
-        load_unlock_required_context_complete_and_free (ctx);
         return;
     }
 
@@ -1881,16 +1858,20 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
     }
 
     /* We're done! */
-    g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (lock), NULL);
-    qmi_message_dms_uim_get_pin_status_output_unref (output);
-    load_unlock_required_context_complete_and_free (ctx);
+    g_task_return_int (task, lock);
+    g_object_unref (task);
 }
 
 static void
-load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
+load_unlock_required_context_step (GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    LoadUnlockRequiredContext *ctx;
     GError *error = NULL;
     QmiClient *client;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case LOAD_UNLOCK_REQUIRED_STEP_FIRST:
@@ -1899,22 +1880,22 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
 
     case LOAD_UNLOCK_REQUIRED_STEP_CDMA:
         /* CDMA-only modems don't need this */
-        if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (ctx->self))) {
+        if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
             mm_dbg ("Skipping unlock check in CDMA-only modem...");
-            g_simple_async_result_set_op_res_gpointer (ctx->result, GUINT_TO_POINTER (MM_MODEM_LOCK_NONE), NULL);
-            load_unlock_required_context_complete_and_free (ctx);
+            g_task_return_int (task, MM_MODEM_LOCK_NONE);
+            g_object_unref (task);
             return;
         }
         ctx->step++;
         /* Go on to next step */
 
     case LOAD_UNLOCK_REQUIRED_STEP_DMS:
-        if (!ctx->self->priv->dms_uim_deprecated) {
+        if (!self->priv->dms_uim_deprecated) {
             /* Failure to get DMS client is hard really */
-            client = peek_qmi_client (ctx->self, QMI_SERVICE_DMS, &error);
+            client = peek_qmi_client (self, QMI_SERVICE_DMS, &error);
             if (!client) {
-                g_simple_async_result_take_error (ctx->result, error);
-                load_unlock_required_context_complete_and_free (ctx);
+                g_task_return_error (task, error);
+                g_object_unref (task);
                 return;
             }
 
@@ -1924,7 +1905,7 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
                                                5,
                                                NULL,
                                                (GAsyncReadyCallback) dms_uim_get_pin_status_ready,
-                                               ctx);
+                                               task);
             return;
         }
         ctx->step++;
@@ -1932,10 +1913,10 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
 
     case LOAD_UNLOCK_REQUIRED_STEP_UIM:
         /* Failure to get UIM client at this point is hard as well */
-        client = peek_qmi_client (ctx->self, QMI_SERVICE_UIM, &error);
+        client = peek_qmi_client (self, QMI_SERVICE_UIM, &error);
         if (!client) {
-            g_simple_async_result_take_error (ctx->result, error);
-            load_unlock_required_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
@@ -1945,7 +1926,7 @@ load_unlock_required_context_step (LoadUnlockRequiredContext *ctx)
                                         5,
                                         NULL,
                                         (GAsyncReadyCallback) unlock_required_uim_get_card_status_ready,
-                                        ctx);
+                                        task);
         return;
     }
 }
@@ -1956,16 +1937,15 @@ modem_load_unlock_required (MMIfaceModem *self,
                             gpointer user_data)
 {
     LoadUnlockRequiredContext *ctx;
+    GTask *task;
 
-    ctx = g_slice_new0 (LoadUnlockRequiredContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_unlock_required);
+    ctx = g_new0 (LoadUnlockRequiredContext, 1);
     ctx->step = LOAD_UNLOCK_REQUIRED_STEP_FIRST;
 
-    load_unlock_required_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    load_unlock_required_context_step (task);
 }
 
 /*****************************************************************************/
@@ -2523,7 +2503,7 @@ modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    return g_array_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -2532,22 +2512,18 @@ modem_load_supported_modes (MMIfaceModem *_self,
                             gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
     GArray *combinations;
     MMModemModeCombination mode;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_modes);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (!self->priv->supported_radio_interfaces) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Cannot load supported modes, no radio interface list");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot load supported modes, no radio interface list");
+        g_object_unref (task);
         return;
     }
 
@@ -2648,9 +2624,8 @@ modem_load_supported_modes (MMIfaceModem *_self,
         combinations = filtered;
     }
 
-    g_simple_async_result_set_op_res_gpointer (result, combinations, (GDestroyNotify) g_array_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -2661,11 +2636,15 @@ modem_load_supported_ip_families_finish (MMIfaceModem *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_BEARER_IP_FAMILY_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMBearerIpFamily) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                    G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+    return (MMBearerIpFamily)value;
 }
 
 static void
@@ -2673,28 +2652,19 @@ modem_load_supported_ip_families (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_supported_ip_families);
-
+    task = g_task_new (self, NULL, callback, user_data);
     if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self)))
         /* CDMA-only: IPv4 */
-        g_simple_async_result_set_op_res_gpointer (
-            result,
-            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4),
-            NULL);
+        g_task_return_int (task, MM_BEARER_IP_FAMILY_IPV4);
     else
         /* Assume IPv4 + IPv6 supported */
-        g_simple_async_result_set_op_res_gpointer (
-            result,
-            GUINT_TO_POINTER (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6 | MM_BEARER_IP_FAMILY_IPV4V6),
-            NULL);
-
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_int (task,
+                           MM_BEARER_IP_FAMILY_IPV4 |
+                           MM_BEARER_IP_FAMILY_IPV6 |
+                           MM_BEARER_IP_FAMILY_IPV4V6);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -3998,14 +3968,7 @@ modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    gchar *imei;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    imei = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded IMEI: %s", imei);
-    return imei;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -4014,24 +3977,18 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
                       gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_imei);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->imei)
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   self->priv->imei,
-                                                   NULL);
+        g_task_return_pointer (task, g_strdup (self->priv->imei), g_free);
     else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Device doesn't report a valid IMEI");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device doesn't report a valid IMEI");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -4422,74 +4379,66 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 /* Load operator name (3GPP interface) */
 
 static gchar *
-modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *_self,
+modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-
-    if (self->priv->current_operator_description)
-        return g_strdup (self->priv->current_operator_description);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Current operator description is still unknown");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
+modem_3gpp_load_operator_name (MMIfaceModem3gpp *_self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask *task;
 
-    /* Just finish the async operation */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_operator_name);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->current_operator_description)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->current_operator_description),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Current operator description is still unknown");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
 /* Load operator code (3GPP interface) */
 
 static gchar *
-modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *_self,
+modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
                                       GAsyncResult *res,
                                       GError **error)
 {
-    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-
-    if (self->priv->current_operator_id)
-        return g_strdup (self->priv->current_operator_id);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Current operator MCC/MNC is still unknown");
-    return NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
+modem_3gpp_load_operator_code (MMIfaceModem3gpp *_self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask *task;
 
-    /* Just finish the async operation */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_load_operator_code);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->current_operator_id)
+        g_task_return_pointer (task,
+                               g_strdup (self->priv->current_operator_id),
+                               g_free);
+    else
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Current operator MCC/MNC is still unknown");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -6685,14 +6634,7 @@ modem_cdma_load_meid_finish (MMIfaceModemCdma *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    gchar *meid;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    meid = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded MEID: %s", meid);
-    return meid;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -6701,24 +6643,18 @@ modem_cdma_load_meid (MMIfaceModemCdma *_self,
                       gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_load_meid);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->meid)
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   self->priv->meid,
-                                                   NULL);
+        g_task_return_pointer (task, g_strdup (self->priv->meid), g_free);
     else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Device doesn't report a valid MEID");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device doesn't report a valid MEID");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -6729,14 +6665,7 @@ modem_cdma_load_esn_finish (MMIfaceModemCdma *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    gchar *esn;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    esn = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded ESN: %s", esn);
-    return esn;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -6745,24 +6674,18 @@ modem_cdma_load_esn (MMIfaceModemCdma *_self,
                      gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_load_esn);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->esn)
-        g_simple_async_result_set_op_res_gpointer (result,
-                                                   self->priv->esn,
-                                                   NULL);
+        g_task_return_pointer (task, g_strdup (self->priv->esn), g_free);
     else
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Device doesn't report a valid ESN");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Device doesn't report a valid ESN");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -7309,22 +7232,20 @@ messaging_check_support_finish (MMIfaceModemMessaging *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    /* no error expected here */
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_messaging_check_support_ready (MMIfaceModemMessaging *_self,
                                       GAsyncResult *res,
-                                      GSimpleAsyncResult *simple)
+                                      GTask *task)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
 
     self->priv->messaging_fallback_at = iface_modem_messaging_parent->check_support_finish (_self, res, NULL);
 
-    g_simple_async_result_set_op_res_gboolean (simple, self->priv->messaging_fallback_at);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, self->priv->messaging_fallback_at);
+    g_object_unref (task);
 }
 
 static void
@@ -7332,13 +7253,10 @@ messaging_check_support (MMIfaceModemMessaging *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMPortQmi *port;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     /* If we have support for the WMS client, messaging is supported */
@@ -7347,14 +7265,13 @@ messaging_check_support (MMIfaceModemMessaging *self,
         iface_modem_messaging_parent->check_support (
             self,
             (GAsyncReadyCallback)parent_messaging_check_support_ready,
-            result);
+            task);
         return;
     }
 
     mm_dbg ("Messaging capabilities supported");
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -7395,7 +7312,7 @@ messaging_load_supported_storages (MMIfaceModemMessaging *_self,
                                    gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     /* Handle fallback */
     if (self->priv->messaging_fallback_at) {
@@ -7403,13 +7320,9 @@ messaging_load_supported_storages (MMIfaceModemMessaging *_self,
         return;
     }
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        messaging_load_supported_storages);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -7427,7 +7340,7 @@ modem_messaging_setup_sms_format_finish (MMIfaceModemMessaging *_self,
         return iface_modem_messaging_parent->setup_sms_format_finish (_self, res, error);
     }
 
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -7436,7 +7349,7 @@ modem_messaging_setup_sms_format (MMIfaceModemMessaging *_self,
                                   gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
     /* Handle fallback */
     if (self->priv->messaging_fallback_at) {
@@ -7444,13 +7357,9 @@ modem_messaging_setup_sms_format (MMIfaceModemMessaging *_self,
     }
 
     /* noop */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_setup_sms_format);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -8401,17 +8310,21 @@ location_load_capabilities_finish (MMIfaceModemLocation *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCATION_SOURCE_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemLocationSource) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                                         G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCATION_SOURCE_NONE;
+    }
+    return (MMModemLocationSource)value;
 }
 
 static void
 parent_load_capabilities_ready (MMIfaceModemLocation *self,
                                 GAsyncResult *res,
-                                GSimpleAsyncResult *simple)
+                                GTask *task)
 {
     MMModemLocationSource sources;
     GError *error = NULL;
@@ -8419,9 +8332,8 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -8442,11 +8354,8 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
         sources |= MM_MODEM_LOCATION_SOURCE_CDMA_BS;
 
     /* So we're done, complete */
-    g_simple_async_result_set_op_res_gpointer (simple,
-                                               GUINT_TO_POINTER (sources),
-                                               NULL);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_int (task, sources);
+    g_object_unref (task);
 }
 
 static void
@@ -8454,18 +8363,15 @@ location_load_capabilities (MMIfaceModemLocation *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        location_load_capabilities);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Chain up parent's setup */
     iface_modem_location_parent->load_capabilities (
         self,
         (GAsyncReadyCallback)parent_load_capabilities_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
@@ -9020,9 +8926,7 @@ location_event_report_indication_cb (QmiClientPds *client,
 }
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientPds *client;
-    GSimpleAsyncResult *result;
     MMModemLocationSource source;
     /* Default tracking session (for A-GPS enabling) */
     QmiPdsOperatingMode session_operation;
@@ -9032,13 +8936,10 @@ typedef struct {
 } EnableLocationGatheringContext;
 
 static void
-enable_location_gathering_context_complete_and_free (EnableLocationGatheringContext *ctx)
+enable_location_gathering_context_free (EnableLocationGatheringContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     if (ctx->client)
         g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     g_slice_free (EnableLocationGatheringContext, ctx);
 }
 
@@ -9047,55 +8948,61 @@ enable_location_gathering_finish (MMIfaceModemLocation *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 ser_location_ready (QmiClientPds *client,
                     GAsyncResult *res,
-                    EnableLocationGatheringContext *ctx)
+                    GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    EnableLocationGatheringContext *ctx;
     QmiMessagePdsSetEventReportOutput *output = NULL;
     GError *error = NULL;
 
     output = qmi_client_pds_set_event_report_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_pds_set_event_report_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't set event report: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_pds_set_event_report_output_unref (output);
         return;
     }
 
     qmi_message_pds_set_event_report_output_unref (output);
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     mm_dbg ("Adding location event report indication handling");
-    g_assert (ctx->self->priv->location_event_report_indication_id == 0);
-    ctx->self->priv->location_event_report_indication_id =
+    g_assert (self->priv->location_event_report_indication_id == 0);
+    self->priv->location_event_report_indication_id =
         g_signal_connect (client,
                           "event-report",
                           G_CALLBACK (location_event_report_indication_cb),
-                          ctx->self);
+                          self);
 
     /* Done */
     mm_dbg ("GPS started");
-    ctx->self->priv->enabled_sources |= ctx->source;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_location_gathering_context_complete_and_free (ctx);
+    self->priv->enabled_sources |= ctx->source;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 auto_tracking_state_start_ready (QmiClientPds *client,
                                  GAsyncResult *res,
-                                 EnableLocationGatheringContext *ctx)
+                                 GTask *task)
 {
+    EnableLocationGatheringContext *ctx;
     QmiMessagePdsSetEventReportInput *input;
     QmiMessagePdsSetAutoTrackingStateOutput *output = NULL;
     GError *error = NULL;
@@ -9103,8 +9010,8 @@ auto_tracking_state_start_ready (QmiClientPds *client,
     output = qmi_client_pds_set_auto_tracking_state_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -9113,8 +9020,8 @@ auto_tracking_state_start_ready (QmiClientPds *client,
                               QMI_PROTOCOL_ERROR,
                               QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_prefix_error (&error, "Couldn't set auto-tracking state: ");
-            g_simple_async_result_take_error (ctx->result, error);
-            enable_location_gathering_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             qmi_message_pds_set_auto_tracking_state_output_unref (output);
             return;
         }
@@ -9122,6 +9029,8 @@ auto_tracking_state_start_ready (QmiClientPds *client,
     }
 
     qmi_message_pds_set_auto_tracking_state_output_unref (output);
+
+    ctx = g_task_get_task_data (task);
 
     /* Only gather standard NMEA traces */
     input = qmi_message_pds_set_event_report_input_new ();
@@ -9132,15 +9041,16 @@ auto_tracking_state_start_ready (QmiClientPds *client,
         5,
         NULL,
         (GAsyncReadyCallback)ser_location_ready,
-        ctx);
+        task);
     qmi_message_pds_set_event_report_input_unref (input);
 }
 
 static void
 gps_service_state_start_ready (QmiClientPds *client,
                                GAsyncResult *res,
-                               EnableLocationGatheringContext *ctx)
+                               GTask *task)
 {
+    EnableLocationGatheringContext *ctx;
     QmiMessagePdsSetAutoTrackingStateInput *input;
     QmiMessagePdsSetGpsServiceStateOutput *output = NULL;
     GError *error = NULL;
@@ -9148,8 +9058,8 @@ gps_service_state_start_ready (QmiClientPds *client,
     output = qmi_client_pds_set_gps_service_state_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -9158,8 +9068,8 @@ gps_service_state_start_ready (QmiClientPds *client,
                               QMI_PROTOCOL_ERROR,
                               QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_prefix_error (&error, "Couldn't set GPS service state: ");
-            g_simple_async_result_take_error (ctx->result, error);
-            enable_location_gathering_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             qmi_message_pds_set_gps_service_state_output_unref (output);
             return;
         }
@@ -9167,6 +9077,8 @@ gps_service_state_start_ready (QmiClientPds *client,
     }
 
     qmi_message_pds_set_gps_service_state_output_unref (output);
+
+    ctx = g_task_get_task_data (task);
 
     /* Enable auto-tracking for a continuous fix */
     input = qmi_message_pds_set_auto_tracking_state_input_new ();
@@ -9177,48 +9089,55 @@ gps_service_state_start_ready (QmiClientPds *client,
         10,
         NULL, /* cancellable */
         (GAsyncReadyCallback)auto_tracking_state_start_ready,
-        ctx);
+        task);
     qmi_message_pds_set_auto_tracking_state_input_unref (input);
 }
 
 static void
 set_default_tracking_session_start_ready (QmiClientPds *client,
                                           GAsyncResult *res,
-                                          EnableLocationGatheringContext *ctx)
+                                          GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    EnableLocationGatheringContext *ctx;
     QmiMessagePdsSetDefaultTrackingSessionOutput *output = NULL;
     GError *error = NULL;
 
     output = qmi_client_pds_set_default_tracking_session_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_pds_set_default_tracking_session_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't set default tracking session: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_pds_set_default_tracking_session_output_unref (output);
         return;
     }
 
     qmi_message_pds_set_default_tracking_session_output_unref (output);
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     /* Done */
     mm_dbg ("A-GPS enabled");
-    ctx->self->priv->enabled_sources |= ctx->source;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_location_gathering_context_complete_and_free (ctx);
+    self->priv->enabled_sources |= ctx->source;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 get_default_tracking_session_start_ready (QmiClientPds *client,
                                           GAsyncResult *res,
-                                          EnableLocationGatheringContext *ctx)
+                                          GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    EnableLocationGatheringContext *ctx;
     QmiMessagePdsSetDefaultTrackingSessionInput *input;
     QmiMessagePdsGetDefaultTrackingSessionOutput *output = NULL;
     GError *error = NULL;
@@ -9226,18 +9145,21 @@ get_default_tracking_session_start_ready (QmiClientPds *client,
     output = qmi_client_pds_get_default_tracking_session_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_pds_get_default_tracking_session_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get default tracking session: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_pds_get_default_tracking_session_output_unref (output);
         return;
     }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     qmi_message_pds_get_default_tracking_session_output_get_info (
         output,
@@ -9252,9 +9174,9 @@ get_default_tracking_session_start_ready (QmiClientPds *client,
     if (ctx->session_operation == QMI_PDS_OPERATING_MODE_MS_ASSISTED) {
         /* Done */
         mm_dbg ("A-GPS already enabled");
-        ctx->self->priv->enabled_sources |= ctx->source;
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        enable_location_gathering_context_complete_and_free (ctx);
+        self->priv->enabled_sources |= ctx->source;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -9272,29 +9194,33 @@ get_default_tracking_session_start_ready (QmiClientPds *client,
         10,
         NULL, /* cancellable */
         (GAsyncReadyCallback)set_default_tracking_session_start_ready,
-        ctx);
+        task);
     qmi_message_pds_set_default_tracking_session_input_unref (input);
 }
 
 static void
-parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
+parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
                                         GAsyncResult *res,
-                                        EnableLocationGatheringContext *ctx)
+                                        GTask *task)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    EnableLocationGatheringContext *ctx;
     GError *error = NULL;
     QmiClient *client;
 
-    if (!iface_modem_location_parent->enable_location_gathering_finish (self, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+    if (!iface_modem_location_parent->enable_location_gathering_finish (_self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    ctx = g_task_get_task_data (task);
+
     /* Nothing else needed in the QMI side for LAC/CI */
     if (ctx->source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
-        ctx->self->priv->enabled_sources |= ctx->source;
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        enable_location_gathering_context_complete_and_free (ctx);
+        self->priv->enabled_sources |= ctx->source;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -9303,21 +9229,21 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
      * Note that we don't care for when the registration checks get finished.
      */
     if (ctx->source == MM_MODEM_LOCATION_SOURCE_CDMA_BS &&
-        mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
+        mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
         /* Reload registration to get LAC/CI */
-        mm_iface_modem_cdma_run_registration_checks (MM_IFACE_MODEM_CDMA (ctx->self), NULL, NULL);
+        mm_iface_modem_cdma_run_registration_checks (MM_IFACE_MODEM_CDMA (self), NULL, NULL);
         /* Just mark it as enabled */
-        ctx->self->priv->enabled_sources |= ctx->source;
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        enable_location_gathering_context_complete_and_free (ctx);
+        self->priv->enabled_sources |= ctx->source;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     /* Setup context and client */
-    client = peek_qmi_client (ctx->self, QMI_SERVICE_PDS, &error);
+    client = peek_qmi_client (self, QMI_SERVICE_PDS, &error);
     if (!client) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
     ctx->client = g_object_ref (client);
@@ -9330,15 +9256,15 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
             10,
             NULL, /* cancellable */
             (GAsyncReadyCallback)get_default_tracking_session_start_ready,
-            ctx);
+            task);
         return;
     }
 
     /* NMEA and RAW are both enabled in the same way */
     if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
         /* Only start GPS engine if not done already */
-        if (!(ctx->self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                                  MM_MODEM_LOCATION_SOURCE_GPS_RAW))) {
+        if (!(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                             MM_MODEM_LOCATION_SOURCE_GPS_RAW))) {
             QmiMessagePdsSetGpsServiceStateInput *input;
 
             input = qmi_message_pds_set_gps_service_state_input_new ();
@@ -9349,15 +9275,15 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
                 10,
                 NULL, /* cancellable */
                 (GAsyncReadyCallback)gps_service_state_start_ready,
-                ctx);
+                task);
             qmi_message_pds_set_gps_service_state_input_unref (input);
             return;
         }
 
         /* GPS already started, we're done */
-        ctx->self->priv->enabled_sources |= ctx->source;
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        enable_location_gathering_context_complete_and_free (ctx);
+        self->priv->enabled_sources |= ctx->source;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -9374,22 +9300,21 @@ enable_location_gathering (MMIfaceModemLocation *self,
                            gpointer user_data)
 {
     EnableLocationGatheringContext *ctx;
+    GTask *task;
 
     ctx = g_slice_new0 (EnableLocationGatheringContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enable_location_gathering);
     /* Store source to enable, there will be only one! */
     ctx->source = source;
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)enable_location_gathering_context_free);
+
     /* Chain up parent's gathering enable */
     iface_modem_location_parent->enable_location_gathering (
-        MM_IFACE_MODEM_LOCATION (ctx->self),
+        self,
         ctx->source,
         (GAsyncReadyCallback)parent_enable_location_gathering_ready,
-        ctx);
+        task);
 }
 
 /*****************************************************************************/
@@ -9400,8 +9325,7 @@ oma_check_support_finish (MMIfaceModemOma *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    /* no error expected here */
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -9409,26 +9333,22 @@ oma_check_support (MMIfaceModemOma *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     MMPortQmi *port;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        oma_check_support);
+    task = g_task_new (self, NULL, callback, user_data);
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     /* If we have support for the OMA client, OMA is supported */
     if (!port || !mm_port_qmi_peek_client (port, QMI_SERVICE_OMA, MM_PORT_QMI_FLAG_DEFAULT)) {
         mm_dbg ("OMA capabilities not supported");
-        g_simple_async_result_set_op_res_gboolean (result, FALSE);
+        g_task_return_boolean (task, FALSE);
     } else {
         mm_dbg ("OMA capabilities supported");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_task_return_boolean (task, TRUE);
     }
 
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -10406,12 +10326,18 @@ firmware_check_support (MMIfaceModemFirmware *self,
 /*****************************************************************************/
 /* Load firmware list (Firmware interface) */
 
+static void
+firmware_list_free (GList *firmware_list)
+{
+    g_list_free_full (firmware_list, g_object_unref);
+}
+
 static GList *
 firmware_load_list_finish (MMIfaceModemFirmware *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    return (GList *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -10420,20 +10346,15 @@ firmware_load_list (MMIfaceModemFirmware *_self,
                     gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
     GList *dup;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        firmware_load_list);
+    GTask *task;
 
     /* We'll return the new list of new references we create here */
     dup = g_list_copy_deep (self->priv->firmware_list, (GCopyFunc)g_object_ref, NULL);
 
-    g_simple_async_result_set_op_res_gpointer (result, dup, NULL);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, dup, (GDestroyNotify)firmware_list_free);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -10444,7 +10365,7 @@ firmware_load_current_finish (MMIfaceModemFirmware *self,
                               GAsyncResult *res,
                               GError **error)
 {
-    return (MMFirmwareProperties *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
@@ -10453,20 +10374,14 @@ firmware_load_current (MMIfaceModemFirmware *_self,
                        gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        firmware_load_current);
-
-    /* We'll return the reference we create here */
-    g_simple_async_result_set_op_res_gpointer (
-        result,
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (
+        task,
         self->priv->current_firmware ? g_object_ref (self->priv->current_firmware) : NULL,
-        NULL);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+        g_object_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -10704,7 +10619,7 @@ signal_check_support_finish (MMIfaceModemSignal *self,
                              GError **error)
 {
 
-    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -10712,14 +10627,9 @@ signal_check_support (MMIfaceModemSignal *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     MMPortQmi *port;
     gboolean supported = FALSE;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        signal_check_support);
+    GTask *task;
 
     port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
 
@@ -10728,9 +10638,10 @@ signal_check_support (MMIfaceModemSignal *self,
         supported = !!mm_port_qmi_peek_client (port, QMI_SERVICE_NAS, MM_PORT_QMI_FLAG_DEFAULT);
 
     mm_dbg ("Extended signal capabilities %ssupported", supported ? "" : "not ");
-    g_simple_async_result_set_op_res_gboolean (result, supported);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, supported);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -11178,13 +11089,13 @@ enabling_started_finish (MMBroadbandModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 parent_enabling_started_ready (MMBroadbandModem *self,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     GError *error = NULL;
 
@@ -11198,9 +11109,8 @@ parent_enabling_started_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -11208,37 +11118,30 @@ enabling_started (MMBroadbandModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        enabling_started);
+    task = g_task_new (self, NULL, callback, user_data);
+
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->enabling_started (
         self,
         (GAsyncReadyCallback)parent_enabling_started_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortQmi *qmi;
     QmiService services[32];
     guint service_index;
 } InitializationStartedContext;
 
 static void
-initialization_started_context_complete_and_free (InitializationStartedContext *ctx)
+initialization_started_context_free (InitializationStartedContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->qmi)
         g_object_unref (ctx->qmi);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -11247,17 +11150,13 @@ initialization_started_finish (MMBroadbandModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    /* Just parent's pointer passed here */
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_initialization_started_ready (MMBroadbandModem *self,
                                      GAsyncResult *res,
-                                     InitializationStartedContext *ctx)
+                                     GTask *task)
 {
     gpointer parent_ctx;
     GError *error = NULL;
@@ -11273,27 +11172,34 @@ parent_initialization_started_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, parent_ctx, NULL);
-    initialization_started_context_complete_and_free (ctx);
+    /* Just parent's pointer passed here */
+    g_task_return_pointer (task, parent_ctx, NULL);
+    g_object_unref (task);
 }
 
 static void
-parent_initialization_started (InitializationStartedContext *ctx)
+parent_initialization_started (GTask *task)
 {
+    MMBroadbandModem *self;
+
+    self = g_task_get_source_object (task);
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->initialization_started (
-        ctx->self,
+        self,
         (GAsyncReadyCallback)parent_initialization_started_ready,
-        ctx);
+        task);
 }
 
-static void allocate_next_client (InitializationStartedContext *ctx);
+static void allocate_next_client (GTask *task);
 
 static void
 qmi_port_allocate_client_ready (MMPortQmi *qmi,
                                 GAsyncResult *res,
-                                InitializationStartedContext *ctx)
+                                GTask *task)
 {
+    InitializationStartedContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!mm_port_qmi_allocate_client_finish (qmi, res, &error)) {
         mm_dbg ("Couldn't allocate client for service '%s': %s",
@@ -11303,15 +11209,19 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
     }
 
     ctx->service_index++;
-    allocate_next_client (ctx);
+    allocate_next_client (task);
 }
 
 static void
-allocate_next_client (InitializationStartedContext *ctx)
+allocate_next_client (GTask *task)
 {
+    InitializationStartedContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     if (ctx->services[ctx->service_index] == QMI_SERVICE_UNKNOWN) {
         /* Done we are, launch parent's callback */
-        parent_initialization_started (ctx);
+        parent_initialization_started (task);
         return;
     }
 
@@ -11321,32 +11231,35 @@ allocate_next_client (InitializationStartedContext *ctx)
                                  MM_PORT_QMI_FLAG_DEFAULT,
                                  NULL,
                                  (GAsyncReadyCallback)qmi_port_allocate_client_ready,
-                                 ctx);
+                                 task);
 }
 
 
 static void
 qmi_port_open_ready_no_data_format (MMPortQmi *qmi,
                                     GAsyncResult *res,
-                                    InitializationStartedContext *ctx)
+                                    GTask *task)
 {
     GError *error = NULL;
 
     if (!mm_port_qmi_open_finish (qmi, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    allocate_next_client (ctx);
+    allocate_next_client (task);
 }
 
 static void
 qmi_port_open_ready (MMPortQmi *qmi,
                      GAsyncResult *res,
-                     InitializationStartedContext *ctx)
+                     GTask *task)
 {
+    InitializationStartedContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     if (!mm_port_qmi_open_finish (qmi, res, &error)) {
         /* Really, really old devices (Gobi 1K, 2008-era firmware) may not
@@ -11358,11 +11271,11 @@ qmi_port_open_ready (MMPortQmi *qmi,
                           FALSE,
                           NULL,
                           (GAsyncReadyCallback)qmi_port_open_ready_no_data_format,
-                          ctx);
+                          task);
         return;
     }
 
-    allocate_next_client (ctx);
+    allocate_next_client (task);
 }
 
 static void
@@ -11371,28 +11284,27 @@ initialization_started (MMBroadbandModem *self,
                         gpointer user_data)
 {
     InitializationStartedContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (InitializationStartedContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialization_started);
     ctx->qmi = mm_base_modem_get_port_qmi (MM_BASE_MODEM (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
 
     /* This may happen if we unplug the modem unexpectedly */
     if (!ctx->qmi) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Cannot initialize: QMI port went missing");
-        initialization_started_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot initialize: QMI port went missing");
+        g_object_unref (task);
         return;
     }
 
     if (mm_port_qmi_is_open (ctx->qmi)) {
         /* Nothing to be done, just launch parent's callback */
-        parent_initialization_started (ctx);
+        parent_initialization_started (task);
         return;
     }
 
@@ -11410,7 +11322,7 @@ initialization_started (MMBroadbandModem *self,
                       TRUE,
                       NULL,
                       (GAsyncReadyCallback)qmi_port_open_ready,
-                      ctx);
+                      task);
 }
 
 /*****************************************************************************/
