@@ -68,12 +68,16 @@ load_current_ready (MMIfaceModemFirmware *self,
     GList *l;
     GError *error = NULL;
 
-    /* reported current may be NULL and we don't treat it as error */
     ctx->current = MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current_finish (self, res, &error);
-    if (error) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_list_context_free (ctx);
-        return;
+    if (!ctx->current) {
+        /* Not found isn't fatal */
+        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND)) {
+            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            handle_list_context_free (ctx);
+            return;
+        }
+        mm_dbg ("Couldn't load current firmware image: %s", error->message);
+        g_clear_error (&error);
     }
 
     /* Build array of dicts */

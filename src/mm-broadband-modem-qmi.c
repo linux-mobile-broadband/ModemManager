@@ -10383,10 +10383,13 @@ firmware_load_current (MMIfaceModemFirmware *_self,
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_return_pointer (
-        task,
-        self->priv->current_firmware ? g_object_ref (self->priv->current_firmware) : NULL,
-        g_object_unref);
+    if (self->priv->current_firmware)
+        g_task_return_pointer (task,
+                               g_object_ref (self->priv->current_firmware),
+                               g_object_unref);
+    else
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                 "current firmware unknown");
     g_object_unref (task);
 }
 
