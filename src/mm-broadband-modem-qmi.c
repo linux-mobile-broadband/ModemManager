@@ -10355,7 +10355,11 @@ firmware_load_list (MMIfaceModemFirmware *_self,
     dup = g_list_copy_deep (self->priv->firmware_list, (GCopyFunc)g_object_ref, NULL);
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_return_pointer (task, dup, (GDestroyNotify)firmware_list_free);
+    if (dup)
+        g_task_return_pointer (task, dup, (GDestroyNotify)firmware_list_free);
+    else
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                 "firmware list unknown");
     g_object_unref (task);
 }
 
