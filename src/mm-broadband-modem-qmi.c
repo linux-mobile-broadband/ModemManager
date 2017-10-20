@@ -7293,6 +7293,8 @@ messaging_load_supported_storages_finish (MMIfaceModemMessaging *_self,
         return iface_modem_messaging_parent->load_supported_storages_finish (_self, res, mem1, mem2, mem3, error);
     }
 
+    g_assert (g_task_propagate_boolean (G_TASK (res), NULL));
+
     *mem1 = g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), 2);
     /* Add SM storage only if not CDMA-only */
     if (!mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
