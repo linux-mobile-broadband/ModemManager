@@ -47,34 +47,6 @@ typedef struct {
     MMModemCdmaRegistrationState detailed_evdo_state;
 } DetailedRegistrationStateResults;
 
-typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
-    MMModemCdmaRegistrationState cdma1x_state;
-    MMModemCdmaRegistrationState evdo_state;
-    GError *error;
-} DetailedRegistrationStateContext;
-
-static void
-detailed_registration_state_context_complete_and_free (DetailedRegistrationStateContext *ctx)
-{
-    if (ctx->error)
-        g_simple_async_result_take_error (ctx->result, ctx->error);
-    else {
-        DetailedRegistrationStateResults *results;
-
-        results = g_new (DetailedRegistrationStateResults, 1);
-        results->detailed_cdma1x_state = ctx->cdma1x_state;
-        results->detailed_evdo_state = ctx->evdo_state;
-        g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
-    }
-
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 get_detailed_registration_state_finish (MMIfaceModemCdma *self,
                                         GAsyncResult *res,
@@ -84,31 +56,36 @@ get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 {
     DetailedRegistrationStateResults *results;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    results = g_task_propagate_pointer (G_TASK (res), error);
+    if (!results)
         return FALSE;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *detailed_cdma1x_state = results->detailed_cdma1x_state;
     *detailed_evdo_state = results->detailed_evdo_state;
+    g_free (results);
     return TRUE;
 }
 
 static void
 hstate_ready (MMIfaceModemCdma *self,
               GAsyncResult *res,
-              DetailedRegistrationStateContext *ctx)
+              GTask *task)
 {
+    DetailedRegistrationStateResults *results;
     GError *error = NULL;
     const gchar *response;
     GRegex *r;
     GMatchInfo *match_info;
 
+    results = g_task_get_task_data (task);
+
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         /* Leave superclass' reg state alone if AT*HSTATE isn't supported */
         g_error_free (error);
-        /* Result is set here when completing */
-        detailed_registration_state_context_complete_and_free (ctx);
+
+        g_task_return_pointer (task, g_memdup (results, sizeof (*results)), g_free);
+        g_object_unref (task);
         return;
     }
 
@@ -135,11 +112,11 @@ hstate_ready (MMIfaceModemCdma *self,
                  * It may be that IDLE actually means NO SERVICE too; not sure.
                  */
                 if (dbm > -105)
-                    ctx->evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+                    results->detailed_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             case 4:  /* ACCESS */
             case 5:  /* CONNECT */
-                ctx->evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+                results->detailed_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             default:
                 mm_warn ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
@@ -155,25 +132,29 @@ hstate_ready (MMIfaceModemCdma *self,
     g_match_info_free (match_info);
     g_regex_unref (r);
 
-    /* Result is set here when completing */
-    detailed_registration_state_context_complete_and_free (ctx);
+    g_task_return_pointer (task, g_memdup (results, sizeof (*results)), g_free);
+    g_object_unref (task);
 }
 
 static void
 state_ready (MMIfaceModemCdma *self,
              GAsyncResult *res,
-             DetailedRegistrationStateContext *ctx)
+             GTask *task)
 {
+    DetailedRegistrationStateResults *results;
+    GError *error = NULL;
     const gchar *response;
     GRegex *r;
     GMatchInfo *match_info;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &ctx->error);
-    if (ctx->error) {
-        detailed_registration_state_context_complete_and_free (ctx);
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
+    results = g_task_get_task_data (task);
     response = mm_strip_tag (response, "*STATE:");
 
     /* Format is "<channel>,<pn>,<sid>,<nid>,<state>,<rssi>,..." */
@@ -197,12 +178,12 @@ state_ready (MMIfaceModemCdma *self,
                  * It may be that IDLE actually means NO SERVICE too; not sure.
                  */
                 if (dbm > -105)
-                    ctx->cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+                    results->detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             case 2:  /* ACCESS */
             case 3:  /* PAGING */
             case 4:  /* TRAFFIC */
-                ctx->cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+                results->detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             default:
                 mm_warn ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
@@ -222,7 +203,7 @@ state_ready (MMIfaceModemCdma *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)hstate_ready,
-                              ctx);
+                              task);
 }
 
 static void
@@ -232,24 +213,22 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    DetailedRegistrationStateContext *ctx;
+    DetailedRegistrationStateResults *results;
+    GTask *task;
 
-    /* Setup context */
-    ctx = g_new0 (DetailedRegistrationStateContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             get_detailed_registration_state);
-    ctx->cdma1x_state = cdma1x_state;
-    ctx->evdo_state = evdo_state;
+    results = g_new (DetailedRegistrationStateResults, 1);
+    results->detailed_cdma1x_state = cdma1x_state;
+    results->detailed_evdo_state = evdo_state;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, results, g_free);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "*STATE?",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)state_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
