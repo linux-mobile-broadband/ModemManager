@@ -298,7 +298,7 @@ cause_code_to_delivery_state (guint8 error_class,
     else if (cause_code == 101)
         /* 101 reserved */
         delivery_state += CAUSE_CODE_GENERAL_PROBLEM_OTHER;
-    else if (cause_code >= 108 && cause_code <= 255)
+    else if (cause_code >= 108) /* cause_code <= 255 is always true */
         /* 108 to 223 reserved, treat as CAUSE_CODE_GENERAL_PROBLEM_OTHER
          * 224 to 255 reserved for TIA/EIA-41 extension, otherwise treat as CAUSE_CODE_GENERAL_PROBLEM_OTHER */
         delivery_state += CAUSE_CODE_GENERAL_PROBLEM_OTHER;
