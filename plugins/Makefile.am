@@ -882,20 +882,6 @@ dist_udevrules_DATA += haier/77-mm-haier-port-types.rules
 AM_CFLAGS += -DTESTUDEVRULESDIR_HAIER=\"${srcdir}/haier\"
 
 ################################################################################
-# udev rules tester
-################################################################################
-
-noinst_PROGRAMS += test-udev-rules
-test_udev_rules_SOURCES = \
-	tests/test-udev-rules.c \
-	$(NULL)
-test_udev_rules_LDADD = \
-	$(top_builddir)/src/libkerneldevice.la \
-	$(top_builddir)/libmm-glib/libmm-glib.la \
-	$(NULL)
-
-
-################################################################################
 # plugin: u-blox
 ################################################################################
 
@@ -986,6 +972,19 @@ libmm_plugin_dell_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_L
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
 
 AM_CFLAGS += -DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\"
+
+################################################################################
+# udev rules tester
+################################################################################
+
+noinst_PROGRAMS += test-udev-rules
+test_udev_rules_SOURCES = \
+	tests/test-udev-rules.c \
+	$(NULL)
+test_udev_rules_LDADD = \
+	$(top_builddir)/src/libkerneldevice.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
 
 ################################################################################
 
