@@ -2,13 +2,13 @@
 # Copyright (C) 2013 Free Software Foundation, Inc.
 # This file is distributed under the same license as the Modem Manager package.
 #
-# Yuri Chornoivan <yurchor@ukr.net>, 2013.
+# Yuri Chornoivan <yurchor@ukr.net>, 2013, 2017.
 msgid ""
 msgstr ""
 "Project-Id-Version: Modem Manager\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2017-08-29 09:24+0200\n"
-"PO-Revision-Date: 2013-10-19 18:17+0300\n"
+"POT-Creation-Date: 2017-11-12 13:40+0100\n"
+"PO-Revision-Date: 2017-11-11 18:33+0200\n"
 "Last-Translator: Yuri Chornoivan <yurchor@ukr.net>\n"
 "Language-Team: Ukrainian <kde-i18n-uk@kde.org>\n"
 "Language: uk\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-"X-Generator: Lokalize 1.5\n"
+"X-Generator: Lokalize 2.0\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
@@ -56,7 +56,6 @@ msgid "Send, save, modify, and delete text messages"
 msgstr "Надіслати, зберегти, внести зміни або вилучити текстові повідомлення"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:41
-#, fuzzy
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
 msgstr ""
@@ -66,11 +65,11 @@ msgstr ""
 #: data/org.freedesktop.ModemManager1.policy.in.in:49
 msgid "Accept incoming voice calls or start outgoing voice calls."
 msgstr ""
+"Приймати вхідні голосові виклики і розпочинати вихідні голосові виклики."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:50
-#, fuzzy
 msgid "System policy prevents voice calls."
-msgstr "Правила системи перешкоджають керування Modem Manager."
+msgstr "Правила системи перешкоджають голосовим викликам."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Enable and view geographic location and positioning information"
@@ -109,4 +108,4 @@ msgstr ""
 
 #: src/mm-sleep-monitor.c:114
 msgid "ModemManager needs to reset devices"
-msgstr ""
+msgstr "ModemManager потребує відновлення початкового стану пристроїв"
