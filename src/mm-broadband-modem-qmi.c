@@ -10106,9 +10106,10 @@ get_pri_image_info_ready (QmiClientDms *client,
                 ctx->self->priv->current_firmware = g_object_ref (firmware);
 
         }
-
-        qmi_message_dms_get_stored_image_info_output_unref (output);
     }
+
+    if (output)
+        qmi_message_dms_get_stored_image_info_output_unref (output);
 
     /* Go on to the next one */
     ctx->l = g_list_next (ctx->l);
