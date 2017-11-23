@@ -2986,9 +2986,7 @@ typedef enum {
 } UpdateLockInfoContextStep;
 
 typedef struct {
-    MMIfaceModem *self;
     UpdateLockInfoContextStep step;
-    GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
     MMModemLock lock;
     GError *saved_error;
@@ -3230,7 +3228,6 @@ mm_iface_modem_update_lock_info (MMIfaceModem *self,
     GTask *task;
 
     ctx = g_slice_new0 (UpdateLockInfoContext);
-    ctx->self = g_object_ref (self);
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
