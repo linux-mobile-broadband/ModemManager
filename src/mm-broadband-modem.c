@@ -3357,6 +3357,132 @@ modem_power_up (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Reprobing the modem if the SIM changed across a power-off or power-down */
+
+typedef struct {
+    MMBaseSim *sim;
+    guint retries;
+} SimSwapContext;
+
+static gboolean load_sim_identifier (GTask *task);
+
+static void
+sim_swap_context_free (SimSwapContext *ctx)
+{
+    g_clear_object (&ctx->sim);
+    g_slice_free (SimSwapContext, ctx);
+}
+
+static gboolean
+modem_check_for_sim_swap_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+load_sim_identifier_ready (MMBaseSim *sim,
+                           GAsyncResult *res,
+                           GTask *task)
+{
+    MMBroadbandModem *self;
+    SimSwapContext *ctx;
+    const gchar *cached_simid;
+    gchar *current_simid;
+    GError *error = NULL;
+
+    self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
+    ctx = g_task_get_task_data (task);
+    cached_simid = mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (sim));
+    current_simid = MM_BASE_SIM_GET_CLASS (sim)->load_sim_identifier_finish (sim, res, &error);
+
+    if (error) {
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            g_task_return_error (task, error);
+            goto out;
+        }
+
+        if (ctx->retries > 0) {
+            mm_warn ("could not load SIM identifier: %s (%d retries left)",
+                     error->message, ctx->retries);
+            --ctx->retries;
+            g_clear_error (&error);
+            g_timeout_add_seconds (1, (GSourceFunc) load_sim_identifier, task);
+            return;
+        }
+
+        mm_warn ("could not load SIM identifier: %s", error->message);
+        g_task_return_error (task, error);
+        goto out;
+    }
+
+    if (g_strcmp0 (current_simid, cached_simid) != 0) {
+        mm_info ("sim identifier has changed: possible SIM swap during power down/low");
+        mm_broadband_modem_update_sim_hot_swap_detected (self);
+    }
+
+    g_task_return_boolean (task, TRUE);
+
+out:
+    g_free (current_simid);
+    g_object_unref (task);
+}
+
+static gboolean
+load_sim_identifier (GTask *task)
+{
+    SimSwapContext *ctx = g_task_get_task_data (task);
+
+    MM_BASE_SIM_GET_CLASS (ctx->sim)->load_sim_identifier (
+        ctx->sim,
+        (GAsyncReadyCallback)load_sim_identifier_ready,
+        task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+modem_check_for_sim_swap (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GTask *task;
+    SimSwapContext *ctx;
+
+    mm_dbg ("Checking if SIM was swapped...");
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (SimSwapContext);
+    ctx->retries = 3;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)sim_swap_context_free);
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM, &ctx->sim,
+                  NULL);
+    if (!ctx->sim) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "could not acquire sim object");
+        g_object_unref (task);
+        return;
+    }
+
+    if (!MM_BASE_SIM_GET_CLASS (ctx->sim)->load_sim_identifier ||
+        !MM_BASE_SIM_GET_CLASS (ctx->sim)->load_sim_identifier_finish) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "sim identifier could not be loaded");
+        g_object_unref (task);
+        return;
+    }
+
+    load_sim_identifier (task);
+}
+
+/*****************************************************************************/
 /* Sending a command to the modem (Modem interface) */
 
 static const gchar *
@@ -10767,6 +10893,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Enabling steps */
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
+    iface->check_for_sim_swap = modem_check_for_sim_swap;
+    iface->check_for_sim_swap_finish = modem_check_for_sim_swap_finish;
     iface->setup_flow_control = modem_setup_flow_control;
     iface->setup_flow_control_finish = modem_setup_flow_control_finish;
     iface->load_supported_charsets = modem_load_supported_charsets;

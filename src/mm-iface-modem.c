@@ -3557,6 +3557,7 @@ static void interface_enabling_step (GTask *task);
 typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SET_POWER_STATE,
+    ENABLING_STEP_CHECK_FOR_SIM_SWAP,
     ENABLING_STEP_FLOW_CONTROL,
     ENABLING_STEP_SUPPORTED_CHARSETS,
     ENABLING_STEP_CHARSET,
@@ -3598,6 +3599,25 @@ enabling_set_power_state_ready (MMIfaceModem *self,
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
+    }
+
+    /* Go on to next step */
+    ctx = g_task_get_task_data (task);
+    ctx->step++;
+    interface_enabling_step (task);
+}
+
+static void
+check_for_sim_swap_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GTask *task)
+{
+    EnablingContext *ctx;
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish (self, res, &error)) {
+        mm_warn ("Error checking if SIM was swapped: '%s'", error->message);
+        g_error_free (error);
     }
 
     /* Go on to next step */
@@ -3708,6 +3728,18 @@ interface_enabling_step (GTask *task)
                                         (GAsyncReadyCallback)enabling_set_power_state_ready,
                                         task);
         return;
+
+    case ENABLING_STEP_CHECK_FOR_SIM_SWAP:
+        if (MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
+                self,
+                (GAsyncReadyCallback)check_for_sim_swap_ready,
+                task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case ENABLING_STEP_FLOW_CONTROL:
         if (MM_IFACE_MODEM_GET_INTERFACE (self)->setup_flow_control &&

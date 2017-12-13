@@ -281,6 +281,16 @@ struct _MMIfaceModem {
                                              GAsyncResult *res,
                                              GError **error);
 
+    /* Asynchronous check to see if the SIM was swapped.
+     * Useful for when the modem changes power states since we might
+     * not get the relevant notifications from the modem. */
+    void (*check_for_sim_swap) (MMIfaceModem *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+    gboolean (*check_for_sim_swap_finish) (MMIfaceModem *self,
+                                           GAsyncResult *res,
+                                           GError **error);
+
     /* Asynchronous flow control setup */
     void (*setup_flow_control) (MMIfaceModem *self,
                                 GAsyncReadyCallback callback,
