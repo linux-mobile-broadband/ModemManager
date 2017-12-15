@@ -247,8 +247,28 @@ sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_of
         mm_dbg ("   Got UTF-8 text: '%s'", utf8);
         g_free (unpacked);
     } else if (encoding == MM_SMS_ENCODING_UCS2) {
-        mm_dbg ("Converting SMS part text from UCS-2BE to UTF8...");
-        utf8 = g_convert ((char *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
+        /* Despite 3GPP TS 23.038 specifies that Unicode SMS messages are
+         * encoded in UCS-2, UTF-16 encoding is commonly used instead on many
+         * modern platforms to allow encoding code points that fall outside the
+         * Basic Multilingual Plane (BMP), such as Emoji. Most of the UCS-2
+         * code points are identical to their equivalent UTF-16 code points.
+         * In UTF-16, non-BMP code points are encoded in a pair of surrogate
+         * code points (i.e. a high surrogate in 0xD800..0xDBFF, followed by a
+         * low surrogate in 0xDC00..0xDFFF). An isolated surrogate code point
+         * has no general interpretation in UTF-16, but could be a valid
+         * (though unmapped) code point in UCS-2. Here we first try to decode
+         * the SMS message in UTF-16BE, and if that fails, fall back to decode
+         * in UCS-2BE.
+         */
+        mm_dbg ("Converting SMS part text from UTF16BE to UTF8...");
+        utf8 = g_convert ((const gchar *) text, len, "UTF8", "UTF16BE", NULL, NULL, NULL);
+        if (!utf8) {
+            mm_dbg ("Converting SMS part text from UCS-2BE to UTF8...");
+            utf8 = g_convert ((const gchar *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
+        }
+        if (!utf8)
+            utf8 = g_strdup ("");
+
         mm_dbg ("   Got UTF-8 text: '%s'", utf8);
     } else {
         g_warn_if_reached ();
