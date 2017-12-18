@@ -201,4 +201,9 @@ ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a4a7", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Silicon Labs Telegesis ETRX USB Zigbee dongle
 ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="000f", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# All devices from Pycom LTD
+# Since Pycom is not producing any modems, it is safe to blacklist all
+# Pycom LTD devices.
+ATTRS{idVendor}=="04d8", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
