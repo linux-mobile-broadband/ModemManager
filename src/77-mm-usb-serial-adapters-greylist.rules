@@ -13,6 +13,9 @@ ATTRS{idVendor}=="050d", ATTRS{idProduct}=="0103", ENV{ID_MM_DEVICE_MANUAL_SCAN_
 #   on the vendor Id.
 ATTRS{idVendor}=="0403", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
+# Devices using Microchip's VID
+ATTRS{idVendor}=="04d8", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
+
 # ATEN Intl UC-232A (Prolific)
 ATTRS{idVendor}=="0557", ATTRS{idProduct}=="2008", ENV{ID_MM_DEVICE_MANUAL_SCAN_ONLY}="1"
 
