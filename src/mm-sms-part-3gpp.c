@@ -23,6 +23,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-helper-enums-types.h"
 #include "mm-sms-part-3gpp.h"
 #include "mm-charsets.h"
 #include "mm-log.h"
@@ -241,7 +242,7 @@ sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_of
     guint32 unpacked_len;
 
     if (encoding == MM_SMS_ENCODING_GSM7) {
-        mm_dbg ("Converting SMS part text from GSM7 to UTF8...");
+        mm_dbg ("Converting SMS part text from GSM-7 to UTF-8...");
         unpacked = mm_charset_gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
         utf8 = (char *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
         mm_dbg ("   Got UTF-8 text: '%s'", utf8);
@@ -260,18 +261,19 @@ sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_of
          * the SMS message in UTF-16BE, and if that fails, fall back to decode
          * in UCS-2BE.
          */
-        mm_dbg ("Converting SMS part text from UTF16BE to UTF8...");
+        mm_dbg ("Converting SMS part text from UTF-16BE to UTF-8...");
         utf8 = g_convert ((const gchar *) text, len, "UTF8", "UTF16BE", NULL, NULL, NULL);
         if (!utf8) {
             mm_dbg ("Converting SMS part text from UCS-2BE to UTF8...");
             utf8 = g_convert ((const gchar *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
         }
-        if (!utf8)
+        if (!utf8) {
+            mm_warn ("Couldn't convert SMS part contents from UTF-16BE/UCS-2BE to UTF-8: not decoding any text");
             utf8 = g_strdup ("");
-
-        mm_dbg ("   Got UTF-8 text: '%s'", utf8);
+        } else
+            mm_dbg ("   Got UTF-8 text: '%s'", utf8);
     } else {
-        g_warn_if_reached ();
+        mm_warn ("Unexpected encoding '%s': not decoding any text", mm_sms_encoding_get_string (encoding));
         utf8 = g_strdup ("");
     }
 
