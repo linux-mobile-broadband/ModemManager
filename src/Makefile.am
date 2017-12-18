@@ -72,6 +72,7 @@ EXTRA_DIST += $(udevrules_DATA)
 noinst_LTLIBRARIES += libhelpers.la
 
 HELPER_ENUMS_INPUTS = \
+	$(srcdir)/mm-sms-part.h \
 	$(srcdir)/mm-modem-helpers.h \
 	$(NULL)
 
@@ -82,7 +83,7 @@ HELPER_ENUMS_GENERATED = \
 
 mm-helper-enums-types.h: Makefile.am $(HELPER_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include \"mm-modem-helpers.h\"\n#ifndef __MM_HELPER_ENUMS_TYPES_H__\n#define __MM_HELPER_ENUMS_TYPES_H__\n" \
+		--fhead "#include \"mm-sms-part.h\"\n#include \"mm-modem-helpers.h\"\n#ifndef __MM_HELPER_ENUMS_TYPES_H__\n#define __MM_HELPER_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_HELPER_ENUMS_TYPES_H__ */\n" \
 		$(HELPER_ENUMS_INPUTS) > $@

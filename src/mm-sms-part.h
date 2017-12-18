@@ -18,9 +18,9 @@
 #define MM_SMS_PART_H
 
 #include <glib.h>
-#include <ModemManager-enums.h>
+#include <ModemManager.h>
 
-typedef enum {
+typedef enum { /*< underscore_name=mm_sms_encoding >*/
     MM_SMS_ENCODING_UNKNOWN = 0x0,
     MM_SMS_ENCODING_GSM7,
     MM_SMS_ENCODING_8BIT,

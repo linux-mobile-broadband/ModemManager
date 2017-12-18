@@ -17,7 +17,7 @@
 #define MM_SMS_PART_CDMA_H
 
 #include <glib.h>
-#include <ModemManager-enums.h>
+#include <ModemManager.h>
 
 #include "mm-sms-part.h"
 

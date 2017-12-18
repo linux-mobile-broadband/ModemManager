@@ -18,7 +18,7 @@
 #define MM_SMS_PART_3GPP_H
 
 #include <glib.h>
-#include <ModemManager-enums.h>
+#include <ModemManager.h>
 
 #include "mm-sms-part.h"
 
