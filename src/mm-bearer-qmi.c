@@ -1156,8 +1156,11 @@ connect_context_step (ConnectContext *ctx)
                                                ctx->cancellable,
                                                (GAsyncReadyCallback) connect_enable_indications_ipv4_ready,
                                                ctx);
-#endif
         return;
+#else
+        /* Just fall down */
+        ctx->step++;
+#endif
 
     case CONNECT_STEP_START_NETWORK_IPV4: {
         QmiMessageWdsStartNetworkInput *input;
@@ -1259,8 +1262,11 @@ connect_context_step (ConnectContext *ctx)
                                                ctx->cancellable,
                                                (GAsyncReadyCallback) connect_enable_indications_ipv6_ready,
                                                ctx);
-#endif
         return;
+#else
+        /* Just fall down */
+        ctx->step++;
+#endif
 
     case CONNECT_STEP_START_NETWORK_IPV6: {
         QmiMessageWdsStartNetworkInput *input;
