@@ -896,12 +896,12 @@ connect_enable_indications_ipv4_ready (QmiClientWds *client,
 
     ctx->event_report_ipv4_indication_id =
         connect_enable_indications_ready (client, res, ctx->self, &ctx->error_ipv4);
-    if (!ctx->event_report_ipv4_indication_id) {
-        ctx->step = CONNECT_STEP_LAST;
-        return;
-    }
 
-    ctx->step++;
+    if (!ctx->event_report_ipv4_indication_id)
+        ctx->step = CONNECT_STEP_LAST;
+    else
+        ctx->step++;
+
     connect_context_step (ctx);
 }
 
@@ -914,12 +914,12 @@ connect_enable_indications_ipv6_ready (QmiClientWds *client,
 
     ctx->event_report_ipv6_indication_id =
         connect_enable_indications_ready (client, res, ctx->self, &ctx->error_ipv6);
-    if (!ctx->event_report_ipv6_indication_id) {
-        ctx->step = CONNECT_STEP_LAST;
-        return;
-    }
 
-    ctx->step++;
+    if (!ctx->event_report_ipv6_indication_id)
+        ctx->step = CONNECT_STEP_LAST;
+    else
+        ctx->step++;
+
     connect_context_step (ctx);
 }
 
