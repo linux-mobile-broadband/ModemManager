@@ -1,4 +1,20 @@
 
+ModemManager 1.6.12
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Among other things fixed:
+
+ * Blacklist:
+   ** Ignored Pycom devices.
+   ** Added Microchip's VID to the greylist.
+
+ * QMI:
+   ** Fixed connection state machine when built against libqmi < 1.18.
+   ** Fixed connection state machine when an error is reported setting up
+      WDS indications.
+
+
 ModemManager 1.6.10
 -------------------------------------------
 This is a new bugfix release of ModemManager.
