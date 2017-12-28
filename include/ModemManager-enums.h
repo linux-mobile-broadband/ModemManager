@@ -1156,6 +1156,24 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_ussd_session_state >*/
 } MMModem3gppUssdSessionState;
 
 /**
+ * MMModem3gppEpsUeModeOperation:
+ * @MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN: Unknown or not applicable.
+ * @MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_1: PS mode 1 of operation: EPS only, voice-centric.
+ * @MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_2: PS mode 2 of operation: EPS only, data-centric.
+ * @MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_1: CS/PS mode 1 of operation: EPS and non-EPS, voice-centric.
+ * @MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_2: CS/PS mode 2 of operation: EPS and non-EPS, data-centric.
+ *
+ * UE mode of operation for EPS, as per 3GPP TS 24.301.
+ */
+typedef enum { /*< underscore_name=mm_modem_3gpp_eps_ue_mode_operation >*/
+    MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN = 0,
+    MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_1    = 1,
+    MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_PS_2    = 2,
+    MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_1  = 3,
+    MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_2  = 4,
+} MMModem3gppEpsUeModeOperation;
+
+/**
  * MMFirmwareImageType:
  * @MM_FIRMWARE_IMAGE_TYPE_UNKNOWN: Unknown firmware type.
  * @MM_FIRMWARE_IMAGE_TYPE_GENERIC: Generic firmware image.

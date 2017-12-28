@@ -68,6 +68,14 @@ struct _MMIfaceModem3gpp {
                                                                GAsyncResult *res,
                                                                GError **error);
 
+    /* Loading of the UE mode of operation for EPS property */
+    void                          (* load_eps_ue_mode_operation)        (MMIfaceModem3gpp     *self,
+                                                                         GAsyncReadyCallback   callback,
+                                                                         gpointer              user_data);
+    MMModem3gppEpsUeModeOperation (* load_eps_ue_mode_operation_finish) (MMIfaceModem3gpp     *self,
+                                                                         GAsyncResult         *res,
+                                                                         GError              **error);
+
     /* Asynchronous setting up unsolicited events */
     void (*setup_unsolicited_events) (MMIfaceModem3gpp *self,
                                       GAsyncReadyCallback callback,
@@ -191,6 +199,15 @@ struct _MMIfaceModem3gpp {
     GList * (*scan_networks_finish) (MMIfaceModem3gpp *self,
                                      GAsyncResult *res,
                                      GError **error);
+
+    /* Set UE mode of operation for EPS */
+    void     (* set_eps_ue_mode_operation)        (MMIfaceModem3gpp               *self,
+                                                   MMModem3gppEpsUeModeOperation   mode,
+                                                   GAsyncReadyCallback             callback,
+                                                   gpointer                        user_data);
+    gboolean (* set_eps_ue_mode_operation_finish) (MMIfaceModem3gpp               *self,
+                                                   GAsyncResult                   *res,
+                                                   GError                        **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);

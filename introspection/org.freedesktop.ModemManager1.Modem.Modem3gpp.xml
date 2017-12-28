@@ -86,6 +86,16 @@
     </method>
 
     <!--
+        SetEpsUeModeOperation:
+        @mode: a <link linkend="MMModem3gppEpsUeModeOperation">MMModem3gppEpsUeModeOperation</link>.
+
+        Sets the UE mode of operation for EPS.
+    -->
+    <method name="SetEpsUeModeOperation">
+      <arg name="mode" type="u" direction="in" />
+    </method>
+
+    <!--
         Imei:
 
         The <ulink url="http://en.wikipedia.org/wiki/Imei">IMEI</ulink> of the device.
@@ -144,6 +154,15 @@
         is any data remaining, given as an unsigned integer (signature <literal>"u"</literal>).
     -->
     <property name="SubscriptionState" type="u" access="read" />
+
+    <!--
+        EpsUeModeOperation:
+
+        A <link linkend="MMModem3gppEpsUeModeOperation">MMModem3gppEpsUeModeOperation</link>
+        value representing the UE mode of operation for EPS, given as an unsigned integer
+        (signature <literal>"u"</literal>).
+    -->
+    <property name="EpsUeModeOperation" type="u" access="read" />
 
   </interface>
 </node>

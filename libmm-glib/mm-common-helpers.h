@@ -76,6 +76,9 @@ MMOmaFeature          mm_common_get_oma_features_from_string (const gchar *str,
 MMOmaSessionType      mm_common_get_oma_session_type_from_string (const gchar *str,
                                                                   GError **error);
 
+MMModem3gppEpsUeModeOperation mm_common_get_eps_ue_mode_operation_from_string (const gchar  *str,
+                                                                               GError      **error);
+
 GArray          *mm_common_ports_variant_to_garray (GVariant *variant);
 MMModemPortInfo *mm_common_ports_variant_to_array  (GVariant *variant,
                                                  guint *n_ports);

@@ -758,6 +758,28 @@ mm_common_build_mode_combinations_default (void)
     return g_variant_builder_end (&builder);
 }
 
+MMModem3gppEpsUeModeOperation
+mm_common_get_eps_ue_mode_operation_from_string (const gchar  *str,
+                                                 GError      **error)
+{
+    GEnumClass *enum_class;
+    guint       i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_EPS_UE_MODE_OPERATION));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMModem3gppEpsUeModeOperation value",
+                 str);
+    return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN;
+}
+
 GArray *
 mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *variant)
 {

@@ -22,6 +22,7 @@ MMModem3gppNetworkAvailability
 MMModem3gppSubscriptionState
 MMModem3gppRegistrationState
 MMModem3gppUssdSessionState
+MMModem3gppEpsUeModeOperation
 MMModemAccessTechnology
 MMModemBand
 MMModemCapability

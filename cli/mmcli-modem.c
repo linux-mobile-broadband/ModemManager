@@ -470,15 +470,18 @@ print_modem_info (void)
                  "           |    operator id: '%s'\n"
                  "           |  operator name: '%s'\n"
                  "           |   subscription: '%s'\n"
-                 "           |   registration: '%s'\n",
+                 "           |   registration: '%s'\n"
+                 "           |    EPS UE mode: '%s'\n",
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_imei (ctx->modem_3gpp)),
                  facility_locks,
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_code (ctx->modem_3gpp)),
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_name (ctx->modem_3gpp)),
                  mm_modem_3gpp_subscription_state_get_string (
-                     mm_modem_3gpp_get_subscription_state ((ctx->modem_3gpp))),
+                     mm_modem_3gpp_get_subscription_state (ctx->modem_3gpp)),
                  mm_modem_3gpp_registration_state_get_string (
-                     mm_modem_3gpp_get_registration_state ((ctx->modem_3gpp))));
+                     mm_modem_3gpp_get_registration_state (ctx->modem_3gpp)),
+                 mm_modem_3gpp_eps_ue_mode_operation_get_string (
+                     mm_modem_3gpp_get_eps_ue_mode_operation (ctx->modem_3gpp)));
 
         g_free (facility_locks);
     }

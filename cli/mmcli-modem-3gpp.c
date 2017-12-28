@@ -49,6 +49,7 @@ static Context *ctx;
 static gboolean scan_flag;
 static gboolean register_home_flag;
 static gchar *register_in_operator_str;
+static gchar *set_eps_ue_mode_operation_str;
 static gboolean ussd_status_flag;
 static gchar *ussd_initiate_str;
 static gchar *ussd_respond_str;
@@ -66,6 +67,10 @@ static GOptionEntry entries[] = {
     { "3gpp-register-in-operator", 0, 0, G_OPTION_ARG_STRING, &register_in_operator_str,
       "Request a given modem to register in the network of the given operator",
       "[MCCMNC]"
+    },
+    { "3gpp-set-eps-ue-mode-operation", 0, 0, G_OPTION_ARG_STRING, &set_eps_ue_mode_operation_str,
+      "Set the UE mode of operation for EPS",
+      "[ps-1|ps-2|csps-1|csps-2]"
     },
     { "3gpp-ussd-status", 0, 0, G_OPTION_ARG_NONE, &ussd_status_flag,
       "Show status of any ongoing USSD session",
@@ -113,6 +118,7 @@ mmcli_modem_3gpp_options_enabled (void)
     n_actions = (scan_flag +
                  register_home_flag +
                  !!register_in_operator_str +
+                 !!set_eps_ue_mode_operation_str +
                  ussd_status_flag +
                  !!ussd_initiate_str +
                  !!ussd_respond_str +
@@ -292,6 +298,45 @@ register_ready (MMModem3gpp  *modem_3gpp,
 }
 
 static void
+set_eps_ue_mode_operation_process_reply (gboolean      result,
+                                         const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set UE mode of operation for EPS: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set UE mode of operation for EPS\n");
+}
+
+static void
+set_eps_ue_mode_operation_ready (MMModem3gpp  *modem,
+                                 GAsyncResult *result)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_3gpp_set_eps_ue_mode_operation_finish (modem, result, &error);
+    set_eps_ue_mode_operation_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+parse_eps_ue_mode_operation (MMModem3gppEpsUeModeOperation *uemode)
+{
+    GError *error = NULL;
+
+    *uemode = mm_common_get_eps_ue_mode_operation_from_string (set_eps_ue_mode_operation_str, &error);
+    if (error) {
+        g_printerr ("error: couldn't parse UE mode of operation for EPS: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+}
+
+static void
 print_ussd_status (void)
 {
     /* Not the best thing to do, as we may be doing _get() calls twice, but
@@ -438,6 +483,21 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to set UE mode of operation for EPS? */
+    if (set_eps_ue_mode_operation_str) {
+        MMModem3gppEpsUeModeOperation uemode;
+
+        parse_eps_ue_mode_operation (&uemode);
+
+        g_debug ("Asynchronously setting UE mode of operation for EPS...");
+        mm_modem_3gpp_set_eps_ue_mode_operation (ctx->modem_3gpp,
+                                                 uemode,
+                                                 ctx->cancellable,
+                                                 (GAsyncReadyCallback)set_eps_ue_mode_operation_ready,
+                                                 NULL);
+        return;
+    }
+
     /* Request to initiate USSD session? */
     if (ussd_initiate_str) {
         ensure_modem_3gpp_ussd ();
@@ -535,6 +595,22 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
             NULL,
             &error);
         register_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set UE mode of operation for EPS? */
+    if (set_eps_ue_mode_operation_str) {
+        MMModem3gppEpsUeModeOperation uemode;
+        gboolean                      result;
+
+        parse_eps_ue_mode_operation (&uemode);
+
+        g_debug ("Synchronously setting UE mode of operation for EPS...");
+        result = mm_modem_3gpp_set_eps_ue_mode_operation_sync (ctx->modem_3gpp,
+                                                               uemode,
+                                                               NULL,
+                                                               &error);
+        set_eps_ue_mode_operation_process_reply (result, error);
         return;
     }
 

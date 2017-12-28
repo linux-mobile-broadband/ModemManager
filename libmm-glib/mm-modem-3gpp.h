@@ -80,6 +80,7 @@ MMModem3gppSubscriptionState  mm_modem_3gpp_get_subscription_state     (MMModem3
 
 MMModem3gppFacility           mm_modem_3gpp_get_enabled_facility_locks (MMModem3gpp *self);
 
+MMModem3gppEpsUeModeOperation mm_modem_3gpp_get_eps_ue_mode_operation  (MMModem3gpp *self);
 
 void     mm_modem_3gpp_register        (MMModem3gpp *self,
                                         const gchar *network_id,
@@ -119,6 +120,19 @@ GList *mm_modem_3gpp_scan_finish (MMModem3gpp *self,
 GList *mm_modem_3gpp_scan_sync   (MMModem3gpp *self,
                                   GCancellable *cancellable,
                                   GError **error);
+
+void     mm_modem_3gpp_set_eps_ue_mode_operation        (MMModem3gpp                    *self,
+                                                         MMModem3gppEpsUeModeOperation   mode,
+                                                         GCancellable                   *cancellable,
+                                                         GAsyncReadyCallback             callback,
+                                                         gpointer                        user_data);
+gboolean mm_modem_3gpp_set_eps_ue_mode_operation_finish (MMModem3gpp                    *self,
+                                                         GAsyncResult                   *res,
+                                                         GError                        **error);
+gboolean mm_modem_3gpp_set_eps_ue_mode_operation_sync   (MMModem3gpp                    *self,
+                                                         MMModem3gppEpsUeModeOperation   mode,
+                                                         GCancellable                   *cancellable,
+                                                         GError                        **error);
 
 G_END_DECLS
 

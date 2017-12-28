@@ -280,6 +280,22 @@ mm_modem_3gpp_get_enabled_facility_locks (MMModem3gpp *self)
     return mm_gdbus_modem3gpp_get_enabled_facility_locks (MM_GDBUS_MODEM3GPP (self));
 }
 
+/**
+ * mm_modem_3gpp_get_eps_ue_mode_operation:
+ * @self: A #MMModem3gpp.
+ *
+ * Get the UE mode of operation for EPS.
+ *
+ * Returns: A #MMModem3gppEpsUeModeOperation.
+ */
+MMModem3gppEpsUeModeOperation
+mm_modem_3gpp_get_eps_ue_mode_operation (MMModem3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN);
+
+    return mm_gdbus_modem3gpp_get_eps_ue_mode_operation (MM_GDBUS_MODEM3GPP (self));
+}
+
 /*****************************************************************************/
 
 /**
@@ -586,6 +602,43 @@ mm_modem_3gpp_scan_sync (MMModem3gpp *self,
         return NULL;
 
     return create_networks_list (result);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_modem_3gpp_set_eps_ue_mode_operation_finish (MMModem3gpp   *self,
+                                                GAsyncResult  *res,
+                                                GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    return mm_gdbus_modem3gpp_call_set_eps_ue_mode_operation_finish (MM_GDBUS_MODEM3GPP (self), res, error);
+}
+
+void
+mm_modem_3gpp_set_eps_ue_mode_operation (MMModem3gpp                    *self,
+                                         MMModem3gppEpsUeModeOperation   mode,
+                                         GCancellable                   *cancellable,
+                                         GAsyncReadyCallback             callback,
+                                         gpointer                        user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_3GPP (self));
+    g_return_if_fail (mode != MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN);
+
+    mm_gdbus_modem3gpp_call_set_eps_ue_mode_operation (MM_GDBUS_MODEM3GPP (self), (guint) mode, cancellable, callback, user_data);
+}
+
+gboolean
+mm_modem_3gpp_set_eps_ue_mode_operation_sync (MMModem3gpp                    *self,
+                                              MMModem3gppEpsUeModeOperation   mode,
+                                              GCancellable                   *cancellable,
+                                              GError                        **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+    g_return_val_if_fail (mode != MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN, FALSE);
+
+    return mm_gdbus_modem3gpp_call_set_eps_ue_mode_operation_sync (MM_GDBUS_MODEM3GPP (self), (guint) mode, cancellable, error);
 }
 
 /*****************************************************************************/
