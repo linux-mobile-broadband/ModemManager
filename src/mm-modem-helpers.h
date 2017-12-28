@@ -328,6 +328,12 @@ gboolean mm_3gpp_cesq_response_to_signal_info (const gchar  *response,
                                                MMSignal    **out_lte,
                                                GError      **error);
 
+/* CEMODE? response parser */
+gchar    *mm_3gpp_build_cemode_set_request    (MMModem3gppEpsUeModeOperation   mode);
+gboolean  mm_3gpp_parse_cemode_query_response (const gchar                    *response,
+                                               MMModem3gppEpsUeModeOperation  *out_mode,
+                                               GError                        **error);
+
 /* Additional 3GPP-specific helpers */
 
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);

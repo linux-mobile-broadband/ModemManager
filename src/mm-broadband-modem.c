@@ -3936,6 +3936,68 @@ modem_3gpp_load_subscription_state (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* UE mode of operation for EPS loading (3GPP interface) */
+
+static MMModem3gppEpsUeModeOperation
+modem_3gpp_load_eps_ue_mode_operation_finish (MMIfaceModem3gpp  *self,
+                                              GAsyncResult      *res,
+                                              GError          **error)
+{
+    MMModem3gppEpsUeModeOperation  mode;
+    const gchar                   *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result || !mm_3gpp_parse_cemode_query_response (result, &mode, error))
+        return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN;
+
+    return mode;
+}
+
+static void
+modem_3gpp_load_eps_ue_mode_operation (MMIfaceModem3gpp    *self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    mm_dbg ("loading UE mode of operation for EPS...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CEMODE?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* UE mode of operation for EPS settin (3GPP interface) */
+
+static gboolean
+modem_3gpp_set_eps_ue_mode_operation_finish (MMIfaceModem3gpp  *self,
+                                             GAsyncResult      *res,
+                                             GError          **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_3gpp_set_eps_ue_mode_operation (MMIfaceModem3gpp              *self,
+                                      MMModem3gppEpsUeModeOperation  mode,
+                                      GAsyncReadyCallback            callback,
+                                      gpointer                       user_data)
+{
+    gchar *cmd;
+
+    mm_dbg ("updating UE mode of operation for EPS...");
+    cmd = mm_3gpp_build_cemode_set_request (mode);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* Unsolicited registration messages handling (3GPP interface) */
 
 static gboolean
@@ -11038,6 +11100,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_imei_finish = modem_3gpp_load_imei_finish;
     iface->load_enabled_facility_locks = modem_3gpp_load_enabled_facility_locks;
     iface->load_enabled_facility_locks_finish = modem_3gpp_load_enabled_facility_locks_finish;
+    iface->load_eps_ue_mode_operation = modem_3gpp_load_eps_ue_mode_operation;
+    iface->load_eps_ue_mode_operation_finish = modem_3gpp_load_eps_ue_mode_operation_finish;
 
     /* Enabling steps */
     iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
@@ -11072,6 +11136,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
     iface->scan_networks = modem_3gpp_scan_networks;
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
+    iface->set_eps_ue_mode_operation = modem_3gpp_set_eps_ue_mode_operation;
+    iface->set_eps_ue_mode_operation_finish = modem_3gpp_set_eps_ue_mode_operation_finish;
 }
 
 static void
