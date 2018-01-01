@@ -679,7 +679,7 @@ csim_query_ready (MMBaseModem *self,
         goto next_step;
     }
 
-    if ( (unlock_retries = mm_telit_parse_csim_response (response, &error)) < 0) {
+    if ( (unlock_retries = mm_parse_csim_response (response, &error)) < 0) {
         mm_warn ("load %s unlock retries parse error: %s.", step_lock_names[ctx->step], error->message);
         g_error_free (error);
         goto next_step;

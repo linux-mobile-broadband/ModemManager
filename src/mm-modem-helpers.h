@@ -394,4 +394,8 @@ gboolean mm_parse_cclk_response (const gchar *response,
                                  MMNetworkTimezone **tzp,
                                  GError **error);
 
+/* +CSIM response parser */
+gint mm_parse_csim_response (const gchar *response,
+                                   GError **error);
+
 #endif  /* MM_MODEM_HELPERS_H */

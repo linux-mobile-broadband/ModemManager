@@ -61,10 +61,6 @@ typedef struct {
     MMModemBand mm_bands[MAX_BANDS_LIST_LEN];
 } TelitToMMBandMap;
 
-/* +CSIM response parser */
-gint mm_telit_parse_csim_response (const gchar *response,
-                                   GError **error);
-
 typedef enum {
     LOAD_SUPPORTED_BANDS,
     LOAD_CURRENT_BANDS
