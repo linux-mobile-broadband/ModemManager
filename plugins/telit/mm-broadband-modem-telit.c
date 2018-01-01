@@ -578,36 +578,21 @@ modem_load_supported_bands (MMIfaceModem *self,
  * always run.
  */
 
-#define CSIM_LOCK_STR               "+CSIM=1"
-#define CSIM_UNLOCK_STR             "+CSIM=0"
-#define CSIM_QUERY_PIN_RETRIES_STR  "+CSIM=10,0020000100"
-#define CSIM_QUERY_PUK_RETRIES_STR  "+CSIM=10,002C000100"
-#define CSIM_QUERY_PIN2_RETRIES_STR "+CSIM=10,0020008100"
-#define CSIM_QUERY_PUK2_RETRIES_STR "+CSIM=10,002C008100"
+#define CSIM_LOCK_STR      "+CSIM=1"
+#define CSIM_UNLOCK_STR    "+CSIM=0"
 #define CSIM_QUERY_TIMEOUT 3
 
 typedef enum {
     LOAD_UNLOCK_RETRIES_STEP_FIRST,
     LOAD_UNLOCK_RETRIES_STEP_LOCK,
-    LOAD_UNLOCK_RETRIES_STEP_PIN,
-    LOAD_UNLOCK_RETRIES_STEP_PUK,
-    LOAD_UNLOCK_RETRIES_STEP_PIN2,
-    LOAD_UNLOCK_RETRIES_STEP_PUK2,
+    LOAD_UNLOCK_RETRIES_STEP_PARENT,
     LOAD_UNLOCK_RETRIES_STEP_UNLOCK,
     LOAD_UNLOCK_RETRIES_STEP_LAST
 } LoadUnlockRetriesStep;
 
-static const gchar *step_lock_names[LOAD_UNLOCK_RETRIES_STEP_LAST] = {
-    [LOAD_UNLOCK_RETRIES_STEP_PIN] = "PIN",
-    [LOAD_UNLOCK_RETRIES_STEP_PUK] = "PUK",
-    [LOAD_UNLOCK_RETRIES_STEP_PIN2] = "PIN2",
-    [LOAD_UNLOCK_RETRIES_STEP_PUK2] = "PUK2",
-};
-
 typedef struct {
     MMUnlockRetries *retries;
     LoadUnlockRetriesStep step;
-    guint succeded_requests;
 } LoadUnlockRetriesContext;
 
 static void load_unlock_retries_step (GTask *task);
@@ -660,54 +645,20 @@ csim_unlock_ready (MMBaseModem  *_self,
 }
 
 static void
-csim_query_ready (MMBaseModem *self,
-                  GAsyncResult *res,
-                  GTask *task)
+parent_load_unlock_retries_ready (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GTask        *task)
 {
-    const gchar *response;
-    gint unlock_retries;
-    GError *error = NULL;
     LoadUnlockRetriesContext *ctx;
+    GError                   *error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (self, res, &error);
-
-    if (!response) {
-        mm_warn ("load %s unlock retries got no response: %s", step_lock_names[ctx->step], error->message);
+    if (!(ctx->retries = iface_modem_parent->load_unlock_retries_finish (self, res, &error))) {
+        mm_warn ("couldn't load unlock retries with generic logic: %s", error->message);
         g_error_free (error);
-        goto next_step;
     }
 
-    if ( (unlock_retries = mm_parse_csim_response (response, &error)) < 0) {
-        mm_warn ("load %s unlock retries parse error: %s.", step_lock_names[ctx->step], error->message);
-        g_error_free (error);
-        goto next_step;
-    }
-
-    ctx->succeded_requests++;
-
-    mm_dbg ("%s unlock retries left: %d", step_lock_names[ctx->step], unlock_retries);
-
-    switch (ctx->step) {
-        case LOAD_UNLOCK_RETRIES_STEP_PIN:
-            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PIN, unlock_retries);
-            break;
-        case LOAD_UNLOCK_RETRIES_STEP_PUK:
-            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PUK, unlock_retries);
-            break;
-        case LOAD_UNLOCK_RETRIES_STEP_PIN2:
-            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PIN2, unlock_retries);
-            break;
-        case LOAD_UNLOCK_RETRIES_STEP_PUK2:
-            mm_unlock_retries_set (ctx->retries, MM_MODEM_LOCK_SIM_PUK2, unlock_retries);
-            break;
-        default:
-            g_assert_not_reached ();
-            break;
-    }
-
-next_step:
     ctx->step++;
     load_unlock_retries_step (task);
 }
@@ -799,7 +750,7 @@ pending_csim_unlock_complete (MMBroadbandModemTelit *self)
 
     ctx = g_task_get_task_data (self->priv->csim_lock_task);
 
-    if (ctx->succeded_requests == 0) {
+    if (!ctx->retries) {
         g_task_return_new_error (self->priv->csim_lock_task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Could not get any of the SIM unlock retries values");
     } else {
@@ -838,37 +789,11 @@ load_unlock_retries_step (GTask *task)
         case LOAD_UNLOCK_RETRIES_STEP_LOCK:
             handle_csim_locking (task, TRUE);
             break;
-        case LOAD_UNLOCK_RETRIES_STEP_PIN:
-            mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                      CSIM_QUERY_PIN_RETRIES_STR,
-                                      CSIM_QUERY_TIMEOUT,
-                                      FALSE,
-                                      (GAsyncReadyCallback) csim_query_ready,
-                                      task);
-            break;
-        case LOAD_UNLOCK_RETRIES_STEP_PUK:
-            mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                      CSIM_QUERY_PUK_RETRIES_STR,
-                                      CSIM_QUERY_TIMEOUT,
-                                      FALSE,
-                                      (GAsyncReadyCallback) csim_query_ready,
-                                      task);
-            break;
-        case LOAD_UNLOCK_RETRIES_STEP_PIN2:
-            mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                      CSIM_QUERY_PIN2_RETRIES_STR,
-                                      CSIM_QUERY_TIMEOUT,
-                                      FALSE,
-                                      (GAsyncReadyCallback) csim_query_ready,
-                                      task);
-            break;
-        case LOAD_UNLOCK_RETRIES_STEP_PUK2:
-            mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                      CSIM_QUERY_PUK2_RETRIES_STR,
-                                      CSIM_QUERY_TIMEOUT,
-                                      FALSE,
-                                      (GAsyncReadyCallback) csim_query_ready,
-                                      task);
+        case LOAD_UNLOCK_RETRIES_STEP_PARENT:
+            iface_modem_parent->load_unlock_retries (
+                MM_IFACE_MODEM (self),
+                (GAsyncReadyCallback)parent_load_unlock_retries_ready,
+                task);
             break;
         case LOAD_UNLOCK_RETRIES_STEP_UNLOCK:
             handle_csim_locking (task, FALSE);
@@ -898,10 +823,11 @@ modem_load_unlock_retries (MMIfaceModem *self,
     GTask *task;
     LoadUnlockRetriesContext *ctx;
 
+    g_assert (iface_modem_parent->load_unlock_retries);
+    g_assert (iface_modem_parent->load_unlock_retries_finish);
+
     ctx = g_slice_new0 (LoadUnlockRetriesContext);
-    ctx->retries = mm_unlock_retries_new ();
     ctx->step = LOAD_UNLOCK_RETRIES_STEP_FIRST;
-    ctx->succeded_requests = 0;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_unlock_retries_context_free);
