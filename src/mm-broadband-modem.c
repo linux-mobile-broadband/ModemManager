@@ -1334,6 +1334,120 @@ modem_load_unlock_required (MMIfaceModem *self,
 /* Supported modes loading (Modem interface) */
 
 typedef struct {
+    MMUnlockRetries *retries;
+    guint            i;
+} LoadUnlockRetriesContext;
+
+typedef struct {
+    MMModemLock  lock;
+    const gchar *command;
+} UnlockRetriesMap;
+
+static const UnlockRetriesMap unlock_retries_map [] = {
+    { MM_MODEM_LOCK_SIM_PIN,     "+CSIM=10,\"0020000100\"" },
+    { MM_MODEM_LOCK_SIM_PUK,     "+CSIM=10,\"002C000100\"" },
+    { MM_MODEM_LOCK_SIM_PIN2,    "+CSIM=10,\"0020008100\"" },
+    { MM_MODEM_LOCK_SIM_PUK2,    "+CSIM=10,\"002C008100\"" },
+};
+
+static void
+load_unlock_retries_context_free (LoadUnlockRetriesContext *ctx)
+{
+    g_object_unref (ctx->retries);
+    g_slice_free (LoadUnlockRetriesContext, ctx);
+}
+
+static MMUnlockRetries *
+load_unlock_retries_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void load_unlock_retries_context_step (GTask *task);
+
+static void
+csim_ready (MMBaseModem  *self,
+            GAsyncResult *res,
+            GTask        *task)
+{
+    LoadUnlockRetriesContext *ctx;
+    const gchar              *response;
+    GError                   *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        mm_dbg ("Couldn't load retry count for lock '%s': %s",
+                mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock),
+                error->message);
+        g_error_free (error);
+    } else {
+        gint val;
+        GError *error = NULL;
+
+        val = mm_parse_csim_response (response, &error);
+        if (val < 0) {
+            mm_warn ("Parse error in step %d: %s.", ctx->i, error->message);
+            mm_dbg ("Couldn't parse retry count value for lock '%s'",
+                    mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock));
+        } else
+           mm_unlock_retries_set (ctx->retries, unlock_retries_map[ctx->i].lock, val);
+    }
+
+    /* Go to next lock value */
+    ctx->i++;
+    load_unlock_retries_context_step (task);
+}
+
+static void
+load_unlock_retries_context_step (GTask *task)
+{
+    MMBroadbandModem *self;
+    LoadUnlockRetriesContext  *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (ctx->i == G_N_ELEMENTS (unlock_retries_map)) {
+        g_task_return_pointer (task, g_object_ref (ctx->retries), g_object_unref);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        unlock_retries_map[ctx->i].command,
+        3,
+        FALSE,
+        (GAsyncReadyCallback)csim_ready,
+        task);
+}
+
+static void
+load_unlock_retries (MMIfaceModem        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    GTask                    *task;
+    LoadUnlockRetriesContext *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (LoadUnlockRetriesContext);
+    ctx->retries = mm_unlock_retries_new ();
+    ctx->i = 0;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_unlock_retries_context_free);
+
+    load_unlock_retries_context_step (task);
+}
+
+/*****************************************************************************/
+/* Supported modes loading (Modem interface) */
+
+typedef struct {
     MMModemMode mode;
     gboolean run_cnti;
     gboolean run_ws46;
@@ -10881,6 +10995,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_own_numbers_finish = modem_load_own_numbers_finish;
     iface->load_unlock_required = modem_load_unlock_required;
     iface->load_unlock_required_finish = modem_load_unlock_required_finish;
+    iface->load_unlock_retries = load_unlock_retries;
+    iface->load_unlock_retries_finish = load_unlock_retries_finish;
     iface->create_sim = modem_create_sim;
     iface->create_sim_finish = modem_create_sim_finish;
     iface->load_supported_modes = modem_load_supported_modes;
