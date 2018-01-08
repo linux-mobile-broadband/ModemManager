@@ -3514,10 +3514,10 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
         goto error;
     }
 
-    /* BCD encoded ICCIDs are 20 digits long */
-    if (len != 20) {
+    /* ICCIDs are 19 or 20 digits long */
+    if (len < 19 || len > 20) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Invalid ICCID response size (was %zd, expected 20)",
+                     "Invalid ICCID response size (was %zd, expected 19 or 20)",
                      len);
         goto error;
     }
@@ -3526,9 +3526,16 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
      * should be '89' for telecommunication purposes according to ISO/IEC 7812.
      */
     if (buf[0] == '8' && buf[1] == '9') {
-      swap = FALSE;
+        swap = FALSE;
     } else if (buf[0] == '9' && buf[1] == '8') {
-      swap = TRUE;
+        /* swapped digits are only expected in raw +CRSM responses, which must all
+         * be 20-bytes long */
+        if (len != 20) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Invalid ICCID response size while swap needed (expected 20)");
+            goto error;
+        }
+        swap = TRUE;
     } else {
       /* FIXME: Instead of erroring out, revisit this solution if we find any SIM
        * that doesn't use '89' as the major industry identifier of the ICCID.
@@ -3539,9 +3546,10 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
     }
 
     /* Ensure if there's an 'F' that it's second-to-last if swap = TRUE,
-     * otherwise last if swap = FALSE */
+     * otherwise last if swap = FALSE. Also fail if an F is found within a
+     * 19-digit reported ICCID. */
     if (f_pos >= 0) {
-        if ((swap && (f_pos != len - 2)) || (!swap && (f_pos != len - 1))) {
+        if ((len != 20) || (swap && (f_pos != len - 2)) || (!swap && (f_pos != len - 1))) {
             g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Invalid ICCID length (unexpected F position)");
             goto error;
@@ -3554,7 +3562,8 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
          *
          *    21436587 -> 12345678
          */
-        swapped = g_malloc0 (25);
+        g_assert (len == 20);
+        swapped = g_malloc0 (21);
         for (i = 0; i < 10; i++) {
             swapped[i * 2] = buf[(i * 2) + 1];
             swapped[(i * 2) + 1] = buf[i * 2];

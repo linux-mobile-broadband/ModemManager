@@ -2091,6 +2091,20 @@ test_iccid_parse_unquoted_unswapped_19_digit (void *f, gpointer d)
 }
 
 static void
+test_iccid_parse_unquoted_unswapped_19_digit_no_f (void *f, gpointer d)
+{
+    const char *raw_iccid = "8944200053671052499";
+    const char *expected = "8944200053671052499";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (parsed, ==, expected);
+    g_free (parsed);
+}
+
+static void
 test_iccid_parse_quoted_unswapped_20_digit (void *f, gpointer d)
 {
     const char *raw_iccid = "\"89324102234690160476\"";
@@ -3924,6 +3938,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_swap_19_digit, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_swap_20_digit, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_unswapped_19_digit, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_unswapped_19_digit_no_f, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_unswapped_20_digit, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_short, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_invalid_chars, NULL));
