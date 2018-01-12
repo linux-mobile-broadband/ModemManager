@@ -1205,9 +1205,27 @@ update_registration_state (MMIfaceModem3gpp *self,
         new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY ||
         new_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED ||
         new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
+        MMModemState modem_state;
+
         /* If already reloading registration info, skip it */
         if (ctx->reloading_registration_info)
             return;
+
+        /* If the modem isn't already enabled or being enabled, this
+         * registration state update is due to a previously scheduled
+         * initial registration check when the modem was being enabled.
+         * We need to ignore it as otherwise it may cause an incorrect
+         * transition of the registration state and modem state when the
+         * modem is being disabled. */
+        modem_state = MM_MODEM_STATE_UNKNOWN;
+        g_object_get (self,
+                      MM_IFACE_MODEM_STATE, &modem_state,
+                      NULL);
+        if (modem_state < MM_MODEM_STATE_ENABLING) {
+            mm_dbg ("Modem %s: 3GPP Registration state change ignored as modem isn't enabled",
+                    g_dbus_object_get_object_path (G_DBUS_OBJECT (self)));
+            return;
+        }
 
         mm_info ("Modem %s: 3GPP Registration state changed (%s -> registering)",
                  g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
