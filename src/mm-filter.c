@@ -134,12 +134,28 @@ mm_filter_port (MMFilter        *self,
             return TRUE;
         }
 
-        /* If the TTY kernel driver is cdc-acm and the interface is class=2/subclass=2/protocol=1, allow it */
+        /*
+         * If the TTY kernel driver is cdc-acm and the interface is class=2/subclass=2/protocol=[1-6], allow it.
+         *
+         * Class definitions for Communication Devices 1.2
+         * Communications Interface Class Control Protocol Codes:
+         *     00h     | USB specification | No class specific protocol required
+         *     01h     | ITU-T V.250       | AT Commands: V.250 etc
+         *     02h     | PCCA-101          | AT Commands defined by PCCA-101
+         *     03h     | PCCA-101          | AT Commands defined by PCCA-101 & Annex O
+         *     04h     | GSM 7.07          | AT Commands defined by GSM 07.07
+         *     05h     | 3GPP 27.07        | AT Commands defined by 3GPP 27.007
+         *     06h     | C-S0017-0         | AT Commands defined by TIA for CDMA
+         *     07h     | USB EEM           | Ethernet Emulation Model
+         *     08h-FDh |                   | RESERVED (future use)
+         *     FEh     |                   | External Protocol: Commands defined by Command Set Functional Descriptor
+         *     FFh     | USB Specification | Vendor-specific
+         */
         if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_ACM_INTERFACE) &&
             (!g_strcmp0 (driver, "cdc_acm")) &&
             (mm_kernel_device_get_interface_class (port) == 2) &&
             (mm_kernel_device_get_interface_subclass (port) == 2) &&
-            (mm_kernel_device_get_interface_protocol (port) == 1)) {
+            (mm_kernel_device_get_interface_protocol (port) >= 1) && (mm_kernel_device_get_interface_protocol (port) <= 6)) {
             mm_dbg ("[filter] (%s/%s): port allowed: cdc-acm interface reported AT-capable", subsystem, name);
             return TRUE;
         }
