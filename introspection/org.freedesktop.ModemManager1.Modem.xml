@@ -316,6 +316,9 @@
 
         In Linux for example, this points to a sysfs path of the usb_device
         object.
+
+        This value may also be set by the user using the MM_ID_PHYSDEV_UID udev
+        tag (e.g. binding the tag to a specific sysfs path).
     -->
     <property name="Device" type="s" access="read" />
 
