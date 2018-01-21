@@ -1,4 +1,190 @@
 
+ModemManager 1.8.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version requires:
+   ** GLib 2.36.0
+   ** gettext 0.19.8 (for the optional rebuild of documentation)
+   ** libmbim >= 1.16.0 (for the optional MBIM support)
+   ** libqmi >= 1.20.0 (for the optional QMI support)
+   ** libsystemd >= 209 or libsystemd-login >= 183 (for the optional suspend
+      and resume support)
+   ** libsystemd >= 209 (for the optional systemd journal support)
+   ** polkit >= 0.97 (for the optional PolicyKit support)
+
+ * This version no longer requires:
+   ** intltool (replaced by new features in gettext)
+
+ * Distributions using systemd should explicitly use the following configure
+   options:
+   ** '--with-systemd-suspend-resume': the only supported source for suspend and
+   resume events is now systemd, so the previous '--with-suspend-resume=[]'
+   option was renamed.
+   ** '--with-systemd-journal' to use the new journal support.
+
+ * Distributions wanting to avoid ModemManager poking TTY ports that isn't
+   supposed to touch may start using the new 'STRICT' filter policy, given
+   as an option to the ModemManager daemon (e.g. patching the default systemd
+   service file provided). See below for more info about the filter policy and
+   the side effects of using the STRICT approach:
+   ** E.g. ModemManager --filter-policy=STRICT
+
+The most important features and changes in this release are the following:
+
+ * New 'filter policy' setting in the ModemManager daemon to decide which ports
+   are probed and how. Currently these levels are defined:
+   ** WHITELIST-ONLY: Only devices or ports explicitly whitelisted with the new
+      'ID_MM_DEVICE_PROCESS' udev tag are probed.
+   ** DEFAULT: All ports are allowed to be probed except for the ones explicitly
+      greylisted as RS232 adapters or completely blacklisted. This is the
+      default approach that was used until now, and the default as well in this
+      release if a different one isn't requested.
+   ** STRICT: The daemon defines a set of heuristics to try to detect modems and
+      ports to probe. Only the TTY ports that are very very likely to be modem
+      ports are probed, therefore completely avoiding the need of having a
+      separate blacklist or RS232 adapter greylist. But note that this policy
+      may end up ignoring some devices, like TTY controlled modems without an
+      associated network port.
+   ** PARANOID: This is equivalent to running the STRICT mode but also applying
+      the blacklist and RS232 greylist filters explicitly.
+
+ * Device 'naming'. This release includes logic to allow 'naming' devices with
+   the ID_MM_PHYSDEV_UID udev tag, so that the names can then be used in e.g.
+   mmcli and also exposed in the 'Device' property in the Modem interface. This
+   new setup makes it possible to give the devices unique names that are kept
+   across reboots.
+
+ * Allow skipping the automatic scan for devices in the daemon with the new
+   '--no-auto-scan' daemon option. Instead, the daemon may be called with the
+   '--initial-kernel-events=[PATH]' option including a predefined list of ports
+   or otherwise get the port additions reported during runtime with the
+   mmcli --report-kernel-event=[] command.
+
+ * Allow building and running without 'udev'. In this setup, the previously
+   explained '--no-auto-scan' is enabled by default, so ports are not
+   automatically detected .Note that this setup is not suggested for standard
+   distributions: if udev is available in the system, it is the preferred method
+   to manage the port addition and removal.
+
+ * SIM hot swap. The core includes the needed logic to support SIM hot swap in
+   the different devices, although for now it's only tested for Telit and MBIM
+   modems. If a SIM hot swap is detected, the modem is flagged as failed and
+   reprobed from scratch.
+
+ * Connection status monitoring logic. In order to try to detect network
+   initiated disconnections, a generic setup is provided to plugins so that they
+   can implement explicit connection status checks that would be executed
+   periodically.
+
+ * New support for 3GPP CSFB states and operation modes. We now support
+   registration states reported as "SMS only" or "CSFB not preferred", and
+   provide APIs to set and get the "UE mode of operation for EPS".
+
+This version comes with the following new features:
+
+ * Build and system:
+   ** Updated the systemd service file with additional security related rules.
+   ** Added support for systemd journal logging.
+   ** Updated most of the code to use GTask instead of the deprecated
+      GSimpleAsyncResult based operations.
+   ** ChangeLog is built from git during the dist tarball generation.
+
+ * New translations: Polish, Brazilian Portuguese, Slovak, Hungarian, Czech,
+   Ukrainian and Swedish.
+
+ * API:
+   ** Defined additional GSM, UMTS and LTE frequency bands.
+   ** The MMModemBand enumeration values (EUTRAN, UTRAN and CDMA) have been
+      renamed to consolidate how they are defined. A compatibility layer has
+      been provided to avoid breaking the API.
+   ** New 'HardwareRevision' property in the Modem interface.
+   ** New 'EpsUeModeOperation' property and 'SetEpsUeModeOperation' method in
+      the Modem 3GPP interface.
+
+ * Core:
+   ** Updated libqcdm to load signal strength from QCDM EVDO Pilot Sets.
+   ** Updated udev rules with new per-vendor rules for quicker processing.
+   ** Explicitly ignored ports are never probed now, but they will be reported
+      as owned by the device and exposed in the Ports property.
+   ** New 'ID_MM_TTY_BAUDRATE' udev tag to specify the baudrate to use in RS232
+      TTY ports.
+   ** If using UCS2, still assume that the operator name may be given in ASCII.
+   ** Explicitly open QCDM ports anytime it's needed, instead of assuming they
+      are open when enabled.
+   ** Query supported ME event reporting options and automatically set the best
+      choice based on the supported ones.
+   ** Query supported flow control modems and automatically set the best choice
+      based on the supported ones.
+   ** Explicitly configure flow control settings on the TTY as soon as it is
+      connected, only applicable for RS232 devices.
+   ** Implemented generic unlock retries loading.
+
+ * MBIM:
+   ** Explicitly reprobe the modem when the mbim-proxy is detected dead.
+   ** Workaround implemented to keep track of the PIN1 unlock retries as the
+      protocol isn't very good allowing this.
+   ** Load and expose HW revision.
+
+ * QMI:
+   ** Explicitly reprobe the modem when the qmi-proxy is detected dead.
+   ** Load and expose HW revision.
+   ** Detect port closed and forbid client allocation operations.
+   ** New optional connection status monitoring support, enabled by default for
+      the Netgear AC341U.
+
+ * Location interface:
+   ** Disabled by default for MBIM modems.
+
+ * Messaging interface:
+   ** Try decoding with UTF-16BE when UCS-2 reported.
+
+ * Plugins:
+   ** u-blox: new plugin, currently supporting the TOBY-L2 and the TOBY-L4.
+   ** quectel: new plugin, supporting generic AT/QMI based modems.
+   ** cinterion: implemented support for devices exposing a WWAN network
+      interface.
+   ** cinterion: support changing modes in LTE capable devices.
+   ** cinterion: added GPS support for devices controlled only with AT^SGPSC.
+   ** cinterion: use ^SIND unsolicited messages for access tech reporting.
+   ** huawei: implemented Signal interface.
+   ** telit: added support for RS232, QMI and MBIM modems.
+   ** novatel: cleaned up registration state and access tech reporting.
+   ** novatel-lte: implemented unlock retries loading.
+   ** dell: speed probing time up and reduce udev dependency.
+   ** mbm: added GPS support for the Dell DW5560.
+
+The following features which were backported to 1.6.x releases are also present
+in ModemManager 1.8.0:
+
+ * Build and System:
+   ** Explicitly use -DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_36 and
+      -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_36 so that we don't get warnings
+      for GLib features that are flagged as deprecated in newer versions.
+   ** Dropped After=syslog.target rule in systemd service file.
+
+ * Core:
+   ** Improved detection of 4G-only modems.
+   ** TTY is set as connected as soon as ATD replies.
+   ** Removed the default ID_MM_PLATFORM_DRIVER_PROBE whitelist.
+
+ * Signal interface:
+   ** Report RSCP if available.
+   ** New generic implementation of the Signal interface in AT-based devices
+      using AT+CESQ.
+
+ * QMI:
+   ** Run FCC auth sequence if "InvalidTransition" is reported when going
+      online.
+   ** Added WDS reporting event support.
+
+ * Plugins:
+   ** huawei: let the E3372 run NDISDUP via TTY (when the exposed cdc-wdm is
+      non-functional).
+   ** telit: added support for the GE910.
+
 ModemManager 1.6.0
 -------------------------------------------
 This is a new stable release of ModemManager.
