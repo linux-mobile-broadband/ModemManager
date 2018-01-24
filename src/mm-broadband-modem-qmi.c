@@ -3114,7 +3114,7 @@ dms_set_operating_mode_ready (QmiClientDms *client,
          * Some new devices, like the Dell DW5770, will return an internal error when
          * trying to bring the power mode to online.
          *
-         * Other devices, like some rebranded EM7455 modules, will return a "invalid
+         * Other devices, like some rebranded EM7455 modules, will return an "invalid
          * transition" instead when trying to bring the power mode to online.
          *
          * We can avoid this by sending the magic "DMS Set FCC Auth" message before

@@ -81,7 +81,7 @@ struct _MMBaseSmsClass {
 
 GType mm_base_sms_get_type (void);
 
-/* This one can be overriden by plugins */
+/* This one can be overridden by plugins */
 MMBaseSms *mm_base_sms_new                 (MMBaseModem *modem);
 MMBaseSms *mm_base_sms_new_from_properties (MMBaseModem *modem,
                                             MMSmsProperties *properties,

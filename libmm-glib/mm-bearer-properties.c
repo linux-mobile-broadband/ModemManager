@@ -416,7 +416,7 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
  * @value: the value string.
  * @error: (allow-none): Return location for error or %NULL.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_properties_consume_string (MMBearerProperties *self,
@@ -534,7 +534,7 @@ mm_bearer_properties_new_from_string (const gchar *str,
  * @value: a #GVariant
  * @error: (allow-none): Return location for error or %NULL.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_properties_consume_variant (MMBearerProperties *properties,

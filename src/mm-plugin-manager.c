@@ -637,7 +637,7 @@ port_context_run (MMPluginManager     *self,
      * cancellation error, regardless of what the standard logic does. */
     port_context->cancellable = g_cancellable_new ();
 
-    /* Create a inner task for the port context. The result we expect is the
+    /* Create an inner task for the port context. The result we expect is the
      * best plugin found for the port. */
     port_context->task = g_task_new (self, port_context->cancellable, callback, user_data);
 
@@ -1308,7 +1308,7 @@ device_context_run (MMPluginManager     *self,
      * cancellation error, regardless of what the standard logic does. */
     device_context->cancellable = g_cancellable_new ();
 
-    /* Create a inner task for the device context. We'll complete this task when
+    /* Create an inner task for the device context. We'll complete this task when
      * the last port has been probed. */
     device_context->task = g_task_new (self, device_context->cancellable, callback, user_data);
 }

@@ -614,7 +614,7 @@ mm_sms_get_service_category (MMSms *self)
  *
  * Finishes an operation started with mm_sms_send().
  *
- * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns:  %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sms_send_finish (MMSms *self,
@@ -669,7 +669,7 @@ mm_sms_send (MMSms *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sms_send() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sms_send_sync (MMSms *self,
@@ -693,7 +693,7 @@ mm_sms_send_sync (MMSms *self,
  *
  * Finishes an operation started with mm_sms_store().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sms_store_finish (MMSms *self,
@@ -752,7 +752,7 @@ mm_sms_store (MMSms *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sms_store() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sms_store_sync (MMSms *self,

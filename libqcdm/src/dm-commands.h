@@ -55,12 +55,12 @@ enum {
     DIAG_CMD_NV_READ      = 38, /* Read NV item */
     DIAG_CMD_NV_WRITE     = 39, /* Write NV item */
     DIAG_CMD_CONTROL      = 41, /* Mode change request */
-    DIAG_CMD_ERR_READ     = 42, /* Error record retreival */
+    DIAG_CMD_ERR_READ     = 42, /* Error record retrieval */
     DIAG_CMD_ERR_CLEAR    = 43, /* Error record clear */
     DIAG_CMD_SER_RESET    = 44, /* Symbol error rate counter reset */
     DIAG_CMD_SER_REPORT   = 45, /* Symbol error rate counter report */
     DIAG_CMD_TEST         = 46, /* Run a specified test */
-    DIAG_CMD_GET_DIPSW    = 47, /* Retreive the current DIP switch setting */
+    DIAG_CMD_GET_DIPSW    = 47, /* Retrieve the current DIP switch setting */
     DIAG_CMD_SET_DIPSW    = 48, /* Write new DIP switch setting */
     DIAG_CMD_VOC_PCM_LB   = 49, /* Start/Stop Vocoder PCM loopback */
     DIAG_CMD_VOC_PKT_LB   = 50, /* Start/Stop Vocoder PKT loopback */

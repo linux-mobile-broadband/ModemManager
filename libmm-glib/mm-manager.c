@@ -269,7 +269,7 @@ mm_manager_get_proxy (MMManager *manager)
  *
  * Finishes an operation started with mm_manager_set_logging().
  *
- * Returns: %TRUE if the call succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_manager_set_logging_finish (MMManager     *manager,
@@ -355,7 +355,7 @@ mm_manager_set_logging (MMManager           *manager,
  *
  * See mm_manager_set_logging() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the call succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_manager_set_logging_sync (MMManager     *manager,
@@ -385,7 +385,7 @@ mm_manager_set_logging_sync (MMManager     *manager,
  *
  * Finishes an operation started with mm_manager_scan_devices().
  *
- * Returns: %TRUE if the call succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_manager_scan_devices_finish (MMManager     *manager,
@@ -467,7 +467,7 @@ mm_manager_scan_devices (MMManager           *manager,
  *
  * See mm_manager_scan_devices() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the call succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_manager_scan_devices_sync (MMManager     *manager,
@@ -495,7 +495,7 @@ mm_manager_scan_devices_sync (MMManager     *manager,
  *
  * Finishes an operation started with mm_manager_report_kernel_event().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_manager_report_kernel_event_finish (MMManager     *manager,
@@ -583,7 +583,7 @@ mm_manager_report_kernel_event (MMManager                *manager,
  *
  * See mm_manager_report_kernel_event() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_manager_report_kernel_event_sync (MMManager                *manager,

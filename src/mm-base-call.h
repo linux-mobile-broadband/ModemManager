@@ -91,7 +91,7 @@ struct _MMBaseCallClass {
 
 GType mm_base_call_get_type (void);
 
-/* This one can be overriden by plugins */
+/* This one can be overridden by plugins */
 MMBaseCall *mm_base_call_new                 (MMBaseModem *modem);
 MMBaseCall *mm_base_call_new_from_properties (MMBaseModem *modem,
                                               MMCallProperties *properties,

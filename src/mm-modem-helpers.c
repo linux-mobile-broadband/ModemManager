@@ -2668,7 +2668,7 @@ mm_3gpp_parse_cpms_query_response (const gchar *reply,
 
     if (!g_regex_match (r, reply, 0, &match_info)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Could not parse CPMS query reponse '%s'", reply);
+                     "Could not parse CPMS query response '%s'", reply);
         goto end;
     }
 
@@ -4005,7 +4005,7 @@ mm_cdma_get_index_from_rm_protocol (MMModemCdmaRmProtocol protocol,
         return 0;
     }
 
-    /* just substracting 1 from the enum value should give us the index */
+    /* just subtracting 1 from the enum value should give us the index */
     return (protocol - 1);
 }
 

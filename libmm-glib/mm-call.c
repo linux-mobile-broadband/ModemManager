@@ -184,7 +184,7 @@ mm_call_get_state_reason (MMCall *self)
  *
  * Finishes an operation started with mm_call_start().
  *
- * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns:  %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_start_finish (MMCall *self,
@@ -239,7 +239,7 @@ mm_call_start (MMCall *self,
  * The calling thread is blocked until a reply is received.
  * See mm_call_start() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_start_sync (MMCall *self,
@@ -263,7 +263,7 @@ mm_call_start_sync (MMCall *self,
  *
  * Finishes an operation started with mm_call_accept().
  *
- * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns:  %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_accept_finish (MMCall *self,
@@ -318,7 +318,7 @@ mm_call_accept (MMCall *self,
  * The calling thread is blocked until an incoming call is ready.
  * See mm_call_accept() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_accept_sync (MMCall *self,
@@ -342,7 +342,7 @@ mm_call_accept_sync (MMCall *self,
  *
  * Finishes an operation started with mm_call_hangup().
  *
- * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns:  %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_hangup_finish (MMCall *self,
@@ -397,7 +397,7 @@ mm_call_hangup (MMCall *self,
  * The calling thread is blocked until an incoming call is ready.
  * See mm_call_hangup() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_hangup_sync (MMCall *self,
@@ -421,7 +421,7 @@ mm_call_hangup_sync (MMCall *self,
  *
  * Finishes an operation started with mm_call_send_dtmf().
  *
- * Returns:  %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns:  %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_send_dtmf_finish (MMCall *self,
@@ -480,7 +480,7 @@ mm_call_send_dtmf (MMCall *self,
  * The calling thread is blocked until an incoming call is ready.
  * See mm_call_send_dtmf() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_call_send_dtmf_sync (MMCall *self,

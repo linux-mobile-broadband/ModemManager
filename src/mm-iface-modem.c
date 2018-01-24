@@ -4380,7 +4380,7 @@ setup_sim_hot_swap_ready (MMIfaceModem *self,
         mm_warn ("Iface modem: SIM hot swap setup failed: '%s'", error->message);
         g_error_free (error);
     } else {
-        mm_dbg ("Iface modem: SIM hot swap setup succeded");
+        mm_dbg ("Iface modem: SIM hot swap setup succeeded");
         g_object_set (self,
                       MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, TRUE,
                       NULL);

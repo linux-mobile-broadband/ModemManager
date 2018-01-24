@@ -132,7 +132,7 @@
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">
           <literal>Connect()</literal>
         </link>
-        method will create a single bearer with the parameters specified in the call an get
+        method will create a single bearer with the parameters specified in the call and get
         it connected, while the
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Disconnect">
           <literal>Disconnect()</literal>

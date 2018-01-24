@@ -596,7 +596,7 @@ build_start_network_input (ConnectContext *ctx)
 
     /* Need to add auth info? */
     if (has_user || has_password || ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
-        /* We define a valid auth preference if we have either user or password, or a explicit
+        /* We define a valid auth preference if we have either user or password, or an explicit
          * request for one to be set. If no explicit one was given, default to PAP. */
         qmi_message_wds_start_network_input_set_authentication_preference (
             input,

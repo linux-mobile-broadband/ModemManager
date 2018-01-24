@@ -18,7 +18,7 @@ initialization sequence, as we want to use the primary port for that always).
 Therefore, looking for ways to mitigate probing time in the specific bad cases
 is a good way of minimizing this problem. Some ideas:
 
-  ** If one AT probing suceeds, don't allow timeouts in remaining ports when
+  ** If one AT probing succeeds, don't allow timeouts in remaining ports when
      probing for AT.
 
 

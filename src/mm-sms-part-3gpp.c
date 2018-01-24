@@ -751,7 +751,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
  * @address: the phone number to encode
  * @buf: the buffer to encode @address in
  * @buflen: the size  of @buf
- * @is_smsc: if %TRUE encode size as number of octets of address infromation,
+ * @is_smsc: if %TRUE encode size as number of octets of address information,
  *   otherwise if %FALSE encode size as number of digits of @address
  *
  * Returns: the size in bytes of the data added to @buf

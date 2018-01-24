@@ -30,7 +30,7 @@ abort_async_if_port_unusable (MMBaseModem *self,
     GError *error = NULL;
     gboolean init_sequence_enabled = FALSE;
 
-    /* If no port given, probably the port dissapeared */
+    /* If no port given, probably the port disappeared */
     if (!port) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),

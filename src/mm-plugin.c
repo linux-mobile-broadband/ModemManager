@@ -39,7 +39,7 @@
 
 G_DEFINE_TYPE (MMPlugin, mm_plugin, G_TYPE_OBJECT)
 
-/* Virtual port corresponding to the embeded modem */
+/* Virtual port corresponding to the embedded modem */
 static gchar *virtual_port[] = {"smd0", NULL};
 
 #define HAS_POST_PROBING_FILTERS(self)          \

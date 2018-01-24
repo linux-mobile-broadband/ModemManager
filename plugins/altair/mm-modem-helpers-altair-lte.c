@@ -77,7 +77,7 @@ mm_altair_parse_ceer_response (const gchar *response,
 
 
     /* First accept an empty response as the no error case. Sometimes, the only
-     * respone to the AT+CEER query is an OK.
+     * response to the AT+CEER query is an OK.
      */
     if (g_strcmp0 ("", response) == 0) {
         return g_strdup ("");

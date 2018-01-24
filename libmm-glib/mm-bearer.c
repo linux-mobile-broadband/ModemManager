@@ -659,7 +659,7 @@ mm_bearer_peek_stats (MMBearer *self)
  *
  * Finishes an operation started with mm_bearer_connect().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_connect_finish (MMBearer *self,
@@ -709,7 +709,7 @@ mm_bearer_connect (MMBearer *self,
  * The calling thread is blocked until a reply is received.
  * See mm_bearer_connect() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_connect_sync (MMBearer *self,
@@ -756,7 +756,7 @@ mm_bearer_disconnect (MMBearer *self,
  *
  * Finishes an operation started with mm_bearer_disconnect().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_disconnect_finish (MMBearer *self,
@@ -779,7 +779,7 @@ mm_bearer_disconnect_finish (MMBearer *self,
  * The calling thread is blocked until a reply is received.
  * See mm_bearer_disconnect() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_bearer_disconnect_sync (MMBearer *self,

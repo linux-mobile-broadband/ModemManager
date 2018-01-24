@@ -253,7 +253,7 @@ mm_sim_dup_operator_name (MMSim *self)
  *
  * Finishes an operation started with mm_sim_send_pin().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_send_pin_finish (MMSim *self,
@@ -308,7 +308,7 @@ mm_sim_send_pin (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_send_pin() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_send_pin_sync (MMSim *self,
@@ -334,7 +334,7 @@ mm_sim_send_pin_sync (MMSim *self,
  *
  * Finishes an operation started with mm_sim_send_puk().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_send_puk_finish (MMSim *self,
@@ -393,7 +393,7 @@ mm_sim_send_puk (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_send_puk() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_send_puk_sync (MMSim *self,
@@ -421,7 +421,7 @@ mm_sim_send_puk_sync (MMSim *self,
  *
  * Finishes an operation started with mm_sim_enable_pin().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_enable_pin_finish (MMSim *self,
@@ -477,7 +477,7 @@ mm_sim_enable_pin (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_enable_pin() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_enable_pin_sync (MMSim *self,
@@ -504,7 +504,7 @@ mm_sim_enable_pin_sync (MMSim *self,
  *
  * Finishes an operation started with mm_sim_disable_pin().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_disable_pin_finish (MMSim *self,
@@ -560,7 +560,7 @@ mm_sim_disable_pin (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_disable_pin() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_disable_pin_sync (MMSim *self,
@@ -587,7 +587,7 @@ mm_sim_disable_pin_sync (MMSim *self,
  *
  * Finishes an operation started with mm_sim_change_pin().
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_change_pin_finish (MMSim *self,
@@ -646,7 +646,7 @@ mm_sim_change_pin (MMSim *self,
  * The calling thread is blocked until a reply is received.
  * See mm_sim_change_pin() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the operation succeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
  */
 gboolean
 mm_sim_change_pin_sync (MMSim *self,

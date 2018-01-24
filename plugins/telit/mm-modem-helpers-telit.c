@@ -142,7 +142,7 @@ mm_telit_get_band_flag (GArray *bands_array,
  * AT#BND=?
  *      #BND: <2G band flags range>,<3G band flags range>[, <4G band flags range>]
  *
- *  where "band flags" is a list of numbers definining the supported bands.
+ *  where "band flags" is a list of numbers defining the supported bands.
  *  Note that the one Telit band flag may represent more than one MM band.
  *
  *  e.g.
@@ -176,7 +176,7 @@ mm_telit_get_band_flag (GArray *bands_array,
  * AT#BND?
  *      #BND: <2G band flags>,<3G band flags>[, <4G band flags>]
  *
- *  where "band flags" is a number definining the current bands.
+ *  where "band flags" is a number defining the current bands.
  *  Note that the one Telit band flag may represent more than one MM band.
  *
  *  e.g.
@@ -216,7 +216,7 @@ mm_telit_parse_bnd_response (const gchar *response,
 
     if (!g_regex_match (r, response, 0, &match_info)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Could not parse reponse '%s'", response);
+                     "Could not parse response '%s'", response);
         goto end;
     }
 
