@@ -13,6 +13,7 @@ ProtectHome=true
 PrivateTmp=true
 RestrictAddressFamilies=AF_NETLINK AF_UNIX
 NoNewPrivileges=true
+User=root
 
 [Install]
 WantedBy=multi-user.target
