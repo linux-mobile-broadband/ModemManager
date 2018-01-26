@@ -230,7 +230,7 @@ mm_huawei_parse_dhcp_response (const char *reply,
      * actually 10.10.1.1.
      */
 
-    r = g_regex_new ("\\^DHCP:\\s*([0-9a-fA-F]+),([0-9a-fA-F]+),([0-9a-fA-F]+),([0-9a-fA-F]+),([0-9a-fA-F]+),([0-9a-fA-F]+),.*$", 0, 0, NULL);
+    r = g_regex_new ("\\^DHCP:\\s*(?:0[xX])?([0-9a-fA-F]+),(?:0[xX])?([0-9a-fA-F]+),(?:0[xX])?([0-9a-fA-F]+),(?:0[xX])?([0-9a-fA-F]+),(?:0[xX])?([0-9a-fA-F]+),(?:0[xX])?([0-9a-fA-F]+),.*$", 0, 0, NULL);
     g_assert (r != NULL);
 
     matched = g_regex_match_full (r, reply, -1, 0, 0, &match_info, &match_error);
