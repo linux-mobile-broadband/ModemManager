@@ -834,7 +834,6 @@ connect_context_step (ConnectContext *ctx)
         return;
 
     case CONNECT_STEP_ENSURE_DISCONNECTED: {
-        MbimMessage *message;
         GError *error = NULL;
 
         message = (mbim_message_connect_set_new (
