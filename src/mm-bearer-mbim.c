@@ -211,6 +211,7 @@ typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_PACKET_SERVICE,
     CONNECT_STEP_PROVISIONED_CONTEXTS,
+    CONNECT_STEP_CHECK_DISCONNECTED,
     CONNECT_STEP_ENSURE_DISCONNECTED,
     CONNECT_STEP_CONNECT,
     CONNECT_STEP_IP_CONFIGURATION,
@@ -645,6 +646,53 @@ ensure_disconnected_ready (MbimDevice   *device,
 }
 
 static void
+check_disconnected_ready (MbimDevice   *device,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    ConnectContext *ctx;
+    GError *error = NULL;
+    MbimMessage *response;
+    guint32 session_id;
+    MbimActivationState activation_state;
+
+    ctx = g_task_get_task_data (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_connect_response_parse (
+            response,
+            &session_id,
+            &activation_state,
+            NULL, /* voice_call_state */
+            NULL, /* ip_type */
+            NULL, /* context_type */
+            NULL, /* nw_error */
+            &error)) {
+        mm_dbg ("Session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
+    } else
+        activation_state = MBIM_ACTIVATION_STATE_UNKNOWN;
+
+    if (response)
+        mbim_message_unref (response);
+
+    /* Some modem (e.g. Huawei ME936) reports MBIM_ACTIVATION_STATE_UNKNOWN
+     * when being queried for the activation state before an IP session has
+     * been activated once. Here we expect a modem would at least tell the
+     * truth when the session has been activated, so we proceed to deactivate
+     * the session only the modem indicates the session has been activated or
+     * is being activated.
+     */
+    if (activation_state == MBIM_ACTIVATION_STATE_ACTIVATED || activation_state == MBIM_ACTIVATION_STATE_ACTIVATING)
+        ctx->step = CONNECT_STEP_ENSURE_DISCONNECTED;
+    else
+        ctx->step = CONNECT_STEP_CONNECT;
+
+    connect_context_step (task);
+}
+
+static void
 provisioned_contexts_query_ready (MbimDevice *device,
                                   GAsyncResult *res,
                                   GTask *task)
@@ -828,6 +876,33 @@ connect_context_step (GTask *task)
                              task);
         mbim_message_unref (message);
         return;
+
+    case CONNECT_STEP_CHECK_DISCONNECTED: {
+        GError *error = NULL;
+
+        message = (mbim_message_connect_query_new (
+                       self->priv->session_id,
+                       MBIM_ACTIVATION_STATE_UNKNOWN,
+                       MBIM_VOICE_CALL_STATE_NONE,
+                       MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                       mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                       0,
+                       &error));
+        if (!message) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+
+        mbim_device_command (ctx->device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)check_disconnected_ready,
+                             task);
+        mbim_message_unref (message);
+        return;
+    }
 
     case CONNECT_STEP_ENSURE_DISCONNECTED: {
         GError *error = NULL;
