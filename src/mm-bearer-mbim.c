@@ -851,7 +851,7 @@ connect_context_step (GTask *task)
 
         mbim_device_command (ctx->device,
                              message,
-                             30,
+                             60,
                              NULL,
                              (GAsyncReadyCallback)ensure_disconnected_ready,
                              task);
@@ -1254,7 +1254,7 @@ disconnect_context_step (GTask *task)
 
         mbim_device_command (ctx->device,
                              message,
-                             30,
+                             60,
                              NULL,
                              (GAsyncReadyCallback)disconnect_set_ready,
                              task);
