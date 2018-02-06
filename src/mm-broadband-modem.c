@@ -8146,7 +8146,6 @@ typedef struct {
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
-    GError *error;
     gboolean has_qcdm_port;
     gboolean has_sprint_commands;
 } SetupRegistrationChecksContext;
@@ -8154,44 +8153,39 @@ typedef struct {
 static void
 setup_registration_checks_context_complete_and_free (SetupRegistrationChecksContext *ctx)
 {
-    if (ctx->error)
-        g_simple_async_result_take_error (ctx->result, ctx->error);
-    else {
-        SetupRegistrationChecksResults *results;
+    SetupRegistrationChecksResults *results;
 
-        results = g_new0 (SetupRegistrationChecksResults, 1);
+    results = g_new0 (SetupRegistrationChecksResults, 1);
 
-        /* Skip QCDM steps if no QCDM port */
-        if (!ctx->has_qcdm_port) {
-            mm_dbg ("Will skip all QCDM-based registration checks");
-            results->skip_qcdm_call_manager_step = TRUE;
-            results->skip_qcdm_hdr_step = TRUE;
-        }
-
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state ==
-            modem_cdma_get_detailed_registration_state) {
-            /* Skip CDMA1x Serving System check if we have Sprint specific
-             * commands AND if the default detailed registration checker
-             * is the generic one. Implementations knowing that their
-             * CSS response is undesired, should either setup NULL callbacks
-             * for the specific step, or subclass this setup and return
-             * FALSE themselves. */
-            if (ctx->has_sprint_commands) {
-                mm_dbg ("Will skip CDMA1x Serving System check, "
-                        "we do have Sprint commands");
-                results->skip_at_cdma1x_serving_system_step = TRUE;
-            } else {
-                /* If there aren't Sprint specific commands, and the detailed
-                 * registration state getter wasn't subclassed, skip the step */
-                mm_dbg ("Will skip generic detailed registration check, we "
-                        "don't have Sprint commands");
-                results->skip_detailed_registration_state = TRUE;
-            }
-        }
-
-        g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
+    /* Skip QCDM steps if no QCDM port */
+    if (!ctx->has_qcdm_port) {
+        mm_dbg ("Will skip all QCDM-based registration checks");
+        results->skip_qcdm_call_manager_step = TRUE;
+        results->skip_qcdm_hdr_step = TRUE;
     }
 
+    if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state ==
+        modem_cdma_get_detailed_registration_state) {
+        /* Skip CDMA1x Serving System check if we have Sprint specific
+         * commands AND if the default detailed registration checker
+         * is the generic one. Implementations knowing that their
+         * CSS response is undesired, should either setup NULL callbacks
+         * for the specific step, or subclass this setup and return
+         * FALSE themselves. */
+        if (ctx->has_sprint_commands) {
+            mm_dbg ("Will skip CDMA1x Serving System check, "
+                    "we do have Sprint commands");
+            results->skip_at_cdma1x_serving_system_step = TRUE;
+        } else {
+            /* If there aren't Sprint specific commands, and the detailed
+             * registration state getter wasn't subclassed, skip the step */
+            mm_dbg ("Will skip generic detailed registration check, we "
+                    "don't have Sprint commands");
+            results->skip_detailed_registration_state = TRUE;
+        }
+    }
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
