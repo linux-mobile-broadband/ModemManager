@@ -119,6 +119,13 @@ get_registration_state_context (MMIfaceModem3gpp *self)
     return ctx;
 }
 
+static gboolean
+reg_state_is_registered (MMModem3gppRegistrationState state)
+{
+    return state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING;
+}
+
 static MMModem3gppRegistrationState
 get_consolidated_reg_state (RegistrationStateContext *ctx)
 {
@@ -268,8 +275,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
     }
 
     /* If we got registered, end registration checks */
-    if (current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        current_registration_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+    if (reg_state_is_registered (current_registration_state)) {
         /* Request immediate access tech update */
         mm_iface_modem_refresh_access_technologies (MM_IFACE_MODEM (ctx->self));
         mm_dbg ("Modem is currently registered in a 3GPP network");
@@ -391,9 +397,11 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     }
     /* Automatic registration requested? */
     else {
+        MMModem3gppRegistrationState reg_state = mm_gdbus_modem3gpp_get_registration_state (ctx->skeleton);
+
         /* If the modem is already registered and the last time it was asked
          * automatic registration, we're done */
-        if (current_operator_code &&
+        if ((current_operator_code || reg_state_is_registered (reg_state)) &&
             !registration_state_context->manual_registration) {
             mm_dbg ("Already registered in network '%s',"
                     " automatic registration not launched...",
@@ -1033,9 +1041,7 @@ mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
 
     /* Even if registration state didn't change, report access technology,
      * but only if something valid to report */
-    if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING ||
-        ctx->reloading_registration_info) {
+    if (reg_state_is_registered (state) || ctx->reloading_registration_info) {
         if (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                        access_tech,
@@ -1068,9 +1074,7 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
      * location updates, but only if something valid to report. For the case
      * where we're registering (loading current registration info after a state
      * change to registered), we also allow LAC/CID updates. */
-    if (ctx->reloading_registration_info ||
-        state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+    if (reg_state_is_registered (state) || ctx->reloading_registration_info) {
         if (location_area_code > 0 && cell_id > 0)
             mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
                                                         location_area_code,
@@ -1122,8 +1126,7 @@ update_non_registered_state (MMIfaceModem3gpp *self,
      * sent by the carrier during registration or b) by looking at the
      * registration reject error code.  If b), we want to make sure we
      * preserve the subscription state */
-    if (old_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        old_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+    if (reg_state_is_registered (old_state))
         clear_subscription_state (self);
 
     /* The property in the interface is bound to the property
@@ -1160,8 +1163,7 @@ update_registration_state (MMIfaceModem3gpp *self,
     if (new_state == old_state)
         return;
 
-    if (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+    if (reg_state_is_registered (new_state)) {
         /* If already reloading registration info, skip it */
         if (ctx->reloading_registration_info)
             return;
