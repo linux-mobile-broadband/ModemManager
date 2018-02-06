@@ -8696,7 +8696,7 @@ modem_signal_load_values (MMIfaceModemSignal  *self,
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CESQ",
                               3,
-                              TRUE,
+                              FALSE,
                               callback,
                               user_data);
 }
