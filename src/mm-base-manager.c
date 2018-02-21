@@ -628,7 +628,7 @@ remove_disable_ready (MMBaseModem *modem,
     if (device) {
         g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
         mm_device_remove_modem (device);
-        g_hash_table_remove (self->priv->devices, device);
+        g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
     }
 }
 
