@@ -47,34 +47,6 @@ create_modem (MMPlugin     *self,
                                                         product));
 }
 
-static gboolean
-grab_port (MMPlugin     *self,
-           MMBaseModem  *modem,
-           MMPortProbe  *probe,
-           GError      **error)
-{
-    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
-    MMKernelDevice *port;
-    MMPortType port_type;
-
-    port_type = mm_port_probe_get_port_type (probe);
-    port = mm_port_probe_peek_port (probe);
-
-    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_UBLOX_PRIMARY_PORT")) {
-        mm_dbg ("(%s/%s)' port flagged as primary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_UBLOX_SECONDARY_PORT")) {
-        mm_dbg ("(%s/%s) port flagged as secondary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-    }
-
-    return mm_base_modem_grab_port (modem, port, port_type, pflags, error);
-}
-
 /*****************************************************************************/
 /* Custom init context */
 
@@ -295,5 +267,4 @@ mm_plugin_ublox_class_init (MMPluginUbloxClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
-    plugin_class->grab_port    = grab_port;
 }
