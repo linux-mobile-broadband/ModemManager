@@ -226,20 +226,21 @@ device_removed (MMBaseManager  *self,
              * support_check_cancel() and g_hash_table_remove(), we hold a full reference
              * ourselves. */
             g_object_ref (device);
+            {
+                mm_info ("(%s/%s): released by device '%s'", subsys, name, mm_device_get_uid (device));
+                mm_device_release_port (device, kernel_device);
 
-            mm_info ("(%s/%s): released by device '%s'", subsys, name, mm_device_get_uid (device));
-            mm_device_release_port (device, kernel_device);
+                /* If port probe list gets empty, remove the device object iself */
+                if (!mm_device_peek_port_probe_list (device)) {
+                    mm_dbg ("Removing empty device '%s'", mm_device_get_uid (device));
+                    if (mm_plugin_manager_device_support_check_cancel (self->priv->plugin_manager, device))
+                        mm_dbg ("Device support check has been cancelled");
 
-            /* If port probe list gets empty, remove the device object iself */
-            if (!mm_device_peek_port_probe_list (device)) {
-                mm_dbg ("Removing empty device '%s'", mm_device_get_uid (device));
-                if (mm_plugin_manager_device_support_check_cancel (self->priv->plugin_manager, device))
-                    mm_dbg ("Device support check has been cancelled");
-
-                /* The device may have already been removed from the tracking HT, we
-                 * just try to remove it and if it fails, we ignore it */
-                mm_device_remove_modem (device);
-                g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
+                    /* The device may have already been removed from the tracking HT, we
+                     * just try to remove it and if it fails, we ignore it */
+                    mm_device_remove_modem (device);
+                    g_hash_table_remove (self->priv->devices, mm_device_get_uid (device));
+                }
             }
             g_object_unref (device);
         }
