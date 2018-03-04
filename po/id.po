@@ -1,0 +1,102 @@
+# Indonesian translation for ModemManager.
+# Copyright (C) 2018 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Andika Triwidada <andika@gmail.com>, 2018.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2018-03-04 16:56+0100\n"
+"PO-Revision-Date: 2018-03-04 20:31+0700\n"
+"Last-Translator: Andika Triwidada <andika@gmail.com>\n"
+"Language-Team: Indonesian <gnome-l10n-id@googlegroups.com>\n"
+"Language: id\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.8.11\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Kendalikan daemon Manajer Modem"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Kebijakan sistem mencegah pengendalian Manajer Modem."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Buka kunci dan kendalikan suatu peranti data seluler"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Kebijakan sistem mencegah membuka kunci atau mengendalikan peranti data "
+"seluler."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Tambah, ubah, dan hapus kontak data seluler"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Kebijakan sistem mencegah menambah, mengubah, atau menghapus kontak-kontak "
+"peranti ini."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Kirim, simpan, ubah, dan hapus pesan-pesan teks"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Kebijakan sistem mencegah pengiriman atau manipulasi pesan-pesan teks "
+"peranti ini."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Terima panggilan suara masuk atau mulai pemanggilan suara keluar."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Kebijakan sistem mencegah panggilan suara."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr "Fungsikan dan tilik lokasi geografis dan informasi posisi"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Kebijakan sistem mencegah memfungsikan atau menilik informasi lokasi "
+"geografis."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Kueri dan manfaatkan layanan dan informasi jaringan"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Kebijakan sistem mencegah kueri atau pemanfaatan layanan dan informasi "
+"jaringan."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Kueri dan kelola firmware pada suatu peranti data seluler"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr "Kebijakan sistem mencegah kueri atau pengelolaan firmware peranti ini."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager perlu mereset peranti"
