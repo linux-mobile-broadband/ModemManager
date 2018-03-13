@@ -803,6 +803,7 @@ mm_bearer_init (MMBearer *self)
     g_mutex_init (&self->priv->ipv4_config_mutex);
     g_mutex_init (&self->priv->ipv6_config_mutex);
     g_mutex_init (&self->priv->properties_mutex);
+    g_mutex_init (&self->priv->stats_mutex);
 }
 
 static void
@@ -813,6 +814,7 @@ finalize (GObject *object)
     g_mutex_clear (&self->priv->ipv4_config_mutex);
     g_mutex_clear (&self->priv->ipv6_config_mutex);
     g_mutex_clear (&self->priv->properties_mutex);
+    g_mutex_clear (&self->priv->stats_mutex);
 
     G_OBJECT_CLASS (mm_bearer_parent_class)->finalize (object);
 }
@@ -825,6 +827,7 @@ dispose (GObject *object)
     g_clear_object (&self->priv->ipv4_config);
     g_clear_object (&self->priv->ipv6_config);
     g_clear_object (&self->priv->properties);
+    g_clear_object (&self->priv->stats);
 
     G_OBJECT_CLASS (mm_bearer_parent_class)->dispose (object);
 }
