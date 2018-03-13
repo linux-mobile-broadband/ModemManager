@@ -1820,7 +1820,7 @@ list_bearers_context_free (ListBearersContext *ctx)
  *
  * Finishes an operation started with mm_modem_list_bearers().
  *
- * Returns: (transfer full) (element-type ModemManager.Modem): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
+ * Returns: (transfer full) (element-type ModemManager.Bearer): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
  */
 GList *
 mm_modem_list_bearers_finish (MMModem *self,
@@ -1955,7 +1955,7 @@ mm_modem_list_bearers (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_list_bearers()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer full) (element-type ModemManager.Modem): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
+ * Returns: (transfer full) (element-type ModemManager.Bearer): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
  */
 GList *
 mm_modem_list_bearers_sync (MMModem *self,
