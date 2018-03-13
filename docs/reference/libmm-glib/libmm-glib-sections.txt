@@ -276,6 +276,7 @@ mm_modem_3gpp_dup_operator_name
 mm_modem_3gpp_get_enabled_facility_locks
 mm_modem_3gpp_get_registration_state
 mm_modem_3gpp_get_subscription_state
+mm_modem_3gpp_get_eps_ue_mode_operation
 <SUBSECTION Methods>
 mm_modem_3gpp_register
 mm_modem_3gpp_register_finish
