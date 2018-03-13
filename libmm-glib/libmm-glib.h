@@ -34,6 +34,10 @@
 /* This headers are not exported within ModemManager */
 # include <mm-manager.h>
 # include <mm-object.h>
+# include <mm-sim.h>
+# include <mm-sms.h>
+# include <mm-call.h>
+# include <mm-bearer.h>
 # include <mm-modem.h>
 # include <mm-modem-3gpp.h>
 # include <mm-modem-3gpp-ussd.h>
@@ -62,6 +66,7 @@
 #include <mm-call-properties.h>
 #include <mm-bearer-properties.h>
 #include <mm-bearer-ip-config.h>
+#include <mm-bearer-stats.h>
 #include <mm-location-common.h>
 #include <mm-location-3gpp.h>
 #include <mm-location-gps-raw.h>
