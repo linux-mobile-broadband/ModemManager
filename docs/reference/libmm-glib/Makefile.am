@@ -12,7 +12,7 @@ DOC_MODULE = libmm-glib
 DOC_MAIN_SGML_FILE = $(DOC_MODULE)-docs.xml
 
 # Extra options to supply to gtkdoc-scan
-SCAN_OPTIONS =
+SCAN_OPTIONS = --rebuild-types --deprecated-guards="MM_DISABLE_DEPRECATED"
 
 # The directory containing the source code.
 DOC_SOURCE_DIR = \

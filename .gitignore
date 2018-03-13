@@ -114,6 +114,7 @@ Makefile.in
 /docs/reference/libmm-glib/libmm-glib.interfaces
 /docs/reference/libmm-glib/libmm-glib.prerequisites
 /docs/reference/libmm-glib/libmm-glib.signals
+/docs/reference/libmm-glib/libmm-glib.types
 /docs/reference/libmm-glib/*.stamp
 /docs/reference/libmm-glib/*.txt
 /docs/reference/libmm-glib/html
