@@ -240,7 +240,7 @@ mm_modem_voice_list_calls (MMModemVoice *self,
  * The calling thread is blocked until a reply is received. See mm_modem_voice_list_calls()
  * for the asynchronous version of this method.
  *
- * Returns: (element-type MMCall) (transfer full): A list of #MMCall objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
+ * Returns: (element-type ModemManager.Call) (transfer full): A list of #MMCall objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
  */
 GList *
 mm_modem_voice_list_calls_sync (MMModemVoice *self,

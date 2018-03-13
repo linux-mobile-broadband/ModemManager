@@ -375,7 +375,7 @@ mm_modem_messaging_list (MMModemMessaging *self,
  * The calling thread is blocked until a reply is received. See mm_modem_messaging_list()
  * for the asynchronous version of this method.
  *
- * Returns: (element-type MMSms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
+ * Returns: (element-type ModemManager.Sms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
  */
 GList *
 mm_modem_messaging_list_sync (MMModemMessaging *self,
