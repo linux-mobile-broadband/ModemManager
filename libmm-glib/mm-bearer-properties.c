@@ -261,7 +261,7 @@ mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
  *
  * Checks whether roaming is allowed in the connection.
  *
- * Returns: %TRUE if roaming is allowed, %FALSE otherwise..
+ * Returns: %TRUE if roaming is allowed, %FALSE otherwise.
  */
 gboolean
 mm_bearer_properties_get_allow_roaming (MMBearerProperties *self)
