@@ -802,7 +802,7 @@ mm_ublox_get_modem_mode_any (const GArray *combinations)
         guint bits_set;
 
         combination = &g_array_index (combinations, MMModemModeCombination, i);
-        if (combination->preferred == MM_MODEM_MODE_NONE)
+        if (combination->preferred != MM_MODEM_MODE_NONE)
             continue;
         bits_set = mm_count_bits_set (combination->allowed);
         if (bits_set > any_bits_set) {
