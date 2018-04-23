@@ -1434,6 +1434,79 @@ modem_power_down (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Signal quality loading (Modem interface) */
+
+static guint
+modem_load_signal_quality_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), error);
+    return value < 0 ? 0 : value;
+}
+
+static void
+signal_state_query_ready (MbimDevice *device,
+                          GAsyncResult *res,
+                          GTask *task)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    guint32 rssi;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_signal_state_response_parse (
+            response,
+            &rssi,
+            NULL, /* error_rate */
+            NULL, /* signal_strength_interval */
+            NULL, /* rssi_threshold */
+            NULL, /* error_rate_threshold */
+            &error)) {
+        guint32 quality;
+
+        /* Normalize the quality. 99 means unknown, we default it to 0 */
+        quality = CLAMP (rssi == 99 ? 0 : rssi, 0, 31) * 100 / 31;
+
+        g_task_return_int (task, quality);
+    } else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+modem_load_signal_quality (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    MbimDevice *device;
+    MbimMessage *message;
+    GTask *task;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    message = mbim_message_signal_state_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)signal_state_query_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBaseBearer *
@@ -3305,6 +3378,7 @@ mm_broadband_modem_mbim_new (const gchar *device,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
+                         MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED, TRUE,
                          NULL);
 }
 
@@ -3379,6 +3453,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_ip_families = modem_load_supported_ip_families;
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
+    /* Additional actions */
+    iface->load_signal_quality = modem_load_signal_quality;
+    iface->load_signal_quality_finish = modem_load_signal_quality_finish;
+
     /* Unneeded things */
     iface->modem_after_power_up = NULL;
     iface->modem_after_power_up_finish = NULL;
@@ -3388,8 +3466,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = NULL;
     iface->setup_charset = NULL;
     iface->setup_charset_finish = NULL;
-    iface->load_signal_quality = NULL;
-    iface->load_signal_quality_finish = NULL;
     iface->load_access_technologies = NULL;
     iface->load_access_technologies_finish = NULL;
 
