@@ -117,6 +117,7 @@ enum {
     PROP_MODEM_SIMPLE_STATUS,
     PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
     PROP_MODEM_SIM_HOT_SWAP_CONFIGURED,
+    PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
     PROP_FLOW_CONTROL,
     PROP_LAST
 };
@@ -136,6 +137,7 @@ struct _MMBroadbandModemPrivate {
     gboolean modem_init_run;
     gboolean sim_hot_swap_supported;
     gboolean sim_hot_swap_configured;
+    gboolean periodic_signal_check_disabled;
 
     /*<--- Modem interface --->*/
     /* Properties */
@@ -10809,6 +10811,9 @@ set_property (GObject *object,
     case PROP_MODEM_SIM_HOT_SWAP_CONFIGURED:
         self->priv->sim_hot_swap_configured = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED:
+        self->priv->periodic_signal_check_disabled = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -10917,6 +10922,9 @@ get_property (GObject *object,
     case PROP_MODEM_SIM_HOT_SWAP_CONFIGURED:
         g_value_set_boolean (value, self->priv->sim_hot_swap_configured);
         break;
+    case PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED:
+        g_value_set_boolean (value, self->priv->periodic_signal_check_disabled);
+        break;
     case PROP_FLOW_CONTROL:
         g_value_set_flags (value, self->priv->flow_control);
         break;
@@ -10949,6 +10957,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->current_sms_mem1_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->current_sms_mem2_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->sim_hot_swap_supported = FALSE;
+    self->priv->periodic_signal_check_disabled = FALSE;
     self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_disable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_ind = MM_3GPP_CMER_IND_NONE;
@@ -11430,6 +11439,11 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM_HOT_SWAP_CONFIGURED,
                                       MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
+                                      MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED);
+
     properties[PROP_FLOW_CONTROL] =
         g_param_spec_flags (MM_BROADBAND_MODEM_FLOW_CONTROL,
                             "Flow control",
