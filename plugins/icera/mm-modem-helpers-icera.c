@@ -215,7 +215,7 @@ mm_icera_parse_ipdpaddr_response (const gchar *response,
     GError *local = NULL;
     gboolean success = FALSE;
     char **items;
-    guint num_items, i, first_free;
+    guint num_items, i;
     gint num;
 
     g_return_val_if_fail (out_ip4_config, FALSE);
@@ -240,7 +240,7 @@ mm_icera_parse_ipdpaddr_response (const gchar *response,
 
     /* Strip any spaces on elements; inet_pton() doesn't like them */
     num_items = g_strv_length (items);
-    for (i = 0, first_free = 0; i < num_items; i++)
+    for (i = 0; i < num_items; i++)
         items[i] = g_strstrip (items[i]);
 
     if (num_items < 7) {

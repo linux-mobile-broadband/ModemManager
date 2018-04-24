@@ -156,15 +156,12 @@ quick_at_ready (MMPortSerialAt *port,
                 GAsyncResult   *res,
                 GTask          *task)
 {
-    CustomInitContext *ctx;
     MMPortProbe       *probe;
-    const gchar       *response;
     GError            *error = NULL;
 
-    ctx   = g_task_get_task_data     (task);
     probe = g_task_get_source_object (task);
 
-    response = mm_port_serial_at_command_finish (port, res, &error);
+    mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         /* On a timeout error, wait for READY URC */
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {

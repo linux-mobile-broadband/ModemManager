@@ -1207,10 +1207,8 @@ init_current_storages_ready (MMIfaceModemMessaging *self,
                              GTask *task)
 {
     InitializationContext *ctx;
-    StorageContext *storage_ctx;
     GError *error = NULL;
 
-    storage_ctx = get_storage_context (self);
     if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->init_current_storages_finish (
             self,
             res,

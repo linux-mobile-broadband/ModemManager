@@ -328,11 +328,6 @@ mm_sms_list_take_part (MMSmsList *self,
                        MMSmsStorage storage,
                        GError **error)
 {
-    PartIndexAndStorage ctx;
-
-    ctx.part_index = mm_sms_part_get_index (part);
-    ctx.storage = storage;
-
     /* Ensure we don't have already taken a part with the same index */
     if (mm_sms_list_has_part (self,
                               storage,

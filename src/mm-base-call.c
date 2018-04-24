@@ -755,11 +755,10 @@ call_hangup_ready (MMBaseModem *modem,
 {
     MMBaseCall *self;
     GError *error = NULL;
-    const gchar *response;
 
     self = g_task_get_source_object (task);
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             g_task_return_error (task, error);
@@ -819,9 +818,8 @@ call_send_dtmf_ready (MMBaseModem *modem,
                       GTask *task)
 {
     GError *error = NULL;
-    const gchar *response = NULL;
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         mm_dbg ("Couldn't send_dtmf: '%s'", error->message);
         g_task_return_error (task, error);

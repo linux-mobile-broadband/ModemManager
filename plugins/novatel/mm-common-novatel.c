@@ -47,10 +47,9 @@ nwdmat_ready (MMPortSerialAt *port,
               GAsyncResult *res,
               GTask* task)
 {
-    const gchar *response;
     GError *error = NULL;
 
-    response = mm_port_serial_at_command_finish (port, res, &error);
+    mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         if (g_error_matches (error,
                              MM_SERIAL_ERROR,

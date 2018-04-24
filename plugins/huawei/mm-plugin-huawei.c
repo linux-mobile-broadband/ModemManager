@@ -180,12 +180,11 @@ curc_ready (MMPortSerialAt *port,
             GTask *task)
 {
     HuaweiCustomInitContext *ctx;
-    const gchar *response;
     GError *error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    response = mm_port_serial_at_command_finish (port, res, &error);
+    mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
         /* Retry if we get a timeout error */
         if (g_error_matches (error,

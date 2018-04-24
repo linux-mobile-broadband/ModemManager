@@ -905,10 +905,9 @@ store_ready (MMBaseModem *modem,
              GTask *task)
 {
     SmsStoreContext *ctx;
-    const gchar *response;
     GError *error = NULL;
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
