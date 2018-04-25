@@ -1222,6 +1222,7 @@ signal_quality_check_ready (MMIfaceModem *self,
 static void
 peridic_signal_check_step (MMIfaceModem *self)
 {
+    gboolean periodic_signal_check_disabled = FALSE;
     SignalCheckContext *ctx;
 
     ctx = get_signal_check_context (self);
@@ -1284,17 +1285,12 @@ peridic_signal_check_step (MMIfaceModem *self)
             initial_check_done = ((signal_quality_ready && access_technology_ready) ||
                                   (--ctx->initial_retries == 0));
             if (initial_check_done) {
-                gboolean periodic_signal_check_disabled = FALSE;
-
+                /* After the initial check is done, check if periodic signal
+                 * check is disabled. */
                 g_object_get (self,
                               MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
                               &periodic_signal_check_disabled,
                               NULL);
-                /* If periodic signal check is disabled, treat it as
-                 * unsupported after the initial check is done. */
-                if (periodic_signal_check_disabled)
-                    ctx->signal_quality_polling_supported = FALSE;
-
                 ctx->interval = SIGNAL_CHECK_TIMEOUT_SEC;
             }
         }
@@ -1302,7 +1298,8 @@ peridic_signal_check_step (MMIfaceModem *self)
         /* If both tasks are unsupported, implicitly disable. Do NOT clear the
          * values, because if we're told they are unsupported it may be that
          * they're really updated via unsolicited messages. */
-        if (!ctx->access_technology_polling_supported && !ctx->signal_quality_polling_supported) {
+        if (!ctx->access_technology_polling_supported &&
+            (!ctx->signal_quality_polling_supported || periodic_signal_check_disabled)) {
             mm_dbg ("Periodic signal and access technologies checks not supported");
             periodic_signal_check_disable (self, FALSE);
             return;
