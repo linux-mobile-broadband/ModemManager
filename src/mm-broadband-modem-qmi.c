@@ -697,21 +697,16 @@ modem_load_supported_capabilities (MMIfaceModem *self,
 /* Current capabilities setting (Modem interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientNas *client;
-    GSimpleAsyncResult *result;
     MMModemCapability capabilities;
     gboolean run_set_system_selection_preference;
     gboolean run_set_technology_preference;
 } SetCurrentCapabilitiesContext;
 
 static void
-set_current_capabilities_context_complete_and_free (SetCurrentCapabilitiesContext *ctx)
+set_current_capabilities_context_free (SetCurrentCapabilitiesContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     g_slice_free (SetCurrentCapabilitiesContext, ctx);
 }
 
@@ -720,42 +715,49 @@ set_current_capabilities_finish (MMIfaceModem *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 capabilities_power_cycle_ready (MMBroadbandModemQmi *self,
                                 GAsyncResult *res,
-                                SetCurrentCapabilitiesContext *ctx)
+                                GTask *task)
 {
     GError *error = NULL;
 
     if (!power_cycle_finish (self, res, &error))
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    set_current_capabilities_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
 }
 
 static void
-capabilities_power_cycle (SetCurrentCapabilitiesContext *ctx)
+capabilities_power_cycle (GTask *task)
 {
+    MMBroadbandModemQmi *self;
+
+    self = g_task_get_source_object (task);
+
     /* Power cycle the modem */
-    power_cycle (ctx->self,
+    power_cycle (self,
                  (GAsyncReadyCallback)capabilities_power_cycle_ready,
-                 ctx);
+                 task);
 }
 
-static void set_current_capabilities_context_step (SetCurrentCapabilitiesContext *ctx);
+static void set_current_capabilities_context_step (GTask *task);
 
 static void
 capabilities_set_technology_preference_ready (QmiClientNas *client,
                                               GAsyncResult *res,
-                                              SetCurrentCapabilitiesContext *ctx)
+                                              GTask *task)
 {
+    SetCurrentCapabilitiesContext *ctx;
     QmiMessageNasSetTechnologyPreferenceOutput *output = NULL;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_nas_set_technology_preference_finish (client, res, &error);
     if (!output) {
         mm_dbg ("QMI operation failed: %s", error->message);
@@ -772,23 +774,25 @@ capabilities_set_technology_preference_ready (QmiClientNas *client,
             g_error_free (error);
 
         /* Good! now reboot the modem */
-        capabilities_power_cycle (ctx);
+        capabilities_power_cycle (task);
         qmi_message_nas_set_technology_preference_output_unref (output);
         return;
     }
 
     ctx->run_set_technology_preference = FALSE;
-    set_current_capabilities_context_step (ctx);
+    set_current_capabilities_context_step (task);
 }
 
 static void
 capabilities_set_system_selection_preference_ready (QmiClientNas *client,
                                                     GAsyncResult *res,
-                                                    SetCurrentCapabilitiesContext *ctx)
+                                                    GTask *task)
 {
+    SetCurrentCapabilitiesContext *ctx;
     QmiMessageNasSetSystemSelectionPreferenceOutput *output = NULL;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
     if (!output) {
         mm_dbg ("QMI operation failed: %s", error->message);
@@ -799,19 +803,22 @@ capabilities_set_system_selection_preference_ready (QmiClientNas *client,
         qmi_message_nas_set_system_selection_preference_output_unref (output);
     } else {
         /* Good! now reboot the modem */
-        capabilities_power_cycle (ctx);
+        capabilities_power_cycle (task);
         qmi_message_nas_set_system_selection_preference_output_unref (output);
         return;
     }
 
     /* Try with the deprecated command */
     ctx->run_set_system_selection_preference = FALSE;
-    set_current_capabilities_context_step (ctx);
+    set_current_capabilities_context_step (task);
 }
 
 static void
-set_current_capabilities_context_step (SetCurrentCapabilitiesContext *ctx)
+set_current_capabilities_context_step (GTask *task)
 {
+    SetCurrentCapabilitiesContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     if (ctx->run_set_system_selection_preference) {
         QmiMessageNasSetSystemSelectionPreferenceInput *input;
         QmiNasRatModePreference pref;
@@ -821,13 +828,13 @@ set_current_capabilities_context_step (SetCurrentCapabilitiesContext *ctx)
             gchar *str;
 
             str = mm_modem_capability_build_string_from_mask (ctx->capabilities);
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unhandled capabilities setting: '%s'",
-                                             str);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unhandled capabilities setting: '%s'",
+                                     str);
+            g_object_unref (task);
             g_free (str);
-            set_current_capabilities_context_complete_and_free (ctx);
             return;
         }
 
@@ -841,7 +848,7 @@ set_current_capabilities_context_step (SetCurrentCapabilitiesContext *ctx)
             5,
             NULL, /* cancellable */
             (GAsyncReadyCallback)capabilities_set_system_selection_preference_ready,
-            ctx);
+            task);
         qmi_message_nas_set_system_selection_preference_input_unref (input);
         return;
     }
@@ -855,13 +862,13 @@ set_current_capabilities_context_step (SetCurrentCapabilitiesContext *ctx)
             gchar *str;
 
             str = mm_modem_capability_build_string_from_mask (ctx->capabilities);
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unhandled capabilities setting: '%s'",
-                                             str);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unhandled capabilities setting: '%s'",
+                                     str);
+            g_object_unref (task);
             g_free (str);
-            set_current_capabilities_context_complete_and_free (ctx);
             return;
         }
 
@@ -874,17 +881,16 @@ set_current_capabilities_context_step (SetCurrentCapabilitiesContext *ctx)
             5,
             NULL, /* cancellable */
             (GAsyncReadyCallback)capabilities_set_technology_preference_ready,
-            ctx);
+            task);
         qmi_message_nas_set_technology_preference_input_unref (input);
         return;
     }
 
-    g_simple_async_result_set_error (
-        ctx->result,
-        MM_CORE_ERROR,
-        MM_CORE_ERROR_UNSUPPORTED,
-        "Setting capabilities is not supported by this device");
-    set_current_capabilities_context_complete_and_free (ctx);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "Setting capabilities is not supported by this device");
+    g_object_unref (task);
 }
 
 static void
@@ -894,20 +900,16 @@ set_current_capabilities (MMIfaceModem *self,
                           gpointer user_data)
 {
     SetCurrentCapabilitiesContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
     ctx = g_slice_new0 (SetCurrentCapabilitiesContext);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             set_current_capabilities);
     ctx->capabilities = capabilities;
 
     /* System selection preference introduced in NAS 1.1 */
@@ -916,7 +918,12 @@ set_current_capabilities (MMIfaceModem *self,
     /* Technology preference introduced in NAS 1.0, so always available */
     ctx->run_set_technology_preference = TRUE;
 
-    set_current_capabilities_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)set_current_capabilities_context_free);
+
+    set_current_capabilities_context_step (task);
 }
 
 /*****************************************************************************/
