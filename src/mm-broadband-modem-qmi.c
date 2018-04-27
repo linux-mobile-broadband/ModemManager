@@ -10521,9 +10521,7 @@ typedef struct {
 } SignalLoadValuesResult;
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientNas *client;
-    GSimpleAsyncResult *result;
     SignalLoadValuesStep step;
     SignalLoadValuesResult *values_result;
 } SignalLoadValuesContext;
@@ -10545,13 +10543,10 @@ signal_load_values_result_free (SignalLoadValuesResult *result)
 }
 
 static void
-signal_load_values_context_complete_and_free (SignalLoadValuesContext *ctx)
+signal_load_values_context_free (SignalLoadValuesContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
     if (ctx->values_result)
         signal_load_values_result_free (ctx->values_result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (SignalLoadValuesContext, ctx);
 }
 
@@ -10586,26 +10581,27 @@ signal_load_values_finish (MMIfaceModemSignal *self,
 {
     SignalLoadValuesResult *values_result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    values_result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!values_result)
         return FALSE;
 
-    values_result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *cdma = values_result->cdma ? g_object_ref (values_result->cdma) : NULL;
     *evdo = values_result->evdo ? g_object_ref (values_result->evdo) : NULL;
     *gsm  = values_result->gsm  ? g_object_ref (values_result->gsm)  : NULL;
     *umts = values_result->umts ? g_object_ref (values_result->umts) : NULL;
     *lte  = values_result->lte  ? g_object_ref (values_result->lte)  : NULL;
-
+    signal_load_values_result_free (values_result);
     return TRUE;
 }
 
-static void signal_load_values_context_step (SignalLoadValuesContext *ctx);
+static void signal_load_values_context_step (GTask *task);
 
 static void
 signal_load_values_get_signal_strength_ready (QmiClientNas *client,
                                               GAsyncResult *res,
-                                              SignalLoadValuesContext *ctx)
+                                              GTask *task)
 {
+    SignalLoadValuesContext *ctx;
     QmiMessageNasGetSignalStrengthOutput *output;
     GArray *array;
     gint32 aux_int32;
@@ -10614,11 +10610,12 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
     QmiNasRadioInterface radio_interface;
     QmiNasEvdoSinrLevel sinr;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_nas_get_signal_strength_finish (client, res, NULL);
     if (!output || !qmi_message_nas_get_signal_strength_output_get_result (output, NULL)) {
         /* No hard errors, go on to next step */
         ctx->step++;
-        signal_load_values_context_step (ctx);
+        signal_load_values_context_step (task);
         if (output)
             qmi_message_nas_get_signal_strength_output_unref (output);
         return;
@@ -10738,14 +10735,15 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
 
     /* Go on */
     ctx->step++;
-    signal_load_values_context_step (ctx);
+    signal_load_values_context_step (task);
 }
 
 static void
 signal_load_values_get_signal_info_ready (QmiClientNas *client,
                                           GAsyncResult *res,
-                                          SignalLoadValuesContext *ctx)
+                                          GTask *task)
 {
+    SignalLoadValuesContext *ctx;
     QmiMessageNasGetSignalInfoOutput *output;
     gint8 rssi;
     gint16 ecio;
@@ -10755,11 +10753,12 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
     gint16 rsrp;
     gint16 snr;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_nas_get_signal_info_finish (client, res, NULL);
     if (!output || !qmi_message_nas_get_signal_info_output_get_result (output, NULL)) {
         /* No hard errors, go on to next step */
         ctx->step++;
-        signal_load_values_context_step (ctx);
+        signal_load_values_context_step (task);
         if (output)
             qmi_message_nas_get_signal_info_output_unref (output);
         return;
@@ -10828,12 +10827,13 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
 
     /* Keep on */
     ctx->step++;
-    signal_load_values_context_step (ctx);
+    signal_load_values_context_step (task);
 }
 
 static void
-signal_load_values_context_step (SignalLoadValuesContext *ctx)
+signal_load_values_context_step (GTask *task)
 {
+    SignalLoadValuesContext *ctx;
 
 #define VALUES_RESULT_LOADED(ctx)    \
     (ctx->values_result &&           \
@@ -10842,6 +10842,8 @@ signal_load_values_context_step (SignalLoadValuesContext *ctx)
       ctx->values_result->gsm  ||    \
       ctx->values_result->umts ||    \
       ctx->values_result->lte))
+
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST:
@@ -10855,7 +10857,7 @@ signal_load_values_context_step (SignalLoadValuesContext *ctx)
                                             5,
                                             NULL,
                                             (GAsyncReadyCallback)signal_load_values_get_signal_info_ready,
-                                            ctx);
+                                            task);
             return;
         }
         ctx->step++;
@@ -10882,7 +10884,7 @@ signal_load_values_context_step (SignalLoadValuesContext *ctx)
                                                5,
                                                NULL,
                                                (GAsyncReadyCallback)signal_load_values_get_signal_strength_ready,
-                                               ctx);
+                                               task);
            qmi_message_nas_get_signal_strength_input_unref (input);
            return;
        }
@@ -10892,17 +10894,16 @@ signal_load_values_context_step (SignalLoadValuesContext *ctx)
     case SIGNAL_LOAD_VALUES_STEP_SIGNAL_LAST:
         /* If any result is set, succeed */
         if (VALUES_RESULT_LOADED (ctx)) {
-            g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                       ctx->values_result,
-                                                       (GDestroyNotify)signal_load_values_result_free);
+            g_task_return_pointer (task,
+                                   g_memdup (&ctx->values_result, sizeof (ctx->values_result)),
+                                   (GDestroyNotify)signal_load_values_result_free);
             ctx->values_result = NULL;
         } else {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "No way to load extended signal information");
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "No way to load extended signal information");
         }
-        signal_load_values_context_complete_and_free (ctx);
         return;
     }
 
@@ -10918,25 +10919,26 @@ signal_load_values (MMIfaceModemSignal *self,
                     gpointer user_data)
 {
     SignalLoadValuesContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
 
     mm_dbg ("loading extended signal information...");
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
     ctx = g_slice_new0 (SignalLoadValuesContext);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             signal_load_values);
     ctx->step = SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST;
 
-    signal_load_values_context_step (ctx);
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)signal_load_values_context_free);
+
+    signal_load_values_context_step (task);
 }
 
 /*****************************************************************************/
