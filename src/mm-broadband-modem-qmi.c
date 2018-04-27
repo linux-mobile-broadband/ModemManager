@@ -1339,21 +1339,13 @@ modem_load_own_numbers_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
-    gchar **own_numbers;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    own_numbers = g_new0 (gchar *, 2);
-    own_numbers[0] = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded own numbers: %s", own_numbers[0]);
-    return own_numbers;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 dms_get_msisdn_ready (QmiClientDms *client,
                       GAsyncResult *res,
-                      GSimpleAsyncResult *simple)
+                      GTask *task)
 {
     QmiMessageDmsGetMsisdnOutput *output = NULL;
     GError *error = NULL;
@@ -1361,24 +1353,24 @@ dms_get_msisdn_ready (QmiClientDms *client,
     output = qmi_client_dms_get_msisdn_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_get_msisdn_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get MSISDN: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         const gchar *str = NULL;
+        GStrv numbers;
 
         qmi_message_dms_get_msisdn_output_get_msisdn (output, &str, NULL);
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   g_strdup (str),
-                                                   g_free);
+        numbers =  g_new0 (gchar *, 2);
+        numbers[0] = g_strdup (str);
+        g_task_return_pointer (task, numbers, (GDestroyNotify)g_strfreev);
     }
 
     if (output)
         qmi_message_dms_get_msisdn_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -1386,18 +1378,12 @@ modem_load_own_numbers (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_own_numbers);
 
     mm_dbg ("loading own numbers...");
     qmi_client_dms_get_msisdn (QMI_CLIENT_DMS (client),
@@ -1405,7 +1391,7 @@ modem_load_own_numbers (MMIfaceModem *self,
                                5,
                                NULL,
                                (GAsyncReadyCallback)dms_get_msisdn_ready,
-                               result);
+                               g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
