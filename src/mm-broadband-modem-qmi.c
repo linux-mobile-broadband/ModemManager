@@ -339,13 +339,10 @@ modem_create_bearer (MMIfaceModem *self,
 /* Current Capabilities loading (Modem interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientNas *nas_client;
     QmiClientDms *dms_client;
-    GSimpleAsyncResult *result;
     gboolean run_get_system_selection_preference;
     gboolean run_get_technology_preference;
-
     MMQmiCapabilitiesContext capabilities_context;
 } LoadCurrentCapabilitiesContext;
 
@@ -354,42 +351,44 @@ modem_load_current_capabilities_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_CAPABILITY_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return ((MMModemCapability) GPOINTER_TO_UINT (
-                g_simple_async_result_get_op_res_gpointer (
-                    G_SIMPLE_ASYNC_RESULT (res))));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_CAPABILITY_NONE;
+    }
+    return (MMModemCapability)value;
 }
 
 static void
-load_current_capabilities_context_complete_and_free (LoadCurrentCapabilitiesContext *ctx)
+load_current_capabilities_context_free (LoadCurrentCapabilitiesContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->nas_client);
     g_object_unref (ctx->dms_client);
-    g_object_unref (ctx->self);
     g_slice_free (LoadCurrentCapabilitiesContext, ctx);
 }
 
-static void load_current_capabilities_context_step (LoadCurrentCapabilitiesContext *ctx);
+static void load_current_capabilities_context_step (GTask *task);
 
 static void
 load_current_capabilities_get_capabilities_ready (QmiClientDms *client,
                                                   GAsyncResult *res,
-                                                  LoadCurrentCapabilitiesContext *ctx)
+                                                  GTask *task)
 {
+    LoadCurrentCapabilitiesContext *ctx;
     QmiMessageDmsGetCapabilitiesOutput *output = NULL;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_dms_get_capabilities_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_get_capabilities_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get Capabilities: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     } else {
         guint i;
         GArray *radio_interface_list;
@@ -414,21 +413,21 @@ load_current_capabilities_get_capabilities_ready (QmiClientDms *client,
     if (output)
         qmi_message_dms_get_capabilities_output_unref (output);
 
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        GUINT_TO_POINTER (mm_modem_capability_from_qmi_capabilities_context (&ctx->capabilities_context)),
-        NULL);
-    load_current_capabilities_context_complete_and_free (ctx);
+    g_task_return_int (task,
+                       mm_modem_capability_from_qmi_capabilities_context (&ctx->capabilities_context));
+    g_object_unref (task);
 }
 
 static void
 load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
                                                            GAsyncResult *res,
-                                                           LoadCurrentCapabilitiesContext *ctx)
+                                                           GTask *task)
 {
+    LoadCurrentCapabilitiesContext *ctx;
     QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
     if (!output) {
         mm_dbg ("QMI operation failed: %s", error->message);
@@ -449,17 +448,19 @@ load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
 
     /* Mark as TP already run */
     ctx->run_get_technology_preference = FALSE;
-    load_current_capabilities_context_step (ctx);
+    load_current_capabilities_context_step (task);
 }
 
 static void
 load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *client,
                                                                  GAsyncResult *res,
-                                                                 LoadCurrentCapabilitiesContext *ctx)
+                                                                 GTask *task)
 {
+    LoadCurrentCapabilitiesContext *ctx;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output) {
         mm_dbg ("QMI operation failed: %s", error->message);
@@ -479,12 +480,15 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
 
     /* Mark as SSP already run */
     ctx->run_get_system_selection_preference = FALSE;
-    load_current_capabilities_context_step (ctx);
+    load_current_capabilities_context_step (task);
 }
 
 static void
-load_current_capabilities_context_step (LoadCurrentCapabilitiesContext *ctx)
+load_current_capabilities_context_step (GTask *task)
 {
+    LoadCurrentCapabilitiesContext *ctx;
+
+    ctx = g_task_get_task_data (task);
     if (ctx->run_get_system_selection_preference) {
         qmi_client_nas_get_system_selection_preference (
             ctx->nas_client,
@@ -492,7 +496,7 @@ load_current_capabilities_context_step (LoadCurrentCapabilitiesContext *ctx)
             5,
             NULL, /* cancellable */
             (GAsyncReadyCallback)load_current_capabilities_get_system_selection_preference_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -503,7 +507,7 @@ load_current_capabilities_context_step (LoadCurrentCapabilitiesContext *ctx)
             5,
             NULL, /* cancellable */
             (GAsyncReadyCallback)load_current_capabilities_get_technology_preference_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -513,7 +517,7 @@ load_current_capabilities_context_step (LoadCurrentCapabilitiesContext *ctx)
         5,
         NULL, /* cancellable */
         (GAsyncReadyCallback)load_current_capabilities_get_capabilities_ready,
-        ctx);
+        task);
 }
 
 static void
@@ -522,6 +526,7 @@ modem_load_current_capabilities (MMIfaceModem *self,
                                  gpointer user_data)
 {
     LoadCurrentCapabilitiesContext *ctx;
+    GTask *task;
     QmiClient *nas_client = NULL;
     QmiClient *dms_client = NULL;
 
@@ -541,30 +546,30 @@ modem_load_current_capabilities (MMIfaceModem *self,
 
     mm_dbg ("loading current capabilities...");
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &nas_client,
                             callback, user_data))
         return;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &dms_client,
                             callback, user_data))
         return;
 
     ctx = g_slice_new0 (LoadCurrentCapabilitiesContext);
-    ctx->self = g_object_ref (self);
     ctx->nas_client = g_object_ref (nas_client);
     ctx->dms_client = g_object_ref (dms_client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_current_capabilities);
 
     /* System selection preference introduced in NAS 1.1 */
     ctx->run_get_system_selection_preference = qmi_client_check_version (nas_client, 1, 1);
     ctx->run_get_technology_preference = TRUE;
 
-    load_current_capabilities_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)load_current_capabilities_context_free);
+
+    load_current_capabilities_context_step (task);
 }
 
 /*****************************************************************************/
