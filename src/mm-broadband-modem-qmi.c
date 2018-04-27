@@ -187,6 +187,26 @@ ensure_qmi_client (MMBroadbandModemQmi *self,
     return TRUE;
 }
 
+static gboolean
+assure_qmi_client (MMBroadbandModemQmi *self,
+                   QmiService service,
+                   QmiClient **o_client,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    GError *error = NULL;
+    QmiClient *client;
+
+    client = peek_qmi_client (self, service, &error);
+    if (!client) {
+        g_task_report_error (self, callback, user_data, assure_qmi_client, error);
+        return FALSE;
+    }
+
+    *o_client = client;
+    return TRUE;
+}
+
 /*****************************************************************************/
 /* Power cycle */
 
