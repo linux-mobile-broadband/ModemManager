@@ -987,20 +987,13 @@ modem_load_model_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    gchar *model;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    model = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded model: %s", model);
-    return model;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 dms_get_model_ready (QmiClientDms *client,
                      GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+                     GTask *task)
 {
     QmiMessageDmsGetModelOutput *output = NULL;
     GError *error = NULL;
@@ -1008,24 +1001,21 @@ dms_get_model_ready (QmiClientDms *client,
     output = qmi_client_dms_get_model_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_get_model_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get Model: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         const gchar *str;
 
         qmi_message_dms_get_model_output_get_model (output, &str, NULL);
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   g_strdup (str),
-                                                   g_free);
+        g_task_return_pointer (task, g_strdup (str), g_free);
     }
 
     if (output)
         qmi_message_dms_get_model_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -1033,18 +1023,12 @@ modem_load_model (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_model);
 
     mm_dbg ("loading model...");
     qmi_client_dms_get_model (QMI_CLIENT_DMS (client),
@@ -1052,7 +1036,7 @@ modem_load_model (MMIfaceModem *self,
                               5,
                               NULL,
                               (GAsyncReadyCallback)dms_get_model_ready,
-                              result);
+                              g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
