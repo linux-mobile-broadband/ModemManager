@@ -9146,10 +9146,15 @@ oma_load_features_finish (MMIfaceModemOma *self,
                           GAsyncResult *res,
                           GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_OMA_FEATURE_NONE;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMOmaFeature) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_OMA_FEATURE_NONE;
+    }
+    return (MMOmaFeature)value;
 }
 
 static void
@@ -9205,7 +9210,7 @@ oma_load_features (MMIfaceModemOma *self,
 {
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9216,10 +9221,7 @@ oma_load_features (MMIfaceModemOma *self,
         5,
         NULL,
         (GAsyncReadyCallback)oma_get_feature_setting_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   oma_load_features));
+        g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
