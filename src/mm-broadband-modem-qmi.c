@@ -3440,13 +3440,13 @@ modem_factory_reset_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 dms_restore_factory_defaults_ready (QmiClientDms *client,
                                     GAsyncResult *res,
-                                    GSimpleAsyncResult *simple)
+                                    GTask *task)
 {
     QmiMessageDmsRestoreFactoryDefaultsOutput *output = NULL;
     GError *error = NULL;
@@ -3454,19 +3454,17 @@ dms_restore_factory_defaults_ready (QmiClientDms *client,
     output = qmi_client_dms_restore_factory_defaults_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_restore_factory_defaults_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't restore factory defaults: ");
-        g_simple_async_result_take_error (simple, error);
-    } else {
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    }
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
 
     if (output)
         qmi_message_dms_restore_factory_defaults_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -3476,19 +3474,16 @@ modem_factory_reset (MMIfaceModem *self,
                      gpointer user_data)
 {
     QmiMessageDmsRestoreFactoryDefaultsInput *input;
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
     GError *error = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_factory_reset);
+    task = g_task_new (self, NULL, callback, user_data);
 
     input = qmi_message_dms_restore_factory_defaults_input_new ();
     if (!qmi_message_dms_restore_factory_defaults_input_set_service_programming_code (
@@ -3496,9 +3491,8 @@ modem_factory_reset (MMIfaceModem *self,
             code,
             &error)) {
         qmi_message_dms_restore_factory_defaults_input_unref (input);
-        g_simple_async_result_take_error (result, error);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -3508,7 +3502,7 @@ modem_factory_reset (MMIfaceModem *self,
                                              10,
                                              NULL,
                                              (GAsyncReadyCallback)dms_restore_factory_defaults_ready,
-                                             result);
+                                             task);
 }
 
 /*****************************************************************************/
