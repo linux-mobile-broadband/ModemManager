@@ -2153,11 +2153,7 @@ modem_load_current_bands_finish (MMIfaceModem *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
-                                       G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 #if defined WITH_NEWEST_QMI_COMMANDS
@@ -2165,7 +2161,7 @@ modem_load_current_bands_finish (MMIfaceModem *self,
 static void
 nas_get_rf_band_information_ready (QmiClientNas *client,
                                    GAsyncResult *res,
-                                   GSimpleAsyncResult *simple)
+                                   GTask *task)
 {
     QmiMessageNasGetRfBandInformationOutput *output;
     GError *error = NULL;
@@ -2173,10 +2169,10 @@ nas_get_rf_band_information_ready (QmiClientNas *client,
     output = qmi_client_nas_get_rf_band_information_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_nas_get_rf_band_information_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get current band information: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         GArray *mm_bands;
         GArray *info_array = NULL;
@@ -2187,22 +2183,19 @@ nas_get_rf_band_information_ready (QmiClientNas *client,
 
         if (mm_bands->len == 0) {
             g_array_unref (mm_bands);
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't parse the list of current bands");
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Couldn't parse the list of current bands");
         } else {
-            g_simple_async_result_set_op_res_gpointer (simple,
-                                                       mm_bands,
-                                                       (GDestroyNotify)g_array_unref);
+            g_task_return_pointer (task, mm_bands, (GDestroyNotify)g_array_unref);
         }
     }
 
     if (output)
         qmi_message_nas_get_rf_band_information_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
@@ -2210,7 +2203,7 @@ nas_get_rf_band_information_ready (QmiClientNas *client,
 static void
 load_bands_get_system_selection_preference_ready (QmiClientNas *client,
                                                   GAsyncResult *res,
-                                                  GSimpleAsyncResult *simple)
+                                                  GTask *task)
 {
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError *error = NULL;
@@ -2218,10 +2211,10 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get system selection preference: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         GArray *mm_bands;
         QmiNasBandPreference band_preference_mask = 0;
@@ -2242,10 +2235,10 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
 
         if (mm_bands->len == 0) {
             g_array_unref (mm_bands);
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Couldn't parse the list of current bands");
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Couldn't parse the list of current bands");
         } else {
             gchar *str;
 
@@ -2253,17 +2246,14 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
             mm_dbg ("Bands reported in system selection preference: '%s'", str);
             g_free (str);
 
-            g_simple_async_result_set_op_res_gpointer (simple,
-                                                       mm_bands,
-                                                       (GDestroyNotify)g_array_unref);
+            g_task_return_pointer (task, mm_bands, (GDestroyNotify)g_array_unref);
         }
     }
 
     if (output)
         qmi_message_nas_get_system_selection_preference_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -2271,18 +2261,15 @@ modem_load_current_bands (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_load_current_bands);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_dbg ("loading current bands...");
 
@@ -2294,7 +2281,7 @@ modem_load_current_bands (MMIfaceModem *self,
                                                 5,
                                                 NULL,
                                                 (GAsyncReadyCallback)nas_get_rf_band_information_ready,
-                                                result);
+                                                task);
         return;
     }
 #endif
@@ -2305,7 +2292,7 @@ modem_load_current_bands (MMIfaceModem *self,
         5,
         NULL, /* cancellable */
         (GAsyncReadyCallback)load_bands_get_system_selection_preference_ready,
-        result);
+        task);
 }
 
 /*****************************************************************************/
