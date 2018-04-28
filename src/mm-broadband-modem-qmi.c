@@ -3045,20 +3045,15 @@ typedef enum {
 } SetOperatingModeStep;
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientDms *client;
-    GSimpleAsyncResult *result;
     QmiMessageDmsSetOperatingModeInput *input;
     SetOperatingModeStep step;
 } SetOperatingModeContext;
 
 static void
-set_operating_mode_context_complete_and_free (SetOperatingModeContext *ctx)
+set_operating_mode_context_free (SetOperatingModeContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     qmi_message_dms_set_operating_mode_input_unref (ctx->input);
     g_slice_free (SetOperatingModeContext, ctx);
 }
@@ -3068,18 +3063,21 @@ modem_power_up_down_off_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void set_operating_mode_context_step (SetOperatingModeContext *ctx);
+static void set_operating_mode_context_step (GTask *task);
 
 static void
 dms_set_fcc_authentication_ready (QmiClientDms *client,
                                   GAsyncResult *res,
-                                  SetOperatingModeContext *ctx)
+                                  GTask *task)
 {
+    SetOperatingModeContext *ctx;
     QmiMessageDmsSetFccAuthenticationOutput *output = NULL;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_dms_set_fcc_authentication_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error)) {
@@ -3093,16 +3091,19 @@ dms_set_fcc_authentication_ready (QmiClientDms *client,
 
     /* Retry Set Operating Mode */
     ctx->step++;
-    set_operating_mode_context_step (ctx);
+    set_operating_mode_context_step (task);
 }
 
 static void
 dms_set_operating_mode_ready (QmiClientDms *client,
                               GAsyncResult *res,
-                              SetOperatingModeContext *ctx)
+                              GTask *task)
 {
+    SetOperatingModeContext *ctx;
     QmiMessageDmsSetOperatingModeOutput *output = NULL;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
     if (!output) {
@@ -3111,13 +3112,13 @@ dms_set_operating_mode_ready (QmiClientDms *client,
             mm_dbg ("Device doesn't support operating mode setting. Ignoring power update.");
             g_error_free (error);
             ctx->step = SET_OPERATING_MODE_STEP_LAST;
-            set_operating_mode_context_step (ctx);
+            set_operating_mode_context_step (task);
             return;
         }
 
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        set_operating_mode_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -3142,15 +3143,15 @@ dms_set_operating_mode_ready (QmiClientDms *client,
             g_error_free (error);
             /* Go on to FCC auth */
             ctx->step++;
-            set_operating_mode_context_step (ctx);
+            set_operating_mode_context_step (task);
             qmi_message_dms_set_operating_mode_output_unref (output);
             return;
         }
 
         g_prefix_error (&error, "Couldn't set operating mode: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_dms_set_operating_mode_output_unref (output);
-        set_operating_mode_context_complete_and_free (ctx);
         return;
     }
 
@@ -3158,12 +3159,16 @@ dms_set_operating_mode_ready (QmiClientDms *client,
 
     /* Good! we're done, go to last step */
     ctx->step = SET_OPERATING_MODE_STEP_LAST;
-    set_operating_mode_context_step (ctx);
+    set_operating_mode_context_step (task);
 }
 
 static void
-set_operating_mode_context_step (SetOperatingModeContext *ctx)
+set_operating_mode_context_step (GTask *task)
 {
+    SetOperatingModeContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case SET_OPERATING_MODE_STEP_FIRST:
         mm_dbg ("Setting device operating mode...");
@@ -3172,7 +3177,7 @@ set_operating_mode_context_step (SetOperatingModeContext *ctx)
                                            20,
                                            NULL,
                                            (GAsyncReadyCallback)dms_set_operating_mode_ready,
-                                           ctx);
+                                           task);
         return;
     case SET_OPERATING_MODE_STEP_FCC_AUTH:
         mm_dbg ("Setting FCC auth...");
@@ -3181,7 +3186,7 @@ set_operating_mode_context_step (SetOperatingModeContext *ctx)
                                                5,
                                                NULL,
                                                (GAsyncReadyCallback)dms_set_fcc_authentication_ready,
-                                               ctx);
+                                               task);
         return;
     case SET_OPERATING_MODE_STEP_RETRY:
         mm_dbg ("Setting device operating mode (retry)...");
@@ -3190,12 +3195,12 @@ set_operating_mode_context_step (SetOperatingModeContext *ctx)
                                            20,
                                            NULL,
                                            (GAsyncReadyCallback)dms_set_operating_mode_ready,
-                                           ctx);
+                                           task);
         return;
     case SET_OPERATING_MODE_STEP_LAST:
         /* Good! */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        set_operating_mode_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     default:
         g_assert_not_reached ();
@@ -3209,26 +3214,27 @@ common_power_up_down_off (MMIfaceModem *self,
                           gpointer user_data)
 {
     SetOperatingModeContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
 
     /* Setup context */
     ctx = g_slice_new0 (SetOperatingModeContext);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             common_power_up_down_off);
     ctx->input = qmi_message_dms_set_operating_mode_input_new ();
     qmi_message_dms_set_operating_mode_input_set_mode (ctx->input, mode, NULL);
     ctx->step = SET_OPERATING_MODE_STEP_FIRST;
 
-    set_operating_mode_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)set_operating_mode_context_free);
+
+    set_operating_mode_context_step (task);
 }
 
 static void
