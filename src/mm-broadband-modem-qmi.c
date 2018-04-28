@@ -9230,28 +9230,27 @@ oma_setup_finish (MMIfaceModemOma *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 oma_set_feature_setting_ready (QmiClientOma *client,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     QmiMessageOmaSetFeatureSettingOutput *output;
     GError *error = NULL;
 
     output = qmi_client_oma_set_feature_setting_finish (client, res, &error);
     if (!output || !qmi_message_oma_set_feature_setting_output_get_result (output, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
 
     if (output)
         qmi_message_oma_set_feature_setting_output_unref (output);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -9263,7 +9262,7 @@ oma_setup (MMIfaceModemOma *self,
     QmiClient *client = NULL;
     QmiMessageOmaSetFeatureSettingInput *input;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9288,10 +9287,7 @@ oma_setup (MMIfaceModemOma *self,
         5,
         NULL,
         (GAsyncReadyCallback)oma_set_feature_setting_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   oma_setup));
+        g_task_new (self, NULL, callback, user_data));
 
     qmi_message_oma_set_feature_setting_input_unref (input);
 }
