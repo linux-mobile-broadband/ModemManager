@@ -4068,11 +4068,7 @@ modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    /* We return the GList as it is */
-    return (GList *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static MMModem3gppNetworkAvailability
@@ -4144,7 +4140,7 @@ get_3gpp_access_technology (GArray *array,
 static void
 nas_network_scan_ready (QmiClientNas *client,
                         GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+                        GTask *task)
 {
     QmiMessageNasNetworkScanOutput *output = NULL;
     GError *error = NULL;
@@ -4152,10 +4148,10 @@ nas_network_scan_ready (QmiClientNas *client,
     output = qmi_client_nas_network_scan_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_nas_network_scan_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't scan networks: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         GList *scan_result = NULL;
         GArray *info_array = NULL;
@@ -4189,16 +4185,13 @@ nas_network_scan_ready (QmiClientNas *client,
             g_free (rat_array_used_flags);
         }
 
-        /* We *require* a callback in the async method, as we're not setting a
-         * GDestroyNotify callback */
-        g_simple_async_result_set_op_res_gpointer (simple, scan_result, NULL);
+        g_task_return_pointer (task, scan_result, (GDestroyNotify)mm_3gpp_network_info_list_free);
     }
 
     if (output)
         qmi_message_nas_network_scan_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -4206,7 +4199,6 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
     /* We will pass the GList in the GSimpleAsyncResult, so we must
@@ -4214,15 +4206,10 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
      * passed to the caller and deallocated afterwards */
     g_assert (callback != NULL);
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_3gpp_scan_networks);
 
     mm_dbg ("Scanning networks...");
     qmi_client_nas_network_scan (QMI_CLIENT_NAS (client),
@@ -4230,7 +4217,7 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                                  300,
                                  NULL,
                                  (GAsyncReadyCallback)nas_network_scan_ready,
-                                 result);
+                                 g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
