@@ -9604,37 +9604,29 @@ oma_setup_unsolicited_events (MMIfaceModemOma *self,
 /* Enable/Disable unsolicited events (OMA interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
-    GSimpleAsyncResult *result;
-    QmiClientOma *client;
     gboolean enable;
 } EnableOmaUnsolicitedEventsContext;
-
-static void
-enable_oma_unsolicited_events_context_complete_and_free (EnableOmaUnsolicitedEventsContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
-    g_slice_free (EnableOmaUnsolicitedEventsContext, ctx);
-}
 
 static gboolean
 common_oma_enable_disable_unsolicited_events_finish (MMIfaceModemOma *self,
                                                      GAsyncResult *res,
                                                      GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 ser_oma_indicator_ready (QmiClientOma *client,
                          GAsyncResult *res,
-                         EnableOmaUnsolicitedEventsContext *ctx)
+                         GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    EnableOmaUnsolicitedEventsContext *ctx;
     QmiMessageOmaSetEventReportOutput *output = NULL;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_oma_set_event_report_finish (client, res, &error);
     if (!output) {
@@ -9649,9 +9641,9 @@ ser_oma_indicator_ready (QmiClientOma *client,
         qmi_message_oma_set_event_report_output_unref (output);
 
     /* Just ignore errors for now */
-    ctx->self->priv->oma_unsolicited_events_enabled = ctx->enable;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_oma_unsolicited_events_context_complete_and_free (ctx);
+    self->priv->oma_unsolicited_events_enabled = ctx->enable;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -9661,34 +9653,29 @@ common_enable_disable_oma_unsolicited_events (MMBroadbandModemQmi *self,
                                               gpointer user_data)
 {
     EnableOmaUnsolicitedEventsContext *ctx;
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
     QmiMessageOmaSetEventReportInput *input;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_enable_disable_oma_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (enable == self->priv->oma_unsolicited_events_enabled) {
         mm_dbg ("OMA unsolicited events already %s; skipping",
                 enable ? "enabled" : "disabled");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
-    ctx = g_slice_new0 (EnableOmaUnsolicitedEventsContext);
-    ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
+    ctx = g_new (EnableOmaUnsolicitedEventsContext, 1);
     ctx->enable = enable;
-    ctx->result = result;
+
+    g_task_set_task_data (task, ctx, g_free);
 
     input = qmi_message_oma_set_event_report_input_new ();
     qmi_message_oma_set_event_report_input_set_session_state_reporting (
@@ -9700,12 +9687,12 @@ common_enable_disable_oma_unsolicited_events (MMBroadbandModemQmi *self,
         ctx->enable,
         NULL);
     qmi_client_oma_set_event_report (
-        ctx->client,
+        QMI_CLIENT_OMA (client),
         input,
         5,
         NULL,
         (GAsyncReadyCallback)ser_oma_indicator_ready,
-        ctx);
+        task);
     qmi_message_oma_set_event_report_input_unref (input);
 }
 
