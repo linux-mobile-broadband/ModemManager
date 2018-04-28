@@ -2558,32 +2558,20 @@ qmi_dbm_valid (gint8 dbm, QmiNasRadioInterface radio_interface)
     return TRUE;
 }
 
-typedef struct {
-    MMBroadbandModemQmi *self;
-    QmiClient *client;
-    GSimpleAsyncResult *result;
-} LoadSignalQualityContext;
-
-static void
-load_signal_quality_context_complete_and_free (LoadSignalQualityContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static guint
 load_signal_quality_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return 0;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                 G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return 0;
+    }
+    return value;
 }
 
 #if defined WITH_NEWEST_QMI_COMMANDS
@@ -2685,8 +2673,9 @@ signal_info_get_quality (MMBroadbandModemQmi *self,
 static void
 get_signal_info_ready (QmiClientNas *client,
                        GAsyncResult *res,
-                       LoadSignalQualityContext *ctx)
+                       GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageNasGetSignalInfoOutput *output;
     GError *error = NULL;
     guint8 quality = 0;
@@ -2694,42 +2683,41 @@ get_signal_info_ready (QmiClientNas *client,
 
     output = qmi_client_nas_get_signal_info_finish (client, res, &error);
     if (!output) {
-        g_simple_async_result_take_error (ctx->result, error);
-        load_signal_quality_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_nas_get_signal_info_output_get_result (output, &error)) {
         qmi_message_nas_get_signal_info_output_unref (output);
-        g_simple_async_result_take_error (ctx->result, error);
-        load_signal_quality_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    if (!signal_info_get_quality (ctx->self, output, &quality, &act)) {
+    self = g_task_get_source_object (task);
+
+    if (!signal_info_get_quality (self, output, &quality, &act)) {
         qmi_message_nas_get_signal_info_output_unref (output);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Signal info reported invalid signal strength.");
-        load_signal_quality_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Signal info reported invalid signal strength.");
+        g_object_unref (task);
         return;
     }
 
     /* We update the access technologies directly here when loading signal
      * quality. It goes a bit out of context, but we can do it nicely */
     mm_iface_modem_update_access_technologies (
-        MM_IFACE_MODEM (ctx->self),
+        MM_IFACE_MODEM (self),
         act,
         (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
 
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        GUINT_TO_POINTER (quality),
-        NULL);
+    g_task_return_int (task, quality);
+    g_object_unref (task);
 
     qmi_message_nas_get_signal_info_output_unref (output);
-    load_signal_quality_context_complete_and_free (ctx);
 }
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
@@ -2794,8 +2782,9 @@ signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
 static void
 get_signal_strength_ready (QmiClientNas *client,
                            GAsyncResult *res,
-                           LoadSignalQualityContext *ctx)
+                           GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageNasGetSignalStrengthOutput *output;
     GError *error = NULL;
     guint8 quality = 0;
@@ -2803,42 +2792,41 @@ get_signal_strength_ready (QmiClientNas *client,
 
     output = qmi_client_nas_get_signal_strength_finish (client, res, &error);
     if (!output) {
-        g_simple_async_result_take_error (ctx->result, error);
-        load_signal_quality_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_nas_get_signal_strength_output_get_result (output, &error)) {
         qmi_message_nas_get_signal_strength_output_unref (output);
-        g_simple_async_result_take_error (ctx->result, error);
-        load_signal_quality_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
-    if (!signal_strength_get_quality_and_access_tech (ctx->self, output, &quality, &act)) {
+    self = g_task_get_source_object (task);
+
+    if (!signal_strength_get_quality_and_access_tech (self, output, &quality, &act)) {
         qmi_message_nas_get_signal_strength_output_unref (output);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "GetSignalStrength signal strength invalid.");
-        load_signal_quality_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "GetSignalStrength signal strength invalid.");
+        g_object_unref (task);
         return;
     }
 
     /* We update the access technologies directly here when loading signal
      * quality. It goes a bit out of context, but we can do it nicely */
     mm_iface_modem_update_access_technologies (
-        MM_IFACE_MODEM (ctx->self),
+        MM_IFACE_MODEM (self),
         act,
         (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
 
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        GUINT_TO_POINTER (quality),
-        NULL);
+    g_task_return_int (task, quality);
+    g_object_unref (task);
 
     qmi_message_nas_get_signal_strength_output_unref (output);
-    load_signal_quality_context_complete_and_free (ctx);
 }
 
 static void
@@ -2846,43 +2834,37 @@ load_signal_quality (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    LoadSignalQualityContext *ctx;
     QmiClient *client = NULL;
+    GTask *task;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    ctx = g_new0 (LoadSignalQualityContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_signal_quality);
+    task = g_task_new (self, NULL, callback, user_data);
 
     mm_dbg ("loading signal quality...");
 
 #if defined WITH_NEWEST_QMI_COMMANDS
     /* Signal info introduced in NAS 1.8 */
-    if (qmi_client_check_version (ctx->client, 1, 8)) {
-        qmi_client_nas_get_signal_info (QMI_CLIENT_NAS (ctx->client),
+    if (qmi_client_check_version (client, 1, 8)) {
+        qmi_client_nas_get_signal_info (QMI_CLIENT_NAS (client),
                                         NULL,
                                         10,
                                         NULL,
                                         (GAsyncReadyCallback)get_signal_info_ready,
-                                        ctx);
+                                        task);
         return;
     }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-    qmi_client_nas_get_signal_strength (QMI_CLIENT_NAS (ctx->client),
+    qmi_client_nas_get_signal_strength (QMI_CLIENT_NAS (client),
                                         NULL,
                                         10,
                                         NULL,
                                         (GAsyncReadyCallback)get_signal_strength_ready,
-                                        ctx);
+                                        task);
 }
 
 /*****************************************************************************/
