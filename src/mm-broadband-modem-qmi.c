@@ -3352,9 +3352,7 @@ modem_factory_reset (MMIfaceModem *self,
 /* Load current modes (Modem interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientNas *client;
-    GSimpleAsyncResult *result;
     gboolean run_get_system_selection_preference;
     gboolean run_get_technology_preference;
 } LoadCurrentModesContext;
@@ -3365,12 +3363,9 @@ typedef struct {
 } LoadCurrentModesResult;
 
 static void
-load_current_modes_context_complete_and_free (LoadCurrentModesContext *ctx)
+load_current_modes_context_free (LoadCurrentModesContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -3383,25 +3378,29 @@ load_current_modes_finish (MMIfaceModem *self,
 {
     LoadCurrentModesResult *result;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
         return FALSE;
 
-    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *allowed = result->allowed;
     *preferred = result->preferred;
+    g_free (result);
     return TRUE;
 }
 
-static void load_current_modes_context_step (LoadCurrentModesContext *ctx);
+static void load_current_modes_context_step (GTask *task);
 
 static void
 get_technology_preference_ready (QmiClientNas *client,
                                  GAsyncResult *res,
-                                 LoadCurrentModesContext *ctx)
+                                 GTask *task)
 {
+    LoadCurrentModesContext *ctx;
     LoadCurrentModesResult *result = NULL;
     QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
     if (!output) {
@@ -3439,26 +3438,26 @@ get_technology_preference_ready (QmiClientNas *client,
 
     if (!result) {
         ctx->run_get_technology_preference = FALSE;
-        load_current_modes_context_step (ctx);
+        load_current_modes_context_step (task);
         return;
     }
 
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        result,
-        g_free);
-    load_current_modes_context_complete_and_free (ctx);
+    g_task_return_pointer (task, result, g_free);
+    g_object_unref (task);
 }
 
 static void
 current_modes_get_system_selection_preference_ready (QmiClientNas *client,
                                                      GAsyncResult *res,
-                                                     LoadCurrentModesContext *ctx)
+                                                     GTask *task)
 {
+    LoadCurrentModesContext *ctx;
     LoadCurrentModesResult *result = NULL;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError *error = NULL;
     QmiNasRatModePreference mode_preference_mask = 0;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output) {
@@ -3507,20 +3506,21 @@ current_modes_get_system_selection_preference_ready (QmiClientNas *client,
     if (!result) {
         /* Try with the deprecated command */
         ctx->run_get_system_selection_preference = FALSE;
-        load_current_modes_context_step (ctx);
+        load_current_modes_context_step (task);
         return;
     }
 
-    g_simple_async_result_set_op_res_gpointer (
-        ctx->result,
-        result,
-        g_free);
-    load_current_modes_context_complete_and_free (ctx);
+    g_task_return_pointer (task, result, g_free);
+    g_object_unref (task);
 }
 
 static void
-load_current_modes_context_step (LoadCurrentModesContext *ctx)
+load_current_modes_context_step (GTask *task)
 {
+    LoadCurrentModesContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     if (ctx->run_get_system_selection_preference) {
         qmi_client_nas_get_system_selection_preference (
             ctx->client,
@@ -3528,7 +3528,7 @@ load_current_modes_context_step (LoadCurrentModesContext *ctx)
             5,
             NULL, /* cancellable */
             (GAsyncReadyCallback)current_modes_get_system_selection_preference_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -3539,16 +3539,15 @@ load_current_modes_context_step (LoadCurrentModesContext *ctx)
             5,
             NULL, /* cancellable */
             (GAsyncReadyCallback)get_technology_preference_ready,
-            ctx);
+            task);
         return;
     }
 
-    g_simple_async_result_set_error (
-        ctx->result,
-        MM_CORE_ERROR,
-        MM_CORE_ERROR_UNSUPPORTED,
-        "Loading current modes is not supported by this device");
-    load_current_modes_context_complete_and_free (ctx);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "Loading current modes is not supported by this device");
+    g_object_unref (task);
 }
 
 static void
@@ -3557,20 +3556,16 @@ load_current_modes (MMIfaceModem *self,
                     gpointer user_data)
 {
     LoadCurrentModesContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
     ctx = g_new0 (LoadCurrentModesContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_current_modes);
 
     /* System selection preference introduced in NAS 1.1 */
     ctx->run_get_system_selection_preference = qmi_client_check_version (client, 1, 1);
@@ -3578,7 +3573,12 @@ load_current_modes (MMIfaceModem *self,
     /* Technology preference introduced in NAS 1.0, so always available */
     ctx->run_get_technology_preference = TRUE;
 
-    load_current_modes_context_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task,
+                          ctx,
+                          (GDestroyNotify)load_current_modes_context_free);
+
+    load_current_modes_context_step (task);
 }
 
 /*****************************************************************************/
