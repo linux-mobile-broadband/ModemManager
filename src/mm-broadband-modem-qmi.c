@@ -3091,6 +3091,8 @@ dms_set_operating_mode_ready (QmiClientDms *client,
         return;
     }
 
+    qmi_message_dms_set_operating_mode_output_unref (output);
+
     /* Good! we're done, go to last step */
     ctx->step = SET_OPERATING_MODE_STEP_LAST;
     set_operating_mode_context_step (ctx);
