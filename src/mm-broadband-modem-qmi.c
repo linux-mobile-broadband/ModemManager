@@ -1162,42 +1162,20 @@ modem_load_hardware_revision (MMIfaceModem *self,
 /*****************************************************************************/
 /* Equipment Identifier loading (Modem interface) */
 
-typedef struct {
-    MMBroadbandModemQmi *self;
-    QmiClient *client;
-    GSimpleAsyncResult *result;
-} LoadEquipmentIdentifierContext;
-
-static void
-load_equipment_identifier_context_complete_and_free (LoadEquipmentIdentifierContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gchar *
 modem_load_equipment_identifier_finish (MMIfaceModem *self,
                                         GAsyncResult *res,
                                         GError **error)
 {
-    gchar *equipment_identifier;
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    equipment_identifier = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-    mm_dbg ("loaded equipment identifier: %s", equipment_identifier);
-    return equipment_identifier;
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 dms_get_ids_ready (QmiClientDms *client,
                    GAsyncResult *res,
-                   LoadEquipmentIdentifierContext *ctx)
+                   GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageDmsGetIdsOutput *output = NULL;
     GError *error = NULL;
     const gchar *str;
@@ -1206,18 +1184,20 @@ dms_get_ids_ready (QmiClientDms *client,
     output = qmi_client_dms_get_ids_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_equipment_identifier_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_dms_get_ids_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get IDs: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_dms_get_ids_output_unref (output);
-        load_equipment_identifier_context_complete_and_free (ctx);
         return;
     }
+
+    self = g_task_get_source_object (task);
 
     /* In order:
      * If we have a IMEI, use it...
@@ -1228,47 +1208,45 @@ dms_get_ids_ready (QmiClientDms *client,
 
     if (qmi_message_dms_get_ids_output_get_imei (output, &str, NULL) &&
         str[0] != '\0') {
-        g_free (ctx->self->priv->imei);
-        ctx->self->priv->imei = g_strdup (str);
+        g_free (self->priv->imei);
+        self->priv->imei = g_strdup (str);
     }
 
     if (qmi_message_dms_get_ids_output_get_esn (output, &str, NULL) &&
         str[0] != '\0') {
-        g_clear_pointer (&ctx->self->priv->esn, g_free);
+        g_clear_pointer (&self->priv->esn, g_free);
         len = strlen (str);
         if (len == 7)
-            ctx->self->priv->esn = g_strdup_printf ("0%s", str);  /* zero-pad to 8 chars */
+            self->priv->esn = g_strdup_printf ("0%s", str);  /* zero-pad to 8 chars */
         else if (len == 8)
-            ctx->self->priv->esn = g_strdup (str);
+            self->priv->esn = g_strdup (str);
         else
             mm_dbg ("Invalid ESN reported: '%s' (unexpected length)", str);
     }
 
     if (qmi_message_dms_get_ids_output_get_meid (output, &str, NULL) &&
         str[0] != '\0') {
-        g_clear_pointer (&ctx->self->priv->meid, g_free);
+        g_clear_pointer (&self->priv->meid, g_free);
         len = strlen (str);
         if (len == 14)
-            ctx->self->priv->meid = g_strdup (str);
+            self->priv->meid = g_strdup (str);
         else
             mm_dbg ("Invalid MEID reported: '%s' (unexpected length)", str);
     }
 
-    if (ctx->self->priv->imei)
-        str = ctx->self->priv->imei;
-    else if (ctx->self->priv->esn)
-        str = ctx->self->priv->esn;
-    else if (ctx->self->priv->meid)
-        str = ctx->self->priv->meid;
+    if (self->priv->imei)
+        str = self->priv->imei;
+    else if (self->priv->esn)
+        str = self->priv->esn;
+    else if (self->priv->meid)
+        str = self->priv->meid;
     else
         str = "unknown";
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               g_strdup (str),
-                                               g_free);
+    g_task_return_pointer (task, g_strdup (str), g_free);
+    g_object_unref (task);
 
     qmi_message_dms_get_ids_output_unref (output);
-    load_equipment_identifier_context_complete_and_free (ctx);
 }
 
 static void
@@ -1276,21 +1254,12 @@ modem_load_equipment_identifier (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data)
 {
-    LoadEquipmentIdentifierContext *ctx;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
-
-    ctx = g_new (LoadEquipmentIdentifierContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_equipment_identifier);
 
     mm_dbg ("loading equipment identifier...");
     qmi_client_dms_get_ids (QMI_CLIENT_DMS (client),
@@ -1298,7 +1267,7 @@ modem_load_equipment_identifier (MMIfaceModem *self,
                             5,
                             NULL,
                             (GAsyncReadyCallback)dms_get_ids_ready,
-                            ctx);
+                            g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
