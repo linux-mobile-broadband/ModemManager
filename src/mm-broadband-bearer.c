@@ -867,29 +867,30 @@ parse_pdp_list (MMBaseModem             *modem,
         MM3gppPdpContext *pdp = l->data;
 
         if (pdp->pdp_type == ctx->ip_family) {
+            const gchar *apn;
+
+            apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+
+            /* First requested, then existing */
+            if (mm_3gpp_cmp_apn_name (apn, pdp->apn)) {
+                gchar *ip_family_str;
+
+                /* Found a PDP context with the same APN and PDP type, we'll use it. */
+                ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
+                mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
+                        pdp->cid, ip_family_str, apn ? apn : "");
+                cid = pdp->cid;
+                ctx->use_existing_cid = TRUE;
+                g_free (ip_family_str);
+                /* In this case, stop searching */
+                break;
+            }
+
             /* PDP with no APN set? we may use that one if not exact match found */
             if (!pdp->apn || !pdp->apn[0]) {
                 mm_dbg ("Found PDP context with CID %u and no APN",
                         pdp->cid);
                 cid = pdp->cid;
-            } else {
-                const gchar *apn;
-
-                apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-                /* First requested, then existing */
-                if (mm_3gpp_cmp_apn_name (apn, pdp->apn)) {
-                    gchar *ip_family_str;
-
-                    /* Found a PDP context with the same APN and PDP type, we'll use it. */
-                    ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
-                    mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
-                            pdp->cid, ip_family_str, apn);
-                    cid = pdp->cid;
-                    ctx->use_existing_cid = TRUE;
-                    g_free (ip_family_str);
-                    /* In this case, stop searching */
-                    break;
-                }
             }
         }
 

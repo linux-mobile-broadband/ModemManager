@@ -2166,17 +2166,22 @@ typedef struct {
 } TestApnCmp;
 
 static const TestApnCmp test_apn_cmp[] = {
+    { "",                                  "",                                  TRUE  },
+    { NULL,                                "",                                  TRUE  },
+    { "",                                  NULL,                                TRUE  },
+    { NULL,                                NULL,                                TRUE  },
     { "m2m.com.attz",                      "m2m.com.attz",                      TRUE  },
     { "m2m.com.attz",                      "M2M.COM.ATTZ",                      TRUE  },
     { "M2M.COM.ATTZ",                      "m2m.com.attz",                      TRUE  },
     { "m2m.com.attz.mnc170.mcc310.gprs",   "m2m.com.attz",                      TRUE  },
     { "ac.vodafone.es.MNC001.MCC214.GPRS", "ac.vodafone.es",                    TRUE  },
+    { "",                                  "m2m.com.attz",                      FALSE },
+    { "m2m.com.attz",                      "",                                  FALSE },
     { "m2m.com.attz",                      "m2m.com.attz.mnc170.mcc310.gprs",   FALSE },
     { "ac.vodafone.es",                    "ac.vodafone.es.MNC001.MCC214.GPRS", FALSE },
     { "internet.test",                     "internet",                          FALSE },
     { "internet.test",                     "INTERNET",                          FALSE },
     { "internet.test",                     "internet.tes",                      FALSE },
-    { "",                                  "",                                  FALSE },
 };
 
 static void

@@ -1305,6 +1305,10 @@ mm_3gpp_cmp_apn_name (const gchar *requested,
     size_t requested_len;
     size_t existing_len;
 
+    /* If both empty, that's a good match */
+    if ((!existing || !existing[0]) && (!requested || !requested[0]))
+        return TRUE;
+
     /* Both must be given to compare properly */
     if (!existing || !existing[0] || !requested || !requested[0])
         return FALSE;
