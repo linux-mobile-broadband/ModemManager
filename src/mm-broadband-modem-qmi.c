@@ -3111,16 +3111,21 @@ load_power_state_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_POWER_STATE_UNKNOWN;
+    GError *inner_error = NULL;
+    gssize value;
 
-    return (MMModemPowerState)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+    }
+    return (MMModemPowerState)value;
 }
 
 static void
 dms_get_operating_mode_ready (QmiClientDms *client,
                               GAsyncResult *res,
-                              GSimpleAsyncResult *simple)
+                              GTask *task)
 {
     QmiMessageDmsGetOperatingModeOutput *output = NULL;
     GError *error = NULL;
@@ -3128,10 +3133,10 @@ dms_get_operating_mode_ready (QmiClientDms *client,
     output = qmi_client_dms_get_operating_mode_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_dms_get_operating_mode_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get operating mode: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else {
         QmiDmsOperatingMode mode = QMI_DMS_OPERATING_MODE_UNKNOWN;
 
@@ -3139,23 +3144,23 @@ dms_get_operating_mode_ready (QmiClientDms *client,
 
         switch (mode) {
         case QMI_DMS_OPERATING_MODE_ONLINE:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_ON), NULL);
+            g_task_return_int (task, MM_MODEM_POWER_STATE_ON);
             break;
         case QMI_DMS_OPERATING_MODE_LOW_POWER:
         case QMI_DMS_OPERATING_MODE_PERSISTENT_LOW_POWER:
         case QMI_DMS_OPERATING_MODE_MODE_ONLY_LOW_POWER:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_LOW), NULL);
+            g_task_return_int (task, MM_MODEM_POWER_STATE_LOW);
             break;
         case QMI_DMS_OPERATING_MODE_OFFLINE:
-            g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER (MM_MODEM_POWER_STATE_OFF), NULL);
+            g_task_return_int (task, MM_MODEM_POWER_STATE_OFF);
             break;
         default:
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Unhandled power state: '%s' (%u)",
-                                             qmi_dms_operating_mode_get_string (mode),
-                                             mode);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unhandled power state: '%s' (%u)",
+                                     qmi_dms_operating_mode_get_string (mode),
+                                     mode);
             break;
         }
     }
@@ -3163,8 +3168,7 @@ dms_get_operating_mode_ready (QmiClientDms *client,
     if (output)
         qmi_message_dms_get_operating_mode_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -3172,18 +3176,12 @@ load_power_state (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_power_state);
 
     mm_dbg ("Getting device operating mode...");
     qmi_client_dms_get_operating_mode (QMI_CLIENT_DMS (client),
@@ -3191,7 +3189,7 @@ load_power_state (MMIfaceModem *self,
                                        5,
                                        NULL,
                                        (GAsyncReadyCallback)dms_get_operating_mode_ready,
-                                       result);
+                                       g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
