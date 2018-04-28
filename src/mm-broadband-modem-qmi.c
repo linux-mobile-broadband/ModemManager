@@ -9160,14 +9160,14 @@ oma_load_features_finish (MMIfaceModemOma *self,
 static void
 oma_get_feature_setting_ready (QmiClientOma *client,
                                GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+                               GTask *task)
 {
     QmiMessageOmaGetFeatureSettingOutput *output = NULL;
     GError *error = NULL;
 
     output = qmi_client_oma_get_feature_setting_finish (client, res, &error);
     if (!output || !qmi_message_oma_get_feature_setting_output_get_result (output, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else {
         MMOmaFeature features = MM_OMA_FEATURE_NONE;
         gboolean enabled;
@@ -9193,14 +9193,13 @@ oma_get_feature_setting_ready (QmiClientOma *client,
             enabled)
             features |= MM_OMA_FEATURE_HANDS_FREE_ACTIVATION;
 
-        g_simple_async_result_set_op_res_gpointer (simple, GUINT_TO_POINTER ((guint)features), NULL);
+        g_task_return_int (task, features);
     }
 
     if (output)
         qmi_message_oma_get_feature_setting_output_unref (output);
 
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_object_unref (task);
 }
 
 static void
@@ -9302,28 +9301,27 @@ oma_start_client_initiated_session_finish (MMIfaceModemOma *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 oma_start_session_ready (QmiClientOma *client,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         GTask *task)
 {
     QmiMessageOmaStartSessionOutput *output;
     GError *error = NULL;
 
     output = qmi_client_oma_start_session_finish (client, res, &error);
     if (!output || !qmi_message_oma_start_session_output_get_result (output, &error))
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
 
     if (output)
         qmi_message_oma_start_session_output_unref (output);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -9335,7 +9333,7 @@ oma_start_client_initiated_session (MMIfaceModemOma *self,
     QmiClient *client = NULL;
     QmiMessageOmaStartSessionInput *input;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9357,10 +9355,7 @@ oma_start_client_initiated_session (MMIfaceModemOma *self,
         5,
         NULL,
         (GAsyncReadyCallback)oma_start_session_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   oma_start_client_initiated_session));
+        g_task_new (self, NULL, callback, user_data));
 
     qmi_message_oma_start_session_input_unref (input);
 }
