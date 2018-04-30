@@ -110,21 +110,26 @@ get_hash_key (const gchar *subsys,
 static void
 serial_port_timed_out_cb (MMPortSerial *port,
                           guint n_consecutive_timeouts,
-                          gpointer user_data)
+                          MMBaseModem *self)
 {
-    MMBaseModem *self = (MM_BASE_MODEM (user_data));
-
-    if (self->priv->max_timeouts > 0 &&
-        n_consecutive_timeouts >= self->priv->max_timeouts) {
-        mm_warn ("(%s/%s) port timed out %u times, marking modem '%s' as disabled",
-                 mm_port_type_get_string (mm_port_get_port_type (MM_PORT (port))),
+    /* If reached the maximum number of timeouts, invalidate modem */
+    if (n_consecutive_timeouts >= self->priv->max_timeouts) {
+        mm_err ("(%s/%s) %s port timed out %u consecutive times, marking modem '%s' as invalid",
+                 mm_port_subsys_get_string (mm_port_get_subsys (MM_PORT (port))),
                  mm_port_get_device (MM_PORT (port)),
+                 mm_port_type_get_string (mm_port_get_port_type (MM_PORT (port))),
                  n_consecutive_timeouts,
                  g_dbus_object_get_object_path (G_DBUS_OBJECT (self)));
-
-        /* Only set action to invalidate modem if not already done */
         g_cancellable_cancel (self->priv->cancellable);
+        return;
     }
+
+    if (n_consecutive_timeouts > 1)
+        mm_warn ("(%s/%s) %s port timed out %u consecutive times",
+                 mm_port_subsys_get_string (mm_port_get_subsys (MM_PORT (port))),
+                 mm_port_get_device (MM_PORT (port)),
+                 mm_port_type_get_string (mm_port_get_port_type (MM_PORT (port))),
+                 n_consecutive_timeouts);
 }
 
 gboolean
@@ -214,11 +219,12 @@ mm_base_modem_grab_port (MMBaseModem         *self,
             return FALSE;
         }
 
-        /* For serial ports, enable port timeout checks */
-        g_signal_connect (port,
-                          "timed-out",
-                          G_CALLBACK (serial_port_timed_out_cb),
-                          self);
+        /* For serial ports, enable port timeout checks if requested to do so */
+        if (self->priv->max_timeouts > 0)
+            g_signal_connect (port,
+                              "timed-out",
+                              G_CALLBACK (serial_port_timed_out_cb),
+                              self);
 
         /* For serial ports, optionally use a specific baudrate */
         if (mm_kernel_device_has_property (kernel_device, "ID_MM_TTY_BAUDRATE"))
