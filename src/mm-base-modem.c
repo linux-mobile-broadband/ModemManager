@@ -36,6 +36,10 @@
 
 G_DEFINE_ABSTRACT_TYPE (MMBaseModem, mm_base_modem, MM_GDBUS_TYPE_OBJECT_SKELETON);
 
+/* If we get 10 consecutive timeouts in a serial port, we consider the modem
+ * invalid and we request re-probing. */
+#define DEFAULT_MAX_TIMEOUTS 10
+
 enum {
     PROP_0,
     PROP_VALID,
@@ -1318,6 +1322,8 @@ mm_base_modem_init (MMBaseModem *self)
                                                g_str_equal,
                                                g_free,
                                                g_object_unref);
+
+    self->priv->max_timeouts = DEFAULT_MAX_TIMEOUTS;
 }
 
 static void
@@ -1497,7 +1503,7 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                            "Max timeouts",
                            "Maximum number of consecutive timed out commands sent to "
                            "the modem before disabling it. If 0, this feature is disabled.",
-                           0, G_MAXUINT, 0,
+                           0, G_MAXUINT, DEFAULT_MAX_TIMEOUTS,
                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MAX_TIMEOUTS, properties[PROP_MAX_TIMEOUTS]);
 
