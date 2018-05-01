@@ -5352,28 +5352,12 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
 /*****************************************************************************/
 /* Registration checks (CDMA interface) */
 
-typedef struct {
-    MMBroadbandModemQmi *self;
-    QmiClientNas *client;
-    GSimpleAsyncResult *result;
-} RunCdmaRegistrationChecksContext;
-
-static void
-run_cdma_registration_checks_context_complete_and_free (RunCdmaRegistrationChecksContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
-    g_slice_free (RunCdmaRegistrationChecksContext, ctx);
-}
-
 static gboolean
 modem_cdma_run_registration_checks_finish (MMIfaceModemCdma *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -5558,32 +5542,35 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
 static void
 get_serving_system_cdma_ready (QmiClientNas *client,
                                GAsyncResult *res,
-                               RunCdmaRegistrationChecksContext *ctx)
+                               GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageNasGetServingSystemOutput *output;
     GError *error = NULL;
 
     output = qmi_client_nas_get_serving_system_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        run_cdma_registration_checks_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_nas_get_serving_system_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get serving system: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_nas_get_serving_system_output_unref (output);
-        run_cdma_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
-    common_process_serving_system_cdma (ctx->self, output, NULL);
+    self = g_task_get_source_object (task);
+
+    common_process_serving_system_cdma (self, output, NULL);
 
     qmi_message_nas_get_serving_system_output_unref (output);
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    run_cdma_registration_checks_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -5593,31 +5580,21 @@ modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
-    RunCdmaRegistrationChecksContext *ctx;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    /* Setup context */
-    ctx = g_slice_new0 (RunCdmaRegistrationChecksContext);
-    ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_run_registration_checks);
-
     /* TODO: Run Get System Info in NAS >= 1.8 */
 
-    qmi_client_nas_get_serving_system (ctx->client,
+    qmi_client_nas_get_serving_system (QMI_CLIENT_NAS (client),
                                        NULL,
                                        10,
                                        NULL,
                                        (GAsyncReadyCallback)get_serving_system_cdma_ready,
-                                       ctx);
+                                       g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
