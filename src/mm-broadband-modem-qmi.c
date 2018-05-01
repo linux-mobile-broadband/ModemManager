@@ -4294,13 +4294,13 @@ modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                        GAsyncResult *res,
                                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 initiate_network_register_ready (QmiClientNas *client,
                                  GAsyncResult *res,
-                                 GSimpleAsyncResult *simple)
+                                 GTask *task)
 {
     GError *error = NULL;
     QmiMessageNasInitiateNetworkRegisterOutput *output;
@@ -4308,25 +4308,25 @@ initiate_network_register_ready (QmiClientNas *client,
     output = qmi_client_nas_initiate_network_register_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
+        g_task_return_error (task, error);
     } else if (!qmi_message_nas_initiate_network_register_output_get_result (output, &error)) {
         /* NOFX is not an error, they actually play pretty well */
         if (g_error_matches (error,
                              QMI_PROTOCOL_ERROR,
                              QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_error_free (error);
-            g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+            g_task_return_boolean (task, TRUE);
         } else {
             g_prefix_error (&error, "Couldn't initiate network register: ");
-            g_simple_async_result_take_error (simple, error);
+            g_task_return_error (task, error);
         }
     } else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
 
     if (output)
         qmi_message_nas_initiate_network_register_output_unref (output);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static void
@@ -4345,15 +4345,16 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     /* Parse input MCC/MNC */
     if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error)) {
         g_assert (error != NULL);
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
+        g_task_report_error (self,
+                             callback,
+                             user_data,
+                             modem_3gpp_register_in_network,
+                             error);
         return;
     }
 
     /* Get NAS client */
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -4386,10 +4387,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
         120,
         cancellable,
         (GAsyncReadyCallback)initiate_network_register_ready,
-        g_simple_async_result_new (G_OBJECT (self),
-                                   callback,
-                                   user_data,
-                                   modem_3gpp_register_in_network));
+        g_task_new (self, NULL, callback, user_data));
 
     qmi_message_nas_initiate_network_register_input_unref (input);
 }
