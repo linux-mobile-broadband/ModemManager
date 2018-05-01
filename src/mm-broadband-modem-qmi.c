@@ -5155,40 +5155,35 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 /* Enable/Disable unsolicited registration events (3GPP interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientNas *client;
-    GSimpleAsyncResult *result;
     gboolean enable; /* TRUE for enabling, FALSE for disabling */
 } UnsolicitedRegistrationEventsContext;
 
 static void
-unsolicited_registration_events_context_complete_and_free (UnsolicitedRegistrationEventsContext *ctx)
+unsolicited_registration_events_context_free (UnsolicitedRegistrationEventsContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
-static UnsolicitedRegistrationEventsContext *
-unsolicited_registration_events_context_new (MMBroadbandModemQmi *self,
-                                             QmiClient *client,
-                                             gboolean enable,
-                                             GAsyncReadyCallback callback,
-                                             gpointer user_data)
+static GTask *
+unsolicited_registration_events_task_new (MMBroadbandModemQmi *self,
+                                          QmiClient *client,
+                                          gboolean enable,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data)
 {
     UnsolicitedRegistrationEventsContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (UnsolicitedRegistrationEventsContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             unsolicited_registration_events_context_new);
     ctx->enable = enable;
-    return ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)unsolicited_registration_events_context_free);
+
+    return task;
 }
 
 static gboolean
@@ -5196,16 +5191,21 @@ modem_3gpp_enable_disable_unsolicited_registration_events_finish (MMIfaceModem3g
                                                                   GAsyncResult *res,
                                                                   GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 ri_serving_system_or_system_info_ready (QmiClientNas *client,
                                         GAsyncResult *res,
-                                        UnsolicitedRegistrationEventsContext *ctx)
+                                        GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    UnsolicitedRegistrationEventsContext *ctx;
     QmiMessageNasRegisterIndicationsOutput *output = NULL;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_register_indications_finish (client, res, &error);
     if (!output) {
@@ -5220,16 +5220,18 @@ ri_serving_system_or_system_info_ready (QmiClientNas *client,
         qmi_message_nas_register_indications_output_unref (output);
 
     /* Just ignore errors for now */
-    ctx->self->priv->unsolicited_registration_events_enabled = ctx->enable;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    unsolicited_registration_events_context_complete_and_free (ctx);
+    self->priv->unsolicited_registration_events_enabled = ctx->enable;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-common_enable_disable_unsolicited_registration_events_serving_system (UnsolicitedRegistrationEventsContext *ctx)
+common_enable_disable_unsolicited_registration_events_serving_system (GTask *task)
 {
+    UnsolicitedRegistrationEventsContext *ctx;
     QmiMessageNasRegisterIndicationsInput *input;
 
+    ctx = g_task_get_task_data (task);
     input = qmi_message_nas_register_indications_input_new ();
     qmi_message_nas_register_indications_input_set_serving_system_events (input, ctx->enable, NULL);
     qmi_client_nas_register_indications (
@@ -5238,16 +5240,18 @@ common_enable_disable_unsolicited_registration_events_serving_system (Unsolicite
         5,
         NULL,
         (GAsyncReadyCallback)ri_serving_system_or_system_info_ready,
-        ctx);
+        task);
     qmi_message_nas_register_indications_input_unref (input);
 }
 
 #if defined WITH_NEWEST_QMI_COMMANDS
 static void
-common_enable_disable_unsolicited_registration_events_system_info (UnsolicitedRegistrationEventsContext *ctx)
+common_enable_disable_unsolicited_registration_events_system_info (GTask *task)
 {
+    UnsolicitedRegistrationEventsContext *ctx;
     QmiMessageNasRegisterIndicationsInput *input;
 
+    ctx = g_task_get_task_data (task);
     input = qmi_message_nas_register_indications_input_new ();
     qmi_message_nas_register_indications_input_set_system_info (input, ctx->enable, NULL);
     qmi_client_nas_register_indications (
@@ -5256,37 +5260,38 @@ common_enable_disable_unsolicited_registration_events_system_info (UnsolicitedRe
         5,
         NULL,
         (GAsyncReadyCallback)ri_serving_system_or_system_info_ready,
-        ctx);
+        task);
     qmi_message_nas_register_indications_input_unref (input);
 }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
 static void
-modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
+modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
                                                     gboolean cs_supported,
                                                     gboolean ps_supported,
                                                     gboolean eps_supported,
                                                     GAsyncReadyCallback callback,
                                                     gpointer user_data)
 {
-    UnsolicitedRegistrationEventsContext *ctx;
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    ctx = unsolicited_registration_events_context_new (MM_BROADBAND_MODEM_QMI (self),
-                                                       client,
-                                                       FALSE,
-                                                       callback,
-                                                       user_data);
+    task = unsolicited_registration_events_task_new (self,
+                                                     client,
+                                                     FALSE,
+                                                     callback,
+                                                     user_data);
 
 #if defined WITH_NEWEST_QMI_COMMANDS
     /* System Info was added in NAS 1.8 */
     if (qmi_client_check_version (client, 1, 8)) {
-        common_enable_disable_unsolicited_registration_events_system_info (ctx);
+        common_enable_disable_unsolicited_registration_events_system_info (task);
         return;
     }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
@@ -5294,53 +5299,54 @@ modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *self,
     /* Ability to explicitly enable/disable serving system indications was
      * added in NAS 1.2 */
     if (qmi_client_check_version (client, 1, 2)) {
-        common_enable_disable_unsolicited_registration_events_serving_system (ctx);
+        common_enable_disable_unsolicited_registration_events_serving_system (task);
         return;
     }
 
     /* Devices with NAS < 1.2 will just always issue serving system indications */
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Device doesn't allow disabling registration events");
-    ctx->self->priv->unsolicited_registration_events_enabled = FALSE;
-    unsolicited_registration_events_context_complete_and_free (ctx);
+    self->priv->unsolicited_registration_events_enabled = FALSE;
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Device doesn't allow disabling registration events");
+    g_object_unref (task);
 }
 
 static void
-modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
+modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
                                                    gboolean cs_supported,
                                                    gboolean ps_supported,
                                                    gboolean eps_supported,
                                                    GAsyncReadyCallback callback,
                                                    gpointer user_data)
 {
-    UnsolicitedRegistrationEventsContext *ctx;
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (self,
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    ctx = unsolicited_registration_events_context_new (MM_BROADBAND_MODEM_QMI (self),
-                                                       client,
-                                                       TRUE,
-                                                       callback,
-                                                       user_data);
+    task = unsolicited_registration_events_task_new (self,
+                                                     client,
+                                                     TRUE,
+                                                     callback,
+                                                     user_data);
 
     /* Ability to explicitly enable/disable serving system indications was
      * added in NAS 1.2 */
     if (qmi_client_check_version (client, 1, 2)) {
-        common_enable_disable_unsolicited_registration_events_serving_system (ctx);
+        common_enable_disable_unsolicited_registration_events_serving_system (task);
         return;
     }
 
     /* Devices with NAS < 1.2 will just always issue serving system indications */
     mm_dbg ("Assuming serving system indications are always enabled");
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    ctx->self->priv->unsolicited_registration_events_enabled = TRUE;
-    unsolicited_registration_events_context_complete_and_free (ctx);
+    self->priv->unsolicited_registration_events_enabled = TRUE;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
