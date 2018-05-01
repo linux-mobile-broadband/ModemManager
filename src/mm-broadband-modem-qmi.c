@@ -8429,9 +8429,7 @@ location_set_supl_server (MMIfaceModemLocation *self,
 /* Disable location gathering (Location interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
     QmiClientPds *client;
-    GSimpleAsyncResult *result;
     MMModemLocationSource source;
     /* Default tracking session (for A-GPS disabling) */
     QmiPdsOperatingMode session_operation;
@@ -8441,13 +8439,10 @@ typedef struct {
 } DisableLocationGatheringContext;
 
 static void
-disable_location_gathering_context_complete_and_free (DisableLocationGatheringContext *ctx)
+disable_location_gathering_context_free (DisableLocationGatheringContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
     if (ctx->client)
         g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     g_slice_free (DisableLocationGatheringContext, ctx);
 }
 
@@ -8456,22 +8451,24 @@ disable_location_gathering_finish (MMIfaceModemLocation *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 gps_service_state_stop_ready (QmiClientPds *client,
                               GAsyncResult *res,
-                              DisableLocationGatheringContext *ctx)
+                              GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    DisableLocationGatheringContext *ctx;
     QmiMessagePdsSetGpsServiceStateOutput *output = NULL;
     GError *error = NULL;
 
     output = qmi_client_pds_set_gps_service_state_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        disable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -8480,8 +8477,8 @@ gps_service_state_stop_ready (QmiClientPds *client,
                               QMI_PROTOCOL_ERROR,
                               QMI_PROTOCOL_ERROR_NO_EFFECT)) {
             g_prefix_error (&error, "Couldn't set GPS service state: ");
-            g_simple_async_result_take_error (ctx->result, error);
-            disable_location_gathering_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             qmi_message_pds_set_gps_service_state_output_unref (output);
             return;
         }
@@ -8489,56 +8486,66 @@ gps_service_state_stop_ready (QmiClientPds *client,
         g_error_free (error);
     }
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     qmi_message_pds_set_gps_service_state_output_unref (output);
 
-    g_assert (ctx->self->priv->location_event_report_indication_id != 0);
-    g_signal_handler_disconnect (client, ctx->self->priv->location_event_report_indication_id);
-    ctx->self->priv->location_event_report_indication_id = 0;
+    g_assert (self->priv->location_event_report_indication_id != 0);
+    g_signal_handler_disconnect (client, self->priv->location_event_report_indication_id);
+    self->priv->location_event_report_indication_id = 0;
 
     mm_dbg ("GPS stopped");
-    ctx->self->priv->enabled_sources &= ~ctx->source;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    disable_location_gathering_context_complete_and_free (ctx);
+    self->priv->enabled_sources &= ~ctx->source;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 set_default_tracking_session_stop_ready (QmiClientPds *client,
                                          GAsyncResult *res,
-                                         DisableLocationGatheringContext *ctx)
+                                         GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    DisableLocationGatheringContext *ctx;
     QmiMessagePdsSetDefaultTrackingSessionOutput *output = NULL;
     GError *error = NULL;
 
     output = qmi_client_pds_set_default_tracking_session_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        disable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_pds_set_default_tracking_session_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't set default tracking session: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        disable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_pds_set_default_tracking_session_output_unref (output);
         return;
     }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     qmi_message_pds_set_default_tracking_session_output_unref (output);
 
     /* Done */
     mm_dbg ("A-GPS disabled");
-    ctx->self->priv->enabled_sources &= ~ctx->source;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    disable_location_gathering_context_complete_and_free (ctx);
+    self->priv->enabled_sources &= ~ctx->source;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
 get_default_tracking_session_stop_ready (QmiClientPds *client,
                                          GAsyncResult *res,
-                                         DisableLocationGatheringContext *ctx)
+                                         GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    DisableLocationGatheringContext *ctx;
     QmiMessagePdsSetDefaultTrackingSessionInput *input;
     QmiMessagePdsGetDefaultTrackingSessionOutput *output = NULL;
     GError *error = NULL;
@@ -8546,18 +8553,21 @@ get_default_tracking_session_stop_ready (QmiClientPds *client,
     output = qmi_client_pds_get_default_tracking_session_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        disable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_pds_get_default_tracking_session_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get default tracking session: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        disable_location_gathering_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_pds_get_default_tracking_session_output_unref (output);
         return;
     }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     qmi_message_pds_get_default_tracking_session_output_get_info (
         output,
@@ -8572,9 +8582,9 @@ get_default_tracking_session_stop_ready (QmiClientPds *client,
     if (ctx->session_operation == QMI_PDS_OPERATING_MODE_STANDALONE) {
         /* Done */
         mm_dbg ("A-GPS already disabled");
-        ctx->self->priv->enabled_sources &= ~ctx->source;
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disable_location_gathering_context_complete_and_free (ctx);
+        self->priv->enabled_sources &= ~ctx->source;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -8592,48 +8602,45 @@ get_default_tracking_session_stop_ready (QmiClientPds *client,
         10,
         NULL, /* cancellable */
         (GAsyncReadyCallback)set_default_tracking_session_stop_ready,
-        ctx);
+        task);
     qmi_message_pds_set_default_tracking_session_input_unref (input);
 }
 
 static void
-disable_location_gathering (MMIfaceModemLocation *self,
+disable_location_gathering (MMIfaceModemLocation *_self,
                             MMModemLocationSource source,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     DisableLocationGatheringContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
-    GSimpleAsyncResult *result;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        disable_location_gathering);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Nothing to be done to disable 3GPP or CDMA locations */
     if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI ||
         source == MM_MODEM_LOCATION_SOURCE_CDMA_BS) {
         /* Just mark it as disabled */
-        MM_BROADBAND_MODEM_QMI (self)->priv->enabled_sources &= ~source;
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        self->priv->enabled_sources &= ~source;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     /* Setup context and client */
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (self,
                             QMI_SERVICE_PDS, &client,
                             callback, user_data)) {
-        g_object_unref (result);
+        g_object_unref (task);
         return;
     }
     ctx = g_slice_new0 (DisableLocationGatheringContext);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = result;
     ctx->source = source;
+
+    g_task_set_task_data (task, ctx, (GDestroyNotify)disable_location_gathering_context_free);
 
     /* Disable A-GPS? */
     if (source == MM_MODEM_LOCATION_SOURCE_AGPS) {
@@ -8643,7 +8650,7 @@ disable_location_gathering (MMIfaceModemLocation *self,
             10,
             NULL, /* cancellable */
             (GAsyncReadyCallback)get_default_tracking_session_stop_ready,
-            ctx);
+            task);
         return;
     }
 
@@ -8652,7 +8659,7 @@ disable_location_gathering (MMIfaceModemLocation *self,
         MMModemLocationSource tmp;
 
         /* If no more GPS sources enabled, stop GPS */
-        tmp = ctx->self->priv->enabled_sources;
+        tmp = self->priv->enabled_sources;
         tmp &= ~source;
         if (!(tmp & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW))) {
             QmiMessagePdsSetGpsServiceStateInput *input;
@@ -8665,16 +8672,16 @@ disable_location_gathering (MMIfaceModemLocation *self,
                 10,
                 NULL, /* cancellable */
                 (GAsyncReadyCallback)gps_service_state_stop_ready,
-                ctx);
+                task);
             qmi_message_pds_set_gps_service_state_input_unref (input);
             return;
         }
 
         /* Otherwise, we have more GPS sources enabled, we shouldn't stop GPS, just
          * return */
-        ctx->self->priv->enabled_sources &= ~source;
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        disable_location_gathering_context_complete_and_free (ctx);
+        self->priv->enabled_sources &= ~source;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
