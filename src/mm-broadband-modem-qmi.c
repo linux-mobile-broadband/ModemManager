@@ -10157,19 +10157,12 @@ firmware_load_current (MMIfaceModemFirmware *_self,
 /* Change current firmware (Firmware interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
-    QmiClientDms *client;
-    GSimpleAsyncResult *result;
     MMFirmwareProperties *firmware;
 } FirmwareChangeCurrentContext;
 
 static void
-firmware_change_current_context_complete_and_free (FirmwareChangeCurrentContext *ctx)
+firmware_change_current_context_free (FirmwareChangeCurrentContext *ctx)
 {
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->client);
     if (ctx->firmware)
         g_object_unref (ctx->firmware);
     g_slice_free (FirmwareChangeCurrentContext, ctx);
@@ -10180,51 +10173,55 @@ firmware_change_current_finish (MMIfaceModemFirmware *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 firmware_power_cycle_ready (MMBroadbandModemQmi *self,
                             GAsyncResult *res,
-                            FirmwareChangeCurrentContext *ctx)
+                            GTask *task)
 {
     GError *error = NULL;
 
     if (!power_cycle_finish (self, res, &error))
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    firmware_change_current_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
 }
 
 static void
 firmware_select_stored_image_ready (QmiClientDms *client,
                                     GAsyncResult *res,
-                                    FirmwareChangeCurrentContext *ctx)
+                                    GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageDmsSetFirmwarePreferenceOutput *output;
     GError *error = NULL;
 
     output = qmi_client_dms_set_firmware_preference_finish (client, res, &error);
     if (!output) {
-        g_simple_async_result_take_error (ctx->result, error);
-        firmware_change_current_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_dms_set_firmware_preference_output_get_result (output, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        firmware_change_current_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_dms_set_firmware_preference_output_unref (output);
         return;
     }
 
+    self = g_task_get_source_object (task);
+
     qmi_message_dms_set_firmware_preference_output_unref (output);
 
     /* Now, go into offline mode */
-    power_cycle (ctx->self,
+    power_cycle (self,
                  (GAsyncReadyCallback)firmware_power_cycle_ready,
-                 ctx);
+                 task);
 }
 
 static MMFirmwareProperties *
@@ -10269,13 +10266,15 @@ find_firmware_properties_by_gobi_pri_info_substring (MMBroadbandModemQmi *self,
 }
 
 static void
-firmware_change_current (MMIfaceModemFirmware *self,
+firmware_change_current (MMIfaceModemFirmware *_self,
                          const gchar *unique_id,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     QmiMessageDmsSetFirmwarePreferenceInput *input;
     FirmwareChangeCurrentContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
     GArray *array;
     QmiMessageDmsSetFirmwarePreferenceInputListImage modem_image_id;
@@ -10283,43 +10282,40 @@ firmware_change_current (MMIfaceModemFirmware *self,
     guint8 *tmp;
     gsize tmp_len;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (self,
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
 
     ctx = g_slice_new0 (FirmwareChangeCurrentContext);
-    ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             firmware_change_current);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)firmware_change_current_context_free);
 
     /* Look for the firmware image with the requested unique ID */
-    ctx->firmware = find_firmware_properties_by_unique_id (ctx->self, unique_id);
+    ctx->firmware = find_firmware_properties_by_unique_id (self, unique_id);
     if (!ctx->firmware) {
         guint n = 0;
 
         /* Ok, let's look at the PRI info */
-        ctx->firmware = find_firmware_properties_by_gobi_pri_info_substring (ctx->self, unique_id, &n);
+        ctx->firmware = find_firmware_properties_by_gobi_pri_info_substring (self, unique_id, &n);
         if (n > 1) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "Multiple firmware images (%u) found matching '%s' as PRI info substring",
-                                             n, unique_id);
-            firmware_change_current_context_complete_and_free (ctx);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_NOT_FOUND,
+                                     "Multiple firmware images (%u) found matching '%s' as PRI info substring",
+                                     n, unique_id);
+            g_object_unref (task);
             return;
         }
 
         if (n == 0) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_NOT_FOUND,
-                                             "Firmware with unique ID '%s' wasn't found",
-                                             unique_id);
-            firmware_change_current_context_complete_and_free (ctx);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_NOT_FOUND,
+                                     "Firmware with unique ID '%s' wasn't found",
+                                     unique_id);
+            g_object_unref (task);
             return;
         }
 
@@ -10327,13 +10323,13 @@ firmware_change_current (MMIfaceModemFirmware *self,
     }
 
     /* If we're already in the requested firmware, we're done */
-    if (ctx->self->priv->current_firmware &&
-        g_str_equal (mm_firmware_properties_get_unique_id (ctx->self->priv->current_firmware),
+    if (self->priv->current_firmware &&
+        g_str_equal (mm_firmware_properties_get_unique_id (self->priv->current_firmware),
                      mm_firmware_properties_get_unique_id (ctx->firmware))) {
         mm_dbg ("Modem is already running firmware image '%s'",
-                mm_firmware_properties_get_unique_id (ctx->self->priv->current_firmware));
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        firmware_change_current_context_complete_and_free (ctx);
+                mm_firmware_properties_get_unique_id (self->priv->current_firmware));
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -10368,12 +10364,12 @@ firmware_change_current (MMIfaceModemFirmware *self,
     input = qmi_message_dms_set_firmware_preference_input_new ();
     qmi_message_dms_set_firmware_preference_input_set_list (input, array, NULL);
     qmi_client_dms_set_firmware_preference (
-        ctx->client,
+        QMI_CLIENT_DMS (client),
         input,
         10,
         NULL,
         (GAsyncReadyCallback)firmware_select_stored_image_ready,
-        ctx);
+        task);
     g_array_unref (modem_image_id.unique_id);
     g_array_unref (pri_image_id.unique_id);
     qmi_message_dms_set_firmware_preference_input_unref (input);
