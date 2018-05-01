@@ -8169,16 +8169,13 @@ location_load_supl_server_finish (MMIfaceModemLocation *self,
                                   GAsyncResult *res,
                                   GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 get_agps_config_ready (QmiClientPds *client,
                        GAsyncResult *res,
-                       GSimpleAsyncResult *simple)
+                       GTask *task)
 {
     QmiMessagePdsGetAgpsConfigOutput *output = NULL;
     GError *error = NULL;
@@ -8190,16 +8187,14 @@ get_agps_config_ready (QmiClientPds *client,
     output = qmi_client_pds_get_agps_config_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_pds_get_agps_config_output_get_result (output, &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -8219,12 +8214,11 @@ get_agps_config_ready (QmiClientPds *client,
         memset (buf, 0, sizeof (buf));
 
         if (!inet_ntop (AF_INET, &a, buf, sizeof (buf) - 1)) {
-            g_simple_async_result_set_error (simple,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Cannot convert numeric IP address to string");
-            g_simple_async_result_complete (simple);
-            g_object_unref (simple);
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Cannot convert numeric IP address to string");
+            g_object_unref (task);
             return;
         }
 
@@ -8245,9 +8239,8 @@ get_agps_config_ready (QmiClientPds *client,
 
     qmi_message_pds_get_agps_config_output_unref (output);
 
-    g_simple_async_result_set_op_res_gpointer (simple, str, g_free);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_pointer (task, str, g_free);
+    g_object_unref (task);
 }
 
 static void
@@ -8256,19 +8249,13 @@ location_load_supl_server (MMIfaceModemLocation *self,
                            gpointer user_data)
 {
     QmiClient *client = NULL;
-    GSimpleAsyncResult *simple;
     QmiMessagePdsGetAgpsConfigInput *input;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_PDS, &client,
                             callback, user_data)) {
         return;
     }
-
-    simple = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        location_load_supl_server);
 
     input = qmi_message_pds_get_agps_config_input_new ();
 
@@ -8284,7 +8271,7 @@ location_load_supl_server (MMIfaceModemLocation *self,
         10,
         NULL, /* cancellable */
         (GAsyncReadyCallback)get_agps_config_ready,
-        simple);
+        g_task_new (self, NULL, callback, user_data));
     qmi_message_pds_get_agps_config_input_unref (input);
 }
 
