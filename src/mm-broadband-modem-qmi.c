@@ -4395,28 +4395,12 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Registration checks (3GPP interface) */
 
-typedef struct {
-    MMBroadbandModemQmi *self;
-    QmiClientNas *client;
-    GSimpleAsyncResult *result;
-} Run3gppRegistrationChecksContext;
-
-static void
-run_3gpp_registration_checks_context_complete_and_free (Run3gppRegistrationChecksContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
 static gboolean
 modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
                                            GAsyncResult *res,
                                            GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -4607,32 +4591,35 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
 static void
 get_serving_system_3gpp_ready (QmiClientNas *client,
                                GAsyncResult *res,
-                               Run3gppRegistrationChecksContext *ctx)
+                               GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageNasGetServingSystemOutput *output;
     GError *error = NULL;
 
     output = qmi_client_nas_get_serving_system_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        run_3gpp_registration_checks_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_nas_get_serving_system_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get serving system: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         qmi_message_nas_get_serving_system_output_unref (output);
-        run_3gpp_registration_checks_context_complete_and_free (ctx);
         return;
     }
 
-    common_process_serving_system_3gpp (ctx->self, output, NULL);
+    self = g_task_get_source_object (task);
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    common_process_serving_system_3gpp (self, output, NULL);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
     qmi_message_nas_get_serving_system_output_unref (output);
-    run_3gpp_registration_checks_context_complete_and_free (ctx);
 }
 
 #if defined WITH_NEWEST_QMI_COMMANDS
@@ -5092,32 +5079,35 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
 static void
 get_system_info_ready (QmiClientNas *client,
                        GAsyncResult *res,
-                       Run3gppRegistrationChecksContext *ctx)
+                       GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageNasGetSystemInfoOutput *output;
     GError *error = NULL;
 
     output = qmi_client_nas_get_system_info_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        run_3gpp_registration_checks_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_nas_get_system_info_output_get_result (output, &error)) {
         g_prefix_error (&error, "Couldn't get system info: ");
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
         qmi_message_nas_get_system_info_output_unref (output);
-        run_3gpp_registration_checks_context_complete_and_free (ctx);
+        g_object_unref (task);
         return;
     }
 
-    common_process_system_info_3gpp (ctx->self, output, NULL);
+    self = g_task_get_source_object (task);
 
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    common_process_system_info_3gpp (self, output, NULL);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
     qmi_message_nas_get_system_info_output_unref (output);
-    run_3gpp_registration_checks_context_complete_and_free (ctx);
 }
 
 #endif /* WITH_NEWEST_QMI_COMMANDS */
@@ -5130,41 +5120,35 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
-    Run3gppRegistrationChecksContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    ctx = g_new0 (Run3gppRegistrationChecksContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_run_registration_checks);
+    task = g_task_new (self, NULL, callback, user_data);
 
 #if defined WITH_NEWEST_QMI_COMMANDS
     /* System Info was added in NAS 1.8 */
     if (qmi_client_check_version (client, 1, 8)) {
-        qmi_client_nas_get_system_info (ctx->client,
+        qmi_client_nas_get_system_info (QMI_CLIENT_NAS (client),
                                         NULL,
                                         10,
                                         NULL,
                                         (GAsyncReadyCallback)get_system_info_ready,
-                                        ctx);
+                                        task);
         return;
     }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-    qmi_client_nas_get_serving_system (ctx->client,
+    qmi_client_nas_get_serving_system (QMI_CLIENT_NAS (client),
                                        NULL,
                                        10,
                                        NULL,
                                        (GAsyncReadyCallback)get_serving_system_3gpp_ready,
-                                       ctx);
+                                       task);
 }
 
 /*****************************************************************************/
