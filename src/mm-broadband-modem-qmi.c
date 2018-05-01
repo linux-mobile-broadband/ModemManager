@@ -8296,13 +8296,13 @@ location_set_supl_server_finish (MMIfaceModemLocation *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 set_agps_config_ready (QmiClientPds *client,
                        GAsyncResult *res,
-                       GSimpleAsyncResult *simple)
+                       GTask *task)
 {
     QmiMessagePdsSetAgpsConfigOutput *output = NULL;
     GError *error = NULL;
@@ -8310,24 +8310,21 @@ set_agps_config_ready (QmiClientPds *client,
     output = qmi_client_pds_set_agps_config_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_pds_set_agps_config_output_get_result (output, &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     qmi_message_pds_set_agps_config_output_unref (output);
 
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static gboolean
@@ -8382,22 +8379,16 @@ location_set_supl_server (MMIfaceModemLocation *self,
                           gpointer user_data)
 {
     QmiClient *client = NULL;
-    GSimpleAsyncResult *simple;
     QmiMessagePdsSetAgpsConfigInput *input;
     guint32 ip;
     guint32 port;
     GArray *url;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_PDS, &client,
                             callback, user_data)) {
         return;
     }
-
-    simple = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        location_set_supl_server);
 
     input = qmi_message_pds_set_agps_config_input_new ();
 
@@ -8421,7 +8412,7 @@ location_set_supl_server (MMIfaceModemLocation *self,
         10,
         NULL, /* cancellable */
         (GAsyncReadyCallback)set_agps_config_ready,
-        simple);
+        g_task_new (self, NULL, callback, user_data));
     qmi_message_pds_set_agps_config_input_unref (input);
 }
 
