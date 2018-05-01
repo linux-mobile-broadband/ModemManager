@@ -7898,21 +7898,8 @@ messaging_setup_unsolicited_events (MMIfaceModemMessaging *_self,
 /* Enable/Disable unsolicited events (Messaging interface) */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
-    GSimpleAsyncResult *result;
-    QmiClientWms *client;
     gboolean enable;
 } EnableMessagingUnsolicitedEventsContext;
-
-static void
-enable_messaging_unsolicited_events_context_complete_and_free (EnableMessagingUnsolicitedEventsContext *ctx)
-{
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
 
 static gboolean
 messaging_disable_unsolicited_events_finish (MMIfaceModemMessaging *_self,
@@ -7926,7 +7913,7 @@ messaging_disable_unsolicited_events_finish (MMIfaceModemMessaging *_self,
         return iface_modem_messaging_parent->disable_unsolicited_events_finish (_self, res, error);
     }
 
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
@@ -7941,16 +7928,21 @@ messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *_self,
         return iface_modem_messaging_parent->enable_unsolicited_events_finish (_self, res, error);
     }
 
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 ser_messaging_indicator_ready (QmiClientWms *client,
                                GAsyncResult *res,
-                               EnableMessagingUnsolicitedEventsContext *ctx)
+                               GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    EnableMessagingUnsolicitedEventsContext *ctx;
     QmiMessageWmsSetEventReportOutput *output = NULL;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_wms_set_event_report_finish (client, res, &error);
     if (!output) {
@@ -7965,9 +7957,9 @@ ser_messaging_indicator_ready (QmiClientWms *client,
         qmi_message_wms_set_event_report_output_unref (output);
 
     /* Just ignore errors for now */
-    ctx->self->priv->messaging_unsolicited_events_enabled = ctx->enable;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_messaging_unsolicited_events_context_complete_and_free (ctx);
+    self->priv->messaging_unsolicited_events_enabled = ctx->enable;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -7977,34 +7969,29 @@ common_enable_disable_messaging_unsolicited_events (MMBroadbandModemQmi *self,
                                                     gpointer user_data)
 {
     EnableMessagingUnsolicitedEventsContext *ctx;
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
     QmiMessageWmsSetEventReportInput *input;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_enable_disable_messaging_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (enable == self->priv->messaging_unsolicited_events_enabled) {
         mm_dbg ("Messaging unsolicited events already %s; skipping",
                 enable ? "enabled" : "disabled");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
-    ctx = g_new0 (EnableMessagingUnsolicitedEventsContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
+    ctx = g_new (EnableMessagingUnsolicitedEventsContext, 1);
     ctx->enable = enable;
-    ctx->result = result;
+
+    g_task_set_task_data (task, ctx, g_free);
 
     input = qmi_message_wms_set_event_report_input_new ();
 
@@ -8013,12 +8000,12 @@ common_enable_disable_messaging_unsolicited_events (MMBroadbandModemQmi *self,
         ctx->enable,
         NULL);
     qmi_client_wms_set_event_report (
-        ctx->client,
+        QMI_CLIENT_WMS (client),
         input,
         5,
         NULL,
         (GAsyncReadyCallback)ser_messaging_indicator_ready,
-        ctx);
+        task);
     qmi_message_wms_set_event_report_input_unref (input);
 }
 
@@ -8034,15 +8021,11 @@ messaging_disable_unsolicited_events (MMIfaceModemMessaging *_self,
         /* Generic implementation doesn't actually have a method to disable
          * unsolicited messaging events */
         if (!iface_modem_messaging_parent->disable_unsolicited_events) {
-            GSimpleAsyncResult *result;
+            GTask *task;
 
-            result = g_simple_async_result_new (G_OBJECT (self),
-                                                callback,
-                                                user_data,
-                                                messaging_disable_unsolicited_events);
-            g_simple_async_result_set_op_res_gboolean (result, TRUE);
-            g_simple_async_result_complete_in_idle (result);
-            g_object_unref (result);
+            task = g_task_new (self, NULL, callback, user_data);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
             return;
         }
 
