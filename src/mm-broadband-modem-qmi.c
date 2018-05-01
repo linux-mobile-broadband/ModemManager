@@ -6555,19 +6555,14 @@ modem_cdma_load_esn (MMIfaceModemCdma *_self,
  */
 
 typedef struct {
-    MMBroadbandModemQmi *self;
-    GSimpleAsyncResult *result;
     QmiClientNas *client;
     gboolean enable;
 } EnableUnsolicitedEventsContext;
 
 static void
-enable_unsolicited_events_context_complete_and_free (EnableUnsolicitedEventsContext *ctx)
+enable_unsolicited_events_context_free (EnableUnsolicitedEventsContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -6576,16 +6571,21 @@ common_enable_disable_unsolicited_events_finish (MMBroadbandModemQmi *self,
                                                  GAsyncResult *res,
                                                  GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 ser_signal_strength_ready (QmiClientNas *client,
                            GAsyncResult *res,
-                           EnableUnsolicitedEventsContext *ctx)
+                           GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    EnableUnsolicitedEventsContext *ctx;
     QmiMessageNasSetEventReportOutput *output = NULL;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_set_event_report_finish (client, res, &error);
     if (!output) {
@@ -6600,20 +6600,23 @@ ser_signal_strength_ready (QmiClientNas *client,
         qmi_message_nas_set_event_report_output_unref (output);
 
     /* Just ignore errors for now */
-    ctx->self->priv->unsolicited_events_enabled = ctx->enable;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_unsolicited_events_context_complete_and_free (ctx);
+    self->priv->unsolicited_events_enabled = ctx->enable;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-common_enable_disable_unsolicited_events_signal_strength (EnableUnsolicitedEventsContext *ctx)
+common_enable_disable_unsolicited_events_signal_strength (GTask *task)
 {
+    EnableUnsolicitedEventsContext *ctx;
+
     /* The device doesn't really like to have many threshold values, so don't
      * grow this array without checking first */
     static const gint8 thresholds_data[] = { -80, -40, 0, 40, 80 };
     QmiMessageNasSetEventReportInput *input;
     GArray *thresholds;
 
+    ctx = g_task_get_task_data (task);
     input = qmi_message_nas_set_event_report_input_new ();
 
     /* Prepare thresholds, separated 20 each */
@@ -6635,7 +6638,7 @@ common_enable_disable_unsolicited_events_signal_strength (EnableUnsolicitedEvent
         5,
         NULL,
         (GAsyncReadyCallback)ser_signal_strength_ready,
-        ctx);
+        task);
     qmi_message_nas_set_event_report_input_unref (input);
 }
 
@@ -6644,10 +6647,15 @@ common_enable_disable_unsolicited_events_signal_strength (EnableUnsolicitedEvent
 static void
 ri_signal_info_ready (QmiClientNas *client,
                       GAsyncResult *res,
-                      EnableUnsolicitedEventsContext *ctx)
+                      GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    EnableUnsolicitedEventsContext *ctx;
     QmiMessageNasRegisterIndicationsOutput *output = NULL;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_register_indications_finish (client, res, &error);
     if (!output) {
@@ -6663,15 +6671,17 @@ ri_signal_info_ready (QmiClientNas *client,
 
     /* Just ignore errors for now */
     ctx->self->priv->unsolicited_events_enabled = ctx->enable;
-    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    enable_unsolicited_events_context_complete_and_free (ctx);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
-common_enable_disable_unsolicited_events_signal_info (EnableUnsolicitedEventsContext *ctx)
+common_enable_disable_unsolicited_events_signal_info (GTask *task)
 {
+    EnableUnsolicitedEventsContext *ctx;
     QmiMessageNasRegisterIndicationsInput *input;
 
+    ctx = g_task_get_task_data (task);
     input = qmi_message_nas_register_indications_input_new ();
     qmi_message_nas_register_indications_input_set_signal_info (input, ctx->enable, NULL);
     qmi_client_nas_register_indications (
@@ -6680,14 +6690,14 @@ common_enable_disable_unsolicited_events_signal_info (EnableUnsolicitedEventsCon
         5,
         NULL,
         (GAsyncReadyCallback)ri_signal_info_ready,
-        ctx);
+        task);
     qmi_message_nas_register_indications_input_unref (input);
 }
 
 static void
 config_signal_info_ready (QmiClientNas *client,
                           GAsyncResult *res,
-                          EnableUnsolicitedEventsContext *ctx)
+                          GTask *task)
 {
     QmiMessageNasConfigSignalInfoOutput *output = NULL;
     GError *error = NULL;
@@ -6705,21 +6715,24 @@ config_signal_info_ready (QmiClientNas *client,
         qmi_message_nas_config_signal_info_output_unref (output);
 
     /* Keep on */
-    common_enable_disable_unsolicited_events_signal_info (ctx);
+    common_enable_disable_unsolicited_events_signal_info (task);
 }
 
 static void
-common_enable_disable_unsolicited_events_signal_info_config (EnableUnsolicitedEventsContext *ctx)
+common_enable_disable_unsolicited_events_signal_info_config (GTask *task)
 {
+    EnableUnsolicitedEventsContext *ctx;
     /* RSSI values go between -105 and -60 for 3GPP technologies,
      * and from -105 to -90 in 3GPP2 technologies (approx). */
     static const gint8 thresholds_data[] = { -100, -97, -95, -92, -90, -85, -80, -75, -70, -65 };
     QmiMessageNasConfigSignalInfoInput *input;
     GArray *thresholds;
 
+    ctx = g_task_get_task_data (task);
+
     /* Signal info config only to be run when enabling */
     if (!ctx->enable) {
-        common_enable_disable_unsolicited_events_signal_info (ctx);
+        common_enable_disable_unsolicited_events_signal_info (task);
         return;
     }
 
@@ -6740,7 +6753,7 @@ common_enable_disable_unsolicited_events_signal_info_config (EnableUnsolicitedEv
         5,
         NULL,
         (GAsyncReadyCallback)config_signal_info_ready,
-        ctx);
+        task);
     qmi_message_nas_config_signal_info_input_unref (input);
 }
 
@@ -6753,43 +6766,38 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
                                           gpointer user_data)
 {
     EnableUnsolicitedEventsContext *ctx;
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_enable_disable_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (enable == self->priv->unsolicited_events_enabled) {
         mm_dbg ("Unsolicited events already %s; skipping",
                 enable ? "enabled" : "disabled");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
     ctx = g_new0 (EnableUnsolicitedEventsContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->enable = enable;
-    ctx->result = result;
+
+    g_task_set_task_data (task, NULL, (GDestroyNotify)enable_unsolicited_events_context_free);
 
 #if defined WITH_NEWEST_QMI_COMMANDS
     /* Signal info introduced in NAS 1.8 */
     if (qmi_client_check_version (client, 1, 8)) {
-        common_enable_disable_unsolicited_events_signal_info_config (ctx);
+        common_enable_disable_unsolicited_events_signal_info_config (task);
         return;
     }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-    common_enable_disable_unsolicited_events_signal_strength (ctx);
+    common_enable_disable_unsolicited_events_signal_strength (task);
 }
 
 /*****************************************************************************/
