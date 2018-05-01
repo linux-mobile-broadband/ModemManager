@@ -6874,7 +6874,7 @@ common_setup_cleanup_unsolicited_events_finish (MMBroadbandModemQmi *self,
                                                 GAsyncResult *res,
                                                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
@@ -6958,25 +6958,21 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    GTask *task;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        common_enable_disable_unsolicited_events);
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (enable == self->priv->unsolicited_events_setup) {
         mm_dbg ("Unsolicited events already %s; skipping",
                 enable ? "setup" : "cleanup");
-        g_simple_async_result_set_op_res_gboolean (result, TRUE);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -7016,9 +7012,8 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
     }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
