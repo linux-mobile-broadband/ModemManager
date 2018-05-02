@@ -7267,8 +7267,6 @@ typedef enum {
 } LoadInitialSmsPartsStep;
 
 typedef struct {
-    MMBroadbandModemQmi *self;
-    GSimpleAsyncResult *result;
     QmiClientWms *client;
     MMSmsStorage storage;
     LoadInitialSmsPartsStep step;
@@ -7279,16 +7277,12 @@ typedef struct {
 } LoadInitialSmsPartsContext;
 
 static void
-load_initial_sms_parts_context_complete_and_free (LoadInitialSmsPartsContext *ctx)
+load_initial_sms_parts_context_free (LoadInitialSmsPartsContext *ctx)
 {
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
-
     if (ctx->message_array)
         g_array_unref (ctx->message_array);
 
     g_object_unref (ctx->client);
-    g_object_unref (ctx->self);
     g_slice_free (LoadInitialSmsPartsContext, ctx);
 }
 
@@ -7304,10 +7298,10 @@ load_initial_sms_parts_finish (MMIfaceModemMessaging *_self,
         return iface_modem_messaging_parent->load_initial_sms_parts_finish (_self, res, error);
     }
 
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);;
 }
 
-static void read_next_sms_part (LoadInitialSmsPartsContext *ctx);
+static void read_next_sms_part (GTask *task);
 
 static void
 add_new_read_sms_part (MMIfaceModemMessaging *self,
@@ -7359,10 +7353,15 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
 static void
 wms_raw_read_ready (QmiClientWms *client,
                     GAsyncResult *res,
-                    LoadInitialSmsPartsContext *ctx)
+                    GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    LoadInitialSmsPartsContext *ctx;
     QmiMessageWmsRawReadOutput *output = NULL;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     /* Ignore errors, just keep on with the next messages */
 
@@ -7389,7 +7388,7 @@ wms_raw_read_ready (QmiClientWms *client,
             &format,
             &data,
             NULL);
-        add_new_read_sms_part (MM_IFACE_MODEM_MESSAGING (ctx->self),
+        add_new_read_sms_part (MM_IFACE_MODEM_MESSAGING (self),
                                mm_sms_storage_to_qmi_storage_type (ctx->storage),
                                message->memory_index,
                                tag,
@@ -7402,16 +7401,19 @@ wms_raw_read_ready (QmiClientWms *client,
 
     /* Keep on reading parts */
     ctx->i++;
-    read_next_sms_part (ctx);
+    read_next_sms_part (task);
 }
 
-static void load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx);
+static void load_initial_sms_parts_step (GTask *task);
 
 static void
-read_next_sms_part (LoadInitialSmsPartsContext *ctx)
+read_next_sms_part (GTask *task)
 {
+    LoadInitialSmsPartsContext *ctx;
     QmiMessageWmsListMessagesOutputMessageListElement *message;
     QmiMessageWmsRawReadInput *input;
+
+    ctx = g_task_get_task_data (task);
 
     if (ctx->i >= ctx->message_array->len ||
         !ctx->message_array) {
@@ -7422,7 +7424,7 @@ read_next_sms_part (LoadInitialSmsPartsContext *ctx)
             ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LAST;
         else
             ctx->step++;
-        load_initial_sms_parts_step (ctx);
+        load_initial_sms_parts_step (task);
         return;
     }
 
@@ -7456,24 +7458,27 @@ read_next_sms_part (LoadInitialSmsPartsContext *ctx)
                              3,
                              NULL,
                              (GAsyncReadyCallback)wms_raw_read_ready,
-                             ctx);
+                             task);
     qmi_message_wms_raw_read_input_unref (input);
 }
 
 static void
 wms_list_messages_ready (QmiClientWms *client,
                          GAsyncResult *res,
-                         LoadInitialSmsPartsContext *ctx)
+                         GTask *task)
 {
+    LoadInitialSmsPartsContext *ctx;
     QmiMessageWmsListMessagesOutput *output = NULL;
     GError *error = NULL;
     GArray *message_array;
 
+    ctx = g_task_get_task_data (task);
+
     output = qmi_client_wms_list_messages_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        load_initial_sms_parts_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -7482,7 +7487,7 @@ wms_list_messages_ready (QmiClientWms *client,
         mm_dbg ("Couldn't read SMS messages: %s", error->message);
         g_error_free (error);
         ctx->step++;
-        load_initial_sms_parts_step (ctx);
+        load_initial_sms_parts_step (task);
         qmi_message_wms_list_messages_output_unref (output);
         return;
     }
@@ -7501,15 +7506,20 @@ wms_list_messages_ready (QmiClientWms *client,
 
     /* Start reading parts */
     ctx->i = 0;
-    read_next_sms_part (ctx);
+    read_next_sms_part (task);
 }
 
 static void
-load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
+load_initial_sms_parts_step (GTask *task)
 {
+    MMBroadbandModemQmi *self;
+    LoadInitialSmsPartsContext *ctx;
     QmiMessageWmsListMessagesInput *input;
     gint mode = -1;
     gint tag_type = -1;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case LOAD_INITIAL_SMS_PARTS_STEP_FIRST:
@@ -7517,9 +7527,9 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
         /* Fall down */
     case LOAD_INITIAL_SMS_PARTS_STEP_3GPP_FIRST:
         /* If modem doesn't have 3GPP caps, skip 3GPP SMS */
-        if (!mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
+        if (!mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
             ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_3GPP_LAST;
-            load_initial_sms_parts_step (ctx);
+            load_initial_sms_parts_step (task);
             return;
         }
         ctx->step++;
@@ -7558,9 +7568,9 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
         /* Fall down */
     case LOAD_INITIAL_SMS_PARTS_STEP_CDMA_FIRST:
         /* If modem doesn't have CDMA caps, skip CDMA SMS */
-        if (!mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
+        if (!mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
             ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_CDMA_LAST;
-            load_initial_sms_parts_step (ctx);
+            load_initial_sms_parts_step (task);
             return;
         }
         ctx->step++;
@@ -7599,8 +7609,8 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
         /* Fall down */
     case LOAD_INITIAL_SMS_PARTS_STEP_LAST:
         /* All steps done */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        load_initial_sms_parts_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -7625,7 +7635,7 @@ load_initial_sms_parts_step (LoadInitialSmsPartsContext *ctx)
                                   5,
                                   NULL,
                                   (GAsyncReadyCallback)wms_list_messages_ready,
-                                  ctx);
+                                  task);
     qmi_message_wms_list_messages_input_unref (input);
 }
 
@@ -7637,6 +7647,7 @@ load_initial_sms_parts (MMIfaceModemMessaging *_self,
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     LoadInitialSmsPartsContext *ctx;
+    GTask *task;
     QmiClient *client = NULL;
 
     /* Handle fallback */
@@ -7644,22 +7655,20 @@ load_initial_sms_parts (MMIfaceModemMessaging *_self,
         return iface_modem_messaging_parent->load_initial_sms_parts (_self, storage, callback, user_data);
     }
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
                             callback, user_data))
         return;
 
     ctx = g_slice_new0 (LoadInitialSmsPartsContext);
-    ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
     ctx->storage = storage;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_initial_sms_parts);
     ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_FIRST;
 
-    load_initial_sms_parts_step (ctx);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_initial_sms_parts_context_free);
+
+    load_initial_sms_parts_step (task);
 }
 
 /*****************************************************************************/
