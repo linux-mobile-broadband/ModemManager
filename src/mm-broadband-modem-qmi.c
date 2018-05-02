@@ -106,7 +106,7 @@ struct _MMBroadbandModemQmiPrivate {
     /* CDMA activation helpers */
     MMModemCdmaActivationState activation_state;
     guint activation_event_report_indication_id;
-    gpointer activation_ctx;
+    GTask *activation_task;
 
     /* Messaging helpers */
     gboolean messaging_fallback_at;
@@ -5691,7 +5691,6 @@ typedef enum {
 typedef struct {
     MMBroadbandModemQmi *self;
     QmiClientDms *client;
-    GSimpleAsyncResult *result;
     CdmaActivationStep step;
     /* OTA activation... */
     QmiMessageDmsActivateAutomaticInput *input_automatic;
@@ -5705,10 +5704,10 @@ typedef struct {
 } CdmaActivationContext;
 
 static void
-cdma_activation_context_complete_and_free (CdmaActivationContext *ctx)
+cdma_activation_context_free (CdmaActivationContext *ctx)
 {
-    /* Cleanup the activation context from the private info */
-    ctx->self->priv->activation_ctx = NULL;
+    /* Cleanup the activation task from the private info */
+    ctx->self->priv->activation_task = NULL;
 
     for (ctx->segment_i = 0; ctx->segment_i < ctx->n_segments; ctx->segment_i++)
         g_array_unref (ctx->segments[ctx->segment_i]);
@@ -5718,8 +5717,6 @@ cdma_activation_context_complete_and_free (CdmaActivationContext *ctx)
         qmi_message_dms_activate_automatic_input_unref (ctx->input_automatic);
     if (ctx->input_manual)
         qmi_message_dms_activate_manual_input_unref (ctx->input_manual);
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->client);
     g_object_unref (ctx->self);
     g_slice_free (CdmaActivationContext, ctx);
@@ -5730,7 +5727,7 @@ modem_cdma_activate_finish (MMIfaceModemCdma *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static gboolean
@@ -5738,10 +5735,10 @@ modem_cdma_activate_manual_finish (MMIfaceModemCdma *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void cdma_activation_context_step (CdmaActivationContext *ctx);
+static void cdma_activation_context_step (GTask *task);
 
 static void
 cdma_activation_disable_indications (CdmaActivationContext *ctx)
@@ -5763,37 +5760,42 @@ cdma_activation_disable_indications (CdmaActivationContext *ctx)
 static void
 activation_power_cycle_ready (MMBroadbandModemQmi *self,
                               GAsyncResult *res,
-                              CdmaActivationContext *ctx)
+                              GTask *task)
 {
+    CdmaActivationContext *ctx;
     GError *error = NULL;
 
     if (!power_cycle_finish (self, res, &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        cdma_activation_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     /* And go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
-    cdma_activation_context_step (ctx);
+    cdma_activation_context_step (task);
 }
 
 static gboolean
-retry_msisdn_check_cb (CdmaActivationContext *ctx)
+retry_msisdn_check_cb (GTask *task)
 {
-    cdma_activation_context_step (ctx);
+    cdma_activation_context_step (task);
     return G_SOURCE_REMOVE;
 }
 
 static void
 activate_manual_get_msisdn_ready (QmiClientDms *client,
                                   GAsyncResult *res,
-                                  CdmaActivationContext *ctx)
+                                  GTask *task)
 {
+    CdmaActivationContext *ctx;
     QmiMessageDmsGetMsisdnOutput *output = NULL;
     GError *error = NULL;
     const gchar *current_mdn = NULL;
     const gchar *expected_mdn = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     qmi_message_dms_activate_manual_input_get_info (ctx->input_manual,
                                                     NULL, /* spc */
@@ -5811,7 +5813,7 @@ activate_manual_get_msisdn_ready (QmiClientDms *client,
         qmi_message_dms_get_msisdn_output_unref (output);
         /* And go on to next step */
         ctx->step++;
-        cdma_activation_context_step (ctx);
+        cdma_activation_context_step (task);
         return;
     }
 
@@ -5821,16 +5823,16 @@ activate_manual_get_msisdn_ready (QmiClientDms *client,
     if (ctx->n_mdn_check_retries < MAX_MDN_CHECK_RETRIES) {
         /* Retry after some time */
         mm_dbg ("MDN not yet updated, retrying...");
-        g_timeout_add (1, (GSourceFunc) retry_msisdn_check_cb, ctx);
+        g_timeout_add (1, (GSourceFunc) retry_msisdn_check_cb, task);
         return;
     }
 
     /* Well, all retries consumed already, return error */
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "MDN was not correctly set during manual activation");
-    cdma_activation_context_complete_and_free (ctx);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "MDN was not correctly set during manual activation");
+    g_object_unref (task);
 }
 
 static void
@@ -5871,24 +5873,26 @@ activation_event_report_indication_cb (QmiClientDms *client,
 
     /* Now, if we have a FINAL state, finish the ongoing activation state request */
     if (new != MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATING) {
+        GTask *task;
         CdmaActivationContext *ctx;
 
-        g_assert (self->priv->activation_ctx != NULL);
-        ctx = (CdmaActivationContext *)self->priv->activation_ctx;
+        g_assert (self->priv->activation_task != NULL);
+        task = self->priv->activation_task;
+        ctx = g_task_get_task_data (task);
 
         /* Disable further indications. */
         cdma_activation_disable_indications (ctx);
 
         /* If there is any error, finish the async method */
         if (error) {
-            g_simple_async_result_take_error (ctx->result, error);
-            cdma_activation_context_complete_and_free (ctx);
+            g_task_return_error (task, error);
+            g_object_unref (task);
             return;
         }
 
         /* Otherwise, go on to next step */
         ctx->step++;
-        cdma_activation_context_step (ctx);
+        cdma_activation_context_step (task);
         return;
     }
 
@@ -5898,26 +5902,29 @@ activation_event_report_indication_cb (QmiClientDms *client,
 static void
 activate_automatic_ready (QmiClientDms *client,
                           GAsyncResult *res,
-                          CdmaActivationContext *ctx)
+                          GTask *task)
 {
+    CdmaActivationContext *ctx;
     QmiMessageDmsActivateAutomaticOutput *output;
     GError *error = NULL;
 
+    ctx = g_task_get_task_data (task);
+
     output = qmi_client_dms_activate_automatic_finish (client, res, &error);
     if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
         cdma_activation_disable_indications (ctx);
-        cdma_activation_context_complete_and_free (ctx);
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_dms_activate_automatic_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't request OTA activation: ");
-        g_simple_async_result_take_error (ctx->result, error);
         qmi_message_dms_activate_automatic_output_unref (output);
         cdma_activation_disable_indications (ctx);
-        cdma_activation_context_complete_and_free (ctx);
+        g_prefix_error (&error, "Couldn't request OTA activation: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -5925,30 +5932,33 @@ activate_automatic_ready (QmiClientDms *client,
 
     /* Keep on */
     ctx->step++;
-    cdma_activation_context_step (ctx);
+    cdma_activation_context_step (task);
 }
 
 static void
 activate_manual_ready (QmiClientDms *client,
                        GAsyncResult *res,
-                       CdmaActivationContext *ctx)
+                       GTask *task)
 {
+    CdmaActivationContext *ctx;
     QmiMessageDmsActivateManualOutput *output;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_dms_activate_manual_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        cdma_activation_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_dms_activate_manual_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't request manual activation: ");
-        g_simple_async_result_take_error (ctx->result, error);
         qmi_message_dms_activate_manual_output_unref (output);
-        cdma_activation_context_complete_and_free (ctx);
+        g_prefix_error (&error, "Couldn't request manual activation: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -5959,23 +5969,26 @@ activate_manual_ready (QmiClientDms *client,
         ctx->segment_i++;
         if (ctx->segment_i < ctx->n_segments) {
             /* There's a pending segment */
-            cdma_activation_context_step (ctx);
+            cdma_activation_context_step (task);
             return;
         }
     }
 
     /* No more segments to send, go on */
     ctx->step++;
-    cdma_activation_context_step (ctx);
+    cdma_activation_context_step (task);
 }
 
 static void
 ser_activation_state_ready (QmiClientDms *client,
                             GAsyncResult *res,
-                            CdmaActivationContext *ctx)
+                            GTask *task)
 {
+    CdmaActivationContext *ctx;
     QmiMessageDmsSetEventReportOutput *output;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     /* We cannot ignore errors, we NEED the indications to finish the
      * activation request properly */
@@ -5983,16 +5996,16 @@ ser_activation_state_ready (QmiClientDms *client,
     output = qmi_client_dms_set_event_report_finish (client, res, &error);
     if (!output) {
         g_prefix_error (&error, "QMI operation failed: ");
-        g_simple_async_result_take_error (ctx->result, error);
-        cdma_activation_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
     if (!qmi_message_dms_set_event_report_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't set event report: ");
-        g_simple_async_result_take_error (ctx->result, error);
         qmi_message_dms_set_event_report_output_unref (output);
-        cdma_activation_context_complete_and_free (ctx);
+        g_prefix_error (&error, "Couldn't set event report: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -6008,12 +6021,16 @@ ser_activation_state_ready (QmiClientDms *client,
 
     /* Keep on */
     ctx->step++;
-    cdma_activation_context_step (ctx);
+    cdma_activation_context_step (task);
 }
 
 static void
-cdma_activation_context_step (CdmaActivationContext *ctx)
+cdma_activation_context_step (GTask *task)
 {
+    CdmaActivationContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
     switch (ctx->step) {
     case CDMA_ACTIVATION_STEP_FIRST:
         ctx->step++;
@@ -6034,7 +6051,7 @@ cdma_activation_context_step (CdmaActivationContext *ctx)
                 5,
                 NULL,
                 (GAsyncReadyCallback)ser_activation_state_ready,
-                ctx);
+                task);
             qmi_message_dms_set_event_report_input_unref (input);
             return;
         }
@@ -6055,7 +6072,7 @@ cdma_activation_context_step (CdmaActivationContext *ctx)
                                                10,
                                                NULL,
                                                (GAsyncReadyCallback)activate_automatic_ready,
-                                               ctx);
+                                               task);
             return;
         }
 
@@ -6079,7 +6096,7 @@ cdma_activation_context_step (CdmaActivationContext *ctx)
                                         10,
                                         NULL,
                                         (GAsyncReadyCallback)activate_manual_ready,
-                                        ctx);
+                                        task);
         return;
 
     case CDMA_ACTIVATION_STEP_WAIT_UNTIL_FINISHED:
@@ -6099,20 +6116,20 @@ cdma_activation_context_step (CdmaActivationContext *ctx)
                                    5,
                                    NULL,
                                    (GAsyncReadyCallback)activate_manual_get_msisdn_ready,
-                                   ctx);
+                                   task);
         return;
 
     case CDMA_ACTIVATION_STEP_POWER_CYCLE:
         mm_info ("Activation step [4/5]: power-cycling...");
         power_cycle (ctx->self,
                      (GAsyncReadyCallback)activation_power_cycle_ready,
-                     ctx);
+                     task);
         return;
 
     case CDMA_ACTIVATION_STEP_LAST:
         mm_info ("Activation step [5/5]: finished");
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        cdma_activation_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
 
     default:
@@ -6127,29 +6144,24 @@ modem_cdma_activate (MMIfaceModemCdma *_self,
                      gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
     CdmaActivationContext *ctx;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_activate);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Fail if we have already an activation ongoing */
-    if (self->priv->activation_ctx) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_IN_PROGRESS,
-            "An activation operation is already in progress");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+    if (self->priv->activation_task) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "An activation operation is already in progress");
+        g_object_unref (task);
         return;
     }
 
@@ -6157,17 +6169,18 @@ modem_cdma_activate (MMIfaceModemCdma *_self,
     ctx = g_slice_new0 (CdmaActivationContext);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = result;
     ctx->step = CDMA_ACTIVATION_STEP_FIRST;
 
     /* Build base input bundle for the Automatic activation */
     ctx->input_automatic = qmi_message_dms_activate_automatic_input_new ();
     qmi_message_dms_activate_automatic_input_set_activation_code (ctx->input_automatic, carrier_code, NULL);
 
-    /* We keep the activation context in the private data, so that we don't
+    g_task_set_task_data (task, ctx, (GDestroyNotify)cdma_activation_context_free);
+
+    /* We keep the activation task in the private data, so that we don't
      * allow multiple activation requests at the same time. */
-    self->priv->activation_ctx = ctx;
-    cdma_activation_context_step (ctx);
+    self->priv->activation_task = task;
+    cdma_activation_context_step (task);
 }
 
 static void
@@ -6177,29 +6190,24 @@ modem_cdma_activate_manual (MMIfaceModemCdma *_self,
                             gpointer user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GSimpleAsyncResult *result;
+    GTask *task;
     CdmaActivationContext *ctx;
     QmiClient *client = NULL;
 
-    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_cdma_activate_manual);
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* Fail if we have already an activation ongoing */
-    if (self->priv->activation_ctx) {
-        g_simple_async_result_set_error (
-            result,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_IN_PROGRESS,
-            "An activation operation is already in progress");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+    if (self->priv->activation_task) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "An activation operation is already in progress");
+        g_object_unref (task);
         return;
     }
 
@@ -6207,11 +6215,12 @@ modem_cdma_activate_manual (MMIfaceModemCdma *_self,
     ctx = g_slice_new0 (CdmaActivationContext);
     ctx->self = g_object_ref (self);
     ctx->client = g_object_ref (client);
-    ctx->result = result;
 
-    /* We keep the activation context in the private data, so that we don't
+    g_task_set_task_data (task, ctx, (GDestroyNotify)cdma_activation_context_free);
+
+    /* We keep the activation task in the private data, so that we don't
      * allow multiple activation requests at the same time. */
-    self->priv->activation_ctx = ctx;
+    self->priv->activation_task = task;
 
     /* Build base input bundle for the Manual activation */
     ctx->input_manual = qmi_message_dms_activate_manual_input_new ();
@@ -6278,7 +6287,7 @@ modem_cdma_activate_manual (MMIfaceModemCdma *_self,
 #undef MAX_PRL_SEGMENT_SIZE
     }
 
-    cdma_activation_context_step (ctx);
+    cdma_activation_context_step (task);
 }
 
 /*****************************************************************************/
