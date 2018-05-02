@@ -175,31 +175,7 @@ ensure_qmi_client (MMBroadbandModemQmi *self,
 
     client = peek_qmi_client (self, service, &error);
     if (!client) {
-        g_simple_async_report_take_gerror_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
-            error);
-        return FALSE;
-    }
-
-    *o_client = client;
-    return TRUE;
-}
-
-static gboolean
-assure_qmi_client (MMBroadbandModemQmi *self,
-                   QmiService service,
-                   QmiClient **o_client,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
-{
-    GError *error = NULL;
-    QmiClient *client;
-
-    client = peek_qmi_client (self, service, &error);
-    if (!client) {
-        g_task_report_error (self, callback, user_data, assure_qmi_client, error);
+        g_task_report_error (self, callback, user_data, ensure_qmi_client, error);
         return FALSE;
     }
 
@@ -288,7 +264,7 @@ power_cycle (MMBroadbandModemQmi *self,
     GTask *task;
     QmiClient *client;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -546,12 +522,12 @@ modem_load_current_capabilities (MMIfaceModem *self,
 
     mm_dbg ("loading current capabilities...");
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &nas_client,
                             callback, user_data))
         return;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &dms_client,
                             callback, user_data))
         return;
@@ -679,7 +655,7 @@ modem_load_supported_capabilities (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -903,7 +879,7 @@ set_current_capabilities (MMIfaceModem *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -972,7 +948,7 @@ modem_load_manufacturer (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -1032,7 +1008,7 @@ modem_load_model (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -1092,7 +1068,7 @@ modem_load_revision (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -1152,7 +1128,7 @@ modem_load_hardware_revision (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -1263,7 +1239,7 @@ modem_load_equipment_identifier (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -1356,7 +1332,7 @@ modem_load_own_numbers (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -2107,7 +2083,7 @@ modem_load_supported_bands (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -2240,7 +2216,7 @@ modem_load_current_bands (MMIfaceModem *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -2321,7 +2297,7 @@ set_current_bands (MMIfaceModem *_self,
     QmiNasBandPreference qmi_bands = 0;
     QmiNasLteBandPreference qmi_lte_bands = 0;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -2839,7 +2815,7 @@ load_signal_quality (MMIfaceModem *self,
     QmiClient *client = NULL;
     GTask *task;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -3052,7 +3028,7 @@ common_power_up_down_off (MMIfaceModem *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -3180,7 +3156,7 @@ load_power_state (MMIfaceModem *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -3303,7 +3279,7 @@ modem_factory_reset (MMIfaceModem *self,
     QmiClient *client = NULL;
     GError *error = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -3541,7 +3517,7 @@ load_current_modes (MMIfaceModem *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -3775,7 +3751,7 @@ set_current_modes (MMIfaceModem *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -4037,7 +4013,7 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -4206,7 +4182,7 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
      * passed to the caller and deallocated afterwards */
     g_assert (callback != NULL);
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -4354,7 +4330,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     }
 
     /* Get NAS client */
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -5123,7 +5099,7 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -5277,7 +5253,7 @@ modem_3gpp_disable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -5324,7 +5300,7 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (self,
+    if (!ensure_qmi_client (self,
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -5582,7 +5558,7 @@ modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -5661,7 +5637,7 @@ modem_cdma_load_activation_state (MMIfaceModemCdma *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -6148,7 +6124,7 @@ modem_cdma_activate (MMIfaceModemCdma *_self,
     CdmaActivationContext *ctx;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -6194,7 +6170,7 @@ modem_cdma_activate_manual (MMIfaceModemCdma *_self,
     CdmaActivationContext *ctx;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -6333,7 +6309,7 @@ common_setup_cleanup_unsolicited_registration_events (MMBroadbandModemQmi *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -6710,7 +6686,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -6902,7 +6878,7 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
@@ -7223,7 +7199,7 @@ messaging_set_default_storage (MMIfaceModemMessaging *_self,
         return;
     }
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
                             callback, user_data))
         return;
@@ -7664,7 +7640,7 @@ load_initial_sms_parts (MMIfaceModemMessaging *_self,
         return iface_modem_messaging_parent->load_initial_sms_parts (_self, storage, callback, user_data);
     }
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
                             callback, user_data))
         return;
@@ -7832,7 +7808,7 @@ common_setup_cleanup_messaging_unsolicited_events (MMBroadbandModemQmi *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
                             callback, user_data))
         return;
@@ -7983,7 +7959,7 @@ common_enable_disable_messaging_unsolicited_events (MMBroadbandModemQmi *self,
     QmiClient *client = NULL;
     QmiMessageWmsSetEventReportInput *input;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_WMS, &client,
                             callback, user_data))
         return;
@@ -8244,7 +8220,7 @@ location_load_supl_server (MMIfaceModemLocation *self,
     QmiClient *client = NULL;
     QmiMessagePdsGetAgpsConfigInput *input;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_PDS, &client,
                             callback, user_data)) {
         return;
@@ -8364,7 +8340,7 @@ location_set_supl_server (MMIfaceModemLocation *self,
     guint32 port;
     GArray *url;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_PDS, &client,
                             callback, user_data)) {
         return;
@@ -8601,7 +8577,7 @@ disable_location_gathering (MMIfaceModemLocation *_self,
     }
 
     /* Setup context and client */
-    if (!assure_qmi_client (self,
+    if (!ensure_qmi_client (self,
                             QMI_SERVICE_PDS, &client,
                             callback, user_data)) {
         g_object_unref (task);
@@ -9187,7 +9163,7 @@ oma_load_features (MMIfaceModemOma *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9241,7 +9217,7 @@ oma_setup (MMIfaceModemOma *self,
     QmiClient *client = NULL;
     QmiMessageOmaSetFeatureSettingInput *input;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9311,7 +9287,7 @@ oma_start_client_initiated_session (MMIfaceModemOma *self,
     QmiClient *client = NULL;
     QmiMessageOmaStartSessionInput *input;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9378,7 +9354,7 @@ oma_accept_network_initiated_session (MMIfaceModemOma *self,
     QmiClient *client = NULL;
     QmiMessageOmaSendSelectionInput *input;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9439,7 +9415,7 @@ oma_cancel_session (MMIfaceModemOma *self,
 {
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9520,7 +9496,7 @@ common_setup_cleanup_oma_unsolicited_events (MMBroadbandModemQmi *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -9635,7 +9611,7 @@ common_enable_disable_oma_unsolicited_events (MMBroadbandModemQmi *self,
     QmiClient *client = NULL;
     QmiMessageOmaSetEventReportInput *input;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_OMA, &client,
                             callback, user_data))
         return;
@@ -10041,7 +10017,7 @@ firmware_check_support (MMIfaceModemFirmware *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -10260,7 +10236,7 @@ firmware_change_current (MMIfaceModemFirmware *_self,
     guint8 *tmp;
     gsize tmp_len;
 
-    if (!assure_qmi_client (self,
+    if (!ensure_qmi_client (self,
                             QMI_SERVICE_DMS, &client,
                             callback, user_data))
         return;
@@ -10809,7 +10785,7 @@ signal_load_values (MMIfaceModemSignal *self,
 
     mm_dbg ("loading extended signal information...");
 
-    if (!assure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
                             QMI_SERVICE_NAS, &client,
                             callback, user_data))
         return;
