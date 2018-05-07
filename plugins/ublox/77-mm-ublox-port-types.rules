@@ -11,9 +11,11 @@ SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInte
 #  ttyACM0 (if #2): secondary (ignore)
 #  ttyACM1 (if #4): debug port (ignore)
 #  ttyACM2 (if #6): primary
+#      Wait up to 20s for the +READY URC
 #  ttyACM3 (if #8): AT port for FOTA (ignore)
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_UBLOX_PORT_READY_DELAY}="20"
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="08", ENV{ID_MM_PORT_IGNORE}="1"
 
 # TOBY-R2 port types
