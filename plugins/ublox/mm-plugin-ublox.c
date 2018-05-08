@@ -202,18 +202,24 @@ ublox_custom_init (MMPortProbe         *probe,
 {
     GTask             *task;
     CustomInitContext *ctx;
+    gint               wait_timeout_secs;
 
     task = g_task_new (probe, cancellable, callback, user_data);
 
+    /* If no explicit READY_DELAY configured, we don't need a custom init procedure */
+    wait_timeout_secs = mm_kernel_device_get_property_as_int (mm_port_probe_peek_port (probe), "ID_MM_UBLOX_PORT_READY_DELAY");
+    if (wait_timeout_secs <= 0) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
     ctx = g_slice_new0 (CustomInitContext);
+    ctx->wait_timeout_secs = wait_timeout_secs;
     ctx->port = g_object_ref (port);
     ctx->ready_regex = g_regex_new ("\\r\\n\\+AT:\\s*READY\\r\\n",
                                     G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_task_set_task_data (task, ctx, (GDestroyNotify) custom_init_context_free);
-
-    ctx->wait_timeout_secs = mm_kernel_device_get_property_as_int (mm_port_probe_peek_port(probe), "ID_MM_UBLOX_PORT_READY_DELAY");
-    if (ctx->wait_timeout_secs < 0)
-        ctx->wait_timeout_secs = 0;
 
     /* If the device hasn't been plugged in right away, we assume it was already
      * running for some time. We validate the assumption with a quick AT probe,
@@ -232,15 +238,8 @@ ublox_custom_init (MMPortProbe         *probe,
         return;
     }
 
-    if (ctx->wait_timeout_secs > 0) {
-        /* Device hotplugged and has a defined ready delay, wait for READY URC */
-        wait_for_ready (task);
-        return;
-    }
-
-    /* Otherwise, no need for any custom wait */
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    /* Device hotplugged and has a defined ready delay, wait for READY URC */
+    wait_for_ready (task);
 }
 
 /*****************************************************************************/
