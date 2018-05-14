@@ -32,7 +32,6 @@
 /* Register in either a CDMA or a 3GPP network (or both) */
 
 typedef struct {
-    MMIfaceModemSimple *self;
     gchar *operator_id;
     guint remaining_tries_cdma;
     guint remaining_tries_3gpp;
@@ -43,7 +42,6 @@ static void
 register_in_network_context_free (RegisterInNetworkContext *ctx)
 {
     g_free (ctx->operator_id);
-    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -67,8 +65,7 @@ register_in_cdma_network_ready (MMIfaceModemCdma *self,
     ctx = g_task_get_task_data (task);
     ctx->remaining_tries_cdma--;
 
-    if (!mm_iface_modem_cdma_register_in_network_finish (
-            MM_IFACE_MODEM_CDMA (self), res, NULL)) {
+    if (!mm_iface_modem_cdma_register_in_network_finish (self, res, NULL)) {
         /* Retry check */
         check_next_registration (task);
         return;
@@ -89,8 +86,7 @@ register_in_3gpp_network_ready (MMIfaceModem3gpp *self,
     ctx = g_task_get_task_data (task);
     ctx->remaining_tries_3gpp--;
 
-    if (!mm_iface_modem_3gpp_register_in_network_finish (
-            MM_IFACE_MODEM_3GPP (self), res, NULL)) {
+    if (!mm_iface_modem_3gpp_register_in_network_finish (self, res, NULL)) {
         /* Retry check */
         check_next_registration (task);
         return;
@@ -105,13 +101,15 @@ static void
 check_next_registration (GTask *task)
 {
     RegisterInNetworkContext *ctx;
+    MMIfaceModemSimple *self;
 
+    self = MM_IFACE_MODEM_SIMPLE (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
     if (ctx->remaining_tries_cdma > ctx->remaining_tries_3gpp &&
         ctx->remaining_tries_cdma > 0) {
         mm_iface_modem_cdma_register_in_network (
-            MM_IFACE_MODEM_CDMA (ctx->self),
+            MM_IFACE_MODEM_CDMA (self),
             ctx->max_try_time,
             (GAsyncReadyCallback)register_in_cdma_network_ready,
             task);
@@ -120,7 +118,7 @@ check_next_registration (GTask *task)
 
     if (ctx->remaining_tries_3gpp > 0) {
         mm_iface_modem_3gpp_register_in_network (
-            MM_IFACE_MODEM_3GPP (ctx->self),
+            MM_IFACE_MODEM_3GPP (self),
             ctx->operator_id,
             ctx->max_try_time,
             (GAsyncReadyCallback)register_in_3gpp_network_ready,
@@ -145,17 +143,16 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
     GTask *task;
 
     ctx = g_new0 (RegisterInNetworkContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->operator_id = g_strdup (operator_id);
 
     /* 3GPP-only modems... */
-    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (ctx->self))) {
+    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (self))) {
         ctx->max_try_time = 60;
         ctx->remaining_tries_cdma = 0;
         ctx->remaining_tries_3gpp = 1;
     }
     /* CDMA-only modems... */
-    else if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (ctx->self))) {
+    else if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
         ctx->max_try_time = 60;
         ctx->remaining_tries_cdma = 1;
         ctx->remaining_tries_3gpp = 0;
