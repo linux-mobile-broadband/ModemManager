@@ -2067,7 +2067,7 @@ signal_quality_cind (GTask *task)
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                    MM_PORT_SERIAL_AT (ctx->at_port),
                                    "+CIND?",
-                                   3,
+                                   5,
                                    FALSE,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
