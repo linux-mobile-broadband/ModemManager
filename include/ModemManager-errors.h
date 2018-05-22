@@ -112,27 +112,52 @@ typedef enum { /*< underscore_name=mm_core_error >*/
  * @MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PUK: Service provider personalisation PUK required.
  * @MM_MOBILE_EQUIPMENT_ERROR_CORP_PIN: Corporate personalisation PIN required.
  * @MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK: Corporate personalisation PUK required.
+ * @MM_MOBILE_EQUIPMENT_ERROR_HIDDEN_KEY_REQUIRED: Hidden key required. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_EAP_METHOD_NOT_SUPPORTED: EAP method not supported. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PARAMETERS: Incorrect parameters. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN: Unknown.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR: IMSI unknown in HLR.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR: IMSI unknown in VLR.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS: Illegal MS.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME: Illegal ME.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED: GPRS service not allowed.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_AND_NON_GPRS_SERVICES_NOT_ALLOWED: GPRS and non-GPRS services not allowed. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED: PLMN not allowed.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED: Location area not allowed.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED: Roaming not allowed in this location area.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA: No cells in this location area.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE: Network failure.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION: Congestion.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NOT_AUTHORIZED_FOR_CSG: GPRS not authorized for CSG. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_INSUFFICIENT_RESOURCES: Insufficient resources.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN: Missing or unknown APN.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_ADDRESS_OR_TYPE: Unknown PDP address or type. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED: User authentication failed.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_BY_GGSN_OR_GW: Activation rejected by GGSN or gateway. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_UNSPECIFIED: Activation rejected (reason unspecified). Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED: Service option not supported.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED: Requested service option not subscribed.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER: Service option temporarily out of order.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_FEATURE_NOT_SUPPORTED: Feature not supported. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERROR_IN_TFT_OPERATION: Semantic error in TFT operation. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_TFT_OPERATION: Syntactical error in TFT operation. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_CONTEXT: Unknown PDP context. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERRORS_IN_PACKET_FILTER: Semantic errors in packet filter. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_PACKET_FILTER: Syntactical error in packet filter. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_CONTEXT_WITHOUT_TFT_ALREADY_ACTIVATED: PDP context witout TFT already activated. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN: Unspecified GPRS error.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE: PDP authentication failure.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS: Invalid mobile class.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED: Last PDN disconnection not allowed. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE: Semantically incorrect message. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MANDATORY_IE_ERROR: Mandatory IE error. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IE_NOT_IMPLEMENTED: IE not implemented. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONDITIONAL_IE_ERROR: Conditional IE error. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNSPECIFIED_PROTOCOL_ERROR: Unspecified protocol error. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_OPERATOR_DETERMINED_BARRING: Operator determined barring. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MAXIMUM_NUMBER_OF_PDP_CONTEXTS_REACHED: Maximum number of PDP contexts reached. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUESTED_APN_NOT_SUPPORTED: Requested APN not supported. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION: Request rejected (BCM violation). Since: 1.8.
  *
  * Enumeration of Mobile Equipment errors, as defined in 3GPP TS 07.07 version 7.8.0.
  */
@@ -174,6 +199,9 @@ typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
     MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PUK          = 45,  /*< nick=ServicePuk >*/
     MM_MOBILE_EQUIPMENT_ERROR_CORP_PIN             = 46,  /*< nick=CorpPin >*/
     MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK             = 47,  /*< nick=CorpPuk >*/
+    MM_MOBILE_EQUIPMENT_ERROR_HIDDEN_KEY_REQUIRED  = 48,  /*< nick=HiddenKeyRequired >*/
+    MM_MOBILE_EQUIPMENT_ERROR_EAP_METHOD_NOT_SUPPORTED = 49, /*< nick=EapMethodNotSupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PARAMETERS = 50,  /*< nick=IncorrectParameters >*/
     MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN              = 100, /*< nick=Unknown >*/
     /* GPRS related errors */
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR           = 102, /*< nick=GprsImsiUnknownInHlr           >*/
@@ -181,21 +209,43 @@ typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR           = 104, /*< nick=GprsImsiUnknownInVlr           >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME                    = 106, /*< nick=GprsIllegalMe                  >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED           = 107, /*< nick=GprsServiceNotAllowed          >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_AND_NON_GPRS_SERVICES_NOT_ALLOWED = 108, /*< nick=GprsAndNonGprsServicesNotAllowed >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED              = 111, /*< nick=GprsPlmnNotAllowed             >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED          = 112, /*< nick=GprsLocationNotAllowed         >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED           = 113, /*< nick=GprsRomaingNotAllowed          >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA     = 115, /*< nick=GprsNoCellsInLocationArea      >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE               = 117, /*< nick=GprsNetworkFailure             >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION                    = 122, /*< nick=GprsCongestion                 >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NOT_AUTHORIZED_FOR_CSG        = 125, /*< nick=NotAuthorizedForCsg            >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_INSUFFICIENT_RESOURCES        = 126, /*< nick=GprsInsufficientResources      >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN        = 127, /*< nick=GprsMissingOrUnknownApn        >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_ADDRESS_OR_TYPE   = 128, /*< nick=GprsUnknownPdpAddressOrType    >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED    = 129, /*< nick=GprsUserAuthenticationFailed   >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_BY_GGSN_OR_GW = 130, /*< nick=GprsActivationRejectedByGgsnOrGw >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_UNSPECIFIED = 131, /*< nick=GprsActivationRejectedUnspecified >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED  = 132, /*< nick=GprsServiceOptionNotSupported  >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED = 133, /*< nick=GprsServiceOptionNotSubscribed >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER   = 134, /*< nick=GprsServiceOptionOutOfOrder    >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_FEATURE_NOT_SUPPORTED         = 140, /*< nick=GprsFeatureNotSupported        >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERROR_IN_TFT_OPERATION = 141, /*< nick=GprsSemanticErrorInTftOperation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_TFT_OPERATION = 142, /*< nick=GprsSyntacticalErrorInTftOperation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_CONTEXT           = 143, /*< nick=GprsUnknownPdpContext          >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERRORS_IN_PACKET_FILTER = 144, /*< nick=GprsSemanticErrorsInPacketFilter >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_PACKET_FILTER = 145, /*< nick=GprsSyntacticalErrorsInPacketFilter >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_CONTEXT_WITHOUT_TFT_ALREADY_ACTIVATED = 146, /*< nick=GprsPdpContextWithoutTftAlreadyActivated >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN                       = 148, /*< nick=GprsUnknown                    >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE              = 149, /*< nick=GprsPdpAuthFailure             >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS          = 150, /*< nick=GprsInvalidMobileClass         >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED = 171, /*< nick=GprsLastPdnDisconnectionNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE = 172, /*< nick=GprsSemanticallyIncorrectMessage >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_MANDATORY_IE_ERROR            = 173, /*< nick=GprsMandatoryIeError           >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IE_NOT_IMPLEMENTED            = 174, /*< nick=GprsIeNotImplemented           >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONDITIONAL_IE_ERROR          = 175, /*< nick=GprsConditionalIeError         >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNSPECIFIED_PROTOCOL_ERROR    = 176, /*< nick=GprsUnspecifiedProtocolError   >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_OPERATOR_DETERMINED_BARRING   = 177, /*< nick=GprsOperatorDeterminedBarring  >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_MAXIMUM_NUMBER_OF_PDP_CONTEXTS_REACHED = 178, /*< nick=GprsMaximumNumberOfPdpContextsReached >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUESTED_APN_NOT_SUPPORTED   = 179, /*< nick=GprsRequestedApnNotSupported   >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION = 180, /*< nick=GprsRequestRejectedBcmViolation >*/
 } MMMobileEquipmentError;
 
 /**
