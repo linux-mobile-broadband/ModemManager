@@ -7,7 +7,7 @@
 # that don't have this tag.  MM will still get the udev 'add' event for the
 # device a short while later and then process it as normal.
 
-ACTION!="add|change|move", GOTO="mm_candidate_end"
+ACTION!="add|change|move|bind", GOTO="mm_candidate_end"
 
 # Opening bound but disconnected Bluetooth RFCOMM ttys would initiate the
 # connection. Don't do that.

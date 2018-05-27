@@ -8,7 +8,7 @@
 # aux ports that may be either AT-capable or not but cannot be used for PPP.
 
 
-ACTION!="add|change|move", GOTO="mm_x22x_port_types_end"
+ACTION!="add|change|move|bind", GOTO="mm_x22x_port_types_end"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1bbb", GOTO="mm_x22x_generic_vendorcheck"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="0b3c", GOTO="mm_x22x_olivetti_vendorcheck"
 GOTO="mm_x22x_port_types_end"

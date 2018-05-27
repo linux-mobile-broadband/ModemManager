@@ -12,7 +12,7 @@
 # cmser.inf lists the aux ports that may be either AT-capable or not but
 # cannot be used for PPP.
 
-ACTION!="add|change|move", GOTO="mm_longcheer_port_types_end"
+ACTION!="add|change|move|bind", GOTO="mm_longcheer_port_types_end"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1c9e", GOTO="mm_longcheer_vendorcheck"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1bbb", GOTO="mm_tamobile_vendorcheck"
 GOTO="mm_longcheer_port_types_end"
