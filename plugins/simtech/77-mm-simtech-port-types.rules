@@ -10,7 +10,7 @@
 # *ser.inf lists the aux ports that may be used for PPP.
 
 
-ACTION!="add|change|move", GOTO="mm_simtech_port_types_end"
+ACTION!="add|change|move|bind", GOTO="mm_simtech_port_types_end"
 SUBSYSTEM!="tty", GOTO="mm_simtech_port_types_end"
 
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="1e0e", GOTO="mm_alink_vendorcheck"
