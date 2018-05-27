@@ -2239,8 +2239,8 @@ static void add_sms_part (MMBroadbandModemMbim *self,
                           const MbimSmsPduReadRecord *pdu);
 
 static void
-sms_notification_read_sms (MMBroadbandModemMbim *self,
-                           MbimMessage *notification)
+sms_notification_read_flash_sms (MMBroadbandModemMbim *self,
+                                 MbimMessage *notification)
 {
     MbimSmsFormat format;
     guint32 messages_count;
@@ -2335,8 +2335,8 @@ alert_sms_read_query_ready (MbimDevice *device,
 }
 
 static void
-sms_notification_read_alert_sms (MMBroadbandModemMbim *self,
-                                 guint32 index)
+sms_notification_read_stored_sms (MMBroadbandModemMbim *self,
+                                  guint32 index)
 {
     MMPortMbim *port;
     MbimDevice *device;
@@ -2349,7 +2349,7 @@ sms_notification_read_alert_sms (MMBroadbandModemMbim *self,
     if (!device)
         return;
 
-    mm_dbg ("Reading flash SMS at index '%u'", index);
+    mm_dbg ("Reading new SMS at index '%u'", index);
     message = mbim_message_sms_read_query_new (MBIM_SMS_FORMAT_PDU,
                                                MBIM_SMS_FLAG_INDEX,
                                                index,
@@ -2369,24 +2369,24 @@ sms_notification (MMBroadbandModemMbim *self,
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
     case MBIM_CID_SMS_READ:
+        /* New flash/alert message? */
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ)
-            sms_notification_read_sms (self, notification);
+            sms_notification_read_flash_sms (self, notification);
         break;
 
     case MBIM_CID_SMS_MESSAGE_STORE_STATUS: {
         MbimSmsStatusFlag flag;
         guint32 index;
 
-        /* New flash/alert message? */
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ &&
             mbim_message_sms_message_store_status_notification_parse (
                 notification,
                 &flag,
                 &index,
                 NULL)) {
-            mm_dbg ("Received flash message: '%s'", mbim_sms_status_flag_get_string (flag));
+            mm_dbg ("Received SMS store status update: '%s'", mbim_sms_status_flag_get_string (flag));
             if (flag == MBIM_SMS_STATUS_FLAG_NEW_MESSAGE)
-                sms_notification_read_alert_sms (self, index);
+                sms_notification_read_stored_sms (self, index);
         }
         break;
     }
