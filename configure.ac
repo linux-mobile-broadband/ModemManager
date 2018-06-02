@@ -5,8 +5,8 @@ dnl Package and library versioning support
 dnl
 
 m4_define([mm_major_version], [1])
-m4_define([mm_minor_version], [7])
-m4_define([mm_micro_version], [991])
+m4_define([mm_minor_version], [8])
+m4_define([mm_micro_version], [0])
 m4_define([mm_version],
           [mm_major_version.mm_minor_version.mm_micro_version])
 
