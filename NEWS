@@ -93,7 +93,7 @@ This version comes with the following new features:
    ** ChangeLog is built from git during the dist tarball generation.
 
  * New translations: Polish, Brazilian Portuguese, Slovak, Hungarian, Czech,
-   Ukrainian and Swedish.
+   Ukrainian, Swedish and Indonesian.
 
  * API:
    ** Defined additional GSM, UMTS and LTE frequency bands.
@@ -142,7 +142,8 @@ This version comes with the following new features:
    ** Try decoding with UTF-16BE when UCS-2 reported.
 
  * Plugins:
-   ** u-blox: new plugin, currently supporting the TOBY-L2 and the TOBY-L4.
+   ** u-blox: new plugin, currently supporting the TOBY-L2, TOBY-L4, TOBY-R2,
+      LARA-R2 and LISA-R2.
    ** quectel: new plugin, supporting generic AT/QMI based modems.
    ** cinterion: implemented support for devices exposing a WWAN network
       interface.
@@ -164,6 +165,7 @@ in ModemManager 1.8.0:
       -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_36 so that we don't get warnings
       for GLib features that are flagged as deprecated in newer versions.
    ** Dropped After=syslog.target rule in systemd service file.
+   ** Added all ModemManager udev tags also in "bind" events.
 
  * Core:
    ** Improved detection of 4G-only modems.
