@@ -101,12 +101,12 @@
         Indicates when the SMS expires in the SMSC.
 
         This value is composed of a
-	    <link linkend="MMSmsValidityType">MMSmsValidityType</link>
-	    key, with an associated data which contains type-specific validity
-	    information:
+        <link linkend="MMSmsValidityType">MMSmsValidityType</link>
+        key, with an associated data which contains type-specific validity
+        information:
 
-	    <variablelist>
-	     <varlistentry><term><link linkend="MM-SMS-VALIDITY-TYPE-RELATIVE:CAPS">MM_SMS_VALIDITY_TYPE_RELATIVE</link></term>
+        <variablelist>
+         <varlistentry><term><link linkend="MM-SMS-VALIDITY-TYPE-RELATIVE:CAPS">MM_SMS_VALIDITY_TYPE_RELATIVE</link></term>
           <listitem>
            <para>
 	        The value is the length of the validity period in minutes, given
