@@ -1283,8 +1283,8 @@ typedef enum { /*< underscore_name=mm_oma_session_state_failed_reason >*/
  * MMCallState:
  * @MM_CALL_STATE_UNKNOWN: default state for a new outgoing call.
  * @MM_CALL_STATE_DIALING: outgoing call started. Wait for free channel.
- * @MM_CALL_STATE_RINGING_IN: outgoing call attached to GSM network, waiting for an answer.
- * @MM_CALL_STATE_RINGING_OUT: incoming call is waiting for an answer.
+ * @MM_CALL_STATE_RINGING_IN: incoming call is waiting for an answer.
+ * @MM_CALL_STATE_RINGING_OUT: outgoing call attached to GSM network, waiting for an answer.
  * @MM_CALL_STATE_ACTIVE: call is active between two peers.
  * @MM_CALL_STATE_HELD: held call (by +CHLD AT command).
  * @MM_CALL_STATE_WAITING: waiting call (by +CCWA AT command).
