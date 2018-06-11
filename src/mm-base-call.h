@@ -104,7 +104,7 @@ void         mm_base_call_change_state   (MMBaseCall *self,
                                           MMCallState new_state,
                                           MMCallStateReason reason);
 void         mm_base_call_received_dtmf  (MMBaseCall *self,
-                                          gchar *dtmf);
+                                          const gchar *dtmf);
 
 void         mm_base_call_delete         (MMBaseCall *self,
                                           GAsyncReadyCallback callback,
