@@ -47,10 +47,10 @@ struct _MMCallListClass {
     GObjectClass parent;
 
     /* Signals */
-    void (*call_added)     (MMCallList *self,
+    void (* call_added)   (MMCallList  *self,
                            const gchar *call_path,
-                           gboolean received);
-    void (*call_deleted)   (MMCallList *self,
+                           gboolean     received);
+    void (* call_deleted) (MMCallList  *self,
                            const gchar *call_path);
 };
 
@@ -64,19 +64,19 @@ guint mm_call_list_get_count (MMCallList *self);
 void mm_call_list_add_call  (MMCallList *self,
                              MMBaseCall *call);
 
-void     mm_call_list_delete_call       (MMCallList *self,
-                                         const gchar *call_path,
-                                         GAsyncReadyCallback callback,
-                                         gpointer user_data);
-gboolean mm_call_list_delete_call_finish (MMCallList *self,
-                                          GAsyncResult *res,
-                                          GError **error);
+void     mm_call_list_delete_call        (MMCallList           *self,
+                                          const gchar          *call_path,
+                                          GAsyncReadyCallback   callback,
+                                          gpointer              user_data);
+gboolean mm_call_list_delete_call_finish (MMCallList           *self,
+                                          GAsyncResult         *res,
+                                          GError              **error);
 
-MMBaseCall* mm_call_list_get_new_incoming               (MMCallList *self);
-MMBaseCall* mm_call_list_get_first_ringing_call         (MMCallList *self);
-MMBaseCall* mm_call_list_get_first_outgoing_dialing_call(MMCallList *self);
-MMBaseCall* mm_call_list_get_first_non_terminated_call  (MMCallList *self);
-gboolean    mm_call_list_send_dtmf_to_active_calls      (MMCallList *self,
-                                                         gchar *dtmf);
+MMBaseCall *mm_call_list_get_new_incoming               (MMCallList  *self);
+MMBaseCall *mm_call_list_get_first_ringing_call         (MMCallList  *self);
+MMBaseCall *mm_call_list_get_first_outgoing_dialing_call(MMCallList  *self);
+MMBaseCall *mm_call_list_get_first_non_terminated_call  (MMCallList  *self);
+gboolean    mm_call_list_send_dtmf_to_active_calls      (MMCallList  *self,
+                                                         const gchar *dtmf);
 
 #endif /* MM_CALL_LIST_H */

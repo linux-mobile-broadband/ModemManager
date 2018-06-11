@@ -29,7 +29,7 @@
 #include "mm-base-call.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMCallList, mm_call_list, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMCallList, mm_call_list, G_TYPE_OBJECT)
 
 enum {
     PROP_0,
@@ -67,8 +67,7 @@ mm_call_list_get_paths (MMCallList *self)
     GList *l;
     guint i;
 
-    path_list = g_new0 (gchar *,
-                        1 + g_list_length (self->priv->list));
+    path_list = g_new0 (gchar *, 1 + g_list_length (self->priv->list));
 
     for (i = 0, l = self->priv->list; l; l = g_list_next (l)) {
         const gchar *path;
@@ -84,27 +83,27 @@ mm_call_list_get_paths (MMCallList *self)
 
 /*****************************************************************************/
 
-MMBaseCall* mm_call_list_get_new_incoming(MMCallList *self)
+MMBaseCall *
+mm_call_list_get_new_incoming (MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
 
-    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
+    for (l = self->priv->list; l; l = g_list_next (l)) {
 
-        MMCallState         state;
-        MMCallStateReason   reason;
-        MMCallDirection     direct;
+        MMCallState       state;
+        MMCallStateReason reason;
+        MMCallDirection   direct;
 
         g_object_get (MM_BASE_CALL (l->data),
-                      "state"       , &state,
+                      "state",        &state,
                       "state-reason", &reason,
-                      "direction"   , &direct,
+                      "direction",    &direct,
                       NULL);
 
-        if( direct  == MM_CALL_DIRECTION_INCOMING           &&
-            state   == MM_CALL_STATE_RINGING_IN             &&
-            reason  == MM_CALL_STATE_REASON_INCOMING_NEW    ) {
-
+        if (direct  == MM_CALL_DIRECTION_INCOMING &&
+            state   == MM_CALL_STATE_RINGING_IN &&
+            reason  == MM_CALL_STATE_REASON_INCOMING_NEW ) {
             call = MM_BASE_CALL (l->data);
             break;
         }
@@ -113,22 +112,21 @@ MMBaseCall* mm_call_list_get_new_incoming(MMCallList *self)
     return call;
 }
 
-MMBaseCall* mm_call_list_get_first_ringing_call(MMCallList *self)
+MMBaseCall *
+mm_call_list_get_first_ringing_call (MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
 
-    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
-
-        MMCallState         state;
+    for (l = self->priv->list; l; l = g_list_next (l)) {
+        MMCallState state;
 
         g_object_get (MM_BASE_CALL (l->data),
-                      "state"       , &state,
+                      "state", &state,
                       NULL);
 
-        if( state == MM_CALL_STATE_RINGING_IN   ||
-            state == MM_CALL_STATE_RINGING_OUT  ) {
-
+        if (state == MM_CALL_STATE_RINGING_IN ||
+            state == MM_CALL_STATE_RINGING_OUT) {
             call = MM_BASE_CALL (l->data);
             break;
         }
@@ -137,24 +135,23 @@ MMBaseCall* mm_call_list_get_first_ringing_call(MMCallList *self)
     return call;
 }
 
-MMBaseCall* mm_call_list_get_first_outgoing_dialing_call(MMCallList *self)
+MMBaseCall *
+mm_call_list_get_first_outgoing_dialing_call (MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
 
-    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
-
-        MMCallState         state;
-        MMCallDirection     direct;
+    for (l = self->priv->list; l; l = g_list_next (l)) {
+        MMCallState     state;
+        MMCallDirection direction;
 
         g_object_get (MM_BASE_CALL (l->data),
-                      "state"       , &state,
-                      "direction"   , &direct,
+                      "state",     &state,
+                      "direction", &direction,
                       NULL);
 
-        if( direct == MM_CALL_DIRECTION_OUTGOING    &&
-            state  == MM_CALL_STATE_DIALING         ) {
-
+        if (direction == MM_CALL_DIRECTION_OUTGOING &&
+            state  == MM_CALL_STATE_DIALING) {
             call = MM_BASE_CALL (l->data);
             break;
         }
@@ -163,20 +160,20 @@ MMBaseCall* mm_call_list_get_first_outgoing_dialing_call(MMCallList *self)
     return call;
 }
 
-MMBaseCall* mm_call_list_get_first_non_terminated_call(MMCallList *self)
+MMBaseCall *
+mm_call_list_get_first_non_terminated_call (MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;
 
-    for (l = self->priv->list; l && !call; l = g_list_next (l)) {
-
-        MMCallState         state;
+    for (l = self->priv->list; l; l = g_list_next (l)) {
+        MMCallState state;
 
         g_object_get (MM_BASE_CALL (l->data),
-                      "state"       , &state,
+                      "state", &state,
                       NULL);
 
-        if( state != MM_CALL_STATE_TERMINATED ) {
+        if (state != MM_CALL_STATE_TERMINATED) {
             call = MM_BASE_CALL (l->data);
             break;
         }
@@ -185,22 +182,23 @@ MMBaseCall* mm_call_list_get_first_non_terminated_call(MMCallList *self)
     return call;
 }
 
-gboolean mm_call_list_send_dtmf_to_active_calls(MMCallList *self, gchar *dtmf)
+gboolean
+mm_call_list_send_dtmf_to_active_calls (MMCallList  *self,
+                                        const gchar *dtmf)
 {
     gboolean signaled = FALSE;
     GList *l;
 
     for (l = self->priv->list; l; l = g_list_next (l)) {
-
-        MMCallState         state;
+        MMCallState state;
 
         g_object_get (MM_BASE_CALL (l->data),
-                      "state"       , &state,
+                      "state", &state,
                       NULL);
 
-        if( state == MM_CALL_STATE_ACTIVE ) {
+        if (state == MM_CALL_STATE_ACTIVE) {
             signaled = TRUE;
-            mm_base_call_received_dtmf(MM_BASE_CALL (l->data), dtmf);
+            mm_base_call_received_dtmf (MM_BASE_CALL (l->data), dtmf);
         }
     }
 
@@ -210,9 +208,9 @@ gboolean mm_call_list_send_dtmf_to_active_calls(MMCallList *self, gchar *dtmf)
 /*****************************************************************************/
 
 gboolean
-mm_call_list_delete_call_finish (MMCallList *self,
-                               GAsyncResult *res,
-                               GError **error)
+mm_call_list_delete_call_finish (MMCallList    *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -225,9 +223,9 @@ cmp_call_by_path (MMBaseCall *call,
 }
 
 static void
-delete_ready (MMBaseCall *call,
+delete_ready (MMBaseCall   *call,
               GAsyncResult *res,
-              GTask *task)
+              GTask        *task)
 {
     MMCallList *self;
     const gchar *path;
@@ -266,10 +264,10 @@ delete_ready (MMBaseCall *call,
 }
 
 void
-mm_call_list_delete_call (MMCallList *self,
-                        const gchar *call_path,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
+mm_call_list_delete_call (MMCallList          *self,
+                          const gchar         *call_path,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
 {
     GList *l;
     GTask *task;
@@ -316,9 +314,9 @@ MMCallList *
 mm_call_list_new (MMBaseModem *modem)
 {
     /* Create the object */
-    return g_object_new  (MM_TYPE_CALL_LIST,
-                          MM_CALL_LIST_MODEM, modem,
-                          NULL);
+    return g_object_new (MM_TYPE_CALL_LIST,
+                         MM_CALL_LIST_MODEM, modem,
+                         NULL);
 }
 
 static void

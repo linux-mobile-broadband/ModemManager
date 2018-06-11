@@ -564,7 +564,7 @@ mm_base_call_change_state (MMBaseCall *self,
 
 void
 mm_base_call_received_dtmf (MMBaseCall *self,
-                            gchar *dtmf)
+                            const gchar *dtmf)
 {
     mm_gdbus_call_emit_dtmf_received (MM_GDBUS_CALL (self), dtmf);
 }
