@@ -1,4 +1,29 @@
 
+ModemManager 1.6.14
+-------------------------------------------
+
+ * Build:
+   ** Avoid -Wincompatible-pointer-types for MM 1.6.x builds, to skip the
+      stricter checks in GObject.
+
+ * Introspection:
+   ** Fixed bearer list annotations.
+   ** Explicitly use ModemManager prefix to refer to introspected types.
+
+ * Core:
+   ** udev: add tags also on bind actions.
+   ** 3GPP: don't force auto registration if already registered.
+   ** Signal: fix reloading of detailed signal quality status on AT modems.
+
+ * Plugins:
+   ** QMI: update EPS registration state for LTE modems.
+   ** MBIM: check if IP session is active before trying to deactivate it.
+   ** MBIM: increase deactivation timeout to 60s.
+   ** Huawei: Handle optional 0x prefix on hex numbers in ^DHCP response.
+
+ * Several other minor fixes.
+
+
 ModemManager 1.6.12
 -------------------------------------------
 This is a new bugfix release of ModemManager.
