@@ -10,7 +10,7 @@ if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
 	for option in -Wmissing-declarations -Wmissing-prototypes \
 		      -Wdeclaration-after-statement -Wstrict-prototypes \
 		      -Wno-unused-parameter -Wno-sign-compare \
-		      -Wno-deprecated-declarations \
+		      -Wno-deprecated-declarations -Wno-incompatible-pointer-types \
 		      -Wno-unused-but-set-variable -Wformat-security; do
 		SAVE_CFLAGS="$CFLAGS"
 		CFLAGS="$CFLAGS $option"
