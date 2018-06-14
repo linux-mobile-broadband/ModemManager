@@ -79,17 +79,23 @@ handle_start_ready (MMBaseCall *self,
 {
     GError *error = NULL;
 
-    if (!MM_BASE_CALL_GET_CLASS (self)->start_finish (self, res, &error))
+    if (!MM_BASE_CALL_GET_CLASS (self)->start_finish (self, res, &error)) {
+        mm_warn ("Couldn't start call : '%s'", error->message);
+        /* Convert errors into call state updates */
+        if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_DIALTONE))
+            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
+        else if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_BUSY)      ||
+                 g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_ANSWER) ||
+                 g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER))
+            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+        else
+            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        /* Transition from Unknown->Dialing */
-        if (mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)) == MM_CALL_STATE_UNKNOWN ) {
-            /* Update state */
-            mm_base_call_change_state (self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
-        }
+    } else {
+        mm_dbg ("Call started");
+        mm_base_call_change_state (self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
         mm_gdbus_call_complete_start (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     }
-
     handle_start_context_free (ctx);
 }
 
@@ -129,6 +135,8 @@ handle_start_auth_ready (MMBaseModem *modem,
         handle_start_context_free (ctx);
         return;
     }
+
+    mm_base_call_change_state (ctx->self, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
 
     MM_BASE_CALL_GET_CLASS (ctx->self)->start (ctx->self,
                                                (GAsyncReadyCallback)handle_start_ready,
@@ -176,22 +184,18 @@ handle_accept_context_free (HandleAcceptContext *ctx)
 
 static void
 handle_accept_ready (MMBaseCall *self,
-                   GAsyncResult *res,
-                   HandleAcceptContext *ctx)
+                     GAsyncResult *res,
+                     HandleAcceptContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_BASE_CALL_GET_CLASS (self)->accept_finish (self, res, &error))
+    if (!MM_BASE_CALL_GET_CLASS (self)->accept_finish (self, res, &error)) {
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        /* Transition from Unknown->Dialing */
-        if (mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)) == MM_CALL_STATE_RINGING_IN) {
-            /* Update state */
-            mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
-        }
+    } else {
+        mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
         mm_gdbus_call_complete_accept (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     }
-
     handle_accept_context_free (ctx);
 }
 
@@ -216,7 +220,7 @@ handle_accept_auth_ready (MMBaseModem *modem,
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_FAILED,
-                                               "This call was not ringing, cannot accept  ");
+                                               "This call was not ringing, cannot accept");
         handle_accept_context_free (ctx);
         return;
     }
@@ -284,17 +288,13 @@ handle_hangup_ready (MMBaseCall *self,
 {
     GError *error = NULL;
 
+    /* we set it as terminated even if we got an error reported */
+    mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
+
     if (!MM_BASE_CALL_GET_CLASS (self)->hangup_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        /* Transition from Unknown->Dialing */
-        if (mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)) != MM_CALL_STATE_TERMINATED ||
-            mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self)) != MM_CALL_STATE_UNKNOWN) {
-            /* Update state */
-            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
-        }
+    else
         mm_gdbus_call_complete_hangup (MM_GDBUS_CALL (ctx->self), ctx->invocation);
-    }
 
     handle_hangup_context_free (ctx);
 }
@@ -331,7 +331,7 @@ handle_hangup_auth_ready (MMBaseModem *modem,
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
-                                               "Hanguping call is not supported by this modem");
+                                               "Hanging up call is not supported by this modem");
         handle_hangup_context_free (ctx);
         return;
     }
@@ -595,48 +595,16 @@ call_start_ready (MMBaseModem *modem,
     self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
-    if (error) {
-        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            /* something is wrong, serial timeout could never occurs */
-        }
-
-        if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_DIALTONE)) {
-            /* Update state */
-            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
-        }
-
-        if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_BUSY)      ||
-            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_ANSWER) ||
-            g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_CARRIER)) {
-            /* Update state */
-            mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
-        }
-
-        mm_dbg ("Couldn't start call : '%s'", error->message);
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
 
     /* check response for error */
-    if (response && response[0]) {
+    if (response && response[0])
         error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Couldn't start the call: "
-                             "Modem response '%s'", response);
-        /* Update state */
-        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
-    } else {
-        /* Update state */
-        mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
-    }
+                             "Couldn't start the call: Unhandled response '%s'", response);
 
-    if (error) {
+    if (error)
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    g_task_return_boolean (task, TRUE);
+    else
+        g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
@@ -657,9 +625,6 @@ call_start (MMBaseCall *self,
                               FALSE,
                               (GAsyncReadyCallback)call_start_ready,
                               task);
-
-    /* Update state */
-    mm_base_call_change_state (self, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
     g_free (cmd);
 }
 
@@ -692,14 +657,10 @@ call_accept_ready (MMBaseModem  *modem,
         g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Couldn't accept the call: Unhandled response '%s'", response);
 
-    if (error) {
-        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
+    if (error)
         g_task_return_error (task, error);
-    } else {
-        mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
+    else
         g_task_return_boolean (task, TRUE);
-    }
-
     g_object_unref (task);
 }
 
@@ -741,9 +702,6 @@ call_hangup_ready (MMBaseModem  *modem,
     self = g_task_get_source_object (task);
 
     mm_base_modem_at_command_finish (modem, res, &error);
-
-    /* we set it as terminated even if we got an error reported */
-    mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
 
     if (error)
         g_task_return_error (task, error);
