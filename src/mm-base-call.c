@@ -717,21 +717,20 @@ call_accept (MMBaseCall          *self,
 }
 
 /*****************************************************************************/
-
-/* Hangup the CALL */
+/* Hangup the call */
 
 static gboolean
-call_hangup_finish (MMBaseCall *self,
-                    GAsyncResult *res,
-                    GError **error)
+call_hangup_finish (MMBaseCall    *self,
+                    GAsyncResult  *res,
+                    GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-call_hangup_ready (MMBaseModem *modem,
+call_hangup_ready (MMBaseModem  *modem,
                    GAsyncResult *res,
-                   GTask *task)
+                   GTask        *task)
 {
     MMBaseCall *self;
     GError *error = NULL;
@@ -739,40 +738,25 @@ call_hangup_ready (MMBaseModem *modem,
     self = g_task_get_source_object (task);
 
     mm_base_modem_at_command_finish (modem, res, &error);
-    if (error) {
-        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
 
-        mm_dbg ("Couldn't hangup call : '%s'", error->message);
-        g_error_free (error);
-        return;
-    }
-
-    /* Update state */
+    /* we set it as terminated even if we got an error reported */
     mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
 
-    if (error) {
+    if (error)
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    g_task_return_boolean (task, TRUE);
+    else
+        g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
 static void
-call_hangup (MMBaseCall *self,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+call_hangup (MMBaseCall          *self,
+             GAsyncReadyCallback  callback,
+             gpointer             user_data)
 {
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-
     mm_base_modem_at_command (self->priv->modem,
                               "+CHUP",
                               2,
