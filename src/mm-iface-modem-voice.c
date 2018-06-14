@@ -99,7 +99,6 @@ mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *self,
         call = mm_call_list_get_new_incoming (list);
 
         if (call) {
-            g_object_set (call, "number", number, NULL);
             mm_gdbus_call_set_number (MM_GDBUS_CALL (call), number);
 
             /*

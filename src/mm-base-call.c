@@ -551,18 +551,9 @@ mm_base_call_change_state (MMBaseCall *self,
     if (old_state == new_state)
         return;
 
-    g_object_set (self,
-                  "state",        new_state,
-                  "state-reason", reason,
-                  NULL);
-
     mm_gdbus_call_set_state (MM_GDBUS_CALL (self), new_state);
     mm_gdbus_call_set_state_reason (MM_GDBUS_CALL (self), reason);
-
-    mm_gdbus_call_emit_state_changed (MM_GDBUS_CALL (self),
-                                      old_state,
-                                      new_state,
-                                      reason);
+    mm_gdbus_call_emit_state_changed (MM_GDBUS_CALL (self), old_state, new_state, reason);
 }
 
 void
