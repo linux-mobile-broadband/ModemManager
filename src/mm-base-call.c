@@ -661,73 +661,53 @@ call_start (MMBaseCall *self,
 }
 
 /*****************************************************************************/
-
-/* Accept the CALL */
+/* Accept the call */
 
 static gboolean
-call_accept_finish (MMBaseCall *self,
-                    GAsyncResult *res,
-                    GError **error)
+call_accept_finish (MMBaseCall    *self,
+                    GAsyncResult  *res,
+                    GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-call_accept_ready (MMBaseModem *modem,
+call_accept_ready (MMBaseModem  *modem,
                    GAsyncResult *res,
-                   GTask *task)
+                   GTask        *task)
 {
-    MMBaseCall *self;
-    GError *error = NULL;
+    MMBaseCall  *self;
+    GError      *error = NULL;
     const gchar *response;
 
     self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
-    if (error) {
-        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mm_dbg ("Couldn't accept call : '%s'", error->message);
-        g_error_free (error);
-        return;
-    }
 
     /* check response for error */
-    if (response && response[0]) {
+    if (response && response[0])
         g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Couldn't accept the call: "
-                     "Unhandled response '%s'", response);
-
-        /* Update state */
-        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
-    } else {
-        /* Update state */
-        mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
-    }
+                     "Couldn't accept the call: Unhandled response '%s'", response);
 
     if (error) {
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
+    } else {
+        mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
+        g_task_return_boolean (task, TRUE);
     }
 
-    g_task_return_boolean (task, FALSE);
     g_object_unref (task);
 }
 
 static void
-call_accept (MMBaseCall *self,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+call_accept (MMBaseCall          *self,
+             GAsyncReadyCallback  callback,
+             gpointer             user_data)
 {
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-
     mm_base_modem_at_command (self->priv->modem,
                               "ATA",
                               2,
