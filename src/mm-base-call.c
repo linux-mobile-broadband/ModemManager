@@ -59,7 +59,81 @@ struct _MMBaseCallPrivate {
     gboolean supports_ringing_to_active;
 
     guint incoming_timeout;
+    GRegex *in_call_events;
 };
+
+/*****************************************************************************/
+/* In-call unsolicited events
+ * Once a call is started, we may need to detect special URCs to trigger call
+ * state changes, e.g. "NO CARRIER" when the remote party hangs up. */
+
+static void
+in_call_event_received (MMPortSerialAt *port,
+                        GMatchInfo     *info,
+                        MMBaseCall     *self)
+{
+    gchar *str;
+
+    str = g_match_info_fetch (info, 1);
+    if (!str)
+        return;
+
+    if (!strcmp (str, "NO DIALTONE"))
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
+    else if (!strcmp (str, "NO CARRIER") || !strcmp (str, "BUSY") || !strcmp (str, "NO ANSWER"))
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+
+    g_free (str);
+}
+
+static gboolean
+common_setup_cleanup_unsolicited_events (MMBaseCall  *self,
+                                         gboolean     enable,
+                                         GError     **error)
+{
+    MMBaseModem    *modem = NULL;
+    MMPortSerialAt *ports[2];
+    gint            i;
+
+    if (G_UNLIKELY (!self->priv->in_call_events))
+        self->priv->in_call_events = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$",
+                                                  G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    g_object_get (self,
+                  MM_BASE_CALL_MODEM, &modem,
+                  NULL);
+
+    ports[0] = mm_base_modem_peek_port_primary   (modem);
+    ports[1] = mm_base_modem_peek_port_secondary (modem);
+
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       self->priv->in_call_events,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn) in_call_event_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+    }
+
+    g_object_unref (modem);
+    return TRUE;
+}
+
+static gboolean
+setup_unsolicited_events (MMBaseCall  *self,
+                          GError     **error)
+{
+    return common_setup_cleanup_unsolicited_events (self, TRUE, error);
+}
+
+static gboolean
+cleanup_unsolicited_events (MMBaseCall  *self,
+                            GError     **error)
+{
+    return common_setup_cleanup_unsolicited_events (self, FALSE, error);
+}
 
 /*****************************************************************************/
 /* Incoming calls are reported via RING URCs. If the caller stops the call
@@ -991,6 +1065,8 @@ finalize (GObject *object)
 {
     MMBaseCall *self = MM_BASE_CALL (object);
 
+    if (self->priv->in_call_events)
+        g_regex_unref (self->priv->in_call_events);
     g_free (self->priv->path);
 
     G_OBJECT_CLASS (mm_base_call_parent_class)->finalize (object);
@@ -1031,14 +1107,17 @@ mm_base_call_class_init (MMBaseCallClass *klass)
     object_class->finalize = finalize;
     object_class->dispose = dispose;
 
-    klass->start            = call_start;
-    klass->start_finish     = call_start_finish;
-    klass->accept           = call_accept;
-    klass->accept_finish    = call_accept_finish;
-    klass->hangup           = call_hangup;
-    klass->hangup_finish    = call_hangup_finish;
-    klass->send_dtmf        = call_send_dtmf;
-    klass->send_dtmf_finish = call_send_dtmf_finish;
+    klass->start                      = call_start;
+    klass->start_finish               = call_start_finish;
+    klass->accept                     = call_accept;
+    klass->accept_finish              = call_accept_finish;
+    klass->hangup                     = call_hangup;
+    klass->hangup_finish              = call_hangup_finish;
+    klass->send_dtmf                  = call_send_dtmf;
+    klass->send_dtmf_finish           = call_send_dtmf_finish;
+    klass->setup_unsolicited_events   = setup_unsolicited_events;
+    klass->cleanup_unsolicited_events = cleanup_unsolicited_events;
+
 
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_BASE_CALL_CONNECTION,

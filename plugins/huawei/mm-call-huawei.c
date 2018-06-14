@@ -139,5 +139,7 @@ mm_call_huawei_class_init (MMCallHuaweiClass *klass)
 {
     MMBaseCallClass *base_call_class = MM_BASE_CALL_CLASS (klass);
 
-    base_call_class->start = call_start;
+    base_call_class->start                      = call_start;
+    base_call_class->setup_unsolicited_events   = NULL;
+    base_call_class->cleanup_unsolicited_events = NULL;
 }
