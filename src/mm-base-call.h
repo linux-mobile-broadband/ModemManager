@@ -35,9 +35,11 @@ typedef struct _MMBaseCall MMBaseCall;
 typedef struct _MMBaseCallClass MMBaseCallClass;
 typedef struct _MMBaseCallPrivate MMBaseCallPrivate;
 
-#define MM_BASE_CALL_PATH       "call-path"
-#define MM_BASE_CALL_CONNECTION "call-connection"
-#define MM_BASE_CALL_MODEM      "call-modem"
+#define MM_BASE_CALL_PATH                        "call-path"
+#define MM_BASE_CALL_CONNECTION                  "call-connection"
+#define MM_BASE_CALL_MODEM                       "call-modem"
+#define MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING "call-supports-dialing-to-ringing"
+#define MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE  "call-supports-ringing-to-active"
 
 struct _MMBaseCall {
     MmGdbusCallSkeleton parent;

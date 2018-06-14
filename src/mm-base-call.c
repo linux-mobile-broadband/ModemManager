@@ -40,6 +40,8 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_MODEM,
+    PROP_SUPPORTS_DIALING_TO_RINGING,
+    PROP_SUPPORTS_RINGING_TO_ACTIVE,
     PROP_LAST
 };
 
@@ -52,6 +54,9 @@ struct _MMBaseCallPrivate {
     MMBaseModem *modem;
     /* The path where the call object is exported */
     gchar *path;
+    /* Features */
+    gboolean supports_dialing_to_ringing;
+    gboolean supports_ringing_to_active;
 };
 
 /*****************************************************************************/
@@ -92,8 +97,15 @@ handle_start_ready (MMBaseCall *self,
             mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
-        mm_dbg ("Call started");
-        mm_base_call_change_state (self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+        /* If dialing to ringing supported, leave it dialing */
+        if (!self->priv->supports_dialing_to_ringing) {
+            /* If ringing to active supported, set it ringing */
+            if (self->priv->supports_ringing_to_active)
+                mm_base_call_change_state (self, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+            else
+                /* Otherwise, active right away */
+                mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+        }
         mm_gdbus_call_complete_start (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     }
     handle_start_context_free (ctx);
@@ -136,7 +148,7 @@ handle_start_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_base_call_change_state (ctx->self, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+    mm_base_call_change_state (ctx->self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
 
     MM_BASE_CALL_GET_CLASS (ctx->self)->start (ctx->self,
                                                (GAsyncReadyCallback)handle_start_ready,
@@ -887,6 +899,12 @@ set_property (GObject *object,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         }
         break;
+    case PROP_SUPPORTS_DIALING_TO_RINGING:
+        self->priv->supports_dialing_to_ringing = g_value_get_boolean (value);
+        break;
+    case PROP_SUPPORTS_RINGING_TO_ACTIVE:
+        self->priv->supports_ringing_to_active = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -910,6 +928,12 @@ get_property (GObject *object,
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
+        break;
+    case PROP_SUPPORTS_DIALING_TO_RINGING:
+        g_value_set_boolean (value, self->priv->supports_dialing_to_ringing);
+        break;
+    case PROP_SUPPORTS_RINGING_TO_ACTIVE:
+        g_value_set_boolean (value, self->priv->supports_ringing_to_active);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -973,7 +997,6 @@ mm_base_call_class_init (MMBaseCallClass *klass)
     klass->send_dtmf        = call_send_dtmf;
     klass->send_dtmf_finish = call_send_dtmf_finish;
 
-
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_BASE_CALL_CONNECTION,
                              "Connection",
@@ -997,4 +1020,20 @@ mm_base_call_class_init (MMBaseCallClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    properties[PROP_SUPPORTS_DIALING_TO_RINGING] =
+        g_param_spec_boolean (MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING,
+                              "Dialing to ringing",
+                              "Whether the call implementation reports dialing to ringing state updates",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_SUPPORTS_DIALING_TO_RINGING, properties[PROP_SUPPORTS_DIALING_TO_RINGING]);
+
+    properties[PROP_SUPPORTS_RINGING_TO_ACTIVE] =
+        g_param_spec_boolean (MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,
+                              "Ringing to active",
+                              "Whether the call implementation reports ringing to active state updates",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_SUPPORTS_RINGING_TO_ACTIVE, properties[PROP_SUPPORTS_RINGING_TO_ACTIVE]);
 }
