@@ -207,14 +207,6 @@ mm_call_list_send_dtmf_to_active_calls (MMCallList  *self,
 
 /*****************************************************************************/
 
-gboolean
-mm_call_list_delete_call_finish (MMCallList    *self,
-                                 GAsyncResult  *res,
-                                 GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
 static guint
 cmp_call_by_path (MMBaseCall *call,
                  const gchar *path)
@@ -222,78 +214,34 @@ cmp_call_by_path (MMBaseCall *call,
     return g_strcmp0 (mm_base_call_get_path (call), path);
 }
 
-static void
-delete_ready (MMBaseCall   *call,
-              GAsyncResult *res,
-              GTask        *task)
+gboolean
+mm_call_list_delete_call (MMCallList   *self,
+                          const gchar  *call_path,
+                          GError      **error)
 {
-    MMCallList *self;
-    const gchar *path;
-    GError *error = NULL;
-    GList *l;
-
-    self = g_task_get_source_object (task);
-    path = g_task_get_task_data (task);
-    if (!mm_base_call_delete_finish (call, res, &error)) {
-        /* We report the error */
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    /* The CALL was properly deleted, we now remove it from our list */
-    l = g_list_find_custom (self->priv->list,
-                            path,
-                            (GCompareFunc)cmp_call_by_path);
-    if (l) {
-        g_object_unref (MM_BASE_CALL (l->data));
-        self->priv->list = g_list_delete_link (self->priv->list, l);
-    }
-
-    /* We don't need to unref the CALL any more, but we can use the
-     * reference we got in the method, which is the one kept alive
-     * during the async operation. */
-    mm_base_call_unexport (call);
-
-    g_signal_emit (self,
-                   signals[SIGNAL_CALL_DELETED], 0,
-                   path);
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-void
-mm_call_list_delete_call (MMCallList          *self,
-                          const gchar         *call_path,
-                          GAsyncReadyCallback  callback,
-                          gpointer             user_data)
-{
-    GList *l;
-    GTask *task;
+    GList      *l;
+    MMBaseCall *call;
 
     l = g_list_find_custom (self->priv->list,
                             (gpointer)call_path,
                             (GCompareFunc)cmp_call_by_path);
     if (!l) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_call_list_delete_call,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_NOT_FOUND,
-                                 "No CALL found with path '%s'",
-                                 call_path);
-        return;
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "No call found with path '%s'",
+                     call_path);
+        return FALSE;
     }
 
-    /* Delete all CALL parts */
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, g_strdup (call_path), g_free);
+    call = MM_BASE_CALL (l->data);
+    mm_base_call_unexport (call);
+    g_signal_emit (self, signals[SIGNAL_CALL_DELETED], 0, call_path);
 
-    mm_base_call_delete (MM_BASE_CALL (l->data),
-                        (GAsyncReadyCallback)delete_ready,
-                        task);
+    g_object_unref (call);
+    self->priv->list = g_list_delete_link (self->priv->list, l);
+
+    return TRUE;
 }
 
 /*****************************************************************************/

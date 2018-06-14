@@ -819,65 +819,6 @@ call_send_dtmf (MMBaseCall *self,
 
 /*****************************************************************************/
 
-static void
-call_delete (MMBaseCall *self,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
-{
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static gboolean
-call_delete_finish (MMBaseCall *self,
-                    GAsyncResult *res,
-                    GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-/*****************************************************************************/
-
-gboolean
-mm_base_call_delete_finish (MMBaseCall *self,
-                            GAsyncResult *res,
-                            GError **error)
-{
-    if (MM_BASE_CALL_GET_CLASS (self)->delete_finish) {
-        gboolean deleted;
-
-        deleted = MM_BASE_CALL_GET_CLASS (self)->delete_finish (self, res, error);
-        if (deleted)
-            /* We do change the state of this call back to UNKNOWN */
-            mm_base_call_change_state (self, MM_CALL_STATE_UNKNOWN, MM_CALL_STATE_REASON_UNKNOWN);
-
-        return deleted;
-    }
-
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-void
-mm_base_call_delete (MMBaseCall *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
-{
-    if (MM_BASE_CALL_GET_CLASS (self)->delete &&
-        MM_BASE_CALL_GET_CLASS (self)->delete_finish) {
-        MM_BASE_CALL_GET_CLASS (self)->delete (self, callback, user_data);
-        return;
-    }
-
-    g_task_report_new_error (self, callback, user_data, mm_base_call_delete,
-                             MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                             "Deleting call is not supported by this modem");
-}
-
-/*****************************************************************************/
-
 MMBaseCall *
 mm_base_call_new (MMBaseModem *modem)
 {
@@ -1053,8 +994,6 @@ mm_base_call_class_init (MMBaseCallClass *klass)
     klass->accept_finish    = call_accept_finish;
     klass->hangup           = call_hangup;
     klass->hangup_finish    = call_hangup_finish;
-    klass->delete           = call_delete;
-    klass->delete_finish    = call_delete_finish;
     klass->send_dtmf        = call_send_dtmf;
     klass->send_dtmf_finish = call_send_dtmf_finish;
 

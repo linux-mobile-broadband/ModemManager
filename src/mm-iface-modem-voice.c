@@ -230,21 +230,6 @@ handle_delete_context_free (HandleDeleteContext *ctx)
 }
 
 static void
-handle_delete_ready (MMCallList *list,
-                     GAsyncResult *res,
-                     HandleDeleteContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!mm_call_list_delete_call_finish (list, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
-        mm_gdbus_modem_voice_complete_delete_call (ctx->skeleton, ctx->invocation);
-
-    handle_delete_context_free (ctx);
-}
-
-static void
 handle_delete_auth_ready (MMBaseModem *self,
                           GAsyncResult *res,
                           HandleDeleteContext *ctx)
@@ -267,7 +252,7 @@ handle_delete_auth_ready (MMBaseModem *self,
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot delete CALL: device not yet enabled");
+                                               "Cannot delete call: device not yet enabled");
         handle_delete_context_free (ctx);
         return;
     }
@@ -279,15 +264,17 @@ handle_delete_auth_ready (MMBaseModem *self,
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot delete CALL: missing CALL list");
+                                               "Cannot delete call: missing call list");
         handle_delete_context_free (ctx);
         return;
     }
 
-    mm_call_list_delete_call (list,
-                            ctx->path,
-                            (GAsyncReadyCallback)handle_delete_ready,
-                            ctx);
+    if (!mm_call_list_delete_call (list, ctx->path, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem_voice_complete_delete_call (ctx->skeleton, ctx->invocation);
+
+    handle_delete_context_free (ctx);
     g_object_unref (list);
 }
 

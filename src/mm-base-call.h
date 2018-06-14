@@ -79,14 +79,6 @@ struct _MMBaseCallClass {
     gboolean (* send_dtmf_finish) (MMBaseCall *self,
                                    GAsyncResult *res,
                                    GError **error);
-
-    /* Delete the call */
-    void     (* delete)        (MMBaseCall *self,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data);
-    gboolean (* delete_finish) (MMBaseCall *self,
-                                GAsyncResult *res,
-                                GError **error);
 };
 
 GType mm_base_call_get_type (void);
@@ -105,12 +97,5 @@ void         mm_base_call_change_state   (MMBaseCall *self,
                                           MMCallStateReason reason);
 void         mm_base_call_received_dtmf  (MMBaseCall *self,
                                           const gchar *dtmf);
-
-void         mm_base_call_delete         (MMBaseCall *self,
-                                          GAsyncReadyCallback callback,
-                                          gpointer user_data);
-gboolean     mm_base_call_delete_finish  (MMBaseCall *self,
-                                          GAsyncResult *res,
-                                          GError **error);
 
 #endif /* MM_BASE_CALL_H */
