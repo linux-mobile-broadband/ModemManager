@@ -104,7 +104,6 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *ndisstat_regex;
 
     /* Regex for voice call related notifications */
-    GRegex *orig_regex;
     GRegex *conf_regex;
     GRegex *conn_regex;
     GRegex *cend_regex;
@@ -130,6 +129,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *ltersrp_regex;
     GRegex *cschannelinfo_regex;
     GRegex *eons_regex;
+    GRegex *orig_regex;
 
     FeatureSupport ndisdup_support;
     FeatureSupport rfswitch_support;
@@ -2866,26 +2866,6 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 /* Setup/Cleanup unsolicited events (Voice interface) */
 
 static void
-huawei_voice_origination (MMPortSerialAt *port,
-                          GMatchInfo *match_info,
-                          MMBroadbandModemHuawei *self)
-{
-    guint call_x    = 0;
-    guint call_type = 0;
-
-    if (!mm_get_uint_from_match_info (match_info, 1, &call_x))
-        return;
-
-    if (!mm_get_uint_from_match_info (match_info, 2, &call_type))
-        return;
-
-    mm_dbg ("[^ORIG] Origination call id '%u' of type '%u'", call_x, call_type);
-
-    /* TODO: Handle multiple calls
-     * mm_iface_modem_voice_set_call_id (MM_IFACE_MODEM_VOICE (self)); */
-}
-
-static void
 huawei_voice_ringback_tone (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemHuawei *self)
@@ -2973,12 +2953,6 @@ set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
     for (l = ports; l; l = g_list_next (l)) {
         MMPortSerialAt *port = MM_PORT_SERIAL_AT (l->data);
 
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            port,
-            self->priv->orig_regex,
-            enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_voice_origination : NULL,
-            enable ? self : NULL,
-            NULL);
         mm_port_serial_at_add_unsolicited_msg_handler (
             port,
             self->priv->conf_regex,
@@ -4157,6 +4131,10 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             port,
             self->priv->eons_regex,
             NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->orig_regex,
+            NULL, NULL, NULL);
     }
 
     g_list_free_full (ports, g_object_unref);
@@ -4283,12 +4261,12 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     /* Voice related regex
-     * <CR><LF>^ORIG: <call_x>,<call_type><CR><LF>
+     * <CR><LF>^ORIG: <call_x>,<call_type><CR><LF>   (ignored)
      * <CR><LF>^CONF: <call_x><CR><LF>
      * <CR><LF>^CONN: <call_x>,<call_type><CR><LF>
      * <CR><LF>^CEND: <call_x>,<duration>,<end_status>[,<cc_cause>]<CR><LF>
      */
-    self->priv->orig_regex = g_regex_new ("\\r\\n\\^ORIG:\\s*(\\d+),(\\d+)\\r\\n",
+    self->priv->orig_regex = g_regex_new ("\\r\\n\\^ORIG:.+\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->conf_regex = g_regex_new ("\\r\\n\\^CONF:\\s*(\\d+)\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
