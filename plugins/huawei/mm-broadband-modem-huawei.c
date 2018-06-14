@@ -109,8 +109,6 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *conn_regex;
     GRegex *cend_regex;
     GRegex *ddtmf_regex;
-    GRegex *cschannelinfo_regex;
-    GRegex *eons_regex;
 
     /* Regex to ignore */
     GRegex *boot_regex;
@@ -130,6 +128,8 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *posend_regex;
     GRegex *ecclist_regex;
     GRegex *ltersrp_regex;
+    GRegex *cschannelinfo_regex;
+    GRegex *eons_regex;
 
     FeatureSupport ndisdup_support;
     FeatureSupport rfswitch_support;
@@ -3003,18 +3003,6 @@ set_voice_unsolicited_events_handlers (MMBroadbandModemHuawei *self,
             enable ? (MMPortSerialAtUnsolicitedMsgFn)huawei_voice_received_dtmf: NULL,
             enable ? self : NULL,
             NULL);
-
-        /* Ignore this message (Huawei ME909s-120 firmware. 23.613.61.00.00) */
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            port,
-            self->priv->cschannelinfo_regex,
-            NULL, NULL, NULL);
-
-        /* Ignore this message (Huawei ME909s-120 firmware. 23.613.61.00.00) */
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            port,
-            self->priv->eons_regex,
-            NULL, NULL, NULL);
     }
 
     g_list_free_full (ports, g_object_unref);
@@ -4161,6 +4149,14 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             port,
             self->priv->ltersrp_regex,
             NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->cschannelinfo_regex,
+            NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->eons_regex,
+            NULL, NULL, NULL);
     }
 
     g_list_free_full (ports, g_object_unref);
@@ -4281,6 +4277,10 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->ltersrp_regex = g_regex_new ("\\r\\n\\^LTERSRP:.+\\r\\n",
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->cschannelinfo_regex = g_regex_new ("\\r\\n\\^CSCHANNELINFO:.+\\r\\n",
+                                                    G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->eons_regex = g_regex_new ("\\r\\n\\^EONS:.+\\r\\n",
+                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     /* Voice related regex
      * <CR><LF>^ORIG: <call_x>,<call_type><CR><LF>
@@ -4303,19 +4303,6 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
      */
     self->priv->ddtmf_regex = g_regex_new ("\\r\\n\\^DDTMF:\\s*([0-9A-D\\*\\#])\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-
-    /* Voice: Unknown message that's broke ATA command
-     * <CR><LF>^CSCHANNELINFO: <number>,<number><CR><LF>
-     * Key should be 0-9, A-D, *, #
-     */
-    self->priv->cschannelinfo_regex = g_regex_new ("\\r\\n\\^CSCHANNELINFO:\\s*(\\d+),(\\d+)\\r\\n",
-                                                    G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-
-    /* Voice: Unknown message that's broke ATA command
-     * <CR><LF>^EONS:<type><CR><LF>
-     */
-    self->priv->eons_regex = g_regex_new ("\\r\\n\\^EONS:\\s*(\\d+)\\r\\n",
-                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = FEATURE_SUPPORT_UNKNOWN;
