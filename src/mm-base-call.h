@@ -79,6 +79,12 @@ struct _MMBaseCallClass {
     gboolean (* send_dtmf_finish) (MMBaseCall *self,
                                    GAsyncResult *res,
                                    GError **error);
+
+    /* Setup/cleanup in-call unsolicited events */
+    gboolean (* setup_unsolicited_events)   (MMBaseCall  *self,
+                                             GError     **error);
+    gboolean (* cleanup_unsolicited_events) (MMBaseCall  *self,
+                                             GError     **error);
 };
 
 GType mm_base_call_get_type (void);

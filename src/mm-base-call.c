@@ -539,17 +539,41 @@ mm_base_call_get_path (MMBaseCall *self)
     return self->priv->path;
 }
 
+/* Define the states in which we want to handle in-call events */
+#define MM_CALL_STATE_IS_IN_CALL(state)         \
+    (state == MM_CALL_STATE_DIALING ||          \
+     state == MM_CALL_STATE_RINGING_OUT ||      \
+     state == MM_CALL_STATE_ACTIVE)
+
 void
-mm_base_call_change_state (MMBaseCall *self,
-                           MMCallState new_state,
-                           MMCallStateReason reason)
+mm_base_call_change_state (MMBaseCall        *self,
+                           MMCallState        new_state,
+                           MMCallStateReason  reason)
 {
-    MMCallState old_state;
+    MMCallState  old_state;
+    GError      *error = NULL;
 
     old_state = mm_gdbus_call_get_state (MM_GDBUS_CALL (self));
 
     if (old_state == new_state)
         return;
+
+    /* Setup/cleanup unsolicited events  based on state transitions to/from ACTIVE */
+    if (!MM_CALL_STATE_IS_IN_CALL (old_state) && MM_CALL_STATE_IS_IN_CALL (new_state)) {
+        mm_dbg ("Setting up in-call unsolicited events...");
+        if (MM_BASE_CALL_GET_CLASS (self)->setup_unsolicited_events &&
+            !MM_BASE_CALL_GET_CLASS (self)->setup_unsolicited_events (self, &error)) {
+            mm_warn ("Couldn't setup in-call unsolicited events: %s", error->message);
+            g_error_free (error);
+        }
+    } else if (MM_CALL_STATE_IS_IN_CALL (old_state) && !MM_CALL_STATE_IS_IN_CALL (new_state)) {
+        mm_dbg ("Cleaning up in-call unsolicited events...");
+        if (MM_BASE_CALL_GET_CLASS (self)->cleanup_unsolicited_events &&
+            !MM_BASE_CALL_GET_CLASS (self)->cleanup_unsolicited_events (self, &error)) {
+            mm_warn ("Couldn't cleanup in-call unsolicited events: %s", error->message);
+            g_error_free (error);
+        }
+    }
 
     mm_gdbus_call_set_state (MM_GDBUS_CALL (self), new_state);
     mm_gdbus_call_set_state_reason (MM_GDBUS_CALL (self), reason);
