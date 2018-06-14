@@ -544,9 +544,12 @@ mm_base_call_change_state (MMBaseCall *self,
                            MMCallState new_state,
                            MMCallStateReason reason)
 {
-    int old_state;
+    MMCallState old_state;
 
     old_state = mm_gdbus_call_get_state (MM_GDBUS_CALL (self));
+
+    if (old_state == new_state)
+        return;
 
     g_object_set (self,
                   "state",        new_state,
