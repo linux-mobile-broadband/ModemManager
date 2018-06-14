@@ -118,7 +118,7 @@ void mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
 
 /* CALL creation */
 MMBaseCall *mm_iface_modem_voice_create_call                    (MMIfaceModemVoice *self);
-MMBaseCall *mm_iface_modem_voice_create_incoming_call           (MMIfaceModemVoice *self);
+void        mm_iface_modem_voice_incoming_call                  (MMIfaceModemVoice *self);
 gboolean    mm_iface_modem_voice_update_incoming_call_number    (MMIfaceModemVoice *self,
                                                                  gchar *number,
                                                                  guint type,

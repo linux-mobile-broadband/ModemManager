@@ -97,13 +97,17 @@ MMBaseCall *mm_base_call_new_from_properties (MMBaseModem *modem,
                                               MMCallProperties *properties,
                                               GError **error);
 
-void         mm_base_call_export         (MMBaseCall *self);
-void         mm_base_call_unexport       (MMBaseCall *self);
-const gchar *mm_base_call_get_path       (MMBaseCall *self);
-void         mm_base_call_change_state   (MMBaseCall *self,
-                                          MMCallState new_state,
-                                          MMCallStateReason reason);
-void         mm_base_call_received_dtmf  (MMBaseCall *self,
-                                          const gchar *dtmf);
+void         mm_base_call_export   (MMBaseCall *self);
+void         mm_base_call_unexport (MMBaseCall *self);
+const gchar *mm_base_call_get_path (MMBaseCall *self);
+
+void         mm_base_call_change_state (MMBaseCall *self,
+                                        MMCallState new_state,
+                                        MMCallStateReason reason);
+
+void         mm_base_call_received_dtmf (MMBaseCall *self,
+                                         const gchar *dtmf);
+
+void         mm_base_call_incoming_refresh (MMBaseCall *self);
 
 #endif /* MM_BASE_CALL_H */

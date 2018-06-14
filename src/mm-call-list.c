@@ -84,36 +84,33 @@ mm_call_list_get_paths (MMCallList *self)
 /*****************************************************************************/
 
 MMBaseCall *
-mm_call_list_get_new_incoming (MMCallList *self)
+mm_call_list_get_first_ringing_in_call (MMCallList *self)
 {
-    MMBaseCall *call = NULL;
     GList *l;
 
     for (l = self->priv->list; l; l = g_list_next (l)) {
-
+        MMBaseCall       *call;
         MMCallState       state;
-        MMCallStateReason reason;
-        MMCallDirection   direct;
+        MMCallDirection   direction;
 
-        g_object_get (MM_BASE_CALL (l->data),
-                      "state",        &state,
-                      "state-reason", &reason,
-                      "direction",    &direct,
+        call = MM_BASE_CALL (l->data);
+
+        g_object_get (call,
+                      "state",     &state,
+                      "direction", &direction,
                       NULL);
 
-        if (direct  == MM_CALL_DIRECTION_INCOMING &&
-            state   == MM_CALL_STATE_RINGING_IN &&
-            reason  == MM_CALL_STATE_REASON_INCOMING_NEW ) {
-            call = MM_BASE_CALL (l->data);
-            break;
+        if (direction == MM_CALL_DIRECTION_INCOMING &&
+            state     == MM_CALL_STATE_RINGING_IN) {
+            return call;
         }
     }
 
-    return call;
+    return NULL;
 }
 
 MMBaseCall *
-mm_call_list_get_first_ringing_call (MMCallList *self)
+mm_call_list_get_first_ringing_out_call (MMCallList *self)
 {
     MMBaseCall *call = NULL;
     GList *l;

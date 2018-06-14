@@ -57,7 +57,36 @@ struct _MMBaseCallPrivate {
     /* Features */
     gboolean supports_dialing_to_ringing;
     gboolean supports_ringing_to_active;
+
+    guint incoming_timeout;
 };
+
+/*****************************************************************************/
+/* Incoming calls are reported via RING URCs. If the caller stops the call
+ * attempt before it has been answered, the only thing we would see is that the
+ * URCs are no longer received. So, we will start a timeout whenever a new RING
+ * URC is received, and we refresh the timeout any time a new URC arrives. If
+ * the timeout is expired (meaning no URCs were received in the last N seconds)
+ * then we assume the call attempt is finished and we transition to TERMINATED.
+ */
+
+#define INCOMING_TIMEOUT_SECS 5
+
+static gboolean
+incoming_timeout_cb (MMBaseCall *self)
+{
+    self->priv->incoming_timeout = 0;
+    mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
+    return G_SOURCE_REMOVE;
+}
+
+void
+mm_base_call_incoming_refresh (MMBaseCall *self)
+{
+    if (self->priv->incoming_timeout)
+        g_source_remove (self->priv->incoming_timeout);
+    self->priv->incoming_timeout = g_timeout_add_seconds (INCOMING_TIMEOUT_SECS, (GSourceFunc)incoming_timeout_cb, self);
+}
 
 /*****************************************************************************/
 /* Start call (DBus call handling) */
@@ -205,6 +234,10 @@ handle_accept_ready (MMBaseCall *self,
         mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     } else {
+        if (ctx->self->priv->incoming_timeout) {
+            g_source_remove (ctx->self->priv->incoming_timeout);
+            ctx->self->priv->incoming_timeout = 0;
+        }
         mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
         mm_gdbus_call_complete_accept (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     }
@@ -305,8 +338,13 @@ handle_hangup_ready (MMBaseCall *self,
 
     if (!MM_BASE_CALL_GET_CLASS (self)->hangup_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
+        if (ctx->self->priv->incoming_timeout) {
+            g_source_remove (ctx->self->priv->incoming_timeout);
+            ctx->self->priv->incoming_timeout = 0;
+        }
         mm_gdbus_call_complete_hangup (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+    }
 
     handle_hangup_context_free (ctx);
 }
@@ -962,6 +1000,11 @@ static void
 dispose (GObject *object)
 {
     MMBaseCall *self = MM_BASE_CALL (object);
+
+    if (self->priv->incoming_timeout) {
+        g_source_remove (self->priv->incoming_timeout);
+        self->priv->incoming_timeout = 0;
+    }
 
     if (self->priv->connection) {
         /* If we arrived here with a valid connection, make sure we unexport

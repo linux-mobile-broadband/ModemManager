@@ -46,8 +46,8 @@ mm_iface_modem_voice_create_call (MMIfaceModemVoice *self)
     return MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self);
 }
 
-MMBaseCall *
-mm_iface_modem_voice_create_incoming_call (MMIfaceModemVoice *self)
+void
+mm_iface_modem_voice_incoming_call (MMIfaceModemVoice *self)
 {
     MMBaseCall *call = NULL;
     MMCallList *list = NULL;
@@ -56,29 +56,36 @@ mm_iface_modem_voice_create_incoming_call (MMIfaceModemVoice *self)
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
-    if (list) {
-        call = mm_call_list_get_new_incoming (list);
-
-        if (!call) {
-            mm_dbg ("Creating new incoming call...");
-
-            call = mm_base_call_new (MM_BASE_MODEM (self));
-            g_object_set (call,
-                          "state",          MM_CALL_STATE_RINGING_IN,
-                          "state-reason",   MM_CALL_STATE_REASON_INCOMING_NEW,
-                          "direction",      MM_CALL_DIRECTION_INCOMING,
-                          NULL);
-
-            /* Only export once properly created */
-            mm_base_call_export (call);
-            mm_call_list_add_call (list, call);
-            g_object_unref (call);
-        }
-
-        g_object_unref (list);
+    if (!list) {
+        mm_warn ("Cannot create incoming call: missing call list");
+        return;
     }
 
-    return call;
+    call = mm_call_list_get_first_ringing_in_call (list);
+
+    /* If call exists already, refresh its validity */
+    if (call) {
+        mm_base_call_incoming_refresh (call);
+        g_object_unref (list);
+        return;
+    }
+
+    mm_dbg ("Creating new incoming call...");
+    call = mm_base_call_new (MM_BASE_MODEM (self));
+    g_object_set (call,
+                  "state",          MM_CALL_STATE_RINGING_IN,
+                  "state-reason",   MM_CALL_STATE_REASON_INCOMING_NEW,
+                  "direction",      MM_CALL_DIRECTION_INCOMING,
+                  NULL);
+
+    /* Start its validity timeout */
+    mm_base_call_incoming_refresh (call);
+
+    /* Only export once properly created */
+    mm_base_call_export (call);
+    mm_call_list_add_call (list, call);
+    g_object_unref (call);
+    g_object_unref (list);
 }
 
 gboolean
@@ -96,7 +103,7 @@ mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *self,
                   NULL);
 
     if (list) {
-        call = mm_call_list_get_new_incoming (list);
+        call = mm_call_list_get_first_ringing_in_call (list);
 
         if (call) {
             mm_gdbus_call_set_number (MM_GDBUS_CALL (call), number);
@@ -153,7 +160,7 @@ mm_iface_modem_voice_call_ringing_to_active (MMIfaceModemVoice *self)
                   NULL);
 
     if (list) {
-        call = mm_call_list_get_first_ringing_call (list);
+        call = mm_call_list_get_first_ringing_out_call (list);
 
         if (call) {
             mm_base_call_change_state (call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);

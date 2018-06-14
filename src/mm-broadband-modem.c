@@ -6928,7 +6928,7 @@ ring_received (MMPortSerialAt *port,
                MMBroadbandModem *self)
 {
     mm_dbg ("Ringing");
-    mm_iface_modem_voice_create_incoming_call (MM_IFACE_MODEM_VOICE (self));
+    mm_iface_modem_voice_incoming_call (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
@@ -6945,7 +6945,7 @@ cring_received (MMPortSerialAt *port,
     mm_dbg ("Ringing (%s)", str);
     g_free (str);
 
-    mm_iface_modem_voice_create_incoming_call (MM_IFACE_MODEM_VOICE (self));
+    mm_iface_modem_voice_incoming_call (MM_IFACE_MODEM_VOICE (self));
 }
 
 static void
