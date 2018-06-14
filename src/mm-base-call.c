@@ -150,6 +150,7 @@ static gboolean
 incoming_timeout_cb (MMBaseCall *self)
 {
     self->priv->incoming_timeout = 0;
+    mm_info ("incoming call timed out: no response");
     mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
     return G_SOURCE_REMOVE;
 }
@@ -239,6 +240,8 @@ handle_start_auth_ready (MMBaseModem *modem,
         handle_start_context_free (ctx);
         return;
     }
+
+    mm_info ("user request to start call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->start ||
@@ -344,6 +347,8 @@ handle_accept_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    mm_info ("user request to accept call");
+
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->accept ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->accept_finish) {
@@ -448,6 +453,8 @@ handle_hangup_auth_ready (MMBaseModem *modem,
         handle_hangup_context_free (ctx);
         return;
     }
+
+    mm_info ("user request to hangup call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->hangup ||
@@ -681,6 +688,11 @@ mm_base_call_change_state (MMBaseCall        *self,
 
     if (old_state == new_state)
         return;
+
+    mm_info ("Call state changed: %s -> %s (%s)",
+             mm_call_state_get_string (old_state),
+             mm_call_state_get_string (new_state),
+             mm_call_state_reason_get_string (reason));
 
     /* Setup/cleanup unsolicited events  based on state transitions to/from ACTIVE */
     if (!MM_CALL_STATE_IS_IN_CALL (old_state) && MM_CALL_STATE_IS_IN_CALL (new_state)) {
