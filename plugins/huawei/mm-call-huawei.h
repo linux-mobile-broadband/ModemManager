@@ -30,9 +30,11 @@
 
 typedef struct _MMCallHuawei MMCallHuawei;
 typedef struct _MMCallHuaweiClass MMCallHuaweiClass;
+typedef struct _MMCallHuaweiPrivate MMCallHuaweiPrivate;
 
 struct _MMCallHuawei {
     MMBaseCall parent;
+    MMCallHuaweiPrivate *priv;
 };
 
 struct _MMCallHuaweiClass {

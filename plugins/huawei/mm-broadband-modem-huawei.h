@@ -50,5 +50,6 @@ MMBroadbandModemHuawei *mm_broadband_modem_huawei_new (const gchar *device,
 
 MMPortSerialAt *mm_broadband_modem_huawei_peek_port_at_for_data (MMBroadbandModemHuawei *self,
                                                                  MMPort *port);
+GList          *mm_broadband_modem_huawei_get_at_port_list      (MMBroadbandModemHuawei *self);
 
 #endif /* MM_BROADBAND_MODEM_HUAWEI_H */

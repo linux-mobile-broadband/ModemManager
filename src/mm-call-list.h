@@ -68,11 +68,6 @@ gboolean mm_call_list_delete_call (MMCallList   *self,
                                    const gchar  *call_path,
                                    GError      **error);
 
-MMBaseCall *mm_call_list_get_first_ringing_in_call       (MMCallList  *self);
-MMBaseCall *mm_call_list_get_first_ringing_out_call      (MMCallList  *self);
-MMBaseCall *mm_call_list_get_first_outgoing_dialing_call (MMCallList  *self);
-MMBaseCall *mm_call_list_get_first_non_terminated_call   (MMCallList  *self);
-gboolean    mm_call_list_send_dtmf_to_active_calls       (MMCallList  *self,
-                                                          const gchar *dtmf);
+MMBaseCall *mm_call_list_get_first_ringing_in_call (MMCallList *self);
 
 #endif /* MM_CALL_LIST_H */
