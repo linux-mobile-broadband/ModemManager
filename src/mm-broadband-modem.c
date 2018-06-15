@@ -3855,12 +3855,8 @@ modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
                                gpointer user_data)
 {
     mm_dbg ("loading Operator Code...");
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+COPS=3,2;+COPS?",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self), "+COPS=3,2", 3, FALSE, NULL, NULL);
+    mm_base_modem_at_command (MM_BASE_MODEM (self), "+COPS?", 3, FALSE, callback, user_data);
 }
 
 /*****************************************************************************/
@@ -3898,12 +3894,8 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
                                gpointer user_data)
 {
     mm_dbg ("loading Operator Name...");
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+COPS=3,0;+COPS?",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self), "+COPS=3,0", 3, FALSE, NULL, NULL);
+    mm_base_modem_at_command (MM_BASE_MODEM (self), "+COPS?", 3, FALSE, callback, user_data);
 }
 
 /*****************************************************************************/
