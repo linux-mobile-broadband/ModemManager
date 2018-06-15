@@ -463,7 +463,7 @@ out:
         g_free (quoted_user);
         g_free (quoted_password);
     } else
-        cmd = g_strdup_printf ("+UAUTHREQ=%u,0", ctx->cid);
+        cmd = g_strdup_printf ("+UAUTHREQ=%u,0,\"\",\"\"", ctx->cid);
 
     mm_dbg ("setting up authentication preferences in PDP context #%u...", ctx->cid);
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
