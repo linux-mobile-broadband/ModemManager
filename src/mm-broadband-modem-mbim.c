@@ -1953,6 +1953,9 @@ initialization_started (MMBroadbandModem *self,
 
     /* Now open our MBIM port */
     mm_port_mbim_open (ctx->mbim,
+#if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+                       TRUE, /* With QMI over MBIM support if available */
+#endif
                        NULL,
                        (GAsyncReadyCallback)mbim_port_open_ready,
                        task);

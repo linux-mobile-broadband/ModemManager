@@ -49,6 +49,9 @@ GType mm_port_mbim_get_type (void);
 MMPortMbim *mm_port_mbim_new (const gchar *name);
 
 void     mm_port_mbim_open         (MMPortMbim *self,
+#if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+                                    gboolean try_qmi_over_mbim,
+#endif
                                     GCancellable *cancellable,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data);
