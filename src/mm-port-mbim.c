@@ -35,8 +35,122 @@ struct _MMPortMbimPrivate {
     MbimDevice *mbim_device;
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     QmiDevice  *qmi_device;
+    GList      *qmi_clients;
 #endif
 };
+
+/*****************************************************************************/
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+gboolean
+mm_port_mbim_supports_qmi (MMPortMbim *self)
+{
+    return !!self->priv->qmi_device;
+}
+
+QmiClient *
+mm_port_mbim_peek_qmi_client (MMPortMbim *self,
+                              QmiService  service)
+{
+    GList *l;
+
+    for (l = self->priv->qmi_clients; l; l = g_list_next (l)) {
+        QmiClient *qmi_client = QMI_CLIENT (l->data);
+
+        if (qmi_client_get_service (qmi_client) == service)
+            return qmi_client;
+    }
+
+    return NULL;
+}
+
+QmiClient *
+mm_port_mbim_get_qmi_client (MMPortMbim *self,
+                             QmiService  service)
+{
+    QmiClient *client;
+
+    client = mm_port_mbim_peek_qmi_client (self, service);
+    return (client ? g_object_ref (client) : NULL);
+}
+
+gboolean
+mm_port_mbim_allocate_qmi_client_finish (MMPortMbim    *self,
+                                         GAsyncResult  *res,
+                                         GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+allocate_client_ready (QmiDevice    *qmi_device,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMPortMbim *self;
+    QmiClient  *qmi_client;
+    GError     *error = NULL;
+
+    self = g_task_get_source_object (task);
+    qmi_client = qmi_device_allocate_client_finish (qmi_device, res, &error);
+    if (!qmi_client) {
+        g_prefix_error (&error,
+                        "Couldn't create QMI client for service '%s': ",
+                        qmi_service_get_string ((QmiService) GPOINTER_TO_INT (g_task_get_task_data (task))));
+        g_task_return_error (task, error);
+    } else {
+        /* Store the client in our internal list */
+        self->priv->qmi_clients = g_list_prepend (self->priv->qmi_clients, qmi_client);
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+}
+
+void
+mm_port_mbim_allocate_qmi_client (MMPortMbim           *self,
+                                  QmiService            service,
+                                  GCancellable         *cancellable,
+                                  GAsyncReadyCallback   callback,
+                                  gpointer              user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    if (!mm_port_mbim_is_open (self)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Port is closed");
+        g_object_unref (task);
+        return;
+    }
+
+    if (!mm_port_mbim_supports_qmi (self)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Port doesn't support QMI over MBIM");
+        g_object_unref (task);
+        return;
+    }
+
+    if (!!mm_port_mbim_peek_qmi_client (self, service)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_EXISTS,
+                                 "Client for service '%s' already allocated",
+                                 qmi_service_get_string (service));
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_set_task_data (task, GINT_TO_POINTER (service), NULL);
+    qmi_device_allocate_client (self->priv->qmi_device,
+                                service,
+                                QMI_CID_NONE,
+                                10,
+                                cancellable,
+                                (GAsyncReadyCallback)allocate_client_ready,
+                                task);
+}
+
+#endif
 
 /*****************************************************************************/
 
@@ -356,6 +470,8 @@ dispose (GObject *object)
     MMPortMbim *self = MM_PORT_MBIM (object);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    g_list_free_full (self->priv->qmi_clients, g_object_unref);
+    self->priv->qmi_clients = NULL;
     g_clear_object (&self->priv->qmi_device);
 #endif
 

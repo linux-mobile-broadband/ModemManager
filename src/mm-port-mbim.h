@@ -16,11 +16,17 @@
 #ifndef MM_PORT_MBIM_H
 #define MM_PORT_MBIM_H
 
+#include <config.h>
+
 #include <glib.h>
 #include <glib-object.h>
 #include <gio/gio.h>
 
 #include <libmbim-glib.h>
+
+#if defined WITH_QMI
+# include <libqmi-glib.h>
+#endif
 
 #include "mm-port.h"
 
@@ -65,6 +71,22 @@ void     mm_port_mbim_close        (MMPortMbim *self,
 gboolean mm_port_mbim_close_finish (MMPortMbim *self,
                                     GAsyncResult *res,
                                     GError **error);
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+gboolean   mm_port_mbim_supports_qmi               (MMPortMbim           *self);
+QmiClient *mm_port_mbim_peek_qmi_client            (MMPortMbim           *self,
+                                                    QmiService            service);
+QmiClient *mm_port_mbim_get_qmi_client             (MMPortMbim           *self,
+                                                    QmiService            service);
+void       mm_port_mbim_allocate_qmi_client        (MMPortMbim           *self,
+                                                    QmiService            service,
+                                                    GCancellable         *cancellable,
+                                                    GAsyncReadyCallback   callback,
+                                                    gpointer              user_data);
+gboolean   mm_port_mbim_allocate_qmi_client_finish (MMPortMbim           *self,
+                                                    GAsyncResult         *res,
+                                                    GError              **error);
+#endif
 
 MbimDevice *mm_port_mbim_peek_device (MMPortMbim *self);
 
