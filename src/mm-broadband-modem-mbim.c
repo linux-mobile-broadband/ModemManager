@@ -133,6 +133,37 @@ peek_device (gpointer self,
     return TRUE;
 }
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static gboolean
+peek_device_full (gpointer              self,
+                  MbimDevice          **o_device,
+                  QmiClient           **o_dms,
+                  GAsyncReadyCallback   callback,
+                  gpointer              user_data)
+{
+    MMPortMbim *port;
+
+    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    if (!port) {
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 peek_device,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek MBIM port");
+        return FALSE;
+    }
+
+    *o_device = mm_port_mbim_peek_device (port);
+    if (o_dms)
+        *o_dms = mm_port_mbim_peek_qmi_client (port, QMI_SERVICE_DMS);
+    return TRUE;
+}
+
+#endif
+
 /*****************************************************************************/
 /* Current Capabilities loading (Modem interface) */
 
@@ -997,23 +1028,18 @@ modem_load_power_state (MMIfaceModem *self,
 typedef enum {
     POWER_UP_CONTEXT_STEP_FIRST,
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    POWER_UP_CONTEXT_STEP_QMI_DEVICE_NEW,
-    POWER_UP_CONTEXT_STEP_QMI_DEVICE_OPEN,
-    POWER_UP_CONTEXT_STEP_ALLOCATE_QMI_CLIENT_DMS,
     POWER_UP_CONTEXT_STEP_FCC_AUTH,
-    POWER_UP_CONTEXT_STEP_RELEASE_QMI_CLIENT_DMS,
     POWER_UP_CONTEXT_STEP_RETRY,
 #endif
     POWER_UP_CONTEXT_STEP_LAST,
 } PowerUpContextStep;
 
 typedef struct {
-    MbimDevice *device;
-    PowerUpContextStep step;
+    MbimDevice         *device;
+    PowerUpContextStep  step;
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    QmiDevice *qmi_device;
-    QmiClient *qmi_client;
-    GError *saved_error;
+    QmiClient          *qmi_client_dms;
+    GError             *saved_error;
 #endif
 } PowerUpContext;
 
@@ -1021,16 +1047,7 @@ static void
 power_up_context_free (PowerUpContext *ctx)
 {
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    if (ctx->qmi_device) {
-        if (ctx->qmi_client) {
-            qmi_device_release_client (ctx->qmi_device,
-                                       ctx->qmi_client,
-                                       QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
-                                       3, NULL, NULL, NULL);
-            g_object_unref (ctx->qmi_client);
-        }
-        g_object_unref (ctx->qmi_device);
-    }
+    g_clear_object (&ctx->qmi_client_dms);
     if (ctx->saved_error)
         g_error_free (ctx->saved_error);
 #endif
@@ -1039,9 +1056,9 @@ power_up_context_free (PowerUpContext *ctx)
 }
 
 static gboolean
-power_up_finish (MMIfaceModem *self,
-                 GAsyncResult *res,
-                 GError **error)
+power_up_finish (MMIfaceModem  *self,
+                 GAsyncResult  *res,
+                 GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -1051,51 +1068,16 @@ static void power_up_context_step (GTask *task);
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
 static void
-release_qmi_client_dms_ready (QmiDevice *dev,
+set_fcc_authentication_ready (QmiClientDms *qmi_client_dms,
                               GAsyncResult *res,
-                              GTask *task)
+                              GTask        *task)
 {
-    PowerUpContext *ctx;
-    GError *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-
-    /* Non-fatal error */
-    if (!qmi_device_release_client_finish (dev, res, &error)) {
-        mm_dbg ("error: couldn't release client: %s", error->message);
-        g_error_free (error);
-    }
-
-    ctx->step++;
-    power_up_context_step (task);
-}
-
-static void
-set_radio_state_release_qmi_client_dms (GTask *task)
-{
-    PowerUpContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-    qmi_device_release_client (ctx->qmi_device,
-                               ctx->qmi_client,
-                               QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
-                               10,
-                               NULL,
-                               (GAsyncReadyCallback)release_qmi_client_dms_ready,
-                               task);
-}
-
-static void
-set_fcc_authentication_ready (QmiClientDms *client,
-                              GAsyncResult *res,
-                              GTask *task)
-{
-    PowerUpContext *ctx;
+    PowerUpContext                          *ctx;
     QmiMessageDmsSetFccAuthenticationOutput *output;
-    GError *error = NULL;
+    GError                                  *error = NULL;
 
     ctx = g_task_get_task_data (task);
-    output = qmi_client_dms_set_fcc_authentication_finish (client, res, &error);
+    output = qmi_client_dms_set_fcc_authentication_finish (qmi_client_dms, res, &error);
     if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error)) {
         mm_dbg ("error: couldn't set FCC auth: %s", error->message);
         g_error_free (error);
@@ -1120,130 +1102,14 @@ set_radio_state_fcc_auth (GTask *task)
     PowerUpContext *ctx;
 
     ctx = g_task_get_task_data (task);
-    qmi_client_dms_set_fcc_authentication (QMI_CLIENT_DMS (ctx->qmi_client),
+    g_assert (ctx->qmi_client_dms);
+
+    qmi_client_dms_set_fcc_authentication (QMI_CLIENT_DMS (ctx->qmi_client_dms),
                                            NULL,
                                            10,
                                            NULL, /* cancellable */
                                            (GAsyncReadyCallback)set_fcc_authentication_ready,
                                            task);
-}
-
-static void
-qmi_client_dms_ready (QmiDevice *dev,
-                      GAsyncResult *res,
-                      GTask *task)
-{
-    PowerUpContext *ctx;
-    GError *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-    ctx->qmi_client = qmi_device_allocate_client_finish (dev, res, &error);
-    if (!ctx->qmi_client) {
-        mm_dbg ("error: couldn't create DMS client: %s", error->message);
-        g_error_free (error);
-        g_assert (ctx->saved_error);
-        g_task_return_error (task, ctx->saved_error);
-        ctx->saved_error = NULL;
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    power_up_context_step (task);
-}
-
-static void
-set_radio_state_allocate_qmi_client_dms (GTask *task)
-{
-    PowerUpContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-    g_assert (ctx->qmi_device);
-    qmi_device_allocate_client (ctx->qmi_device,
-                                QMI_SERVICE_DMS,
-                                QMI_CID_NONE,
-                                10,
-                                NULL, /* cancellable */
-                                (GAsyncReadyCallback) qmi_client_dms_ready,
-                                task);
-}
-
-static void
-device_open_ready (QmiDevice *dev,
-                   GAsyncResult *res,
-                   GTask *task)
-{
-    PowerUpContext *ctx;
-    GError *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-    if (!qmi_device_open_finish (dev, res, &error)) {
-        mm_dbg ("error: couldn't open QmiDevice: %s", error->message);
-        g_error_free (error);
-        g_assert (ctx->saved_error);
-        g_task_return_error (task, ctx->saved_error);
-        ctx->saved_error = NULL;
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    power_up_context_step (task);
-}
-
-static void
-set_radio_state_qmi_device_open (GTask *task)
-{
-    PowerUpContext *ctx;
-
-    /* Open the device */
-    ctx = g_task_get_task_data (task);
-    g_assert (ctx->qmi_device);
-    qmi_device_open (ctx->qmi_device,
-                     (QMI_DEVICE_OPEN_FLAGS_PROXY | QMI_DEVICE_OPEN_FLAGS_MBIM),
-                     15,
-                     NULL, /* cancellable */
-                     (GAsyncReadyCallback)device_open_ready,
-                     task);
-}
-
-static void
-qmi_device_new_ready (GObject *unused,
-                      GAsyncResult *res,
-                      GTask *task)
-{
-    PowerUpContext *ctx;
-    GError *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-    ctx->qmi_device = qmi_device_new_finish (res, &error);
-    if (!ctx->qmi_device) {
-        mm_dbg ("error: couldn't create QmiDevice: %s", error->message);
-        g_error_free (error);
-        g_assert (ctx->saved_error);
-        g_task_return_error (task, ctx->saved_error);
-        ctx->saved_error = NULL;
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    power_up_context_step (task);
-}
-
-static void
-set_radio_state_qmi_device_new (GTask *task)
-{
-    PowerUpContext *ctx;
-    GFile *file;
-
-    ctx = g_task_get_task_data (task);
-    file = mbim_device_get_file (ctx->device);
-    qmi_device_new (file,
-                    NULL, /* cancellable */
-                    (GAsyncReadyCallback) qmi_device_new_ready,
-                    task);
-    g_object_unref (file);
 }
 
 #endif
@@ -1289,8 +1155,8 @@ radio_state_set_up_ready (MbimDevice *device,
     }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    /* Only the first attempt isn't fatal */
-    if (ctx->step == POWER_UP_CONTEXT_STEP_FIRST) {
+    /* Only the first attempt isn't fatal, if we have a QMI DMS client */
+    if ((ctx->step == POWER_UP_CONTEXT_STEP_FIRST) && ctx->qmi_client_dms) {
         /* Warn and keep, will retry */
         mm_warn ("%s", error->message);
         g_assert (!ctx->saved_error);
@@ -1337,24 +1203,8 @@ power_up_context_step (GTask *task)
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
-    case POWER_UP_CONTEXT_STEP_QMI_DEVICE_NEW:
-        set_radio_state_qmi_device_new (task);
-        return;
-
-    case POWER_UP_CONTEXT_STEP_QMI_DEVICE_OPEN:
-        set_radio_state_qmi_device_open (task);
-        return;
-
-    case POWER_UP_CONTEXT_STEP_ALLOCATE_QMI_CLIENT_DMS:
-        set_radio_state_allocate_qmi_client_dms (task);
-        return;
-
     case POWER_UP_CONTEXT_STEP_FCC_AUTH:
         set_radio_state_fcc_auth (task);
-        return;
-
-    case POWER_UP_CONTEXT_STEP_RELEASE_QMI_CLIENT_DMS:
-        set_radio_state_release_qmi_client_dms (task);
         return;
 
     case POWER_UP_CONTEXT_STEP_RETRY:
@@ -1375,20 +1225,31 @@ power_up_context_step (GTask *task)
 }
 
 static void
-modem_power_up (MMIfaceModem *self,
-                GAsyncReadyCallback callback,
-                gpointer user_data)
+modem_power_up (MMIfaceModem        *self,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
 {
     PowerUpContext *ctx;
-    MbimDevice *device;
-    GTask *task;
+    MbimDevice     *device;
+    GTask          *task;
 
-    if (!peek_device (self, &device, callback, user_data))
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    QmiClient *qmi_client_dms;
+
+    if (!peek_device_full (self, &device, &qmi_client_dms, callback, user_data))
         return;
+#else
+    if (!peek_device (self, &device, NULL, callback, user_data))
+        return;
+#endif
 
     ctx = g_slice_new0 (PowerUpContext);
     ctx->device = g_object_ref (device);
     ctx->step = POWER_UP_CONTEXT_STEP_FIRST;
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    ctx->qmi_client_dms = g_object_ref (qmi_client_dms);
+#endif
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)power_up_context_free);
