@@ -1694,6 +1694,10 @@ enabling_started (MMBroadbandModem *self,
 
 typedef struct {
     MMPortMbim *mbim;
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    QmiService qmi_services[32];
+    guint      qmi_service_index;
+#endif
 } InitializationStartedContext;
 
 static void
@@ -1705,17 +1709,17 @@ initialization_started_context_free (InitializationStartedContext *ctx)
 }
 
 static gpointer
-initialization_started_finish (MMBroadbandModem *self,
-                               GAsyncResult *res,
-                               GError **error)
+initialization_started_finish (MMBroadbandModem  *self,
+                               GAsyncResult      *res,
+                               GError           **error)
 {
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
 parent_initialization_started_ready (MMBroadbandModem *self,
-                                     GAsyncResult *res,
-                                     GTask *task)
+                                     GAsyncResult     *res,
+                                     GTask            *task)
 {
     gpointer parent_ctx;
     GError *error = NULL;
@@ -1747,6 +1751,55 @@ parent_initialization_started (GTask *task)
         (GAsyncReadyCallback)parent_initialization_started_ready,
         task);
 }
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void allocate_next_qmi_client (GTask *task);
+
+static void
+mbim_port_allocate_qmi_client_ready (MMPortMbim   *mbim,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    InitializationStartedContext *ctx;
+    GError                       *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_port_mbim_allocate_qmi_client_finish (mbim, res, &error)) {
+        mm_dbg ("Couldn't allocate QMI client for service '%s': %s",
+                qmi_service_get_string (ctx->qmi_services[ctx->qmi_service_index]),
+                error->message);
+        g_error_free (error);
+    }
+
+    ctx->qmi_service_index++;
+    allocate_next_qmi_client (task);
+}
+
+static void
+allocate_next_qmi_client (GTask *task)
+{
+    InitializationStartedContext *ctx;
+    MMBroadbandModemMbim         *self;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (ctx->qmi_services[ctx->qmi_service_index] == QMI_SERVICE_UNKNOWN) {
+        parent_initialization_started (task);
+        return;
+    }
+
+    /* Otherwise, allocate next client */
+    mm_port_mbim_allocate_qmi_client (ctx->mbim,
+                                      ctx->qmi_services[ctx->qmi_service_index],
+                                      NULL,
+                                      (GAsyncReadyCallback)mbim_port_allocate_qmi_client_ready,
+                                      task);
+}
+
+#endif
 
 static void
 query_device_services_ready (MbimDevice   *device,
@@ -1822,7 +1875,11 @@ query_device_services_ready (MbimDevice   *device,
     if (response)
         mbim_message_unref (response);
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    allocate_next_qmi_client (task);
+#else
     parent_initialization_started (task);
+#endif
 }
 
 static void
@@ -1848,7 +1905,7 @@ query_device_services (GTask *task)
 }
 
 static void
-mbim_device_removed_cb (MbimDevice *device,
+mbim_device_removed_cb (MbimDevice           *device,
                         MMBroadbandModemMbim *self)
 {
     /* We have to do a full re-probe here because simply reopening the device
@@ -1866,7 +1923,7 @@ mbim_device_removed_cb (MbimDevice *device,
 
 static void
 track_mbim_device_removed (MMBroadbandModemMbim *self,
-                           MMPortMbim *mbim)
+                           MMPortMbim           *mbim)
 {
     MbimDevice *device;
 
@@ -1883,7 +1940,7 @@ track_mbim_device_removed (MMBroadbandModemMbim *self,
 
 static void
 untrack_mbim_device_removed (MMBroadbandModemMbim *self,
-                             MMPortMbim *mbim)
+                             MMPortMbim           *mbim)
 {
     MbimDevice *device;
 
@@ -1899,11 +1956,10 @@ untrack_mbim_device_removed (MMBroadbandModemMbim *self,
 }
 
 static void
-mbim_port_open_ready (MMPortMbim *mbim,
+mbim_port_open_ready (MMPortMbim   *mbim,
                       GAsyncResult *res,
-                      GTask *task)
+                      GTask        *task)
 {
-    MMBroadbandModemMbim *self;
     GError *error = NULL;
 
     if (!mm_port_mbim_open_finish (mbim, res, &error)) {
@@ -1914,18 +1970,17 @@ mbim_port_open_ready (MMPortMbim *mbim,
 
     /* Make sure we know if mbim-proxy dies on us, and then do the parent's
      * initialization */
-    self = MM_BROADBAND_MODEM_MBIM (g_task_get_source_object (task));
-    track_mbim_device_removed (self, mbim);
+    track_mbim_device_removed (MM_BROADBAND_MODEM_MBIM (g_task_get_source_object (task)), mbim);
     query_device_services (task);
 }
 
 static void
-initialization_started (MMBroadbandModem *self,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
+initialization_started (MMBroadbandModem    *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
 {
     InitializationStartedContext *ctx;
-    GTask *task;
+    GTask                        *task;
 
     ctx = g_slice_new0 (InitializationStartedContext);
     ctx->mbim = mm_base_modem_get_port_mbim (MM_BASE_MODEM (self));
@@ -1950,6 +2005,12 @@ initialization_started (MMBroadbandModem *self,
         query_device_services (task);
         return;
     }
+
+#if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    /* Setup services to open */
+    ctx->qmi_services[0] = QMI_SERVICE_DMS;
+    ctx->qmi_services[1] = QMI_SERVICE_UNKNOWN;
+#endif
 
     /* Now open our MBIM port */
     mm_port_mbim_open (ctx->mbim,
