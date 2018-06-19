@@ -1,0 +1,108 @@
+# Friulian translation for ModemManager.
+# Copyright (C) 2018 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Fabio Tomat <f.t.public@gmail.com>, 2018.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2018-06-19 17:58+0200\n"
+"PO-Revision-Date: 2018-03-25 17:20+0200\n"
+"Last-Translator: Fabio Tomat <f.t.public@gmail.com>\n"
+"Language-Team: Friulian <f.t.public@gmail.com>\n"
+"Language: fur\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.0.6\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Controle il demoni di Modem Manager"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "La politiche dal sisteme e impedìs il control di Modem Manager."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Sbloche e controle un dispositîf a bande largje mobile"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"La politiche dal sisteme e impedìs di sblocâ o controlâ il dispositîf a "
+"bande largje mobile."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Zonte, modifiche e elimine i contats de bande largje mobile"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"La politiche dal sisteme e impedìs di zontâ, modificâ o eliminâ i contats di "
+"chest dispositîf."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Invie, salve, modifiche e elimine i messaçs di test"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"La politiche dal sisteme e impedìs di inviâ o manipolâ i messaçs di test di "
+"chest dispositîf."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr ""
+"Acete lis clamadis vocâls in jentrade o tacâ clamadis vocâls in jessude."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "La politiche dal sisteme e impedìs lis clamadis vocâls."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"Abilite e viôt la posizion gjeografiche e lis informazions su la posizion"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"La politiche dal sisteme e impedìs di abilitâ o viodi lis informazions su la "
+"posizion gjeografiche."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Interoghe e dopre lis informazions di rêt e i servizis"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"La politiche dal sisteme e impedìs la interogazion e la utilizazion di "
+"informazions di rêt e servizis."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr ""
+"Interoghe e gjestìs il firmware suntun dispositîf a bande largje mobile"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"La politiche dal sisteme e impedìs di interogâ o gjestî il firmware di chest "
+"dispositîf."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager al à bisugne di ristabilî/azerâ i dispositîfs"
