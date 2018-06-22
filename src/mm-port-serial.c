@@ -1263,7 +1263,6 @@ error:
     mm_warn ("(%s) failed to open serial device", device);
 
     if (self->priv->iochannel) {
-        g_io_channel_shutdown (self->priv->iochannel, FALSE, NULL);
         g_io_channel_unref (self->priv->iochannel);
         self->priv->iochannel = NULL;
     }
@@ -1351,7 +1350,9 @@ _close_internal (MMPortSerial *self, gboolean force)
         /* Destroy channel */
         if (self->priv->iochannel) {
             data_watch_enable (self, FALSE);
-            g_io_channel_shutdown (self->priv->iochannel, TRUE, NULL);
+            /* unref() without g_io_channel_shutdown() to destroy the channel
+             * without closing the fd. The close() is called explicitly after.
+             */
             g_io_channel_unref (self->priv->iochannel);
             self->priv->iochannel = NULL;
         }
