@@ -6704,7 +6704,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
     ctx = g_new0 (EnableUnsolicitedEventsContext, 1);
     ctx->client = g_object_ref (client);
 
-    g_task_set_task_data (task, NULL, (GDestroyNotify)enable_unsolicited_events_context_free);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)enable_unsolicited_events_context_free);
 
 #if defined WITH_NEWEST_QMI_COMMANDS
     /* Signal info introduced in NAS 1.8 */
