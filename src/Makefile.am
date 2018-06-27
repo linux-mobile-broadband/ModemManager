@@ -366,6 +366,8 @@ endif
 # Additional QMI support in ModemManager
 if WITH_QMI
 ModemManager_SOURCES += \
+	mm-shared-qmi.h \
+	mm-shared-qmi.c \
 	mm-sms-qmi.h \
 	mm-sms-qmi.c \
 	mm-sim-qmi.h \
