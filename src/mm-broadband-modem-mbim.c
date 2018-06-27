@@ -40,8 +40,9 @@
 #include "mm-iface-modem-signal.h"
 #include "mm-sms-part-3gpp.h"
 
-#if defined WITH_QMI
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 # include <libqmi-glib.h>
+# include "mm-shared-qmi.h"
 #endif
 
 static void iface_modem_init           (MMIfaceModem          *iface);
@@ -49,7 +50,13 @@ static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
 static void iface_modem_location_init  (MMIfaceModemLocation  *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_signal_init    (MMIfaceModemSignal    *iface);
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+static void shared_qmi_init            (MMSharedQmi           *iface);
+#endif
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+static MMIfaceModemLocation *iface_modem_location_parent;
+#endif
 static MMIfaceModemSignal *iface_modem_signal_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
@@ -57,7 +64,11 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_B
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_QMI, shared_qmi_init)
+#endif
+)
 
 typedef enum {
     PROCESS_NOTIFICATION_FLAG_NONE                 = 0,
@@ -135,31 +146,35 @@ peek_device (gpointer self,
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
-static gboolean
-peek_device_full (gpointer              self,
-                  MbimDevice          **o_device,
-                  QmiClient           **o_dms,
-                  GAsyncReadyCallback   callback,
-                  gpointer              user_data)
+static QmiClient *
+shared_qmi_peek_client (MMSharedQmi    *self,
+                        QmiService      service,
+                        MMPortQmiFlag   flag,
+                        GError        **error)
 {
     MMPortMbim *port;
+    QmiClient  *client;
+
+    g_assert (flag == MM_PORT_QMI_FLAG_DEFAULT);
 
     port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     if (!port) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 peek_device,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't peek MBIM port");
-        return FALSE;
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't peek MBIM port");
+        return NULL;
     }
 
-    *o_device = mm_port_mbim_peek_device (port);
-    if (o_dms)
-        *o_dms = mm_port_mbim_peek_qmi_client (port, QMI_SERVICE_DMS);
-    return TRUE;
+    client = mm_port_mbim_peek_qmi_client (port, service);
+    if (!client)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't peek client for service '%s'",
+                     qmi_service_get_string (service));
+
+    return client;
 }
 
 #endif
@@ -1233,22 +1248,20 @@ modem_power_up (MMIfaceModem        *self,
     MbimDevice     *device;
     GTask          *task;
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    QmiClient *qmi_client_dms;
-
-    if (!peek_device_full (self, &device, &qmi_client_dms, callback, user_data))
+    if (!peek_device (self, &device, callback, user_data))
         return;
-#else
-    if (!peek_device (self, &device, NULL, callback, user_data))
-        return;
-#endif
 
     ctx = g_slice_new0 (PowerUpContext);
     ctx->device = g_object_ref (device);
     ctx->step = POWER_UP_CONTEXT_STEP_FIRST;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    ctx->qmi_client_dms = g_object_ref (qmi_client_dms);
+    ctx->qmi_client_dms = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                                     QMI_SERVICE_DMS,
+                                                     MM_PORT_QMI_FLAG_DEFAULT,
+                                                     NULL);
+    if (ctx->qmi_client_dms)
+        g_object_ref (ctx->qmi_client_dms);
 #endif
 
     task = g_task_new (self, NULL, callback, user_data);
@@ -1870,7 +1883,8 @@ initialization_started (MMBroadbandModem    *self,
 #if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     /* Setup services to open */
     ctx->qmi_services[0] = QMI_SERVICE_DMS;
-    ctx->qmi_services[1] = QMI_SERVICE_UNKNOWN;
+    ctx->qmi_services[1] = QMI_SERVICE_PDS;
+    ctx->qmi_services[2] = QMI_SERVICE_UNKNOWN;
 #endif
 
     /* Now open our MBIM port */
@@ -3935,10 +3949,25 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_location_init (MMIfaceModemLocation *iface)
 {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    iface_modem_location_parent = g_type_interface_peek_parent (iface);
+
+    iface->load_capabilities = mm_shared_qmi_location_load_capabilities;
+    iface->load_capabilities_finish = mm_shared_qmi_location_load_capabilities_finish;
+    iface->enable_location_gathering = mm_shared_qmi_enable_location_gathering;
+    iface->enable_location_gathering_finish = mm_shared_qmi_enable_location_gathering_finish;
+    iface->disable_location_gathering = mm_shared_qmi_disable_location_gathering;
+    iface->disable_location_gathering_finish = mm_shared_qmi_disable_location_gathering_finish;
+    iface->load_supl_server = mm_shared_qmi_location_load_supl_server;
+    iface->load_supl_server_finish = mm_shared_qmi_location_load_supl_server_finish;
+    iface->set_supl_server = mm_shared_qmi_location_set_supl_server;
+    iface->set_supl_server_finish = mm_shared_qmi_location_set_supl_server_finish;
+#else
     iface->load_capabilities = NULL;
     iface->load_capabilities_finish = NULL;
     iface->enable_location_gathering = NULL;
     iface->enable_location_gathering_finish = NULL;
+#endif
 }
 
 static void
@@ -3976,6 +4005,19 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
     iface->check_support_finish = modem_signal_check_support_finish;
     iface->load_values = modem_signal_load_values;
     iface->load_values_finish = modem_signal_load_values_finish;
+}
+
+static MMIfaceModemLocation *
+peek_parent_location_interface (MMSharedQmi *self)
+{
+    return iface_modem_location_parent;
+}
+
+static void
+shared_qmi_init (MMSharedQmi *iface)
+{
+    iface->peek_client = shared_qmi_peek_client;
+    iface->peek_parent_location_interface = peek_parent_location_interface;
 }
 
 static void
