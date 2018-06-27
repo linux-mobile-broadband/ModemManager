@@ -220,9 +220,10 @@ qmi_device_new_ready (GObject      *unused,
     mm_dbg ("[%s] trying to open QMI over MBIM device...",
             mm_port_get_device (MM_PORT (self)));
     qmi_device_open (self->priv->qmi_device,
-                     (QMI_DEVICE_OPEN_FLAGS_PROXY |
-                      QMI_DEVICE_OPEN_FLAGS_MBIM  |
-                      QMI_DEVICE_OPEN_FLAGS_VERSION_INFO),
+                     (QMI_DEVICE_OPEN_FLAGS_PROXY        |
+                      QMI_DEVICE_OPEN_FLAGS_MBIM         |
+                      QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
+                      QMI_DEVICE_OPEN_FLAGS_EXPECT_INDICATIONS),
                      15,
                      g_task_get_cancellable (task),
                      (GAsyncReadyCallback)qmi_device_open_ready,
