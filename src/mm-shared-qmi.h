@@ -25,6 +25,7 @@
 #include <libqmi-glib.h>
 
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-location.h"
 #include "mm-port-qmi.h"
 
 #define MM_TYPE_SHARED_QMI            (mm_shared_qmi_get_type ())
@@ -41,6 +42,9 @@ struct _MMSharedQmi {
                                  QmiService      service,
                                  MMPortQmiFlag   flag,
                                  GError        **error);
+
+    /* Peek location interface of the parent class of the object */
+    MMIfaceModemLocation * (* peek_parent_location_interface) (MMSharedQmi *self);
 };
 
 GType mm_shared_qmi_get_type (void);
@@ -56,5 +60,40 @@ gboolean   mm_shared_qmi_ensure_client (MMSharedQmi          *self,
                                         GAsyncReadyCallback   callback,
                                         gpointer              user_data);
 
+/* Shared QMI location support */
+
+void                   mm_shared_qmi_location_load_capabilities        (MMIfaceModemLocation  *self,
+                                                                        GAsyncReadyCallback    callback,
+                                                                        gpointer               user_data);
+MMModemLocationSource  mm_shared_qmi_location_load_capabilities_finish (MMIfaceModemLocation  *self,
+                                                                        GAsyncResult          *res,
+                                                                        GError               **error);
+void                   mm_shared_qmi_enable_location_gathering         (MMIfaceModemLocation  *_self,
+                                                                        MMModemLocationSource  source,
+                                                                        GAsyncReadyCallback    callback,
+                                                                        gpointer               user_data);
+gboolean               mm_shared_qmi_enable_location_gathering_finish  (MMIfaceModemLocation  *self,
+                                                                        GAsyncResult          *res,
+                                                                        GError               **error);
+void                   mm_shared_qmi_disable_location_gathering        (MMIfaceModemLocation  *_self,
+                                                                        MMModemLocationSource  source,
+                                                                        GAsyncReadyCallback    callback,
+                                                                        gpointer               user_data);
+gboolean               mm_shared_qmi_disable_location_gathering_finish (MMIfaceModemLocation  *self,
+                                                                        GAsyncResult          *res,
+                                                                        GError               **error);
+void                   mm_shared_qmi_location_load_supl_server         (MMIfaceModemLocation  *self,
+                                                                        GAsyncReadyCallback    callback,
+                                                                        gpointer               user_data);
+gchar                 *mm_shared_qmi_location_load_supl_server_finish  (MMIfaceModemLocation  *self,
+                                                                        GAsyncResult          *res,
+                                                                        GError               **error);
+void                   mm_shared_qmi_location_set_supl_server          (MMIfaceModemLocation  *self,
+                                                                        const gchar           *supl,
+                                                                        GAsyncReadyCallback    callback,
+                                                                        gpointer               user_data);
+gboolean               mm_shared_qmi_location_set_supl_server_finish   (MMIfaceModemLocation  *self,
+                                                                        GAsyncResult          *res,
+                                                                        GError               **error);
 
 #endif /* MM_SHARED_QMI_H */
