@@ -374,6 +374,8 @@ finalize (GObject *object)
     if (self->priv->gpgga_regex)
         g_regex_unref (self->priv->gpgga_regex);
 
+    g_free (self->priv->utc_time);
+
     G_OBJECT_CLASS (mm_location_gps_raw_parent_class)->finalize (object);
 }
 
