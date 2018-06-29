@@ -906,7 +906,7 @@ mm_modem_get_ports (MMModem *self,
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_plugin() if on another
+ * @self was constructed. Use mm_modem_dup_equipment_identifier() if on another
  * thread.</warning>
  *
  * Returns: (transfer none): The equipment identifier, or %NULL if none available. Do not free the returned value, it belongs to @self.
