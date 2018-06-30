@@ -1884,7 +1884,8 @@ initialization_started (MMBroadbandModem    *self,
     /* Setup services to open */
     ctx->qmi_services[0] = QMI_SERVICE_DMS;
     ctx->qmi_services[1] = QMI_SERVICE_PDS;
-    ctx->qmi_services[2] = QMI_SERVICE_UNKNOWN;
+    ctx->qmi_services[2] = QMI_SERVICE_LOC;
+    ctx->qmi_services[3] = QMI_SERVICE_UNKNOWN;
 #endif
 
     /* Now open our MBIM port */
