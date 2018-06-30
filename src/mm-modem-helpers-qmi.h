@@ -106,6 +106,12 @@ MMOmaSessionState mm_oma_session_state_from_qmi_oma_session_state (QmiOmaSession
 MMOmaSessionStateFailedReason mm_oma_session_state_failed_reason_from_qmi_oma_session_failed_reason (QmiOmaSessionFailedReason qmi_session_failed_reason);
 
 /*****************************************************************************/
+/* QMI/LOC to MM translations */
+
+gboolean mm_error_from_qmi_loc_indication_status (QmiLocIndicationStatus   status,
+                                                  GError                 **error);
+
+/*****************************************************************************/
 /* Utility to gather current capabilities from various sources */
 
 typedef struct {

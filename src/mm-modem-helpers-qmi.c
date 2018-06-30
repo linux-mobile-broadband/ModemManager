@@ -10,8 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012-2018 Google, Inc.
+ * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
+
+#include <ModemManager.h>
+#include <mm-errors-types.h>
 
 #include "mm-modem-helpers-qmi.h"
 #include "mm-enums-types.h"
@@ -1348,5 +1352,36 @@ mm_oma_session_state_failed_reason_from_qmi_oma_session_failed_reason (QmiOmaSes
         return MM_OMA_SESSION_STATE_FAILED_REASON_SESSION_CANCELLED;
     default:
         return MM_OMA_SESSION_STATE_FAILED_REASON_UNKNOWN;
+    }
+}
+
+gboolean
+mm_error_from_qmi_loc_indication_status (QmiLocIndicationStatus   status,
+                                         GError                 **error)
+{
+    switch (status) {
+    case QMI_LOC_INDICATION_STATUS_SUCCESS:
+        return TRUE;
+    case QMI_LOC_INDICATION_STATUS_GENERAL_FAILURE:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "LOC service: general failure");
+        return FALSE;
+    case QMI_LOC_INDICATION_STATUS_UNSUPPORTED:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "LOC service: unsupported");
+        return FALSE;
+    case QMI_LOC_INDICATION_STATUS_INVALID_PARAMETER:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "LOC service: invalid parameter");
+        return FALSE;
+    case QMI_LOC_INDICATION_STATUS_ENGINE_BUSY:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS, "LOC service: engine busy");
+        return FALSE;
+    case QMI_LOC_INDICATION_STATUS_PHONE_OFFLINE:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "LOC service: phone offline");
+        return FALSE;
+    case QMI_LOC_INDICATION_STATUS_TIMEOUT:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED, "LOC service: timeout");
+        return FALSE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "LOC service: unknown failure");
+        return FALSE;
     }
 }
