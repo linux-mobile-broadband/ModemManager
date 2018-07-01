@@ -31,6 +31,7 @@ MMModemCdmaRegistrationState
 MMModemCdmaRmProtocol
 MMModemContactsStorage
 MMModemLocationSource
+MMModemLocationAssistanceDataType
 MMModemLock
 MMModemMode
 MMModemState

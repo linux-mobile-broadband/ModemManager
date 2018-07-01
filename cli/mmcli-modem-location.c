@@ -66,6 +66,8 @@ static gboolean set_enable_signal_flag;
 static gboolean set_disable_signal_flag;
 static gboolean get_all_flag;
 static gchar *set_supl_server_str;
+static gchar *set_supl_server_str;
+static gchar *inject_assistance_data_str;
 static gchar *set_gps_refresh_rate_str;
 
 static GOptionEntry entries[] = {
@@ -144,6 +146,10 @@ static GOptionEntry entries[] = {
     { "location-set-supl-server", 0, 0, G_OPTION_ARG_STRING, &set_supl_server_str,
       "Set SUPL server address",
       "[IP:PORT] or [URL]"
+    },
+    { "location-inject-assistance-data", 0, 0, G_OPTION_ARG_FILENAME, &inject_assistance_data_str,
+      "Inject assistance data in the GNSS module",
+      "[PATH]"
     },
     { "location-set-gps-refresh-rate", 0, 0, G_OPTION_ARG_STRING, &set_gps_refresh_rate_str,
       "Set GPS refresh rate in seconds, or 0 disable the explicit rate.",
@@ -226,6 +232,7 @@ mmcli_modem_location_options_enabled (void)
                     get_gps_raw_flag +
                     get_cdma_bs_flag) +
                  !!set_supl_server_str +
+                 !!inject_assistance_data_str +
                  !!set_gps_refresh_rate_str);
 
     if (n_actions > 1) {
@@ -300,27 +307,52 @@ print_location_status (void)
              enabled_str,
              mm_modem_location_signals_location (ctx->modem_location) ? "yes" : "no");
 
-    /* If A-GPS supported, show SUPL server setup */
-    if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS) {
-        const gchar *supl_server;
-
-        supl_server = mm_modem_location_get_supl_server (ctx->modem_location);
-        g_print ("  ----------------------------\n"
-                 "  A-GPS    |    SUPL server: '%s'\n",
-                 supl_server ? supl_server : "unset");
-    }
-
-    /* If GPS supported, show GPS refresh rate */
+    /* If GPS supported, show GPS refresh rate and supported assistance data */
     if (mm_modem_location_get_capabilities (ctx->modem_location) & (MM_MODEM_LOCATION_SOURCE_GPS_RAW |
                                                                     MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) {
-        guint rate;
+        guint                             rate;
+        MMModemLocationAssistanceDataType mask;
+        gchar                            *mask_str;
 
         rate = mm_modem_location_get_gps_refresh_rate (ctx->modem_location);
         g_print ("  ----------------------------\n");
         if (rate > 0)
-            g_print ("  GPS      |  refresh rate: '%u'\n", rate);
+            g_print ("  GPS      |              refresh rate: '%u'\n", rate);
         else
-            g_print ("  GPS      |  refresh rate: disabled\n");
+            g_print ("  GPS      |              refresh rate: disabled\n");
+
+        /* If A-GPS supported, show SUPL server setup */
+        if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS) {
+            const gchar *supl_server;
+
+            supl_server = mm_modem_location_get_supl_server (ctx->modem_location);
+            g_print ("           |         A-GPS SUPL server: '%s'\n",
+                     supl_server ? supl_server : "unset");
+        }
+
+        mask = mm_modem_location_get_supported_assistance_data (ctx->modem_location);
+        mask_str = mm_modem_location_assistance_data_type_build_string_from_mask (mask);
+        g_print ("           | supported assistance data: '%s'\n", mask_str);
+        g_free (mask_str);
+
+        /* If any assistance data supported, show server list */
+        if (mask != MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE) {
+            const gchar **servers;
+
+            servers = mm_modem_location_get_assistance_data_servers (ctx->modem_location);
+            if (!servers)
+                g_print ("           |   assistance data servers: 'n/a'\n");
+            else {
+                guint server_i;
+
+                for (server_i = 0; servers[server_i]; server_i++) {
+                    if (server_i == 0)
+                        g_print ("           |   assistance data servers: '%s'\n", servers[server_i]);
+                    else
+                        g_print ("           |                            '%s'\n", servers[server_i]);
+                }
+            }
+        }
     }
 
     g_free (capabilities_str);
@@ -375,6 +407,65 @@ set_supl_server_ready (MMModemLocation *modem_location,
 
     operation_result = mm_modem_location_set_supl_server_finish (modem_location, result, &error);
     set_supl_server_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static gboolean
+parse_inject_assistance_data (guint8 **o_data,
+                              gsize   *o_data_size)
+{
+    gboolean  result = FALSE;
+    GFile    *file = NULL;
+    gchar    *data;
+    gsize     data_size;
+    GError   *error = NULL;
+
+    file = g_file_new_for_commandline_arg (inject_assistance_data_str);
+
+    if (!g_file_load_contents (file, NULL, &data, &data_size, NULL, &error)) {
+        g_printerr ("error: cannot load file contents: %s\n", error->message);
+        goto out;
+    }
+
+    if (data_size == 0) {
+        g_printerr ("error: file is empty\n");
+        goto out;
+    }
+
+    *o_data = (guint8 *)data;
+    *o_data_size = data_size;
+    result = TRUE;
+
+out:
+    if (error)
+        g_error_free (error);
+    g_object_unref (file);
+    return result;
+}
+
+static void
+inject_assistance_data_process_reply (gboolean result,
+                                      const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't inject assistance data: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully injected assistance data\n");
+}
+
+static void
+inject_assistance_data_ready (MMModemLocation *modem_location,
+                              GAsyncResult    *result)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_location_inject_assistance_data_finish (modem_location, result, &error);
+    inject_assistance_data_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
@@ -667,6 +758,27 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to inject assistance data? */
+    if (inject_assistance_data_str) {
+        guint8 *data;
+        gsize   data_size;
+
+        if (!parse_inject_assistance_data (&data, &data_size)) {
+            g_printerr ("error: couldn't inject assistance data: invalid parameters given: '%s'\n",
+                        inject_assistance_data_str);
+            exit (EXIT_FAILURE);
+        }
+
+        g_debug ("Asynchronously injecting assistance data...");
+        mm_modem_location_inject_assistance_data (ctx->modem_location,
+                                                  data, data_size,
+                                                  ctx->cancellable,
+                                                  (GAsyncReadyCallback)inject_assistance_data_ready,
+                                                  NULL);
+        g_free (data);
+        return;
+    }
+
     /* Request to set GPS refresh rate? */
     if (set_gps_refresh_rate_str) {
         guint rate;
@@ -789,6 +901,28 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
                                                          NULL,
                                                          &error);
         set_supl_server_process_reply (result, error);
+        return;
+    }
+
+    /* Request to inject assistance data? */
+    if (inject_assistance_data_str) {
+        gboolean  result;
+        guint8   *data;
+        gsize     data_size;
+
+        if (!parse_inject_assistance_data (&data, &data_size)) {
+            g_printerr ("error: couldn't inject assistance data: invalid parameters given: '%s'\n",
+                        inject_assistance_data_str);
+            exit (EXIT_FAILURE);
+        }
+
+        g_debug ("Synchronously setting assistance data...");
+        result = mm_modem_location_inject_assistance_data_sync (ctx->modem_location,
+                                                                data, data_size,
+                                                                NULL,
+                                                                &error);
+        inject_assistance_data_process_reply (result, error);
+        g_free (data);
         return;
     }
 

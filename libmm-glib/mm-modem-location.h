@@ -76,8 +76,13 @@ MMModemLocationSource mm_modem_location_get_enabled      (MMModemLocation *self)
 
 gboolean              mm_modem_location_signals_location (MMModemLocation *self);
 
+MMModemLocationAssistanceDataType mm_modem_location_get_supported_assistance_data (MMModemLocation *self);
+
 const gchar *mm_modem_location_get_supl_server (MMModemLocation *self);
 gchar       *mm_modem_location_dup_supl_server (MMModemLocation *self);
+
+const gchar **mm_modem_location_get_assistance_data_servers (MMModemLocation *self);
+gchar       **mm_modem_location_dup_assistance_data_servers (MMModemLocation *self);
 
 guint mm_modem_location_get_gps_refresh_rate (MMModemLocation *self);
 
@@ -108,6 +113,21 @@ gboolean mm_modem_location_set_supl_server_sync   (MMModemLocation *self,
                                                    const gchar *supl,
                                                    GCancellable *cancellable,
                                                    GError **error);
+
+void     mm_modem_location_inject_assistance_data        (MMModemLocation      *self,
+                                                          const guint8         *data,
+                                                          gsize                 data_size,
+                                                          GCancellable         *cancellable,
+                                                          GAsyncReadyCallback   callback,
+                                                          gpointer              user_data);
+gboolean mm_modem_location_inject_assistance_data_finish (MMModemLocation      *self,
+                                                          GAsyncResult         *res,
+                                                          GError              **error);
+gboolean mm_modem_location_inject_assistance_data_sync   (MMModemLocation      *self,
+                                                          const guint8         *data,
+                                                          gsize                 data_size,
+                                                          GCancellable         *cancellable,
+                                                          GError              **error);
 
 void     mm_modem_location_set_gps_refresh_rate        (MMModemLocation *self,
                                                         guint rate,

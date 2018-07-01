@@ -80,6 +80,24 @@
     </method>
 
     <!--
+        InjectAssistanceData:
+        @data: assistance data to be injected to the GNSS module.
+
+        Inject assistance data to the GNSS module.
+        The data files should be downloaded using external means from the URLs specified in
+        the <link linkend="AssistanceDataServers">AssistanceDataServers</link> property.
+
+        The user does not need to specify the assistance data type being given.
+
+        There is no maximum @data size limit specified, default DBus system bus limits apply.
+    -->
+    <method name="InjectAssistanceData">
+      <arg name="data" type="ay" direction="in">
+        <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
+      </arg>
+    </method>
+
+    <!--
         SetGpsRefreshRate:
         @rate: Rate, in seconds.
 
@@ -100,6 +118,14 @@
         values, specifying the supported location sources.
     -->
     <property name="Capabilities" type="u" access="read" />
+
+    <!--
+        SupportedAssistanceData:
+
+        Bitmask of <link linkend="MMModemLocationAssistanceDataType">MMModemLocationAssistanceDataType</link>
+        values, specifying the supported types of assistance data.
+    -->
+    <property name="SupportedAssistanceData" type="u" access="read" />
 
     <!--
         Enabled:
@@ -311,6 +337,14 @@
         SUPL server configuration for A-GPS, given either as IP:PORT or with a full URL.
     -->
     <property name="SuplServer" type="s" access="read" />
+
+    <!--
+        AssistanceDataServers:
+
+        URLs from where the user can download assistance data files to inject with
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.InjectAssistanceData">InjectAssistanceData()</link>.
+    -->
+    <property name="AssistanceDataServers" type="as" access="read" />
 
     <!--
         GpsRefreshRate:

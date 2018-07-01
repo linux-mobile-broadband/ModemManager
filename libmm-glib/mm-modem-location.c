@@ -101,6 +101,24 @@ mm_modem_location_get_capabilities (MMModemLocation *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_location_get_supported_assistance_data:
+ * @self: A #MMModemLocation.
+ *
+ * Gets a bitmask of the supported assistance data types.
+ *
+ * Returns: A #MMModemLocationAssistanceDataType.
+ */
+MMModemLocationAssistanceDataType
+mm_modem_location_get_supported_assistance_data (MMModemLocation *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE);
+
+    return (MMModemLocationAssistanceDataType) mm_gdbus_modem_location_get_supported_assistance_data (MM_GDBUS_MODEM_LOCATION (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_location_get_enabled:
  * @self: A #MMModemLocation.
  *
@@ -302,6 +320,91 @@ mm_modem_location_set_supl_server_sync (MMModemLocation *self,
                                                               supl,
                                                               cancellable,
                                                               error);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_location_inject_assistance_data_finish:
+ * @self: A #MMModemLocation.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_inject_assistance_data().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_location_inject_assistance_data().
+ *
+ * Returns: %TRUE if the injection was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_location_inject_assistance_data_finish (MMModemLocation  *self,
+                                                 GAsyncResult     *res,
+                                                 GError          **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
+
+    return mm_gdbus_modem_location_call_inject_assistance_data_finish (MM_GDBUS_MODEM_LOCATION (self), res, error);
+}
+
+/**
+ * mm_modem_location_inject_assistance_data:
+ * @self: A #MMModemLocation.
+ * @data: (array length=data_size): Data to inject.
+ * @data_size: size of @data.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Aynchronously injects assistance data to the GNSS module.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_location_inject_assistance_data_finish() to get the result of the operation.
+ *
+ * See mm_modem_location_inject_assistance_data_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_location_inject_assistance_data (MMModemLocation     *self,
+                                          const guint8        *data,
+                                          gsize                data_size,
+                                          GCancellable        *cancellable,
+                                          GAsyncReadyCallback  callback,
+                                          gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_LOCATION (self));
+
+    mm_gdbus_modem_location_call_inject_assistance_data (MM_GDBUS_MODEM_LOCATION (self),
+                                                         g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE, data, data_size, sizeof (guint8)),
+                                                         cancellable,
+                                                         callback,
+                                                         user_data);
+}
+
+/**
+ * mm_modem_location_inject_assistance_data_sync:
+ * @self: A #MMModemLocation.
+ * @data: (array length=data_size): Data to inject.
+ * @data_size: size of @data.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously injects assistance data to the GNSS module.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_location_inject_assistance_data()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the injection was successful, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_location_inject_assistance_data_sync (MMModemLocation  *self,
+                                               const guint8     *data,
+                                               gsize             data_size,
+                                               GCancellable     *cancellable,
+                                               GError          **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
+
+    return mm_gdbus_modem_location_call_inject_assistance_data_sync (MM_GDBUS_MODEM_LOCATION (self),
+                                                                     g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE, data, data_size, sizeof (guint8)),
+                                                                     cancellable,
+                                                                     error);
 }
 
 /*****************************************************************************/
@@ -872,6 +975,56 @@ mm_modem_location_dup_supl_server (MMModemLocation *self)
 
     RETURN_NON_EMPTY_STRING (
         mm_gdbus_modem_location_dup_supl_server (MM_GDBUS_MODEM_LOCATION (self)));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_location_get_assistance_data_servers:
+ * @self: A #MMModemLocation.
+ *
+ * Gets the list of assistance data servers.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_location_dup_assistance_data_servers() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): a %NULL-terminated array of server addresses, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ */
+const gchar **
+mm_modem_location_get_assistance_data_servers (MMModemLocation *self)
+{
+    const gchar **tmp;
+
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
+
+    tmp = (const gchar **) mm_gdbus_modem_location_get_assistance_data_servers (MM_GDBUS_MODEM_LOCATION (self));
+
+    return ((tmp && tmp[0]) ? tmp : NULL);
+}
+
+/**
+ * mm_modem_location_dup_assistance_data_servers:
+ * @self: A #MMModemLocation.
+ *
+ * Gets the list of assistance data servers.
+ *
+ * Returns: (transfer full): a %NULL-terminated array of server addresses, or %NULL if none available. The returned value should be freed with g_strfreev().
+ */
+gchar **
+mm_modem_location_dup_assistance_data_servers (MMModemLocation *self)
+{
+    gchar **tmp;
+
+    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
+
+    tmp = mm_gdbus_modem_location_dup_assistance_data_servers (MM_GDBUS_MODEM_LOCATION (self));
+    if (tmp && tmp[0])
+        return tmp;
+
+    g_strfreev (tmp);
+    return NULL;
 }
 
 /*****************************************************************************/

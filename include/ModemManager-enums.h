@@ -911,6 +911,18 @@ typedef enum { /*< underscore_name=mm_modem_location_source >*/
 } MMModemLocationSource;
 
 /**
+ * MMModemLocationAssistanceDataType:
+ * @MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE: None.
+ * @MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_XTRA: Qualcomm gpsOneXTRA.
+ *
+ * Type of assistance data that may be injected to the GNSS module.
+ */
+typedef enum { /*< underscore_name=mm_modem_location_assistance_data_type >*/
+    MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE = 0,
+    MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_XTRA = 1 << 0,
+} MMModemLocationAssistanceDataType;
+
+/**
  * MMModemContactsStorage:
  * @MM_MODEM_CONTACTS_STORAGE_UNKNOWN: Unknown location.
  * @MM_MODEM_CONTACTS_STORAGE_ME: Device's local memory.

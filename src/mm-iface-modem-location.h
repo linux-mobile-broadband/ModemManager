@@ -50,6 +50,22 @@ struct _MMIfaceModemLocation {
                                          GAsyncResult *res,
                                          GError **error);
 
+    /* Loading of the AssistanceDataServers property */
+    void     (* load_assistance_data_servers)        (MMIfaceModemLocation  *self,
+                                                      GAsyncReadyCallback    callback,
+                                                      gpointer               user_data);
+    gchar ** (* load_assistance_data_servers_finish) (MMIfaceModemLocation  *self,
+                                                      GAsyncResult          *res,
+                                                      GError               **error);
+
+    /* Loading of the SupportedAssistanceData property */
+    void                              (* load_supported_assistance_data)        (MMIfaceModemLocation  *self,
+                                                                                 GAsyncReadyCallback    callback,
+                                                                                 gpointer               user_data);
+    MMModemLocationAssistanceDataType (* load_supported_assistance_data_finish) (MMIfaceModemLocation  *self,
+                                                                                 GAsyncResult          *res,
+                                                                                 GError               **error);
+
     /* Enable location gathering (async) */
     void (* enable_location_gathering) (MMIfaceModemLocation *self,
                                         MMModemLocationSource source,
@@ -76,6 +92,16 @@ struct _MMIfaceModemLocation {
     gboolean (*set_supl_server_finish) (MMIfaceModemLocation *self,
                                         GAsyncResult *res,
                                         GError **error);
+
+    /* Inject assistance data (async) */
+    void     (* inject_assistance_data)       (MMIfaceModemLocation  *self,
+                                               const guint8          *data,
+                                               gsize                  data_size,
+                                               GAsyncReadyCallback    callback,
+                                               gpointer               user_data);
+    gboolean (*inject_assistance_data_finish) (MMIfaceModemLocation  *self,
+                                               GAsyncResult          *res,
+                                               GError               **error);
 };
 
 GType mm_iface_modem_location_get_type (void);
