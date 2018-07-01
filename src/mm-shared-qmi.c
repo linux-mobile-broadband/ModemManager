@@ -41,12 +41,15 @@ static GQuark private_quark;
 
 typedef struct {
     /* Location helpers */
-    MMIfaceModemLocation  *iface_modem_location_parent;
-    MMModemLocationSource  enabled_sources;
-    QmiClient             *pds_client;
-    gulong                 pds_location_event_report_indication_id;
-    QmiClient             *loc_client;
-    gulong                 loc_location_nmea_indication_id;
+    MMIfaceModemLocation   *iface_modem_location_parent;
+    MMModemLocationSource   enabled_sources;
+    QmiClient              *pds_client;
+    gulong                  pds_location_event_report_indication_id;
+    QmiClient              *loc_client;
+    gulong                  loc_location_nmea_indication_id;
+    gchar                 **loc_assistance_data_servers;
+    guint32                 loc_assistance_data_max_file_size;
+    guint32                 loc_assistance_data_max_part_size;
 } Private;
 
 static void
@@ -60,6 +63,7 @@ private_free (Private *priv)
         g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
     if (priv->loc_client)
         g_object_unref (priv->loc_client);
+    g_strfreev (priv->loc_assistance_data_servers);
     g_slice_free (Private, priv);
 }
 
@@ -1895,6 +1899,453 @@ mm_shared_qmi_location_load_capabilities (MMIfaceModemLocation *self,
     priv->iface_modem_location_parent->load_capabilities (self,
                                                           (GAsyncReadyCallback)parent_load_capabilities_ready,
                                                           task);
+}
+
+/*****************************************************************************/
+/* Location: load supported assistance data */
+
+gchar **
+mm_shared_qmi_location_load_assistance_data_servers_finish (MMIfaceModemLocation  *self,
+                                                            GAsyncResult          *res,
+                                                            GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+void
+mm_shared_qmi_location_load_assistance_data_servers (MMIfaceModemLocation *self,
+                                                     GAsyncReadyCallback   callback,
+                                                     gpointer              user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    priv = get_private (MM_SHARED_QMI (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_pointer (task, g_strdupv (priv->loc_assistance_data_servers), (GDestroyNotify) g_strfreev);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Location: load supported assistance data */
+
+typedef struct {
+    QmiClientLoc *client;
+    glong         indication_id;
+    guint         timeout_id;
+} LoadSupportedAssistanceDataContext;
+
+static void
+load_supported_assistance_data_context_free (LoadSupportedAssistanceDataContext *ctx)
+{
+    if (ctx->client) {
+        if (ctx->timeout_id)
+            g_source_remove (ctx->timeout_id);
+        if (ctx->indication_id)
+            g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+        g_object_unref (ctx->client);
+    }
+    g_slice_free (LoadSupportedAssistanceDataContext, ctx);
+}
+
+MMModemLocationAssistanceDataType
+mm_shared_qmi_location_load_supported_assistance_data_finish (MMIfaceModemLocation  *self,
+                                                              GAsyncResult          *res,
+                                                              GError               **error)
+{
+    GError *inner_error = NULL;
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE;
+    }
+    return (MMModemLocationAssistanceDataType)value;
+}
+
+static gboolean
+loc_location_get_predicted_orbits_data_source_indication_timed_out (GTask *task)
+{
+    LoadSupportedAssistanceDataContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    ctx->timeout_id = 0;
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                             "Failed to receive indication with the predicted orbits data source");
+    g_object_unref (task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+loc_location_get_predicted_orbits_data_source_indication_cb (QmiClientLoc                                       *client,
+                                                             QmiIndicationLocGetPredictedOrbitsDataSourceOutput *output,
+                                                             GTask                                              *task)
+{
+    MMSharedQmi            *self;
+    Private                *priv;
+    QmiLocIndicationStatus  status;
+    GError                 *error = NULL;
+    GArray                 *server_list = NULL;
+    gboolean                supported = FALSE;
+
+    if (!qmi_indication_loc_get_predicted_orbits_data_source_output_get_indication_status (output, &status, &error)) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        goto out;
+    }
+
+    if (!mm_error_from_qmi_loc_indication_status (status, &error))
+        goto out;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+
+    if (qmi_indication_loc_get_predicted_orbits_data_source_output_get_server_list (
+            output,
+            &server_list,
+            NULL) &&
+        server_list->len > 0) {
+        guint      i;
+        GPtrArray *tmp;
+
+        tmp = g_ptr_array_sized_new (server_list->len + 1);
+        for (i = 0; i < server_list->len; i++) {
+            const gchar *server;
+
+            server = g_array_index (server_list, gchar *, i);
+            g_ptr_array_add (tmp, g_strdup (server));
+        }
+        g_ptr_array_add (tmp, NULL);
+
+        g_assert (!priv->loc_assistance_data_servers);
+        priv->loc_assistance_data_servers = (gchar **) g_ptr_array_free (tmp, FALSE);
+
+        supported = TRUE;
+    }
+
+    if (qmi_indication_loc_get_predicted_orbits_data_source_output_get_allowed_sizes (
+            output,
+            &priv->loc_assistance_data_max_file_size,
+            &priv->loc_assistance_data_max_part_size,
+            NULL) &&
+        priv->loc_assistance_data_max_file_size > 0 &&
+        priv->loc_assistance_data_max_part_size > 0) {
+        supported = TRUE;
+    }
+
+out:
+    if (error)
+        g_task_return_error (task, error);
+    else if (!supported)
+        g_task_return_int (task, MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE);
+    else
+        g_task_return_int (task, MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_XTRA);
+    g_object_unref (task);
+}
+
+static void
+loc_location_get_predicted_orbits_data_source_ready (QmiClientLoc *client,
+                                                     GAsyncResult *res,
+                                                     GTask        *task)
+{
+    LoadSupportedAssistanceDataContext              *ctx;
+    QmiMessageLocGetPredictedOrbitsDataSourceOutput *output;
+    GError                                          *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_loc_get_predicted_orbits_data_source_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_loc_get_predicted_orbits_data_source_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_loc_get_predicted_orbits_data_source_output_unref (output);
+        return;
+    }
+
+    /* The task ownership is shared between signal and timeout; the one which is
+     * scheduled first will cancel the other. */
+    ctx->indication_id = g_signal_connect (ctx->client,
+                                           "get-predicted-orbits-data-source",
+                                           G_CALLBACK (loc_location_get_predicted_orbits_data_source_indication_cb),
+                                           task);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)loc_location_get_predicted_orbits_data_source_indication_timed_out,
+                                             task);
+
+    qmi_message_loc_get_predicted_orbits_data_source_output_unref (output);
+}
+
+void
+mm_shared_qmi_location_load_supported_assistance_data (MMIfaceModemLocation  *self,
+                                                       GAsyncReadyCallback    callback,
+                                                       gpointer               user_data)
+{
+    LoadSupportedAssistanceDataContext *ctx;
+    GTask                              *task;
+    QmiClient                          *client;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* If no LOC client, no assistance data right away */
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_LOC, MM_PORT_QMI_FLAG_DEFAULT, NULL);
+    if (!client) {
+        g_task_return_int (task, MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (LoadSupportedAssistanceDataContext);
+    ctx->client = g_object_ref (client);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_supported_assistance_data_context_free);
+
+    qmi_client_loc_get_predicted_orbits_data_source (ctx->client,
+                                                     NULL,
+                                                     10,
+                                                     NULL,
+                                                     (GAsyncReadyCallback)loc_location_get_predicted_orbits_data_source_ready,
+                                                     task);
+}
+
+/*****************************************************************************/
+/* Location: inject assistance data */
+
+#define MAX_BYTES_PER_REQUEST 1024
+
+typedef struct {
+    QmiClientLoc *client;
+    guint8       *data;
+    goffset       data_size;
+    gulong        total_parts;
+    guint32       part_size;
+    glong         indication_id;
+    guint         timeout_id;
+    goffset       i;
+    gulong        n_part;
+} InjectAssistanceDataContext;
+
+static void
+inject_assistance_data_context_free (InjectAssistanceDataContext *ctx)
+{
+    if (ctx->client) {
+        if (ctx->timeout_id)
+            g_source_remove (ctx->timeout_id);
+        if (ctx->indication_id)
+            g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+        g_object_unref (ctx->client);
+    }
+    g_free (ctx->data);
+    g_slice_free (InjectAssistanceDataContext, ctx);
+}
+
+gboolean
+mm_shared_qmi_location_inject_assistance_data_finish (MMIfaceModemLocation  *self,
+                                                      GAsyncResult          *res,
+                                                      GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void inject_assistance_data_next (GTask *task);
+
+static gboolean
+loc_location_inject_predicted_orbits_data_indication_timed_out (GTask *task)
+{
+    InjectAssistanceDataContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    ctx->timeout_id = 0;
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                             "Failed to receive indication with the server update result");
+    g_object_unref (task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+loc_location_inject_predicted_orbits_data_indication_cb (QmiClientLoc                                    *client,
+                                                         QmiIndicationLocInjectPredictedOrbitsDataOutput *output,
+                                                         GTask                                           *task)
+{
+    InjectAssistanceDataContext *ctx;
+    QmiLocIndicationStatus       status;
+    GError                      *error = NULL;
+
+    if (!qmi_indication_loc_inject_predicted_orbits_data_output_get_indication_status (output, &status, &error)) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        goto out;
+    }
+
+    mm_error_from_qmi_loc_indication_status (status, &error);
+
+out:
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_task_get_task_data (task);
+
+    g_source_remove (ctx->timeout_id);
+    ctx->timeout_id = 0;
+
+    g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+    ctx->indication_id = 0;
+
+    inject_assistance_data_next (task);
+}
+
+static void
+inject_predicted_orbits_data_ready (QmiClientLoc *client,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    QmiMessageLocInjectPredictedOrbitsDataOutput *output;
+    InjectAssistanceDataContext                  *ctx;
+    GError                                       *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_loc_inject_predicted_orbits_data_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_loc_inject_predicted_orbits_data_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_loc_inject_predicted_orbits_data_output_unref (output);
+        return;
+    }
+
+    /* The task ownership is shared between signal and timeout; the one which is
+     * scheduled first will cancel the other. */
+    ctx->indication_id = g_signal_connect (ctx->client,
+                                           "inject-predicted-orbits-data",
+                                           G_CALLBACK (loc_location_inject_predicted_orbits_data_indication_cb),
+                                           task);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)loc_location_inject_predicted_orbits_data_indication_timed_out,
+                                             task);
+
+    qmi_message_loc_inject_predicted_orbits_data_output_unref (output);
+}
+
+static void
+inject_assistance_data_next (GTask *task)
+{
+    QmiMessageLocInjectPredictedOrbitsDataInput *input;
+    InjectAssistanceDataContext                 *ctx;
+    goffset                                      total_bytes_left;
+    gsize                                        count;
+    GArray                                      *data;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->data_size >= ctx->i);
+    total_bytes_left = ctx->data_size - ctx->i;
+    if (total_bytes_left == 0) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->n_part++;
+    count = (total_bytes_left >= ctx->part_size) ? ctx->part_size : total_bytes_left;
+
+    input = qmi_message_loc_inject_predicted_orbits_data_input_new ();
+    qmi_message_loc_inject_predicted_orbits_data_input_set_format_type (
+        input,
+        QMI_LOC_PREDICTED_ORBITS_DATA_FORMAT_XTRA,
+        NULL);
+    qmi_message_loc_inject_predicted_orbits_data_input_set_total_size (
+        input,
+        (guint32)ctx->data_size,
+        NULL);
+    qmi_message_loc_inject_predicted_orbits_data_input_set_total_parts (
+        input,
+        (guint16)ctx->total_parts,
+        NULL);
+    qmi_message_loc_inject_predicted_orbits_data_input_set_part_number (
+        input,
+        (guint16)ctx->n_part,
+        NULL);
+    data = g_array_append_vals (g_array_sized_new (FALSE, FALSE, sizeof (guint8), count), &(ctx->data[ctx->i]), count);
+    qmi_message_loc_inject_predicted_orbits_data_input_set_part_data (
+        input,
+        data,
+        NULL);
+    g_array_unref (data);
+
+    ctx->i += count;
+
+    mm_info ("injecting predicted orbits data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
+             count, (guint) ctx->n_part, (guint) ctx->total_parts);
+    qmi_client_loc_inject_predicted_orbits_data (ctx->client,
+                                                 input,
+                                                 10,
+                                                 NULL,
+                                                 (GAsyncReadyCallback) inject_predicted_orbits_data_ready,
+                                                 task);
+
+    qmi_message_loc_inject_predicted_orbits_data_input_unref (input);
+}
+
+void
+mm_shared_qmi_location_inject_assistance_data (MMIfaceModemLocation *self,
+                                               const guint8         *data,
+                                               gsize                 data_size,
+                                               GAsyncReadyCallback   callback,
+                                               gpointer              user_data)
+{
+    InjectAssistanceDataContext *ctx;
+    QmiClient                   *client;
+    GTask                       *task;
+    Private                     *priv;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_LOC, &client,
+                                      callback, user_data))
+        return;
+
+    priv = get_private (MM_SHARED_QMI (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (InjectAssistanceDataContext);
+    ctx->client = g_object_ref (client);
+    ctx->data = g_memdup (data, data_size);
+    ctx->data_size = data_size;
+    ctx->part_size = ((priv->loc_assistance_data_max_part_size > 0) ? priv->loc_assistance_data_max_part_size : MAX_BYTES_PER_REQUEST);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) inject_assistance_data_context_free);
+
+    if ((ctx->data_size > (G_MAXUINT16 * ctx->part_size)) ||
+        ((priv->loc_assistance_data_max_file_size > 0) && (ctx->data_size > priv->loc_assistance_data_max_file_size))) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_TOO_MANY,
+                                 "Assistance data file is too big");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->total_parts = (ctx->data_size / ctx->part_size);
+    if (ctx->data_size % ctx->part_size)
+        ctx->total_parts++;
+    g_assert (ctx->total_parts <= G_MAXUINT16);
+
+    mm_dbg ("Injecting gpsOneXTRA data (%" G_GOFFSET_FORMAT " bytes)...", ctx->data_size);
+
+    inject_assistance_data_next (task);
 }
 
 /*****************************************************************************/

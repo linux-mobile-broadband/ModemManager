@@ -10577,6 +10577,12 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->load_supl_server_finish = mm_shared_qmi_location_load_supl_server_finish;
     iface->set_supl_server = mm_shared_qmi_location_set_supl_server;
     iface->set_supl_server_finish = mm_shared_qmi_location_set_supl_server_finish;
+    iface->load_supported_assistance_data = mm_shared_qmi_location_load_supported_assistance_data;
+    iface->load_supported_assistance_data_finish = mm_shared_qmi_location_load_supported_assistance_data_finish;
+    iface->inject_assistance_data = mm_shared_qmi_location_inject_assistance_data;
+    iface->inject_assistance_data_finish = mm_shared_qmi_location_inject_assistance_data_finish;
+    iface->load_assistance_data_servers = mm_shared_qmi_location_load_assistance_data_servers;
+    iface->load_assistance_data_servers_finish = mm_shared_qmi_location_load_assistance_data_servers_finish;
 }
 
 static void
