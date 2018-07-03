@@ -118,12 +118,9 @@ void mm_iface_modem_voice_shutdown (MMIfaceModemVoice *self);
 void mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
                                               MMSimpleStatus *status);
 
-/* CALL creation */
-void        mm_iface_modem_voice_incoming_call                  (MMIfaceModemVoice *self);
-gboolean    mm_iface_modem_voice_update_incoming_call_number    (MMIfaceModemVoice *self,
-                                                                 gchar *number,
-                                                                 guint type,
-                                                                 guint validity);
+/* Incoming call management */
+void mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
+                                                const gchar       *number);
 
 /* Look for a new valid multipart reference */
 guint8 mm_iface_modem_voice_get_local_multipart_reference (MMIfaceModemVoice *self,

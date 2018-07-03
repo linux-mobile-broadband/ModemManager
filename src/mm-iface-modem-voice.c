@@ -72,7 +72,8 @@ create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
 /*****************************************************************************/
 
 void
-mm_iface_modem_voice_incoming_call (MMIfaceModemVoice *self)
+mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
+                                           const gchar       *number)
 {
     MMBaseCall *call = NULL;
     MMCallList *list = NULL;
@@ -88,15 +89,17 @@ mm_iface_modem_voice_incoming_call (MMIfaceModemVoice *self)
 
     call = mm_call_list_get_first_ringing_in_call (list);
 
-    /* If call exists already, refresh its validity */
+    /* If call exists already, refresh its validity and set number if it wasn't set */
     if (call) {
+        if (number && !mm_gdbus_call_get_number (MM_GDBUS_CALL (call)))
+            mm_gdbus_call_set_number (MM_GDBUS_CALL (call), number);
         mm_base_call_incoming_refresh (call);
         g_object_unref (list);
         return;
     }
 
     mm_dbg ("Creating new incoming call...");
-    call = create_incoming_call (self, NULL);
+    call = create_incoming_call (self, number);
 
     /* Set the state as ringing in */
     mm_base_call_change_state (call, MM_CALL_STATE_RINGING_IN, MM_CALL_STATE_REASON_INCOMING_NEW);
@@ -109,41 +112,6 @@ mm_iface_modem_voice_incoming_call (MMIfaceModemVoice *self)
     mm_call_list_add_call (list, call);
     g_object_unref (call);
     g_object_unref (list);
-}
-
-gboolean
-mm_iface_modem_voice_update_incoming_call_number (MMIfaceModemVoice *self,
-                                                  gchar *number,
-                                                  guint type,
-                                                  guint validity)
-{
-    gboolean    updated = FALSE;
-    MMBaseCall  *call   = NULL;
-    MMCallList  *list   = NULL;
-
-    g_object_get (MM_BASE_MODEM (self),
-                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
-                  NULL);
-
-    if (list) {
-        call = mm_call_list_get_first_ringing_in_call (list);
-
-        if (call) {
-            mm_gdbus_call_set_number (MM_GDBUS_CALL (call), number);
-
-            /*
-             * TODO: Maybe also this parameters should be used:
-             *  - type
-             *  - validity
-             */
-
-            updated = TRUE;
-        } else {
-            mm_dbg ("Incoming call does not exist yet");
-        }
-    }
-
-    return updated;
 }
 
 /*****************************************************************************/
