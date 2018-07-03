@@ -673,6 +673,7 @@ mm_base_call_get_path (MMBaseCall *self)
 /* Define the states in which we want to handle in-call events */
 #define MM_CALL_STATE_IS_IN_CALL(state)         \
     (state == MM_CALL_STATE_DIALING ||          \
+     state == MM_CALL_STATE_RINGING_IN  ||      \
      state == MM_CALL_STATE_RINGING_OUT ||      \
      state == MM_CALL_STATE_ACTIVE)
 

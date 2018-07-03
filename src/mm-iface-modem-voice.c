@@ -97,10 +97,9 @@ mm_iface_modem_voice_incoming_call (MMIfaceModemVoice *self)
 
     mm_dbg ("Creating new incoming call...");
     call = create_incoming_call (self, NULL);
-    g_object_set (call,
-                  "state",        MM_CALL_STATE_RINGING_IN,
-                  "state-reason", MM_CALL_STATE_REASON_INCOMING_NEW,
-                  NULL);
+
+    /* Set the state as ringing in */
+    mm_base_call_change_state (call, MM_CALL_STATE_RINGING_IN, MM_CALL_STATE_REASON_INCOMING_NEW);
 
     /* Start its validity timeout */
     mm_base_call_incoming_refresh (call);
