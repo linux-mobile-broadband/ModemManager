@@ -201,10 +201,14 @@ cleanup_unsolicited_events (MMBaseCall  *self,
 /*****************************************************************************/
 
 MMBaseCall *
-mm_call_huawei_new (MMBaseModem *modem)
+mm_call_huawei_new (MMBaseModem     *modem,
+                    MMCallDirection  direction,
+                    const gchar     *number)
 {
     return MM_BASE_CALL (g_object_new (MM_TYPE_CALL_HUAWEI,
                                        MM_BASE_CALL_MODEM, modem,
+                                       "direction",        direction,
+                                       "number",           number,
                                        MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, TRUE,
                                        MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  TRUE,
                                        NULL));

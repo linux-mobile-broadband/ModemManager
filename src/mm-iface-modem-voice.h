@@ -78,7 +78,9 @@ struct _MMIfaceModemVoice {
                                                     GError **error);
 
     /* Create CALL objects */
-    MMBaseCall * (* create_call) (MMIfaceModemVoice *self);
+    MMBaseCall * (* create_call) (MMIfaceModemVoice *self,
+                                  MMCallDirection    direction,
+                                  const gchar       *number);
 };
 
 GType mm_iface_modem_voice_get_type (void);

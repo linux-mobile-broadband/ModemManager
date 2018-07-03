@@ -7115,9 +7115,11 @@ modem_voice_enable_unsolicited_events (MMIfaceModemVoice *self,
 /* Create CALL (Voice interface) */
 
 static MMBaseCall *
-modem_voice_create_call (MMIfaceModemVoice *self)
+modem_voice_create_call (MMIfaceModemVoice *self,
+                         MMCallDirection    direction,
+                         const gchar       *number)
 {
-    return mm_base_call_new (MM_BASE_MODEM (self));
+    return mm_base_call_new (MM_BASE_MODEM (self), direction, number);
 }
 
 /*****************************************************************************/

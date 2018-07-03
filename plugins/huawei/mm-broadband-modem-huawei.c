@@ -2987,10 +2987,12 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice *self,
 /* Create call (Voice interface) */
 
 static MMBaseCall *
-create_call (MMIfaceModemVoice *self)
+create_call (MMIfaceModemVoice *self,
+             MMCallDirection    direction,
+             const gchar       *number)
 {
     /* New Huawei Call */
-    return mm_call_huawei_new (MM_BASE_MODEM (self));
+    return mm_call_huawei_new (MM_BASE_MODEM (self), direction, number);
 }
 
 /*****************************************************************************/

@@ -932,10 +932,14 @@ call_send_dtmf (MMBaseCall *self,
 /*****************************************************************************/
 
 MMBaseCall *
-mm_base_call_new (MMBaseModem *modem)
+mm_base_call_new (MMBaseModem     *modem,
+                  MMCallDirection  direction,
+                  const gchar     *number)
 {
     return MM_BASE_CALL (g_object_new (MM_TYPE_BASE_CALL,
                                        MM_BASE_CALL_MODEM, modem,
+                                       "direction",        direction,
+                                       "number",           number,
                                        NULL));
 }
 

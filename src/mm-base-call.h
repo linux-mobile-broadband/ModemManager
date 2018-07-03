@@ -92,7 +92,9 @@ struct _MMBaseCallClass {
 GType mm_base_call_get_type (void);
 
 /* This one can be overriden by plugins */
-MMBaseCall *mm_base_call_new (MMBaseModem *modem);
+MMBaseCall *mm_base_call_new (MMBaseModem     *modem,
+                              MMCallDirection  direction,
+                              const gchar     *number);
 
 void         mm_base_call_export   (MMBaseCall *self);
 void         mm_base_call_unexport (MMBaseCall *self);

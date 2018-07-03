@@ -39,19 +39,19 @@ mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
 /*****************************************************************************/
 
 static MMBaseCall *
-create_call (MMIfaceModemVoice *self)
+create_incoming_call (MMIfaceModemVoice *self,
+                      const gchar       *number)
 {
     g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call != NULL);
 
-    return MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self);
+    return MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self, MM_CALL_DIRECTION_INCOMING, number);
 }
 
 static MMBaseCall *
-create_call_from_properties (MMIfaceModemVoice  *self,
-                             MMCallProperties   *properties,
-                             GError            **error)
+create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
+                                      MMCallProperties   *properties,
+                                      GError            **error)
 {
-    MMBaseCall  *call;
     const gchar *number;
 
     /* Don't create CALL from properties if either number is missing */
@@ -66,14 +66,7 @@ create_call_from_properties (MMIfaceModemVoice  *self,
 
     /* Create a call object as defined by the interface */
     g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call != NULL);
-    call = MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self);
-    g_object_set (call,
-                  "state",        mm_call_properties_get_state (properties),
-                  "state-reason", mm_call_properties_get_state_reason (properties),
-                  "direction",    mm_call_properties_get_direction (properties),
-                  "number",       number,
-                  NULL);
-    return call;
+    return MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->create_call (self, MM_CALL_DIRECTION_OUTGOING, number);
 }
 
 /*****************************************************************************/
@@ -103,11 +96,10 @@ mm_iface_modem_voice_incoming_call (MMIfaceModemVoice *self)
     }
 
     mm_dbg ("Creating new incoming call...");
-    call = create_call (self);
+    call = create_incoming_call (self, NULL);
     g_object_set (call,
-                  "state",          MM_CALL_STATE_RINGING_IN,
-                  "state-reason",   MM_CALL_STATE_REASON_INCOMING_NEW,
-                  "direction",      MM_CALL_DIRECTION_INCOMING,
+                  "state",        MM_CALL_STATE_RINGING_IN,
+                  "state-reason", MM_CALL_STATE_REASON_INCOMING_NEW,
                   NULL);
 
     /* Start its validity timeout */
@@ -302,7 +294,7 @@ handle_create_auth_ready (MMBaseModem *self,
         return;
     }
 
-    call = create_call_from_properties (MM_IFACE_MODEM_VOICE (self), properties, &error);
+    call = create_outgoing_call_from_properties (MM_IFACE_MODEM_VOICE (self), properties, &error);
     if (!call) {
         g_object_unref (properties);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
