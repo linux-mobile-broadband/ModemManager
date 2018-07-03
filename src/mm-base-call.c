@@ -939,48 +939,6 @@ mm_base_call_new (MMBaseModem *modem)
                                        NULL));
 }
 
-MMBaseCall *
-mm_base_call_new_from_properties (MMBaseModem *modem,
-                                  MMCallProperties *properties,
-                                  GError **error)
-{
-    MMBaseCall *self;
-    const gchar *number;
-    MMCallDirection direction;
-
-    g_assert (MM_IS_IFACE_MODEM_VOICE (modem));
-
-    number    = mm_call_properties_get_number (properties);
-    direction = mm_call_properties_get_direction (properties);
-
-    /* Don't create CALL from properties if either number is missing */
-    if (!number) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Cannot create call: mandatory parameter 'number' is missing");
-        return NULL;
-    }
-
-    /* if no direction is specified force to outgoing */
-    if (direction == MM_CALL_DIRECTION_UNKNOWN)
-        direction = MM_CALL_DIRECTION_OUTGOING;
-
-    /* Create a call object as defined by the interface */
-    self = mm_iface_modem_voice_create_call (MM_IFACE_MODEM_VOICE (modem));
-    g_object_set (self,
-                  "state",        mm_call_properties_get_state (properties),
-                  "state-reason", mm_call_properties_get_state_reason (properties),
-                  "direction",    direction,
-                  "number",       number,
-                  NULL);
-
-    /* Only export once properly created */
-    mm_base_call_export (self);
-
-    return self;
-}
-
 /*****************************************************************************/
 
 static void
