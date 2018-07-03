@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2016 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2016-2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -25,6 +25,7 @@
 #include "mm-log.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-voice.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer.h"
 #include "mm-broadband-modem-ublox.h"
@@ -32,11 +33,16 @@
 #include "mm-sim-ublox.h"
 #include "mm-modem-helpers-ublox.h"
 #include "mm-ublox-enums-types.h"
+#include "mm-call-ublox.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_voice_init (MMIfaceModemVoice *iface);
+
+static MMIfaceModemVoice *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemUblox, mm_broadband_modem_ublox, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init))
 
 typedef enum {
     FEATURE_SUPPORT_UNKNOWN,
@@ -745,6 +751,135 @@ load_unlock_retries (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Enabling unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_enable_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                              GAsyncResult       *res,
+                                              GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+own_voice_enable_unsolicited_events_ready (MMBaseModem *self,
+                                           GAsyncResult *res,
+                                           GTask *task)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_full_finish (self, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                              GAsyncResult      *res,
+                                              GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->enable_unsolicited_events_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Our own enable now */
+    mm_base_modem_at_command_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        "+UCALLSTAT=1",
+        5,
+        FALSE, /* allow_cached */
+        FALSE, /* raw */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_voice_enable_unsolicited_events_ready,
+        task);
+}
+
+static void
+modem_voice_enable_unsolicited_events (MMIfaceModemVoice   *self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Chain up parent's enable */
+    iface_modem_voice_parent->enable_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_enable_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Disabling unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_disable_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                               GAsyncResult       *res,
+                                               GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+own_voice_disable_unsolicited_events_ready (MMBaseModem  *self,
+                                            GAsyncResult *res,
+                                            GTask        *task)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_full_finish (self, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
+                                        GAsyncReadyCallback  callback,
+                                        gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Note: no parent disable method */
+
+    mm_base_modem_at_command_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        "+UCALLSTAT=0",
+        5,
+        FALSE, /* allow_cached */
+        FALSE, /* raw */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_voice_disable_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Create call (Voice interface) */
+
+static MMBaseCall *
+create_call (MMIfaceModemVoice *self,
+             MMCallDirection    direction,
+             const gchar       *number)
+{
+    /* New u-blox Call */
+    return mm_call_ublox_new (MM_BASE_MODEM (self), direction, number);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 typedef enum {
@@ -1119,6 +1254,19 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = load_current_bands_finish;
     iface->set_current_bands        = set_current_bands;
     iface->set_current_bands_finish = common_set_current_modes_bands_finish;
+}
+
+static void
+iface_modem_voice_init (MMIfaceModemVoice *iface)
+{
+    iface_modem_voice_parent = g_type_interface_peek_parent (iface);
+
+    iface->enable_unsolicited_events = modem_voice_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_voice_enable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_voice_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_voice_disable_unsolicited_events_finish;
+
+    iface->create_call = create_call;
 }
 
 static void
