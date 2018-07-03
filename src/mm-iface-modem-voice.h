@@ -122,9 +122,4 @@ void mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
 void mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
                                                 const gchar       *number);
 
-/* Look for a new valid multipart reference */
-guint8 mm_iface_modem_voice_get_local_multipart_reference (MMIfaceModemVoice *self,
-                                                           const gchar *number,
-                                                           GError **error);
-
 #endif /* MM_IFACE_MODEM_VOICE_H */
