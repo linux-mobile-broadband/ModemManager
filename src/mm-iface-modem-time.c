@@ -281,6 +281,22 @@ network_timezone_state_changed (MMIfaceModemTime *self)
 }
 
 static void
+stop_network_timezone (MMIfaceModemTime *self)
+{
+    NetworkTimezoneContext *ctx;
+
+    ctx = (NetworkTimezoneContext *) g_object_get_qdata (G_OBJECT (self), network_timezone_context_quark);
+    if (ctx) {
+        /* Remove signal connection and then trigger context free */
+        if (ctx->state_changed_id) {
+            g_signal_handler_disconnect (self, ctx->state_changed_id);
+            ctx->state_changed_id = 0;
+        }
+        g_object_set_qdata (G_OBJECT (self), network_timezone_context_quark, NULL);
+    }
+}
+
+static void
 start_network_timezone (MMIfaceModemTime *self)
 {
     NetworkTimezoneContext *ctx;
@@ -294,6 +310,9 @@ start_network_timezone (MMIfaceModemTime *self)
 
     if (G_UNLIKELY (!network_timezone_context_quark))
         network_timezone_context_quark = (g_quark_from_static_string (NETWORK_TIMEZONE_CONTEXT_TAG));
+
+    /* Cleanup context properly if it already exists, including the signal handler */
+    stop_network_timezone (self);
 
     ctx = g_new0 (NetworkTimezoneContext, 1);
     g_object_set_qdata_full (G_OBJECT (self),
@@ -313,22 +332,6 @@ start_network_timezone (MMIfaceModemTime *self)
     /* If we're registered already, start timezone poll */
     if (ctx->state >= MM_MODEM_STATE_REGISTERED)
         start_network_timezone_poll (self);
-}
-
-static void
-stop_network_timezone (MMIfaceModemTime *self)
-{
-    NetworkTimezoneContext *ctx;
-
-    ctx = (NetworkTimezoneContext *) g_object_get_qdata (G_OBJECT (self), network_timezone_context_quark);
-    if (ctx) {
-        /* Remove signal connection and then trigger context free */
-        if (ctx->state_changed_id) {
-            g_signal_handler_disconnect (self, ctx->state_changed_id);
-            ctx->state_changed_id = 0;
-        }
-        g_object_set_qdata (G_OBJECT (self), network_timezone_context_quark, NULL);
-    }
 }
 
 /*****************************************************************************/
