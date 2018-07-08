@@ -165,106 +165,6 @@ shared_qmi_peek_client (MMSharedQmi    *self,
 }
 
 /*****************************************************************************/
-/* Power cycle */
-
-static gboolean
-power_cycle_finish (MMBroadbandModemQmi *self,
-                    GAsyncResult *res,
-                    GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-power_cycle_set_operating_mode_reset_ready (QmiClientDms *client,
-                                            GAsyncResult *res,
-                                            GTask *task)
-{
-    QmiMessageDmsSetOperatingModeOutput *output;
-    GError *error = NULL;
-
-    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
-    if (!output ||
-        !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
-        g_task_return_error (task, error);
-    } else {
-        mm_info ("Modem is being rebooted now");
-        g_task_return_boolean (task, TRUE);
-    }
-
-    if (output)
-        qmi_message_dms_set_operating_mode_output_unref (output);
-
-    g_object_unref (task);
-}
-
-static void
-power_cycle_set_operating_mode_offline_ready (QmiClientDms *client,
-                                              GAsyncResult *res,
-                                              GTask *task)
-{
-    QmiMessageDmsSetOperatingModeInput *input;
-    QmiMessageDmsSetOperatingModeOutput *output;
-    GError *error = NULL;
-
-    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
-    if (!output) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        qmi_message_dms_set_operating_mode_output_unref (output);
-        return;
-    }
-
-    qmi_message_dms_set_operating_mode_output_unref (output);
-
-    /* Now, go into reset mode. This will fully reboot the modem, and the current
-     * modem object should get disposed. */
-    input = qmi_message_dms_set_operating_mode_input_new ();
-    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_RESET, NULL);
-    qmi_client_dms_set_operating_mode (client,
-                                       input,
-                                       20,
-                                       NULL,
-                                       (GAsyncReadyCallback)power_cycle_set_operating_mode_reset_ready,
-                                       task);
-    qmi_message_dms_set_operating_mode_input_unref (input);
-}
-
-static void
-power_cycle (MMBroadbandModemQmi *self,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
-{
-    QmiMessageDmsSetOperatingModeInput *input;
-    GTask *task;
-    QmiClient *client;
-
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_DMS, &client,
-                                      callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    /* Now, go into offline mode */
-    input = qmi_message_dms_set_operating_mode_input_new ();
-    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_OFFLINE, NULL);
-    qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (client),
-                                       input,
-                                       20,
-                                       NULL,
-                                       (GAsyncReadyCallback)power_cycle_set_operating_mode_offline_ready,
-                                       task);
-    qmi_message_dms_set_operating_mode_input_unref (input);
-}
-
-/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBaseBearer *
@@ -676,13 +576,13 @@ set_current_capabilities_finish (MMIfaceModem *self,
 }
 
 static void
-capabilities_power_cycle_ready (MMBroadbandModemQmi *self,
-                                GAsyncResult *res,
-                                GTask *task)
+capabilities_reset_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GTask *task)
 {
     GError *error = NULL;
 
-    if (!power_cycle_finish (self, res, &error))
+    if (!mm_shared_qmi_reset_finish (self, res, &error))
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
@@ -691,16 +591,16 @@ capabilities_power_cycle_ready (MMBroadbandModemQmi *self,
 }
 
 static void
-capabilities_power_cycle (GTask *task)
+capabilities_reset (GTask *task)
 {
     MMBroadbandModemQmi *self;
 
     self = g_task_get_source_object (task);
 
     /* Power cycle the modem */
-    power_cycle (self,
-                 (GAsyncReadyCallback)capabilities_power_cycle_ready,
-                 task);
+    mm_shared_qmi_reset (MM_IFACE_MODEM (self),
+                         (GAsyncReadyCallback)capabilities_reset_ready,
+                         task);
 }
 
 static void set_current_capabilities_context_step (GTask *task);
@@ -731,7 +631,7 @@ capabilities_set_technology_preference_ready (QmiClientNas *client,
             g_error_free (error);
 
         /* Good! now reboot the modem */
-        capabilities_power_cycle (task);
+        capabilities_reset (task);
         qmi_message_nas_set_technology_preference_output_unref (output);
         return;
     }
@@ -760,7 +660,7 @@ capabilities_set_system_selection_preference_ready (QmiClientNas *client,
         qmi_message_nas_set_system_selection_preference_output_unref (output);
     } else {
         /* Good! now reboot the modem */
-        capabilities_power_cycle (task);
+        capabilities_reset (task);
         qmi_message_nas_set_system_selection_preference_output_unref (output);
         return;
     }
@@ -3185,45 +3085,6 @@ create_sim (MMIfaceModem *self,
                     NULL, /* cancellable */
                     callback,
                     user_data);
-}
-
-/*****************************************************************************/
-/* Reset (Modem interface) */
-
-static gboolean
-modem_reset_finish (MMIfaceModem *self,
-                    GAsyncResult *res,
-                    GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-
-static void
-modem_reset_power_cycle_ready (MMBroadbandModemQmi *self,
-                               GAsyncResult *res,
-                               GTask *task)
-{
-    GError *error = NULL;
-
-    if (!power_cycle_finish (self, res, &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-
-    g_object_unref (task);
-}
-
-
-static void
-modem_reset (MMIfaceModem *self,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
-{
-    /* Power cycle the modem */
-    power_cycle (MM_BROADBAND_MODEM_QMI (self),
-                 (GAsyncReadyCallback)modem_reset_power_cycle_ready,
-                 g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
@@ -5677,7 +5538,7 @@ typedef enum {
     CDMA_ACTIVATION_STEP_ENABLE_INDICATIONS,
     CDMA_ACTIVATION_STEP_REQUEST_ACTIVATION,
     CDMA_ACTIVATION_STEP_WAIT_UNTIL_FINISHED,
-    CDMA_ACTIVATION_STEP_POWER_CYCLE,
+    CDMA_ACTIVATION_STEP_RESET,
     CDMA_ACTIVATION_STEP_LAST
 } CdmaActivationStep;
 
@@ -5751,14 +5612,14 @@ cdma_activation_disable_indications (CdmaActivationContext *ctx)
 }
 
 static void
-activation_power_cycle_ready (MMBroadbandModemQmi *self,
-                              GAsyncResult *res,
-                              GTask *task)
+activation_reset_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        GTask *task)
 {
     CdmaActivationContext *ctx;
     GError *error = NULL;
 
-    if (!power_cycle_finish (self, res, &error)) {
+    if (!mm_shared_qmi_reset_finish (self, res, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -6112,11 +5973,11 @@ cdma_activation_context_step (GTask *task)
                                    task);
         return;
 
-    case CDMA_ACTIVATION_STEP_POWER_CYCLE:
+    case CDMA_ACTIVATION_STEP_RESET:
         mm_info ("Activation step [4/5]: power-cycling...");
-        power_cycle (ctx->self,
-                     (GAsyncReadyCallback)activation_power_cycle_ready,
-                     task);
+        mm_shared_qmi_reset (MM_IFACE_MODEM (ctx->self),
+                             (GAsyncReadyCallback)activation_reset_ready,
+                             task);
         return;
 
     case CDMA_ACTIVATION_STEP_LAST:
@@ -9336,13 +9197,13 @@ firmware_change_current_finish (MMIfaceModemFirmware *self,
 }
 
 static void
-firmware_power_cycle_ready (MMBroadbandModemQmi *self,
-                            GAsyncResult *res,
-                            GTask *task)
+firmware_reset_ready (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GTask *task)
 {
     GError *error = NULL;
 
-    if (!power_cycle_finish (self, res, &error))
+    if (!mm_shared_qmi_reset_finish (self, res, &error))
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
@@ -9378,9 +9239,9 @@ firmware_select_stored_image_ready (QmiClientDms *client,
     qmi_message_dms_set_firmware_preference_output_unref (output);
 
     /* Now, go into offline mode */
-    power_cycle (self,
-                 (GAsyncReadyCallback)firmware_power_cycle_ready,
-                 task);
+    mm_shared_qmi_reset (MM_IFACE_MODEM (self),
+                         (GAsyncReadyCallback)firmware_reset_ready,
+                         task);
 }
 
 static MMFirmwareProperties *
@@ -10458,8 +10319,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_bearer_finish = modem_create_bearer_finish;
 
     /* Other actions */
-    iface->reset = modem_reset;
-    iface->reset_finish = modem_reset_finish;
+    iface->reset = mm_shared_qmi_reset;
+    iface->reset_finish = mm_shared_qmi_reset_finish;
     iface->factory_reset = modem_factory_reset;
     iface->factory_reset_finish = modem_factory_reset_finish;
 }

@@ -91,6 +91,105 @@ get_private (MMSharedQmi *self)
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+gboolean
+mm_shared_qmi_reset_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+reset_set_operating_mode_reset_ready (QmiClientDms *client,
+                                      GAsyncResult *res,
+                                      GTask *task)
+{
+    QmiMessageDmsSetOperatingModeOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
+    if (!output || !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+    } else {
+        mm_info ("Modem is being rebooted now");
+        g_task_return_boolean (task, TRUE);
+    }
+
+    if (output)
+        qmi_message_dms_set_operating_mode_output_unref (output);
+
+    g_object_unref (task);
+}
+
+static void
+reset_set_operating_mode_offline_ready (QmiClientDms *client,
+                                        GAsyncResult *res,
+                                        GTask        *task)
+{
+    QmiMessageDmsSetOperatingModeInput  *input;
+    QmiMessageDmsSetOperatingModeOutput *output;
+    GError                              *error = NULL;
+
+    output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
+    if (!output) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        qmi_message_dms_set_operating_mode_output_unref (output);
+        return;
+    }
+
+    qmi_message_dms_set_operating_mode_output_unref (output);
+
+    /* Now, go into reset mode. This will fully reboot the modem, and the current
+     * modem object should get disposed. */
+    input = qmi_message_dms_set_operating_mode_input_new ();
+    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_RESET, NULL);
+    qmi_client_dms_set_operating_mode (client,
+                                       input,
+                                       20,
+                                       NULL,
+                                       (GAsyncReadyCallback)reset_set_operating_mode_reset_ready,
+                                       task);
+    qmi_message_dms_set_operating_mode_input_unref (input);
+}
+
+void
+mm_shared_qmi_reset (MMIfaceModem        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    QmiMessageDmsSetOperatingModeInput *input;
+    GTask                              *task;
+    QmiClient                          *client;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_DMS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Now, go into offline mode */
+    input = qmi_message_dms_set_operating_mode_input_new ();
+    qmi_message_dms_set_operating_mode_input_set_mode (input, QMI_DMS_OPERATING_MODE_OFFLINE, NULL);
+    qmi_client_dms_set_operating_mode (QMI_CLIENT_DMS (client),
+                                       input,
+                                       20,
+                                       NULL,
+                                       (GAsyncReadyCallback)reset_set_operating_mode_offline_ready,
+                                       task);
+    qmi_message_dms_set_operating_mode_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Location: Set SUPL server */
 
 typedef struct {

@@ -4502,6 +4502,12 @@ iface_modem_init (MMIfaceModem *iface)
     /* SIM hot swapping */
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
+
+    /* Other actions */
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    iface->reset = mm_shared_qmi_reset;
+    iface->reset_finish = mm_shared_qmi_reset_finish;
+#endif
 }
 
 static void
