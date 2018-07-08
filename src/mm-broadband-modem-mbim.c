@@ -4507,6 +4507,8 @@ iface_modem_init (MMIfaceModem *iface)
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     iface->reset = mm_shared_qmi_reset;
     iface->reset_finish = mm_shared_qmi_reset_finish;
+    iface->factory_reset = mm_shared_qmi_factory_reset;
+    iface->factory_reset_finish = mm_shared_qmi_factory_reset_finish;
 #endif
 }
 

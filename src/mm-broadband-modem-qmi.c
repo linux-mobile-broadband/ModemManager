@@ -3088,80 +3088,6 @@ create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Factory reset (Modem interface) */
-
-static gboolean
-modem_factory_reset_finish (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-dms_restore_factory_defaults_ready (QmiClientDms *client,
-                                    GAsyncResult *res,
-                                    GTask *task)
-{
-    QmiMessageDmsRestoreFactoryDefaultsOutput *output = NULL;
-    GError *error = NULL;
-
-    output = qmi_client_dms_restore_factory_defaults_finish (client, res, &error);
-    if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_task_return_error (task, error);
-    } else if (!qmi_message_dms_restore_factory_defaults_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't restore factory defaults: ");
-        g_task_return_error (task, error);
-    } else
-        g_task_return_boolean (task, TRUE);
-
-    if (output)
-        qmi_message_dms_restore_factory_defaults_output_unref (output);
-
-    g_object_unref (task);
-}
-
-static void
-modem_factory_reset (MMIfaceModem *self,
-                     const gchar *code,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
-{
-    QmiMessageDmsRestoreFactoryDefaultsInput *input;
-    GTask *task;
-    QmiClient *client = NULL;
-    GError *error = NULL;
-
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_DMS, &client,
-                                      callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    input = qmi_message_dms_restore_factory_defaults_input_new ();
-    if (!qmi_message_dms_restore_factory_defaults_input_set_service_programming_code (
-            input,
-            code,
-            &error)) {
-        qmi_message_dms_restore_factory_defaults_input_unref (input);
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    mm_dbg ("performing a factory reset...");
-    qmi_client_dms_restore_factory_defaults (QMI_CLIENT_DMS (client),
-                                             input,
-                                             10,
-                                             NULL,
-                                             (GAsyncReadyCallback)dms_restore_factory_defaults_ready,
-                                             task);
-    qmi_message_dms_restore_factory_defaults_input_unref (input);
-}
-
-/*****************************************************************************/
 /* Load current modes (Modem interface) */
 
 typedef struct {
@@ -10321,8 +10247,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Other actions */
     iface->reset = mm_shared_qmi_reset;
     iface->reset_finish = mm_shared_qmi_reset_finish;
-    iface->factory_reset = modem_factory_reset;
-    iface->factory_reset_finish = modem_factory_reset_finish;
+    iface->factory_reset = mm_shared_qmi_factory_reset;
+    iface->factory_reset_finish = mm_shared_qmi_factory_reset_finish;
 }
 
 static void
