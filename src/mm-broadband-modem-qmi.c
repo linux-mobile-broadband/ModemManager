@@ -3489,6 +3489,7 @@ modem_factory_reset (MMIfaceModem *self,
                                              NULL,
                                              (GAsyncReadyCallback)dms_restore_factory_defaults_ready,
                                              result);
+    qmi_message_dms_restore_factory_defaults_input_unref (input);
 }
 
 /*****************************************************************************/
