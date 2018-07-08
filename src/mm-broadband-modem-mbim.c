@@ -166,6 +166,14 @@ shared_qmi_peek_client (MMSharedQmi    *self,
         return NULL;
     }
 
+    if (!mm_port_mbim_supports_qmi (port)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported");
+        return NULL;
+    }
+
     client = mm_port_mbim_peek_qmi_client (port, service);
     if (!client)
         g_set_error (error,
