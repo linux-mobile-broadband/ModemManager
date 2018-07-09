@@ -1161,7 +1161,7 @@ start_gps_engine (MMSharedQmi         *self,
         input = qmi_message_loc_start_input_new ();
         qmi_message_loc_start_input_set_session_id (input, DEFAULT_LOC_SESSION_ID, NULL);
         qmi_message_loc_start_input_set_intermediate_report_state (input, QMI_LOC_INTERMEDIATE_REPORT_STATE_DISABLE, NULL);
-        qmi_message_loc_start_input_set_minimum_interval_between_position_reports (input, 5000, NULL);
+        qmi_message_loc_start_input_set_minimum_interval_between_position_reports (input, 1000, NULL);
         qmi_message_loc_start_input_set_fix_recurrence_type (input, QMI_LOC_FIX_RECURRENCE_TYPE_REQUEST_PERIODIC_FIXES, NULL);
         qmi_client_loc_start (QMI_CLIENT_LOC (client),
                               input,
