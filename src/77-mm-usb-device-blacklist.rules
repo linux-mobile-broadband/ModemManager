@@ -120,8 +120,8 @@ ATTRS{idVendor}=="0fcf", ATTRS{idProduct}=="1009", ENV{ID_MM_DEVICE_IGNORE}="1"
 # Cypress M8-based GPS devices, UPSes, and serial converters
 DRIVERS=="cypress_m8", ENV{ID_MM_DEVICE_IGNORE}="1"
 
-# All devices in the Openmoko vendor ID
-ATTRS{idVendor}=="1d50", ENV{ID_MM_DEVICE_IGNORE}="1"
+# All devices in the Openmoko vendor ID, except usb hubs
+ATTRS{idVendor}=="1d50", ATTRS{bDeviceClass}!="09", ENV{ID_MM_DEVICE_IGNORE}="1"
 
 # All devices from 3D Robotics
 ATTRS{idVendor}=="26ac", ENV{ID_MM_DEVICE_IGNORE}="1"
