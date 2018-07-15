@@ -2838,112 +2838,6 @@ modem_3gpp_load_operator_code (MMIfaceModem3gpp *_self,
 }
 
 /*****************************************************************************/
-/* Register in network (3GPP interface) */
-
-static gboolean
-modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
-                                       GAsyncResult *res,
-                                       GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-initiate_network_register_ready (QmiClientNas *client,
-                                 GAsyncResult *res,
-                                 GTask *task)
-{
-    GError *error = NULL;
-    QmiMessageNasInitiateNetworkRegisterOutput *output;
-
-    output = qmi_client_nas_initiate_network_register_finish (client, res, &error);
-    if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_task_return_error (task, error);
-    } else if (!qmi_message_nas_initiate_network_register_output_get_result (output, &error)) {
-        /* NOFX is not an error, they actually play pretty well */
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
-            g_error_free (error);
-            g_task_return_boolean (task, TRUE);
-        } else {
-            g_prefix_error (&error, "Couldn't initiate network register: ");
-            g_task_return_error (task, error);
-        }
-    } else
-        g_task_return_boolean (task, TRUE);
-
-    g_object_unref (task);
-
-    if (output)
-        qmi_message_nas_initiate_network_register_output_unref (output);
-}
-
-static void
-modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
-                                const gchar *operator_id,
-                                GCancellable *cancellable,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data)
-{
-    guint16 mcc = 0;
-    guint16 mnc = 0;
-    QmiClient *client = NULL;
-    QmiMessageNasInitiateNetworkRegisterInput *input;
-    GError *error = NULL;
-
-    /* Parse input MCC/MNC */
-    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error)) {
-        g_assert (error != NULL);
-        g_task_report_error (self,
-                             callback,
-                             user_data,
-                             modem_3gpp_register_in_network,
-                             error);
-        return;
-    }
-
-    /* Get NAS client */
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_NAS, &client,
-                                      callback, user_data))
-        return;
-
-    input = qmi_message_nas_initiate_network_register_input_new ();
-
-    if (mcc) {
-        /* If the user sent a specific network to use, lock it in. */
-        qmi_message_nas_initiate_network_register_input_set_action (
-            input,
-            QMI_NAS_NETWORK_REGISTER_TYPE_MANUAL,
-            NULL);
-        qmi_message_nas_initiate_network_register_input_set_manual_registration_info_3gpp (
-            input,
-            mcc,
-            mnc,
-            QMI_NAS_RADIO_INTERFACE_UNKNOWN,
-            NULL);
-    } else {
-        /* Otherwise, automatic registration */
-        qmi_message_nas_initiate_network_register_input_set_action (
-            input,
-            QMI_NAS_NETWORK_REGISTER_TYPE_AUTOMATIC,
-            NULL);
-    }
-
-    qmi_client_nas_initiate_network_register (
-        QMI_CLIENT_NAS (client),
-        input,
-        120,
-        cancellable,
-        (GAsyncReadyCallback)initiate_network_register_ready,
-        g_task_new (self, NULL, callback, user_data));
-
-    qmi_message_nas_initiate_network_register_input_unref (input);
-}
-
-/*****************************************************************************/
 /* Registration checks (3GPP interface) */
 
 static gboolean
@@ -9073,8 +8967,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     /* Other actions */
     iface->scan_networks = modem_3gpp_scan_networks;
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
-    iface->register_in_network = modem_3gpp_register_in_network;
-    iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
+    iface->register_in_network = mm_shared_qmi_3gpp_register_in_network;
+    iface->register_in_network_finish = mm_shared_qmi_3gpp_register_in_network_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
     iface->load_operator_code = modem_3gpp_load_operator_code;

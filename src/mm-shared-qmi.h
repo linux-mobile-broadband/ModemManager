@@ -25,6 +25,7 @@
 #include <libqmi-glib.h>
 
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-location.h"
 #include "mm-port-qmi.h"
 
@@ -59,6 +60,17 @@ gboolean   mm_shared_qmi_ensure_client (MMSharedQmi          *self,
                                         QmiClient           **o_client,
                                         GAsyncReadyCallback   callback,
                                         gpointer              user_data);
+
+/* Shared QMI 3GPP operations */
+
+void     mm_shared_qmi_3gpp_register_in_network        (MMIfaceModem3gpp     *self,
+                                                        const gchar          *operator_id,
+                                                        GCancellable         *cancellable,
+                                                        GAsyncReadyCallback   callback,
+                                                        gpointer              user_data);
+gboolean mm_shared_qmi_3gpp_register_in_network_finish (MMIfaceModem3gpp     *self,
+                                                        GAsyncResult         *res,
+                                                        GError              **error);
 
 /* Shared QMI device management support */
 

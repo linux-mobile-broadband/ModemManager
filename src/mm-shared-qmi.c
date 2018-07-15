@@ -27,6 +27,7 @@
 
 #include "mm-log.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-location.h"
 #include "mm-shared-qmi.h"
 #include "mm-modem-helpers-qmi.h"
@@ -106,6 +107,107 @@ get_private (MMSharedQmi *self)
     }
 
     return priv;
+}
+
+/*****************************************************************************/
+/* Register in network (3GPP interface) */
+
+gboolean
+mm_shared_qmi_3gpp_register_in_network_finish (MMIfaceModem3gpp  *self,
+                                               GAsyncResult      *res,
+                                               GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+initiate_network_register_ready (QmiClientNas *client,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    GError                                     *error = NULL;
+    QmiMessageNasInitiateNetworkRegisterOutput *output;
+
+    output = qmi_client_nas_initiate_network_register_finish (client, res, &error);
+    if (!output || !qmi_message_nas_initiate_network_register_output_get_result (output, &error)) {
+        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_prefix_error (&error, "Couldn't initiate network register: ");
+            g_task_return_error (task, error);
+            goto out;
+        }
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+
+out:
+    g_object_unref (task);
+
+    if (output)
+        qmi_message_nas_initiate_network_register_output_unref (output);
+}
+
+void
+mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
+                                        const gchar         *operator_id,
+                                        GCancellable        *cancellable,
+                                        GAsyncReadyCallback  callback,
+                                        gpointer             user_data)
+{
+    GTask                                     *task;
+    QmiMessageNasInitiateNetworkRegisterInput *input;
+    guint16                                    mcc = 0;
+    guint16                                    mnc = 0;
+    QmiClient                                 *client = NULL;
+    GError                                    *error = NULL;
+
+    /* Get NAS client */
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Parse input MCC/MNC */
+    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error)) {
+        g_assert (error != NULL);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    input = qmi_message_nas_initiate_network_register_input_new ();
+
+    if (mcc) {
+        /* If the user sent a specific network to use, lock it in. */
+        qmi_message_nas_initiate_network_register_input_set_action (
+            input,
+            QMI_NAS_NETWORK_REGISTER_TYPE_MANUAL,
+            NULL);
+        qmi_message_nas_initiate_network_register_input_set_manual_registration_info_3gpp (
+            input,
+            mcc,
+            mnc,
+            QMI_NAS_RADIO_INTERFACE_UNKNOWN, /* don't change radio interface */
+            NULL);
+    } else {
+        /* Otherwise, automatic registration */
+        qmi_message_nas_initiate_network_register_input_set_action (
+            input,
+            QMI_NAS_NETWORK_REGISTER_TYPE_AUTOMATIC,
+            NULL);
+    }
+
+    qmi_client_nas_initiate_network_register (
+        QMI_CLIENT_NAS (client),
+        input,
+        120,
+        cancellable,
+        (GAsyncReadyCallback)initiate_network_register_ready,
+        task);
+
+    qmi_message_nas_initiate_network_register_input_unref (input);
 }
 
 /*****************************************************************************/
@@ -3948,6 +4050,7 @@ mm_shared_qmi_get_type (void)
 
         shared_qmi_type = g_type_register_static (G_TYPE_INTERFACE, "MMSharedQmi", &info, 0);
         g_type_interface_add_prerequisite (shared_qmi_type, MM_TYPE_IFACE_MODEM);
+        g_type_interface_add_prerequisite (shared_qmi_type, MM_TYPE_IFACE_MODEM_3GPP);
         g_type_interface_add_prerequisite (shared_qmi_type, MM_TYPE_IFACE_MODEM_LOCATION);
     }
 
