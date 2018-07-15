@@ -754,6 +754,25 @@ mm_modem_access_technologies_from_qmi_data_capability_array (GArray *data_capabi
 /*****************************************************************************/
 
 MMModemMode
+mm_modem_mode_from_qmi_nas_radio_interface (QmiNasRadioInterface iface)
+{
+    switch (iface) {
+        case QMI_NAS_RADIO_INTERFACE_CDMA_1X:
+        case QMI_NAS_RADIO_INTERFACE_GSM:
+            return MM_MODEM_MODE_2G;
+        case QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO:
+        case QMI_NAS_RADIO_INTERFACE_UMTS:
+            return MM_MODEM_MODE_3G;
+        case QMI_NAS_RADIO_INTERFACE_LTE:
+            return MM_MODEM_MODE_4G;
+        default:
+            return MM_MODEM_MODE_NONE;
+    }
+}
+
+/*****************************************************************************/
+
+MMModemMode
 mm_modem_mode_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPreference qmi)
 {
     MMModemMode mode = MM_MODEM_MODE_NONE;
@@ -905,6 +924,94 @@ mm_modem_capability_to_qmi_rat_mode_preference (MMModemCapability caps)
         qmi |= QMI_NAS_RAT_MODE_PREFERENCE_LTE;
 
     return qmi;
+}
+
+/*****************************************************************************/
+
+GArray *
+mm_modem_capability_to_qmi_acquisition_order_preference (MMModemCapability caps)
+{
+    GArray               *array;
+    QmiNasRadioInterface  value;
+
+    array = g_array_new (FALSE, FALSE, sizeof (QmiNasRadioInterface));
+
+    if (caps & MM_MODEM_CAPABILITY_LTE) {
+        value = QMI_NAS_RADIO_INTERFACE_LTE;
+        g_array_append_val (array, value);
+    }
+
+    if (caps & MM_MODEM_CAPABILITY_GSM_UMTS) {
+        value = QMI_NAS_RADIO_INTERFACE_UMTS;
+        g_array_append_val (array, value);
+        value = QMI_NAS_RADIO_INTERFACE_GSM;
+        g_array_append_val (array, value);
+    }
+
+    if (caps & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+        value = QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO;
+        g_array_append_val (array, value);
+        value = QMI_NAS_RADIO_INTERFACE_CDMA_1X;
+        g_array_append_val (array, value);
+    }
+
+    return array;
+}
+
+GArray *
+mm_modem_mode_to_qmi_acquisition_order_preference (MMModemMode allowed,
+                                                   MMModemMode preferred,
+                                                   gboolean    is_cdma,
+                                                   gboolean    is_3gpp)
+{
+    GArray               *array;
+    QmiNasRadioInterface  value;
+
+    array = g_array_new (FALSE, FALSE, sizeof (QmiNasRadioInterface));
+
+    if (allowed & MM_MODEM_MODE_4G) {
+        value = QMI_NAS_RADIO_INTERFACE_LTE;
+        if (preferred == MM_MODEM_MODE_4G)
+            g_array_prepend_val (array, value);
+        else
+            g_array_append_val (array, value);
+    }
+
+    if (allowed & MM_MODEM_MODE_3G) {
+        if (is_cdma) {
+            value = QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO;
+            if (preferred == MM_MODEM_MODE_3G)
+                g_array_prepend_val (array, value);
+            else
+                g_array_append_val (array, value);
+        }
+        if (is_3gpp) {
+            value = QMI_NAS_RADIO_INTERFACE_UMTS;
+            if (preferred == MM_MODEM_MODE_3G)
+                g_array_prepend_val (array, value);
+            else
+                g_array_append_val (array, value);
+        }
+    }
+
+    if (allowed & MM_MODEM_MODE_2G) {
+        if (is_cdma) {
+            value = QMI_NAS_RADIO_INTERFACE_CDMA_1X;
+            if (preferred == MM_MODEM_MODE_2G)
+                g_array_prepend_val (array, value);
+            else
+                g_array_append_val (array, value);
+        }
+        if (is_3gpp) {
+            value = QMI_NAS_RADIO_INTERFACE_GSM;
+            if (preferred == MM_MODEM_MODE_2G)
+                g_array_prepend_val (array, value);
+            else
+                g_array_append_val (array, value);
+        }
+    }
+
+    return array;
 }
 
 /*****************************************************************************/
@@ -1200,6 +1307,15 @@ mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth)
 
 /*****************************************************************************/
 
+/**
+ * The only case where we need to apply some logic to decide what the current
+ * capabilities are is when we have a multimode CDMA/EVDO+GSM/UMTS device, in
+ * which case we'll check the SSP and TP current values to decide which
+ * capabilities are present and which have been disabled.
+ *
+ * For all the other cases, the DMS capabilities are exactly the current ones,
+ * as there would be no capability switching support.
+ */
 MMModemCapability
 mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx)
 {
@@ -1209,16 +1325,19 @@ mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx
     gchar *dms_capabilities_str;
     gchar *tmp_str;
 
-    /* SSP logic to gather capabilities uses the Mode Preference TLV if available,
-     * and if not available it falls back to using Band Preference TLVs */
+    /* If not a multimode device, we're done */
+#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
+    if ((ctx->dms_capabilities & MULTIMODE) != MULTIMODE)
+        return ctx->dms_capabilities;
+
+    /* We have a multimode CDMA/EVDO+GSM/UMTS device, check SSP and TP */
+
+    /* SSP logic to gather capabilities uses the Mode Preference TLV if available */
     if (ctx->nas_ssp_mode_preference_mask)
         tmp = mm_modem_capability_from_qmi_rat_mode_preference (ctx->nas_ssp_mode_preference_mask);
-
     /* If no value retrieved from SSP, check TP. We only process TP
      * values if not 'auto'. */
-    if (   tmp == MM_MODEM_CAPABILITY_NONE
-        && ctx->nas_tp_mask
-        && ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO)
+    else if (ctx->nas_tp_mask && (ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO))
         tmp = mm_modem_capability_from_qmi_radio_technology_preference (ctx->nas_tp_mask);
 
     /* Final capabilities are the intersection between the Technology

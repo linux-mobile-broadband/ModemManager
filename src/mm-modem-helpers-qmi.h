@@ -46,6 +46,8 @@ MMModemAccessTechnology mm_modem_access_technologies_from_qmi_radio_interface_ar
 MMModemAccessTechnology mm_modem_access_technology_from_qmi_data_capability (QmiNasDataCapability cap);
 MMModemAccessTechnology mm_modem_access_technologies_from_qmi_data_capability_array (GArray *data_capabilities);
 
+MMModemMode mm_modem_mode_from_qmi_nas_radio_interface (QmiNasRadioInterface iface);
+
 MMModemMode mm_modem_mode_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPreference qmi);
 QmiNasRadioTechnologyPreference mm_modem_mode_to_qmi_radio_technology_preference (MMModemMode mode,
                                                                                   gboolean is_cdma);
@@ -57,6 +59,12 @@ QmiNasRatModePreference mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mo
 
 MMModemCapability mm_modem_capability_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi);
 QmiNasRatModePreference mm_modem_capability_to_qmi_rat_mode_preference (MMModemCapability caps);
+
+GArray *mm_modem_capability_to_qmi_acquisition_order_preference (MMModemCapability caps);
+GArray *mm_modem_mode_to_qmi_acquisition_order_preference       (MMModemMode       allowed,
+                                                                 MMModemMode       preferred,
+                                                                 gboolean          is_cdma,
+                                                                 gboolean          is_3gpp);
 
 MMModemCapability mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPreference qmi);
 QmiNasRadioTechnologyPreference mm_modem_capability_to_qmi_radio_technology_preference (MMModemCapability caps);

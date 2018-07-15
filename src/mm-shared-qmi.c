@@ -40,7 +40,20 @@
 #define PRIVATE_TAG "shared-qmi-private-tag"
 static GQuark private_quark;
 
+typedef enum {
+    FEATURE_UNKNOWN,
+    FEATURE_UNSUPPORTED,
+    FEATURE_SUPPORTED,
+} Feature;
+
 typedef struct {
+    /* Capabilities & modes helpers */
+    MMModemCapability  current_capabilities;
+    GArray            *supported_radio_interfaces;
+    Feature            feature_nas_technology_preference;
+    Feature            feature_nas_system_selection_preference;
+    gboolean           disable_4g_only_mode;
+
     /* Location helpers */
     MMIfaceModemLocation   *iface_modem_location_parent;
     MMModemLocationSource   enabled_sources;
@@ -56,6 +69,8 @@ typedef struct {
 static void
 private_free (Private *priv)
 {
+    if (priv->supported_radio_interfaces)
+        g_array_unref (priv->supported_radio_interfaces);
     if (priv->pds_location_event_report_indication_id)
         g_signal_handler_disconnect (priv->pds_client, priv->pds_location_event_report_indication_id);
     if (priv->pds_client)
@@ -80,6 +95,9 @@ get_private (MMSharedQmi *self)
     if (!priv) {
         priv = g_slice_new0 (Private);
 
+        priv->feature_nas_technology_preference = FEATURE_UNKNOWN;
+        priv->feature_nas_system_selection_preference = FEATURE_UNKNOWN;
+
         /* Setup parent class' MMIfaceModemLocation */
         g_assert (MM_SHARED_QMI_GET_INTERFACE (self)->peek_parent_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_QMI_GET_INTERFACE (self)->peek_parent_location_interface (self);
@@ -88,6 +106,1255 @@ get_private (MMSharedQmi *self)
     }
 
     return priv;
+}
+
+/*****************************************************************************/
+/* Current capabilities setting (Modem interface) */
+
+typedef enum {
+    SET_CURRENT_CAPABILITIES_STEP_FIRST,
+    SET_CURRENT_CAPABILITIES_STEP_NAS_SYSTEM_SELECTION_PREFERENCE,
+    SET_CURRENT_CAPABILITIES_STEP_NAS_TECHNOLOGY_PREFERENCE,
+    SET_CURRENT_CAPABILITIES_STEP_RESET,
+    SET_CURRENT_CAPABILITIES_STEP_LAST,
+} SetCurrentCapabilitiesStep;
+
+typedef struct {
+    QmiClientNas               *client;
+    MMModemCapability           capabilities;
+    gboolean                    capabilities_updated;
+    SetCurrentCapabilitiesStep  step;
+} SetCurrentCapabilitiesContext;
+
+static void
+set_current_capabilities_context_free (SetCurrentCapabilitiesContext *ctx)
+{
+    g_object_unref (ctx->client);
+    g_slice_free (SetCurrentCapabilitiesContext, ctx);
+}
+
+gboolean
+mm_shared_qmi_set_current_capabilities_finish (MMIfaceModem  *self,
+                                               GAsyncResult  *res,
+                                               GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void set_current_capabilities_step (GTask *task);
+
+static void
+set_current_capabilities_reset_ready (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GTask        *task)
+{
+    SetCurrentCapabilitiesContext *ctx;
+    GError                        *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_shared_qmi_reset_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    set_current_capabilities_step (task);
+}
+
+static void
+set_current_capabilities_set_technology_preference_ready (QmiClientNas *client,
+                                                          GAsyncResult *res,
+                                                          GTask        *task)
+{
+    SetCurrentCapabilitiesContext              *ctx;
+    QmiMessageNasSetTechnologyPreferenceOutput *output = NULL;
+    GError                                     *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_set_technology_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_set_technology_preference_output_get_result (output, &error)) {
+        /* A no-effect error here is not a real error */
+        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            goto out;
+        }
+        /* no effect, just end operation without reset */
+        g_clear_error (&error);
+        ctx->step = SET_CURRENT_CAPABILITIES_STEP_LAST;
+        set_current_capabilities_step (task);
+        goto out;
+    }
+
+    /* success! */
+    ctx->step = SET_CURRENT_CAPABILITIES_STEP_RESET;
+    set_current_capabilities_step (task);
+
+out:
+    if (output)
+        qmi_message_nas_set_technology_preference_output_unref (output);
+}
+
+static void
+set_current_capabilities_technology_preference (GTask *task)
+{
+    SetCurrentCapabilitiesContext             *ctx;
+    QmiMessageNasSetTechnologyPreferenceInput *input;
+    QmiNasRadioTechnologyPreference            pref;
+
+    ctx = g_task_get_task_data (task);
+
+    pref = mm_modem_capability_to_qmi_radio_technology_preference (ctx->capabilities);
+    if (!pref) {
+        gchar *str;
+
+        str = mm_modem_capability_build_string_from_mask (ctx->capabilities);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Unhandled capabilities setting: '%s'",
+                                 str);
+        g_object_unref (task);
+        g_free (str);
+        return;
+    }
+
+    input = qmi_message_nas_set_technology_preference_input_new ();
+    qmi_message_nas_set_technology_preference_input_set_current (input, pref, QMI_NAS_PREFERENCE_DURATION_PERMANENT, NULL);
+
+    qmi_client_nas_set_technology_preference (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)set_current_capabilities_set_technology_preference_ready,
+        task);
+    qmi_message_nas_set_technology_preference_input_unref (input);
+}
+
+static void
+set_current_capabilities_set_system_selection_preference_ready (QmiClientNas *client,
+                                                                GAsyncResult *res,
+                                                                GTask        *task)
+{
+    SetCurrentCapabilitiesContext                   *ctx;
+    QmiMessageNasSetSystemSelectionPreferenceOutput *output = NULL;
+    GError                                          *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_set_system_selection_preference_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
+
+    /* success! */
+    ctx->step = SET_CURRENT_CAPABILITIES_STEP_RESET;
+    set_current_capabilities_step (task);
+
+out:
+    if (output)
+        qmi_message_nas_set_system_selection_preference_output_unref (output);
+}
+
+static void
+set_current_capabilities_system_selection_preference (GTask *task)
+{
+    MMSharedQmi                                    *self;
+    Private                                        *priv;
+    SetCurrentCapabilitiesContext                  *ctx;
+    QmiMessageNasSetSystemSelectionPreferenceInput *input;
+    QmiNasRatModePreference                         pref;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+    ctx  = g_task_get_task_data (task);
+
+    pref = mm_modem_capability_to_qmi_rat_mode_preference (ctx->capabilities);
+    if (!pref) {
+        gchar *str;
+
+        str = mm_modem_capability_build_string_from_mask (ctx->capabilities);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Unhandled capabilities setting: '%s'",
+                                 str);
+        g_object_unref (task);
+        g_free (str);
+        return;
+    }
+
+    input = qmi_message_nas_set_system_selection_preference_input_new ();
+    qmi_message_nas_set_system_selection_preference_input_set_mode_preference (input, pref, NULL);
+    qmi_message_nas_set_system_selection_preference_input_set_change_duration (input, QMI_NAS_CHANGE_DURATION_PERMANENT, NULL);
+
+    qmi_client_nas_set_system_selection_preference (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)set_current_capabilities_set_system_selection_preference_ready,
+        task);
+    qmi_message_nas_set_system_selection_preference_input_unref (input);
+}
+
+static void
+set_current_capabilities_step (GTask *task)
+{
+    MMSharedQmi                   *self;
+    Private                       *priv;
+    SetCurrentCapabilitiesContext *ctx;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+    ctx  = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case SET_CURRENT_CAPABILITIES_STEP_FIRST:
+        /* Error out early if both unsupported */
+        if ((priv->feature_nas_system_selection_preference != FEATURE_SUPPORTED) &&
+            (priv->feature_nas_technology_preference       != FEATURE_SUPPORTED)) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                     "Setting capabilities is not supported by this device");
+            g_object_unref (task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
+    case SET_CURRENT_CAPABILITIES_STEP_NAS_SYSTEM_SELECTION_PREFERENCE:
+        if (priv->feature_nas_system_selection_preference == FEATURE_SUPPORTED) {
+            set_current_capabilities_system_selection_preference (task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
+    case SET_CURRENT_CAPABILITIES_STEP_NAS_TECHNOLOGY_PREFERENCE:
+        if (priv->feature_nas_technology_preference == FEATURE_SUPPORTED) {
+            set_current_capabilities_technology_preference (task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
+    case SET_CURRENT_CAPABILITIES_STEP_RESET:
+        mm_shared_qmi_reset (MM_IFACE_MODEM (self),
+                             (GAsyncReadyCallback)set_current_capabilities_reset_ready,
+                             task);
+        return;
+
+    case SET_CURRENT_CAPABILITIES_STEP_LAST:
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+}
+
+void
+mm_shared_qmi_set_current_capabilities (MMIfaceModem        *self,
+                                        MMModemCapability    capabilities,
+                                        GAsyncReadyCallback  callback,
+                                        gpointer             user_data)
+{
+    Private                       *priv;
+    SetCurrentCapabilitiesContext *ctx;
+    GTask                         *task;
+    QmiClient                     *client = NULL;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    priv = get_private (MM_SHARED_QMI (self));
+    g_assert (priv->feature_nas_technology_preference       != FEATURE_UNKNOWN);
+    g_assert (priv->feature_nas_system_selection_preference != FEATURE_UNKNOWN);
+
+    ctx = g_slice_new0 (SetCurrentCapabilitiesContext);
+    ctx->client       = g_object_ref (client);
+    ctx->capabilities = capabilities;
+    ctx->step = SET_CURRENT_CAPABILITIES_STEP_FIRST;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)set_current_capabilities_context_free);
+
+    set_current_capabilities_step (task);
+}
+
+/*****************************************************************************/
+/* Current capabilities (Modem interface) */
+
+typedef enum {
+    LOAD_CURRENT_CAPABILITIES_STEP_FIRST,
+    LOAD_CURRENT_CAPABILITIES_STEP_NAS_SYSTEM_SELECTION_PREFERENCE,
+    LOAD_CURRENT_CAPABILITIES_STEP_NAS_TECHNOLOGY_PREFERENCE,
+    LOAD_CURRENT_CAPABILITIES_STEP_DMS_GET_CAPABILITIES,
+    LOAD_CURRENT_CAPABILITIES_STEP_LAST,
+} LoadCurrentCapabilitiesStep;
+
+typedef struct {
+    QmiClientNas                *nas_client;
+    QmiClientDms                *dms_client;
+    LoadCurrentCapabilitiesStep  step;
+    MMQmiCapabilitiesContext     capabilities_context;
+} LoadCurrentCapabilitiesContext;
+
+MMModemCapability
+mm_shared_qmi_load_current_capabilities_finish (MMIfaceModem  *self,
+                                                GAsyncResult  *res,
+                                                GError       **error)
+{
+    GError *inner_error = NULL;
+    gssize  value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_CAPABILITY_NONE;
+    }
+    return (MMModemCapability)value;
+}
+
+static void
+load_current_capabilities_context_free (LoadCurrentCapabilitiesContext *ctx)
+{
+    g_object_unref (ctx->nas_client);
+    g_object_unref (ctx->dms_client);
+    g_slice_free (LoadCurrentCapabilitiesContext, ctx);
+}
+
+static void load_current_capabilities_step (GTask *task);
+
+static void
+load_current_capabilities_get_capabilities_ready (QmiClientDms *client,
+                                                  GAsyncResult *res,
+                                                  GTask        *task)
+{
+    MMSharedQmi                        *self;
+    Private                            *priv;
+    LoadCurrentCapabilitiesContext     *ctx;
+    QmiMessageDmsGetCapabilitiesOutput *output = NULL;
+    GError                             *error = NULL;
+    guint                               i;
+    GArray                             *radio_interface_list;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+    ctx  = g_task_get_task_data (task);
+
+    output = qmi_client_dms_get_capabilities_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        goto out;
+    }
+
+    if (!qmi_message_dms_get_capabilities_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get Capabilities: ");
+        goto out;
+    }
+
+    qmi_message_dms_get_capabilities_output_get_info (
+        output,
+        NULL, /* info_max_tx_channel_rate */
+        NULL, /* info_max_rx_channel_rate */
+        NULL, /* info_data_service_capability */
+        NULL, /* info_sim_capability */
+        &radio_interface_list,
+        NULL);
+
+    /* Cache supported radio interfaces */
+    g_assert (!priv->supported_radio_interfaces);
+    priv->supported_radio_interfaces = g_array_ref (radio_interface_list);
+
+    for (i = 0; i < radio_interface_list->len; i++)
+        ctx->capabilities_context.dms_capabilities |=
+            mm_modem_capability_from_qmi_radio_interface (g_array_index (radio_interface_list, QmiDmsRadioInterface, i));
+
+out:
+    if (output)
+        qmi_message_dms_get_capabilities_output_unref (output);
+
+    /* Failure in DMS Get Capabilities is fatal */
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    load_current_capabilities_step (task);
+}
+
+static void
+load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
+                                                           GAsyncResult *res,
+                                                           GTask        *task)
+{
+    MMSharedQmi                                *self;
+    Private                                    *priv;
+    LoadCurrentCapabilitiesContext             *ctx;
+    QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
+    GError                                     *error = NULL;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+    ctx  = g_task_get_task_data (task);
+
+    output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+        priv->feature_nas_technology_preference = FEATURE_UNSUPPORTED;
+    } else if (!qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't get technology preference: %s", error->message);
+        g_error_free (error);
+        priv->feature_nas_technology_preference = FEATURE_SUPPORTED;
+    } else {
+        qmi_message_nas_get_technology_preference_output_get_active (
+            output,
+            &ctx->capabilities_context.nas_tp_mask,
+            NULL, /* duration */
+            NULL);
+        priv->feature_nas_technology_preference = FEATURE_SUPPORTED;
+    }
+
+    if (output)
+        qmi_message_nas_get_technology_preference_output_unref (output);
+
+    ctx->step++;
+    load_current_capabilities_step (task);
+}
+
+static void
+load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *client,
+                                                                 GAsyncResult *res,
+                                                                 GTask        *task)
+{
+    MMSharedQmi                                     *self;
+    Private                                         *priv;
+    LoadCurrentCapabilitiesContext                  *ctx;
+    QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
+    GError                                          *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+    priv = get_private (MM_SHARED_QMI (self));
+
+    output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
+    if (!output) {
+        mm_dbg ("QMI operation failed: %s", error->message);
+        g_error_free (error);
+        priv->feature_nas_system_selection_preference = FEATURE_UNSUPPORTED;
+    } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
+        mm_dbg ("Couldn't get system selection preference: %s", error->message);
+        g_error_free (error);
+        priv->feature_nas_system_selection_preference = FEATURE_SUPPORTED;
+    } else {
+        qmi_message_nas_get_system_selection_preference_output_get_mode_preference (
+            output,
+            &ctx->capabilities_context.nas_ssp_mode_preference_mask,
+            NULL);
+        priv->feature_nas_system_selection_preference = FEATURE_SUPPORTED;
+    }
+
+    if (output)
+        qmi_message_nas_get_system_selection_preference_output_unref (output);
+
+    ctx->step++;
+    load_current_capabilities_step (task);
+}
+
+static void
+load_current_capabilities_step (GTask *task)
+{
+    MMSharedQmi                    *self;
+    Private                        *priv;
+    LoadCurrentCapabilitiesContext *ctx;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+    ctx  = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case LOAD_CURRENT_CAPABILITIES_STEP_FIRST:
+        ctx->step++;
+        /* fall-through */
+
+    case LOAD_CURRENT_CAPABILITIES_STEP_NAS_SYSTEM_SELECTION_PREFERENCE:
+        qmi_client_nas_get_system_selection_preference (
+            ctx->nas_client, NULL, 5, NULL,
+            (GAsyncReadyCallback)load_current_capabilities_get_system_selection_preference_ready,
+            task);
+        return;
+
+    case LOAD_CURRENT_CAPABILITIES_STEP_NAS_TECHNOLOGY_PREFERENCE:
+        qmi_client_nas_get_technology_preference (
+            ctx->nas_client, NULL, 5, NULL,
+            (GAsyncReadyCallback)load_current_capabilities_get_technology_preference_ready,
+            task);
+        return;
+
+    case LOAD_CURRENT_CAPABILITIES_STEP_DMS_GET_CAPABILITIES:
+        qmi_client_dms_get_capabilities (
+            ctx->dms_client, NULL, 5, NULL,
+            (GAsyncReadyCallback)load_current_capabilities_get_capabilities_ready,
+            task);
+        return;
+
+    case LOAD_CURRENT_CAPABILITIES_STEP_LAST:
+        g_assert (priv->feature_nas_technology_preference       != FEATURE_UNKNOWN);
+        g_assert (priv->feature_nas_system_selection_preference != FEATURE_UNKNOWN);
+        priv->current_capabilities = mm_modem_capability_from_qmi_capabilities_context (&ctx->capabilities_context);
+        g_task_return_int (task, priv->current_capabilities);
+        g_object_unref (task);
+        return;
+    }
+}
+
+void
+mm_shared_qmi_load_current_capabilities (MMIfaceModem        *self,
+                                         GAsyncReadyCallback  callback,
+                                         gpointer             user_data)
+{
+    LoadCurrentCapabilitiesContext *ctx;
+    GTask                          *task;
+    QmiClient                      *nas_client = NULL;
+    QmiClient                      *dms_client = NULL;
+    Private                        *priv;
+
+    /*
+     * We assume that DMS Get Capabilities reports always the same result,
+     * that will include all capabilities supported by the device regardless
+     * of which ones are configured at the moment. E.g. for the Load Supported
+     * Capabilities we base the logic exclusively on this method's output.
+     *
+     * We then consider 3 different cases:
+     *  a) If the device supports NAS System Selection Preference, we use the
+     *  "mode preference" TLV to select currently enabled capabilities.
+     *  b) If the device supports NAS Technology Preference (older devices),
+     *  we use this method to select currently enabled capabilities.
+     *  c) If none of those messages is supported we don't allow swiching
+     *  capabilities.
+     */
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &nas_client,
+                                      callback, user_data))
+        return;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_DMS, &dms_client,
+                                      callback, user_data))
+        return;
+
+    /* Current capabilities is the first thing run, and will only be run once per modem,
+     * so we should here check support for the optional features. */
+    priv = get_private (MM_SHARED_QMI (self));
+    g_assert (priv->feature_nas_technology_preference       == FEATURE_UNKNOWN);
+    g_assert (priv->feature_nas_system_selection_preference == FEATURE_UNKNOWN);
+
+    ctx = g_slice_new0 (LoadCurrentCapabilitiesContext);
+    ctx->nas_client = g_object_ref (nas_client);
+    ctx->dms_client = g_object_ref (dms_client);
+    ctx->step = LOAD_CURRENT_CAPABILITIES_STEP_FIRST;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_current_capabilities_context_free);
+
+    load_current_capabilities_step (task);
+}
+
+/*****************************************************************************/
+/* Supported capabilities (Modem interface) */
+
+GArray *
+mm_shared_qmi_load_supported_capabilities_finish (MMIfaceModem  *self,
+                                                  GAsyncResult  *res,
+                                                  GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+void
+mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
+                                           GAsyncReadyCallback  callback,
+                                           gpointer             user_data)
+{
+    GTask             *task;
+    Private           *priv;
+    MMModemCapability  mask;
+    MMModemCapability  single;
+    GArray            *supported_combinations;
+    guint              i;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* List of radio interfaces preloaded in current capabilities */
+    priv = get_private (MM_SHARED_QMI (self));
+    if (!priv->supported_radio_interfaces) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "cannot load current capabilities without radio interface information");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Build mask with all supported capabilities */
+    mask = MM_MODEM_CAPABILITY_NONE;
+    for (i = 0; i < priv->supported_radio_interfaces->len; i++)
+        mask |= mm_modem_capability_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i));
+
+    supported_combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 3);
+
+    /* Add all possible supported capability combinations.
+     * In order to avoid unnecessary modem reboots, we will only implement capabilities
+     * switching only when switching GSM/UMTS+CDMA/EVDO multimode devices, and only if
+     * we have support for the commands doing it.
+     */
+    if (priv->feature_nas_technology_preference == FEATURE_SUPPORTED || priv->feature_nas_system_selection_preference == FEATURE_UNKNOWN) {
+        if (mask == (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)) {
+            /* Multimode GSM/UMTS+CDMA/EVDO device switched to GSM/UMTS only */
+            single = MM_MODEM_CAPABILITY_GSM_UMTS;
+            g_array_append_val (supported_combinations, single);
+            /* Multimode GSM/UMTS+CDMA/EVDO device switched to CDMA/EVDO only */
+            single = MM_MODEM_CAPABILITY_CDMA_EVDO;
+            g_array_append_val (supported_combinations, single);
+        } else if (mask == (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE)) {
+            /* Multimode GSM/UMTS+CDMA/EVDO+LTE device switched to GSM/UMTS+LTE only */
+            single = MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE;
+            g_array_append_val (supported_combinations, single);
+            /* Multimode GSM/UMTS+CDMA/EVDO+LTE device switched to CDMA/EVDO+LTE only */
+            single = MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE;
+            g_array_append_val (supported_combinations, single);
+            /*
+             * Multimode GSM/UMTS+CDMA/EVDO+LTE device switched to LTE only.
+             *
+             * This case is required because we use the same methods and operations to
+             * switch capabilities and modes. For the LTE capability there is a direct
+             * related 4G mode, and so we cannot select a '4G only' mode in this device
+             * because we wouldn't be able to know the full list of current capabilities
+             * if the device was rebooted, as we would only see LTE capability. So,
+             * handle this special case so that the LTE/4G-only mode can exclusively be
+             * selected as capability switching in this kind of devices.
+             */
+            priv->disable_4g_only_mode = TRUE;
+            single = MM_MODEM_CAPABILITY_LTE;
+            g_array_append_val (supported_combinations, single);
+        }
+    }
+
+    /* Add the full mask itself */
+    single = mask;
+    g_array_append_val (supported_combinations, single);
+
+    g_task_return_pointer (task, supported_combinations, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Allowed modes setting (Modem interface) */
+
+typedef struct {
+    QmiClientNas *client;
+    MMModemMode   allowed;
+    MMModemMode   preferred;
+} SetCurrentModesContext;
+
+static void
+set_current_modes_context_free (SetCurrentModesContext *ctx)
+{
+    g_object_unref (ctx->client);
+    g_slice_free (SetCurrentModesContext, ctx);
+}
+
+gboolean
+mm_shared_qmi_set_current_modes_finish (MMIfaceModem  *self,
+                                        GAsyncResult  *res,
+                                        GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_current_modes_technology_preference_ready (QmiClientNas *client,
+                                               GAsyncResult *res,
+                                               GTask        *task)
+{
+    SetCurrentModesContext                     *ctx;
+    QmiMessageNasSetTechnologyPreferenceOutput *output = NULL;
+    GError                                     *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_set_technology_preference_finish (client, res, &error);
+    if (!output ||
+        (!qmi_message_nas_set_technology_preference_output_get_result (output, &error) &&
+         !g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT))) {
+        g_task_return_error (task, error);
+    } else {
+        g_clear_error (&error);
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+
+    if (output)
+        qmi_message_nas_set_technology_preference_output_unref (output);
+}
+
+static void
+set_current_modes_technology_preference (GTask *task)
+{
+    MMIfaceModem                              *self;
+    SetCurrentModesContext                    *ctx;
+    QmiMessageNasSetTechnologyPreferenceInput *input;
+    QmiNasRadioTechnologyPreference            pref;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (ctx->preferred != MM_MODEM_MODE_NONE) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Cannot set specific preferred mode");
+        g_object_unref (task);
+        return;
+    }
+
+    pref = mm_modem_mode_to_qmi_radio_technology_preference (ctx->allowed, mm_iface_modem_is_cdma (self));
+    if (!pref) {
+        gchar *str;
+
+        str = mm_modem_mode_build_string_from_mask (ctx->allowed);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Unhandled allowed mode setting: '%s'",
+                                 str);
+        g_object_unref (task);
+        g_free (str);
+        return;
+    }
+
+    input = qmi_message_nas_set_technology_preference_input_new ();
+    qmi_message_nas_set_technology_preference_input_set_current (input, pref, QMI_NAS_PREFERENCE_DURATION_PERMANENT, NULL);
+
+    qmi_client_nas_set_technology_preference (
+        ctx->client,
+        input,
+        5,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)set_current_modes_technology_preference_ready,
+        task);
+    qmi_message_nas_set_technology_preference_input_unref (input);
+}
+
+static void
+set_current_modes_system_selection_preference_ready (QmiClientNas *client,
+                                                     GAsyncResult *res,
+                                                     GTask        *task)
+{
+    SetCurrentModesContext                          *ctx;
+    QmiMessageNasSetSystemSelectionPreferenceOutput *output = NULL;
+    GError                                          *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_set_system_selection_preference_output_get_result (output, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+
+    if (output)
+        qmi_message_nas_set_system_selection_preference_output_unref (output);
+}
+
+static void
+set_current_modes_system_selection_preference (GTask *task)
+{
+    MMIfaceModem                                   *self;
+    SetCurrentModesContext                         *ctx;
+    QmiMessageNasSetSystemSelectionPreferenceInput *input;
+    Private                                        *priv;
+    QmiNasRatModePreference                         pref;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+    ctx  = g_task_get_task_data (task);
+
+    input = qmi_message_nas_set_system_selection_preference_input_new ();
+    qmi_message_nas_set_system_selection_preference_input_set_change_duration (input, QMI_NAS_CHANGE_DURATION_PERMANENT, NULL);
+
+    /* Preferred modes */
+
+    if (ctx->preferred != MM_MODEM_MODE_NONE) {
+        GArray *array;
+
+        /* Acquisition order array */
+        array = mm_modem_mode_to_qmi_acquisition_order_preference (ctx->allowed,
+                                                                   ctx->preferred,
+                                                                   mm_iface_modem_is_cdma (self),
+                                                                   mm_iface_modem_is_3gpp (self));
+        g_assert (array);
+        qmi_message_nas_set_system_selection_preference_input_set_acquisition_order_preference (input, array, NULL);
+        g_array_unref (array);
+
+        /* Only set GSM/WCDMA acquisition order preference if both 2G and 3G given as allowed */
+        if (mm_iface_modem_is_3gpp (self) && ((ctx->allowed & (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G))) {
+            QmiNasGsmWcdmaAcquisitionOrderPreference order;
+
+            order = mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (ctx->preferred);
+            qmi_message_nas_set_system_selection_preference_input_set_gsm_wcdma_acquisition_order_preference (input, order, NULL);
+        }
+    }
+
+    /* Allowed modes */
+    pref = mm_modem_mode_to_qmi_rat_mode_preference (ctx->allowed,
+                                                     mm_iface_modem_is_cdma (self),
+                                                     mm_iface_modem_is_3gpp (self));
+    qmi_message_nas_set_system_selection_preference_input_set_mode_preference (input, pref, NULL);
+
+    qmi_client_nas_set_system_selection_preference (
+        ctx->client,
+        input,
+        5,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)set_current_modes_system_selection_preference_ready,
+        task);
+    qmi_message_nas_set_system_selection_preference_input_unref (input);
+}
+
+void
+mm_shared_qmi_set_current_modes (MMIfaceModem        *self,
+                                 MMModemMode          allowed,
+                                 MMModemMode          preferred,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
+{
+    SetCurrentModesContext *ctx;
+    GTask                  *task;
+    QmiClient              *client = NULL;
+    Private                *priv;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    ctx = g_slice_new0 (SetCurrentModesContext);
+    ctx->client = g_object_ref (client);
+
+    if (allowed == MM_MODEM_MODE_ANY && ctx->preferred == MM_MODEM_MODE_NONE) {
+        ctx->allowed = MM_MODEM_MODE_NONE;
+        if (mm_iface_modem_is_2g (self))
+            ctx->allowed |= MM_MODEM_MODE_2G;
+        if (mm_iface_modem_is_3g (self))
+            ctx->allowed |= MM_MODEM_MODE_3G;
+        if (mm_iface_modem_is_4g (self))
+            ctx->allowed |= MM_MODEM_MODE_4G;
+        ctx->preferred = MM_MODEM_MODE_NONE;
+    } else {
+        ctx->allowed = allowed;
+        ctx->preferred = preferred;
+    }
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)set_current_modes_context_free);
+
+    priv = get_private (MM_SHARED_QMI (self));
+
+    if (priv->feature_nas_system_selection_preference == FEATURE_SUPPORTED) {
+        set_current_modes_system_selection_preference (task);
+        return;
+    }
+
+    if (priv->feature_nas_technology_preference == FEATURE_SUPPORTED) {
+        set_current_modes_technology_preference (task);
+        return;
+    }
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Setting allowed modes is not supported by this device");
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Load current modes (Modem interface) */
+
+typedef struct {
+    QmiClientNas *client;
+} LoadCurrentModesContext;
+
+typedef struct {
+    MMModemMode allowed;
+    MMModemMode preferred;
+} LoadCurrentModesResult;
+
+static void
+load_current_modes_context_free (LoadCurrentModesContext *ctx)
+{
+    g_object_unref (ctx->client);
+    g_free (ctx);
+}
+
+gboolean
+mm_shared_qmi_load_current_modes_finish (MMIfaceModem  *self,
+                                         GAsyncResult  *res,
+                                         MMModemMode   *allowed,
+                                         MMModemMode   *preferred,
+                                         GError       **error)
+{
+    LoadCurrentModesResult *result;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return FALSE;
+
+    *allowed = result->allowed;
+    *preferred = result->preferred;
+    g_free (result);
+    return TRUE;
+}
+
+static void
+get_technology_preference_ready (QmiClientNas *client,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    LoadCurrentModesContext                    *ctx;
+    LoadCurrentModesResult                     *result = NULL;
+    QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
+    GError                                     *error = NULL;
+    MMModemMode                                 allowed;
+    QmiNasRadioTechnologyPreference             preference_mask;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        goto out;
+    }
+
+    qmi_message_nas_get_technology_preference_output_get_active (
+        output,
+        &preference_mask,
+        NULL, /* duration */
+        NULL);
+    allowed = mm_modem_mode_from_qmi_radio_technology_preference (preference_mask);
+    if (allowed == MM_MODEM_MODE_NONE) {
+        gchar *str;
+
+        str = qmi_nas_radio_technology_preference_build_string_from_mask (preference_mask);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unsupported modes reported: '%s'", str);
+        g_free (str);
+        goto out;
+    }
+
+    /* We got a valid value from here */
+    result = g_new (LoadCurrentModesResult, 1);
+    result->allowed = allowed;
+    result->preferred = MM_MODEM_MODE_NONE;
+    g_task_return_pointer (task, result, g_free);
+
+out:
+    if (output)
+        qmi_message_nas_get_technology_preference_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+load_current_modes_technology_preference (GTask *task)
+{
+    LoadCurrentModesContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    qmi_client_nas_get_technology_preference (
+        ctx->client,
+        NULL, /* no input */
+        5,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)get_technology_preference_ready,
+        task);
+}
+
+static void
+load_current_modes_system_selection_preference_ready (QmiClientNas *client,
+                                                      GAsyncResult *res,
+                                                      GTask        *task)
+{
+    LoadCurrentModesContext                         *ctx;
+    LoadCurrentModesResult                          *result = NULL;
+    QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
+    GError                                          *error = NULL;
+    QmiNasRatModePreference                          mode_preference_mask = 0;
+    MMModemMode                                      allowed;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        goto out;
+    }
+
+    if (!qmi_message_nas_get_system_selection_preference_output_get_mode_preference (
+            output,
+            &mode_preference_mask,
+            NULL)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Mode preference not reported in system selection preference");
+        goto out;
+    }
+
+    allowed = mm_modem_mode_from_qmi_rat_mode_preference (mode_preference_mask);
+    if (allowed == MM_MODEM_MODE_NONE) {
+        gchar *str;
+
+        str = qmi_nas_rat_mode_preference_build_string_from_mask (mode_preference_mask);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unsupported modes reported: '%s'", str);
+        g_free (str);
+        goto out;
+    }
+
+    /* We got a valid value from here */
+    result = g_new (LoadCurrentModesResult, 1);
+    result->allowed = allowed;
+    result->preferred = MM_MODEM_MODE_NONE;
+
+    /* For 2G+3G only rely on the GSM/WCDMA acquisition order preference TLV */
+    if (mode_preference_mask == (QMI_NAS_RAT_MODE_PREFERENCE_GSM | QMI_NAS_RAT_MODE_PREFERENCE_UMTS)) {
+        QmiNasGsmWcdmaAcquisitionOrderPreference gsm_or_wcdma;
+
+        if (qmi_message_nas_get_system_selection_preference_output_get_gsm_wcdma_acquisition_order_preference (
+                output,
+                &gsm_or_wcdma,
+                NULL))
+            result->preferred = mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (gsm_or_wcdma);
+    }
+    /* Otherwise, rely on the acquisition order array TLV */
+    else {
+        GArray *array;
+
+        if (qmi_message_nas_get_system_selection_preference_output_get_acquisition_order_preference (
+                output,
+                &array,
+                NULL) &&
+            array->len > 0) {
+            guint i;
+
+            /* The array of preference contains the preference of the full list of supported
+             * access technologies, regardless of whether they're enabled or not. So, look for
+             * the first one that is flagged as enabled, not just the first one in the array.
+             */
+            for (i = 0; i < array->len; i++) {
+                MMModemMode mode;
+
+                mode = mm_modem_mode_from_qmi_nas_radio_interface (g_array_index (array, QmiNasRadioInterface, i));
+                if (allowed == mode)
+                    break;
+                if (allowed & mode) {
+                    result->preferred = mode;
+                    break;
+                }
+            }
+        }
+    }
+
+    g_task_return_pointer (task, result, g_free);
+
+out:
+    if (output)
+        qmi_message_nas_get_system_selection_preference_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+load_current_modes_system_selection_preference (GTask *task)
+{
+    LoadCurrentModesContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    qmi_client_nas_get_system_selection_preference (
+        ctx->client,
+        NULL, /* no input */
+        5,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)load_current_modes_system_selection_preference_ready,
+        task);
+}
+
+void
+mm_shared_qmi_load_current_modes (MMIfaceModem        *self,
+                                  GAsyncReadyCallback  callback,
+                                  gpointer             user_data)
+{
+    Private                 *priv;
+    LoadCurrentModesContext *ctx;
+    GTask                   *task;
+    QmiClient               *client = NULL;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    ctx = g_new0 (LoadCurrentModesContext, 1);
+    ctx->client = g_object_ref (client);
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_current_modes_context_free);
+
+    priv = get_private (MM_SHARED_QMI (self));
+
+    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
+        load_current_modes_system_selection_preference (task);
+        return;
+    }
+
+    if (priv->feature_nas_technology_preference != FEATURE_UNSUPPORTED) {
+        load_current_modes_technology_preference (task);
+        return;
+    }
+
+    /* Default to supported */
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Loading current modes is not supported by this device");
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Supported modes (Modem interface) */
+
+GArray *
+mm_shared_qmi_load_supported_modes_finish (MMIfaceModem  *self,
+                                           GAsyncResult  *res,
+                                           GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+void
+mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
+{
+    GTask                  *task;
+    GArray                 *combinations;
+    MMModemModeCombination  mode;
+    Private                *priv;
+    MMModemMode             mask_all;
+    guint                   i;
+    GArray                 *all;
+    GArray                 *filtered;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_QMI (self));
+    g_assert (priv->supported_radio_interfaces);
+
+    /* Build all, based on the supported radio interfaces */
+    mask_all = MM_MODEM_MODE_NONE;
+    for (i = 0; i < priv->supported_radio_interfaces->len; i++)
+        mask_all |= mm_modem_mode_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i));
+    mode.allowed = mask_all;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    g_array_append_val (all, mode);
+
+    /* If SSP and TP are not supported, ignore supported mode management */
+    if (priv->feature_nas_system_selection_preference == FEATURE_UNSUPPORTED && priv->feature_nas_technology_preference == FEATURE_UNSUPPORTED) {
+        g_task_return_pointer (task, all, (GDestroyNotify) g_array_unref);
+        g_object_unref (task);
+        return;
+    }
+
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
+
+    /* 2G-only, 3G-only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    /* 4G-only mode is not possible in multimode GSM/UMTS+CDMA/EVDO+LTE
+     * devices. This configuration may be selected as "LTE only" capability
+     * instead. */
+    if (!priv->disable_4g_only_mode) {
+        mode.allowed = MM_MODEM_MODE_4G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
+    /* 2G+3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
+        mode.preferred = MM_MODEM_MODE_3G;
+        g_array_append_val (combinations, mode);
+        mode.preferred = MM_MODEM_MODE_2G;
+        g_array_append_val (combinations, mode);
+    } else {
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
+    /* 2G+4G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
+        mode.preferred = MM_MODEM_MODE_4G;
+        g_array_append_val (combinations, mode);
+        mode.preferred = MM_MODEM_MODE_2G;
+        g_array_append_val (combinations, mode);
+    } else {
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
+    /* 3G+4G */
+    mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
+        mode.preferred = MM_MODEM_MODE_3G;
+        g_array_append_val (combinations, mode);
+        mode.preferred = MM_MODEM_MODE_4G;
+        g_array_append_val (combinations, mode);
+    } else {
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
+    /* 2G+3G+4G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
+        mode.preferred = MM_MODEM_MODE_4G;
+        g_array_append_val (combinations, mode);
+        mode.preferred = MM_MODEM_MODE_3G;
+        g_array_append_val (combinations, mode);
+        mode.preferred = MM_MODEM_MODE_2G;
+        g_array_append_val (combinations, mode);
+    } else {
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+
+    /* Filter out unsupported modes */
+    filtered = mm_filter_supported_modes (all, combinations);
+    g_array_unref (all);
+    g_array_unref (combinations);
+
+    g_task_return_pointer (task, filtered, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
