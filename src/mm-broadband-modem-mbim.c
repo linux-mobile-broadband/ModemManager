@@ -123,6 +123,11 @@ struct _MMBroadbandModemMbimPrivate {
 
     /* For notifying when the mbim-proxy connection is dead */
     gulong mbim_device_removed_id;
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    /* Flag when QMI-based capability/mode switching is in use */
+    gboolean qmi_capability_and_mode_switching;
+#endif
 };
 
 /*****************************************************************************/
@@ -195,7 +200,22 @@ shared_qmi_peek_client (MMSharedQmi    *self,
 #endif
 
 /*****************************************************************************/
-/* Current Capabilities loading (Modem interface) */
+/* Current capabilities (Modem interface) */
+
+typedef struct {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    MMModemCapability  current_qmi;
+#endif
+    MbimDevice        *device;
+    MMModemCapability  current_mbim;
+} LoadCurrentCapabilitiesContext;
+
+static void
+load_current_capabilities_context_free (LoadCurrentCapabilitiesContext *ctx)
+{
+    g_object_unref (ctx->device);
+    g_free (ctx);
+}
 
 static MMModemCapability
 modem_load_current_capabilities_finish (MMIfaceModem *self,
@@ -214,21 +234,71 @@ modem_load_current_capabilities_finish (MMIfaceModem *self,
 }
 
 static void
+complete_current_capabilities (GTask *task)
+{
+    MMBroadbandModemMbim           *self;
+    LoadCurrentCapabilitiesContext *ctx;
+    MMModemCapability               result = 0;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    /* Warn if the MBIM loaded capabilities isn't a subset of the QMI loaded ones */
+    if (ctx->current_qmi && ctx->current_mbim) {
+        gchar *mbim_caps_str;
+        gchar *qmi_caps_str;
+
+        mbim_caps_str = mm_common_build_capabilities_string ((const MMModemCapability *)&(ctx->current_mbim), 1);
+        qmi_caps_str = mm_common_build_capabilities_string ((const MMModemCapability *)&(ctx->current_qmi), 1);
+
+        if ((ctx->current_mbim & ctx->current_qmi) != ctx->current_mbim)
+            mm_warn ("MBIM reported current capabilities (%s) not found in QMI-over-MBIM reported ones (%s)",
+                     mbim_caps_str, qmi_caps_str);
+        else
+            mm_dbg ("MBIM reported current capabilities (%s) is a subset of the QMI-over-MBIM reported ones (%s)",
+                    mbim_caps_str, qmi_caps_str);
+        g_free (mbim_caps_str);
+        g_free (qmi_caps_str);
+
+        result = ctx->current_qmi;
+        self->priv->qmi_capability_and_mode_switching = TRUE;
+    } else if (ctx->current_qmi) {
+        result = ctx->current_qmi;
+        self->priv->qmi_capability_and_mode_switching = TRUE;
+    } else
+        result = ctx->current_mbim;
+
+    /* If current capabilities loading is done via QMI, we can safely assume that all the other
+     * capability and mode related operations are going to be done via QMI as well, so that we
+     * don't mix both logics */
+    if (self->priv->qmi_capability_and_mode_switching)
+        mm_info ("QMI-based capability and mode switching support enabled");
+#else
+    result = ctx->current_mbim;
+#endif
+
+    g_task_return_int (task, (gint) result);
+    g_object_unref (task);
+}
+
+static void
 device_caps_query_ready (MbimDevice *device,
                          GAsyncResult *res,
                          GTask *task)
 {
-    MMBroadbandModemMbim *self;
-    MMModemCapability mask;
-    MbimMessage *response;
-    GError *error = NULL;
+    MMBroadbandModemMbim           *self;
+    MbimMessage                    *response;
+    GError                         *error = NULL;
+    LoadCurrentCapabilitiesContext *ctx;
 
     self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_device_caps_response_parse (
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_device_caps_response_parse (
             response,
             NULL, /* device_type */
             &self->priv->caps_cellular_class,
@@ -243,51 +313,178 @@ device_caps_query_ready (MbimDevice *device,
             &self->priv->caps_firmware_info,
             &self->priv->caps_hardware_info,
             &error)) {
-        /* Build mask of modem capabilities */
-        mask = 0;
-        if (self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_GSM)
-            mask |= MM_MODEM_CAPABILITY_GSM_UMTS;
-
-#if 0  /* Disable until we add MBIM CDMA support */
-        if (self->priv->caps_cellular_class & MBIM_CELLULAR_CLASS_CDMA)
-            mask |= MM_MODEM_CAPABILITY_CDMA_EVDO;
-#endif
-
-        if (self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
-            mask |= MM_MODEM_CAPABILITY_LTE;
-        g_task_return_int (task, mask);
-    } else
         g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
 
-    g_object_unref (task);
+    ctx->current_mbim = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class,
+                                                                   self->priv->caps_data_class);
+    complete_current_capabilities (task);
 
+out:
     if (response)
         mbim_message_unref (response);
 }
 
 static void
-modem_load_current_capabilities (MMIfaceModem *self,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+load_current_capabilities_mbim (GTask *task)
 {
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
+    MbimMessage                    *message;
+    LoadCurrentCapabilitiesContext *ctx;
 
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_task_get_task_data (task);
 
     mm_dbg ("loading current capabilities...");
     message = mbim_message_device_caps_query_new (NULL);
-    mbim_device_command (device,
+    mbim_device_command (ctx->device,
                          message,
                          10,
                          NULL,
                          (GAsyncReadyCallback)device_caps_query_ready,
                          task);
     mbim_message_unref (message);
+}
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+qmi_load_current_capabilities_ready (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    LoadCurrentCapabilitiesContext *ctx;
+    GError                         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->current_qmi = mm_shared_qmi_load_current_capabilities_finish (self, res, &error);
+    if (!ctx->current_qmi) {
+        mm_dbg ("Couldn't load currrent capabilities using QMI over MBIM: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    load_current_capabilities_mbim (task);
+}
+
+#endif
+
+static void
+modem_load_current_capabilities (MMIfaceModem        *self,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
+{
+    MbimDevice                     *device;
+    GTask                          *task;
+    LoadCurrentCapabilitiesContext *ctx;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_new0 (LoadCurrentCapabilitiesContext, 1);
+    ctx->device = g_object_ref (device);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) load_current_capabilities_context_free);
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    mm_shared_qmi_load_current_capabilities (self,
+                                             (GAsyncReadyCallback)qmi_load_current_capabilities_ready,
+                                             task);
+#else
+    load_current_capabilities_mbim (task);
+#endif
+}
+
+/*****************************************************************************/
+/* Supported Capabilities loading (Modem interface) */
+
+static GArray *
+modem_load_supported_capabilities_finish (MMIfaceModem  *self,
+                                          GAsyncResult  *res,
+                                          GError       **error)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
+        return mm_shared_qmi_load_supported_capabilities_finish (self, res, error);
+#endif
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+load_supported_capabilities_mbim (GTask *task)
+{
+    MMBroadbandModemMbim *self;
+    MMModemCapability     current;
+    GArray               *supported = NULL;
+
+    self = g_task_get_source_object (task);
+
+    /* Current capabilities should have been cached already, just assume them */
+    current = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class, self->priv->caps_data_class);
+    if (current != 0) {
+        supported = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 1);
+        g_array_append_val (supported, current);
+    }
+
+    if (!supported)
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't load supported capabilities: no previously catched current capabilities");
+    else
+        g_task_return_pointer (task, supported, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
+}
+
+static void
+modem_load_supported_capabilities (MMIfaceModem        *self,
+                                   GAsyncReadyCallback  callback,
+                                   gpointer             user_data)
+{
+    GTask *task;
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_load_supported_capabilities (self, callback, user_data);
+        return;
+    }
+#endif
+
+    task = g_task_new (self, NULL, callback, user_data);
+    load_supported_capabilities_mbim (task);
+}
+
+/*****************************************************************************/
+/* Capabilities switching (Modem interface) */
+
+static gboolean
+modem_set_current_capabilities_finish (MMIfaceModem  *self,
+                                       GAsyncResult  *res,
+                                       GError       **error)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
+        return mm_shared_qmi_set_current_capabilities_finish (self, res, error);
+#endif
+    g_assert (error);
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_set_current_capabilities (MMIfaceModem         *self,
+                                MMModemCapability     capabilities,
+                                GAsyncReadyCallback   callback,
+                                gpointer              user_data)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_set_current_capabilities (self, capabilities, callback, user_data);
+        return;
+    }
+#endif
+
+    g_task_report_new_error (self, callback, user_data,
+                             modem_set_current_capabilities,
+                             MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Capability switching is not supported");
 }
 
 /*****************************************************************************/
@@ -492,21 +689,22 @@ modem_load_supported_modes_finish (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
+        return mm_shared_qmi_load_supported_modes_finish (self, res, error);
+#endif
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_load_supported_modes (MMIfaceModem *_self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+load_supported_modes_mbim (GTask *task)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GArray *combinations;
-    MMModemModeCombination mode;
-    MMModemMode all;
-    GTask *task;
+    MMBroadbandModemMbim   *self;
+    MMModemModeCombination  mode;
+    MMModemMode             all;
+    GArray                 *supported;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    self = g_task_get_source_object (task);
 
     if (self->priv->caps_data_class == 0) {
         g_task_return_new_error (task,
@@ -543,13 +741,103 @@ modem_load_supported_modes (MMIfaceModem *_self,
         all |= MM_MODEM_MODE_4G;
 
     /* Build a mask with all supported modes */
-    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    supported = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
     mode.allowed = all;
     mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
+    g_array_append_val (supported, mode);
 
-    g_task_return_pointer (task, combinations, (GDestroyNotify)g_array_unref);
+    g_task_return_pointer (task, supported, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
+}
+
+static void
+modem_load_supported_modes (MMIfaceModem        *self,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+    GTask *task;
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_load_supported_modes (self, callback, user_data);
+        return;
+    }
+#endif
+
+    task = g_task_new (self, NULL, callback, user_data);
+    load_supported_modes_mbim (task);
+}
+
+/*****************************************************************************/
+/* Current modes loading (Modem interface) */
+
+static gboolean
+modem_load_current_modes_finish (MMIfaceModem  *self,
+                                 GAsyncResult  *res,
+                                 MMModemMode   *allowed,
+                                 MMModemMode   *preferred,
+                                 GError       **error)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
+        return mm_shared_qmi_load_current_modes_finish (self, res, allowed, preferred, error);
+#endif
+    g_assert (error);
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_load_current_modes (MMIfaceModem        *self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_load_current_modes (self, callback, user_data);
+        return;
+    }
+#endif
+
+    g_task_report_new_error (self, callback, user_data,
+                             modem_set_current_capabilities,
+                             MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Current mode loading is not supported");
+}
+
+/*****************************************************************************/
+/* Current modes switching (Modem interface) */
+
+static gboolean
+modem_set_current_modes_finish (MMIfaceModem  *self,
+                                GAsyncResult  *res,
+                                GError       **error)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
+        return mm_shared_qmi_set_current_modes_finish (self, res, error);
+#endif
+    g_assert (error);
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_set_current_modes (MMIfaceModem        *self,
+                         MMModemMode          allowed,
+                         MMModemMode          preferred,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_set_current_modes (self, allowed, preferred, callback, user_data);
+        return;
+    }
+#endif
+
+    g_task_report_new_error (self, callback, user_data,
+                             modem_set_current_capabilities,
+                             MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Capability switching is not supported");
 }
 
 /*****************************************************************************/
@@ -1898,9 +2186,10 @@ initialization_started (MMBroadbandModem    *self,
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     /* Setup services to open */
     ctx->qmi_services[0] = QMI_SERVICE_DMS;
-    ctx->qmi_services[1] = QMI_SERVICE_PDS;
-    ctx->qmi_services[2] = QMI_SERVICE_LOC;
-    ctx->qmi_services[3] = QMI_SERVICE_UNKNOWN;
+    ctx->qmi_services[1] = QMI_SERVICE_NAS;
+    ctx->qmi_services[2] = QMI_SERVICE_PDS;
+    ctx->qmi_services[3] = QMI_SERVICE_LOC;
+    ctx->qmi_services[4] = QMI_SERVICE_UNKNOWN;
 #endif
 
     /* Now open our MBIM port */
@@ -3197,6 +3486,11 @@ modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                        GAsyncResult *res,
                                        GError **error)
 {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
+        return mm_shared_qmi_3gpp_register_in_network_finish (self, res, error);
+#endif
+
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
@@ -3248,6 +3542,17 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     MbimDevice *device;
     MbimMessage *message;
     GTask *task;
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    /* data_class set to 0 in the MBIM register state set message ends up
+     * selecting some "auto" mode that would overwrite whatever capabilities
+     * and modes we had set. So, if we're using QMI-based capability and
+     * mode switching, also use QMI-based network registration. */
+    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_3gpp_register_in_network (self, operator_id, cancellable, callback, user_data);
+        return;
+    }
+#endif
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -4444,8 +4749,12 @@ static void
 iface_modem_init (MMIfaceModem *iface)
 {
     /* Initialization steps */
+    iface->load_supported_capabilities = modem_load_supported_capabilities;
+    iface->load_supported_capabilities_finish = modem_load_supported_capabilities_finish;
     iface->load_current_capabilities = modem_load_current_capabilities;
     iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
+    iface->set_current_capabilities = modem_set_current_capabilities;
+    iface->set_current_capabilities_finish = modem_set_current_capabilities_finish;
     iface->load_manufacturer = modem_load_manufacturer;
     iface->load_manufacturer_finish = modem_load_manufacturer_finish;
     iface->load_model = modem_load_model;
@@ -4460,6 +4769,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_device_identifier_finish = modem_load_device_identifier_finish;
     iface->load_supported_modes = modem_load_supported_modes;
     iface->load_supported_modes_finish = modem_load_supported_modes_finish;
+    iface->load_current_modes = modem_load_current_modes;
+    iface->load_current_modes_finish = modem_load_current_modes_finish;
+    iface->set_current_modes = modem_set_current_modes;
+    iface->set_current_modes_finish = modem_set_current_modes_finish;
     iface->load_unlock_required = modem_load_unlock_required;
     iface->load_unlock_required_finish = modem_load_unlock_required_finish;
     iface->load_unlock_retries = modem_load_unlock_retries;

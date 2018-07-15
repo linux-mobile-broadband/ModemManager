@@ -21,6 +21,28 @@
 
 /*****************************************************************************/
 
+MMModemCapability
+mm_modem_capability_from_mbim_device_caps (MbimCellularClass caps_cellular_class,
+                                           MbimDataClass     caps_data_class)
+{
+    MMModemCapability mask = 0;
+
+    if (caps_cellular_class & MBIM_CELLULAR_CLASS_GSM)
+        mask |= MM_MODEM_CAPABILITY_GSM_UMTS;
+
+#if 0  /* Disable until we add MBIM CDMA support */
+    if (caps_cellular_class & MBIM_CELLULAR_CLASS_CDMA)
+        mask |= MM_MODEM_CAPABILITY_CDMA_EVDO;
+#endif
+
+    if (caps_data_class & MBIM_DATA_CLASS_LTE)
+        mask |= MM_MODEM_CAPABILITY_LTE;
+
+    return mask;
+}
+
+/*****************************************************************************/
+
 MMModemLock
 mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
 {
