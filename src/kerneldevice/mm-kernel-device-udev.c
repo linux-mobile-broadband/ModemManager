@@ -439,6 +439,21 @@ kernel_device_get_physdev_manufacturer (MMKernelDevice *_self)
     return g_udev_device_get_sysfs_attr (self->priv->physdev, "manufacturer");
 }
 
+static const gchar *
+kernel_device_get_physdev_product (MMKernelDevice *_self)
+{
+    MMKernelDeviceUdev *self;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+    ensure_physdev (self);
+    if (!self->priv->physdev)
+        return NULL;
+
+    return g_udev_device_get_sysfs_attr (self->priv->physdev, "product");
+}
+
 static gint
 kernel_device_get_interface_class (MMKernelDevice *_self)
 {
@@ -882,6 +897,7 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     kernel_device_class->get_physdev_sysfs_path         = kernel_device_get_physdev_sysfs_path;
     kernel_device_class->get_physdev_subsystem          = kernel_device_get_physdev_subsystem;
     kernel_device_class->get_physdev_manufacturer       = kernel_device_get_physdev_manufacturer;
+    kernel_device_class->get_physdev_product            = kernel_device_get_physdev_product;
     kernel_device_class->get_interface_class            = kernel_device_get_interface_class;
     kernel_device_class->get_interface_subclass         = kernel_device_get_interface_subclass;
     kernel_device_class->get_interface_protocol         = kernel_device_get_interface_protocol;
