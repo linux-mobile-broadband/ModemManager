@@ -988,6 +988,18 @@ libmm_plugin_quectel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_quectel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 ################################################################################
+# plugin: fibocom
+################################################################################
+
+pkglib_LTLIBRARIES += libmm-plugin-fibocom.la
+libmm_plugin_fibocom_la_SOURCES = \
+	fibocom/mm-plugin-fibocom.c \
+	fibocom/mm-plugin-fibocom.h \
+	$(NULL)
+libmm_plugin_fibocom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_fibocom_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+################################################################################
 # udev rules tester
 ################################################################################
 
