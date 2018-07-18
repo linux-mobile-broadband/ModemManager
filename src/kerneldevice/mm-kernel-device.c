@@ -123,6 +123,16 @@ mm_kernel_device_get_physdev_manufacturer (MMKernelDevice *self)
             NULL);
 }
 
+const gchar *
+mm_kernel_device_get_physdev_product (MMKernelDevice *self)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), NULL);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_product ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_product (self) :
+            NULL);
+}
+
 gint
 mm_kernel_device_get_interface_class (MMKernelDevice *self)
 {
