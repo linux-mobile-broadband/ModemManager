@@ -270,10 +270,18 @@ modem_load_model (MMIfaceModem *self,
 {
     gchar *model;
     GTask *task;
+    MMPortMbim *port;
 
-    model = g_strdup_printf ("MBIM [%04X:%04X]",
-                             (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
-                             (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
+    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    if (port) {
+        model = g_strdup (mm_kernel_device_get_physdev_product (
+            mm_port_peek_kernel_device (MM_PORT (port))));
+    }
+
+    if (!model)
+        model = g_strdup_printf ("MBIM [%04X:%04X]",
+                                 (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
+                                 (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_return_pointer (task, model, g_free);
