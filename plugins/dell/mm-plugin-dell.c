@@ -259,8 +259,6 @@ custom_init_step (GTask *task)
     if (mm_port_probe_list_has_qmi_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (probe)))) {
         mm_dbg ("(Dell) no need to run custom init in (%s): device has QMI port",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        mm_port_probe_set_result_at (probe, FALSE);
-        mm_port_probe_set_result_qcdm (probe, FALSE);
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -272,8 +270,6 @@ custom_init_step (GTask *task)
     if (mm_port_probe_list_has_mbim_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (probe)))) {
         mm_dbg ("(Dell) no need to run custom init in (%s): device has MBIM port",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        mm_port_probe_set_result_at (probe, FALSE);
-        mm_port_probe_set_result_qcdm (probe, FALSE);
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
