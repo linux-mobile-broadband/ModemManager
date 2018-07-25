@@ -487,6 +487,8 @@ update_message_list (MmGdbusModemVoice *skeleton,
     paths = mm_call_list_get_paths (list);
     mm_gdbus_modem_voice_set_calls (skeleton, (const gchar *const *)paths);
     g_strfreev (paths);
+
+    g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
 }
 
 static void
