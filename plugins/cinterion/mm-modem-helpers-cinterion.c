@@ -36,21 +36,33 @@ typedef struct {
     MMModemBand mm_band;
 } CinterionBand;
 
-/* Table checked in HC25 and PHS8 references. This table includes both 2G and 3G
+/* Table checked in PLS8-X/E/J/V/US, HC25 & PHS8 references. The table includes 2/3/4G
  * frequencies. Depending on which one is configured, one access technology or
  * the other will be used. This may conflict with the allowed mode configuration
  * set, so you shouldn't for example set 3G frequency bands, and then use a
  * 2G-only allowed mode. */
 static const CinterionBand cinterion_bands[] = {
-    { (1 << 0), MM_MODEM_BAND_EGSM    },
-    { (1 << 1), MM_MODEM_BAND_DCS     },
-    { (1 << 2), MM_MODEM_BAND_PCS     },
-    { (1 << 3), MM_MODEM_BAND_G850    },
-    { (1 << 4), MM_MODEM_BAND_UTRAN_1 },
-    { (1 << 5), MM_MODEM_BAND_UTRAN_2 },
-    { (1 << 6), MM_MODEM_BAND_UTRAN_5 },
-    { (1 << 7), MM_MODEM_BAND_UTRAN_8 },
-    { (1 << 8), MM_MODEM_BAND_UTRAN_6 }
+    { (1 << 0), MM_MODEM_BAND_EGSM       },
+    { (1 << 1), MM_MODEM_BAND_DCS        },
+    { (1 << 2), MM_MODEM_BAND_G850       },
+    { (1 << 3), MM_MODEM_BAND_PCS        },
+    { (1 << 4), MM_MODEM_BAND_UTRAN_1    },
+    { (1 << 5), MM_MODEM_BAND_UTRAN_2    },
+    { (1 << 6), MM_MODEM_BAND_UTRAN_5    },
+    { (1 << 7), MM_MODEM_BAND_UTRAN_8    },
+    { (1 << 8), MM_MODEM_BAND_UTRAN_6    },
+    { (1 << 9), MM_MODEM_BAND_UTRAN_4    },
+    { (1 << 12), MM_MODEM_BAND_UTRAN_3   },
+    { (1 << 13), MM_MODEM_BAND_EUTRAN_1  },
+    { (1 << 14), MM_MODEM_BAND_EUTRAN_2  },
+    { (1 << 15), MM_MODEM_BAND_EUTRAN_3  },
+    { (1 << 16), MM_MODEM_BAND_EUTRAN_4  },
+    { (1 << 17), MM_MODEM_BAND_EUTRAN_5  },
+    { (1 << 18), MM_MODEM_BAND_EUTRAN_7  },
+    { (1 << 19), MM_MODEM_BAND_EUTRAN_8  },
+    { (1 << 20), MM_MODEM_BAND_EUTRAN_17 },
+    { (1 << 21), MM_MODEM_BAND_EUTRAN_20 },
+    { (1 << 22), MM_MODEM_BAND_EUTRAN_13 }
 };
 
 /* Check valid combinations in 2G-only devices */
