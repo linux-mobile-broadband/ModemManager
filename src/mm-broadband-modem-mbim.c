@@ -4788,6 +4788,15 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_ip_families = modem_load_supported_ip_families;
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    iface->load_supported_bands = mm_shared_qmi_load_supported_bands;
+    iface->load_supported_bands_finish = mm_shared_qmi_load_supported_bands_finish;
+    iface->load_current_bands = mm_shared_qmi_load_current_bands;
+    iface->load_current_bands_finish = mm_shared_qmi_load_current_bands_finish;
+    iface->set_current_bands = mm_shared_qmi_set_current_bands;
+    iface->set_current_bands_finish = mm_shared_qmi_set_current_bands_finish;
+#endif
+
     /* Additional actions */
     iface->load_signal_quality = modem_load_signal_quality;
     iface->load_signal_quality_finish = modem_load_signal_quality_finish;

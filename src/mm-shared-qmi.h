@@ -115,6 +115,25 @@ void               mm_shared_qmi_set_current_modes                  (MMIfaceMode
 gboolean           mm_shared_qmi_set_current_modes_finish           (MMIfaceModem         *self,
                                                                      GAsyncResult         *res,
                                                                      GError              **error);
+void               mm_shared_qmi_load_supported_bands               (MMIfaceModem         *self,
+                                                                     GAsyncReadyCallback   callback,
+                                                                     gpointer              user_data);
+GArray            *mm_shared_qmi_load_supported_bands_finish        (MMIfaceModem         *self,
+                                                                     GAsyncResult         *res,
+                                                                     GError              **error);
+void               mm_shared_qmi_load_current_bands                 (MMIfaceModem         *self,
+                                                                     GAsyncReadyCallback   callback,
+                                                                     gpointer              user_data);
+GArray            *mm_shared_qmi_load_current_bands_finish          (MMIfaceModem         *self,
+                                                                     GAsyncResult         *res,
+                                                                     GError              **error);
+void               mm_shared_qmi_set_current_bands                  (MMIfaceModem         *self,
+                                                                     GArray               *bands_array,
+                                                                     GAsyncReadyCallback   callback,
+                                                                     gpointer              user_data);
+gboolean           mm_shared_qmi_set_current_bands_finish           (MMIfaceModem         *self,
+                                                                     GAsyncResult         *res,
+                                                                     GError              **error);
 void               mm_shared_qmi_reset                              (MMIfaceModem         *self,
                                                                      GAsyncReadyCallback   callback,
                                                                      gpointer              user_data);
