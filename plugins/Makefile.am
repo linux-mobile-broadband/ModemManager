@@ -1014,6 +1014,14 @@ libmm_plugin_dell_la_SOURCES = \
 	dell/mm-plugin-dell.c \
 	dell/mm-plugin-dell.h \
 	$(NULL)
+
+if WITH_MBIM
+libmm_plugin_dell_la_SOURCES += \
+	dell/mm-broadband-modem-dell-dw5821e.h \
+	dell/mm-broadband-modem-dell-dw5821e.c \
+	$(NULL)
+endif
+
 libmm_plugin_dell_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS) $(TELIT_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
 libmm_plugin_dell_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_dell_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS) $(TELIT_COMMON_LIBADD_FLAGS) $(MBM_COMMON_LIBADD_FLAGS)

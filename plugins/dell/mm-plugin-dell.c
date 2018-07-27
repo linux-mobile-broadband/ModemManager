@@ -43,6 +43,7 @@
 
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
+#include "mm-broadband-modem-dell-dw5821e.h"
 #endif
 
 #define MAX_PORT_PROBE_TIMEOUTS 3
@@ -395,6 +396,15 @@ create_modem (MMPlugin *self,
 
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
+        /* Specific implementation for the DW5821e */
+        if (vendor == 0x413c && product == 0x81d7) {
+            mm_dbg ("MBIM-powered DW5821e modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_dell_dw5821e_new (uid,
+                                                                       drivers,
+                                                                       mm_plugin_get_name (self),
+                                                                       vendor,
+                                                                       product));
+        }
         mm_dbg ("MBIM-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
@@ -442,10 +452,10 @@ create_modem (MMPlugin *self,
 /*****************************************************************************/
 
 static gboolean
-grab_port (MMPlugin *self,
-           MMBaseModem *modem,
-           MMPortProbe *probe,
-           GError **error)
+grab_port (MMPlugin     *self,
+           MMBaseModem  *modem,
+           MMPortProbe  *probe,
+           GError      **error)
 {
     if (MM_IS_BROADBAND_MODEM_SIERRA (modem))
         return mm_common_sierra_grab_port (self, modem, probe, error);
