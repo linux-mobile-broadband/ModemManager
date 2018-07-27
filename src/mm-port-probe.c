@@ -89,6 +89,9 @@ struct _MMPortProbePrivate {
     /* From udev tags */
     gboolean is_ignored;
     gboolean is_gps;
+    gboolean maybe_at_primary;
+    gboolean maybe_at_secondary;
+    gboolean maybe_at_ppp;
 
     /* Current probing task. Only one can be available at a time */
     GTask *task;
@@ -1382,6 +1385,14 @@ mm_port_probe_run (MMPortProbe                *self,
         mm_port_probe_set_result_qcdm (self, FALSE);
     }
 
+    /* If this is a port flagged as being an AT port, don't do any QCDM probing */
+    if (self->priv->maybe_at_primary || self->priv->maybe_at_secondary || self->priv->maybe_at_ppp) {
+        mm_dbg ("(%s/%s) no QCDM probing in possible AT port",
+                mm_kernel_device_get_subsystem (self->priv->port),
+                mm_kernel_device_get_name (self->priv->port));
+        mm_port_probe_set_result_qcdm (self, FALSE);
+    }
+
     /* Check if we already have the requested probing results.
      * We will fix here the 'ctx->flags' so that we only request probing
      * for the missing things. */
@@ -1762,6 +1773,9 @@ set_property (GObject *object,
         self->priv->port = g_value_dup_object (value);
         self->priv->is_ignored = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_IGNORE");
         self->priv->is_gps = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_GPS");
+        self->priv->maybe_at_primary = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_PRIMARY");
+        self->priv->maybe_at_secondary = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_SECONDARY");
+        self->priv->maybe_at_ppp = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_PPP");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
