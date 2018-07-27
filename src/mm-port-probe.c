@@ -92,6 +92,7 @@ struct _MMPortProbePrivate {
     gboolean maybe_at_primary;
     gboolean maybe_at_secondary;
     gboolean maybe_at_ppp;
+    gboolean maybe_qcdm;
 
     /* Current probing task. Only one can be available at a time */
     GTask *task;
@@ -1070,10 +1071,13 @@ serial_probe_schedule (MMPortProbe *self)
         return;
 
     /* If we got some custom initialization setup requested, go on with it
-     * first. */
+     * first. We completely ignore the custom initialization if the serial port
+     * that we receive in the context isn't an AT port (e.g. if it was flagged
+     * as not being an AT port early) */
     if (!ctx->at_custom_init_run &&
         ctx->at_custom_init &&
-        ctx->at_custom_init_finish) {
+        ctx->at_custom_init_finish &&
+        MM_IS_PORT_SERIAL_AT (ctx->serial)) {
         ctx->at_custom_init (self,
                              MM_PORT_SERIAL_AT (ctx->serial),
                              ctx->at_probing_cancellable,
@@ -1391,6 +1395,14 @@ mm_port_probe_run (MMPortProbe                *self,
                 mm_kernel_device_get_subsystem (self->priv->port),
                 mm_kernel_device_get_name (self->priv->port));
         mm_port_probe_set_result_qcdm (self, FALSE);
+    }
+
+    /* If this is a port flagged as being a QCDM port, don't do any AT probing */
+    if (self->priv->maybe_qcdm) {
+        mm_dbg ("(%s/%s) no AT probing in possible QCDM port",
+                mm_kernel_device_get_subsystem (self->priv->port),
+                mm_kernel_device_get_name (self->priv->port));
+        mm_port_probe_set_result_at (self, FALSE);
     }
 
     /* Check if we already have the requested probing results.
@@ -1776,6 +1788,7 @@ set_property (GObject *object,
         self->priv->maybe_at_primary = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_PRIMARY");
         self->priv->maybe_at_secondary = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_SECONDARY");
         self->priv->maybe_at_ppp = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_PPP");
+        self->priv->maybe_qcdm = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_QCDM");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
