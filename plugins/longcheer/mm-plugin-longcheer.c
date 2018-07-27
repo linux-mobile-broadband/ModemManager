@@ -213,12 +213,12 @@ grab_port (MMPlugin *self,
      * be the data/primary port on these devices.  We have to tag them based on
      * what the Windows .INF files say the port layout should be.
      */
-    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_PORT_TYPE_MODEM")) {
+    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
         mm_dbg ("longcheer: AT port '%s/%s' flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_PORT_TYPE_AUX")) {
+    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
         mm_dbg ("longcheer: AT port '%s/%s' flagged as secondary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));

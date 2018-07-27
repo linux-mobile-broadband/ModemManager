@@ -9,10 +9,10 @@ LABEL="mm_huawei_port_types"
 ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="1573", ENV{ID_MM_HUAWEI_DISABLE_GETPORTMODE}="1"
 
 # Mark the modem and at port flags for ModemManager
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="01", ENV{ID_MM_HUAWEI_MODEM_PORT}="1"
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="02", ENV{ID_MM_HUAWEI_AT_PORT}="1"
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="01", ENV{ID_MM_HUAWEI_MODEM_PORT}="1"
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="02", ENV{ID_MM_HUAWEI_AT_PORT}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="01", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="01", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
 # GPS NMEA port on MU609
 SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="05", ENV{ID_MM_PORT_TYPE_GPS}="1"

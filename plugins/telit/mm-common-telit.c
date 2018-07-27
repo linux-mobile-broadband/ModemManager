@@ -56,12 +56,12 @@ telit_grab_port (MMPlugin *self,
      * If no udev rules are found, AT#PORTCFG (if supported) can be used for
      * identifying the port layout
      */
-    if (mm_kernel_device_get_property_as_boolean (port, TAG_TELIT_MODEM_PORT)) {
+    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
         mm_dbg ("telit: AT port '%s/%s' flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    } else if (mm_kernel_device_get_property_as_boolean (port, TAG_TELIT_AUX_PORT)) {
+    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
         mm_dbg ("telit: AT port '%s/%s' flagged as secondary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));

@@ -58,7 +58,7 @@ grab_port (MMPlugin *self,
     port = mm_port_probe_peek_port (probe);
 
     /* Look for port type hints */
-    if (mm_port_probe_is_at (probe) && mm_kernel_device_get_property_as_boolean (port, "ID_MM_HAIER_PORT_TYPE_MODEM")) {
+    if (mm_port_probe_is_at (probe) && mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
         mm_dbg ("HAIER: AT port '%s/%s' flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));

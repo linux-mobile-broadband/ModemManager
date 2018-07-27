@@ -63,12 +63,12 @@ grab_port (MMPlugin *self,
 
     if (mm_port_probe_is_at (probe)) {
         /* Get port type from udev */
-        if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_MTK_AT_PORT")) {
+        if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
             mm_dbg ("MTK: AT port '%s/%s' flagged as secondary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
             pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-        } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_MTK_MODEM_PORT")) {
+        } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
             mm_dbg ("MTK: Modem port '%s/%s' flagged as primary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));

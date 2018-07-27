@@ -128,12 +128,12 @@ grab_port (MMPlugin *self,
 
     if (mm_port_probe_is_at (probe)) {
         /* Look for port type hints */
-        if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_ZTE_PORT_TYPE_MODEM")) {
+        if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
             mm_dbg ("ZTE: AT port '%s/%s' flagged as primary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));
             pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-        } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_ZTE_PORT_TYPE_AUX")) {
+        } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
             mm_dbg ("ZTE: AT port '%s/%s' flagged as secondary",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe));

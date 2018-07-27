@@ -532,12 +532,12 @@ grab_port (MMPlugin *self,
     port_type = mm_port_probe_get_port_type (probe);
     port = mm_port_probe_peek_port (probe);
 
-    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_HUAWEI_AT_PORT")) {
+    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
         mm_dbg ("(%s/%s)' Port flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_HUAWEI_MODEM_PORT")) {
+    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PPP")) {
         mm_dbg ("(%s/%s) Port flagged as PPP",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
