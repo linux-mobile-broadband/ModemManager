@@ -78,7 +78,7 @@ grab_port (MMPlugin *self,
     port_type = mm_port_probe_get_port_type (probe);
     port = mm_port_probe_peek_port (probe);
 
-    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_ERICSSON_MBM_GPS_PORT")) {
+    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_GPS")) {
         mm_dbg ("(%s/%s) Port flagged as GPS",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
