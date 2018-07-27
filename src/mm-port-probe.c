@@ -88,6 +88,7 @@ struct _MMPortProbePrivate {
 
     /* From udev tags */
     gboolean is_ignored;
+    gboolean is_gps;
 
     /* Current probing task. Only one can be available at a time */
     GTask *task;
@@ -1372,6 +1373,15 @@ mm_port_probe_run (MMPortProbe                *self,
         return;
     }
 
+    /* If this is a port flagged as a GPS port, don't do any AT or QCDM probing */
+    if (self->priv->is_gps) {
+        mm_dbg ("(%s/%s) GPS port detected",
+                mm_kernel_device_get_subsystem (self->priv->port),
+                mm_kernel_device_get_name (self->priv->port));
+        mm_port_probe_set_result_at (self, FALSE);
+        mm_port_probe_set_result_qcdm (self, FALSE);
+    }
+
     /* Check if we already have the requested probing results.
      * We will fix here the 'ctx->flags' so that we only request probing
      * for the missing things. */
@@ -1748,6 +1758,7 @@ set_property (GObject *object,
         /* construct only */
         self->priv->port = g_value_dup_object (value);
         self->priv->is_ignored = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_IGNORE");
+        self->priv->is_gps = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_GPS");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
