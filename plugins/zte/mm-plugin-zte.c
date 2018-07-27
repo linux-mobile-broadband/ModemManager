@@ -111,7 +111,6 @@ grab_port (MMPlugin *self,
            GError **error)
 {
     MMKernelDevice *port;
-    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
     MMPortType ptype;
 
     port = mm_port_probe_peek_port (probe);
@@ -126,21 +125,6 @@ grab_port (MMPlugin *self,
         return FALSE;
     }
 
-    if (mm_port_probe_is_at (probe)) {
-        /* Look for port type hints */
-        if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
-            mm_dbg ("ZTE: AT port '%s/%s' flagged as primary",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
-            pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-        } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
-            mm_dbg ("ZTE: AT port '%s/%s' flagged as secondary",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
-            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-        }
-    }
-
     if (mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_ZTE_ICERA_DHCP")) {
         mm_dbg ("ZTE: Icera-based modem will use DHCP");
         g_object_set (modem,
@@ -151,7 +135,7 @@ grab_port (MMPlugin *self,
     return mm_base_modem_grab_port (modem,
                                     port,
                                     ptype,
-                                    pflags,
+                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                     error);
 }
 

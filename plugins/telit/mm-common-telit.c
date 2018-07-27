@@ -49,24 +49,8 @@ telit_grab_port (MMPlugin *self,
     if (!g_str_equal (subsys, "tty"))
         goto out;
 
-    /* Look for port type hints; just probing can't distinguish which port should
-     * be the data/primary port on these devices.  We have to tag them based on
-     * what the Windows .INF files say the port layout should be.
-     *
-     * If no udev rules are found, AT#PORTCFG (if supported) can be used for
-     * identifying the port layout
-     */
-    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
-        mm_dbg ("telit: AT port '%s/%s' flagged as primary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
-        mm_dbg ("telit: AT port '%s/%s' flagged as secondary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-    } else if (g_object_get_data (G_OBJECT (device), TAG_GETPORTCFG_SUPPORTED) != NULL) {
+    /* AT#PORTCFG (if supported) can be used for identifying the port layout */
+    if (g_object_get_data (G_OBJECT (device), TAG_GETPORTCFG_SUPPORTED) != NULL) {
         if (g_strcmp0 (mm_kernel_device_get_property (port, "ID_USB_INTERFACE_NUM"), g_object_get_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT)) == 0) {
             mm_dbg ("telit: AT port '%s/%s' flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
@@ -83,23 +67,6 @@ telit_grab_port (MMPlugin *self,
                 mm_port_probe_get_port_name (probe));
             ptype = MM_PORT_TYPE_GPS;
         } else
-            ptype = MM_PORT_TYPE_IGNORED;
-    } else {
-        /* If the port isn't explicitly tagged as primary, secondary, or gps
-         * port, we will fallback to flagging it as secondary, but only if it
-         * probed AT successfully.
-         *
-         * This is so that we support the case where a single TTY is exposed
-         * by the modem and no explicit port type hint is specified.
-         *
-         * From the modem point of view, only the AT_FLAG_PRIMARY would be
-         * important, as that is the port that would end up getting used for PPP
-         * in this case, so having multiple secondary ports, if that ever
-         * happened, wouldn't be an issue.
-         */
-        if (mm_port_probe_is_at (probe))
-            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-        else
             ptype = MM_PORT_TYPE_IGNORED;
     }
 

@@ -525,29 +525,19 @@ grab_port (MMPlugin *self,
            MMPortProbe *probe,
            GError **error)
 {
-    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
+    MMPortSerialAtFlag pflags;
     MMKernelDevice *port;
     MMPortType port_type;
 
     port_type = mm_port_probe_get_port_type (probe);
     port = mm_port_probe_peek_port (probe);
 
-    if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
-        mm_dbg ("(%s/%s)' Port flagged as primary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PPP")) {
-        mm_dbg ("(%s/%s) Port flagged as PPP",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
-    } else {
+    pflags = (MMPortSerialAtFlag) GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS));
+    if (pflags != MM_PORT_SERIAL_AT_FLAG_NONE) {
         gchar *str;
 
-        pflags = (MMPortSerialAtFlag) GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS));
         str = mm_port_serial_at_flag_build_string_from_mask (pflags);
-        mm_dbg ("(%s/%s) Port will have AT flags '%s'",
+        mm_dbg ("(%s/%s) huawei port will have AT flags '%s'",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe),
                 str);

@@ -63,52 +63,6 @@ create_modem (MMPlugin *self,
                                                           product));
 }
 
-static gboolean
-grab_port (MMPlugin *self,
-           MMBaseModem *modem,
-           MMPortProbe *probe,
-           GError **error)
-{
-    MMKernelDevice *port;
-    MMPortType ptype;
-    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
-
-    port = mm_port_probe_peek_port (probe);
-    ptype = mm_port_probe_get_port_type (probe);
-
-    if (mm_port_probe_is_at (probe)) {
-        /* Look for port type hints; just probing can't distinguish which port should
-         * be the data/primary port on these devices.  We have to tag them based on
-         * what the Windows .INF files say the port layout should be.
-         */
-        if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
-            mm_dbg ("Simtech: AT port '%s/%s' flagged as primary",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
-            pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-        } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
-            mm_dbg ("Simtech: AT port '%s/%s' flagged as secondary",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
-            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-        }
-
-        /* If the port was tagged by the udev rules but isn't a primary or secondary,
-         * then ignore it to guard against race conditions if a device just happens
-         * to show up with more than two AT-capable ports.
-         */
-        if (pflags == MM_PORT_SERIAL_AT_FLAG_NONE &&
-            mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_SIMTECH_TAGGED"))
-            ptype = MM_PORT_TYPE_IGNORED;
-    }
-
-    return mm_base_modem_grab_port (modem,
-                                    port,
-                                    ptype,
-                                    pflags,
-                                    error);
-}
-
 /*****************************************************************************/
 
 G_MODULE_EXPORT MMPlugin *
@@ -140,5 +94,4 @@ mm_plugin_simtech_class_init (MMPluginSimtechClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
-    plugin_class->grab_port = grab_port;
 }

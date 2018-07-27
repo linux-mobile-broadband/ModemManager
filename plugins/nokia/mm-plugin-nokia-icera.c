@@ -57,39 +57,6 @@ create_modem (MMPlugin *self,
                                                         product));
 }
 
-static gboolean
-grab_port (MMPlugin *self,
-           MMBaseModem *modem,
-           MMPortProbe *probe,
-           GError **error)
-{
-    MMKernelDevice *port;
-    MMPortSerialAtFlag pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
-
-    port = mm_port_probe_peek_port (probe);
-
-    /* Look for port type hints */
-    if (mm_port_probe_is_at (probe)) {
-        if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
-            mm_dbg ("Nokia: AT port '%s/%s' flagged as primary",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
-            pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-        } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
-            mm_dbg ("Nokia: AT port '%s/%s' flagged as secondary",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
-            pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-        }
-    }
-
-    return mm_base_modem_grab_port (modem,
-                                    port,
-                                    mm_port_probe_get_port_type (probe),
-                                    pflags,
-                                    error);
-}
-
 /*****************************************************************************/
 
 G_MODULE_EXPORT MMPlugin *
@@ -120,5 +87,4 @@ mm_plugin_nokia_icera_class_init (MMPluginNokiaIceraClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
-    plugin_class->grab_port = grab_port;
 }

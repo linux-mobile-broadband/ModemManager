@@ -211,7 +211,19 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                                                    mm_serial_parser_v1_parse,
                                                    mm_serial_parser_v1_new (),
                                                    mm_serial_parser_v1_destroy);
-            /* Store flags already */
+            /* Prefer plugin-provided flags to the generic ones */
+            if (at_pflags == MM_PORT_SERIAL_AT_FLAG_NONE) {
+                if (mm_kernel_device_get_property_as_boolean (kernel_device, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
+                    mm_dbg ("AT port '%s/%s' flagged as primary", subsys, name);
+                    at_pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
+                } else if (mm_kernel_device_get_property_as_boolean (kernel_device, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
+                    mm_dbg ("AT port '%s/%s' flagged as secondary", subsys, name);
+                    at_pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
+                } else if (mm_kernel_device_get_property_as_boolean (kernel_device, "ID_MM_PORT_TYPE_AT_PPP")) {
+                    mm_dbg ("AT port '%s/%s' flagged as PPP", subsys, name);
+                    at_pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
+                }
+            }
             mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (port), at_pflags);
         } else if (ptype == MM_PORT_TYPE_GPS) {
             /* Raw GPS port */
