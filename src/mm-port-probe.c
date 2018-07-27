@@ -1596,6 +1596,9 @@ mm_port_probe_get_port_type (MMPortProbe *self)
         self->priv->is_at)
         return MM_PORT_TYPE_AT;
 
+    if (self->priv->is_gps)
+        return MM_PORT_TYPE_GPS;
+
     return MM_PORT_TYPE_UNKNOWN;
 }
 

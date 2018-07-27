@@ -66,11 +66,6 @@ telit_grab_port (MMPlugin *self,
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_GPS")) {
-        mm_dbg ("telit: port '%s/%s' flagged as NMEA",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        ptype = MM_PORT_TYPE_GPS;
     } else if (g_object_get_data (G_OBJECT (device), TAG_GETPORTCFG_SUPPORTED) != NULL) {
         if (g_strcmp0 (mm_kernel_device_get_property (port, "ID_USB_INTERFACE_NUM"), g_object_get_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT)) == 0) {
             mm_dbg ("telit: AT port '%s/%s' flagged as primary",

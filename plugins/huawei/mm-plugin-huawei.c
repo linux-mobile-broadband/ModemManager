@@ -542,11 +542,6 @@ grab_port (MMPlugin *self,
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
-    } else if (mm_kernel_device_get_property_as_boolean (port, "ID_MM_PORT_TYPE_GPS")) {
-        mm_dbg ("(%s/%s) Port flagged as GPS",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
-        port_type = MM_PORT_TYPE_GPS;
     } else {
         gchar *str;
 
