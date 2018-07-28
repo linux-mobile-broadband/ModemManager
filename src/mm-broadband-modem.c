@@ -3955,37 +3955,6 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Subscription State Loading (3GPP interface) */
-
-static MMModem3gppSubscriptionState
-modem_3gpp_load_subscription_state_finish (MMIfaceModem3gpp *self,
-                                           GAsyncResult *res,
-                                           GError **error)
-{
-    GError *inner_error = NULL;
-    gssize value;
-
-    value = g_task_propagate_int (G_TASK (res), &inner_error);
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
-    }
-    return (MMModem3gppSubscriptionState)value;
-}
-
-static void
-modem_3gpp_load_subscription_state (MMIfaceModem3gpp *self,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data)
-{
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_return_int (task, MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
-    g_object_unref (task);
-}
-
-/*****************************************************************************/
 /* UE mode of operation for EPS loading (3GPP interface) */
 
 static MMModem3gppEpsUeModeOperation
@@ -11182,8 +11151,6 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
     iface->load_operator_name = modem_3gpp_load_operator_name;
     iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
-    iface->load_subscription_state = modem_3gpp_load_subscription_state;
-    iface->load_subscription_state_finish = modem_3gpp_load_subscription_state_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
     iface->register_in_network = modem_3gpp_register_in_network;

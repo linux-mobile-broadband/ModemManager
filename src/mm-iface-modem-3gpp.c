@@ -64,10 +64,6 @@ mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
                             status, MM_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
-    g_object_bind_property (skeleton, "subscription-state",
-                            status, MM_SIMPLE_PROPERTY_3GPP_SUBSCRIPTION_STATE,
-                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-
     g_object_unref (skeleton);
 }
 
@@ -962,7 +958,6 @@ typedef struct {
     MmGdbusModem3gpp *skeleton;
     gboolean operator_code_loaded;
     gboolean operator_name_loaded;
-    gboolean subscription_state_loaded;
 } ReloadCurrentRegistrationInfoContext;
 
 static void
@@ -1044,31 +1039,6 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
 }
 
 static void
-load_subscription_state_ready (MMIfaceModem3gpp *self,
-                               GAsyncResult *res,
-                               GTask *task)
-{
-    ReloadCurrentRegistrationInfoContext *ctx;
-    GError *error = NULL;
-    MMModem3gppSubscriptionState subscription_state = MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
-
-    ctx = g_task_get_task_data (task);
-
-    subscription_state = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_subscription_state_finish (self, res, &error);
-    if (error) {
-        mm_warn ("Couldn't load Subscription State: '%s'", error->message);
-        g_error_free (error);
-    }
-
-    if (ctx->skeleton)
-        mm_gdbus_modem3gpp_set_subscription_state (ctx->skeleton, subscription_state);
-
-    ctx->subscription_state_loaded = TRUE;
-    reload_current_registration_info_context_step (task);
-}
-
-
-static void
 reload_current_registration_info_context_step (GTask *task)
 {
     MMIfaceModem3gpp *self;
@@ -1091,15 +1061,6 @@ reload_current_registration_info_context_step (GTask *task)
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name (
             self,
             (GAsyncReadyCallback)load_operator_name_ready,
-            task);
-        return;
-    }
-
-    if (!ctx->subscription_state_loaded) {
-        /* Launch subscription state update */
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_subscription_state (
-            self,
-            (GAsyncReadyCallback)load_subscription_state_ready,
             task);
         return;
     }
@@ -1147,11 +1108,6 @@ mm_iface_modem_3gpp_reload_current_registration_info (MMIfaceModem3gpp *self,
     if (ctx->operator_name_loaded)
         mm_gdbus_modem3gpp_set_operator_name (ctx->skeleton, NULL);
 
-    ctx->subscription_state_loaded = !(MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_subscription_state &&
-                                       MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_subscription_state_finish);
-    if (ctx->subscription_state_loaded)
-        mm_gdbus_modem3gpp_set_subscription_state (ctx->skeleton, MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
-
     reload_current_registration_info_context_step (task);
 }
 
@@ -1170,19 +1126,6 @@ mm_iface_modem_3gpp_clear_current_operator (MMIfaceModem3gpp *self)
     mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
     if (MM_IS_IFACE_MODEM_LOCATION (self))
         mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), 0, 0);
-}
-
-static void
-clear_subscription_state (MMIfaceModem3gpp *self)
-{
-    MmGdbusModem3gpp *skeleton = NULL;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
-                  NULL);
-    if (!skeleton)
-        return;
-    mm_gdbus_modem3gpp_set_subscription_state (skeleton, MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
 }
 
 /*****************************************************************************/
@@ -1285,13 +1228,6 @@ update_non_registered_state (MMIfaceModem3gpp *self,
 {
     /* Not registered neither in home nor roaming network */
     mm_iface_modem_3gpp_clear_current_operator (self);
-
-    /* The subscription state can be computed in two ways: a) via PCO which is
-     * sent by the carrier during registration or b) by looking at the
-     * registration reject error code.  If b), we want to make sure we
-     * preserve the subscription state */
-    if (reg_state_is_registered (old_state))
-        clear_subscription_state (self);
 
     /* The property in the interface is bound to the property
      * in the skeleton, so just updating here is enough */
@@ -1427,22 +1363,6 @@ mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp *self,
     ctx = get_registration_state_context (self);
     ctx->eps = state;
     update_registration_state (self, get_consolidated_reg_state (ctx), TRUE);
-}
-
-void
-mm_iface_modem_3gpp_update_subscription_state (MMIfaceModem3gpp *self,
-                                               MMModem3gppSubscriptionState state)
-{
-    MmGdbusModem3gpp *skeleton = NULL;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
-                  NULL);
-    if (skeleton) {
-        mm_dbg ("Setting subscription state to: %s", mm_modem_3gpp_subscription_state_get_string (state));
-        mm_gdbus_modem3gpp_set_subscription_state (skeleton, state);
-        g_object_unref (skeleton);
-    }
 }
 
 /*****************************************************************************/

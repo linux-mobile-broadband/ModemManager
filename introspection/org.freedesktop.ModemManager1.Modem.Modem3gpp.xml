@@ -152,6 +152,10 @@
         A <link linkend="MMModem3gppSubscriptionState">MMModem3gppSubscriptionState</link>
         value representing the subscription status of the account and whether there
         is any data remaining, given as an unsigned integer (signature <literal>"u"</literal>).
+
+        Deprecated: 1.10.0. The value of this property can only be obtained with operator
+        specific logic (e.g. processing specific PCO info), and therefore it doesn't make sense
+        to expose it in the ModemManager interface.
     -->
     <property name="SubscriptionState" type="u" access="read" />
 

@@ -253,14 +253,20 @@ mm_modem_3gpp_get_registration_state (MMModem3gpp *self)
  * Get the current subscription status of the account. This value is only
  * available after the modem attempts to register with the network.
  *
+ * The value of this property can only be obtained with operator specific logic (e.g.
+ * processing specific PCO info), and therefore it doesn't make sense to expose it in
+ * the ModemManager interface.
+ *
  * Returns: A #MMModem3gppSubscriptionState value, specifying the current subscription state.
+ *
+ * Deprecated: 1.10.0. The value of this property can only be obtained with operator
+ * specific logic (e.g. processing specific PCO info), and therefore it doesn't make sense
+ * to expose it in the ModemManager interface.
  */
 MMModem3gppSubscriptionState
 mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
 {
-    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
-
-    return mm_gdbus_modem3gpp_get_subscription_state (MM_GDBUS_MODEM3GPP (self));
+    return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
 }
 
 /*****************************************************************************/

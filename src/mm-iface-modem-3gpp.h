@@ -184,14 +184,6 @@ struct _MMIfaceModem3gpp {
                                           GAsyncResult *res,
                                           GError **error);
 
-    /* Loading of the subscription state property */
-    void (*load_subscription_state) (MMIfaceModem3gpp *self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data);
-    MMModem3gppSubscriptionState (*load_subscription_state_finish) (MMIfaceModem3gpp *self,
-                                                                    GAsyncResult *res,
-                                                                    GError **error);
-
     /* Scan current networks, expect a GList of MMModem3gppNetworkInfo */
     void (* scan_networks) (MMIfaceModem3gpp *self,
                             GAsyncReadyCallback callback,
