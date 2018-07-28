@@ -2154,10 +2154,8 @@ mm_shared_qmi_location_inject_assistance_data_finish (MMIfaceModemLocation  *sel
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void inject_assistance_data_next (GTask *task);
-
 static gboolean
-loc_location_inject_predicted_orbits_data_indication_timed_out (GTask *task)
+loc_location_inject_data_indication_timed_out (GTask *task)
 {
     InjectAssistanceDataContext *ctx;
 
@@ -2169,6 +2167,148 @@ loc_location_inject_predicted_orbits_data_indication_timed_out (GTask *task)
     g_object_unref (task);
     return G_SOURCE_REMOVE;
 }
+
+static void inject_xtra_data_next (GTask *task);
+
+static void
+loc_location_inject_xtra_data_indication_cb (QmiClientLoc                         *client,
+                                             QmiIndicationLocInjectXtraDataOutput *output,
+                                             GTask                                *task)
+{
+    InjectAssistanceDataContext *ctx;
+    QmiLocIndicationStatus       status;
+    GError                      *error = NULL;
+
+    if (!qmi_indication_loc_inject_xtra_data_output_get_indication_status (output, &status, &error)) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        goto out;
+    }
+
+    mm_error_from_qmi_loc_indication_status (status, &error);
+
+out:
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_task_get_task_data (task);
+
+    g_source_remove (ctx->timeout_id);
+    ctx->timeout_id = 0;
+
+    g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+    ctx->indication_id = 0;
+
+    inject_xtra_data_next (task);
+}
+
+static void
+inject_xtra_data_ready (QmiClientLoc *client,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    QmiMessageLocInjectXtraDataOutput *output;
+    InjectAssistanceDataContext       *ctx;
+    GError                            *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_loc_inject_xtra_data_finish (client, res, &error);
+    if (!output || !qmi_message_loc_inject_xtra_data_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
+
+    /* The task ownership is shared between signal and timeout; the one which is
+     * scheduled first will cancel the other. */
+    ctx->indication_id = g_signal_connect (ctx->client,
+                                           "inject-xtra-data",
+                                           G_CALLBACK (loc_location_inject_xtra_data_indication_cb),
+                                           task);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)loc_location_inject_data_indication_timed_out,
+                                             task);
+out:
+    if (output)
+        qmi_message_loc_inject_xtra_data_output_unref (output);
+}
+
+static void
+inject_xtra_data_next (GTask *task)
+{
+    QmiMessageLocInjectXtraDataInput *input;
+    InjectAssistanceDataContext      *ctx;
+    goffset                           total_bytes_left;
+    gsize                             count;
+    GArray                           *data;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->data_size >= ctx->i);
+    total_bytes_left = ctx->data_size - ctx->i;
+    if (total_bytes_left == 0) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->n_part++;
+    count = (total_bytes_left >= ctx->part_size) ? ctx->part_size : total_bytes_left;
+
+    input = qmi_message_loc_inject_xtra_data_input_new ();
+    qmi_message_loc_inject_xtra_data_input_set_total_size (
+        input,
+        (guint32)ctx->data_size,
+        NULL);
+    qmi_message_loc_inject_xtra_data_input_set_total_parts (
+        input,
+        (guint16)ctx->total_parts,
+        NULL);
+    qmi_message_loc_inject_xtra_data_input_set_part_number (
+        input,
+        (guint16)ctx->n_part,
+        NULL);
+    data = g_array_append_vals (g_array_sized_new (FALSE, FALSE, sizeof (guint8), count), &(ctx->data[ctx->i]), count);
+    qmi_message_loc_inject_xtra_data_input_set_part_data (
+        input,
+        data,
+        NULL);
+    g_array_unref (data);
+
+    ctx->i += count;
+
+    mm_info ("injecting xtra data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
+             count, (guint) ctx->n_part, (guint) ctx->total_parts);
+    qmi_client_loc_inject_xtra_data (ctx->client,
+                                     input,
+                                     10,
+                                     NULL,
+                                     (GAsyncReadyCallback) inject_xtra_data_ready,
+                                     task);
+
+    qmi_message_loc_inject_xtra_data_input_unref (input);
+}
+
+static void
+inject_xtra_data (GTask *task)
+{
+    InjectAssistanceDataContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->timeout_id == 0);
+    g_assert (ctx->indication_id == 0);
+
+    ctx->n_part = 0;
+    ctx->i = 0;
+
+    inject_xtra_data_next (task);
+}
+
+static void inject_assistance_data_next (GTask *task);
 
 static void
 loc_location_inject_predicted_orbits_data_indication_cb (QmiClientLoc                                    *client,
@@ -2216,18 +2356,17 @@ inject_predicted_orbits_data_ready (QmiClientLoc *client,
     ctx = g_task_get_task_data (task);
 
     output = qmi_client_loc_inject_predicted_orbits_data_finish (client, res, &error);
-    if (!output) {
+    if (!output || !qmi_message_loc_inject_predicted_orbits_data_output_get_result (output, &error)) {
+        /* Try with InjectXtra if InjectPredictedOrbits is unsupported */
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NOT_SUPPORTED)) {
+            g_error_free (error);
+            inject_xtra_data (task);
+            goto out;
+        }
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
-        return;
-    }
-
-    if (!qmi_message_loc_inject_predicted_orbits_data_output_get_result (output, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        qmi_message_loc_inject_predicted_orbits_data_output_unref (output);
-        return;
+        goto out;
     }
 
     /* The task ownership is shared between signal and timeout; the one which is
@@ -2237,10 +2376,11 @@ inject_predicted_orbits_data_ready (QmiClientLoc *client,
                                            G_CALLBACK (loc_location_inject_predicted_orbits_data_indication_cb),
                                            task);
     ctx->timeout_id = g_timeout_add_seconds (10,
-                                             (GSourceFunc)loc_location_inject_predicted_orbits_data_indication_timed_out,
+                                             (GSourceFunc)loc_location_inject_data_indication_timed_out,
                                              task);
-
-    qmi_message_loc_inject_predicted_orbits_data_output_unref (output);
+out:
+    if (output)
+        qmi_message_loc_inject_predicted_orbits_data_output_unref (output);
 }
 
 static void
