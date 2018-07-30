@@ -25,12 +25,6 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-cinterion.h"
 
-static gint
-sort_band (MMModemBand a, MMModemBand b)
-{
-    return a - b;
-}
-
 /*****************************************************************************/
 /* Test ^SCFG test responses */
 
@@ -52,8 +46,8 @@ common_test_scfg (const gchar *response,
     g_assert (res == TRUE);
     g_assert (bands != NULL);
 
-    g_array_sort (bands, (GCompareFunc)sort_band);
-    g_array_sort (expected_bands, (GCompareFunc)sort_band);
+    mm_common_bands_garray_sort (bands);
+    mm_common_bands_garray_sort (expected_bands);
 
     expected_bands_str = mm_common_build_bands_string ((const MMModemBand *)expected_bands->data,
                                                        expected_bands->len);
@@ -205,8 +199,8 @@ common_test_scfg_response (const gchar *response,
     g_assert (res == TRUE);
     g_assert (bands != NULL);
 
-    g_array_sort (bands, (GCompareFunc)sort_band);
-    g_array_sort (expected_bands, (GCompareFunc)sort_band);
+    mm_common_bands_garray_sort (bands);
+    mm_common_bands_garray_sort (expected_bands);
 
     expected_bands_str = mm_common_build_bands_string ((const MMModemBand *)expected_bands->data,
                                                        expected_bands->len);
