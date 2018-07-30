@@ -52,6 +52,7 @@ static const CinterionBand cinterion_bands[] = {
     { (1 << 7), MM_MODEM_BAND_UTRAN_8    },
     { (1 << 8), MM_MODEM_BAND_UTRAN_6    },
     { (1 << 9), MM_MODEM_BAND_UTRAN_4    },
+    { (1 << 10), MM_MODEM_BAND_UTRAN_19  },
     { (1 << 12), MM_MODEM_BAND_UTRAN_3   },
     { (1 << 13), MM_MODEM_BAND_EUTRAN_1  },
     { (1 << 14), MM_MODEM_BAND_EUTRAN_2  },
@@ -62,7 +63,8 @@ static const CinterionBand cinterion_bands[] = {
     { (1 << 19), MM_MODEM_BAND_EUTRAN_8  },
     { (1 << 20), MM_MODEM_BAND_EUTRAN_17 },
     { (1 << 21), MM_MODEM_BAND_EUTRAN_20 },
-    { (1 << 22), MM_MODEM_BAND_EUTRAN_13 }
+    { (1 << 22), MM_MODEM_BAND_EUTRAN_13 },
+    { (1 << 24), MM_MODEM_BAND_EUTRAN_19 }
 };
 
 /* Check valid combinations in 2G-only devices */
