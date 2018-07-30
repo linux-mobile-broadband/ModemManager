@@ -268,7 +268,7 @@ modem_load_model (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    gchar *model;
+    gchar *model = NULL;
     GTask *task;
     MMPortMbim *port;
 
