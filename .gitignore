@@ -161,15 +161,7 @@ Makefile.in
 
 /plugins/test-suite.log
 /plugins/test-udev-rules
-/plugins/test-modem-helpers-huawei*
-/plugins/test-modem-helpers-altair*
-/plugins/test-modem-helpers-cinterion*
-/plugins/test-modem-helpers-icera*
-/plugins/test-modem-helpers-mbm*
-/plugins/test-modem-helpers-telit*
-/plugins/test-modem-helpers-thuraya*
-/plugins/test-modem-helpers-ublox*
-/plugins/test-modem-helpers-linktop*
+/plugins/test-modem-helpers-*
 /plugins/test-service-*
 
 /plugins/ublox/mm-ublox-enums-types.[ch]
