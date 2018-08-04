@@ -2221,40 +2221,82 @@ mm_iface_modem_set_current_bands_finish (MMIfaceModem *self,
 }
 
 static void
+set_current_bands_complete_with_defaults (GTask *task)
+{
+    SetCurrentBandsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    /* Never show just 'any' in the interface */
+    if (ctx->bands_array->len == 1 && g_array_index (ctx->bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        GArray *supported_bands;
+
+        supported_bands = (mm_common_bands_variant_to_garray (mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
+        mm_common_bands_garray_sort (supported_bands);
+        mm_gdbus_modem_set_current_bands (ctx->skeleton, mm_common_bands_garray_to_variant (supported_bands));
+        g_array_unref (supported_bands);
+    } else {
+        mm_common_bands_garray_sort (ctx->bands_array);
+        mm_gdbus_modem_set_current_bands (ctx->skeleton, mm_common_bands_garray_to_variant (ctx->bands_array));
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+after_set_load_current_bands_ready (MMIfaceModem *self,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    GError                 *error = NULL;
+    GArray                 *current_bands;
+    SetCurrentBandsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    current_bands = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish (self, res, &error);
+    if (!current_bands) {
+        /* Errors when getting bands won't be critical */
+        mm_warn ("couldn't load current bands: '%s'", error->message);
+        g_error_free (error);
+        /* Default to the ones we requested */
+        set_current_bands_complete_with_defaults (task);
+        return;
+    }
+
+    mm_common_bands_garray_sort (current_bands);
+    mm_gdbus_modem_set_current_bands (ctx->skeleton, mm_common_bands_garray_to_variant (current_bands));
+    g_array_unref (current_bands);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 set_current_bands_ready (MMIfaceModem *self,
                          GAsyncResult *res,
                          GTask *task)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands_finish (self, res, &error))
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_current_bands_finish (self, res, &error)) {
         g_task_return_error (task, error);
-    else {
-        SetCurrentBandsContext *ctx;
-
-        ctx = g_task_get_task_data (task);
-
-        /* Never show just 'any' in the interface */
-        if (ctx->bands_array->len == 1 &&
-            g_array_index (ctx->bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
-            GArray *supported_bands;
-
-            supported_bands = (mm_common_bands_variant_to_garray (
-                                   mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
-            mm_common_bands_garray_sort (supported_bands);
-            mm_gdbus_modem_set_current_bands (ctx->skeleton,
-                                              mm_common_bands_garray_to_variant (supported_bands));
-            g_array_unref (supported_bands);
-        } else {
-            mm_common_bands_garray_sort (ctx->bands_array);
-            mm_gdbus_modem_set_current_bands (ctx->skeleton,
-                                              mm_common_bands_garray_to_variant (ctx->bands_array));
-        }
-
-        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
     }
 
-    g_object_unref (task);
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands &&
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish) {
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands (
+            self,
+            (GAsyncReadyCallback)after_set_load_current_bands_ready,
+            task);
+        return;
+    }
+
+    /* Default to the ones we requested */
+    set_current_bands_complete_with_defaults (task);
 }
 
 static gboolean
