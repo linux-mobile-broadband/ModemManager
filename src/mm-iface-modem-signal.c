@@ -113,35 +113,40 @@ load_values_ready (MMIfaceModemSignal *self,
         mm_gdbus_modem_signal_set_cdma (skeleton, dictionary);
         g_variant_unref (dictionary);
         g_object_unref (cdma);
-    }
+    } else
+        mm_gdbus_modem_signal_set_cdma (skeleton, NULL);
 
     if (evdo) {
         dictionary = mm_signal_get_dictionary (evdo);
         mm_gdbus_modem_signal_set_evdo (skeleton, dictionary);
         g_variant_unref (dictionary);
         g_object_unref (evdo);
-    }
+    } else
+        mm_gdbus_modem_signal_set_evdo (skeleton, NULL);
 
     if (gsm) {
         dictionary = mm_signal_get_dictionary (gsm);
         mm_gdbus_modem_signal_set_gsm (skeleton, dictionary);
         g_variant_unref (dictionary);
         g_object_unref (gsm);
-    }
+    } else
+        mm_gdbus_modem_signal_set_gsm (skeleton, NULL);
 
     if (umts) {
         dictionary = mm_signal_get_dictionary (umts);
         mm_gdbus_modem_signal_set_umts (skeleton, dictionary);
         g_variant_unref (dictionary);
         g_object_unref (umts);
-    }
+    } else
+        mm_gdbus_modem_signal_set_umts (skeleton, NULL);
 
     if (lte) {
         dictionary = mm_signal_get_dictionary (lte);
         mm_gdbus_modem_signal_set_lte (skeleton, dictionary);
         g_variant_unref (dictionary);
         g_object_unref (lte);
-    }
+    } else
+        mm_gdbus_modem_signal_set_lte (skeleton, NULL);
 
     /* Flush right away */
     g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
