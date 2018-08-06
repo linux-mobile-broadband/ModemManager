@@ -175,7 +175,7 @@ struct _MMBroadbandModemPrivate {
     GObject *modem_3gpp_ussd_dbus_skeleton;
     /* Implementation helpers */
     gboolean use_unencoded_ussd;
-    GSimpleAsyncResult *pending_ussd_action;
+    GTask *pending_ussd_action;
 
     /*<--- Modem CDMA interface --->*/
     /* Properties */
@@ -4883,9 +4883,9 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *self,
 /* Cancel USSD (3GPP/USSD interface) */
 
 static gboolean
-modem_3gpp_ussd_cancel_finish (MMIfaceModem3gppUssd *self,
-                               GAsyncResult *res,
-                               GError **error)
+modem_3gpp_ussd_cancel_finish (MMIfaceModem3gppUssd  *self,
+                               GAsyncResult          *res,
+                               GError               **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -4898,31 +4898,33 @@ cancel_command_ready (MMBroadbandModem *self,
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+
+    /* Complete the pending action, regardless of the CUSD result */
+    if (self->priv->pending_ussd_action) {
+        GTask *task;
+
+        task = self->priv->pending_ussd_action;
+        self->priv->pending_ussd_action = NULL;
+
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
+                                 "USSD session was cancelled");
+        g_object_unref (task);
+    }
+
+    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
+                                           MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+
     if (error)
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-
-    /* Complete the pending action, if any */
-    if (self->priv->pending_ussd_action) {
-        g_simple_async_result_set_error (self->priv->pending_ussd_action,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_CANCELLED,
-                                         "USSD session was cancelled");
-        g_simple_async_result_complete_in_idle (self->priv->pending_ussd_action);
-        g_object_unref (self->priv->pending_ussd_action);
-        self->priv->pending_ussd_action = NULL;
-    }
-
-    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
-                                           MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
 }
 
 static void
 modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *self,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
+                        GAsyncReadyCallback   callback,
+                        gpointer              user_data)
 {
     GTask *task;
 
@@ -4940,113 +4942,100 @@ modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *self,
 /* Send command (3GPP/USSD interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
-    gchar *command;
-    gboolean current_is_unencoded;
-    gboolean encoded_used;
-    gboolean unencoded_used;
+    gchar    *command;
+    gboolean  current_is_unencoded;
+    gboolean  encoded_used;
+    gboolean  unencoded_used;
 } Modem3gppUssdSendContext;
 
 static void
-modem_3gpp_ussd_send_context_complete_and_free (Modem3gppUssdSendContext *ctx)
+modem_3gpp_ussd_send_context_free (Modem3gppUssdSendContext *ctx)
 {
-    /* We check for result, as we may have already set it in
-     * priv->pending_ussd_request */
-    if (ctx->result) {
-        g_simple_async_result_complete_in_idle (ctx->result);
-        g_object_unref (ctx->result);
-    }
-    g_object_unref (ctx->self);
     g_free (ctx->command);
     g_slice_free (Modem3gppUssdSendContext, ctx);
 }
 
-static const gchar *
-modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd *self,
-                             GAsyncResult *res,
-                             GError **error)
+static gchar *
+modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd  *self,
+                             GAsyncResult          *res,
+                             GError               **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static void modem_3gpp_ussd_context_step (Modem3gppUssdSendContext *ctx);
+static void modem_3gpp_ussd_context_step (MMBroadbandModem *self);
 
 static void cusd_process_string (MMBroadbandModem *self,
                                  const gchar *str);
 
 static void
-ussd_send_command_ready (MMBroadbandModem *self,
-                         GAsyncResult *res,
-                         Modem3gppUssdSendContext *ctx)
+ussd_send_command_ready (MMBaseModem  *_self,
+                         GAsyncResult *res)
 {
-    GError *error = NULL;
-    const gchar *reply;
+    MMBroadbandModem         *self;
+    Modem3gppUssdSendContext *ctx;
+    GError                   *error = NULL;
+    const gchar              *response;
 
-    g_assert (ctx->result == NULL);
+    self = MM_BROADBAND_MODEM (_self);
 
-    reply = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (error) {
         /* Some immediate error happened when sending the USSD request */
         mm_dbg ("Error sending USSD request: '%s'", error->message);
         g_error_free (error);
 
         if (self->priv->pending_ussd_action) {
-            /* Recover result */
-            ctx->result = self->priv->pending_ussd_action;
-            self->priv->pending_ussd_action = NULL;
-            modem_3gpp_ussd_context_step (ctx);
+            modem_3gpp_ussd_context_step (self);
             return;
         }
+    }
 
-        /* So the USSD action was completed already... */
-        mm_dbg ("USSD action already completed via URCs");
-        modem_3gpp_ussd_send_context_complete_and_free (ctx);
+    if (!self->priv->pending_ussd_action) {
+        mm_dbg ("USSD operation finished already via URCs");
         return;
     }
 
     /* Cache the hint for the next time we send something */
-    if (!ctx->self->priv->use_unencoded_ussd &&
-        ctx->current_is_unencoded) {
+    ctx = g_task_get_task_data (self->priv->pending_ussd_action);
+    if (!self->priv->use_unencoded_ussd && ctx->current_is_unencoded) {
         mm_dbg ("Will assume we want unencoded USSD commands");
-        ctx->self->priv->use_unencoded_ussd = TRUE;
-    } else if (ctx->self->priv->use_unencoded_ussd &&
-               !ctx->current_is_unencoded) {
+        self->priv->use_unencoded_ussd = TRUE;
+    } else if (self->priv->use_unencoded_ussd && !ctx->current_is_unencoded) {
         mm_dbg ("Will assume we want encoded USSD commands");
-        ctx->self->priv->use_unencoded_ussd = FALSE;
+        self->priv->use_unencoded_ussd = FALSE;
     }
 
-    if (!self->priv->pending_ussd_action)
-        mm_dbg ("USSD operation finished already via URCs");
-    else if (reply && reply[0]) {
-        reply = mm_strip_tag (reply, "+CUSD:");
-        cusd_process_string (ctx->self, reply);
+    if (response && response[0]) {
+        response = mm_strip_tag (response, "+CUSD:");
+        cusd_process_string (self, response);
     }
-
-    modem_3gpp_ussd_send_context_complete_and_free (ctx);
 }
 
 static void
-modem_3gpp_ussd_context_send_encoded (Modem3gppUssdSendContext *ctx)
+modem_3gpp_ussd_context_send_encoded (MMBroadbandModem *self)
 {
-    gchar *at_command = NULL;
-    GError *error = NULL;
-    guint scheme = 0;
-    gchar *encoded;
+    Modem3gppUssdSendContext *ctx;
+    gchar                    *at_command = NULL;
+    GError                   *error = NULL;
+    guint                     scheme = 0;
+    gchar                    *encoded;
+
+    g_assert (self->priv->pending_ussd_action);
+    ctx = g_task_get_task_data (self->priv->pending_ussd_action);
 
     /* Encode USSD command */
-    encoded = mm_iface_modem_3gpp_ussd_encode (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
-                                               ctx->command,
-                                               &scheme,
-                                               &error);
+    encoded = mm_iface_modem_3gpp_ussd_encode (MM_IFACE_MODEM_3GPP_USSD (self), ctx->command, &scheme, &error);
     if (!encoded) {
-        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
-                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
-        g_simple_async_result_take_error (ctx->result, error);
-        modem_3gpp_ussd_send_context_complete_and_free (ctx);
+        GTask *task;
+
+        task = self->priv->pending_ussd_action;
+        self->priv->pending_ussd_action = NULL;
+
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self), MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -5056,25 +5045,23 @@ modem_3gpp_ussd_context_send_encoded (Modem3gppUssdSendContext *ctx)
     at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d", encoded, scheme);
     g_free (encoded);
 
-    /* Cache the action, as it may be completed via URCs.
-     * There shouldn't be any previous action pending. */
-    g_warn_if_fail (ctx->self->priv->pending_ussd_action == NULL);
-    ctx->self->priv->pending_ussd_action = ctx->result;
-    ctx->result = NULL;
-
-    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
                               at_command,
                               10,
                               FALSE,
                               (GAsyncReadyCallback)ussd_send_command_ready,
-                              ctx);
+                              NULL);
     g_free (at_command);
 }
 
 static void
-modem_3gpp_ussd_context_send_unencoded (Modem3gppUssdSendContext *ctx)
+modem_3gpp_ussd_context_send_unencoded (MMBroadbandModem *self)
 {
-    gchar *at_command = NULL;
+    Modem3gppUssdSendContext *ctx;
+    gchar                    *at_command = NULL;
+
+    g_assert (self->priv->pending_ussd_action);
+    ctx = g_task_get_task_data (self->priv->pending_ussd_action);
 
     /* Build AT command with action unencoded */
     ctx->unencoded_used = TRUE;
@@ -5083,76 +5070,86 @@ modem_3gpp_ussd_context_send_unencoded (Modem3gppUssdSendContext *ctx)
                                   ctx->command,
                                   MM_MODEM_GSM_USSD_SCHEME_7BIT);
 
-    /* Cache the action, as it may be completed via URCs.
-     * There shouldn't be any previous action pending. */
-    g_warn_if_fail (ctx->self->priv->pending_ussd_action == NULL);
-    ctx->self->priv->pending_ussd_action = ctx->result;
-    ctx->result = NULL;
-
-    mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
                               at_command,
                               10,
                               FALSE,
                               (GAsyncReadyCallback)ussd_send_command_ready,
-                              ctx);
+                              NULL);
     g_free (at_command);
 }
 
 static void
-modem_3gpp_ussd_context_step (Modem3gppUssdSendContext *ctx)
+modem_3gpp_ussd_context_step (MMBroadbandModem *self)
 {
-    if (ctx->encoded_used &&
-        ctx->unencoded_used) {
-        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+    Modem3gppUssdSendContext *ctx;
+
+    g_assert (self->priv->pending_ussd_action);
+    ctx = g_task_get_task_data (self->priv->pending_ussd_action);
+
+    if (ctx->encoded_used && ctx->unencoded_used) {
+        GTask *task;
+
+        task = self->priv->pending_ussd_action;
+        self->priv->pending_ussd_action = NULL;
+
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
                                                MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Sending USSD command failed");
-        modem_3gpp_ussd_send_context_complete_and_free (ctx);
+
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Sending USSD command failed");
+        g_object_unref (task);
         return;
     }
 
-    if (ctx->self->priv->use_unencoded_ussd) {
+    if (self->priv->use_unencoded_ussd) {
         if (!ctx->unencoded_used)
-            modem_3gpp_ussd_context_send_unencoded (ctx);
+            modem_3gpp_ussd_context_send_unencoded (self);
         else if (!ctx->encoded_used)
-            modem_3gpp_ussd_context_send_encoded (ctx);
+            modem_3gpp_ussd_context_send_encoded (self);
         else
             g_assert_not_reached ();
     } else {
         if (!ctx->encoded_used)
-            modem_3gpp_ussd_context_send_encoded (ctx);
+            modem_3gpp_ussd_context_send_encoded (self);
         else if (!ctx->unencoded_used)
-            modem_3gpp_ussd_context_send_unencoded (ctx);
+            modem_3gpp_ussd_context_send_unencoded (self);
         else
             g_assert_not_reached ();
     }
 }
 
 static void
-modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
-                      const gchar *command,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+modem_3gpp_ussd_send (MMIfaceModem3gppUssd *_self,
+                      const gchar          *command,
+                      GAsyncReadyCallback   callback,
+                      gpointer              user_data)
 {
+    MMBroadbandModem         *self;
+    GTask                    *task;
     Modem3gppUssdSendContext *ctx;
 
+    self = MM_BROADBAND_MODEM (_self);
+
+    task = g_task_new (self, NULL, callback, user_data);
     ctx = g_slice_new0 (Modem3gppUssdSendContext);
-    /* We're going to steal the string result in finish() so we must have a
-     * callback specified. */
-    g_assert (callback != NULL);
-    ctx->self = g_object_ref (self);
     ctx->command = g_strdup (command);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_3gpp_ussd_send);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) modem_3gpp_ussd_send_context_free);
 
-    mm_iface_modem_3gpp_ussd_update_state (self,
-                                           MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE);
+    /* Fail if there is an ongoing operation already */
+    if (self->priv->pending_ussd_action) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
+                                 "there is already an ongoing USSD operation");
+        g_object_unref (task);
+        return;
+    }
 
-    modem_3gpp_ussd_context_step (ctx);
+    /* Cache the action, as it may be completed via URCs */
+    self->priv->pending_ussd_action = task;
+
+    mm_iface_modem_3gpp_ussd_update_state (_self, MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE);
+
+    modem_3gpp_ussd_context_step (self);
 }
 
 /*****************************************************************************/
@@ -5254,120 +5251,100 @@ decode_ussd_response (MMBroadbandModem *self,
 
 static void
 cusd_process_string (MMBroadbandModem *self,
-                     const gchar *str)
+                     const gchar      *str)
 {
-    MMModem3gppUssdSessionState ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE;
+    MMModem3gppUssdSessionState  ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE;
+    GError                      *error = NULL;
+    gint                         status;
+    GTask                       *task;
+    gchar                       *converted = NULL;
+
+    /* If there is a pending action, it is ALWAYS completed here */
+    task = self->priv->pending_ussd_action;
+    self->priv->pending_ussd_action = NULL;
 
     if (!str || !isdigit (*str)) {
-        if (self->priv->pending_ussd_action)
-            g_simple_async_result_set_error (self->priv->pending_ussd_action,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Invalid USSD response received: '%s'",
-                                             str ? str : "(none)");
-        else
-            mm_warn ("Received invalid USSD network-initiated request: '%s'",
-                     str ? str : "(none)");
-    } else {
-        gint status;
-
-        status = g_ascii_digit_value (*str);
-        switch (status) {
-        case 0: /* no further action required */ {
-            gchar *converted;
-            GError *error = NULL;
-
-            converted = decode_ussd_response (self, str, &error);
-            if (self->priv->pending_ussd_action) {
-                /* Response to the user's request */
-                if (error)
-                    g_simple_async_result_take_error (self->priv->pending_ussd_action, error);
-                else
-                    g_simple_async_result_set_op_res_gpointer (self->priv->pending_ussd_action,
-                                                               converted,
-                                                               g_free);
-            } else {
-                if (error) {
-                    mm_warn ("Invalid network initiated USSD notification: %s",
-                             error->message);
-                    g_error_free (error);
-                } else {
-                    /* Network-initiated USSD-Notify */
-                    mm_iface_modem_3gpp_ussd_update_network_notification (
-                        MM_IFACE_MODEM_3GPP_USSD (self),
-                        converted);
-                    g_free (converted);
-                }
-            }
-            break;
-        }
-
-        case 1: /* further action required */ {
-            gchar *converted;
-            GError *error = NULL;
-
-            ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE;
-            converted = decode_ussd_response (self, str, &error);
-            if (self->priv->pending_ussd_action) {
-                if (error)
-                    g_simple_async_result_take_error (self->priv->pending_ussd_action, error);
-                else
-                    g_simple_async_result_set_op_res_gpointer (self->priv->pending_ussd_action,
-                                                               converted,
-                                                               g_free);
-            } else {
-                if (error) {
-                    mm_warn ("Invalid network initiated USSD request: %s",
-                             error->message);
-                    g_error_free (error);
-                } else {
-                    /* Network-initiated USSD-Request */
-                    mm_iface_modem_3gpp_ussd_update_network_request (
-                        MM_IFACE_MODEM_3GPP_USSD (self),
-                        converted);
-                    g_free (converted);
-                }
-            }
-            break;
-        }
-
-        case 2:
-            if (self->priv->pending_ussd_action)
-                g_simple_async_result_set_error (self->priv->pending_ussd_action,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_CANCELLED,
-                                                 "USSD terminated by network.");
-            break;
-
-        case 4:
-            if (self->priv->pending_ussd_action)
-                g_simple_async_result_set_error (self->priv->pending_ussd_action,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_UNSUPPORTED,
-                                                 "Operation not supported.");
-            break;
-
-        default:
-            if (self->priv->pending_ussd_action)
-                g_simple_async_result_set_error (self->priv->pending_ussd_action,
-                                                 MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_FAILED,
-                                                 "Unhandled USSD reply: %s (%d)",
-                                                 str,
-                                                 status);
-            break;
-        }
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Invalid USSD message received: '%s'", str ? str : "(none)");
+        goto out;
     }
 
-    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
-                                           ussd_state);
+    status = g_ascii_digit_value (*str);
+    switch (status) {
+    case 0:
+        /* no further action required */
+        converted = decode_ussd_response (self, str, &error);
+        if (!converted)
+            break;
+
+        /* Response to the user's request? */
+        if (task)
+            break;
+
+        /* Network-initiated USSD-Notify */
+        mm_iface_modem_3gpp_ussd_update_network_notification (MM_IFACE_MODEM_3GPP_USSD (self), converted);
+        g_clear_pointer (&converted, g_free);
+        break;
+
+    case 1:
+        /* further action required */
+        ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE;
+
+        converted = decode_ussd_response (self, str, &error);
+        if (!converted)
+            break;
+
+        /* Response to the user's request? */
+        if (task)
+            break;
+
+        /* Network-initiated USSD-Request */
+        mm_iface_modem_3gpp_ussd_update_network_request (MM_IFACE_MODEM_3GPP_USSD (self), converted);
+        g_clear_pointer (&converted, g_free);
+        break;
+
+    case 2:
+        /* Response to the user's request? */
+        if (task)
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "USSD terminated by network");
+        break;
+
+    case 4:
+        /* Response to the user's request? */
+        if (task)
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Operation not supported");
+        break;
+
+    default:
+        /* Response to the user's request? */
+        if (task)
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unhandled USSD reply: %s (%d)", str, status);
+        break;
+    }
+
+out:
+
+    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self), ussd_state);
 
     /* Complete the pending action */
-    if (self->priv->pending_ussd_action) {
-        g_simple_async_result_complete_in_idle (self->priv->pending_ussd_action);
-        g_object_unref (self->priv->pending_ussd_action);
-        self->priv->pending_ussd_action = NULL;
+    if (task) {
+        if (error)
+            g_task_return_error (task, error);
+        else if (converted)
+            g_task_return_pointer (task, converted, g_free);
+        else
+            g_assert_not_reached ();
+        return;
     }
+
+    /* If no pending task, just report the error */
+    if (error) {
+        mm_warn ("Invalid USSD message: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_assert (!converted);
 }
 
 static void
