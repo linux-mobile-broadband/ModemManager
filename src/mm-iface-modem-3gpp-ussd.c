@@ -402,6 +402,24 @@ mm_iface_modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
 
 /*****************************************************************************/
 
+MMModem3gppUssdSessionState
+mm_iface_modem_3gpp_ussd_get_state (MMIfaceModem3gppUssd *self)
+{
+    MmGdbusModem3gppUssd        *skeleton = NULL;
+    MMModem3gppUssdSessionState  state;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (!skeleton)
+        return MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN;
+
+    state = (MMModem3gppUssdSessionState) mm_gdbus_modem3gpp_ussd_get_state (skeleton);
+    g_object_unref (skeleton);
+    return state;
+}
+
 void
 mm_iface_modem_3gpp_ussd_update_state (MMIfaceModem3gppUssd *self,
                                        MMModem3gppUssdSessionState new_state)

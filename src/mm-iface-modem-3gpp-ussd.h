@@ -132,6 +132,8 @@ gboolean mm_iface_modem_3gpp_ussd_disable_finish (MMIfaceModem3gppUssd *self,
                                                   GAsyncResult *res,
                                                   GError **error);
 
+MMModem3gppUssdSessionState mm_iface_modem_3gpp_ussd_get_state (MMIfaceModem3gppUssd *self);
+
 /* Property updaters */
 void mm_iface_modem_3gpp_ussd_update_state                (MMIfaceModem3gppUssd *self,
                                                            MMModem3gppUssdSessionState new_state);
