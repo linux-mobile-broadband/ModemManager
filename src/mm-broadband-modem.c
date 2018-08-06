@@ -9969,12 +9969,10 @@ enable (MMBaseModem *self,
         break;
 
     case MM_MODEM_STATE_FAILED:
-    case MM_MODEM_STATE_INITIALIZING:
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_WRONG_STATE,
-                                 "Cannot enable modem: "
-                                 "device not fully initialized yet");
+                                 "Cannot enable modem: initialization failed");
         break;
 
     case MM_MODEM_STATE_LOCKED:
@@ -9984,7 +9982,9 @@ enable (MMBaseModem *self,
                                  "Cannot enable modem: device locked");
         break;
 
-    case MM_MODEM_STATE_DISABLED: {
+    case MM_MODEM_STATE_INITIALIZING:
+    case MM_MODEM_STATE_DISABLED:
+    case MM_MODEM_STATE_DISABLING: {
         EnablingContext *ctx;
 
         ctx = g_new0 (EnablingContext, 1);
@@ -9996,14 +9996,6 @@ enable (MMBaseModem *self,
         enabling_step (task);
         return;
     }
-
-    case MM_MODEM_STATE_DISABLING:
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_WRONG_STATE,
-                                 "Cannot enable modem: "
-                                 "currently being disabled");
-        break;
 
     case MM_MODEM_STATE_ENABLING:
         g_assert_not_reached ();
