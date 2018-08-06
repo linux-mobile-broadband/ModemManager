@@ -4970,10 +4970,7 @@ modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd *self,
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    /* We can return the string as constant because it is owned by the async
-     * result, which will be valid during the whole call of its callback, which
-     * is when we're actually calling finish() */
-    return (const gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void modem_3gpp_ussd_context_step (Modem3gppUssdSendContext *ctx);

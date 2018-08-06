@@ -194,15 +194,17 @@ handle_respond_ready (MMIfaceModem3gppUssd *self,
                       HandleRespondContext *ctx)
 {
     GError *error = NULL;
-    const gchar *reply;
+    gchar *reply;
 
-    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self, res,&error);
+    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self, res, &error);
     if (!reply)
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
         mm_gdbus_modem3gpp_ussd_complete_respond (ctx->skeleton,
                                                   ctx->invocation,
                                                   reply);
+        g_free (reply);
+    }
     handle_respond_context_free (ctx);
 }
 
@@ -298,15 +300,17 @@ handle_initiate_ready (MMIfaceModem3gppUssd *self,
                        HandleInitiateContext *ctx)
 {
     GError *error = NULL;
-    const gchar *reply;
+    gchar *reply;
 
     reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self, res, &error);
     if (!reply)
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
         mm_gdbus_modem3gpp_ussd_complete_initiate (ctx->skeleton,
                                                    ctx->invocation,
                                                    reply);
+        g_free (reply);
+    }
     handle_initiate_context_free (ctx);
 }
 

@@ -93,9 +93,9 @@ struct _MMIfaceModem3gppUssd {
                    const gchar *command,
                    GAsyncReadyCallback callback,
                    gpointer user_data);
-    const gchar * (* send_finish) (MMIfaceModem3gppUssd *self,
-                                   GAsyncResult *res,
-                                   GError **error);
+    gchar * (* send_finish) (MMIfaceModem3gppUssd *self,
+                             GAsyncResult *res,
+                             GError **error);
 
     /* Cancel */
     void (* cancel) (MMIfaceModem3gppUssd *self,
