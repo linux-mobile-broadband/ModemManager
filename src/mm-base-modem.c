@@ -89,6 +89,10 @@ struct _MMBaseModemPrivate {
     MMPortSerialAt *gps_control;
     MMPortSerialGps *gps;
 
+    /* Support for parallel enable/disable operations */
+    GList *enable_tasks;
+    GList *disable_tasks;
+
 #if defined WITH_QMI
     /* QMI ports */
     GList *qmi;
@@ -310,49 +314,123 @@ mm_base_modem_grab_port (MMBaseModem         *self,
 }
 
 gboolean
-mm_base_modem_disable_finish (MMBaseModem *self,
-                              GAsyncResult *res,
-                              GError **error)
+mm_base_modem_disable_finish (MMBaseModem   *self,
+                              GAsyncResult  *res,
+                              GError       **error)
 {
-    return MM_BASE_MODEM_GET_CLASS (self)->disable_finish (self, res, error);
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+disable_ready (MMBaseModem  *self,
+               GAsyncResult *res)
+{
+    GError *error = NULL;
+    GList  *l;
+    GList  *disable_tasks;
+
+    g_assert (self->priv->disable_tasks);
+    disable_tasks = self->priv->disable_tasks;
+    self->priv->disable_tasks = NULL;
+
+    MM_BASE_MODEM_GET_CLASS (self)->disable_finish (self, res, &error);
+    for (l = disable_tasks; l; l = g_list_next (l)) {
+        if (error)
+            g_task_return_error (G_TASK (l->data), g_error_copy (error));
+        else
+            g_task_return_boolean (G_TASK (l->data), TRUE);
+    }
+    g_clear_error (&error);
+
+    g_list_free_full (disable_tasks, (GDestroyNotify)g_object_unref);
 }
 
 void
-mm_base_modem_disable (MMBaseModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+mm_base_modem_disable (MMBaseModem         *self,
+                       GAsyncReadyCallback  callback,
+                       gpointer             user_data)
 {
+    GTask    *task;
+    gboolean  run_disable;
+
     g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable != NULL);
     g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable_finish != NULL);
+
+    /* If the list of disable tasks is empty, we need to run */
+    run_disable = !self->priv->disable_tasks;
+
+    /* Store task */
+    task = g_task_new (self, self->priv->cancellable, callback, user_data);
+    self->priv->disable_tasks = g_list_append (self->priv->disable_tasks, task);
+
+    if (!run_disable)
+        return;
 
     MM_BASE_MODEM_GET_CLASS (self)->disable (
         self,
         self->priv->cancellable,
-        callback,
-        user_data);
+        (GAsyncReadyCallback) disable_ready,
+        NULL);
 }
 
 gboolean
-mm_base_modem_enable_finish (MMBaseModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+mm_base_modem_enable_finish (MMBaseModem   *self,
+                             GAsyncResult  *res,
+                             GError       **error)
 {
-    return MM_BASE_MODEM_GET_CLASS (self)->enable_finish (self, res, error);
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+enable_ready (MMBaseModem  *self,
+              GAsyncResult *res)
+{
+    GError *error = NULL;
+    GList  *l;
+    GList  *enable_tasks;
+
+    g_assert (self->priv->enable_tasks);
+    enable_tasks = self->priv->enable_tasks;
+    self->priv->enable_tasks = NULL;
+
+    MM_BASE_MODEM_GET_CLASS (self)->enable_finish (self, res, &error);
+    for (l = enable_tasks; l; l = g_list_next (l)) {
+        if (error)
+            g_task_return_error (G_TASK (l->data), g_error_copy (error));
+        else
+            g_task_return_boolean (G_TASK (l->data), TRUE);
+    }
+    g_clear_error (&error);
+
+    g_list_free_full (enable_tasks, (GDestroyNotify)g_object_unref);
 }
 
 void
-mm_base_modem_enable (MMBaseModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+mm_base_modem_enable (MMBaseModem         *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
 {
+    GTask    *task;
+    gboolean  run_enable;
+
     g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable != NULL);
     g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable_finish != NULL);
+
+    /* If the list of enable tasks is empty, we need to run */
+    run_enable = !self->priv->enable_tasks;
+
+    /* Store task */
+    task = g_task_new (self, self->priv->cancellable, callback, user_data);
+    self->priv->enable_tasks = g_list_append (self->priv->enable_tasks, task);
+
+    if (!run_enable)
+        return;
 
     MM_BASE_MODEM_GET_CLASS (self)->enable (
         self,
         self->priv->cancellable,
-        callback,
-        user_data);
+        (GAsyncReadyCallback) enable_ready,
+        NULL);
 }
 
 gboolean
@@ -1416,6 +1494,9 @@ finalize (GObject *object)
     /* TODO
      * mm_auth_provider_cancel_for_owner (self->priv->authp, object);
     */
+
+    g_assert (!self->priv->enable_tasks);
+    g_assert (!self->priv->disable_tasks);
 
     mm_dbg ("Modem (%s) '%s' completely disposed",
             self->priv->plugin,

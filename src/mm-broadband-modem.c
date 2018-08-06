@@ -10006,11 +10006,7 @@ enable (MMBaseModem *self,
         break;
 
     case MM_MODEM_STATE_ENABLING:
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_IN_PROGRESS,
-                                 "Cannot enable modem: "
-                                 "already being enabled");
+        g_assert_not_reached ();
         break;
 
     case MM_MODEM_STATE_ENABLED:
