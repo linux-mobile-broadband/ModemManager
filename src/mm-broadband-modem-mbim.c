@@ -81,6 +81,7 @@ struct _MMBroadbandModemMbimPrivate {
     guint notification_id;
     ProcessNotificationFlag setup_flags;
     ProcessNotificationFlag enable_flags;
+    gboolean is_pco_supported;
 
     /* 3GPP registration helpers */
     gchar *current_operator_id;
@@ -1738,6 +1739,84 @@ parent_initialization_started (GTask *task)
 }
 
 static void
+query_device_services_ready (MbimDevice   *device,
+                             GAsyncResult *res,
+                             GTask        *task)
+{
+    MMBroadbandModemMbim *self;
+    MbimMessage *response;
+    GError *error = NULL;
+    MbimDeviceServiceElement **device_services;
+    guint32 device_services_count;
+
+    self = g_task_get_source_object (task);
+    self->priv->is_pco_supported = FALSE;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_device_services_response_parse (
+            response,
+            &device_services_count,
+            NULL, /* max_dss_sessions */
+            &device_services,
+            &error)) {
+        guint32 i;
+
+        for (i = 0; i < device_services_count; i++) {
+            MbimService service;
+            guint32 j;
+
+            service = mbim_uuid_to_service (&device_services[i]->device_service_id);
+            if (service != MBIM_SERVICE_BASIC_CONNECT_EXTENSIONS)
+                continue;
+
+            for (j = 0; j < device_services[i]->cids_count; j++) {
+                if (device_services[i]->cids[j] == MBIM_CID_BASIC_CONNECT_EXTENSIONS_PCO) {
+                    mm_dbg ("PCO is supported");
+                    self->priv->is_pco_supported = TRUE;
+                    break;
+                }
+            }
+
+            break;
+        }
+        mbim_device_service_element_array_free (device_services);
+    } else {
+        /* Ignore error */
+        mm_warn ("Couldn't query device services: %s", error->message);
+        g_error_free (error);
+    }
+
+    if (response)
+        mbim_message_unref (response);
+
+    parent_initialization_started (task);
+}
+
+static void
+query_device_services (GTask *task)
+{
+    InitializationStartedContext *ctx;
+    MbimMessage *message;
+    MbimDevice *device;
+
+    ctx = g_task_get_task_data (task);
+    device = mm_port_mbim_peek_device (ctx->mbim);
+    g_assert (device);
+
+    mm_dbg ("querying device services...");
+    message = mbim_message_device_services_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)query_device_services_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+static void
 mbim_device_removed_cb (MbimDevice *device,
                         MMBroadbandModemMbim *self)
 {
@@ -1806,7 +1885,7 @@ mbim_port_open_ready (MMPortMbim *mbim,
      * initialization */
     self = MM_BROADBAND_MODEM_MBIM (g_task_get_source_object (task));
     track_mbim_device_removed (self, mbim);
-    parent_initialization_started (task);
+    query_device_services (task);
 }
 
 static void
@@ -1837,7 +1916,7 @@ initialization_started (MMBroadbandModem *self,
         /* Nothing to be done, just connect to a signal and launch parent's
          * callback */
         track_mbim_device_removed (MM_BROADBAND_MODEM_MBIM (self), ctx->mbim);
-        parent_initialization_started (task);
+        query_device_services (task);
         return;
     }
 
