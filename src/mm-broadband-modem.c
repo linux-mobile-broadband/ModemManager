@@ -5204,9 +5204,9 @@ modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
 /* Setup/Cleanup unsolicited result codes (3GPP/USSD interface) */
 
 static gboolean
-modem_3gpp_ussd_setup_cleanup_unsolicited_result_codes_finish (MMIfaceModem3gppUssd *self,
-                                                               GAsyncResult *res,
-                                                               GError **error)
+modem_3gpp_ussd_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gppUssd  *self,
+                                                         GAsyncResult          *res,
+                                                         GError               **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -5406,17 +5406,17 @@ set_unsolicited_result_code_handlers (MMIfaceModem3gppUssd *self,
 }
 
 static void
-modem_3gpp_ussd_setup_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
-                                                GAsyncReadyCallback callback,
-                                                gpointer user_data)
+modem_3gpp_ussd_setup_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                          GAsyncReadyCallback   callback,
+                                          gpointer              user_data)
 {
     set_unsolicited_result_code_handlers (self, TRUE, callback, user_data);
 }
 
 static void
-modem_3gpp_ussd_cleanup_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
-                                                  GAsyncReadyCallback callback,
-                                                  gpointer user_data)
+modem_3gpp_ussd_cleanup_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                            GAsyncReadyCallback   callback,
+                                            gpointer              user_data)
 {
     set_unsolicited_result_code_handlers (self, FALSE, callback, user_data);
 }
@@ -5425,9 +5425,9 @@ modem_3gpp_ussd_cleanup_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
 /* Enable/Disable URCs (3GPP/USSD interface) */
 
 static gboolean
-modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish (MMIfaceModem3gppUssd *self,
-                                                                GAsyncResult *res,
-                                                                GError **error)
+modem_3gpp_ussd_enable_disable_unsolicited_events_finish (MMIfaceModem3gppUssd  *self,
+                                                          GAsyncResult          *res,
+                                                          GError               **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -5451,9 +5451,9 @@ urc_enable_disable_ready (MMBroadbandModem *self,
 }
 
 static void
-modem_3gpp_ussd_disable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
-                                                  GAsyncReadyCallback callback,
-                                                  gpointer user_data)
+modem_3gpp_ussd_disable_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                            GAsyncReadyCallback   callback,
+                                            gpointer              user_data)
 {
     GTask *task;
 
@@ -5468,9 +5468,9 @@ modem_3gpp_ussd_disable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
 }
 
 static void
-modem_3gpp_ussd_enable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
-                                                 GAsyncReadyCallback callback,
-                                                 gpointer user_data)
+modem_3gpp_ussd_enable_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                           GAsyncReadyCallback   callback,
+                                           gpointer              user_data)
 {
     GTask *task;
 
@@ -11135,16 +11135,16 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
     iface->check_support_finish = modem_3gpp_ussd_check_support_finish;
 
     /* Enabling steps */
-    iface->setup_unsolicited_result_codes = modem_3gpp_ussd_setup_unsolicited_result_codes;
-    iface->setup_unsolicited_result_codes_finish = modem_3gpp_ussd_setup_cleanup_unsolicited_result_codes_finish;
-    iface->enable_unsolicited_result_codes = modem_3gpp_ussd_enable_unsolicited_result_codes;
-    iface->enable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
+    iface->setup_unsolicited_events = modem_3gpp_ussd_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_ussd_setup_cleanup_unsolicited_events_finish;
+    iface->enable_unsolicited_events = modem_3gpp_ussd_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_3gpp_ussd_enable_disable_unsolicited_events_finish;
 
     /* Disabling steps */
-    iface->cleanup_unsolicited_result_codes_finish = modem_3gpp_ussd_setup_cleanup_unsolicited_result_codes_finish;
-    iface->cleanup_unsolicited_result_codes = modem_3gpp_ussd_cleanup_unsolicited_result_codes;
-    iface->disable_unsolicited_result_codes = modem_3gpp_ussd_disable_unsolicited_result_codes;
-    iface->disable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_ussd_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_ussd_cleanup_unsolicited_events;
+    iface->disable_unsolicited_events = modem_3gpp_ussd_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_3gpp_ussd_enable_disable_unsolicited_events_finish;
 
     /* Additional actions */
     iface->encode = modem_3gpp_ussd_encode;

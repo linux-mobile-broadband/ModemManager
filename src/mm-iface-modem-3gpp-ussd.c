@@ -467,8 +467,8 @@ static void interface_disabling_step (GTask *task);
 
 typedef enum {
     DISABLING_STEP_FIRST,
-    DISABLING_STEP_DISABLE_UNSOLICITED_RESULT_CODES,
-    DISABLING_STEP_CLEANUP_UNSOLICITED_RESULT_CODES,
+    DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
+    DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -494,19 +494,17 @@ mm_iface_modem_3gpp_ussd_disable_finish (MMIfaceModem3gppUssd *self,
 }
 
 static void
-disable_unsolicited_result_codes_ready (MMIfaceModem3gppUssd *self,
-                                        GAsyncResult *res,
-                                        GTask *task)
+disable_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
+                                  GAsyncResult *res,
+                                  GTask *task)
 {
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->disable_unsolicited_result_codes_finish (self,
-                                                                                            res,
-                                                                                            &error);
+    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't disable unsolicited result codes: '%s'", error->message);
+        mm_dbg ("Couldn't disable unsolicited USSD events: '%s'", error->message);
         g_error_free (error);
     }
 
@@ -517,19 +515,17 @@ disable_unsolicited_result_codes_ready (MMIfaceModem3gppUssd *self,
 }
 
 static void
-cleanup_unsolicited_result_codes_ready (MMIfaceModem3gppUssd *self,
-                                        GAsyncResult *res,
-                                        GTask *task)
+cleanup_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
+                                  GAsyncResult *res,
+                                  GTask *task)
 {
     DisablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cleanup_unsolicited_result_codes_finish (self,
-                                                                                            res,
-                                                                                            &error);
+    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't cleanup unsolicited result codes: '%s'", error->message);
+        mm_dbg ("Couldn't cleanup unsolicited USSD events: '%s'", error->message);
         g_error_free (error);
     }
 
@@ -553,17 +549,17 @@ interface_disabling_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
-    case DISABLING_STEP_DISABLE_UNSOLICITED_RESULT_CODES:
-        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->disable_unsolicited_result_codes (
+    case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
+        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->disable_unsolicited_events (
             self,
-            (GAsyncReadyCallback)disable_unsolicited_result_codes_ready,
+            (GAsyncReadyCallback)disable_unsolicited_events_ready,
             task);
         return;
 
-    case DISABLING_STEP_CLEANUP_UNSOLICITED_RESULT_CODES:
-        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cleanup_unsolicited_result_codes (
+    case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
+        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cleanup_unsolicited_events (
             self,
-            (GAsyncReadyCallback)cleanup_unsolicited_result_codes_ready,
+            (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
             task);
         return;
 
@@ -615,8 +611,8 @@ static void interface_enabling_step (GTask *task);
 
 typedef enum {
     ENABLING_STEP_FIRST,
-    ENABLING_STEP_SETUP_UNSOLICITED_RESULT_CODES,
-    ENABLING_STEP_ENABLE_UNSOLICITED_RESULT_CODES,
+    ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
+    ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -642,19 +638,17 @@ mm_iface_modem_3gpp_ussd_enable_finish (MMIfaceModem3gppUssd *self,
 }
 
 static void
-setup_unsolicited_result_codes_ready (MMIfaceModem3gppUssd *self,
-                                      GAsyncResult *res,
-                                      GTask *task)
+setup_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
+                                GAsyncResult *res,
+                                GTask *task)
 {
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->setup_unsolicited_result_codes_finish (self,
-                                                                                          res,
-                                                                                          &error);
+    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't setup unsolicited result codes: '%s'", error->message);
+        mm_dbg ("Couldn't setup unsolicited USSD events: '%s'", error->message);
         g_error_free (error);
     }
 
@@ -665,19 +659,17 @@ setup_unsolicited_result_codes_ready (MMIfaceModem3gppUssd *self,
 }
 
 static void
-enable_unsolicited_result_codes_ready (MMIfaceModem3gppUssd *self,
-                                       GAsyncResult *res,
-                                       GTask *task)
+enable_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
+                                 GAsyncResult *res,
+                                 GTask *task)
 {
     EnablingContext *ctx;
     GError *error = NULL;
 
-    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->enable_unsolicited_result_codes_finish (self,
-                                                                                           res,
-                                                                                           &error);
+    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't enable unsolicited result codes: '%s'", error->message);
+        mm_dbg ("Couldn't enable unsolicited USSD events: '%s'", error->message);
         g_error_free (error);
     }
 
@@ -701,17 +693,17 @@ interface_enabling_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_SETUP_UNSOLICITED_RESULT_CODES:
-        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->setup_unsolicited_result_codes (
+    case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
+        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->setup_unsolicited_events (
             self,
-            (GAsyncReadyCallback)setup_unsolicited_result_codes_ready,
+            (GAsyncReadyCallback)setup_unsolicited_events_ready,
             task);
         return;
 
-    case ENABLING_STEP_ENABLE_UNSOLICITED_RESULT_CODES:
-        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->enable_unsolicited_result_codes (
+    case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
+        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->enable_unsolicited_events (
             self,
-            (GAsyncReadyCallback)enable_unsolicited_result_codes_ready,
+            (GAsyncReadyCallback)enable_unsolicited_events_ready,
             task);
         return;
 

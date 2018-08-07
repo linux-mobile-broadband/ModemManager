@@ -40,44 +40,44 @@ struct _MMIfaceModem3gppUssd {
     GTypeInterface g_iface;
 
     /* Check for USSD support (async) */
-    void (* check_support) (MMIfaceModem3gppUssd *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data);
-    gboolean (*check_support_finish) (MMIfaceModem3gppUssd *self,
-                                      GAsyncResult *res,
-                                      GError **error);
+    void     (* check_support)        (MMIfaceModem3gppUssd  *self,
+                                       GAsyncReadyCallback    callback,
+                                       gpointer               user_data);
+    gboolean (* check_support_finish) (MMIfaceModem3gppUssd  *self,
+                                       GAsyncResult          *res,
+                                       GError               **error);
 
-    /* Asynchronous setup of unsolicited result codes */
-    void (*setup_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
-                                            GAsyncReadyCallback callback,
-                                            gpointer user_data);
-    gboolean (*setup_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
-                                                       GAsyncResult *res,
-                                                       GError **error);
+    /* Asynchronous setup of unsolicited events */
+    void     (* setup_unsolicited_events)        (MMIfaceModem3gppUssd  *self,
+                                                  GAsyncReadyCallback   callback,
+                                                  gpointer               user_data);
+    gboolean (* setup_unsolicited_events_finish) (MMIfaceModem3gppUssd  *self,
+                                                  GAsyncResult          *res,
+                                                  GError               **error);
 
-    /* Asynchronous enabling of unsolicited result codes */
-    void (*enable_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
-                                             GAsyncReadyCallback callback,
-                                             gpointer user_data);
-    gboolean (*enable_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
-                                                        GAsyncResult *res,
-                                                        GError **error);
+    /* Asynchronous enabling of unsolicited events */
+    void     (* enable_unsolicited_events)        (MMIfaceModem3gppUssd  *self,
+                                                   GAsyncReadyCallback    callback,
+                                                   gpointer               user_data);
+    gboolean (* enable_unsolicited_events_finish) (MMIfaceModem3gppUssd  *self,
+                                                   GAsyncResult          *res,
+                                                   GError               **error);
 
-    /* Asynchronous disabling of unsolicited result codes */
-    void (*disable_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
-                                              GAsyncReadyCallback callback,
-                                              gpointer user_data);
-    gboolean (*disable_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
-                                                         GAsyncResult *res,
-                                                         GError **error);
+    /* Asynchronous disabling of unsolicited events */
+    void     (* disable_unsolicited_events)        (MMIfaceModem3gppUssd  *self,
+                                                    GAsyncReadyCallback    callback,
+                                                    gpointer               user_data);
+    gboolean (* disable_unsolicited_events_finish) (MMIfaceModem3gppUssd  *self,
+                                                    GAsyncResult          *res,
+                                                    GError               **error);
 
-    /* Asynchronous cleaning up of unsolicited result codes */
-    void (*cleanup_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
-                                              GAsyncReadyCallback callback,
-                                              gpointer user_data);
-    gboolean (*cleanup_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
-                                                         GAsyncResult *res,
-                                                         GError **error);
+    /* Asynchronous cleaning up of unsolicited events */
+    void     (* cleanup_unsolicited_events)        (MMIfaceModem3gppUssd  *self,
+                                                    GAsyncReadyCallback    callback,
+                                                    gpointer               user_data);
+    gboolean (* cleanup_unsolicited_events_finish) (MMIfaceModem3gppUssd  *self,
+                                                    GAsyncResult          *res,
+                                                    GError               **error);
 
     /* Encode/Decode */
     gchar * (*encode) (MMIfaceModem3gppUssd *self,
