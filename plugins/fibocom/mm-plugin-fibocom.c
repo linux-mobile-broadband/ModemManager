@@ -22,9 +22,11 @@
 #include "mm-log.h"
 #include "mm-plugin-fibocom.h"
 #include "mm-broadband-modem.h"
+#include "mm-broadband-modem-xmm.h"
 
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
+#include "mm-broadband-modem-mbim-xmm.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginFibocom, mm_plugin_fibocom, MM_TYPE_PLUGIN)
@@ -45,6 +47,14 @@ create_modem (MMPlugin     *self,
 {
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
+        if (mm_port_probe_list_is_xmm (probes)) {
+            mm_dbg ("MBIM-powered XMM-based Fibocom modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_new (uid,
+                                                                   drivers,
+                                                                   mm_plugin_get_name (self),
+                                                                   vendor,
+                                                                   product));
+        }
         mm_dbg ("MBIM-powered Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
@@ -54,6 +64,16 @@ create_modem (MMPlugin     *self,
     }
 #endif
 
+    if (mm_port_probe_list_is_xmm (probes)) {
+        mm_dbg ("XMM-based Fibocom modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_xmm_new (uid,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
+    }
+
+    mm_dbg ("Fibocom modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
                                                   drivers,
                                                   mm_plugin_get_name (self),
@@ -78,6 +98,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_DRIVERS,    drivers,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_MBIM,       TRUE,
+                      MM_PLUGIN_XMM_PROBE,          TRUE,
                       NULL));
 }
 
