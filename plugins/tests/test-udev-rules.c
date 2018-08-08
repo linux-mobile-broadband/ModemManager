@@ -118,6 +118,12 @@ test_haier (void)
     common_test (TESTUDEVRULESDIR_HAIER);
 }
 
+static void
+test_fibocom (void)
+{
+    common_test (TESTUDEVRULESDIR_FIBOCOM);
+}
+
 /************************************************************/
 
 void
@@ -158,6 +164,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/test-udev-rules/telit",     test_telit);
     g_test_add_func ("/MM/test-udev-rules/mtk",       test_mtk);
     g_test_add_func ("/MM/test-udev-rules/haier",     test_haier);
+    g_test_add_func ("/MM/test-udev-rules/fibocom",   test_fibocom);
 
     return g_test_run ();
 }

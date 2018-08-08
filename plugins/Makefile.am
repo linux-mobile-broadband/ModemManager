@@ -1036,8 +1036,6 @@ libmm_plugin_quectel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 # plugin: fibocom
 ################################################################################
 
-dist_udevrules_DATA += fibocom/77-mm-fibocom-port-types.rules
-
 pkglib_LTLIBRARIES += libmm-plugin-fibocom.la
 libmm_plugin_fibocom_la_SOURCES = \
 	fibocom/mm-plugin-fibocom.c \
@@ -1046,6 +1044,10 @@ libmm_plugin_fibocom_la_SOURCES = \
 libmm_plugin_fibocom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(XMM_COMMON_COMPILER_FLAGS)
 libmm_plugin_fibocom_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_fibocom_la_LIBADD   = $(XMM_COMMON_LIBADD_FLAGS)
+
+dist_udevrules_DATA += fibocom/77-mm-fibocom-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_FIBOCOM=\"${srcdir}/fibocom\"
 
 ################################################################################
 # udev rules tester
