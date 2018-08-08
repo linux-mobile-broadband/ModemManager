@@ -141,6 +141,18 @@ xact_num_to_band (guint num)
     return MM_MODEM_BAND_UNKNOWN;
 }
 
+static guint
+xact_band_to_num (MMModemBand band)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (xact_band_config); i++) {
+        if (band == xact_band_config[i].band)
+            return xact_band_config[i].num;
+    }
+    return 0;
+}
+
 /*****************************************************************************/
 /* XACT=? response parser */
 
@@ -457,4 +469,94 @@ out:
     }
 
     return TRUE;
+}
+
+/*****************************************************************************/
+/* AT+XACT=X command builder */
+
+static gboolean
+append_rat_value (GString      *str,
+                  MMModemMode   mode,
+                  GError      **error)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (xmm_modes); i++) {
+        if (xmm_modes[i] == mode) {
+            g_string_append_printf (str, "%u", i);
+            return TRUE;
+        }
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "No AcT value matches requested mode");
+    return FALSE;
+}
+
+gchar *
+mm_xmm_build_xact_set_command (const MMModemModeCombination  *mode,
+                               const GArray                  *bands,
+                               GError                       **error)
+{
+    GString *command;
+
+    /* At least one required */
+    g_assert (mode || bands);
+
+    /* Build command */
+    command = g_string_new ("+XACT=");
+
+    /* Mode is optional. If not given, we set all fields as empty */
+    if (mode) {
+        /* Allowed mask */
+        if (!append_rat_value (command, mode->allowed, error)) {
+            g_string_free (command, TRUE);
+            return NULL;
+        }
+
+        /* Preferred */
+        if (mode->preferred != MM_MODEM_MODE_NONE) {
+            g_string_append (command, ",");
+            if (!append_rat_value (command, mode->preferred, error)) {
+                g_string_free (command, TRUE);
+                return NULL;
+            }
+            /* We never set <PreferredAct2> because that is anyway not part of
+             * ModemManager's API. In modems with triple GSM/UMTS/LTE mode, the
+             * <PreferredAct2> is always the highest of the remaining ones. E.g.
+             * if "2G+3G+4G allowed with 2G preferred", the second preferred one
+             * would be 4G, not 3G. */
+            g_string_append (command, ",");
+        } else
+            g_string_append (command, ",,");
+    } else
+        g_string_append (command, ",,");
+
+    if (bands) {
+        g_string_append (command, ",");
+        /* Automatic band selection */
+        if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
+            g_string_append (command, "0");
+        else {
+            guint i;
+
+            for (i = 0; i < bands->len; i++) {
+                MMModemBand band;
+                guint       num;
+
+                band = g_array_index (bands, MMModemBand, i);
+                num = xact_band_to_num (band);
+                if (!num) {
+                    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Band unsupported by this plugin: %s", mm_modem_band_get_string (band));
+                    g_string_free (command, TRUE);
+                    return NULL;
+                }
+
+                g_string_append_printf (command, "%s%u", i == 0 ? "" : ",", num);
+            }
+        }
+    }
+
+    return g_string_free (command, FALSE);
 }

@@ -31,4 +31,9 @@ gboolean mm_xmm_parse_xact_query_response (const gchar             *response,
                                            GArray                 **bands_out,
                                            GError                 **error);
 
+/* AT+XACT=X command builder */
+gchar *mm_xmm_build_xact_set_command (const MMModemModeCombination  *mode,
+                                      const GArray                  *bands,
+                                      GError                       **error);
+
 #endif  /* MM_MODEM_HELPERS_XMM_H */
