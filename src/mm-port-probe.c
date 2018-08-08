@@ -11,8 +11,8 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2011 Red Hat, Inc.
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2009 - 2018 Red Hat, Inc.
+ * Copyright (C) 2011 - 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include "config.h"
@@ -52,6 +52,7 @@
  *      |----> Vendor
  *      |----> Product
  *      |----> Is Icera?
+ *      |----> Is Xmm?
  * ----> QCDM Serial Open
  *   |----> QCDM?
  * ----> QMI Device Open
@@ -83,6 +84,7 @@ struct _MMPortProbePrivate {
     gchar *vendor;
     gchar *product;
     gboolean is_icera;
+    gboolean is_xmm;
     gboolean is_qmi;
     gboolean is_mbim;
 
@@ -170,9 +172,11 @@ mm_port_probe_set_result_at (MMPortProbe *self,
         self->priv->vendor = NULL;
         self->priv->product = NULL;
         self->priv->is_icera = FALSE;
+        self->priv->is_xmm = FALSE;
         self->priv->flags |= (MM_PORT_PROBE_AT_VENDOR |
                               MM_PORT_PROBE_AT_PRODUCT |
-                              MM_PORT_PROBE_AT_ICERA);
+                              MM_PORT_PROBE_AT_ICERA |
+                              MM_PORT_PROBE_AT_XMM);
     }
 }
 
@@ -235,6 +239,25 @@ mm_port_probe_set_result_at_icera (MMPortProbe *self,
 }
 
 void
+mm_port_probe_set_result_at_xmm (MMPortProbe *self,
+                                 gboolean is_xmm)
+{
+    if (is_xmm) {
+        mm_dbg ("(%s/%s) Modem is XMM-based",
+                mm_kernel_device_get_subsystem (self->priv->port),
+                mm_kernel_device_get_name (self->priv->port));
+        self->priv->is_xmm = TRUE;
+        self->priv->flags |= MM_PORT_PROBE_AT_XMM;
+    } else {
+        mm_dbg ("(%s/%s) Modem is probably not XMM-based",
+                mm_kernel_device_get_subsystem (self->priv->port),
+                mm_kernel_device_get_name (self->priv->port));
+        self->priv->is_xmm = FALSE;
+        self->priv->flags |= MM_PORT_PROBE_AT_XMM;
+    }
+}
+
+void
 mm_port_probe_set_result_qcdm (MMPortProbe *self,
                                gboolean qcdm)
 {
@@ -253,10 +276,12 @@ mm_port_probe_set_result_qcdm (MMPortProbe *self,
         self->priv->vendor = NULL;
         self->priv->product = NULL;
         self->priv->is_icera = FALSE;
+        self->priv->is_xmm = FALSE;
         self->priv->flags |= (MM_PORT_PROBE_AT |
                               MM_PORT_PROBE_AT_VENDOR |
                               MM_PORT_PROBE_AT_PRODUCT |
                               MM_PORT_PROBE_AT_ICERA |
+                              MM_PORT_PROBE_AT_XMM |
                               MM_PORT_PROBE_QMI |
                               MM_PORT_PROBE_MBIM);
     } else
@@ -287,6 +312,7 @@ mm_port_probe_set_result_qmi (MMPortProbe *self,
                               MM_PORT_PROBE_AT_VENDOR |
                               MM_PORT_PROBE_AT_PRODUCT |
                               MM_PORT_PROBE_AT_ICERA |
+                              MM_PORT_PROBE_AT_XMM |
                               MM_PORT_PROBE_QCDM |
                               MM_PORT_PROBE_MBIM);
     } else
@@ -317,6 +343,7 @@ mm_port_probe_set_result_mbim (MMPortProbe *self,
                               MM_PORT_PROBE_AT_VENDOR |
                               MM_PORT_PROBE_AT_PRODUCT |
                               MM_PORT_PROBE_AT_ICERA |
+                              MM_PORT_PROBE_AT_XMM |
                               MM_PORT_PROBE_QCDM |
                               MM_PORT_PROBE_QMI);
     } else
@@ -828,6 +855,22 @@ is_non_at_response (const guint8 *data, gsize len)
 }
 
 static void
+serial_probe_at_xmm_result_processor (MMPortProbe *self,
+                                      GVariant *result)
+{
+    if (result) {
+        /* If any result given, it must be a string */
+        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_STRING));
+        if (strstr (g_variant_get_string (result, NULL), "XACT:")) {
+            mm_port_probe_set_result_at_xmm (self, TRUE);
+            return;
+        }
+    }
+
+    mm_port_probe_set_result_at_xmm (self, FALSE);
+}
+
+static void
 serial_probe_at_icera_result_processor (MMPortProbe *self,
                                         GVariant *result)
 {
@@ -1038,6 +1081,11 @@ static const MMPortProbeAtCommand icera_probing[] = {
     { NULL }
 };
 
+static const MMPortProbeAtCommand xmm_probing[] = {
+    { "+XACT=?", 3, mm_port_probe_response_processor_string },
+    { NULL }
+};
+
 static void
 at_custom_init_ready (MMPortProbe *self,
                       GAsyncResult *res)
@@ -1126,6 +1174,13 @@ serial_probe_schedule (MMPortProbe *self)
         ctx->at_commands = icera_probing;
         /* By default, wait 2 seconds between ICERA probing retries */
         ctx->at_commands_wait_secs = 2;
+    }
+    /* XMM support check requested and not already done? */
+    else if ((ctx->flags & MM_PORT_PROBE_AT_XMM) &&
+             !(self->priv->flags & MM_PORT_PROBE_AT_XMM)) {
+        /* Prepare AT product probing */
+        ctx->at_result_processor = serial_probe_at_xmm_result_processor;
+        ctx->at_commands = xmm_probing;
     }
 
     /* If a next AT group detected, go for it */
@@ -1437,7 +1492,8 @@ mm_port_probe_run (MMPortProbe                *self,
     if (ctx->flags & MM_PORT_PROBE_AT ||
         ctx->flags & MM_PORT_PROBE_AT_VENDOR ||
         ctx->flags & MM_PORT_PROBE_AT_PRODUCT ||
-        ctx->flags & MM_PORT_PROBE_AT_ICERA) {
+        ctx->flags & MM_PORT_PROBE_AT_ICERA ||
+        ctx->flags & MM_PORT_PROBE_AT_XMM) {
         ctx->at_probing_cancellable = g_cancellable_new ();
         /* If the main cancellable is cancelled, so will be the at-probing one */
         if (cancellable)
@@ -1720,6 +1776,32 @@ mm_port_probe_list_is_icera (GList *probes)
 
     for (l = probes; l; l = g_list_next (l)) {
         if (mm_port_probe_is_icera (MM_PORT_PROBE (l->data)))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean
+mm_port_probe_is_xmm (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "net"))
+        return FALSE;
+
+    return (self->priv->flags & MM_PORT_PROBE_AT_XMM ?
+            self->priv->is_xmm :
+            FALSE);
+}
+
+gboolean
+mm_port_probe_list_is_xmm (GList *probes)
+{
+    GList *l;
+
+    for (l = probes; l; l = g_list_next (l)) {
+        if (mm_port_probe_is_xmm (MM_PORT_PROBE (l->data)))
             return TRUE;
     }
 

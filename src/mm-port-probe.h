@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2009 - 2018 Red Hat, Inc.
+ * Copyright (C) 2011 - 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #ifndef MM_PORT_PROBE_H
@@ -42,9 +43,10 @@ typedef enum { /*< underscore_name=mm_port_probe_flag >*/
     MM_PORT_PROBE_AT_VENDOR  = 1 << 1,
     MM_PORT_PROBE_AT_PRODUCT = 1 << 2,
     MM_PORT_PROBE_AT_ICERA   = 1 << 3,
-    MM_PORT_PROBE_QCDM       = 1 << 4,
-    MM_PORT_PROBE_QMI        = 1 << 5,
-    MM_PORT_PROBE_MBIM       = 1 << 6
+    MM_PORT_PROBE_AT_XMM     = 1 << 4,
+    MM_PORT_PROBE_QCDM       = 1 << 5,
+    MM_PORT_PROBE_QMI        = 1 << 6,
+    MM_PORT_PROBE_MBIM       = 1 << 7,
 } MMPortProbeFlag;
 
 typedef struct _MMPortProbe MMPortProbe;
@@ -97,6 +99,8 @@ void mm_port_probe_set_result_at_product (MMPortProbe *self,
                                           const gchar *at_product);
 void mm_port_probe_set_result_at_icera   (MMPortProbe *self,
                                           gboolean is_icera);
+void mm_port_probe_set_result_at_xmm     (MMPortProbe *self,
+                                          gboolean is_xmm);
 void mm_port_probe_set_result_qcdm       (MMPortProbe *self,
                                           gboolean qcdm);
 void mm_port_probe_set_result_qmi        (MMPortProbe *self,
@@ -130,6 +134,7 @@ gboolean      mm_port_probe_is_mbim          (MMPortProbe *self);
 const gchar  *mm_port_probe_get_vendor       (MMPortProbe *self);
 const gchar  *mm_port_probe_get_product      (MMPortProbe *self);
 gboolean      mm_port_probe_is_icera         (MMPortProbe *self);
+gboolean      mm_port_probe_is_xmm           (MMPortProbe *self);
 gboolean      mm_port_probe_is_ignored       (MMPortProbe *self);
 
 /* Additional helpers */
@@ -137,5 +142,6 @@ gboolean mm_port_probe_list_has_at_port   (GList *list);
 gboolean mm_port_probe_list_has_qmi_port  (GList *list);
 gboolean mm_port_probe_list_has_mbim_port (GList *list);
 gboolean mm_port_probe_list_is_icera      (GList *list);
+gboolean mm_port_probe_list_is_xmm        (GList *list);
 
 #endif /* MM_PORT_PROBE_H */
