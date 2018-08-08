@@ -78,11 +78,14 @@ struct _MMBroadbandModemMbimPrivate {
     gchar *caps_firmware_info;
     gchar *caps_hardware_info;
 
+    /* Supported features */
+    gboolean is_pco_supported;
+    gboolean is_ussd_supported;
+
     /* Process unsolicited notifications */
     guint notification_id;
     ProcessNotificationFlag setup_flags;
     ProcessNotificationFlag enable_flags;
-    gboolean is_pco_supported;
 
     /* 3GPP registration helpers */
     gchar *current_operator_id;
@@ -1751,7 +1754,6 @@ query_device_services_ready (MbimDevice   *device,
     guint32 device_services_count;
 
     self = g_task_get_source_object (task);
-    self->priv->is_pco_supported = FALSE;
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -1769,18 +1771,29 @@ query_device_services_ready (MbimDevice   *device,
             guint32 j;
 
             service = mbim_uuid_to_service (&device_services[i]->device_service_id);
-            if (service != MBIM_SERVICE_BASIC_CONNECT_EXTENSIONS)
-                continue;
 
-            for (j = 0; j < device_services[i]->cids_count; j++) {
-                if (device_services[i]->cids[j] == MBIM_CID_BASIC_CONNECT_EXTENSIONS_PCO) {
-                    mm_dbg ("PCO is supported");
-                    self->priv->is_pco_supported = TRUE;
+            switch (service) {
+                case MBIM_SERVICE_BASIC_CONNECT_EXTENSIONS:
+                    for (j = 0; j < device_services[i]->cids_count; j++) {
+                        if (device_services[i]->cids[j] == MBIM_CID_BASIC_CONNECT_EXTENSIONS_PCO) {
+                            mm_dbg ("PCO is supported");
+                            self->priv->is_pco_supported = TRUE;
+                            break;
+                        }
+                    }
                     break;
-                }
+                case MBIM_SERVICE_USSD:
+                    for (j = 0; j < device_services[i]->cids_count; j++) {
+                        if (device_services[i]->cids[j] == MBIM_CID_USSD) {
+                            mm_dbg ("USSD is supported");
+                            self->priv->is_ussd_supported = TRUE;
+                            break;
+                        }
+                    }
+                    break;
+                default:
+                    break;
             }
-
-            break;
         }
         mbim_device_service_element_array_free (device_services);
     } else {
