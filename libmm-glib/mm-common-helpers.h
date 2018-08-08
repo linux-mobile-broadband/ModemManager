@@ -106,6 +106,11 @@ GVariant    *mm_common_build_bands_unknown (void);
 gboolean     mm_common_bands_garray_cmp  (GArray *a, GArray *b);
 void         mm_common_bands_garray_sort (GArray *array);
 
+gboolean mm_common_band_is_gsm    (MMModemBand band);
+gboolean mm_common_band_is_utran  (MMModemBand band);
+gboolean mm_common_band_is_eutran (MMModemBand band);
+gboolean mm_common_band_is_cdma   (MMModemBand band);
+
 GArray                 *mm_common_mode_combinations_variant_to_garray (GVariant *variant);
 MMModemModeCombination *mm_common_mode_combinations_variant_to_array  (GVariant *variant,
                                                                        guint *n_modes);

@@ -668,6 +668,32 @@ mm_common_bands_garray_sort (GArray *array)
     g_array_sort (array, (GCompareFunc) cmp_band);
 }
 
+gboolean
+mm_common_band_is_gsm (MMModemBand band)
+{
+    return ((band >= MM_MODEM_BAND_EGSM && band <= MM_MODEM_BAND_G850) ||
+            (band >= MM_MODEM_BAND_G450 && band <= MM_MODEM_BAND_G810));
+}
+
+gboolean
+mm_common_band_is_utran (MMModemBand band)
+{
+    return ((band >= MM_MODEM_BAND_UTRAN_1 && band <= MM_MODEM_BAND_UTRAN_7) ||
+            (band >= MM_MODEM_BAND_UTRAN_10 && band <= MM_MODEM_BAND_UTRAN_32));
+}
+
+gboolean
+mm_common_band_is_eutran (MMModemBand band)
+{
+    return (band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_71);
+}
+
+gboolean
+mm_common_band_is_cdma (MMModemBand band)
+{
+    return (band >= MM_MODEM_BAND_CDMA_BC0 && band <= MM_MODEM_BAND_CDMA_BC19);
+}
+
 GArray *
 mm_common_mode_combinations_variant_to_garray (GVariant *variant)
 {
