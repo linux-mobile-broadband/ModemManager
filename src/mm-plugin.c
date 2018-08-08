@@ -48,6 +48,8 @@ static gchar *virtual_port[] = {"smd0", NULL};
      self->priv->forbidden_product_strings ||   \
      self->priv->allowed_icera ||               \
      self->priv->forbidden_icera ||             \
+     self->priv->allowed_xmm ||                 \
+     self->priv->forbidden_xmm ||               \
      self->priv->custom_init)
 
 
@@ -70,6 +72,8 @@ struct _MMPluginPrivate {
     mm_str_pair *forbidden_product_strings;
     gboolean allowed_icera;
     gboolean forbidden_icera;
+    gboolean allowed_xmm;
+    gboolean forbidden_xmm;
 
     /* Probing setup */
     gboolean at;
@@ -78,6 +82,7 @@ struct _MMPluginPrivate {
     gboolean qmi;
     gboolean mbim;
     gboolean icera_probe;
+    gboolean xmm_probe;
     MMPortProbeAtCommand *custom_at_probe;
     guint64 send_delay;
     gboolean remove_echo;
@@ -110,6 +115,9 @@ enum {
     PROP_ICERA_PROBE,
     PROP_ALLOWED_ICERA,
     PROP_FORBIDDEN_ICERA,
+    PROP_XMM_PROBE,
+    PROP_ALLOWED_XMM,
+    PROP_FORBIDDEN_XMM,
     PROP_CUSTOM_AT_PROBE,
     PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
@@ -576,6 +584,28 @@ apply_post_probing_filters (MMPlugin *self,
         return TRUE;
     }
 
+    /* The plugin may specify that only Xmm-based modems are supported.
+     * If that is the case, filter by allowed Xmm support */
+    if (self->priv->allowed_xmm &&
+        !mm_port_probe_is_xmm (probe)) {
+        /* Unsupported! */
+        mm_dbg ("(%s) [%s] filtered as modem is not XMM",
+                self->priv->name,
+                mm_port_probe_get_port_name (probe));
+        return TRUE;
+    }
+
+    /* The plugin may specify that Xmm-based modems are NOT supported.
+     * If that is the case, filter by forbidden Xmm support */
+    if (self->priv->forbidden_xmm &&
+        mm_port_probe_is_xmm (probe)) {
+        /* Unsupported! */
+        mm_dbg ("(%s) [%s] filtered as modem is XMM",
+                self->priv->name,
+                mm_port_probe_get_port_name (probe));
+        return TRUE;
+    }
+
     return FALSE;
 }
 
@@ -768,6 +798,8 @@ mm_plugin_supports_port (MMPlugin            *self,
             probe_run_flags |= MM_PORT_PROBE_AT_PRODUCT;
         if (self->priv->icera_probe || self->priv->allowed_icera || self->priv->forbidden_icera)
             probe_run_flags |= MM_PORT_PROBE_AT_ICERA;
+        if (self->priv->xmm_probe || self->priv->allowed_xmm || self->priv->forbidden_xmm)
+            probe_run_flags |= MM_PORT_PROBE_AT_XMM;
     }
 
     /* If no explicit probing was required, just request to grab it without probing anything.
@@ -1103,6 +1135,18 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->forbidden_icera = g_value_get_boolean (value);
         break;
+    case PROP_XMM_PROBE:
+        /* Construct only */
+        self->priv->xmm_probe = g_value_get_boolean (value);
+        break;
+    case PROP_ALLOWED_XMM:
+        /* Construct only */
+        self->priv->allowed_xmm = g_value_get_boolean (value);
+        break;
+    case PROP_FORBIDDEN_XMM:
+        /* Construct only */
+        self->priv->forbidden_xmm = g_value_get_boolean (value);
+        break;
     case PROP_CUSTOM_AT_PROBE:
         /* Construct only */
         self->priv->custom_at_probe = g_value_dup_boxed (value);
@@ -1194,6 +1238,15 @@ get_property (GObject *object,
         break;
     case PROP_FORBIDDEN_ICERA:
         g_value_set_boolean (value, self->priv->forbidden_icera);
+        break;
+    case PROP_XMM_PROBE:
+        g_value_set_boolean (value, self->priv->xmm_probe);
+        break;
+    case PROP_ALLOWED_XMM:
+        g_value_set_boolean (value, self->priv->allowed_xmm);
+        break;
+    case PROP_FORBIDDEN_XMM:
+        g_value_set_boolean (value, self->priv->forbidden_xmm);
         break;
     case PROP_CUSTOM_AT_PROBE:
         g_value_set_boxed (value, self->priv->custom_at_probe);
@@ -1414,6 +1467,30 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boolean (MM_PLUGIN_FORBIDDEN_ICERA,
                                "Allowed Icera",
                                "Whether Icera support is forbidden in this plugin.",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_XMM_PROBE,
+         g_param_spec_boolean (MM_PLUGIN_XMM_PROBE,
+                               "XMM probe",
+                               "Request to probe for XMM support.",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_XMM,
+         g_param_spec_boolean (MM_PLUGIN_ALLOWED_XMM,
+                               "Allowed XMM",
+                               "Whether XMM support is allowed in this plugin.",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_FORBIDDEN_XMM,
+         g_param_spec_boolean (MM_PLUGIN_FORBIDDEN_XMM,
+                               "Allowed XMM",
+                               "Whether XMM support is forbidden in this plugin.",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
