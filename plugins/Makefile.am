@@ -251,6 +251,8 @@ noinst_LTLIBRARIES += libmm-utils-xmm.la
 libmm_utils_xmm_la_SOURCES = \
 	xmm/mm-shared-xmm.h \
 	xmm/mm-shared-xmm.c \
+	xmm/mm-broadband-modem-xmm.h \
+	xmm/mm-broadband-modem-xmm.c \
 	$(NULL)
 libmm_utils_xmm_la_LIBADD = \
 	$(builddir)/libhelpers-xmm.la \
