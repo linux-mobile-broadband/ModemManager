@@ -73,6 +73,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish   = mm_shared_xmm_load_current_bands_finish;
     iface->set_current_bands           = mm_shared_xmm_set_current_bands;
     iface->set_current_bands_finish    = mm_shared_xmm_set_current_bands_finish;
+
+    /* power up/down already managed via MBIM */
+    iface->modem_power_off         = mm_shared_xmm_power_off;
+    iface->modem_power_off_finish  = mm_shared_xmm_power_off_finish;
+    iface->reset                   = mm_shared_xmm_reset;
+    iface->reset_finish            = mm_shared_xmm_reset_finish;
 }
 
 static void

@@ -82,4 +82,35 @@ gboolean  mm_shared_xmm_set_current_bands_finish    (MMIfaceModem         *self,
                                                      GAsyncResult         *res,
                                                      GError              **error);
 
+void              mm_shared_xmm_load_power_state        (MMIfaceModem         *self,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+MMModemPowerState mm_shared_xmm_load_power_state_finish (MMIfaceModem         *self,
+                                                         GAsyncResult         *res,
+                                                         GError              **error);
+void              mm_shared_xmm_power_up                (MMIfaceModem         *self,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+gboolean          mm_shared_xmm_power_up_finish         (MMIfaceModem         *self,
+                                                         GAsyncResult         *res,
+                                                         GError              **error);
+void              mm_shared_xmm_power_down              (MMIfaceModem         *self,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+gboolean          mm_shared_xmm_power_down_finish       (MMIfaceModem         *self,
+                                                         GAsyncResult         *res,
+                                                         GError              **error);
+void              mm_shared_xmm_power_off               (MMIfaceModem         *self,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+gboolean          mm_shared_xmm_power_off_finish        (MMIfaceModem         *self,
+                                                         GAsyncResult         *res,
+                                                         GError              **error);
+void              mm_shared_xmm_reset                   (MMIfaceModem         *self,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+gboolean          mm_shared_xmm_reset_finish            (MMIfaceModem         *self,
+                                                         GAsyncResult         *res,
+                                                         GError              **error);
+
 #endif /* MM_SHARED_XMM_H */

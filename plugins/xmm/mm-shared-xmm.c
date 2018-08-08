@@ -536,6 +536,158 @@ out:
 }
 
 /*****************************************************************************/
+/* Power state loading (Modem interface) */
+
+MMModemPowerState
+mm_shared_xmm_load_power_state_finish (MMIfaceModem  *self,
+                                       GAsyncResult  *res,
+                                       GError       **error)
+{
+    guint        state;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+
+    if (!mm_3gpp_parse_cfun_query_response (response, &state, error))
+        return MM_MODEM_POWER_STATE_UNKNOWN;
+
+    switch (state) {
+    case 1:
+        return MM_MODEM_POWER_STATE_ON;
+    case 4:
+        return MM_MODEM_POWER_STATE_LOW;
+    default:
+        break;
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "Unknown +CFUN state: %u", state);
+    return MM_MODEM_POWER_STATE_UNKNOWN;
+}
+
+void
+mm_shared_xmm_load_power_state (MMIfaceModem        *self,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Modem power up/down/off (Modem interface) */
+
+static gboolean
+common_modem_power_operation_finish (MMSharedXmm   *self,
+                                     GAsyncResult  *res,
+                                     GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+power_operation_ready (MMBaseModem  *self,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_modem_power_operation (MMSharedXmm         *self,
+                              const gchar         *command,
+                              GAsyncReadyCallback  callback,
+                              gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              command,
+                              30,
+                              FALSE,
+                              (GAsyncReadyCallback) power_operation_ready,
+                              task);
+}
+
+gboolean
+mm_shared_xmm_reset_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return common_modem_power_operation_finish (MM_SHARED_XMM (self), res, error);
+}
+
+void
+mm_shared_xmm_reset (MMIfaceModem        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    common_modem_power_operation (MM_SHARED_XMM (self), "+CFUN=16", callback, user_data);
+}
+
+gboolean
+mm_shared_xmm_power_off_finish (MMIfaceModem  *self,
+                                GAsyncResult  *res,
+                                GError       **error)
+{
+    return common_modem_power_operation_finish (MM_SHARED_XMM (self), res, error);
+}
+
+void
+mm_shared_xmm_power_off (MMIfaceModem        *self,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+    common_modem_power_operation (MM_SHARED_XMM (self), "+CPWROFF", callback, user_data);
+}
+
+gboolean
+mm_shared_xmm_power_down_finish (MMIfaceModem  *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
+{
+    return common_modem_power_operation_finish (MM_SHARED_XMM (self), res, error);
+}
+
+void
+mm_shared_xmm_power_down (MMIfaceModem        *self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+    common_modem_power_operation (MM_SHARED_XMM (self), "+CFUN=4", callback, user_data);
+}
+
+gboolean
+mm_shared_xmm_power_up_finish (MMIfaceModem  *self,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    return common_modem_power_operation_finish (MM_SHARED_XMM (self), res, error);
+}
+
+void
+mm_shared_xmm_power_up (MMIfaceModem        *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    common_modem_power_operation (MM_SHARED_XMM (self), "+CFUN=1", callback, user_data);
+}
+
+/*****************************************************************************/
 
 static void
 shared_xmm_init (gpointer g_iface)
