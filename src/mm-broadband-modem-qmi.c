@@ -6588,7 +6588,7 @@ ri_signal_info_ready (QmiClientNas *client,
         qmi_message_nas_register_indications_output_unref (output);
 
     /* Just ignore errors for now */
-    ctx->self->priv->unsolicited_events_enabled = ctx->enable;
+    self->priv->unsolicited_events_enabled = ctx->enable;
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
