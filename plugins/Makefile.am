@@ -247,8 +247,17 @@ test_modem_helpers_xmm_LDADD = \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)
 
+noinst_LTLIBRARIES += libmm-utils-xmm.la
+libmm_utils_xmm_la_SOURCES = \
+	xmm/mm-shared-xmm.h \
+	xmm/mm-shared-xmm.c \
+	$(NULL)
+libmm_utils_xmm_la_LIBADD = \
+	$(builddir)/libhelpers-xmm.la \
+	$(NULL)
+
 XMM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/xmm
-XMM_COMMON_LIBADD_FLAGS   = $(builddir)/libhelpers-xmm.la
+XMM_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-xmm.la
 
 ################################################################################
 # plugin: generic
