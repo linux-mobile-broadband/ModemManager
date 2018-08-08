@@ -2298,7 +2298,12 @@ huawei_modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* USSD encode/decode (3GPP-USSD interface) */
+/* USSD encode/decode (3GPP-USSD interface)
+ *
+ * Huawei devices don't use the current charset (as per AT+CSCS) in the CUSD
+ * command, they instead expect data encoded in GSM-7 already, given as a
+ * hex string.
+ */
 
 static gchar *
 encode (MMIfaceModem3gppUssd *self,

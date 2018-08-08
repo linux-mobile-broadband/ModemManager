@@ -5167,11 +5167,17 @@ modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
 
     ussd_command = g_byte_array_new ();
 
-    /* encode to the current charset */
+    /* Encode to the current charset (as per AT+CSCS, which is what most modems
+     * (except for Huawei it seems) will ask for. */
     if (mm_modem_charset_byte_array_append (ussd_command,
                                             command,
                                             FALSE,
                                             broadband->priv->modem_current_charset)) {
+        /* The scheme value does NOT represent the encoding used to encode the string
+         * we're giving. This scheme reflects the encoding that the modem should use when
+         * sending the data out to the network. We're hardcoding this to GSM-7 because
+         * USSD commands fit well in GSM-7, unlike USSD responses that may contain code
+         * points that may only be encoded in UCS-2. */
         *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
         /* convert to hex representation */
         hex = mm_utils_bin2hexstr (ussd_command->data, ussd_command->len);
@@ -5189,8 +5195,9 @@ modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
 {
     MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
 
-    return mm_modem_charset_hex_to_utf8 (reply,
-                                         broadband->priv->modem_current_charset);
+    /* Decode from current charset (as per AT+CSCS, which is what most modems
+     * (except for Huawei it seems) will ask for. */
+    return mm_modem_charset_hex_to_utf8 (reply, broadband->priv->modem_current_charset);
 }
 
 /*****************************************************************************/
