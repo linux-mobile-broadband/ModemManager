@@ -175,6 +175,102 @@ test_xact_test_2g_3g_4g (void)
 }
 
 /*****************************************************************************/
+/* Test XACT? responses */
+
+static void
+validate_xact_query_response (const gchar                  *response,
+                              const MMModemModeCombination *expected_mode,
+                              const MMModemBand            *expected_bands,
+                              guint                         n_expected_bands)
+{
+    GError   *error = NULL;
+    GArray   *bands = NULL;
+    gboolean  ret;
+    guint     i;
+
+    MMModemModeCombination mode = {
+        .allowed = MM_MODEM_MODE_NONE,
+        .preferred = MM_MODEM_MODE_NONE,
+    };
+
+    ret = mm_xmm_parse_xact_query_response (response, &mode, &bands, &error);
+    g_assert_no_error (error);
+    g_assert (ret);
+
+    g_assert_cmpuint (mode.allowed,   ==, expected_mode->allowed);
+    g_assert_cmpuint (mode.preferred, ==, expected_mode->preferred);
+
+    g_assert_cmpuint (bands->len, ==, n_expected_bands);
+    for (i = 0; i < bands->len; i++) {
+        MMModemBand band;
+        guint       j;
+        gboolean    found = FALSE;
+
+        band = g_array_index (bands, MMModemBand, i);
+        for (j = 0; !found && j < n_expected_bands; j++)
+            found = (band == expected_bands[j]);
+        g_assert (found);
+    }
+    g_array_unref (bands);
+}
+
+static void
+test_xact_query_3g_only (void)
+{
+    const gchar *response =
+        "+XACT: "
+        "1,1,,"
+        "1,2,4,5,8,"
+        "101,102,103,104,105,107,108,111,112,113,117,118,119,120,121,126,128,129,130,138,139,140,141,166";
+
+    static const MMModemModeCombination expected_mode = {
+        .allowed = MM_MODEM_MODE_3G,
+        .preferred = MM_MODEM_MODE_NONE
+    };
+
+    static const MMModemBand expected_bands[] = {
+        MM_MODEM_BAND_UTRAN_1,   MM_MODEM_BAND_UTRAN_2,   MM_MODEM_BAND_UTRAN_4,   MM_MODEM_BAND_UTRAN_5,   MM_MODEM_BAND_UTRAN_8,
+        MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5,
+        MM_MODEM_BAND_EUTRAN_7,  MM_MODEM_BAND_EUTRAN_8,  MM_MODEM_BAND_EUTRAN_11, MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13,
+        MM_MODEM_BAND_EUTRAN_17, MM_MODEM_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_21,
+        MM_MODEM_BAND_EUTRAN_26, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_29, MM_MODEM_BAND_EUTRAN_30, MM_MODEM_BAND_EUTRAN_38,
+        MM_MODEM_BAND_EUTRAN_39, MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41, MM_MODEM_BAND_EUTRAN_66
+    };
+
+    validate_xact_query_response (response,
+                                  &expected_mode,
+                                  expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+static void
+test_xact_query_3g_4g (void)
+{
+    const gchar *response =
+        "+XACT: "
+        "4,1,2,"
+        "1,2,4,5,8,"
+        "101,102,103,104,105,107,108,111,112,113,117,118,119,120,121,126,128,129,130,138,139,140,141,166";
+
+    static const MMModemModeCombination expected_mode = {
+        .allowed = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .preferred = MM_MODEM_MODE_3G
+    };
+
+    static const MMModemBand expected_bands[] = {
+        MM_MODEM_BAND_UTRAN_1,   MM_MODEM_BAND_UTRAN_2,   MM_MODEM_BAND_UTRAN_4,   MM_MODEM_BAND_UTRAN_5,   MM_MODEM_BAND_UTRAN_8,
+        MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5,
+        MM_MODEM_BAND_EUTRAN_7,  MM_MODEM_BAND_EUTRAN_8,  MM_MODEM_BAND_EUTRAN_11, MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13,
+        MM_MODEM_BAND_EUTRAN_17, MM_MODEM_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_21,
+        MM_MODEM_BAND_EUTRAN_26, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_29, MM_MODEM_BAND_EUTRAN_30, MM_MODEM_BAND_EUTRAN_38,
+        MM_MODEM_BAND_EUTRAN_39, MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41, MM_MODEM_BAND_EUTRAN_66
+    };
+
+    validate_xact_query_response (response,
+                                  &expected_mode,
+                                  expected_bands, G_N_ELEMENTS (expected_bands));
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -205,6 +301,9 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/xmm/xact/test/4g-only",  test_xact_test_4g_only);
     g_test_add_func ("/MM/xmm/xact/test/3g-4g",    test_xact_test_3g_4g);
     g_test_add_func ("/MM/xmm/xact/test/2g-3g-4g", test_xact_test_2g_3g_4g);
+
+    g_test_add_func ("/MM/xmm/xact/query/3g-only", test_xact_query_3g_only);
+    g_test_add_func ("/MM/xmm/xact/query/3g-4g",   test_xact_query_3g_4g);
 
     return g_test_run ();
 }

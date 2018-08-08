@@ -338,3 +338,123 @@ out:
     *bands_out = bands;
     return TRUE;
 }
+
+/*****************************************************************************/
+/* AT+XACT? response parser */
+
+gboolean
+mm_xmm_parse_xact_query_response (const gchar             *response,
+                                  MMModemModeCombination  *mode_out,
+                                  GArray                 **bands_out,
+                                  GError                 **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info;
+    GError     *inner_error = NULL;
+    GArray     *bands = NULL;
+    guint       i;
+
+    MMModemModeCombination mode = {
+        .allowed   = MM_MODEM_MODE_NONE,
+        .preferred = MM_MODEM_MODE_NONE,
+    };
+
+    /* At least one */
+    g_assert (mode_out || bands_out);
+
+    /*
+     * AT+XACT?
+     * +XACT: 4,1,2,1,2,4,5,8,101,102,103,104,105,107,108,111,...
+     *
+     * Note: the first 3 fields corresponde to allowed and preferred modes. Only the
+     * first one of those 3 first fields is mandatory, the other two may be empty.
+     */
+    r = g_regex_new ("\\+XACT: (\\d+),([^,]*),([^,]*),(.*)(?:\\r\\n)?",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (!inner_error && g_match_info_matches (match_info)) {
+        if (mode_out) {
+            guint xmm_mode;
+
+            /* Number at index 1 */
+            mm_get_uint_from_match_info (match_info, 1, &xmm_mode);
+            if (xmm_mode >= G_N_ELEMENTS (xmm_modes)) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Unsupported XACT AcT value: %u", xmm_mode);
+                goto out;
+            }
+            mode.allowed = xmm_modes[xmm_mode];
+
+            /* Number at index 2 */
+            if (mm_count_bits_set (mode.allowed) > 1 && mm_get_uint_from_match_info (match_info, 2, &xmm_mode)) {
+                if (xmm_mode >= G_N_ELEMENTS (xmm_modes)) {
+                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Unsupported XACT preferred AcT value: %u", xmm_mode);
+                    goto out;
+                }
+                mode.preferred = xmm_modes[xmm_mode];
+            }
+
+            /* Number at index 3: ignored */
+        }
+
+        if (bands_out) {
+            gchar  *bandstr;
+            GArray *nums;
+
+            /* Bands start at index 4 */
+            bandstr = mm_get_string_unquoted_from_match_info (match_info, 4);
+            nums = mm_parse_uint_list (bandstr, &inner_error);
+            g_free (bandstr);
+
+            if (inner_error)
+                goto out;
+            if (!nums) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Invalid XACT? response");
+                goto out;
+            }
+
+            bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), nums->len);
+            for (i = 0; i < nums->len; i++) {
+                MMModemBand band;
+
+                band = xact_num_to_band (g_array_index (nums, guint, i));
+                if (band != MM_MODEM_BAND_UNKNOWN)
+                    g_array_append_val (bands, band);
+            }
+            g_array_unref (nums);
+
+            if (bands->len == 0) {
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing current band list");
+                goto out;
+            }
+        }
+    }
+
+    /* success */
+
+out:
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        if (bands)
+            g_array_unref (bands);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (mode_out) {
+        g_assert (mode.allowed != MM_MODEM_MODE_NONE);
+        mode_out->allowed = mode.allowed;
+        mode_out->preferred = mode.preferred;
+    }
+
+    if (bands_out) {
+        g_assert (bands);
+        *bands_out = bands;
+    }
+
+    return TRUE;
+}

@@ -25,4 +25,10 @@ gboolean mm_xmm_parse_xact_test_response (const gchar  *response,
                                           GArray      **bands_out,
                                           GError      **error);
 
+/* AT+XACT? response parser */
+gboolean mm_xmm_parse_xact_query_response (const gchar             *response,
+                                           MMModemModeCombination  *mode_out,
+                                           GArray                 **bands_out,
+                                           GError                 **error);
+
 #endif  /* MM_MODEM_HELPERS_XMM_H */
