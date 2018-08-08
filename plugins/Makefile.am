@@ -254,6 +254,14 @@ libmm_utils_xmm_la_SOURCES = \
 	xmm/mm-broadband-modem-xmm.h \
 	xmm/mm-broadband-modem-xmm.c \
 	$(NULL)
+
+if WITH_MBIM
+libmm_utils_xmm_la_SOURCES += \
+	xmm/mm-broadband-modem-mbim-xmm.h \
+	xmm/mm-broadband-modem-mbim-xmm.c \
+	$(NULL)
+endif
+
 libmm_utils_xmm_la_LIBADD = \
 	$(builddir)/libhelpers-xmm.la \
 	$(NULL)
