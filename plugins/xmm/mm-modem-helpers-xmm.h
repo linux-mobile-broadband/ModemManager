@@ -36,4 +36,7 @@ gchar *mm_xmm_build_xact_set_command (const MMModemModeCombination  *mode,
                                       const GArray                  *bands,
                                       GError                       **error);
 
+/* Mode to apply when ANY */
+MMModemMode mm_xmm_get_modem_mode_any (const GArray *combinations);
+
 #endif  /* MM_MODEM_HELPERS_XMM_H */
