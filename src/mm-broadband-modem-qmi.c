@@ -2016,7 +2016,7 @@ modem_load_supported_bands_finish (MMIfaceModem *_self,
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
     GArray *supported_bands;
-    
+
     supported_bands = g_task_propagate_pointer (G_TASK (res), error);
     if (supported_bands) {
         if (self->priv->supported_bands)
@@ -4397,6 +4397,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     const gchar *description;
     gboolean has_pcs_digit;
     guint16 lac;
+    guint16 tac;
     guint32 cid;
     MMModemAccessTechnology mm_access_technologies;
     MMModem3gppRegistrationState mm_cs_registration_state;
@@ -4459,7 +4460,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
         mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0);
+        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0, 0);
         return;
     }
 
@@ -4548,18 +4549,22 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     if (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_LTE)
         mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state);
 
-    /* Get 3GPP location LAC and CI */
+    /* Get 3GPP location LAC/TAC and CI */
     lac = 0;
+    tac = 0;
     cid = 0;
-    if ((response_output &&
-         qmi_message_nas_get_serving_system_output_get_lac_3gpp (response_output, &lac, NULL) &&
-         qmi_message_nas_get_serving_system_output_get_cid_3gpp (response_output, &cid, NULL)) ||
-        (indication_output &&
-         qmi_indication_nas_serving_system_output_get_lac_3gpp (indication_output, &lac, NULL) &&
-         qmi_indication_nas_serving_system_output_get_cid_3gpp (indication_output, &cid, NULL))) {
-        /* Only update info in the interface if we get something */
-        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
+    if (response_output) {
+        qmi_message_nas_get_serving_system_output_get_lac_3gpp (response_output, &lac, NULL);
+        qmi_message_nas_get_serving_system_output_get_lte_tac  (response_output, &tac, NULL);
+        qmi_message_nas_get_serving_system_output_get_cid_3gpp (response_output, &cid, NULL);
+    } else if (indication_output) {
+        qmi_indication_nas_serving_system_output_get_lac_3gpp (indication_output, &lac, NULL);
+        qmi_indication_nas_serving_system_output_get_lte_tac  (indication_output, &tac, NULL);
+        qmi_indication_nas_serving_system_output_get_cid_3gpp (indication_output, &cid, NULL);
     }
+    /* Only update info in the interface if we get something */
+    if (cid && (lac || tac))
+        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 
     /* Note: don't update access technologies with the ones retrieved here; they
      * are not really the 'current' access technologies */
@@ -4611,6 +4616,8 @@ process_common_info (QmiNasServiceStatus service_status,
                      gboolean forbidden,
                      gboolean lac_valid,
                      guint16 lac,
+                     gboolean tac_valid,
+                     guint16 tac,
                      gboolean cid_valid,
                      guint32 cid,
                      gboolean network_id_valid,
@@ -4619,6 +4626,7 @@ process_common_info (QmiNasServiceStatus service_status,
                      MMModem3gppRegistrationState *mm_cs_registration_state,
                      MMModem3gppRegistrationState *mm_ps_registration_state,
                      guint16 *mm_lac,
+                     guint16 *mm_tac,
                      guint32 *mm_cid,
                      gchar **mm_operator_id)
 {
@@ -4659,6 +4667,8 @@ process_common_info (QmiNasServiceStatus service_status,
             /* If we're registered either at home or roaming, try to get LAC/CID */
             if (lac_valid)
                 *mm_lac = lac;
+            if (tac_valid)
+                *mm_tac = tac;
             if (cid_valid)
                 *mm_cid = cid;
         }
@@ -4773,11 +4783,13 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
                               roaming_status_valid, roaming_status,
                               forbidden_valid,      forbidden,
                               lac_valid,            lac,
+                              FALSE,                0,
                               cid_valid,            cid,
                               network_id_valid,     mcc, mnc,
                               mm_cs_registration_state,
                               mm_ps_registration_state,
                               mm_lac,
+                              NULL,
                               mm_cid,
                               mm_operator_id)) {
         mm_dbg ("No GSM service registered");
@@ -4880,11 +4892,13 @@ process_wcdma_info (QmiMessageNasGetSystemInfoOutput *response_output,
                               roaming_status_valid, roaming_status,
                               forbidden_valid,      forbidden,
                               lac_valid,            lac,
+                              FALSE,                0,
                               cid_valid,            cid,
                               network_id_valid,     mcc, mnc,
                               mm_cs_registration_state,
                               mm_ps_registration_state,
                               mm_lac,
+                              NULL,
                               mm_cid,
                               mm_operator_id)) {
         mm_dbg ("No WCDMA service registered");
@@ -4900,6 +4914,7 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
                   MMModem3gppRegistrationState *mm_cs_registration_state,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
                   guint16 *mm_lac,
+                  guint16 *mm_tac,
                   guint32 *mm_cid,
                   gchar **mm_operator_id)
 {
@@ -4912,6 +4927,8 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
     gboolean forbidden;
     gboolean lac_valid;
     guint16 lac;
+    gboolean tac_valid;
+    guint16 tac;
     gboolean cid_valid;
     guint32 cid;
     gboolean network_id_valid;
@@ -4924,6 +4941,7 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
     *mm_ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     *mm_lac = 0;
+    *mm_tac = 0;
     *mm_cid = 0;
     g_free (*mm_operator_id);
     *mm_operator_id = NULL;
@@ -4945,7 +4963,7 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
                 &cid_valid,            &cid,
                 NULL, NULL, NULL, /* registration_reject_info */
                 &network_id_valid,     &mcc, &mnc,
-                NULL, NULL, /* tac */
+                &tac_valid,            &tac,
                 NULL)) {
             mm_dbg ("No LTE service reported");
             /* No GSM service */
@@ -4968,7 +4986,7 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
                 &cid_valid,            &cid,
                 NULL, NULL, NULL, /* registration_reject_info */
                 &network_id_valid,     &mcc, &mnc,
-                NULL, NULL, /* tac */
+                &tac_valid,            &tac,
                 NULL)) {
             mm_dbg ("No LTE service reported");
             /* No GSM service */
@@ -4981,11 +4999,13 @@ process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
                               roaming_status_valid, roaming_status,
                               forbidden_valid,      forbidden,
                               lac_valid,            lac,
+                              tac_valid,            tac,
                               cid_valid,            cid,
                               network_id_valid,     mcc, mnc,
                               mm_cs_registration_state,
                               mm_ps_registration_state,
                               mm_lac,
+                              mm_tac,
                               mm_cid,
                               mm_operator_id)) {
         mm_dbg ("No LTE service registered");
@@ -5003,6 +5023,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     MMModem3gppRegistrationState cs_registration_state;
     MMModem3gppRegistrationState ps_registration_state;
     guint16 lac;
+    guint16 tac;
     guint32 cid;
     gchar *operator_id;
     gboolean has_lte_info;
@@ -5010,6 +5031,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     lac = 0;
+    tac = 0;
     cid = 0;
     operator_id = NULL;
 
@@ -5021,6 +5043,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
                                      &cs_registration_state,
                                      &ps_registration_state,
                                      &lac,
+                                     &tac,
                                      &cid,
                                      &operator_id);
     if (!has_lte_info &&
@@ -5050,7 +5073,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
     if (has_lte_info)
         mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
-    mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, cid);
+    mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 }
 
 static void

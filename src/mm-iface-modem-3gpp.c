@@ -252,7 +252,7 @@ register_in_network_context_complete_failed (GTask *task,
     mm_iface_modem_3gpp_update_ps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_eps_registration_state (ctx->self, MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
     mm_iface_modem_3gpp_update_access_technologies (ctx->self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-    mm_iface_modem_3gpp_update_location (ctx->self, 0, 0);
+    mm_iface_modem_3gpp_update_location (ctx->self, 0, 0, 0);
 
     g_task_return_error (task, error);
     g_object_unref (task);
@@ -1217,6 +1217,7 @@ mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
 void
 mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
                                      gulong location_area_code,
+                                     gulong tracking_area_code,
                                      gulong cell_id)
 {
     MMModem3gppRegistrationState state;
@@ -1238,9 +1239,10 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
      * change to registered), we also allow LAC/CID updates. */
     if (reg_state_is_registered (state) || ctx->reloading_registration_info) {
         if (location_area_code > 0 && cell_id > 0)
-            mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
-                                                        location_area_code,
-                                                        cell_id);
+            mm_iface_modem_location_3gpp_update_lac_tac_ci (MM_IFACE_MODEM_LOCATION (self),
+                                                            location_area_code,
+                                                            tracking_area_code,
+                                                            cell_id);
     } else
         mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
 }
@@ -1689,7 +1691,7 @@ interface_disabling_step (GTask *task)
     case DISABLING_STEP_REGISTRATION_STATE:
         update_registration_state (self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, FALSE);
         mm_iface_modem_3gpp_update_access_technologies (self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-        mm_iface_modem_3gpp_update_location (self, 0, 0);
+        mm_iface_modem_3gpp_update_location (self, 0, 0, 0);
         /* Fall down to next step */
         ctx->step++;
 

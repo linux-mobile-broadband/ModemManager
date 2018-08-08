@@ -41,6 +41,7 @@ struct _MMLocation3gppPrivate {
     guint mobile_network_code;
     gulong location_area_code;
     gulong cell_id;
+    gulong tracking_area_code;
 };
 
 /*****************************************************************************/
@@ -173,6 +174,38 @@ mm_location_3gpp_set_cell_id (MMLocation3gpp *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_location_3gpp_get_tracking_area_code:
+ * @self: a #MMLocation3gpp.
+ *
+ * Gets the location area code of the 3GPP network.
+ *
+ * Returns: the location area code, or 0 if unknown.
+ */
+gulong
+mm_location_3gpp_get_tracking_area_code (MMLocation3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
+    return self->priv->tracking_area_code;
+}
+
+gboolean
+mm_location_3gpp_set_tracking_area_code (MMLocation3gpp *self,
+                                         gulong tracking_area_code)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
+
+    /* If no change in the location info, don't do anything */
+    if (self->priv->tracking_area_code == tracking_area_code)
+        return FALSE;
+
+    self->priv->tracking_area_code = tracking_area_code;
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 GVariant *
 mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
 {
@@ -182,15 +215,16 @@ mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
 
     if (self->priv->mobile_country_code &&
         self->priv->mobile_network_code &&
-        self->priv->location_area_code &&
+        (self->priv->location_area_code || self->priv->tracking_area_code) &&
         self->priv->cell_id) {
         gchar *str;
 
-        str = g_strdup_printf ("%u,%u,%lX,%lX",
+        str = g_strdup_printf ("%u,%u,%lX,%lX,%lX",
                                self->priv->mobile_country_code,
                                self->priv->mobile_network_code,
                                self->priv->location_area_code,
-                               self->priv->cell_id);
+                               self->priv->cell_id,
+                               self->priv->tracking_area_code);
 
         variant = g_variant_new_string (str);
         g_free (str);
@@ -291,13 +325,16 @@ mm_location_3gpp_new_from_string_variant (GVariant *string,
         validate_string_length ("Location area code", split[2], 4, error) &&
         validate_numeric_string_content ("Location area code", split[2], TRUE, error) &&
         validate_string_length ("Cell ID", split[3], 8, error) &&
-        validate_numeric_string_content ("Cell ID", split[3], TRUE, error)) {
+        validate_numeric_string_content ("Cell ID", split[3], TRUE, error) &&
+        validate_string_length ("Tracking area code", split[4], 8, error) &&
+        validate_numeric_string_content ("Tracking area code", split[4], TRUE, error)) {
         /* Create new location object */
         self = mm_location_3gpp_new ();
         self->priv->mobile_country_code = strtol (split[0], NULL, 10);
         self->priv->mobile_network_code = strtol (split[1], NULL, 10);
         self->priv->location_area_code = strtol (split[2], NULL, 16);
         self->priv->cell_id = strtol (split[3], NULL, 16);
+        self->priv->tracking_area_code = strtol (split[4], NULL, 16);
     }
 
     g_strfreev (split);

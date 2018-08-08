@@ -143,7 +143,7 @@
           <listitem>
             <para>
               Devices supporting this
-              capability return a string in the format <literal>"MCC,MNC,LAC,CI"</literal> (without the
+              capability return a string in the format <literal>"MCC,MNC,LAC,CI,TAC"</literal> (without the
               quotes of course) where the following applies:
             </para>
             <variablelist>
@@ -163,10 +163,10 @@
               </varlistentry>
               <varlistentry><term><literal>LAC</literal></term>
                 <listitem>
-                  This is the two-byte Location Area Code of the base station with
-                  which the mobile is registered, in upper-case hexadecimal format
-                  without leading zeros, as specified in 3GPP TS 27.007 section
-                  10.1.19. e.g. <literal>"84CD"</literal>.
+                  This is the two-byte Location Area Code of the GSM/UMTS base
+                  station with which the mobile is registered, in upper-case
+                  hexadecimal format without leading zeros, as specified in
+                  3GPP TS 27.007. E.g. <literal>"84CD"</literal>.
                 </listitem>
               </varlistentry>
               <varlistentry><term><literal>CI</literal></term>
@@ -175,6 +175,14 @@
                   is registered, in upper-case hexadecimal format without leading
                   zeros, as specified in 3GPP TS 27.007.
                   e.g. <literal>"2BAF"</literal> or <literal>"D30156"</literal>.
+                </listitem>
+              </varlistentry>
+              <varlistentry><term><literal>TAC</literal></term>
+                <listitem>
+                  This is the two-byte Location Area Code of the LTE base
+                  station with which the mobile is registered, in upper-case
+                  hexadecimal format without leading zeros, as specified in
+                  3GPP TS 27.007. E.g. <literal>"6FFE"</literal>.
                 </listitem>
               </varlistentry>
             </variablelist>

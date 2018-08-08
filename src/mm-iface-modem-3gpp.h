@@ -257,6 +257,7 @@ void mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp *self,
                                                      MMModemAccessTechnology access_tech);
 void mm_iface_modem_3gpp_update_location            (MMIfaceModem3gpp *self,
                                                      gulong location_area_code,
+                                                     gulong tracking_area_code,
                                                      gulong cell_id);
 
 /* Run all registration checks */

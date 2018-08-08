@@ -59,6 +59,7 @@ guint  mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self);
 guint  mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);
 gulong mm_location_3gpp_get_location_area_code  (MMLocation3gpp *self);
 gulong mm_location_3gpp_get_cell_id             (MMLocation3gpp *self);
+gulong mm_location_3gpp_get_tracking_area_code  (MMLocation3gpp *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -81,6 +82,8 @@ gboolean mm_location_3gpp_set_location_area_code  (MMLocation3gpp *self,
                                                    gulong location_area_code);
 gboolean mm_location_3gpp_set_cell_id             (MMLocation3gpp *self,
                                                    gulong cell_id);
+gboolean mm_location_3gpp_set_tracking_area_code  (MMLocation3gpp *self,
+                                                   gulong tracking_area_code);
 
 #endif
 
