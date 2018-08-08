@@ -225,6 +225,32 @@ NOVATEL_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/novatel
 NOVATEL_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-novatel.la
 
 ################################################################################
+# common xmm support
+################################################################################
+
+noinst_LTLIBRARIES += libhelpers-xmm.la
+libhelpers_xmm_la_SOURCES = \
+	xmm/mm-modem-helpers-xmm.c \
+	xmm/mm-modem-helpers-xmm.h \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-xmm
+test_modem_helpers_xmm_SOURCES = \
+	xmm/tests/test-modem-helpers-xmm.c \
+	$(NULL)
+test_modem_helpers_xmm_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/xmm \
+	$(NULL)
+test_modem_helpers_xmm_LDADD = \
+	$(builddir)/libhelpers-xmm.la  \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
+XMM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/xmm
+XMM_COMMON_LIBADD_FLAGS   = $(builddir)/libhelpers-xmm.la
+
+################################################################################
 # plugin: generic
 ################################################################################
 
