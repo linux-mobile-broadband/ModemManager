@@ -133,6 +133,17 @@ mmcli_modem_signal_shutdown (void)
 }
 
 static void
+print_signal_value (const gchar *prefix,
+                    gdouble      value,
+                    const gchar *units)
+{
+    if (value != MM_SIGNAL_UNKNOWN)
+        g_print ("%s'%.2lf' %s\n", prefix, value, units);
+    else
+        g_print ("%sn/a\n", prefix);
+}
+
+static void
 print_signal_info (void)
 {
     MMSignal *signal;
@@ -146,56 +157,45 @@ print_signal_info (void)
 
     /* CDMA */
     signal = mm_modem_signal_peek_cdma (ctx->modem_signal);
-    if (signal)
-        g_print ("  -------------------------\n"
-                 "  CDMA1x | RSSI: '%.2lf' dBm\n"
-                 "         | EcIo: '%.2lf' dBm\n",
-                 mm_signal_get_rssi (signal),
-                 mm_signal_get_ecio (signal));
+    if (signal) {
+        g_print ("  -------------------------\n");
+        print_signal_value ("  CDMA1x | RSSI: ", mm_signal_get_rssi (signal), "dBm");
+        print_signal_value ("         | EcIo: ", mm_signal_get_ecio (signal), "dBm");
+    }
 
     /* EVDO */
     signal = mm_modem_signal_peek_evdo (ctx->modem_signal);
-    if (signal)
-        g_print ("  -------------------------\n"
-                 "  EV-DO  | RSSI: '%.2lf' dBm\n"
-                 "         | EcIo: '%.2lf' dBm\n"
-                 "         | SINR: '%.2lf' dBm\n"
-                 "         |   Io: '%.2lf' dB\n",
-                 mm_signal_get_rssi (signal),
-                 mm_signal_get_ecio (signal),
-                 mm_signal_get_sinr (signal),
-                 mm_signal_get_io (signal));
+    if (signal) {
+        g_print ("  -------------------------\n");
+        print_signal_value ("  EV-DO  | RSSI: ", mm_signal_get_rssi (signal), "dBm");
+        print_signal_value ("         | EcIo: ", mm_signal_get_ecio (signal), "dB");
+        print_signal_value ("         | SINR: ", mm_signal_get_sinr (signal), "dB");
+        print_signal_value ("         |   Io: ", mm_signal_get_io   (signal), "dBm");
+    }
 
     /* GSM */
     signal = mm_modem_signal_peek_gsm (ctx->modem_signal);
     if (signal)
-        g_print ("  -------------------------\n"
-                 "  GSM    | RSSI: '%.2lf' dBm\n",
-                 mm_signal_get_rssi (signal));
+        print_signal_value ("  GSM    | RSSI: ", mm_signal_get_rssi (signal), "dBm");
 
     /* UMTS */
     signal = mm_modem_signal_peek_umts (ctx->modem_signal);
-    if (signal)
-        g_print ("  -------------------------\n"
-                 "  UMTS   | RSSI: '%.2lf' dBm\n"
-                 "         | RSCP: '%.2lf' dBm\n"
-                 "         | EcIo: '%.2lf' dB\n",
-                 mm_signal_get_rssi (signal),
-                 mm_signal_get_rscp (signal),
-                 mm_signal_get_ecio (signal));
+    if (signal) {
+        g_print ("  -------------------------\n");
+        print_signal_value ("  UMTS   | RSSI: ", mm_signal_get_rssi (signal), "dBm");
+        print_signal_value ("         | RSCP: ", mm_signal_get_rscp (signal), "dBm");
+        print_signal_value ("         | EcIo: ", mm_signal_get_ecio (signal), "dB");
+    }
 
     /* LTE */
     signal = mm_modem_signal_peek_lte (ctx->modem_signal);
-    if (signal)
-        g_print ("  -------------------------\n"
-                 "  LTE    | RSSI: '%.2lf' dBm\n"
-                 "         | RSRQ: '%.2lf' dB\n"
-                 "         | RSRP: '%.2lf' dBm\n"
-                 "         |  SNR: '%.2lf' dB\n",
-                 mm_signal_get_rssi (signal),
-                 mm_signal_get_rsrq (signal),
-                 mm_signal_get_rsrp (signal),
-                 mm_signal_get_snr (signal));
+    if (signal) {
+        g_print ("  -------------------------\n");
+        print_signal_value ("  LTE    | RSSI: ", mm_signal_get_rssi (signal), "dBm");
+        print_signal_value ("         | RSRQ: ", mm_signal_get_rsrq (signal), "dB");
+        print_signal_value ("         | RSRP: ", mm_signal_get_rsrp (signal), "dBm");
+        print_signal_value ("         |  S/N: ", mm_signal_get_snr  (signal), "dB");
+    }
 }
 
 static void
