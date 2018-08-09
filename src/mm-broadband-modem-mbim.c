@@ -82,6 +82,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_pco_supported;
     gboolean is_ussd_supported;
     gboolean is_atds_location_supported;
+    gboolean is_atds_signal_supported;
 
     /* Process unsolicited notifications */
     guint notification_id;
@@ -1797,7 +1798,9 @@ query_device_services_ready (MbimDevice   *device,
                         if (device_services[i]->cids[j] == MBIM_CID_ATDS_LOCATION) {
                             mm_dbg ("ATDS location is supported");
                             self->priv->is_atds_location_supported = TRUE;
-                            break;
+                        } else if (device_services[i]->cids[j] == MBIM_CID_ATDS_SIGNAL) {
+                            mm_dbg ("ATDS signal is supported");
+                            self->priv->is_atds_signal_supported = TRUE;
                         }
                     }
                     break;
@@ -3334,6 +3337,195 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Check support (Signal interface) */
+
+static gboolean
+modem_signal_check_support_finish (MMIfaceModemSignal  *self,
+                                   GAsyncResult        *res,
+                                   GError             **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_signal_check_support (MMIfaceModemSignal  *self,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, MM_BROADBAND_MODEM_MBIM (self)->priv->is_atds_signal_supported);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Load extended signal information (Signal interface) */
+
+typedef struct {
+    MMSignal *gsm;
+    MMSignal *umts;
+    MMSignal *lte;
+} SignalLoadValuesResult;
+
+static void
+signal_load_values_result_free (SignalLoadValuesResult *result)
+{
+    g_clear_object (&result->gsm);
+    g_clear_object (&result->umts);
+    g_clear_object (&result->lte);
+    g_slice_free (SignalLoadValuesResult, result);
+}
+
+static gboolean
+modem_signal_load_values_finish (MMIfaceModemSignal  *self,
+                                 GAsyncResult        *res,
+                                 MMSignal           **cdma,
+                                 MMSignal           **evdo,
+                                 MMSignal           **gsm,
+                                 MMSignal           **umts,
+                                 MMSignal           **lte,
+                                 GError             **error)
+{
+    SignalLoadValuesResult *result;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return FALSE;
+
+    if (gsm && result->gsm) {
+        *gsm = result->gsm;
+        result->gsm = NULL;
+    }
+
+    if (umts && result->umts) {
+        *umts = result->umts;
+        result->umts = NULL;
+    }
+
+    if (lte && result->lte) {
+        *lte = result->lte;
+        result->lte = NULL;
+    }
+
+    signal_load_values_result_free (result);
+
+    /* No 3GPP2 support */
+    if (cdma)
+        *cdma = NULL;
+    if (evdo)
+        *evdo = NULL;
+    return TRUE;
+}
+
+static void
+atds_signal_query_ready (MbimDevice   *device,
+                         GAsyncResult *res,
+                         GTask        *task)
+{
+    MbimMessage            *response;
+    SignalLoadValuesResult *result;
+    GError                 *error = NULL;
+    guint32                 rssi;
+    guint32                 error_rate;
+    guint32                 rscp;
+    guint32                 ecno;
+    guint32                 rsrq;
+    guint32                 rsrp;
+    guint32                 snr;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_atds_signal_response_parse (response, &rssi, &error_rate, &rscp, &ecno, &rsrq, &rsrp, &snr, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    result = g_slice_new0 (SignalLoadValuesResult);
+
+    if (rscp <= 96) {
+        result->umts = mm_signal_new ();
+        mm_signal_set_rscp (result->umts, -120.0 + rscp);
+    }
+
+    if (ecno <= 49) {
+        if (!result->umts)
+            result->umts = mm_signal_new ();
+        mm_signal_set_ecio (result->umts, -24.0 + ((float) ecno / 2));
+    }
+
+    if (rsrq <= 34) {
+        result->lte = mm_signal_new ();
+        mm_signal_set_rsrq (result->lte, -19.5 + ((float) rsrq / 2));
+    }
+
+    if (rsrp <= 97) {
+        if (!result->lte)
+            result->lte = mm_signal_new ();
+        mm_signal_set_rsrp (result->lte, -140.0 + rsrp);
+    }
+
+    if (snr <= 35) {
+        if (!result->lte)
+            result->lte = mm_signal_new ();
+        mm_signal_set_snr (result->lte, -5.0 + snr);
+    }
+
+    /* RSSI may be given for all 2G, 3G or 4G so we detect to which one applies */
+    if (rssi <= 31) {
+        gdouble value;
+
+        value = -113.0 + (2 * rssi);
+        if (result->lte)
+            mm_signal_set_rssi (result->lte, value);
+        else if (result->umts)
+            mm_signal_set_rssi (result->umts, value);
+        else {
+            result->gsm = mm_signal_new ();
+            mm_signal_set_rssi (result->gsm, value);
+        }
+    }
+
+    if (!result->gsm && !result->umts && !result->lte) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "No signal details given");
+        g_object_unref (task);
+        signal_load_values_result_free (result);
+        return;
+    }
+
+    g_task_return_pointer (task, result, (GDestroyNotify) signal_load_values_result_free);
+    g_object_unref (task);
+}
+
+static void
+modem_signal_load_values (MMIfaceModemSignal  *self,
+                          GCancellable        *cancellable,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+    MbimDevice  *device;
+    MbimMessage *message;
+    GTask       *task;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    message = mbim_message_atds_signal_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         5,
+                         NULL,
+                         (GAsyncReadyCallback)atds_signal_query_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Check support (Messaging interface) */
 
 static gboolean
@@ -3774,10 +3966,10 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 static void
 iface_modem_signal_init (MMIfaceModemSignal *iface)
 {
-    iface->check_support = NULL;
-    iface->check_support_finish = NULL;
-    iface->load_values = NULL;
-    iface->load_values_finish = NULL;
+    iface->check_support = modem_signal_check_support;
+    iface->check_support_finish = modem_signal_check_support_finish;
+    iface->load_values = modem_signal_load_values;
+    iface->load_values_finish = modem_signal_load_values_finish;
 }
 
 static void
