@@ -81,6 +81,7 @@ struct _MMBroadbandModemMbimPrivate {
     /* Supported features */
     gboolean is_pco_supported;
     gboolean is_ussd_supported;
+    gboolean is_atds_location_supported;
 
     /* Process unsolicited notifications */
     guint notification_id;
@@ -1791,6 +1792,15 @@ query_device_services_ready (MbimDevice   *device,
                         }
                     }
                     break;
+                case MBIM_SERVICE_ATDS:
+                    for (j = 0; j < device_services[i]->cids_count; j++) {
+                        if (device_services[i]->cids[j] == MBIM_CID_ATDS_LOCATION) {
+                            mm_dbg ("ATDS location is supported");
+                            self->priv->is_atds_location_supported = TRUE;
+                            break;
+                        }
+                    }
+                    break;
                 default:
                     break;
             }
@@ -3046,29 +3056,56 @@ modem_3gpp_load_operator_code (MMIfaceModem3gpp *_self,
 /* Registration checks (3GPP interface) */
 
 static gboolean
-modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
-                                           GAsyncResult *res,
-                                           GError **error)
+modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp  *self,
+                                           GAsyncResult      *res,
+                                           GError           **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-register_state_query_ready (MbimDevice *device,
-                            GAsyncResult *res,
-                            GTask *task)
+atds_location_query_ready (MbimDevice   *device,
+                           GAsyncResult *res,
+                           GTask        *task)
 {
-    MbimMessage *response;
-    GError *error = NULL;
-    MbimRegisterState register_state;
-    MbimDataClass available_data_classes;
-    gchar *provider_id;
-    gchar *provider_name;
+    MMBroadbandModemMbim *self;
+    MbimMessage          *response;
+    GError               *error = NULL;
+    guint32               lac;
+    guint32               tac;
+    guint32               cid;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_register_state_response_parse (
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_atds_location_response_parse (response, &lac, &tac, &cid, &error)) {
+        g_task_return_error (task, error);
+    } else {
+        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+}
+
+static void
+register_state_query_ready (MbimDevice   *device,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    MMBroadbandModemMbim *self;
+    MbimMessage          *response;
+    GError               *error = NULL;
+    MbimRegisterState     register_state;
+    MbimDataClass         available_data_classes;
+    gchar                *provider_id;
+    gchar                *provider_name;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_register_state_response_parse (
             response,
             NULL, /* nw_error */
             &register_state,
@@ -3079,37 +3116,53 @@ register_state_query_ready (MbimDevice *device,
             &provider_name,
             NULL, /* roaming_text */
             NULL, /* registration_flag */
-            NULL)) {
-        MMBroadbandModemMbim *self;
-
-        self = g_task_get_source_object (task);
-        update_registration_info (self,
-                                  register_state,
-                                  available_data_classes,
-                                  provider_id,
-                                  provider_name);
-
-        g_task_return_boolean (task, TRUE);
-    } else
+            &error)) {
         g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
 
+    self = g_task_get_source_object (task);
+    update_registration_info (self,
+                              register_state,
+                              available_data_classes,
+                              provider_id,
+                              provider_name);
+
+    if (self->priv->is_atds_location_supported) {
+        MbimMessage *message;
+
+        message = mbim_message_atds_location_query_new (NULL);
+
+        mbim_device_command (device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)atds_location_query_ready,
+                             task);
+        mbim_message_unref (message);
+        goto out;
+    }
+
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 
+ out:
     if (response)
         mbim_message_unref (response);
 }
 
 static void
-modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
-                                    gboolean cs_supported,
-                                    gboolean ps_supported,
-                                    gboolean eps_supported,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data)
+modem_3gpp_run_registration_checks (MMIfaceModem3gpp    *self,
+                                    gboolean             cs_supported,
+                                    gboolean             ps_supported,
+                                    gboolean             eps_supported,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
 {
-    MbimDevice *device;
+    MbimDevice  *device;
     MbimMessage *message;
-    GTask *task;
+    GTask       *task;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
