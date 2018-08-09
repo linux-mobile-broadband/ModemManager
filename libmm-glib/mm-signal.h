@@ -30,7 +30,7 @@ G_BEGIN_DECLS
  *
  * Identifier for an unknown signal value.
  */
-#define MM_SIGNAL_UNKNOWN G_MINDOUBLE
+#define MM_SIGNAL_UNKNOWN -G_MAXDOUBLE
 
 #define MM_TYPE_SIGNAL            (mm_signal_get_type ())
 #define MM_SIGNAL(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SIGNAL, MMSignal))
