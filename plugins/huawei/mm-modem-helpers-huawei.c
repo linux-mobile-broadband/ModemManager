@@ -1406,3 +1406,66 @@ done:
 
     return ret;
 }
+
+/*****************************************************************************/
+/* ^CVOICE response parser */
+
+gboolean
+mm_huawei_parse_cvoice_response (const gchar  *response,
+                                 guint        *out_hz,
+                                 guint        *out_bits,
+                                 GError      **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    GError *match_error = NULL;
+    guint supported = 0, hz = 0, bits = 0;
+    gboolean ret = FALSE;
+
+    /* ^CVOICE: <0=supported,1=unsupported>,<hz>,<bits>,<unknown> */
+    r = g_regex_new ("\\^CVOICE:\\s*(\\d)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)$", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
+        if (match_error) {
+            g_propagate_error (error, match_error);
+            g_prefix_error (error, "Could not parse ^CVOICE results: ");
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't match ^CVOICE reply");
+        }
+    } else {
+        /* Remember that g_match_info_get_match_count() includes match #0 */
+        g_assert (g_match_info_get_match_count (match_info) >= 5);
+
+        if (mm_get_uint_from_match_info (match_info, 1, &supported) &&
+            mm_get_uint_from_match_info (match_info, 2, &hz) &&
+            mm_get_uint_from_match_info (match_info, 3, &bits)) {
+            if (supported == 0) {
+                if (out_hz)
+                    *out_hz = hz;
+                if (out_bits)
+                    *out_bits = bits;
+                ret = TRUE;
+            } else {
+                g_set_error_literal (error,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_UNSUPPORTED,
+                                     "^CVOICE not supported by this device");
+            }
+        } else {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse ^CVOICE reply");
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return ret;
+}

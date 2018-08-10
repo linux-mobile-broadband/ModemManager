@@ -28,6 +28,9 @@
 #define MM_IS_CALL_HUAWEI_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_CALL_HUAWEI))
 #define MM_CALL_HUAWEI_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_CALL_HUAWEI, MMCallHuaweiClass))
 
+#define MM_CALL_HUAWEI_AUDIO_HZ   "call-huawei-audio-hz"
+#define MM_CALL_HUAWEI_AUDIO_BITS "call-huawei-audio-bits"
+
 typedef struct _MMCallHuawei MMCallHuawei;
 typedef struct _MMCallHuaweiClass MMCallHuaweiClass;
 typedef struct _MMCallHuaweiPrivate MMCallHuaweiPrivate;
@@ -45,6 +48,8 @@ GType mm_call_huawei_get_type (void);
 
 MMBaseCall *mm_call_huawei_new (MMBaseModem     *modem,
                                 MMCallDirection  direction,
-                                const gchar     *number);
+                                const gchar     *number,
+                                guint            audio_hz,
+                                guint            audio_bits);
 
 #endif /* MM_CALL_HUAWEI_H */

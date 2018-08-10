@@ -133,6 +133,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     FeatureSupport prefmode_support;
     FeatureSupport time_support;
     FeatureSupport nwtime_support;
+    FeatureSupport cvoice_support;
 
     MMModemLocationSource enabled_sources;
 
@@ -141,6 +142,10 @@ struct _MMBroadbandModemHuaweiPrivate {
     GArray *prefmode_supported_modes;
 
     DetailedSignal detailed_signal;
+
+    /* Voice call audio related properties */
+    guint audio_hz;
+    guint audio_bits;
 };
 
 /*****************************************************************************/
@@ -2857,6 +2862,78 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Check if Voice supported (Voice interface) */
+
+static gboolean
+modem_voice_check_support_finish (MMIfaceModemVoice  *self,
+                                  GAsyncResult       *res,
+                                  GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+voice_parent_check_support_ready (MMIfaceModemVoice *self,
+                                  GAsyncResult      *res,
+                                  GTask             *task)
+{
+    gboolean parent_support;
+
+    parent_support = iface_modem_voice_parent->check_support_finish (self, res, NULL);
+    g_task_return_boolean (task, parent_support);
+    g_object_unref (task);
+}
+
+static void
+cvoice_check_ready (MMBaseModem  *_self,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    GError                 *error = NULL;
+    const gchar            *response;
+
+    response = mm_base_modem_at_command_finish (_self, res, &error);
+    if (!response ||
+        !mm_huawei_parse_cvoice_response (response,
+                                          &self->priv->audio_hz,
+                                          &self->priv->audio_bits,
+                                          &error)) {
+        self->priv->cvoice_support = FEATURE_NOT_SUPPORTED;
+        mm_dbg ("Huawei-specific CVOICE is unsupported: %s", error->message);
+        g_clear_error (&error);
+
+        /* Now check generic support */
+        iface_modem_voice_parent->check_support (MM_IFACE_MODEM_VOICE (self),
+                                                 (GAsyncReadyCallback)voice_parent_check_support_ready,
+                                                 task);
+        return;
+    }
+
+    mm_dbg ("Huawei-specific CVOICE is supported");
+    self->priv->cvoice_support = FEATURE_SUPPORTED;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_check_support (MMIfaceModemVoice   *self,
+                           GAsyncReadyCallback  callback,
+                           gpointer             user_data)
+{
+    GTask *task;
+
+    /* Check for Huawei-specific ^CVOICE support */
+    task = g_task_new (self, NULL, callback, user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^CVOICE?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)cvoice_check_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Enabling unsolicited events (Voice interface) */
 
 static gboolean
@@ -2987,12 +3064,21 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice *self,
 /* Create call (Voice interface) */
 
 static MMBaseCall *
-create_call (MMIfaceModemVoice *self,
+create_call (MMIfaceModemVoice *_self,
              MMCallDirection    direction,
              const gchar       *number)
 {
-    /* New Huawei Call */
-    return mm_call_huawei_new (MM_BASE_MODEM (self), direction, number);
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+
+    /* If CVOICE is supported we must have audio settings */
+    g_assert (self->priv->cvoice_support == FEATURE_NOT_SUPPORTED ||
+              (self->priv->cvoice_support == FEATURE_SUPPORTED && self->priv->audio_hz && self->priv->audio_bits));
+
+    return mm_call_huawei_new (MM_BASE_MODEM (self),
+                               direction,
+                               number,
+                               self->priv->audio_hz,
+                               self->priv->audio_bits);
 }
 
 /*****************************************************************************/
@@ -4071,6 +4157,7 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
     self->priv->prefmode_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->nwtime_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->time_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->cvoice_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
@@ -4228,6 +4315,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
 
+    iface->check_support = modem_voice_check_support;
+    iface->check_support_finish = modem_voice_check_support_finish;
     iface->enable_unsolicited_events = modem_voice_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = modem_voice_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_voice_disable_unsolicited_events;

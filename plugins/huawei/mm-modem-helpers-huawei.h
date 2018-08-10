@@ -151,4 +151,12 @@ gboolean mm_huawei_parse_hcsq_response (const gchar *response,
                                         guint *out_value5,
                                         GError **error);
 
+/*****************************************************************************/
+/* ^CVOICE response parser */
+
+gboolean mm_huawei_parse_cvoice_response (const gchar  *response,
+                                          guint        *hz,
+                                          guint        *bits,
+                                          GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_HUAWEI_H */
