@@ -4344,6 +4344,7 @@ registration_status_check_ready (MMBroadbandModem *self,
     cereg = FALSE;
     state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    tac = 0;
     lac = 0;
     cid = 0;
     parsed = mm_3gpp_parse_creg_response (match_info,
