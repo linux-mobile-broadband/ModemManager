@@ -60,6 +60,9 @@ struct _MMBaseCallPrivate {
 
     guint incoming_timeout;
     GRegex *in_call_events;
+
+    /* The port used for audio while call is ongoing, if known */
+    MMPort *audio_port;
 };
 
 /*****************************************************************************/
@@ -164,6 +167,27 @@ mm_base_call_incoming_refresh (MMBaseCall *self)
 }
 
 /*****************************************************************************/
+/* Update audio settings */
+
+static void
+update_audio_settings (MMBaseCall        *self,
+                       MMPort            *audio_port,
+                       MMCallAudioFormat *audio_format)
+{
+    if (!audio_port && self->priv->audio_port && mm_port_get_connected (self->priv->audio_port))
+        mm_port_set_connected (self->priv->audio_port, FALSE);
+    g_clear_object (&self->priv->audio_port);
+
+    if (audio_port) {
+        self->priv->audio_port = g_object_ref (audio_port);
+        mm_port_set_connected (self->priv->audio_port, TRUE);
+    }
+
+    mm_gdbus_call_set_audio_port   (MM_GDBUS_CALL (self), audio_port ? mm_port_get_device (audio_port) : NULL);
+    mm_gdbus_call_set_audio_format (MM_GDBUS_CALL (self), mm_call_audio_format_get_dictionary (audio_format));
+}
+
+/*****************************************************************************/
 /* Start call (DBus call handling) */
 
 typedef struct {
@@ -182,8 +206,52 @@ handle_start_context_free (HandleStartContext *ctx)
 }
 
 static void
-handle_start_ready (MMBaseCall *self,
-                    GAsyncResult *res,
+call_started (HandleStartContext *ctx)
+{
+    mm_info ("call is started");
+
+    /* If dialing to ringing supported, leave it dialing */
+    if (!ctx->self->priv->supports_dialing_to_ringing) {
+        /* If ringing to active supported, set it ringing */
+        if (ctx->self->priv->supports_ringing_to_active)
+            mm_base_call_change_state (ctx->self, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+        else
+            /* Otherwise, active right away */
+            mm_base_call_change_state (ctx->self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_OUTGOING_STARTED);
+    }
+    mm_gdbus_call_complete_start (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+    handle_start_context_free (ctx);
+}
+
+static void
+start_setup_audio_channel_ready (MMBaseCall         *self,
+                                 GAsyncResult       *res,
+                                 HandleStartContext *ctx)
+{
+    MMPort            *audio_port = NULL;
+    MMCallAudioFormat *audio_format = NULL;
+    GError            *error = NULL;
+
+    if (!MM_BASE_CALL_GET_CLASS (self)->setup_audio_channel_finish (self, res, &audio_port, &audio_format, &error)) {
+        mm_warn ("Couldn't setup audio channel: '%s'", error->message);
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_start_context_free (ctx);
+        return;
+    }
+
+    if (audio_port || audio_format) {
+        update_audio_settings (self, audio_port, audio_format);
+        g_clear_object (&audio_port);
+        g_clear_object (&audio_format);
+    }
+
+    call_started (ctx);
+}
+
+static void
+handle_start_ready (MMBaseCall         *self,
+                    GAsyncResult       *res,
                     HandleStartContext *ctx)
 {
     GError *error = NULL;
@@ -200,19 +268,21 @@ handle_start_ready (MMBaseCall *self,
         else
             mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    } else {
-        /* If dialing to ringing supported, leave it dialing */
-        if (!self->priv->supports_dialing_to_ringing) {
-            /* If ringing to active supported, set it ringing */
-            if (self->priv->supports_ringing_to_active)
-                mm_base_call_change_state (self, MM_CALL_STATE_RINGING_OUT, MM_CALL_STATE_REASON_OUTGOING_STARTED);
-            else
-                /* Otherwise, active right away */
-                mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_OUTGOING_STARTED);
-        }
-        mm_gdbus_call_complete_start (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+        handle_start_context_free (ctx);
+        return;
     }
-    handle_start_context_free (ctx);
+
+    /* If there is an audio setup method, run it now */
+    if (MM_BASE_CALL_GET_CLASS (self)->setup_audio_channel) {
+        mm_info ("setting up audio channel...");
+        MM_BASE_CALL_GET_CLASS (self)->setup_audio_channel (self,
+                                                            (GAsyncReadyCallback) start_setup_audio_channel_ready,
+                                                            ctx);
+        return;
+    }
+
+    /* Otherwise, we're done */
+    call_started (ctx);
 }
 
 static void
@@ -301,6 +371,46 @@ handle_accept_context_free (HandleAcceptContext *ctx)
 }
 
 static void
+call_accepted (HandleAcceptContext *ctx)
+{
+    mm_info ("call is accepted");
+
+    if (ctx->self->priv->incoming_timeout) {
+        g_source_remove (ctx->self->priv->incoming_timeout);
+        ctx->self->priv->incoming_timeout = 0;
+    }
+    mm_base_call_change_state (ctx->self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
+    mm_gdbus_call_complete_accept (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+    handle_accept_context_free (ctx);
+}
+
+static void
+accept_setup_audio_channel_ready (MMBaseCall          *self,
+                                  GAsyncResult        *res,
+                                  HandleAcceptContext *ctx)
+{
+    MMPort            *audio_port = NULL;
+    MMCallAudioFormat *audio_format = NULL;
+    GError            *error = NULL;
+
+    if (!MM_BASE_CALL_GET_CLASS (self)->setup_audio_channel_finish (self, res, &audio_port, &audio_format, &error)) {
+        mm_warn ("Couldn't setup audio channel: '%s'", error->message);
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_accept_context_free (ctx);
+        return;
+    }
+
+    if (audio_port || audio_format) {
+        update_audio_settings (self, audio_port, audio_format);
+        g_clear_object (&audio_port);
+        g_clear_object (&audio_format);
+    }
+
+    call_accepted (ctx);
+}
+
+static void
 handle_accept_ready (MMBaseCall *self,
                      GAsyncResult *res,
                      HandleAcceptContext *ctx)
@@ -310,15 +420,21 @@ handle_accept_ready (MMBaseCall *self,
     if (!MM_BASE_CALL_GET_CLASS (self)->accept_finish (self, res, &error)) {
         mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    } else {
-        if (ctx->self->priv->incoming_timeout) {
-            g_source_remove (ctx->self->priv->incoming_timeout);
-            ctx->self->priv->incoming_timeout = 0;
-        }
-        mm_base_call_change_state (self, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
-        mm_gdbus_call_complete_accept (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+        handle_accept_context_free (ctx);
+        return;
     }
-    handle_accept_context_free (ctx);
+
+    /* If there is an audio setup method, run it now */
+    if (MM_BASE_CALL_GET_CLASS (self)->setup_audio_channel) {
+        mm_info ("setting up audio channel...");
+        MM_BASE_CALL_GET_CLASS (self)->setup_audio_channel (self,
+                                                            (GAsyncReadyCallback) accept_setup_audio_channel_ready,
+                                                            ctx);
+        return;
+    }
+
+    /* Otherwise, we're done */
+    call_accepted (ctx);
 }
 
 static void
@@ -677,6 +793,18 @@ mm_base_call_get_path (MMBaseCall *self)
      state == MM_CALL_STATE_RINGING_OUT ||      \
      state == MM_CALL_STATE_ACTIVE)
 
+static void
+cleanup_audio_channel_ready (MMBaseCall   *self,
+                             GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!MM_BASE_CALL_GET_CLASS (self)->cleanup_audio_channel_finish (self, res, &error)) {
+        mm_warn ("audio channel cleanup failed: %s", error->message);
+        g_error_free (error);
+    }
+}
+
 void
 mm_base_call_change_state (MMBaseCall        *self,
                            MMCallState        new_state,
@@ -710,6 +838,13 @@ mm_base_call_change_state (MMBaseCall        *self,
             mm_warn ("Couldn't cleanup in-call unsolicited events: %s", error->message);
             g_error_free (error);
         }
+        if (MM_BASE_CALL_GET_CLASS (self)->cleanup_audio_channel) {
+            mm_info ("cleaning up audio channel...");
+            update_audio_settings (self, NULL, NULL);
+            MM_BASE_CALL_GET_CLASS (self)->cleanup_audio_channel (self,
+                                                                  (GAsyncReadyCallback) cleanup_audio_channel_ready,
+                                                                  NULL);
+        }
     }
 
     mm_gdbus_call_set_state (MM_GDBUS_CALL (self), new_state);
@@ -722,21 +857,6 @@ mm_base_call_received_dtmf (MMBaseCall *self,
                             const gchar *dtmf)
 {
     mm_gdbus_call_emit_dtmf_received (MM_GDBUS_CALL (self), dtmf);
-}
-
-void
-mm_base_call_set_audio_port (MMBaseCall *self, const gchar *port)
-{
-    mm_gdbus_call_set_audio_port (MM_GDBUS_CALL (self), port);
-}
-
-void
-mm_base_call_set_audio_format (MMBaseCall *self,
-                               MMCallAudioFormat *audio_format)
-{
-    mm_gdbus_call_set_audio_format (
-        MM_GDBUS_CALL (self),
-        mm_call_audio_format_get_dictionary (audio_format));
 }
 
 /*****************************************************************************/
@@ -1066,6 +1186,8 @@ static void
 dispose (GObject *object)
 {
     MMBaseCall *self = MM_BASE_CALL (object);
+
+    g_clear_object (&self->priv->audio_port);
 
     if (self->priv->incoming_timeout) {
         g_source_remove (self->priv->incoming_timeout);
