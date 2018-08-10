@@ -1354,8 +1354,9 @@ typedef enum { /*< underscore_name=mm_call_state >*/
  * @MM_CALL_STATE_REASON_INCOMING_NEW: Received a new incoming call.
  * @MM_CALL_STATE_REASON_ACCEPTED: Dialing or Ringing call is accepted.
  * @MM_CALL_STATE_REASON_TERMINATED: Call is correctly terminated.
- * @MM_CALL_STATE_REASON_REFUSED_OR_BUSY: Remote peer is busy or refused call
+ * @MM_CALL_STATE_REASON_REFUSED_OR_BUSY: Remote peer is busy or refused call.
  * @MM_CALL_STATE_REASON_ERROR: Wrong number or generic network error.
+ * @MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED: Error setting up audio channel.
  */
 typedef enum { /*< underscore_name=mm_call_state_reason >*/
     MM_CALL_STATE_REASON_UNKNOWN            = 0,
@@ -1364,7 +1365,8 @@ typedef enum { /*< underscore_name=mm_call_state_reason >*/
     MM_CALL_STATE_REASON_ACCEPTED           = 3,
     MM_CALL_STATE_REASON_TERMINATED         = 4,
     MM_CALL_STATE_REASON_REFUSED_OR_BUSY    = 5,
-    MM_CALL_STATE_REASON_ERROR              = 6
+    MM_CALL_STATE_REASON_ERROR              = 6,
+    MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED = 7
 } MMCallStateReason;
 
 /**
