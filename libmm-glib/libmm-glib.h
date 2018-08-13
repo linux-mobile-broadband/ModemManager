@@ -78,6 +78,7 @@
 #include <mm-cdma-manual-activation-properties.h>
 #include <mm-signal.h>
 #include <mm-kernel-event-properties.h>
+#include <mm-pco.h>
 
 /* generated */
 #include <mm-errors-types.h>

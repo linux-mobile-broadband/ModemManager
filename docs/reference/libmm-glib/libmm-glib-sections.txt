@@ -1309,6 +1309,34 @@ mm_call_properties_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-pco</FILE>
+<TITLE>MMPco</TITLE>
+MMPco
+<SUBSECTION New>
+mm_pco_new
+<SUBSECTION GettersSetters>
+mm_pco_get_session_id
+mm_pco_is_complete
+mm_pco_get_data
+<SUBSECTION Private>
+mm_pco_from_variant
+mm_pco_to_variant
+mm_pco_set_session_id
+mm_pco_set_complete
+mm_pco_set_data
+<SUBSECTION Standard>
+MMPcoClass
+MMPcoPrivate
+MM_IS_PCO
+MM_IS_PCO_CLASS
+MM_PCO
+MM_PCO_CLASS
+MM_PCO_GET_CLASS
+MM_TYPE_PCO
+mm_pco_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-enums-types</FILE>
 <TITLE>Flags and Enumerations</TITLE>
 mm_bearer_ip_method_get_string

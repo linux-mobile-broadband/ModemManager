@@ -129,6 +129,10 @@
         <title>Voice support</title>
         <xi:include href="xml/mm-modem-voice.xml"/>
       </section>
+      <section>
+        <title>PCO support</title>
+        <xi:include href="xml/mm-pco.xml"/>
+      </section>
     </chapter>
 
     <chapter>
