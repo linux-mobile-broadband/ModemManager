@@ -37,22 +37,25 @@
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-cinterion.h"
 #include "mm-modem-helpers-cinterion.h"
-#include "mm-common-cinterion.h"
+#include "mm-shared-cinterion.h"
 #include "mm-broadband-bearer-cinterion.h"
 
-static void iface_modem_init      (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init           (MMIfaceModem          *iface);
+static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
-static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void iface_modem_location_init  (MMIfaceModemLocation  *iface);
+static void shared_cinterion_init      (MMSharedCinterion     *iface);
 
-static MMIfaceModem *iface_modem_parent;
-static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModem         *iface_modem_parent;
+static MMIfaceModem3gpp     *iface_modem_3gpp_parent;
+static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_CINTERION, shared_cinterion_init))
 
 typedef enum {
     FEATURE_SUPPORT_UNKNOWN,
@@ -1905,14 +1908,26 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 static void
 iface_modem_location_init (MMIfaceModemLocation *iface)
 {
-    mm_common_cinterion_peek_parent_location_interface (iface);
+    iface_modem_location_parent = g_type_interface_peek_parent (iface);
 
-    iface->load_capabilities = mm_common_cinterion_location_load_capabilities;
-    iface->load_capabilities_finish = mm_common_cinterion_location_load_capabilities_finish;
-    iface->enable_location_gathering = mm_common_cinterion_enable_location_gathering;
-    iface->enable_location_gathering_finish = mm_common_cinterion_enable_location_gathering_finish;
-    iface->disable_location_gathering = mm_common_cinterion_disable_location_gathering;
-    iface->disable_location_gathering_finish = mm_common_cinterion_disable_location_gathering_finish;
+    iface->load_capabilities                 = mm_shared_cinterion_location_load_capabilities;
+    iface->load_capabilities_finish          = mm_shared_cinterion_location_load_capabilities_finish;
+    iface->enable_location_gathering         = mm_shared_cinterion_enable_location_gathering;
+    iface->enable_location_gathering_finish  = mm_shared_cinterion_enable_location_gathering_finish;
+    iface->disable_location_gathering        = mm_shared_cinterion_disable_location_gathering;
+    iface->disable_location_gathering_finish = mm_shared_cinterion_disable_location_gathering_finish;
+}
+
+static MMIfaceModemLocation *
+peek_parent_location_interface (MMSharedCinterion *self)
+{
+    return iface_modem_location_parent;
+}
+
+static void
+shared_cinterion_init (MMSharedCinterion *iface)
+{
+    iface->peek_parent_location_interface = peek_parent_location_interface;
 }
 
 static void

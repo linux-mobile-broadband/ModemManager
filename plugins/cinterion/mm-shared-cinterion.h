@@ -11,39 +11,59 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2014 Ammonit Measurement GmbH
- * Author: Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2014 - 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
-#ifndef MM_COMMON_CINTERION_H
-#define MM_COMMON_CINTERION_H
+#ifndef MM_SHARED_CINTERION_H
+#define MM_SHARED_CINTERION_H
 
-#include "glib.h"
+#include <glib-object.h>
+#include <gio/gio.h>
+
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include "mm-broadband-modem.h"
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 
-void                  mm_common_cinterion_location_load_capabilities        (MMIfaceModemLocation *self,
+#define MM_TYPE_SHARED_CINTERION               (mm_shared_cinterion_get_type ())
+#define MM_SHARED_CINTERION(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_CINTERION, MMSharedCinterion))
+#define MM_IS_SHARED_CINTERION(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SHARED_CINTERION))
+#define MM_SHARED_CINTERION_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_SHARED_CINTERION, MMSharedCinterion))
+
+typedef struct _MMSharedCinterion MMSharedCinterion;
+
+struct _MMSharedCinterion {
+    GTypeInterface g_iface;
+
+    /* Peek location interface of the parent class of the object */
+    MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedCinterion *self);
+};
+
+GType mm_shared_cinterion_get_type (void);
+
+void                  mm_shared_cinterion_location_load_capabilities        (MMIfaceModemLocation *self,
                                                                              GAsyncReadyCallback callback,
                                                                              gpointer user_data);
-MMModemLocationSource mm_common_cinterion_location_load_capabilities_finish (MMIfaceModemLocation *self,
+MMModemLocationSource mm_shared_cinterion_location_load_capabilities_finish (MMIfaceModemLocation *self,
                                                                              GAsyncResult *res,
                                                                              GError **error);
 
-void                  mm_common_cinterion_enable_location_gathering         (MMIfaceModemLocation *self,
+void                  mm_shared_cinterion_enable_location_gathering         (MMIfaceModemLocation *self,
                                                                              MMModemLocationSource source,
                                                                              GAsyncReadyCallback callback,
                                                                              gpointer user_data);
-gboolean              mm_common_cinterion_enable_location_gathering_finish  (MMIfaceModemLocation *self,
+gboolean              mm_shared_cinterion_enable_location_gathering_finish  (MMIfaceModemLocation *self,
                                                                              GAsyncResult *res,
                                                                              GError **error);
 
-void                  mm_common_cinterion_disable_location_gathering        (MMIfaceModemLocation *self,
+void                  mm_shared_cinterion_disable_location_gathering        (MMIfaceModemLocation *self,
                                                                              MMModemLocationSource source,
                                                                              GAsyncReadyCallback callback,
                                                                              gpointer user_data);
-gboolean              mm_common_cinterion_disable_location_gathering_finish (MMIfaceModemLocation *self,
+gboolean              mm_shared_cinterion_disable_location_gathering_finish (MMIfaceModemLocation *self,
                                                                              GAsyncResult *res,
                                                                              GError **error);
 
-void                  mm_common_cinterion_peek_parent_location_interface    (MMIfaceModemLocation *iface);
-
-#endif  /* MM_COMMON_CINTERION_H */
+#endif  /* MM_SHARED_CINTERION_H */
