@@ -27,12 +27,16 @@
 #include "mm-errors-types.h"
 #include "mm-iface-modem-location.h"
 #include "mm-broadband-modem-qmi-cinterion.h"
-#include "mm-common-cinterion.h"
+#include "mm-shared-cinterion.h"
 
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void shared_cinterion_init     (MMSharedCinterion    *iface);
+
+static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiCinterion, mm_broadband_modem_qmi_cinterion, MM_TYPE_BROADBAND_MODEM_QMI, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_CINTERION, shared_cinterion_init))
 
 /*****************************************************************************/
 
@@ -60,14 +64,26 @@ mm_broadband_modem_qmi_cinterion_init (MMBroadbandModemQmiCinterion *self)
 static void
 iface_modem_location_init (MMIfaceModemLocation *iface)
 {
-    mm_common_cinterion_peek_parent_location_interface (iface);
+    iface_modem_location_parent = g_type_interface_peek_parent (iface);
 
-    iface->load_capabilities = mm_common_cinterion_location_load_capabilities;
-    iface->load_capabilities_finish = mm_common_cinterion_location_load_capabilities_finish;
-    iface->enable_location_gathering = mm_common_cinterion_enable_location_gathering;
-    iface->enable_location_gathering_finish = mm_common_cinterion_enable_location_gathering_finish;
-    iface->disable_location_gathering = mm_common_cinterion_disable_location_gathering;
-    iface->disable_location_gathering_finish = mm_common_cinterion_disable_location_gathering_finish;
+    iface->load_capabilities                 = mm_shared_cinterion_location_load_capabilities;
+    iface->load_capabilities_finish          = mm_shared_cinterion_location_load_capabilities_finish;
+    iface->enable_location_gathering         = mm_shared_cinterion_enable_location_gathering;
+    iface->enable_location_gathering_finish  = mm_shared_cinterion_enable_location_gathering_finish;
+    iface->disable_location_gathering        = mm_shared_cinterion_disable_location_gathering;
+    iface->disable_location_gathering_finish = mm_shared_cinterion_disable_location_gathering_finish;
+}
+
+static MMIfaceModemLocation *
+peek_parent_location_interface (MMSharedCinterion *self)
+{
+    return iface_modem_location_parent;
+}
+
+static void
+shared_cinterion_init (MMSharedCinterion *iface)
+{
+    iface->peek_parent_location_interface = peek_parent_location_interface;
 }
 
 static void

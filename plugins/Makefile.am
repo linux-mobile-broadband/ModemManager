@@ -605,8 +605,8 @@ pkglib_LTLIBRARIES += libmm-plugin-cinterion.la
 libmm_plugin_cinterion_la_SOURCES = \
 	cinterion/mm-plugin-cinterion.c \
 	cinterion/mm-plugin-cinterion.h \
-	cinterion/mm-common-cinterion.c \
-	cinterion/mm-common-cinterion.h \
+	cinterion/mm-shared-cinterion.c \
+	cinterion/mm-shared-cinterion.h \
 	cinterion/mm-broadband-modem-cinterion.c \
 	cinterion/mm-broadband-modem-cinterion.h \
 	cinterion/mm-broadband-bearer-cinterion.c \
