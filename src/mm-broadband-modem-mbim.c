@@ -3547,6 +3547,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->setup_sms_format_finish = NULL;
     iface->set_default_storage = NULL;
     iface->set_default_storage_finish = NULL;
+    iface->init_current_storages = NULL;
+    iface->init_current_storages_finish = NULL;
     iface->load_initial_sms_parts = load_initial_sms_parts;
     iface->load_initial_sms_parts_finish = load_initial_sms_parts_finish;
     iface->setup_unsolicited_events = setup_unsolicited_events_messaging;
