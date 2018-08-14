@@ -277,6 +277,7 @@ mm_modem_3gpp_get_enabled_facility_locks
 mm_modem_3gpp_get_registration_state
 mm_modem_3gpp_get_subscription_state
 mm_modem_3gpp_get_eps_ue_mode_operation
+mm_modem_3gpp_get_pco
 <SUBSECTION Methods>
 mm_modem_3gpp_register
 mm_modem_3gpp_register_finish
@@ -1703,6 +1704,8 @@ mm_gdbus_modem3gpp_dup_operator_name
 mm_gdbus_modem3gpp_get_enabled_facility_locks
 mm_gdbus_modem3gpp_get_subscription_state
 mm_gdbus_modem3gpp_get_eps_ue_mode_operation
+mm_gdbus_modem3gpp_get_pco
+mm_gdbus_modem3gpp_dup_pco
 <SUBSECTION Methods>
 mm_gdbus_modem3gpp_call_register
 mm_gdbus_modem3gpp_call_register_finish
@@ -1726,6 +1729,7 @@ mm_gdbus_modem3gpp_set_operator_name
 mm_gdbus_modem3gpp_set_registration_state
 mm_gdbus_modem3gpp_set_subscription_state
 mm_gdbus_modem3gpp_set_eps_ue_mode_operation
+mm_gdbus_modem3gpp_set_pco
 <SUBSECTION Standard>
 MM_GDBUS_IS_MODEM3GPP
 MM_GDBUS_MODEM3GPP

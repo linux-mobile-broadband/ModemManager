@@ -259,6 +259,8 @@ void mm_iface_modem_3gpp_update_location            (MMIfaceModem3gpp *self,
                                                      gulong location_area_code,
                                                      gulong tracking_area_code,
                                                      gulong cell_id);
+void mm_iface_modem_3gpp_update_pco_list            (MMIfaceModem3gpp *self,
+                                                     const GList *pco_list);
 
 /* Run all registration checks */
 void mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,

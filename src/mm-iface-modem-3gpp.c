@@ -1540,6 +1540,34 @@ periodic_registration_check_enable (MMIfaceModem3gpp *self)
 
 /*****************************************************************************/
 
+void
+mm_iface_modem_3gpp_update_pco_list (MMIfaceModem3gpp *self,
+                                     const GList *pco_list)
+{
+    MmGdbusModem3gpp *skeleton = NULL;
+    GVariantBuilder builder;
+    GVariant *variant;
+    const GList *iter;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (!skeleton)
+        return;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(ubay)"));
+    for (iter = pco_list; iter; iter = g_list_next (iter)) {
+        g_variant_builder_add_value (&builder,
+                                     mm_pco_to_variant (MM_PCO (iter->data)));
+    }
+    variant = g_variant_ref_sink (g_variant_builder_end (&builder));
+    mm_gdbus_modem3gpp_set_pco (skeleton, variant);
+    g_variant_unref (variant);
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (GTask *task);
 
@@ -2242,6 +2270,7 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
         mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
         mm_gdbus_modem3gpp_set_enabled_facility_locks (skeleton, MM_MODEM_3GPP_FACILITY_NONE);
         mm_gdbus_modem3gpp_set_subscription_state (skeleton, MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN);
+        mm_gdbus_modem3gpp_set_pco (skeleton, NULL);
 
         /* Bind our RegistrationState property */
         g_object_bind_property (self, MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,

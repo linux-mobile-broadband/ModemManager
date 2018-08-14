@@ -82,6 +82,8 @@ MMModem3gppFacility           mm_modem_3gpp_get_enabled_facility_locks (MMModem3
 
 MMModem3gppEpsUeModeOperation mm_modem_3gpp_get_eps_ue_mode_operation  (MMModem3gpp *self);
 
+GList   *mm_modem_3gpp_get_pco         (MMModem3gpp *self);
+
 void     mm_modem_3gpp_register        (MMModem3gpp *self,
                                         const gchar *network_id,
                                         GCancellable *cancellable,

@@ -164,5 +164,12 @@
     -->
     <property name="EpsUeModeOperation" type="u" access="read" />
 
+    <!--
+        Pco:
+
+        The raw PCOs received from the network.
+    -->
+    <property name="Pco" type="a(ubay)" access="read" />
+
   </interface>
 </node>

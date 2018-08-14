@@ -26,6 +26,7 @@
 #include "mm-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-modem-3gpp.h"
+#include "mm-pco.h"
 
 /**
  * SECTION: mm-modem-3gpp
@@ -294,6 +295,45 @@ mm_modem_3gpp_get_eps_ue_mode_operation (MMModem3gpp *self)
     g_return_val_if_fail (MM_IS_MODEM_3GPP (self), MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN);
 
     return mm_gdbus_modem3gpp_get_eps_ue_mode_operation (MM_GDBUS_MODEM3GPP (self));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_3gpp_get_pco:
+ * @self: A #MMModem3gpp.
+ *
+ * Get the list of #MMPco received from the network.
+ *
+ * The caller is responsible for freeing the returned #GList with
+ * mm_pco_list_free().
+ *
+ * Returns: (transfer full): A list of #MMPco.
+ */
+GList *
+mm_modem_3gpp_get_pco (MMModem3gpp *self)
+{
+    GList *pco_list = NULL;
+    GVariant *container, *child;
+    GVariantIter iter;
+
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
+
+    container = mm_gdbus_modem3gpp_get_pco (MM_GDBUS_MODEM3GPP (self));
+
+    g_return_val_if_fail (g_variant_is_of_type (container, G_VARIANT_TYPE ("a(ubay)")),
+                          NULL);
+    g_variant_iter_init (&iter, container);
+    while ((child = g_variant_iter_next_value (&iter))) {
+        MMPco *pco;
+
+        pco = mm_pco_from_variant (child, NULL);
+        pco_list = mm_pco_list_add (pco_list, pco);
+        g_object_unref (pco);
+        g_variant_unref (child);
+    }
+
+    return pco_list;
 }
 
 /*****************************************************************************/
