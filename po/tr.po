@@ -1,0 +1,105 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# Emin Tufan Çetin <etcetin@gmail.com>, 2018.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2018-08-14 11:06+0200\n"
+"PO-Revision-Date: 2018-06-23 18:53+0300\n"
+"Last-Translator: Emin Tufan Çetin <etcetin@gmail.com>\n"
+"Language-Team: Türkçe <gnome-turk@gnome.org>\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Gtranslator 2.91.7\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Modem Manager artalan uygulamasını denetle"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Sistem ilkesi Modem Manager'ı denetlemeyi engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Mobil geniş bant aygıtının kilidini aç ve denetle"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Sistem ilkesi mobil geniş bant aygıtını denetlemeyi veya kilidini açmayı "
+"engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Mobil geniş bant kişileri ekle, düzenle ve sil"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Sistem ilkesi bu aygıtın kişilerini eklemeyi, düzenlemeyi veya silmeyi "
+"engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Metin ileti gönder, kaydet, düzenle ve sil"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Sistem ilkesi bu aygıtın metin iletilerini göndermeyi veya işlemeyi "
+"engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Gelen sesli çağrıları kabul et veya giden sesli çağrılar başlat."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Sistem ilkesi sesli çağrıları engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr "Coğrafi konum ve konumlandırma bilgisini etkinleştir ve gör"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Sistem ilkesi coğrafi konum bilgisini etkinleştirmeyi ve göstermeyi "
+"engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Ağ bilgisi ve hizmetleri sorgula ve yararlan"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Sistem ilkesi ağ bilgisini ve hizmetleri sorgulamayı veya yararlanmayı "
+"engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Mobil geniş bant aygıtındaki donanım yazılımını sorgula ve yönet"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Sistem ilkesi bu aygıtın donanım yazılımını sorgulamayı veya yönetmeyi "
+"engelliyor."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager'in aygıtları sıfırlaması gerekiyor"
