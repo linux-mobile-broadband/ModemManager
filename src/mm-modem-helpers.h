@@ -404,4 +404,10 @@ gboolean mm_parse_cclk_response (const gchar *response,
 gint mm_parse_csim_response (const gchar *response,
                                    GError **error);
 
+gboolean mm_parse_supl_address (const gchar  *supl,
+                                gchar       **out_fqdn,
+                                guint32      *out_ip,
+                                guint16      *out_port,
+                                GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_H */

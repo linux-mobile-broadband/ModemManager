@@ -21,6 +21,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 
 #define MM_LOCATION_GPS_REFRESH_TIME_SECS 30
 
@@ -988,6 +989,13 @@ handle_set_supl_server_auth_ready (MMBaseModem *self,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot set SUPL server: A-GPS not supported");
+        handle_set_supl_server_context_free (ctx);
+        return;
+    }
+
+    /* Validate SUPL address string: either FQDN:PORT or IP:PORT */
+    if (!mm_parse_supl_address (ctx->supl, NULL, NULL, NULL, &error)) {
+        g_dbus_method_invocation_return_gerror (ctx->invocation, error);
         handle_set_supl_server_context_free (ctx);
         return;
     }

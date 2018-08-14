@@ -113,36 +113,6 @@ set_supl_server_context_free (SetSuplServerContext *ctx)
     g_slice_free (SetSuplServerContext, ctx);
 }
 
-static gboolean
-parse_as_ip_port (const gchar *supl,
-                  guint32     *out_ip,
-                  guint32     *out_port)
-{
-    gboolean   valid = FALSE;
-    gchar    **split;
-    guint      port;
-    guint32    ip;
-
-    split = g_strsplit (supl, ":", -1);
-    if (g_strv_length (split) != 2)
-        goto out;
-
-    if (!mm_get_uint_from_str (split[1], &port))
-        goto out;
-    if (port == 0 || port > G_MAXUINT16)
-        goto out;
-    if (inet_pton (AF_INET, split[0], &ip) <= 0)
-        goto out;
-
-    *out_ip = ip;
-    *out_port = port;
-    valid = TRUE;
-
-out:
-    g_strfreev (split);
-    return valid;
-}
-
 static GArray *
 parse_as_utf16_url (const gchar *supl)
 {
@@ -197,7 +167,7 @@ pds_set_supl_server (GTask *task)
     SetSuplServerContext            *ctx;
     QmiMessagePdsSetAgpsConfigInput *input;
     guint32                          ip;
-    guint32                          port;
+    guint16                          port;
     GArray                          *url;
 
     self = g_task_get_source_object (task);
@@ -211,7 +181,7 @@ pds_set_supl_server (GTask *task)
     else if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
         qmi_message_pds_set_agps_config_input_set_network_mode (input, QMI_PDS_NETWORK_MODE_CDMA, NULL);
 
-    if (parse_as_ip_port (ctx->supl, &ip, &port))
+    if (mm_parse_supl_address (ctx->supl, NULL, &ip, &port, NULL))
         qmi_message_pds_set_agps_config_input_set_location_server_address (input, ip, port, NULL);
     else {
         url = parse_as_utf16_url (ctx->supl);
@@ -312,7 +282,7 @@ loc_set_supl_server (GTask *task)
     SetSuplServerContext        *ctx;
     QmiMessageLocSetServerInput *input;
     guint32                      ip;
-    guint32                      port;
+    guint16                      port;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -325,8 +295,8 @@ loc_set_supl_server (GTask *task)
     else if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self)))
         qmi_message_loc_set_server_input_set_server_type (input, QMI_LOC_SERVER_TYPE_CDMA_PDE, NULL);
 
-    if (parse_as_ip_port (ctx->supl, &ip, &port))
-        qmi_message_loc_set_server_input_set_ipv4 (input, ip, port, NULL);
+    if (mm_parse_supl_address (ctx->supl, NULL, &ip, &port, NULL))
+        qmi_message_loc_set_server_input_set_ipv4 (input, ip, (guint32) port, NULL);
     else
         qmi_message_loc_set_server_input_set_url (input, ctx->supl, NULL);
 

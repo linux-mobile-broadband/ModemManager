@@ -71,7 +71,7 @@
 
     <!--
         SetSuplServer:
-        @supl: SUPL server configuration, given either as IP:PORT or with a full URL.
+        @supl: SUPL server configuration, given either as IP:PORT or as FQDN:PORT.
 
         Configure the SUPL server for A-GPS.
     -->
@@ -334,7 +334,7 @@
     <!--
         SuplServer:
 
-        SUPL server configuration for A-GPS, given either as IP:PORT or with a full URL.
+        SUPL server configuration for A-GPS, given either as IP:PORT or FQDN:PORT.
     -->
     <property name="SuplServer" type="s" access="read" />
 

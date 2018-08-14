@@ -145,7 +145,7 @@ static GOptionEntry entries[] = {
     },
     { "location-set-supl-server", 0, 0, G_OPTION_ARG_STRING, &set_supl_server_str,
       "Set SUPL server address",
-      "[IP:PORT] or [URL]"
+      "[IP:PORT] or [FQDN:PORT]"
     },
     { "location-inject-assistance-data", 0, 0, G_OPTION_ARG_FILENAME, &inject_assistance_data_str,
       "Inject assistance data in the GNSS module",

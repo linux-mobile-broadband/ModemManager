@@ -4372,3 +4372,61 @@ out:
     g_assert (retries >= 0);
     return retries;
 }
+
+/*****************************************************************************/
+
+gboolean
+mm_parse_supl_address (const gchar  *supl,
+                       gchar       **out_fqdn,
+                       guint32      *out_ip,
+                       guint16      *out_port,
+                       GError      **error)
+{
+    gboolean   valid = FALSE;
+    gchar    **split;
+    guint      port;
+    guint32    ip;
+
+    split = g_strsplit (supl, ":", -1);
+    if (g_strv_length (split) != 2) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid SUPL address format: expected FQDN:PORT or IP:PORT");
+        goto out;
+    }
+
+    if (!mm_get_uint_from_str (split[1], &port)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid SUPL port number specified: not a number: %s", split[1]);
+        goto out;
+    }
+
+    if (port == 0 || port > G_MAXUINT16) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid SUPL port number specified: out of range: %u", port);
+        goto out;
+    }
+
+    /* Port is valid */
+    if (out_port)
+        *out_port = (guint16) port;
+
+    /* Try to parse first item as IP */
+    if (inet_pton (AF_INET, split[0], &ip) <= 0) {
+        /* Otherwise, assume it's a domain name */
+        if (out_fqdn)
+            *out_fqdn = g_strdup (split[0]);
+        if (out_ip)
+            *out_ip = 0;
+    } else {
+        if (out_ip)
+            *out_ip = ip;
+        if (out_fqdn)
+            *out_fqdn = NULL;
+    }
+
+    valid = TRUE;
+
+out:
+    g_strfreev (split);
+    return valid;
+}
