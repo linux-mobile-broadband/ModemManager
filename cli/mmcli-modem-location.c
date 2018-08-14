@@ -599,9 +599,9 @@ get_location_process_reply (MMLocation3gpp *location_3gpp,
             g_print ("  -------------------------\n"
                      "  3GPP location   | Mobile country code: '%u'\n"
                      "                  | Mobile network code: '%u'\n"
-                     "                  |  Location area code: '%lu'\n"
-                     "                  |  Tracking area code: '%lu'\n"
-                     "                  |             Cell ID: '%lu'\n",
+                     "                  |  Location area code: '%04lX'\n"
+                     "                  |  Tracking area code: '%04lX'\n"
+                     "                  |             Cell ID: '%08lX'\n",
                      mm_location_3gpp_get_mobile_country_code (location_3gpp),
                      mm_location_3gpp_get_mobile_network_code (location_3gpp),
                      mm_location_3gpp_get_location_area_code (location_3gpp),
