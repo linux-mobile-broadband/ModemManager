@@ -91,6 +91,8 @@ struct _MMBroadbandModemMbimPrivate {
     ProcessNotificationFlag setup_flags;
     ProcessNotificationFlag enable_flags;
 
+    GList *pco_list;
+
     /* 3GPP registration helpers */
     gchar *current_operator_id;
     gchar *current_operator_name;
@@ -2520,6 +2522,7 @@ basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
     MbimPcoValue *pco_value;
     GError *error = NULL;
     gchar *pco_data_hex;
+    MMPco *pco;
 
     if (!mbim_message_basic_connect_extensions_pco_notification_parse (
             notification,
@@ -2530,13 +2533,27 @@ basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
         return;
     }
 
-    pco_data_hex = mm_utils_bin2hexstr (pco_value->pco_data_buffer, pco_value->pco_data_size);
+    pco_data_hex = mm_utils_bin2hexstr (pco_value->pco_data_buffer,
+                                        pco_value->pco_data_size);
     mm_dbg ("Received PCO: session ID=%u type=%s size=%u data=%s",
              pco_value->session_id,
              mbim_pco_type_get_string (pco_value->pco_data_type),
              pco_value->pco_data_size,
              pco_data_hex);
     g_free (pco_data_hex);
+
+    pco = mm_pco_new ();
+    mm_pco_set_session_id (pco, pco_value->session_id);
+    mm_pco_set_complete (pco,
+                         pco_value->pco_data_type == MBIM_PCO_TYPE_COMPLETE);
+    mm_pco_set_data (pco,
+                     pco_value->pco_data_buffer,
+                     pco_value->pco_data_size);
+
+    self->priv->pco_list = mm_pco_list_add (self->priv->pco_list, pco);
+    mm_iface_modem_3gpp_update_pco_list (MM_IFACE_MODEM_3GPP (self),
+                                         self->priv->pco_list);
+    g_object_unref (pco);
     mbim_pco_value_free (pco_value);
 }
 
@@ -3884,6 +3901,7 @@ finalize (GObject *object)
     g_free (self->priv->caps_hardware_info);
     g_free (self->priv->current_operator_id);
     g_free (self->priv->current_operator_name);
+    mm_pco_list_free (self->priv->pco_list);
 
     G_OBJECT_CLASS (mm_broadband_modem_mbim_parent_class)->finalize (object);
 }
