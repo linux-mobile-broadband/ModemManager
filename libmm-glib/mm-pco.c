@@ -224,6 +224,42 @@ mm_pco_to_variant (MMPco *self)
 
 /*****************************************************************************/
 
+void
+mm_pco_list_free (GList *pco_list)
+{
+    g_list_free_full (pco_list, g_object_unref);
+}
+
+GList *
+mm_pco_list_add (GList *pco_list,
+                 MMPco *pco)
+{
+    GList *iter;
+    guint32 session_id;
+
+    g_return_val_if_fail (pco != NULL, pco_list);
+
+    session_id = mm_pco_get_session_id (pco);
+
+    for (iter = g_list_first (pco_list); iter; iter = g_list_next (iter)) {
+        MMPco *iter_pco = iter->data;
+        guint32 iter_session_id = mm_pco_get_session_id (iter_pco);
+
+        if (iter_session_id < session_id)
+            continue;
+        else if (iter_session_id == session_id) {
+            iter->data = g_object_ref (pco);
+            g_object_unref (iter_pco);
+            return pco_list;
+        } else
+            break;
+    }
+
+    return g_list_insert_before (pco_list, iter, g_object_ref (pco));
+}
+
+/*****************************************************************************/
+
 MMPco *
 mm_pco_new (void)
 {

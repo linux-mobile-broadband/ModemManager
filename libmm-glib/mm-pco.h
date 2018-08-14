@@ -61,6 +61,10 @@ gboolean      mm_pco_is_complete    (MMPco *self);
 const guint8 *mm_pco_get_data       (MMPco *self,
                                      gsize *data_size);
 
+void          mm_pco_list_free      (GList *pco_list);
+GList        *mm_pco_list_add       (GList *pco_list,
+                                     MMPco *pco);
+
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 
