@@ -38,6 +38,7 @@ Makefile.in
 /libmm-glib/generated/*.xml
 /libmm-glib/generated/tests/mm-gdbus-*.[ch]
 /libmm-glib/tests/test-common-helpers
+/libmm-glib/tests/test-pco
 /libmm-glib/*.gir
 /libmm-glib/*.typelib
 
