@@ -142,20 +142,19 @@ out:
     return valid;
 }
 
-static gboolean
-parse_as_utf16_url (const gchar  *supl,
-                    GArray      **out_url)
+static GArray *
+parse_as_utf16_url (const gchar *supl)
 {
-    gchar *utf16;
-    gsize  utf16_len;
+    GArray *url;
+    gchar  *utf16;
+    gsize   utf16_len;
 
     utf16 = g_convert (supl, -1, "UTF-16BE", "UTF-8", NULL, &utf16_len, NULL);
-    *out_url = g_array_append_vals (g_array_sized_new (FALSE, FALSE, sizeof (guint8), utf16_len),
-                                    utf16, utf16_len);
+    url = g_array_append_vals (g_array_sized_new (FALSE, FALSE, sizeof (guint8), utf16_len),
+                               utf16, utf16_len);
     g_free (utf16);
-    return TRUE;
+    return url;
 }
-
 
 gboolean
 mm_shared_qmi_location_set_supl_server_finish (MMIfaceModemLocation  *self,
@@ -213,11 +212,11 @@ pds_set_supl_server (GTask *task)
 
     if (parse_as_ip_port (ctx->supl, &ip, &port))
         qmi_message_pds_set_agps_config_input_set_location_server_address (input, ip, port, NULL);
-    else if (parse_as_utf16_url (ctx->supl, &url)) {
+    else {
+        url = parse_as_utf16_url (ctx->supl);
         qmi_message_pds_set_agps_config_input_set_location_server_url (input, url, NULL);
         g_array_unref (url);
-    } else
-        g_assert_not_reached ();
+    }
 
     qmi_client_pds_set_agps_config (
         QMI_CLIENT_PDS (ctx->client),
