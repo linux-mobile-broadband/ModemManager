@@ -953,6 +953,8 @@ libmm_plugin_ublox_la_SOURCES = \
 	ublox/mm-broadband-bearer-ublox.c \
 	ublox/mm-broadband-modem-ublox.h \
 	ublox/mm-broadband-modem-ublox.c \
+	ublox/mm-sim-ublox.c \
+	ublox/mm-sim-ublox.h \
 	$(NULL)
 libmm_plugin_ublox_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(PLUGIN_UBLOX_COMPILER_FLAGS)
 libmm_plugin_ublox_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
