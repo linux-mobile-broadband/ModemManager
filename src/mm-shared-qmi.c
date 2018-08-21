@@ -1335,7 +1335,7 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
 static gboolean
 loc_location_operation_mode_indication_timed_out (GTask *task)
 {
-    SetSuplServerContext *ctx;
+    SetGpsOperationModeContext *ctx;
 
     ctx = g_task_get_task_data (task);
     ctx->timeout_id = 0;
