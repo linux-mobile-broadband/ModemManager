@@ -3477,14 +3477,21 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
 }
 
 /*************************************************************************/
-
+/* ICCID validation */
+/*
+ * 89: telecom (2 digits)
+ * cc: country (2 digits)
+ * oo: operator (2 digits)
+ * aaaaaaaaaaaaa: operator-specific account number (13 digits)
+ * x: checksum (1 digit)
+ */
 char *
 mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
 {
     gboolean swap;
     char *buf, *swapped = NULL;
     gsize len = 0;
-    int f_pos = -1, i;
+    int i;
 
     g_return_val_if_fail (raw_iccid != NULL, NULL);
 
@@ -3495,13 +3502,20 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
     /* Make sure the buffer is only digits or 'F' */
     buf = g_strdup (raw_iccid);
     for (len = 0; buf[len]; len++) {
-        if (isdigit (buf[len]))
+        /* Digit values allowed anywhere */
+        if (g_ascii_isdigit (buf[len]))
             continue;
-        if (buf[len] == 'F' || buf[len] == 'f') {
-            buf[len] = 'F';  /* canonicalize the F */
-            f_pos = len;
+
+        /* There are operators (e.g. the Chinese CMCC operator) that abuse the
+         * fact that 4 bits are used to store the BCD encoded numbers, and also
+         * use the [A-F] range as valid characters for the ICCID. Explicitly
+         * allow this range in the operator-specific part. */
+        if (len >= 6 && g_ascii_isxdigit (buf[len])) {
+            /* canonicalize hex digit */
+            buf[len] = g_ascii_toupper (buf[len]);
             continue;
         }
+
         if (buf[len] == '\"') {
             buf[len] = 0;
             break;
@@ -3509,8 +3523,8 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
 
         /* Invalid character */
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "ICCID response contained invalid character '%c'",
-                     buf[len]);
+                     "ICCID response contained invalid character '%c' at index '%zu'",
+                     buf[len], len);
         goto error;
     }
 
@@ -3543,17 +3557,6 @@ mm_3gpp_parse_iccid (const char *raw_iccid, GError **error)
       g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                    "Invalid ICCID response (leading two digits are not 89)");
       goto error;
-    }
-
-    /* Ensure if there's an 'F' that it's second-to-last if swap = TRUE,
-     * otherwise last if swap = FALSE. Also fail if an F is found within a
-     * 19-digit reported ICCID. */
-    if (f_pos >= 0) {
-        if ((len != 20) || (swap && (f_pos != len - 2)) || (!swap && (f_pos != len - 1))) {
-            g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Invalid ICCID length (unexpected F position)");
-            goto error;
-        }
     }
 
     if (swap) {
