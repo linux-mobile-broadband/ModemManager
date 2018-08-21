@@ -13,6 +13,8 @@
  * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
+#include <string.h>
+
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-xmm.h"
