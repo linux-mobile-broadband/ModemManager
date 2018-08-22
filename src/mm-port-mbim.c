@@ -302,7 +302,7 @@ mbim_device_new_ready (GObject      *unused,
 
 void
 mm_port_mbim_open (MMPortMbim          *self,
-#if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
                    gboolean             try_qmi_over_mbim,
 #endif
                    GCancellable        *cancellable,
@@ -335,7 +335,7 @@ mm_port_mbim_open (MMPortMbim          *self,
     fullpath = g_strdup_printf ("/dev/%s", mm_port_get_device (MM_PORT (self)));
     file = g_file_new_for_path (fullpath);
 
-#if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     /* If we want to try QMI over MBIM, store the GFile as task data */
     if (try_qmi_over_mbim)
         g_task_set_task_data (task, g_object_ref (file), g_object_unref);

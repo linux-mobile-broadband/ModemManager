@@ -1895,7 +1895,7 @@ initialization_started (MMBroadbandModem    *self,
         return;
     }
 
-#if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     /* Setup services to open */
     ctx->qmi_services[0] = QMI_SERVICE_DMS;
     ctx->qmi_services[1] = QMI_SERVICE_PDS;
@@ -1905,7 +1905,7 @@ initialization_started (MMBroadbandModem    *self,
 
     /* Now open our MBIM port */
     mm_port_mbim_open (ctx->mbim,
-#if WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
                        TRUE, /* With QMI over MBIM support if available */
 #endif
                        NULL,
