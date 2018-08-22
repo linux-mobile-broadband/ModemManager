@@ -4634,6 +4634,8 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
     iface->load_values_finish = modem_signal_load_values_finish;
 }
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
 static MMIfaceModemLocation *
 peek_parent_location_interface (MMSharedQmi *self)
 {
@@ -4646,6 +4648,8 @@ shared_qmi_init (MMSharedQmi *iface)
     iface->peek_client = shared_qmi_peek_client;
     iface->peek_parent_location_interface = peek_parent_location_interface;
 }
+
+#endif
 
 static void
 mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
