@@ -2119,6 +2119,34 @@ test_iccid_parse_quoted_unswapped_20_digit (void *f, gpointer d)
 }
 
 static void
+test_iccid_parse_quoted_unswapped_hex_account (void *f, gpointer d)
+{
+    const char *raw_iccid = "\"898602F9091830030220\"";
+    const char *expected = "898602F9091830030220";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (parsed, ==, expected);
+    g_free (parsed);
+}
+
+static void
+test_iccid_parse_quoted_unswapped_hex_account_2 (void *f, gpointer d)
+{
+    const char *raw_iccid = "\"898602C0123456789012\"";
+    const char *expected = "898602C0123456789012";
+    char *parsed;
+    GError *error = NULL;
+
+    parsed = mm_3gpp_parse_iccid (raw_iccid, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (parsed, ==, expected);
+    g_free (parsed);
+}
+
+static void
 test_iccid_parse_short (void *f, gpointer d)
 {
     const char *raw_iccid = "982314203264096";
@@ -2134,7 +2162,7 @@ test_iccid_parse_short (void *f, gpointer d)
 static void
 test_iccid_parse_invalid_chars (void *f, gpointer d)
 {
-    const char *raw_iccid = "98231420326ab9614067";
+    const char *raw_iccid = "98231420326pl9614067";
     char *parsed;
     GError *error = NULL;
 
@@ -3940,6 +3968,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_unswapped_19_digit, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_unswapped_19_digit_no_f, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_unswapped_20_digit, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_unswapped_hex_account, NULL));
+    g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_unswapped_hex_account_2, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_short, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_invalid_chars, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_invalid_mii, NULL));
