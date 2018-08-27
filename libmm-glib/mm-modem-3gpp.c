@@ -308,7 +308,7 @@ mm_modem_3gpp_get_eps_ue_mode_operation (MMModem3gpp *self)
  * The caller is responsible for freeing the returned #GList with
  * mm_pco_list_free().
  *
- * Returns: (transfer full): A list of #MMPco.
+ * Returns: (element-type ModemManager.Pco) (transfer full): A list of #MMPco.
  */
 GList *
 mm_modem_3gpp_get_pco (MMModem3gpp *self)

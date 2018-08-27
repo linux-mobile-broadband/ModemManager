@@ -193,6 +193,14 @@ mm_pco_from_variant (GVariant *variant,
 
 /*****************************************************************************/
 
+/**
+ * mm_pco_to_variant:
+ * @self: a #MMPco.
+ *
+ * Gets a GVariant representation with signature "(ubay)" of @self.
+ *
+ * Returns: (transfer full): A #GVariant representation of the #MMPco object. The returned value should be freed with g_variant_unref().
+ */
 GVariant *
 mm_pco_to_variant (MMPco *self)
 {
@@ -224,12 +232,29 @@ mm_pco_to_variant (MMPco *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_pco_list_free:
+ * @pco_list (element-type ModemManager.Pco): a #GList of #MMPco.
+ *
+ * Frees all of the memory used by a #GList of #MMPco.
+ */
 void
 mm_pco_list_free (GList *pco_list)
 {
     g_list_free_full (pco_list, g_object_unref);
 }
 
+/**
+ * mm_pco_list_add:
+ * @pco_list (element-type ModemManager.Pco): a #GList of #MMPco.
+ * @pco:: a #MMPco to add to the given list.
+ *
+ * Adds a #MMPco to a given PCO list. #MMPco objects stored in the order of
+ * their session ID. An existing PCO with the same session ID is overwritten
+ * with the new value.
+ *
+ * Returns: (element-type ModemManager.Pco): the new start of an updated or newly allocated #GList of #MMPco.
+ */
 GList *
 mm_pco_list_add (GList *pco_list,
                  MMPco *pco)
