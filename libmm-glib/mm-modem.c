@@ -2876,7 +2876,7 @@ modem_get_sim_ready (GDBusConnection *connection,
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Synchronously gets the #MMSim object managed by this #MMModem.
+ * Asynchronously gets the #MMSim object managed by this #MMModem.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
  * You can then call mm_modem_get_sim_finish() to get the result of the operation.
