@@ -3265,8 +3265,7 @@ test_cclk_response (void)
             g_assert (mm_network_timezone_get_leap_seconds (tz) == MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN);
         }
 
-        if (iso8601)
-            g_free (iso8601);
+        g_free (iso8601);
 
         if (tz)
             g_object_unref (tz);
