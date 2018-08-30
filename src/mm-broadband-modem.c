@@ -7145,27 +7145,15 @@ modem_cdma_load_meid (MMIfaceModemCdma *self,
 /* Setup/Cleanup unsolicited events (CDMA interface) */
 
 typedef struct {
-    MMBroadbandModem *self;
     gboolean setup;
-    GSimpleAsyncResult *result;
     MMPortSerialQcdm *qcdm;
+    gboolean close_port;
 } CdmaUnsolicitedEventsContext;
 
 static void
-cdma_unsolicited_events_context_complete_and_free (CdmaUnsolicitedEventsContext *ctx,
-                                                   gboolean close_port,
-                                                   GError *error)
+cdma_unsolicited_events_context_free (CdmaUnsolicitedEventsContext *ctx)
 {
-    if (error)
-        g_simple_async_result_take_error (ctx->result, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    g_simple_async_result_complete_in_idle (ctx->result);
-
-    g_clear_object (&ctx->result);
-    g_clear_object (&ctx->self);
-
-    if (ctx->qcdm && close_port)
+    if (ctx->qcdm && ctx->close_port)
         mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
     g_clear_object (&ctx->qcdm);
 
@@ -7175,16 +7163,23 @@ cdma_unsolicited_events_context_complete_and_free (CdmaUnsolicitedEventsContext 
 static void
 logcmd_qcdm_ready (MMPortSerialQcdm *port,
                    GAsyncResult *res,
-                   CdmaUnsolicitedEventsContext *ctx)
+                   GTask *task)
 {
+    MMBroadbandModem *self;
+    CdmaUnsolicitedEventsContext *ctx;
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     GByteArray *response;
     GError *error = NULL;
 
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        cdma_unsolicited_events_context_complete_and_free (ctx, TRUE, error);
+        ctx->close_port = TRUE;
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -7194,18 +7189,20 @@ logcmd_qcdm_ready (MMPortSerialQcdm *port,
                                                   &err);
     g_byte_array_unref (response);
     if (!result) {
-        error = g_error_new (MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Failed to parse Log Config Set Mask command result: %d",
-                             err);
-        cdma_unsolicited_events_context_complete_and_free (ctx, TRUE, error);
+        ctx->close_port = TRUE;
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse Log Config Set Mask command result: %d",
+                                 err);
+        g_object_unref (task);
         return;
     }
 
     mm_port_serial_qcdm_add_unsolicited_msg_handler (port,
                                                      DM_LOG_ITEM_EVDO_PILOT_SETS_V2,
                                                      ctx->setup ? qcdm_evdo_pilot_sets_log_handle : NULL,
-                                                     ctx->self,
+                                                     self,
                                                      NULL);
 
     qcdm_result_unref (result);
@@ -7218,7 +7215,9 @@ logcmd_qcdm_ready (MMPortSerialQcdm *port,
      * Setup should leave the port open to allow log messages to be received
      * and sent to handlers.
      */
-    cdma_unsolicited_events_context_complete_and_free (ctx, ctx->setup ? FALSE : TRUE, NULL);
+    ctx->close_port = ctx->setup ? FALSE : TRUE;
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -7228,20 +7227,21 @@ modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
                                              gpointer user_data)
 {
     CdmaUnsolicitedEventsContext *ctx;
+    GTask *task;
     GByteArray *logcmd;
     uint16_t log_items[] = { DM_LOG_ITEM_EVDO_PILOT_SETS_V2, 0 };
     GError *error = NULL;
 
     ctx = g_new0 (CdmaUnsolicitedEventsContext, 1);
-    ctx->self = g_object_ref (self);
     ctx->setup = TRUE;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_setup_cleanup_unsolicited_events);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)cdma_unsolicited_events_context_free);
+
     ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
     if (!ctx->qcdm) {
-        cdma_unsolicited_events_context_complete_and_free (ctx, FALSE, NULL);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -7251,7 +7251,8 @@ modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
      */
     if (setup || !mm_port_serial_is_open (MM_PORT_SERIAL (ctx->qcdm))) {
         if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), &error)) {
-            cdma_unsolicited_events_context_complete_and_free (ctx, FALSE, error);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
             return;
         }
     }
@@ -7268,7 +7269,7 @@ modem_cdma_setup_cleanup_unsolicited_events (MMBroadbandModem *self,
                                  5,
                                  NULL,
                                  (GAsyncReadyCallback)logcmd_qcdm_ready,
-                                 ctx);
+                                 task);
     g_byte_array_unref (logcmd);
 }
 
@@ -7277,7 +7278,7 @@ modem_cdma_setup_cleanup_unsolicited_events_finish (MMIfaceModemCdma *self,
                                                     GAsyncResult *res,
                                                     GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
