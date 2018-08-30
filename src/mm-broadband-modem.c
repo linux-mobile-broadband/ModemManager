@@ -8149,14 +8149,13 @@ typedef struct {
 } SetupRegistrationChecksResults;
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     gboolean has_qcdm_port;
     gboolean has_sprint_commands;
 } SetupRegistrationChecksContext;
 
-static void
-setup_registration_checks_context_complete_and_free (SetupRegistrationChecksContext *ctx)
+static SetupRegistrationChecksResults *
+setup_registration_checks_results_new (MMBroadbandModem *self,
+                                       SetupRegistrationChecksContext *ctx)
 {
     SetupRegistrationChecksResults *results;
 
@@ -8169,7 +8168,7 @@ setup_registration_checks_context_complete_and_free (SetupRegistrationChecksCont
         results->skip_qcdm_hdr_step = TRUE;
     }
 
-    if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state ==
+    if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state ==
         modem_cdma_get_detailed_registration_state) {
         /* Skip CDMA1x Serving System check if we have Sprint specific
          * commands AND if the default detailed registration checker
@@ -8190,11 +8189,7 @@ setup_registration_checks_context_complete_and_free (SetupRegistrationChecksCont
         }
     }
 
-    g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
+    return results;
 }
 
 static gboolean
@@ -8209,86 +8204,104 @@ modem_cdma_setup_registration_checks_finish (MMIfaceModemCdma *self,
 {
     SetupRegistrationChecksResults *results;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    results = g_task_propagate_pointer (G_TASK (res), error);
+    if (!results)
         return FALSE;
 
-    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *skip_qcdm_call_manager_step = results->skip_qcdm_call_manager_step;
     *skip_qcdm_hdr_step = results->skip_qcdm_hdr_step;
     *skip_at_cdma_service_status_step = results->skip_at_cdma_service_status_step;
     *skip_at_cdma1x_serving_system_step = results->skip_at_cdma1x_serving_system_step;
     *skip_detailed_registration_state = results->skip_detailed_registration_state;
+    g_free (results);
     return TRUE;
 }
 
 static void
-speri_check_ready (MMIfaceModemCdma *self,
+speri_check_ready (MMIfaceModemCdma *_self,
                    GAsyncResult *res,
-                   SetupRegistrationChecksContext *ctx)
+                   GTask *task)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    SetupRegistrationChecksContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error)
         g_error_free (error);
     else
         /* We DO have SPERI */
-        ctx->self->priv->has_speri = TRUE;
+        self->priv->has_speri = TRUE;
 
     /* All done */
-    ctx->self->priv->checked_sprint_support = TRUE;
-    setup_registration_checks_context_complete_and_free (ctx);
+    self->priv->checked_sprint_support = TRUE;
+    g_task_return_pointer (task,
+                           setup_registration_checks_results_new (self, ctx),
+                           g_free);
+    g_object_unref (task);
 }
 
 static void
-spservice_check_ready (MMIfaceModemCdma *self,
+spservice_check_ready (MMIfaceModemCdma *_self,
                        GAsyncResult *res,
-                       SetupRegistrationChecksContext *ctx)
+                       GTask *task)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+    SetupRegistrationChecksContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         g_error_free (error);
-        ctx->self->priv->checked_sprint_support = TRUE;
-        setup_registration_checks_context_complete_and_free (ctx);
+        self->priv->checked_sprint_support = TRUE;
+        g_task_return_pointer (task,
+                               setup_registration_checks_results_new (self, ctx),
+                               g_free);
+        g_object_unref (task);
         return;
     }
 
     /* We DO have SPSERVICE, look for SPERI */
     ctx->has_sprint_commands = TRUE;
-    ctx->self->priv->has_spservice = TRUE;
+    self->priv->has_spservice = TRUE;
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "$SPERI?",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)speri_check_ready,
-                              ctx);
+                              task);
 }
 
 static void
-modem_cdma_setup_registration_checks (MMIfaceModemCdma *self,
+modem_cdma_setup_registration_checks (MMIfaceModemCdma *_self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     SetupRegistrationChecksContext *ctx;
+    GTask *task;
 
     ctx = g_new0 (SetupRegistrationChecksContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_setup_registration_checks);
 
     /* Check if we have a QCDM port */
     ctx->has_qcdm_port = !!mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
     /* If we have cached results of Sprint command checking, use them */
-    if (ctx->self->priv->checked_sprint_support) {
-        ctx->has_sprint_commands = ctx->self->priv->has_spservice;
+    if (self->priv->checked_sprint_support) {
+        ctx->has_sprint_commands = self->priv->has_spservice;
 
         /* Completes in idle */
-        setup_registration_checks_context_complete_and_free (ctx);
+        g_task_return_pointer (task,
+                               setup_registration_checks_results_new (self, ctx),
+                               g_free);
+        g_object_unref (task);
         return;
     }
 
@@ -8298,7 +8311,7 @@ modem_cdma_setup_registration_checks (MMIfaceModemCdma *self,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)spservice_check_ready,
-                              ctx);
+                              task);
 }
 
 /*****************************************************************************/
