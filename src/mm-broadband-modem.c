@@ -8319,14 +8319,13 @@ modem_cdma_setup_registration_checks (MMIfaceModemCdma *_self,
 
 typedef struct {
     MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     GCancellable *cancellable;
     GTimer *timer;
     guint max_registration_time;
 } RegisterInCdmaNetworkContext;
 
 static void
-register_in_cdma_network_context_complete_and_free (RegisterInCdmaNetworkContext *ctx)
+register_in_cdma_network_context_free (RegisterInCdmaNetworkContext *ctx)
 {
     /* If our cancellable reference is still around, clear it */
     if (ctx->self->priv->modem_cdma_pending_registration_cancellable ==
@@ -8337,8 +8336,6 @@ register_in_cdma_network_context_complete_and_free (RegisterInCdmaNetworkContext
     if (ctx->timer)
         g_timer_destroy (ctx->timer);
 
-    g_simple_async_result_complete (ctx->result);
-    g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
@@ -8349,7 +8346,7 @@ modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,
                                        GAsyncResult *res,
                                        GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 #undef REG_IS_IDLE
@@ -8364,25 +8361,28 @@ modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,
 
 static void run_cdma_registration_checks_ready (MMBroadbandModem *self,
                                                 GAsyncResult *res,
-                                                RegisterInCdmaNetworkContext *ctx);
+                                                GTask *task);
 
 static gboolean
-run_cdma_registration_checks_again (RegisterInCdmaNetworkContext *ctx)
+run_cdma_registration_checks_again (GTask *task)
 {
     /* Get fresh registration state */
     mm_iface_modem_cdma_run_registration_checks (
-        MM_IFACE_MODEM_CDMA (ctx->self),
+        MM_IFACE_MODEM_CDMA (g_task_get_source_object (task)),
         (GAsyncReadyCallback)run_cdma_registration_checks_ready,
-        ctx);
+        task);
     return G_SOURCE_REMOVE;
 }
 
 static void
 run_cdma_registration_checks_ready (MMBroadbandModem *self,
                                     GAsyncResult *res,
-                                    RegisterInCdmaNetworkContext *ctx)
+                                    GTask *task)
 {
+    RegisterInCdmaNetworkContext *ctx;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     mm_iface_modem_cdma_run_registration_checks_finish (MM_IFACE_MODEM_CDMA (self), res, &error);
 
@@ -8400,8 +8400,8 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
             MM_IFACE_MODEM_CDMA (self),
             MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
 
-        g_simple_async_result_take_error (ctx->result, error);
-        register_in_cdma_network_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -8412,8 +8412,8 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
                 "(CDMA1x: '%s', EV-DO: '%s')",
                 REG_IS_DONE (self->priv->modem_cdma_cdma1x_registration_state) ? "yes" : "no",
                 REG_IS_DONE (self->priv->modem_cdma_evdo_registration_state) ? "yes" : "no");
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        register_in_cdma_network_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -8431,10 +8431,9 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
         mm_iface_modem_cdma_update_access_technologies (
             MM_IFACE_MODEM_CDMA (self),
             MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-        g_simple_async_result_take_error (
-            ctx->result,
-            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
-        register_in_cdma_network_context_complete_and_free (ctx);
+        error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -8442,7 +8441,7 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
     mm_dbg ("Modem not yet registered in a CDMA network... will recheck soon");
     g_timeout_add_seconds (3,
                            (GSourceFunc)run_cdma_registration_checks_again,
-                           ctx);
+                           task);
 }
 
 static void
@@ -8453,6 +8452,7 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
 {
     MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
     RegisterInCdmaNetworkContext *ctx;
+    GTask *task;
 
     /* (Try to) cancel previous registration request */
     if (broadband->priv->modem_cdma_pending_registration_cancellable) {
@@ -8463,10 +8463,6 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
     ctx = g_new0 (RegisterInCdmaNetworkContext, 1);
     ctx->self = g_object_ref (self);
     ctx->max_registration_time = max_registration_time;
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_cdma_register_in_network);
     ctx->cancellable = g_cancellable_new ();
 
     /* Keep an accessible reference to the cancellable, so that we can cancel
@@ -8476,10 +8472,14 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
 
     /* Get fresh registration state */
     ctx->timer = g_timer_new ();
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_cdma_network_context_free);
+
     mm_iface_modem_cdma_run_registration_checks (
         self,
         (GAsyncReadyCallback)run_cdma_registration_checks_ready,
-        ctx);
+        task);
 }
 
 /*****************************************************************************/
