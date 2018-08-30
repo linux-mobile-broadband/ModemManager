@@ -2238,20 +2238,17 @@ modem_load_access_technologies_finish (MMIfaceModem *self,
 {
     AccessTechAndMask *tech;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    tech = g_task_propagate_pointer (G_TASK (res), error);
+    if (!tech)
         return FALSE;
-
-    tech = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    g_assert (tech);
 
     *access_technologies = tech->access_technologies;
     *mask = tech->mask;
+    g_free (tech);
     return TRUE;
 }
 
 typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
     MMPortSerialQcdm *port;
 
     guint32 opmode;
@@ -2266,18 +2263,21 @@ typedef struct {
 } AccessTechContext;
 
 static void
-access_tech_context_complete_and_free (AccessTechContext *ctx,
-                                       GError *error, /* takes ownership */
-                                       gboolean idle)
+access_tech_context_free (AccessTechContext *ctx)
+{
+    if (ctx->port) {
+        mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
+        g_object_unref (ctx->port);
+    }
+    g_free (ctx);
+}
+
+static AccessTechAndMask *
+access_tech_and_mask_new (AccessTechContext *ctx)
 {
     AccessTechAndMask *tech;
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     guint mask = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-
-    if (error) {
-        g_simple_async_result_take_error (ctx->result, error);
-        goto done;
-    }
 
     if (ctx->fallback_mask) {
         mm_dbg ("Fallback access technology: 0x%08x", ctx->fallback_act);
@@ -2333,32 +2333,18 @@ access_tech_context_complete_and_free (AccessTechContext *ctx,
     }
 
 done:
-    if (error == NULL) {
-        tech = g_new0 (AccessTechAndMask, 1);
-        tech->access_technologies = act;
-        tech->mask = mask;
-        g_simple_async_result_set_op_res_gpointer (ctx->result, tech, g_free);
-    }
-
-    if (idle)
-        g_simple_async_result_complete_in_idle (ctx->result);
-    else
-        g_simple_async_result_complete (ctx->result);
-
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    if (ctx->port) {
-        mm_port_serial_close (MM_PORT_SERIAL (ctx->port));
-        g_object_unref (ctx->port);
-    }
-    g_free (ctx);
+    tech = g_new0 (AccessTechAndMask, 1);
+    tech->access_technologies = act;
+    tech->mask = mask;
+    return tech;
 }
 
 static void
 access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
                               GAsyncResult *res,
-                              AccessTechContext *ctx)
+                              GTask *task)
 {
+    AccessTechContext *ctx;
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     guint8 l1;
@@ -2367,9 +2353,12 @@ access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, error, FALSE);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Parse the response */
     result = qcdm_cmd_wcdma_subsys_state_info_result ((const gchar *) response->data,
@@ -2387,14 +2376,16 @@ access_tech_qcdm_wcdma_ready (MMPortSerialQcdm *port,
             ctx->wcdma_open = TRUE;
     }
 
-    access_tech_context_complete_and_free (ctx, NULL, FALSE);
+    g_task_return_pointer (task, access_tech_and_mask_new (ctx), g_free);
+    g_object_unref (task);
 }
 
 static void
 access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
                             GAsyncResult *res,
-                            AccessTechContext *ctx)
+                            GTask *task)
 {
+    AccessTechContext *ctx;
     GByteArray *cmd;
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
@@ -2405,7 +2396,8 @@ access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, error, FALSE);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -2415,13 +2407,16 @@ access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
                                                     &err);
     g_byte_array_unref (response);
     if (!result) {
-        error = g_error_new (MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Failed to parse GSM subsys command result: %d",
-                             err);
-        access_tech_context_complete_and_free (ctx, error, FALSE);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse GSM subsys command result: %d",
+                                 err);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     qcdm_result_get_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_OP_MODE, &opmode);
     qcdm_result_get_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_SYS_MODE, &sysmode);
@@ -2440,15 +2435,16 @@ access_tech_qcdm_gsm_ready (MMPortSerialQcdm *port,
                                  3,
                                  NULL,
                                  (GAsyncReadyCallback)access_tech_qcdm_wcdma_ready,
-                                 ctx);
+                                 task);
     g_byte_array_unref (cmd);
 }
 
 static void
 access_tech_qcdm_hdr_ready (MMPortSerialQcdm *port,
                             GAsyncResult *res,
-                            AccessTechContext *ctx)
+                            GTask *task)
 {
+    AccessTechContext *ctx;
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
     guint8 session = 0;
@@ -2458,9 +2454,12 @@ access_tech_qcdm_hdr_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, error, FALSE);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     /* Parse the response */
     result = qcdm_cmd_hdr_subsys_state_info_result ((const gchar *) response->data,
@@ -2478,14 +2477,16 @@ access_tech_qcdm_hdr_ready (MMPortSerialQcdm *port,
             ctx->evdo_open = TRUE;
     }
 
-    access_tech_context_complete_and_free (ctx, NULL, FALSE);
+    g_task_return_pointer (task, access_tech_and_mask_new (ctx), g_free);
+    g_object_unref (task);
 }
 
 static void
 access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
                              GAsyncResult *res,
-                             AccessTechContext *ctx)
+                             GTask *task)
 {
+    AccessTechContext *ctx;
     GByteArray *cmd;
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
@@ -2495,7 +2496,8 @@ access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        access_tech_context_complete_and_free (ctx, error, FALSE);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -2505,13 +2507,16 @@ access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
                                                    &err);
     g_byte_array_unref (response);
     if (!result) {
-        error = g_error_new (MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Failed to parse CM subsys command result: %d",
-                             err);
-        access_tech_context_complete_and_free (ctx, error, FALSE);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to parse CM subsys command result: %d",
+                                 err);
+        g_object_unref (task);
         return;
     }
+
+    ctx = g_task_get_task_data (task);
 
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &ctx->opmode);
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &ctx->sysmode);
@@ -2530,7 +2535,7 @@ access_tech_qcdm_cdma_ready (MMPortSerialQcdm *port,
                                  3,
                                  NULL,
                                  (GAsyncReadyCallback)access_tech_qcdm_hdr_ready,
-                                 ctx);
+                                 task);
     g_byte_array_unref (cmd);
 }
 
@@ -2566,6 +2571,7 @@ modem_load_access_technologies (MMIfaceModem *self,
                                 gpointer user_data)
 {
     AccessTechContext *ctx;
+    GTask *task;
     GByteArray *cmd;
     GError *error = NULL;
 
@@ -2574,13 +2580,11 @@ modem_load_access_technologies (MMIfaceModem *self,
      * registration state
      */
     ctx = g_new0 (AccessTechContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             modem_load_access_technologies);
-
     ctx->port = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)access_tech_context_free);
+
     if (ctx->port) {
         /* Need to open QCDM port as it may be closed/blocked */
         if (mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
@@ -2603,7 +2607,7 @@ modem_load_access_technologies (MMIfaceModem *self,
                                              3,
                                              NULL,
                                              (GAsyncReadyCallback)access_tech_qcdm_gsm_ready,
-                                             ctx);
+                                             task);
                 g_byte_array_unref (cmd);
                 return;
             }
@@ -2618,7 +2622,7 @@ modem_load_access_technologies (MMIfaceModem *self,
                                              3,
                                              NULL,
                                              (GAsyncReadyCallback)access_tech_qcdm_cdma_ready,
-                                             ctx);
+                                             task);
                 g_byte_array_unref (cmd);
                 return;
             }
@@ -2637,12 +2641,14 @@ modem_load_access_technologies (MMIfaceModem *self,
          * guess access technologies from the registration information.
          */
         access_tech_from_cdma_registration_state (MM_BROADBAND_MODEM (self), ctx);
+        g_task_return_pointer (task, access_tech_and_mask_new (ctx), g_free);
     } else {
-        error = g_error_new_literal (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNSUPPORTED,
-                                     "Cannot get 3GPP access technology without a QCDM port");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot get 3GPP access technology without a QCDM port");
     }
-    access_tech_context_complete_and_free (ctx, error, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
