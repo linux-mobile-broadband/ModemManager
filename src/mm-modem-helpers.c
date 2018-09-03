@@ -646,6 +646,25 @@ out:
     return mask;
 }
 
+MMFlowControl
+mm_parse_flow_control_tag (const gchar *flow_control_tag)
+{
+    MMFlowControl flow_control;
+
+    if (g_strcmp0 ("xonxoff", flow_control_tag) == 0)
+        flow_control = MM_FLOW_CONTROL_XON_XOFF;
+    else if (g_strcmp0 ("rtscts", flow_control_tag) == 0)
+        flow_control = MM_FLOW_CONTROL_RTS_CTS;
+    else if (g_strcmp0 ("none", flow_control_tag) == 0)
+        flow_control = MM_FLOW_CONTROL_NONE;
+    else {
+        mm_warn ("Cannot parse flow control tag: '%s', setting as unknown", flow_control_tag);
+        flow_control = MM_FLOW_CONTROL_UNKNOWN;
+    }
+
+    return flow_control;
+}
+
 /*************************************************************************/
 
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */

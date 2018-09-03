@@ -112,6 +112,8 @@ typedef enum { /*< underscore_name=mm_flow_control >*/
 MMFlowControl mm_parse_ifc_test_response (const gchar  *response,
                                           GError      **error);
 
+MMFlowControl mm_parse_flow_control_tag (const gchar *flow_control);
+
 /*****************************************************************************/
 /* 3GPP specific helpers and utilities */
 /*****************************************************************************/
