@@ -151,6 +151,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     gchar       *key;
     const gchar *subsys;
     const gchar *name;
+    const gchar *flow_control_tag;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE (kernel_device), FALSE);
@@ -246,10 +247,17 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                               G_CALLBACK (serial_port_timed_out_cb),
                               self);
 
-        /* For serial ports, optionally use a specific baudrate */
+        /* For serial ports, optionally use a specific baudrate and flow control */
         if (mm_kernel_device_has_property (kernel_device, "ID_MM_TTY_BAUDRATE"))
             g_object_set (port,
                           MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (kernel_device, "ID_MM_TTY_BAUDRATE"),
+                          NULL);
+        flow_control_tag = mm_kernel_device_get_property (kernel_device,
+                                                          "ID_MM_TTY_FLOW_CONTROL");
+        if (flow_control_tag)
+            g_object_set (port,
+                          MM_PORT_SERIAL_FLOW_CONTROL,
+                          mm_parse_flow_control_tag (flow_control_tag),
                           NULL);
     }
     /* Net ports... */

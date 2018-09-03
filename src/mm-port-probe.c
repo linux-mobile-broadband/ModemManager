@@ -711,6 +711,7 @@ serial_probe_qcdm (MMPortProbe *self)
     gint                 len;
     guint8               marker = 0x7E;
     PortProbeRunContext *ctx;
+    const gchar         *flow_control_tag;
 
     g_assert (self->priv->task);
     ctx = g_task_get_task_data (self->priv->task);
@@ -750,6 +751,13 @@ serial_probe_qcdm (MMPortProbe *self)
     if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
         g_object_set (ctx->serial,
                       MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
+                      NULL);
+    flow_control_tag = mm_kernel_device_get_property (self->priv->port,
+                                                      "ID_MM_TTY_FLOW_CONTROL");
+    if (flow_control_tag)
+        g_object_set (ctx->serial,
+                      MM_PORT_SERIAL_FLOW_CONTROL,
+                      mm_parse_flow_control_tag (flow_control_tag),
                       NULL);
 
     /* Try to open the port */
@@ -1256,6 +1264,7 @@ serial_open_at (MMPortProbe *self)
 {
     GError              *error = NULL;
     PortProbeRunContext *ctx;
+    const gchar         *flow_control_tag;
 
     g_assert (self->priv->task);
     ctx = g_task_get_task_data (self->priv->task);
@@ -1294,6 +1303,13 @@ serial_open_at (MMPortProbe *self)
         if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
             g_object_set (ctx->serial,
                           MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
+                          NULL);
+        flow_control_tag = mm_kernel_device_get_property (self->priv->port,
+                                                          "ID_MM_TTY_FLOW_CONTROL");
+        if (flow_control_tag)
+            g_object_set (ctx->serial,
+                          MM_PORT_SERIAL_FLOW_CONTROL,
+                          mm_parse_flow_control_tag (flow_control_tag),
                           NULL);
 
         parser = mm_serial_parser_v1_new ();
