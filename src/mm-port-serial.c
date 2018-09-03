@@ -35,6 +35,7 @@
 
 #include "mm-port-serial.h"
 #include "mm-log.h"
+#include "mm-helper-enums-types.h"
 
 static gboolean port_serial_queue_process          (gpointer data);
 static void     port_serial_schedule_queue_process (MMPortSerial *self,
@@ -53,6 +54,7 @@ enum {
     PROP_BITS,
     PROP_PARITY,
     PROP_STOPBITS,
+    PROP_FLOW_CONTROL,
     PROP_SEND_DELAY,
     PROP_FD,
     PROP_SPEW_CONTROL,
@@ -94,6 +96,7 @@ struct _MMPortSerialPrivate {
     guint bits;
     char parity;
     guint stopbits;
+    MMFlowControl flow_control;
     guint64 send_delay;
     gboolean spew_control;
     gboolean flash_ok;
@@ -404,6 +407,48 @@ internal_tcsetattr (MMPortSerial          *self,
 }
 
 static gboolean
+set_flow_control_termios (MMPortSerial    *self,
+                          MMFlowControl    flow_control,
+                          struct termios  *options)
+{
+    gboolean had_xon_xoff;
+    gboolean had_rts_cts;
+    tcflag_t iflag_orig, cflag_orig;
+
+    iflag_orig = options->c_iflag;
+    cflag_orig = options->c_cflag;
+
+    had_xon_xoff = !!(options->c_iflag & (IXON | IXOFF));
+    options->c_iflag &= ~(IXON | IXOFF | IXANY);
+
+    had_rts_cts  = !!(options->c_cflag & (CRTSCTS));
+    options->c_cflag &= ~(CRTSCTS);
+
+    /* setup the requested flags */
+    switch (flow_control) {
+        case MM_FLOW_CONTROL_XON_XOFF:
+            mm_dbg ("(%s): enabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
+            options->c_iflag |= (IXON | IXOFF | IXANY);
+            break;
+        case MM_FLOW_CONTROL_RTS_CTS:
+            mm_dbg ("(%s): enabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
+            options->c_cflag |= (CRTSCTS);
+            break;
+        case MM_FLOW_CONTROL_NONE:
+        case MM_FLOW_CONTROL_UNKNOWN:
+            if (had_xon_xoff)
+                mm_dbg ("(%s): disabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
+            if (had_rts_cts)
+                mm_dbg ("(%s): disabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
+            break;
+        default:
+            g_assert_not_reached ();
+    }
+
+    return iflag_orig != options->c_iflag || cflag_orig != options->c_cflag;
+}
+
+static gboolean
 real_config_fd (MMPortSerial *self, int fd, GError **error)
 {
     struct termios stbuf;
@@ -470,6 +515,12 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
                      __func__, errno);
         return FALSE;
     }
+
+    mm_dbg ("(%s): flow control is: %d",
+            mm_port_get_device (MM_PORT (self)),
+            self->priv->flow_control);
+
+    set_flow_control_termios (self, self->priv->flow_control, &stbuf);
 
     return internal_tcsetattr (self, fd, &stbuf, error);
 }
@@ -1787,8 +1838,6 @@ mm_port_serial_set_flow_control (MMPortSerial   *self,
                                  GError        **error)
 {
     struct termios options;
-    gboolean       had_xon_xoff;
-    gboolean       had_rts_cts;
 
     /* retrieve current settings */
     memset (&options, 0, sizeof (struct termios));
@@ -1798,35 +1847,16 @@ mm_port_serial_set_flow_control (MMPortSerial   *self,
         return FALSE;
     }
 
-    /* clear all flow control flags */
-
-    had_xon_xoff = !!(options.c_iflag & (IXON | IXOFF));
-    options.c_iflag &= ~(IXON | IXOFF | IXANY);
-
-    had_rts_cts  = !!(options.c_cflag & (CRTSCTS));
-    options.c_cflag &= ~(CRTSCTS);
-
-    /* setup the requested flags */
-    switch (flow_control) {
-        case MM_FLOW_CONTROL_XON_XOFF:
-            mm_dbg ("(%s): enabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
-            options.c_iflag |= (IXON | IXOFF | IXANY);
-            break;
-        case MM_FLOW_CONTROL_RTS_CTS:
-            mm_dbg ("(%s): enabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
-            options.c_cflag |= (CRTSCTS);
-            break;
-        case MM_FLOW_CONTROL_NONE:
-            if (had_xon_xoff)
-                mm_dbg ("(%s): disabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
-            if (had_rts_cts)
-                mm_dbg ("(%s): disabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
-            break;
-        default:
-            g_assert_not_reached ();
-    }
+    /* Return if current settings are already what we want */
+    if (!set_flow_control_termios (self, flow_control, &options))
+        return TRUE;
 
     return internal_tcsetattr (self, self->priv->fd, &options, error);
+}
+
+MMFlowControl mm_port_serial_get_flow_control (MMPortSerial *self)
+{
+    return self->priv->flow_control;
 }
 
 /*****************************************************************************/
@@ -1895,6 +1925,7 @@ mm_port_serial_init (MMPortSerial *self)
     self->priv->bits = 8;
     self->priv->parity = 'n';
     self->priv->stopbits = 1;
+    self->priv->flow_control = MM_FLOW_CONTROL_UNKNOWN;
     self->priv->send_delay = 1000;
 
     self->priv->queue = g_queue_new ();
@@ -1924,6 +1955,9 @@ set_property (GObject *object,
         break;
     case PROP_STOPBITS:
         self->priv->stopbits = g_value_get_uint (value);
+        break;
+    case PROP_FLOW_CONTROL:
+        self->priv->flow_control = g_value_get_enum (value);
         break;
     case PROP_SEND_DELAY:
         self->priv->send_delay = g_value_get_uint64 (value);
@@ -1963,6 +1997,9 @@ get_property (GObject *object,
         break;
     case PROP_STOPBITS:
         g_value_set_uint (value, self->priv->stopbits);
+        break;
+    case PROP_FLOW_CONTROL:
+        g_value_set_enum (value, self->priv->flow_control);
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, self->priv->send_delay);
@@ -2059,6 +2096,15 @@ mm_port_serial_class_init (MMPortSerialClass *klass)
                             "Stopbits",
                             "Stopbits",
                             1, 2, 1,
+                            G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_FLOW_CONTROL,
+         g_param_spec_enum (MM_PORT_SERIAL_FLOW_CONTROL,
+                            "flowcontrol",
+                            "Select flow control (see MMFlowControl definition)",
+                            MM_TYPE_FLOW_CONTROL,
+                            MM_FLOW_CONTROL_UNKNOWN,
                             G_PARAM_READWRITE));
 
     g_object_class_install_property

@@ -35,6 +35,7 @@
 #define MM_PORT_SERIAL_BITS         "bits"
 #define MM_PORT_SERIAL_PARITY       "parity"
 #define MM_PORT_SERIAL_STOPBITS     "stopbits"
+#define MM_PORT_SERIAL_FLOW_CONTROL "flowcontrol"
 #define MM_PORT_SERIAL_SEND_DELAY   "send-delay"
 #define MM_PORT_SERIAL_FD           "fd" /* Construct-only */
 #define MM_PORT_SERIAL_SPEW_CONTROL "spew-control" /* Construct-only */
@@ -154,4 +155,5 @@ gboolean mm_port_serial_set_flow_control (MMPortSerial   *self,
                                           MMFlowControl   flow_control,
                                           GError        **error);
 
+MMFlowControl mm_port_serial_get_flow_control (MMPortSerial *self);
 #endif /* MM_PORT_SERIAL_H */
