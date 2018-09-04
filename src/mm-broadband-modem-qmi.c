@@ -9962,8 +9962,9 @@ signal_load_values_context_step (GTask *task)
         /* If any result is set, succeed */
         if (VALUES_RESULT_LOADED (ctx)) {
             g_task_return_pointer (task,
-                                   g_memdup (&ctx->values_result, sizeof (ctx->values_result)),
+                                   ctx->values_result,
                                    (GDestroyNotify)signal_load_values_result_free);
+            /* Prevent values_result from being freed by signal_load_values_context_free */
             ctx->values_result = NULL;
         } else {
             g_task_return_new_error (task,
