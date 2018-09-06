@@ -9976,6 +9976,7 @@ signal_load_values_context_step (GTask *task)
                                      MM_CORE_ERROR_FAILED,
                                      "No way to load extended signal information");
         }
+        g_object_unref (task);
         return;
     }
 
