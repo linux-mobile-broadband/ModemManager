@@ -9961,11 +9961,15 @@ signal_load_values_context_step (GTask *task)
     case SIGNAL_LOAD_VALUES_STEP_SIGNAL_LAST:
         /* If any result is set, succeed */
         if (VALUES_RESULT_LOADED (ctx)) {
-            g_task_return_pointer (task,
-                                   ctx->values_result,
-                                   (GDestroyNotify)signal_load_values_result_free);
-            /* Prevent values_result from being freed by signal_load_values_context_free */
+            SignalLoadValuesResult *values_result;
+
+            /* Steal results from context in order to return them */
+            values_result = ctx->values_result;
             ctx->values_result = NULL;
+
+            g_task_return_pointer (task,
+                                   values_result,
+                                   (GDestroyNotify)signal_load_values_result_free);
         } else {
             g_task_return_new_error (task,
                                      MM_CORE_ERROR,
