@@ -1992,6 +1992,14 @@ load_connection_status (MMBaseBearer        *self,
                   MM_BASE_BEARER_MODEM, &modem,
                   NULL);
 
+    /* No connection status checks on CDMA-only */
+    if (MM_BROADBAND_BEARER (self)->priv->connection_type == CONNECTION_TYPE_CDMA) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Couldn't load connection status: unsupported in CDMA");
+        g_object_unref (task);
+        goto out;
+    }
+
     /* If CID not defined, error out */
     if (!MM_BROADBAND_BEARER (self)->priv->cid) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
