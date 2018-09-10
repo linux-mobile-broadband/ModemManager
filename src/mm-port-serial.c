@@ -516,9 +516,17 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
         return FALSE;
     }
 
-    mm_dbg ("(%s): flow control is: %d",
-            mm_port_get_device (MM_PORT (self)),
-            self->priv->flow_control);
+    if (self->priv->flow_control != MM_FLOW_CONTROL_UNKNOWN) {
+        gchar *str;
+
+        str = mm_flow_control_build_string_from_mask (self->priv->flow_control);
+        mm_dbg ("(%s): flow control explicitly requested for device is: %s",
+                mm_port_get_device (MM_PORT (self)),
+                str ? str : "unknown");
+        g_free (str);
+    } else
+        mm_dbg ("(%s): no flow control explicitly requested for device",
+                mm_port_get_device (MM_PORT (self)));
 
     set_flow_control_termios (self, self->priv->flow_control, &stbuf);
 
