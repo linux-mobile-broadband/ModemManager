@@ -1423,6 +1423,7 @@ setup_flow_control (MMIfaceModem        *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     /* We need to enable RTS/CTS so that CYCLIC SLEEP mode works */
+    g_object_set (self, MM_BROADBAND_MODEM_FLOW_CONTROL, MM_FLOW_CONTROL_RTS_CTS, NULL);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "\\Q3",
                               3,
