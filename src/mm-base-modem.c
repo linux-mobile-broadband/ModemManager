@@ -151,7 +151,6 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     gchar       *key;
     const gchar *subsys;
     const gchar *name;
-    const gchar *flow_control_tag;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE (kernel_device), FALSE);
@@ -200,6 +199,8 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     }
     /* Serial ports... */
     else if (g_str_equal (subsys, "tty")) {
+        const gchar *flow_control_tag;
+
         if (ptype == MM_PORT_TYPE_QCDM)
             /* QCDM port */
             port = MM_PORT (mm_port_serial_qcdm_new (name));
@@ -252,8 +253,8 @@ mm_base_modem_grab_port (MMBaseModem         *self,
             g_object_set (port,
                           MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (kernel_device, "ID_MM_TTY_BAUDRATE"),
                           NULL);
-        flow_control_tag = mm_kernel_device_get_property (kernel_device,
-                                                          "ID_MM_TTY_FLOW_CONTROL");
+
+        flow_control_tag = mm_kernel_device_get_property (kernel_device, "ID_MM_TTY_FLOW_CONTROL");
         if (flow_control_tag)
             g_object_set (port,
                           MM_PORT_SERIAL_FLOW_CONTROL,

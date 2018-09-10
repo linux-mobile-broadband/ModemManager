@@ -1862,7 +1862,8 @@ mm_port_serial_set_flow_control (MMPortSerial   *self,
     return internal_tcsetattr (self, self->priv->fd, &options, error);
 }
 
-MMFlowControl mm_port_serial_get_flow_control (MMPortSerial *self)
+MMFlowControl
+mm_port_serial_get_flow_control (MMPortSerial *self)
 {
     return self->priv->flow_control;
 }
