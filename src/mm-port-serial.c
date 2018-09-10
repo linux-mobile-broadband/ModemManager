@@ -1846,20 +1846,40 @@ mm_port_serial_set_flow_control (MMPortSerial   *self,
                                  GError        **error)
 {
     struct termios options;
+    gchar *flow_control_str = NULL;
+    GError *inner_error = NULL;
 
     /* retrieve current settings */
     memset (&options, 0, sizeof (struct termios));
     if (tcgetattr (self->priv->fd, &options) != 0) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "couldn't get serial port attributes: %s", g_strerror (errno));
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "couldn't get serial port attributes: %s", g_strerror (errno));
+        goto out;
+    }
+
+    flow_control_str = mm_flow_control_build_string_from_mask (flow_control);
+
+    /* Return if current settings are already what we want */
+    if (!set_flow_control_termios (self, flow_control, &options)) {
+        mm_dbg ("(%s): no need to change flow control settings: already %s",
+                mm_port_get_device (MM_PORT (self)), flow_control_str);
+        goto out;
+    }
+
+    if (!internal_tcsetattr (self, self->priv->fd, &options, &inner_error))
+        goto out;
+
+    mm_dbg ("(%s): flow control settings updated to %s",
+            mm_port_get_device (MM_PORT (self)), flow_control_str);
+
+ out:
+    g_free (flow_control_str);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return FALSE;
     }
 
-    /* Return if current settings are already what we want */
-    if (!set_flow_control_termios (self, flow_control, &options))
-        return TRUE;
-
-    return internal_tcsetattr (self, self->priv->fd, &options, error);
+    return TRUE;
 }
 
 MMFlowControl
