@@ -630,6 +630,39 @@ wdm_probe (MMPortProbe *self)
 }
 
 /***************************************************************/
+
+static void
+common_serial_port_setup (MMPortProbe  *self,
+                          MMPortSerial *serial)
+{
+    const gchar *flow_control_tag;
+
+    if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
+        g_object_set (serial,
+                      MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
+                      NULL);
+
+    flow_control_tag = mm_kernel_device_get_property (self->priv->port, "ID_MM_TTY_FLOW_CONTROL");
+    if (flow_control_tag) {
+        MMFlowControl flow_control;
+        GError *error = NULL;
+
+        flow_control = mm_flow_control_from_string (flow_control_tag, &error);
+        if (flow_control == MM_FLOW_CONTROL_UNKNOWN) {
+            mm_warn ("(%s/%s) Unsupported flow control settings in port: %s",
+                     mm_kernel_device_get_subsystem (self->priv->port),
+                     mm_kernel_device_get_name (self->priv->port),
+                     error->message);
+            g_error_free (error);
+        } else {
+            g_object_set (serial,
+                          MM_PORT_SERIAL_FLOW_CONTROL, flow_control,
+                          NULL);
+        }
+    }
+}
+
+/***************************************************************/
 /* QCDM */
 
 static void
@@ -711,7 +744,6 @@ serial_probe_qcdm (MMPortProbe *self)
     gint                 len;
     guint8               marker = 0x7E;
     PortProbeRunContext *ctx;
-    const gchar         *flow_control_tag;
 
     g_assert (self->priv->task);
     ctx = g_task_get_task_data (self->priv->task);
@@ -748,17 +780,8 @@ serial_probe_qcdm (MMPortProbe *self)
         return G_SOURCE_REMOVE;
     }
 
-    if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
-        g_object_set (ctx->serial,
-                      MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
-                      NULL);
-    flow_control_tag = mm_kernel_device_get_property (self->priv->port,
-                                                      "ID_MM_TTY_FLOW_CONTROL");
-    if (flow_control_tag)
-        g_object_set (ctx->serial,
-                      MM_PORT_SERIAL_FLOW_CONTROL,
-                      mm_parse_flow_control_tag (flow_control_tag),
-                      NULL);
+    /* Setup port if needed */
+    common_serial_port_setup (self, ctx->serial);
 
     /* Try to open the port */
     if (!mm_port_serial_open (ctx->serial, &error)) {
@@ -1264,7 +1287,6 @@ serial_open_at (MMPortProbe *self)
 {
     GError              *error = NULL;
     PortProbeRunContext *ctx;
-    const gchar         *flow_control_tag;
 
     g_assert (self->priv->task);
     ctx = g_task_get_task_data (self->priv->task);
@@ -1300,17 +1322,7 @@ serial_open_at (MMPortProbe *self)
                       MM_PORT_SERIAL_AT_SEND_LF,     ctx->at_send_lf,
                       NULL);
 
-        if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
-            g_object_set (ctx->serial,
-                          MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
-                          NULL);
-        flow_control_tag = mm_kernel_device_get_property (self->priv->port,
-                                                          "ID_MM_TTY_FLOW_CONTROL");
-        if (flow_control_tag)
-            g_object_set (ctx->serial,
-                          MM_PORT_SERIAL_FLOW_CONTROL,
-                          mm_parse_flow_control_tag (flow_control_tag),
-                          NULL);
+        common_serial_port_setup (self, ctx->serial);
 
         parser = mm_serial_parser_v1_new ();
         mm_serial_parser_v1_add_filter (parser,

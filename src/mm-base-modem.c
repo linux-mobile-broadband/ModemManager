@@ -255,11 +255,21 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                           NULL);
 
         flow_control_tag = mm_kernel_device_get_property (kernel_device, "ID_MM_TTY_FLOW_CONTROL");
-        if (flow_control_tag)
-            g_object_set (port,
-                          MM_PORT_SERIAL_FLOW_CONTROL,
-                          mm_parse_flow_control_tag (flow_control_tag),
-                          NULL);
+        if (flow_control_tag) {
+            MMFlowControl flow_control;
+            GError *inner_error = NULL;
+
+            flow_control = mm_flow_control_from_string (flow_control_tag, &inner_error);
+            if (flow_control == MM_FLOW_CONTROL_UNKNOWN) {
+                mm_warn ("(%s/%s) unsupported flow control settings in port: %s",
+                         subsys, name, inner_error->message);
+                g_error_free (inner_error);
+            } else {
+                g_object_set (port,
+                              MM_PORT_SERIAL_FLOW_CONTROL, flow_control,
+                              NULL);
+            }
+        }
     }
     /* Net ports... */
     else if (g_str_equal (subsys, "net")) {

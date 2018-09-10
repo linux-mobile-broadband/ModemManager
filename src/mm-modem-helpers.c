@@ -30,6 +30,7 @@
 
 #include "mm-sms-part.h"
 #include "mm-modem-helpers.h"
+#include "mm-helper-enums-types.h"
 #include "mm-log.h"
 
 /*****************************************************************************/
@@ -647,22 +648,25 @@ out:
 }
 
 MMFlowControl
-mm_parse_flow_control_tag (const gchar *flow_control_tag)
+mm_flow_control_from_string (const gchar  *str,
+                             GError      **error)
 {
-    MMFlowControl flow_control;
+    GFlagsClass *flags_class;
+    guint i;
 
-    if (g_strcmp0 ("xonxoff", flow_control_tag) == 0)
-        flow_control = MM_FLOW_CONTROL_XON_XOFF;
-    else if (g_strcmp0 ("rtscts", flow_control_tag) == 0)
-        flow_control = MM_FLOW_CONTROL_RTS_CTS;
-    else if (g_strcmp0 ("none", flow_control_tag) == 0)
-        flow_control = MM_FLOW_CONTROL_NONE;
-    else {
-        mm_warn ("Cannot parse flow control tag: '%s', setting as unknown", flow_control_tag);
-        flow_control = MM_FLOW_CONTROL_UNKNOWN;
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_FLOW_CONTROL));
+
+    for (i = 0; flags_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick))
+            return flags_class->values[i].value;
     }
 
-    return flow_control;
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMFlowControl value",
+                 str);
+    return MM_FLOW_CONTROL_UNKNOWN;
 }
 
 /*************************************************************************/
