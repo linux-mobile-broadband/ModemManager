@@ -211,6 +211,7 @@ setup_flow_control (MMIfaceModem *self,
      *   AT&K4: XOFF/XON
      *   AT&K6: Both RTS/CTS and XOFF/XON
      */
+    g_object_set (self, MM_BROADBAND_MODEM_FLOW_CONTROL, MM_FLOW_CONTROL_RTS_CTS, NULL);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "&K3",
                               3,
