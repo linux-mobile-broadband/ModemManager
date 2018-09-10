@@ -1957,7 +1957,7 @@ set_property (GObject *object,
         self->priv->stopbits = g_value_get_uint (value);
         break;
     case PROP_FLOW_CONTROL:
-        self->priv->flow_control = g_value_get_enum (value);
+        self->priv->flow_control = g_value_get_flags (value);
         break;
     case PROP_SEND_DELAY:
         self->priv->send_delay = g_value_get_uint64 (value);
@@ -1999,7 +1999,7 @@ get_property (GObject *object,
         g_value_set_uint (value, self->priv->stopbits);
         break;
     case PROP_FLOW_CONTROL:
-        g_value_set_enum (value, self->priv->flow_control);
+        g_value_set_flags (value, self->priv->flow_control);
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, self->priv->send_delay);
@@ -2100,12 +2100,12 @@ mm_port_serial_class_init (MMPortSerialClass *klass)
 
     g_object_class_install_property
         (object_class, PROP_FLOW_CONTROL,
-         g_param_spec_enum (MM_PORT_SERIAL_FLOW_CONTROL,
-                            "flowcontrol",
-                            "Select flow control (see MMFlowControl definition)",
-                            MM_TYPE_FLOW_CONTROL,
-                            MM_FLOW_CONTROL_UNKNOWN,
-                            G_PARAM_READWRITE));
+         g_param_spec_flags (MM_PORT_SERIAL_FLOW_CONTROL,
+                             "FlowControl",
+                             "Select flow control",
+                             MM_TYPE_FLOW_CONTROL,
+                             MM_FLOW_CONTROL_UNKNOWN,
+                             G_PARAM_READWRITE));
 
     g_object_class_install_property
         (object_class, PROP_SEND_DELAY,
