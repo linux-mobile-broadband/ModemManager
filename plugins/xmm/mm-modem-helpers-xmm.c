@@ -18,6 +18,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-xmm.h"
+#include "mm-signal.h"
 
 /*****************************************************************************/
 /* XACT common config */
@@ -592,4 +593,218 @@ mm_xmm_get_modem_mode_any (const GArray *combinations)
      * 'none', so there must be some valid combination as result */
     g_assert (any != MM_MODEM_MODE_NONE);
     return any;
+}
+
+/*****************************************************************************/
+/* +XCESQ? response parser */
+gboolean
+mm_xmm_parse_xcesq_query_response  (const gchar  *response,
+                                    guint        *out_rxlev,
+                                    guint        *out_ber,
+                                    guint        *out_rscp,
+                                    guint        *out_ecn0,
+                                    guint        *out_rsrq,
+                                    guint        *out_rsrp,
+                                    gint         *out_rssnr,
+                                    GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info;
+    GError     *inner_error = NULL;
+    guint       rxlev = 99;
+    guint       ber = 99;
+    guint       rscp = 255;
+    guint       ecn0 = 255;
+    guint       rsrq = 255;
+    guint       rsrp = 255;
+    gint        rssnr = 255;
+    gboolean    success = FALSE;
+
+    g_assert (out_rxlev);
+    g_assert (out_ber);
+    g_assert (out_rscp);
+    g_assert (out_ecn0);
+    g_assert (out_rsrq);
+    g_assert (out_rsrp);
+    g_assert (out_rssnr);
+
+    /* Response may be e.g.:
+     * +XCESQ: 0,99,99,255,255,24,51,18
+     * +XCESQ: 0,99,99,46,31,255,255,255
+     * +XCESQ: 0,99,99,255,255,17,45,-2
+     */
+    r = g_regex_new ("\\+XCESQ: (\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(-?\\d+)(?:\\r\\n)?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (!inner_error && g_match_info_matches (match_info)) {
+        /* Ignore "n" value */
+        if (!mm_get_uint_from_match_info (match_info, 2, &rxlev)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RXLEV");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 3, &ber)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read BER");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 4, &rscp)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSCP");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 5, &ecn0)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read Ec/N0");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 6, &rsrq)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSRQ");
+            goto out;
+        }
+        if (!mm_get_uint_from_match_info (match_info, 7, &rsrp)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSRP");
+            goto out;
+        }
+        if (!mm_get_int_from_match_info (match_info, 8, &rssnr)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSSNR");
+            goto out;
+        }
+        success = TRUE;
+    }
+
+out:
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (!success) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't parse +XCESQ response: %s", response);
+        return FALSE;
+    }
+
+    *out_rxlev = rxlev;
+    *out_ber = ber;
+    *out_rscp = rscp;
+    *out_ecn0 = ecn0;
+    *out_rsrq = rsrq;
+    *out_rsrp = rsrp;
+    *out_rssnr = rssnr;
+    return TRUE;
+}
+
+static gboolean
+rssnr_level_to_rssnr (gint     rssnr_level,
+                      gdouble *out_rssnr)
+{
+    if (rssnr_level <= 100 &&
+        rssnr_level >= -100) {
+        *out_rssnr = rssnr_level / 2.0;
+        return TRUE;
+    }
+
+    if (rssnr_level != 255)
+        mm_warn ("unexpected RSSNR level: %u", rssnr_level);
+    return FALSE;
+}
+
+
+/*****************************************************************************/
+/* Get extended signal information */
+gboolean
+mm_xmm_xcesq_response_to_signal_info      (const gchar  *response,
+                                           MMSignal    **out_gsm,
+                                           MMSignal    **out_umts,
+                                           MMSignal    **out_lte,
+                                           GError      **error)
+{
+    guint     rxlev = 0;
+    guint     ber = 0;
+    guint     rscp_level = 0;
+    guint     ecn0_level = 0;
+    guint     rsrq_level = 0;
+    guint     rsrp_level = 0;
+    gint      rssnr_level = 0;
+    gdouble   rssi = MM_SIGNAL_UNKNOWN;
+    gdouble   rscp = MM_SIGNAL_UNKNOWN;
+    gdouble   ecio = MM_SIGNAL_UNKNOWN;
+    gdouble   rsrq = MM_SIGNAL_UNKNOWN;
+    gdouble   rsrp = MM_SIGNAL_UNKNOWN;
+    gdouble   rssnr = MM_SIGNAL_UNKNOWN;
+    MMSignal *gsm = NULL;
+    MMSignal *umts = NULL;
+    MMSignal *lte = NULL;
+
+    if (!mm_xmm_parse_xcesq_query_response (response,
+                                            &rxlev, &ber,
+                                            &rscp_level, &ecn0_level,
+                                            &rsrq_level, &rsrp_level,
+                                            &rssnr_level, error))
+        return FALSE;
+
+    /* GERAN RSSI */
+    if (mm_3gpp_rxlev_to_rssi (rxlev, &rssi)) {
+        gsm = mm_signal_new ();
+        mm_signal_set_rssi (gsm, rssi);
+    }
+
+    /* ignore BER */
+
+    /* UMTS RSCP */
+    if (mm_3gpp_rscp_level_to_rscp (rscp_level, &rscp)) {
+        umts = mm_signal_new ();
+        mm_signal_set_rscp (umts, rscp);
+    }
+
+    /* UMTS EcIo (assumed EcN0) */
+    if (mm_3gpp_ecn0_level_to_ecio (ecn0_level, &ecio)) {
+        if (!umts)
+            umts = mm_signal_new ();
+        mm_signal_set_ecio (umts, ecio);
+    }
+
+    /* Calculate RSSI if we have ecio and rscp */
+    if (umts && ecio != -G_MAXDOUBLE && rscp != -G_MAXDOUBLE)
+    {
+        mm_signal_set_rssi (umts, rscp - ecio);
+    }
+
+    /* LTE RSRQ */
+    if (mm_3gpp_rsrq_level_to_rsrq (rsrq_level, &rsrq)) {
+        lte = mm_signal_new ();
+        mm_signal_set_rsrq (lte, rsrq);
+    }
+
+    /* LTE RSRP */
+    if (mm_3gpp_rsrp_level_to_rsrp (rsrp_level, &rsrp)) {
+        if (!lte)
+            lte = mm_signal_new ();
+        mm_signal_set_rsrp (lte, rsrp);
+    }
+
+    /* LTE RSSNR */
+    if (rssnr_level_to_rssnr (rssnr_level, &rssnr)) {
+        if (!lte)
+            lte = mm_signal_new ();
+        mm_signal_set_snr (lte, rssnr);
+    }
+
+    if (!gsm && !umts && !lte) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't build detailed signal info");
+        return FALSE;
+    }
+
+    if (gsm)
+        *out_gsm = gsm;
+    if (umts)
+        *out_umts = umts;
+    if (lte)
+        *out_lte = lte;
+
+    return TRUE;
 }

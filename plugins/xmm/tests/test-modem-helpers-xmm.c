@@ -16,6 +16,7 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <locale.h>
+#include <math.h>
 
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
@@ -24,6 +25,9 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-xmm.h"
+
+#define g_assert_cmpfloat_tolerance(val1, val2, tolerance)  \
+    g_assert_cmpfloat (fabs (val1 - val2), <, tolerance)
 
 /*****************************************************************************/
 /* Test XACT=? responses */
@@ -508,6 +512,143 @@ test_xact_set (void)
 }
 
 /*****************************************************************************/
+/* Test +XCESQ responses */
+
+typedef struct {
+    const gchar *str;
+
+    gboolean gsm_info;
+    guint    rxlev;
+    gdouble  rssi;
+    guint    ber;
+
+    gboolean umts_info;
+    guint    rscp_level;
+    gdouble  rscp;
+    guint    ecn0_level;
+    gdouble  ecio;
+
+    gboolean lte_info;
+    guint    rsrq_level;
+    gdouble  rsrq;
+    guint    rsrp_level;
+    gdouble  rsrp;
+    gint     rssnr_level;
+    gdouble  rssnr;
+} XCesqResponseTest;
+
+static const XCesqResponseTest xcesq_response_tests[] = {
+    {
+        .str       = "+XCESQ: 0,99,99,255,255,19,46,32",
+        .gsm_info  = FALSE, .rxlev = 99, .ber = 99,
+        .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
+        .lte_info  = TRUE,  .rsrq_level = 19, .rsrq = -10.5, .rsrp_level = 46, .rsrp = -95.0, .rssnr_level = 32, .rssnr = 16.0
+    },
+    {
+        .str       = "+XCESQ: 0,99,99,255,255,19,46,-32",
+        .gsm_info  = FALSE, .rxlev = 99, .ber = 99,
+        .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
+        .lte_info  = TRUE,  .rsrq_level = 19, .rsrq = -10.5, .rsrp_level = 46, .rsrp = -95.0, .rssnr_level = -32, .rssnr = -16.0
+    },
+    {
+        .str       = "+XCESQ: 0,99,99,255,255,16,47,28",
+        .gsm_info  = FALSE, .rxlev = 99, .ber = 99,
+        .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
+        .lte_info  = TRUE,  .rsrq_level = 16, .rsrq = -12.0, .rsrp_level = 47, .rsrp = -94.0, .rssnr_level = 28, .rssnr = 14.0
+    },
+    {
+        .str       = "+XCESQ: 0,99,99,41,29,255,255,255",
+        .gsm_info  = FALSE, .rxlev = 99, .ber = 99,
+        .umts_info = TRUE,  .rscp_level = 41, .rscp = -80.0, .ecn0_level = 29, .ecio = -10.0,
+        .lte_info  = FALSE, .rsrq_level = 255, .rsrp_level = 255, .rssnr_level = 255
+    },
+    {
+        .str       = "+XCESQ: 0,10,6,255,255,255,255,255",
+        .gsm_info  = TRUE,  .rxlev = 10, .rssi = -101.0, .ber = 6,
+        .umts_info = FALSE, .rscp_level = 255, .ecn0_level = 255,
+        .lte_info  = FALSE, .rsrq_level = 255, .rsrp_level = 255, .rssnr_level = 255
+    }
+};
+
+static void
+test_xcesq_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (xcesq_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        guint rxlev = G_MAXUINT;
+        guint ber = G_MAXUINT;
+        guint rscp = G_MAXUINT;
+        guint ecn0 = G_MAXUINT;
+        guint rsrq = G_MAXUINT;
+        guint rsrp = G_MAXUINT;
+        gint rssnr = G_MAXUINT;
+
+        success = mm_xmm_parse_xcesq_query_response (xcesq_response_tests[i].str,
+                                                    &rxlev, &ber,
+                                                    &rscp, &ecn0,
+                                                    &rsrq, &rsrp,
+                                                    &rssnr, &error);
+        g_assert_no_error (error);
+        g_assert (success);
+
+        g_assert_cmpuint (xcesq_response_tests[i].rxlev,      ==, rxlev);
+        g_assert_cmpuint (xcesq_response_tests[i].ber,        ==, ber);
+        g_assert_cmpuint (xcesq_response_tests[i].rscp_level, ==, rscp);
+        g_assert_cmpuint (xcesq_response_tests[i].ecn0_level, ==, ecn0);
+        g_assert_cmpuint (xcesq_response_tests[i].rsrq_level, ==, rsrq);
+        g_assert_cmpuint (xcesq_response_tests[i].rsrp_level, ==, rsrp);
+        g_assert_cmpuint (xcesq_response_tests[i].rssnr_level, ==, rssnr);
+    }
+}
+
+static void
+test_xcesq_response_to_signal (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (xcesq_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        MMSignal *gsm  = NULL;
+        MMSignal *umts = NULL;
+        MMSignal *lte  = NULL;
+
+        success = mm_xmm_xcesq_response_to_signal_info (xcesq_response_tests[i].str,
+                                                        &gsm, &umts, &lte,
+                                                        &error);
+        g_assert_no_error (error);
+        g_assert (success);
+
+        if (xcesq_response_tests[i].gsm_info) {
+            g_assert (gsm);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rssi (gsm), xcesq_response_tests[i].rssi, 0.1);
+            g_object_unref (gsm);
+        } else
+            g_assert (!gsm);
+
+        if (xcesq_response_tests[i].umts_info) {
+            g_assert (umts);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rscp (umts), xcesq_response_tests[i].rscp, 0.1);
+            g_assert_cmpfloat_tolerance (mm_signal_get_ecio (umts), xcesq_response_tests[i].ecio, 0.1);
+            g_object_unref (umts);
+        } else
+            g_assert (!umts);
+
+        if (xcesq_response_tests[i].lte_info) {
+            g_assert (lte);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rsrq (lte), xcesq_response_tests[i].rsrq, 0.1);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rsrp (lte), xcesq_response_tests[i].rsrp, 0.1);
+            g_assert_cmpfloat_tolerance (mm_signal_get_snr (lte), xcesq_response_tests[i].rssnr, 0.1);
+            g_object_unref (lte);
+        } else
+            g_assert (!lte);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -543,6 +684,9 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/xmm/xact/query/3g-4g",   test_xact_query_3g_4g);
 
     g_test_add_func ("/MM/xmm/xact/set", test_xact_set);
+
+    g_test_add_func ("/MM/xmm/xcesq/query_response", test_xcesq_response);
+    g_test_add_func ("/MM/xmm/xcesq/query_response_to_signal", test_xcesq_response_to_signal);
 
     return g_test_run ();
 }

@@ -39,4 +39,20 @@ gchar *mm_xmm_build_xact_set_command (const MMModemModeCombination  *mode,
 /* Mode to apply when ANY */
 MMModemMode mm_xmm_get_modem_mode_any (const GArray *combinations);
 
+gboolean mm_xmm_parse_xcesq_query_response (const gchar  *response,
+                                            guint        *out_rxlev,
+                                            guint        *out_ber,
+                                            guint        *out_rscp,
+                                            guint        *out_ecn0,
+                                            guint        *out_rsrq,
+                                            guint        *out_rsrp,
+                                            gint         *out_rssnr,
+                                            GError      **error);
+
+gboolean mm_xmm_xcesq_response_to_signal_info  (const gchar  *response,
+                                                MMSignal    **out_gsm,
+                                                MMSignal    **out_umts,
+                                                MMSignal    **out_lte,
+                                                GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_XMM_H */
