@@ -29,9 +29,11 @@
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void shared_xmm_init  (MMSharedXmm  *iface);
+static void iface_modem_signal_init (MMIfaceModemSignal *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemXmm, mm_broadband_modem_xmm, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_XMM,  shared_xmm_init))
 
 /*****************************************************************************/
@@ -84,6 +86,15 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_off_finish  = mm_shared_xmm_power_off_finish;
     iface->reset                   = mm_shared_xmm_reset;
     iface->reset_finish            = mm_shared_xmm_reset_finish;
+}
+
+static void
+iface_modem_signal_init (MMIfaceModemSignal *iface)
+{
+    iface->check_support        = mm_shared_xmm_signal_check_support;
+    iface->check_support_finish = mm_shared_xmm_signal_check_support_finish;
+    iface->load_values          = mm_shared_xmm_signal_load_values;
+    iface->load_values_finish   = mm_shared_xmm_signal_load_values_finish;
 }
 
 static void

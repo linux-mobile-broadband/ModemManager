@@ -23,6 +23,7 @@
 #include <libmm-glib.h>
 
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-signal.h"
 
 #define MM_TYPE_SHARED_XMM               (mm_shared_xmm_get_type ())
 #define MM_SHARED_XMM(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_XMM, MMSharedXmm))
@@ -112,5 +113,25 @@ void              mm_shared_xmm_reset                   (MMIfaceModem         *s
 gboolean          mm_shared_xmm_reset_finish            (MMIfaceModem         *self,
                                                          GAsyncResult         *res,
                                                          GError              **error);
+
+gboolean          mm_shared_xmm_signal_check_support_finish    (MMIfaceModemSignal  *self,
+                                                                GAsyncResult        *res,
+                                                                GError             **error);
+
+void              mm_shared_xmm_signal_check_support           (MMIfaceModemSignal  *self,
+                                                                GAsyncReadyCallback  callback,
+                                                                gpointer             user_data);
+gboolean          mm_shared_xmm_signal_load_values_finish      (MMIfaceModemSignal  *self,
+                                                                GAsyncResult        *res,
+                                                                MMSignal           **cdma,
+                                                                MMSignal           **evdo,
+                                                                MMSignal           **gsm,
+                                                                MMSignal           **umts,
+                                                                MMSignal           **lte,
+                                                                GError             **error);
+void              mm_shared_xmm_signal_load_values             (MMIfaceModemSignal  *self,
+                                                                GCancellable        *cancellable,
+                                                                GAsyncReadyCallback  callback,
+                                                                gpointer             user_data);
 
 #endif /* MM_SHARED_XMM_H */

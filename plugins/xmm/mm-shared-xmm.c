@@ -23,6 +23,7 @@
 
 #include "mm-log.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-signal.h"
 #include "mm-base-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-shared-xmm.h"
@@ -685,6 +686,69 @@ mm_shared_xmm_power_up (MMIfaceModem        *self,
                         gpointer             user_data)
 {
     common_modem_power_operation (MM_SHARED_XMM (self), "+CFUN=1", callback, user_data);
+}
+
+/*****************************************************************************/
+
+
+/*****************************************************************************/
+/* Check support (Signal interface) */
+
+gboolean
+mm_shared_xmm_signal_check_support_finish  (MMIfaceModemSignal  *self,
+                                            GAsyncResult        *res,
+                                            GError             **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+void
+mm_shared_xmm_signal_check_support (MMIfaceModemSignal  *self,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+XCESQ=?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
+/* Load extended signal information (Signal interface) */
+
+gboolean
+mm_shared_xmm_signal_load_values_finish    (MMIfaceModemSignal  *self,
+                                            GAsyncResult        *res,
+                                            MMSignal           **cdma,
+                                            MMSignal           **evdo,
+                                            MMSignal           **gsm,
+                                            MMSignal           **umts,
+                                            MMSignal           **lte,
+                                            GError             **error)
+{
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response || !mm_xmm_xcesq_response_to_signal_info (response, gsm, umts, lte, error))
+        return FALSE;
+
+    return TRUE;
+}
+
+void
+mm_shared_xmm_signal_load_values   (MMIfaceModemSignal  *self,
+                                    GCancellable        *cancellable,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+XCESQ?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
