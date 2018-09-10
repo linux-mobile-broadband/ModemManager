@@ -10868,6 +10868,9 @@ set_property (GObject *object,
     case PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED:
         self->priv->periodic_signal_check_disabled = g_value_get_boolean (value);
         break;
+    case PROP_FLOW_CONTROL:
+        self->priv->flow_control = g_value_get_flags (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -11504,6 +11507,6 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
                             "Flow control settings to use in the connected TTY",
                             MM_TYPE_FLOW_CONTROL,
                             MM_FLOW_CONTROL_NONE,
-                            G_PARAM_READABLE);
+                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_FLOW_CONTROL, properties[PROP_FLOW_CONTROL]);
 }
