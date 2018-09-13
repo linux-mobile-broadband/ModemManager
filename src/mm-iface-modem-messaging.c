@@ -896,6 +896,27 @@ get_best_initial_default_sms_storage (MMIfaceModemMessaging *self)
     return default_storages_preference[i];
 }
 
+static MMSmsStorage
+get_single_default_sms_storage (MMIfaceModemMessaging *self)
+{
+    StorageContext *storage_ctx;
+
+    storage_ctx = get_storage_context (self);
+
+    /* If there is one single storage supported for storing and receiving, just
+     * use that one. */
+    if (storage_ctx->supported_mem2 && storage_ctx->supported_mem2->len == 1 &&
+        storage_ctx->supported_mem3 && storage_ctx->supported_mem3->len == 1) {
+        MMSmsStorage storing_default;
+
+        storing_default = g_array_index (storage_ctx->supported_mem2, MMSmsStorage, 0);
+        if (storing_default == g_array_index (storage_ctx->supported_mem3, MMSmsStorage, 0))
+            return storing_default;
+    }
+
+    return MM_SMS_STORAGE_UNKNOWN;
+}
+
 static void
 interface_enabling_step (GTask *task)
 {
@@ -949,32 +970,35 @@ interface_enabling_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_STORAGE_DEFAULTS:
-        /* Set storage defaults */
-        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage &&
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage_finish) {
-            MMSmsStorage default_storage;
+    case ENABLING_STEP_STORAGE_DEFAULTS: {
+        MMSmsStorage default_storage;
 
+        /* Is there only one single storage supported? if so, we don't care if
+         * setting default storage is implemented or not. */
+        default_storage = get_single_default_sms_storage (self);
+        if (default_storage == MM_SMS_STORAGE_UNKNOWN)
             default_storage = get_best_initial_default_sms_storage (self);
 
-            /* Already bound to the 'default-storage' property in the skeleton */
-            g_object_set (self,
-                          MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, default_storage,
-                          NULL);
+        /* Already bound to the 'default-storage' property in the skeleton */
+        g_object_set (self,
+                      MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE, default_storage,
+                      NULL);
 
-            if (default_storage != MM_SMS_STORAGE_UNKNOWN) {
-                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage (
-                    self,
-                    default_storage,
-                    (GAsyncReadyCallback)set_default_storage_ready,
-                    task);
-                return;
-            }
-
+        if (default_storage == MM_SMS_STORAGE_UNKNOWN)
             mm_info ("Cannot set default storage, none of the suggested ones supported");
+        else if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage &&
+                 MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_default_storage (
+                self,
+                default_storage,
+                (GAsyncReadyCallback)set_default_storage_ready,
+                task);
+            return;
         }
+
         /* Fall down to next step */
         ctx->step++;
+    }
 
     case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
         /* Allow loading the initial list of SMS parts */
