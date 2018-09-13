@@ -734,6 +734,11 @@ mm_shared_xmm_signal_load_values_finish    (MMIfaceModemSignal  *self,
     if (!response || !mm_xmm_xcesq_response_to_signal_info (response, gsm, umts, lte, error))
         return FALSE;
 
+    if (cdma)
+        *cdma = NULL;
+    if (evdo)
+        *evdo = NULL;
+
     return TRUE;
 }
 

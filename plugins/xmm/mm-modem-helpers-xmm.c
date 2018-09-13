@@ -799,11 +799,11 @@ mm_xmm_xcesq_response_to_signal_info      (const gchar  *response,
         return FALSE;
     }
 
-    if (gsm)
+    if (out_gsm)
         *out_gsm = gsm;
-    if (umts)
+    if (out_umts)
         *out_umts = umts;
-    if (lte)
+    if (out_lte)
         *out_lte = lte;
 
     return TRUE;
