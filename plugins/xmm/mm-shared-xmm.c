@@ -350,7 +350,7 @@ mm_shared_xmm_set_current_modes (MMIfaceModem        *self,
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         command,
-        3,
+        10,
         FALSE,
         (GAsyncReadyCallback)xact_set_modes_ready,
         task);
@@ -529,7 +529,7 @@ out:
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         command,
-        3,
+        10,
         FALSE,
         (GAsyncReadyCallback)xact_set_bands_ready,
         task);
