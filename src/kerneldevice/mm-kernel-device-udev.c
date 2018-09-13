@@ -18,6 +18,8 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include <ModemManager-tags.h>
+
 #include "mm-kernel-device-udev.h"
 #include "mm-log.h"
 
@@ -358,7 +360,7 @@ kernel_device_get_physdev_uid (MMKernelDevice *_self)
     }
 
     /* Try to load from properties set on the physical device */
-    if ((uid = mm_kernel_device_get_global_property (MM_KERNEL_DEVICE (self), "ID_MM_PHYSDEV_UID")) != NULL)
+    if ((uid = mm_kernel_device_get_global_property (MM_KERNEL_DEVICE (self), ID_MM_PHYSDEV_UID)) != NULL)
         return uid;
 
     /* Use physical device sysfs path, if any */

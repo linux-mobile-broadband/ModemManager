@@ -19,4 +19,5 @@ CLEANFILES = \
 	ModemManager-names.h
 
 EXTRA_DIST = \
+	ModemManager-tags.h \
 	ModemManager-version.h.in

@@ -30,6 +30,8 @@
 #include "mm-kernel-device-generic.h"
 
 #include <ModemManager.h>
+#include <ModemManager-tags.h>
+
 #include <mm-errors-types.h>
 #include <mm-gdbus-manager.h>
 #include <mm-gdbus-test.h>
@@ -303,8 +305,8 @@ device_added (MMBaseManager  *manager,
      *
      * This udev tag applies to each port in a device. In other words, the flag
      * may be set in some ports, but not in others */
-    if (!mm_kernel_device_get_property_as_boolean (port, "ID_MM_CANDIDATE")) {
-        /* This could mean that device changed, losing its ID_MM_CANDIDATE
+    if (!mm_kernel_device_get_property_as_boolean (port, ID_MM_CANDIDATE)) {
+        /* This could mean that device changed, losing its candidate
          * flags (such as Bluetooth RFCOMM devices upon disconnect.
          * Try to forget it. */
         device_removed (manager, port);

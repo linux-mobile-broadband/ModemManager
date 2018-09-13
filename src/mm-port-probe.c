@@ -22,6 +22,8 @@
 #include <string.h>
 
 #include <ModemManager.h>
+#include <ModemManager-tags.h>
+
 #include <mm-errors-types.h>
 
 #include "mm-port-probe.h"
@@ -637,12 +639,12 @@ common_serial_port_setup (MMPortProbe  *self,
 {
     const gchar *flow_control_tag;
 
-    if (mm_kernel_device_has_property (self->priv->port, "ID_MM_TTY_BAUDRATE"))
+    if (mm_kernel_device_has_property (self->priv->port, ID_MM_TTY_BAUDRATE))
         g_object_set (serial,
-                      MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, "ID_MM_TTY_BAUDRATE"),
+                      MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (self->priv->port, ID_MM_TTY_BAUDRATE),
                       NULL);
 
-    flow_control_tag = mm_kernel_device_get_property (self->priv->port, "ID_MM_TTY_FLOW_CONTROL");
+    flow_control_tag = mm_kernel_device_get_property (self->priv->port, ID_MM_TTY_FLOW_CONTROL);
     if (flow_control_tag) {
         MMFlowControl flow_control;
         GError *error = NULL;
@@ -1896,12 +1898,12 @@ set_property (GObject *object,
     case PROP_PORT:
         /* construct only */
         self->priv->port = g_value_dup_object (value);
-        self->priv->is_ignored = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_IGNORE");
-        self->priv->is_gps = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_GPS");
-        self->priv->maybe_at_primary = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_PRIMARY");
-        self->priv->maybe_at_secondary = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_SECONDARY");
-        self->priv->maybe_at_ppp = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_AT_PPP");
-        self->priv->maybe_qcdm = mm_kernel_device_get_property_as_boolean (self->priv->port, "ID_MM_PORT_TYPE_QCDM");
+        self->priv->is_ignored = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_IGNORE);
+        self->priv->is_gps = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_GPS);
+        self->priv->maybe_at_primary = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PRIMARY);
+        self->priv->maybe_at_secondary = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_SECONDARY);
+        self->priv->maybe_at_ppp = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PPP);
+        self->priv->maybe_qcdm = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_QCDM);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

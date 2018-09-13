@@ -23,6 +23,8 @@
 #include <string.h>
 
 #include <ModemManager.h>
+#include <ModemManager-tags.h>
+
 #include <mm-errors-types.h>
 #include <mm-gdbus-modem.h>
 
@@ -215,13 +217,13 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                                                    mm_serial_parser_v1_destroy);
             /* Prefer plugin-provided flags to the generic ones */
             if (at_pflags == MM_PORT_SERIAL_AT_FLAG_NONE) {
-                if (mm_kernel_device_get_property_as_boolean (kernel_device, "ID_MM_PORT_TYPE_AT_PRIMARY")) {
+                if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_PRIMARY)) {
                     mm_dbg ("AT port '%s/%s' flagged as primary", subsys, name);
                     at_pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-                } else if (mm_kernel_device_get_property_as_boolean (kernel_device, "ID_MM_PORT_TYPE_AT_SECONDARY")) {
+                } else if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_SECONDARY)) {
                     mm_dbg ("AT port '%s/%s' flagged as secondary", subsys, name);
                     at_pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-                } else if (mm_kernel_device_get_property_as_boolean (kernel_device, "ID_MM_PORT_TYPE_AT_PPP")) {
+                } else if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_PPP)) {
                     mm_dbg ("AT port '%s/%s' flagged as PPP", subsys, name);
                     at_pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
                 }
@@ -249,12 +251,12 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                               self);
 
         /* For serial ports, optionally use a specific baudrate and flow control */
-        if (mm_kernel_device_has_property (kernel_device, "ID_MM_TTY_BAUDRATE"))
+        if (mm_kernel_device_has_property (kernel_device, ID_MM_TTY_BAUDRATE))
             g_object_set (port,
-                          MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (kernel_device, "ID_MM_TTY_BAUDRATE"),
+                          MM_PORT_SERIAL_BAUD, mm_kernel_device_get_property_as_int (kernel_device, ID_MM_TTY_BAUDRATE),
                           NULL);
 
-        flow_control_tag = mm_kernel_device_get_property (kernel_device, "ID_MM_TTY_FLOW_CONTROL");
+        flow_control_tag = mm_kernel_device_get_property (kernel_device, ID_MM_TTY_FLOW_CONTROL);
         if (flow_control_tag) {
             MMFlowControl flow_control;
             GError *inner_error = NULL;

@@ -49,6 +49,7 @@
       <year>2015</year>
       <year>2016</year>
       <year>2017</year>
+      <year>2018</year>
       <holder>The ModemManager Authors</holder>
     </copyright>
 
@@ -82,6 +83,11 @@
     <xi:include href="xml/mm-version.xml"/>
     <xi:include href="xml/mm-enums.xml"/>
     <xi:include href="xml/mm-errors.xml"/>
+  </part>
+
+  <part id="ref-udev">
+    <title>Common udev tag definitions</title>
+    <xi:include href="xml/mm-tags.xml"/>
   </part>
 
   <!-- Part 2, DBus reference -->

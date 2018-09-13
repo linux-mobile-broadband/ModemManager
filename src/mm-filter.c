@@ -16,6 +16,9 @@
 #include <config.h>
 #include <string.h>
 
+#include <ModemManager.h>
+#include <ModemManager-tags.h>
+
 #include "mm-daemon-enums-types.h"
 #include "mm-filter.h"
 #include "mm-log.h"
@@ -51,8 +54,8 @@ mm_filter_port (MMFilter        *self,
      * allow specifying this flag per-port instead of for the full device, e.g.
      * for platform tty ports where there's only one port anyway. */
     if ((self->priv->enabled_rules & MM_FILTER_RULE_EXPLICIT_WHITELIST) &&
-        (mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_DEVICE_PROCESS") ||
-         mm_kernel_device_get_property_as_boolean (port, "ID_MM_DEVICE_PROCESS"))) {
+        (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_PROCESS) ||
+         mm_kernel_device_get_property_as_boolean (port, ID_MM_DEVICE_PROCESS))) {
         mm_dbg ("[filter] (%s/%s) port allowed: device is whitelisted", subsystem, name);
         return TRUE;
     }
@@ -89,7 +92,7 @@ mm_filter_port (MMFilter        *self,
 
         /* Ignore blacklisted tty devices. */
         if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_BLACKLIST) &&
-            (mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_DEVICE_IGNORE"))) {
+            (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_IGNORE))) {
             mm_dbg ("[filter] (%s/%s): port filtered: device is blacklisted", subsystem, name);
             return FALSE;
         }
@@ -97,7 +100,7 @@ mm_filter_port (MMFilter        *self,
         /* Is the device in the manual-only greylist? If so, return if this is an
          * automatic scan. */
         if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY) &&
-            (!manual_scan && mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_DEVICE_MANUAL_SCAN_ONLY"))) {
+            (!manual_scan && mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_MANUAL_SCAN_ONLY))) {
             mm_dbg ("[filter] (%s/%s): port filtered: device probed only in manual scan", subsystem, name);
             return FALSE;
         }
@@ -111,7 +114,7 @@ mm_filter_port (MMFilter        *self,
              !g_strcmp0 (physdev_subsystem, "pci") ||
              !g_strcmp0 (physdev_subsystem, "pnp") ||
              !g_strcmp0 (physdev_subsystem, "sdio"))) {
-            if (!mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_PLATFORM_DRIVER_PROBE")) {
+            if (!mm_kernel_device_get_global_property_as_boolean (port, ID_MM_PLATFORM_DRIVER_PROBE)) {
                 mm_dbg ("[filter] (%s/%s): port filtered: port's parent platform driver is not whitelisted", subsystem, name);
                 return FALSE;
             }
