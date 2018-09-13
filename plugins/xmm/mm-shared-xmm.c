@@ -689,9 +689,6 @@ mm_shared_xmm_power_up (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
-
-
-/*****************************************************************************/
 /* Check support (Signal interface) */
 
 gboolean
@@ -719,14 +716,14 @@ mm_shared_xmm_signal_check_support (MMIfaceModemSignal  *self,
 /* Load extended signal information (Signal interface) */
 
 gboolean
-mm_shared_xmm_signal_load_values_finish    (MMIfaceModemSignal  *self,
-                                            GAsyncResult        *res,
-                                            MMSignal           **cdma,
-                                            MMSignal           **evdo,
-                                            MMSignal           **gsm,
-                                            MMSignal           **umts,
-                                            MMSignal           **lte,
-                                            GError             **error)
+mm_shared_xmm_signal_load_values_finish (MMIfaceModemSignal  *self,
+                                         GAsyncResult        *res,
+                                         MMSignal           **cdma,
+                                         MMSignal           **evdo,
+                                         MMSignal           **gsm,
+                                         MMSignal           **umts,
+                                         MMSignal           **lte,
+                                         GError             **error)
 {
     const gchar *response;
 
@@ -743,10 +740,10 @@ mm_shared_xmm_signal_load_values_finish    (MMIfaceModemSignal  *self,
 }
 
 void
-mm_shared_xmm_signal_load_values   (MMIfaceModemSignal  *self,
-                                    GCancellable        *cancellable,
-                                    GAsyncReadyCallback  callback,
-                                    gpointer             user_data)
+mm_shared_xmm_signal_load_values (MMIfaceModemSignal  *self,
+                                  GCancellable        *cancellable,
+                                  GAsyncReadyCallback  callback,
+                                  gpointer             user_data)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+XCESQ?",

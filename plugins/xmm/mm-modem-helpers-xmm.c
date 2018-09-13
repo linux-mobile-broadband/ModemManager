@@ -597,16 +597,17 @@ mm_xmm_get_modem_mode_any (const GArray *combinations)
 
 /*****************************************************************************/
 /* +XCESQ? response parser */
+
 gboolean
-mm_xmm_parse_xcesq_query_response  (const gchar  *response,
-                                    guint        *out_rxlev,
-                                    guint        *out_ber,
-                                    guint        *out_rscp,
-                                    guint        *out_ecn0,
-                                    guint        *out_rsrq,
-                                    guint        *out_rsrp,
-                                    gint         *out_rssnr,
-                                    GError      **error)
+mm_xmm_parse_xcesq_query_response (const gchar  *response,
+                                   guint        *out_rxlev,
+                                   guint        *out_ber,
+                                   guint        *out_rscp,
+                                   guint        *out_ecn0,
+                                   guint        *out_rsrq,
+                                   guint        *out_rsrp,
+                                   gint         *out_rssnr,
+                                   GError      **error)
 {
     GRegex     *r;
     GMatchInfo *match_info;
@@ -712,15 +713,15 @@ rssnr_level_to_rssnr (gint     rssnr_level,
     return FALSE;
 }
 
-
 /*****************************************************************************/
 /* Get extended signal information */
+
 gboolean
-mm_xmm_xcesq_response_to_signal_info      (const gchar  *response,
-                                           MMSignal    **out_gsm,
-                                           MMSignal    **out_umts,
-                                           MMSignal    **out_lte,
-                                           GError      **error)
+mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
+                                      MMSignal    **out_gsm,
+                                      MMSignal    **out_umts,
+                                      MMSignal    **out_lte,
+                                      GError      **error)
 {
     guint     rxlev = 0;
     guint     ber = 0;
@@ -768,8 +769,7 @@ mm_xmm_xcesq_response_to_signal_info      (const gchar  *response,
     }
 
     /* Calculate RSSI if we have ecio and rscp */
-    if (umts && ecio != -G_MAXDOUBLE && rscp != -G_MAXDOUBLE)
-    {
+    if (umts && ecio != -G_MAXDOUBLE && rscp != -G_MAXDOUBLE) {
         mm_signal_set_rssi (umts, rscp - ecio);
     }
 

@@ -49,10 +49,10 @@ gboolean mm_xmm_parse_xcesq_query_response (const gchar  *response,
                                             gint         *out_rssnr,
                                             GError      **error);
 
-gboolean mm_xmm_xcesq_response_to_signal_info  (const gchar  *response,
-                                                MMSignal    **out_gsm,
-                                                MMSignal    **out_umts,
-                                                MMSignal    **out_lte,
-                                                GError      **error);
+gboolean mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
+                                               MMSignal    **out_gsm,
+                                               MMSignal    **out_umts,
+                                               MMSignal    **out_lte,
+                                               GError      **error);
 
 #endif  /* MM_MODEM_HELPERS_XMM_H */
