@@ -151,7 +151,7 @@ print_signal_info (void)
     g_print ("\n"
              "%s\n"
              "  -------------------------\n"
-             "  Refresh rate: '%u' seconds\n",
+             "  Signal | Refresh rate: '%u' seconds\n",
              mm_modem_signal_get_path (ctx->modem_signal),
              mm_modem_signal_get_rate (ctx->modem_signal));
 
