@@ -66,7 +66,6 @@ static gboolean set_enable_signal_flag;
 static gboolean set_disable_signal_flag;
 static gboolean get_all_flag;
 static gchar *set_supl_server_str;
-static gchar *set_supl_server_str;
 static gchar *inject_assistance_data_str;
 static gchar *set_gps_refresh_rate_str;
 
