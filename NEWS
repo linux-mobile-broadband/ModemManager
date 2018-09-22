@@ -1,3 +1,72 @@
+ModemManager 1.8.2
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+ * Docs:
+   ** Fix explanation of MM_CALL_STATE_RINGING_{IN|OUT}.
+   ** Fix documentation of mm_modem_get_equipment_identifier().
+   ** Fix documentation of mm_modem_get_sim().
+   ** Fix documentation of --set-current-bands.
+   ** Moved mmcli manpage to section 1.
+   ** Added --filter-policy documentation in daemon manpage.
+
+ * Build:
+   ** Use realpath() instead of canonicalize_filename(), fixing build with musl
+      libc.
+
+ * systemd:
+   ** Set User=root in the service, to avoid gio looking into /etc/passwd.
+
+ * Serial:
+   ** Avoid closing TTY file twice.
+   ** Skip concatenated AT commands, that may not be supported by all modems.
+
+ * Modem interface:
+   ** Allow parallel Enable()/Disable() calls.
+   ** Allow Enable() calls when in disabling or initializing intermediate
+      states.
+   ** Explicitly reload current bands after updating them.
+
+ * Time interface:
+   ** Fix crash due to not properly cleaninig up the timezone context.
+
+ * Voice interface:
+   ** Fix call addition/deletion D-Bus signal ordering.
+
+ * Signal interface:
+   ** Fix missing interface shutdown when modem is disabled.
+   ** Cleanup previous extended info if no new one given.
+   ** Cleanup refresh context on shutdown.
+   ** Fixed the value of MM_SIGNAL_UNKNOWN symbol (minor ABI break).
+   ** Print unset signal values as 'n/a' in mmcli --signal-get.
+   ** Print generic fields in its own group in --signal-get.
+
+ * Bearer:
+   ** Skip connection checks on CDMA-only modems.
+
+ * SIM:
+   ** Allow [A-F] range in operator-specific ICCID account number.
+
+ * MBIM:
+   ** Show USB product attribute as model.
+   ** Explicitly ignore SMS storage initialization commands.
+
+ * Plugins:
+   ** u-blox: always pass user/pass strings to +UAUTHREQ, even if no auth
+      requested.
+   ** u-blox: custom ICCID loading.
+   ** cinterion: update frequency/band table.
+   ** cinterion: avoid crash when a QMI-based and a non-QMI-based modem are
+      available in the system.
+   ** dell: don't ignore TTYs in QMI/MBIM modems.
+
+ * Blacklist:
+   ** Removed openmoko hubs from the blacklist.
+   ** Added all devices from Prusa Research.
+
+ * po:
+   ** Added new Friulian, Turkish, French and Italian translations.
+
 
 ModemManager 1.8.0
 -------------------------------------------
