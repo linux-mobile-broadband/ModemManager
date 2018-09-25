@@ -42,6 +42,11 @@ struct _MMLocation3gppPrivate {
     gulong location_area_code;
     gulong cell_id;
     gulong tracking_area_code;
+
+    /* We use 0 as default MNC when unknown, and that is a bit problematic if
+     * the network operator has actually a 0 MNC (e.g. China Mobile, 46000).
+     * We need to explicitly track whether MNC is set or not. */
+    gboolean mobile_network_code_set;
 };
 
 /*****************************************************************************/
@@ -84,6 +89,10 @@ mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
  *
  * Gets the Mobile Network Code of the 3GPP network.
  *
+ * Note that 0 may actually be a valid MNC. In general, the MNC should be
+ * considered valid just if the reported MCC is valid, as MCC should never
+ * be 0.
+ *
  * Returns: the MNC, or 0 if unknown.
  */
 guint
@@ -101,9 +110,10 @@ mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
     g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
 
     /* If no change in the location info, don't do anything */
-    if (self->priv->mobile_network_code == mobile_network_code)
+    if (self->priv->mobile_network_code_set && (self->priv->mobile_network_code == mobile_network_code))
         return FALSE;
 
+    self->priv->mobile_network_code_set = TRUE;
     self->priv->mobile_network_code = mobile_network_code;
     return TRUE;
 }
@@ -206,6 +216,30 @@ mm_location_3gpp_set_tracking_area_code (MMLocation3gpp *self,
 
 /*****************************************************************************/
 
+gboolean
+mm_location_3gpp_reset (MMLocation3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
+
+    if (self->priv->mobile_country_code == 0 &&
+        !self->priv->mobile_network_code_set &&
+        self->priv->mobile_network_code == 0 &&
+        self->priv->location_area_code == 0 &&
+        self->priv->tracking_area_code == 0 &&
+        self->priv->cell_id == 0)
+        return FALSE;
+
+    self->priv->mobile_country_code = 0;
+    self->priv->mobile_network_code_set = FALSE;
+    self->priv->mobile_network_code = 0;
+    self->priv->location_area_code = 0;
+    self->priv->tracking_area_code = 0;
+    self->priv->cell_id = 0;
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 GVariant *
 mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
 {
@@ -214,7 +248,7 @@ mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
     g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), NULL);
 
     if (self->priv->mobile_country_code &&
-        self->priv->mobile_network_code &&
+        self->priv->mobile_network_code_set &&  /* MNC 0 is actually valid! */
         (self->priv->location_area_code || self->priv->tracking_area_code) &&
         self->priv->cell_id) {
         gchar *str;

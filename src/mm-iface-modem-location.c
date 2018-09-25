@@ -383,15 +383,8 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
         return;
 
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
-        guint changed = 0;
-
         g_assert (ctx->location_3gpp != NULL);
-        changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
-        changed += mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, 0);
-        changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp, 0);
-        changed += mm_location_3gpp_set_mobile_country_code (ctx->location_3gpp, 0);
-        changed += mm_location_3gpp_set_mobile_network_code (ctx->location_3gpp, 0);
-        if (changed)
+        if (mm_location_3gpp_reset (ctx->location_3gpp))
             notify_3gpp_location_update (self, skeleton, ctx->location_3gpp);
     }
 

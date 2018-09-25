@@ -84,6 +84,7 @@ gboolean mm_location_3gpp_set_cell_id             (MMLocation3gpp *self,
                                                    gulong cell_id);
 gboolean mm_location_3gpp_set_tracking_area_code  (MMLocation3gpp *self,
                                                    gulong tracking_area_code);
+gboolean mm_location_3gpp_reset                   (MMLocation3gpp *self);
 
 #endif
 
