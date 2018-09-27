@@ -112,7 +112,7 @@ struct _MMPortSerialPrivate {
     guint connected_id;
 
     gpointer flash_ctx;
-    gpointer reopen_ctx;
+    GTask *reopen_task;
 };
 
 /*****************************************************************************/
@@ -1166,7 +1166,7 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
         return FALSE;
     }
 
-    if (self->priv->reopen_ctx) {
+    if (self->priv->reopen_task) {
         g_set_error (error,
                      MM_SERIAL_ERROR,
                      MM_SERIAL_ERROR_OPEN_FAILED,
@@ -1516,20 +1516,15 @@ port_serial_close_force (MMPortSerial *self)
 /* Reopen */
 
 typedef struct {
-    MMPortSerial *self;
-    GSimpleAsyncResult *result;
     guint initial_open_count;
     guint reopen_id;
 } ReopenContext;
 
 static void
-reopen_context_complete_and_free (ReopenContext *ctx)
+reopen_context_free (ReopenContext *ctx)
 {
     if (ctx->reopen_id)
         g_source_remove (ctx->reopen_id);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (ReopenContext, ctx);
 }
 
@@ -1538,54 +1533,56 @@ mm_port_serial_reopen_finish (MMPortSerial *port,
                               GAsyncResult *res,
                               GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
 port_serial_reopen_cancel (MMPortSerial *self)
 {
-    ReopenContext *ctx;
+    GTask *task;
 
-    if (!self->priv->reopen_ctx)
+    if (!self->priv->reopen_task)
         return;
 
-    /* Recover context */
-    ctx = (ReopenContext *)self->priv->reopen_ctx;
-    self->priv->reopen_ctx = NULL;
+    /* Recover task */
+    task = self->priv->reopen_task;
+    self->priv->reopen_task = NULL;
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Reopen cancelled");
-    reopen_context_complete_and_free (ctx);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_CANCELLED,
+                             "Reopen cancelled");
+    g_object_unref (task);
 }
 
 static gboolean
 reopen_do (MMPortSerial *self)
 {
+    GTask *task;
     ReopenContext *ctx;
     GError *error = NULL;
     guint i;
 
-    /* Recover context */
-    g_assert (self->priv->reopen_ctx != NULL);
-    ctx = (ReopenContext *)self->priv->reopen_ctx;
-    self->priv->reopen_ctx = NULL;
+    /* Recover task */
+    g_assert (self->priv->reopen_task != NULL);
+    task = self->priv->reopen_task;
+    self->priv->reopen_task = NULL;
 
+    ctx = g_task_get_task_data (task);
     ctx->reopen_id = 0;
 
     for (i = 0; i < ctx->initial_open_count; i++) {
-        if (!mm_port_serial_open (ctx->self, &error)) {
+        if (!mm_port_serial_open (self, &error)) {
             g_prefix_error (&error, "Couldn't reopen port (%u): ", i);
             break;
         }
     }
 
     if (error)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    reopen_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 
     return G_SOURCE_REMOVE;
 }
@@ -1597,35 +1594,34 @@ mm_port_serial_reopen (MMPortSerial *self,
                        gpointer user_data)
 {
     ReopenContext *ctx;
+    GTask *task;
     guint i;
 
     g_return_if_fail (MM_IS_PORT_SERIAL (self));
 
     /* Setup context */
     ctx = g_slice_new0 (ReopenContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_port_serial_reopen);
     ctx->initial_open_count = self->priv->open_count;
 
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)reopen_context_free);
+
     if (self->priv->forced_close) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Serial port has been forced close.");
-        reopen_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Serial port has been forced close.");
+        g_object_unref (task);
         return;
     }
 
     /* If already reopening, halt */
-    if (self->priv->reopen_ctx) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_IN_PROGRESS,
-                                         "Modem is already being reopened");
-        reopen_context_complete_and_free (ctx);
+    if (self->priv->reopen_task) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "Modem is already being reopened");
+        g_object_unref (task);
         return;
     }
 
@@ -1642,7 +1638,7 @@ mm_port_serial_reopen (MMPortSerial *self,
         ctx->reopen_id = g_idle_add ((GSourceFunc)reopen_do, self);
 
     /* Store context in private info */
-    self->priv->reopen_ctx = ctx;
+    self->priv->reopen_task = task;
 }
 
 static gboolean
