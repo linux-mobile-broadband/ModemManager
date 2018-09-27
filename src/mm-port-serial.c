@@ -111,7 +111,7 @@ struct _MMPortSerialPrivate {
 
     guint connected_id;
 
-    gpointer flash_ctx;
+    GTask *flash_task;
     GTask *reopen_task;
 };
 
@@ -1690,20 +1690,15 @@ set_speed (MMPortSerial *self, speed_t speed, GError **error)
 /* Flash */
 
 typedef struct {
-    GSimpleAsyncResult *result;
-    MMPortSerial *self;
     speed_t current_speed;
     guint flash_id;
 } FlashContext;
 
 static void
-flash_context_complete_and_free (FlashContext *ctx)
+flash_context_free (FlashContext *ctx)
 {
     if (ctx->flash_id)
         g_source_remove (ctx->flash_id);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
     g_slice_free (FlashContext, ctx);
 }
 
@@ -1712,44 +1707,46 @@ mm_port_serial_flash_finish (MMPortSerial *port,
                              GAsyncResult *res,
                              GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
 mm_port_serial_flash_cancel (MMPortSerial *self)
 {
-    FlashContext *ctx;
+    GTask *task;
 
-    if (!self->priv->flash_ctx)
+    if (!self->priv->flash_task)
         return;
 
-    /* Recover context */
-    ctx = (FlashContext *)self->priv->flash_ctx;
-    self->priv->flash_ctx = NULL;
+    /* Recover task */
+    task = self->priv->flash_task;
+    self->priv->flash_task = NULL;
 
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_CANCELLED,
-                                     "Flash cancelled");
-    flash_context_complete_and_free (ctx);
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_CANCELLED,
+                             "Flash cancelled");
+    g_object_unref (task);
 }
 
 static gboolean
 flash_do (MMPortSerial *self)
 {
+    GTask *task;
     FlashContext *ctx;
     GError *error = NULL;
 
-    /* Recover context */
-    g_assert (self->priv->flash_ctx != NULL);
-    ctx = (FlashContext *)self->priv->flash_ctx;
-    self->priv->flash_ctx = NULL;
+    /* Recover task */
+    g_assert (self->priv->flash_task != NULL);
+    task = self->priv->flash_task;
+    self->priv->flash_task = NULL;
 
+    ctx = g_task_get_task_data (task);
     ctx->flash_id = 0;
 
     if (self->priv->flash_ok && mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_TTY) {
         if (ctx->current_speed) {
-            if (!set_speed (ctx->self, ctx->current_speed, &error))
+            if (!set_speed (self, ctx->current_speed, &error))
                 g_assert (error);
         } else {
             error = g_error_new_literal (MM_SERIAL_ERROR,
@@ -1759,10 +1756,10 @@ flash_do (MMPortSerial *self)
     }
 
     if (error)
-        g_simple_async_result_take_error (ctx->result, error);
+        g_task_return_error (task, error);
     else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    flash_context_complete_and_free (ctx);
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 
     return G_SOURCE_REMOVE;
 }
@@ -1775,6 +1772,7 @@ mm_port_serial_flash (MMPortSerial *self,
                       gpointer user_data)
 {
     FlashContext *ctx;
+    GTask *task;
     GError *error = NULL;
     gboolean success;
 
@@ -1782,33 +1780,31 @@ mm_port_serial_flash (MMPortSerial *self,
 
     /* Setup context */
     ctx = g_slice_new0 (FlashContext);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             mm_port_serial_flash);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)flash_context_free);
 
     if (!mm_port_serial_is_open (self)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_SERIAL_ERROR,
-                                         MM_SERIAL_ERROR_NOT_OPEN,
-                                         "The serial port is not open.");
-        flash_context_complete_and_free (ctx);
+        g_task_return_new_error (task,
+                                 MM_SERIAL_ERROR,
+                                 MM_SERIAL_ERROR_NOT_OPEN,
+                                 "The serial port is not open.");
+        g_object_unref (task);
         return;
     }
 
-    if (self->priv->flash_ctx) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_IN_PROGRESS,
-                                         "Modem is already being flashed.");
-        flash_context_complete_and_free (ctx);
+    if (self->priv->flash_task) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "Modem is already being flashed.");
+        g_object_unref (task);
         return;
     }
 
     /* Flashing only in TTY */
     if (!self->priv->flash_ok || mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY) {
-        self->priv->flash_ctx = ctx;
+        self->priv->flash_task = task;
         ctx->flash_id = g_idle_add ((GSourceFunc)flash_do, self);
         return;
     }
@@ -1816,21 +1812,21 @@ mm_port_serial_flash (MMPortSerial *self,
     /* Grab current speed so we can reset it after flashing */
     success = get_speed (self, &ctx->current_speed, &error);
     if (!success && !ignore_errors) {
-        g_simple_async_result_take_error (ctx->result, error);
-        flash_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
     g_clear_error (&error);
 
     success = set_speed (self, B0, &error);
     if (!success && !ignore_errors) {
-        g_simple_async_result_take_error (ctx->result, error);
-        flash_context_complete_and_free (ctx);
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
     g_clear_error (&error);
 
-    self->priv->flash_ctx = ctx;
+    self->priv->flash_task = task;
     ctx->flash_id = g_timeout_add (flash_time, (GSourceFunc)flash_do, self);
 }
 
