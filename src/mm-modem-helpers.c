@@ -652,14 +652,20 @@ mm_flow_control_from_string (const gchar  *str,
                              GError      **error)
 {
     GFlagsClass *flags_class;
+    guint value;
     guint i;
 
     flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_FLOW_CONTROL));
 
     for (i = 0; flags_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick))
-            return flags_class->values[i].value;
+        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick)) {
+            value = flags_class->values[i].value;
+            g_type_class_unref (flags_class);
+            return value;
+        }
     }
+
+    g_type_class_unref (flags_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,

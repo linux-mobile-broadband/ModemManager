@@ -25,6 +25,26 @@
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
 
+static int
+_enum_class_return_value (GEnumClass *enum_class, guint i)
+{
+	int value;
+
+	value = enum_class->values[i].value;
+	g_type_class_unref (enum_class);
+	return value;
+}
+
+static int
+_flags_class_return_value (GFlagsClass *flags_class, guint i)
+{
+	guint value;
+
+	value = flags_class->values[i].value;
+	g_type_class_unref (flags_class);
+	return value;
+}
+
 gchar *
 mm_common_build_capabilities_string (const MMModemCapability *capabilities,
                                      guint n_capabilities)
@@ -795,8 +815,10 @@ mm_common_get_eps_ue_mode_operation_from_string (const gchar  *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -914,8 +936,10 @@ mm_common_get_rm_protocol_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -936,8 +960,10 @@ mm_common_get_ip_type_from_string (const gchar *str,
 
     for (i = 0; flags_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick))
-            return flags_class->values[i].value;
+            return _flags_class_return_value (flags_class, i);
     }
+
+    g_type_class_unref (flags_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -1008,8 +1034,10 @@ mm_common_get_sms_storage_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -1030,8 +1058,10 @@ mm_common_get_sms_cdma_teleservice_id_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -1052,8 +1082,10 @@ mm_common_get_sms_cdma_service_category_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -1074,8 +1106,10 @@ mm_common_get_call_direction_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -1096,8 +1130,10 @@ mm_common_get_call_state_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -1118,8 +1154,10 @@ mm_common_get_call_state_reason_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
@@ -1190,8 +1228,10 @@ mm_common_get_oma_session_type_from_string (const gchar *str,
 
     for (i = 0; enum_class->values[i].value_nick; i++) {
         if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return enum_class->values[i].value;
+            return _enum_class_return_value (enum_class, i);
     }
+
+    g_type_class_unref (enum_class);
 
     g_set_error (error,
                  MM_CORE_ERROR,
