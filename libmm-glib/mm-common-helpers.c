@@ -25,24 +25,64 @@
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
 
-static int
-_enum_class_return_value (GEnumClass *enum_class, guint i)
+static gint
+_enum_from_string (GType type,
+                   const gchar *str,
+                   gint error_value,
+                   GError **error)
 {
-	int value;
+    GEnumClass *enum_class;
+    gint value;
+    guint i;
 
-	value = enum_class->values[i].value;
-	g_type_class_unref (enum_class);
-	return value;
+    enum_class = G_ENUM_CLASS (g_type_class_ref (type));
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick)) {
+            value = enum_class->values[i].value;
+            g_type_class_unref (enum_class);
+            return value;
+        }
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid %s value",
+                 str,
+                 g_type_name (type));
+    g_type_class_unref (enum_class);
+    return error_value;
 }
 
-static int
-_flags_class_return_value (GFlagsClass *flags_class, guint i)
+static guint
+_flags_from_string (GType type,
+                    const gchar *str,
+                    guint error_value,
+                    GError **error)
 {
-	guint value;
+    GFlagsClass *flags_class;
+    guint value;
+    guint i;
 
-	value = flags_class->values[i].value;
-	g_type_class_unref (flags_class);
-	return value;
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (type));
+
+    for (i = 0; flags_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick)) {
+            value = flags_class->values[i].value;
+            g_type_class_unref (flags_class);
+            return value;
+        }
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid %s value",
+                 str,
+                 g_type_name (type));
+    g_type_class_unref (flags_class);
+    return error_value;
 }
 
 gchar *
@@ -808,24 +848,10 @@ MMModem3gppEpsUeModeOperation
 mm_common_get_eps_ue_mode_operation_from_string (const gchar  *str,
                                                  GError      **error)
 {
-    GEnumClass *enum_class;
-    guint       i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_EPS_UE_MODE_OPERATION));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMModem3gppEpsUeModeOperation value",
-                 str);
-    return MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN;
+    return _enum_from_string (MM_TYPE_MODEM_3GPP_EPS_UE_MODE_OPERATION,
+                              str,
+                              MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN,
+                              error);
 }
 
 GArray *
@@ -929,48 +955,20 @@ MMModemCdmaRmProtocol
 mm_common_get_rm_protocol_from_string (const gchar *str,
                                        GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMModemCdmaRmProtocol value",
-                 str);
-    return MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
+    return _enum_from_string (MM_TYPE_MODEM_CDMA_RM_PROTOCOL,
+                              str,
+                              MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN,
+                              error);
 }
 
 MMBearerIpFamily
 mm_common_get_ip_type_from_string (const gchar *str,
                                    GError **error)
 {
-    GFlagsClass *flags_class;
-    guint i;
-
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_BEARER_IP_FAMILY));
-
-    for (i = 0; flags_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick))
-            return _flags_class_return_value (flags_class, i);
-    }
-
-    g_type_class_unref (flags_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMBearerIpFamily value",
-                 str);
-    return MM_BEARER_IP_FAMILY_NONE;
+    return _flags_from_string (MM_TYPE_BEARER_IP_FAMILY,
+                               str,
+                               MM_BEARER_IP_FAMILY_NONE,
+                               error);
 }
 
 MMBearerAllowedAuth
@@ -1027,144 +1025,60 @@ MMSmsStorage
 mm_common_get_sms_storage_from_string (const gchar *str,
                                        GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_SMS_STORAGE));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMSmsStorage value",
-                 str);
-    return MM_SMS_STORAGE_UNKNOWN;
+    return _enum_from_string (MM_TYPE_SMS_STORAGE,
+                              str,
+                              MM_SMS_STORAGE_UNKNOWN,
+                              error);
 }
 
 MMSmsCdmaTeleserviceId
 mm_common_get_sms_cdma_teleservice_id_from_string (const gchar *str,
                                                    GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_SMS_CDMA_TELESERVICE_ID));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMSmsCdmaTeleserviceId value",
-                 str);
-    return MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN;
+    return _enum_from_string (MM_TYPE_SMS_CDMA_TELESERVICE_ID,
+                              str,
+                              MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN,
+                              error);
 }
 
 MMSmsCdmaServiceCategory
 mm_common_get_sms_cdma_service_category_from_string (const gchar *str,
                                                      GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_SMS_CDMA_SERVICE_CATEGORY));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMSmsCdmaServiceCategory value",
-                 str);
-    return MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN;
+    return _enum_from_string (MM_TYPE_SMS_CDMA_SERVICE_CATEGORY,
+                              str,
+                              MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+                              error);
 }
 
 MMCallDirection
 mm_common_get_call_direction_from_string (const gchar *str,
                                           GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_CALL_DIRECTION));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMCallDirection value",
-                 str);
-    return MM_CALL_DIRECTION_UNKNOWN;
+    return _enum_from_string (MM_TYPE_CALL_DIRECTION,
+                              str,
+                              MM_CALL_DIRECTION_UNKNOWN,
+                              error);
 }
 
 MMCallState
 mm_common_get_call_state_from_string (const gchar *str,
                                       GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_CALL_STATE));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMCallState value",
-                 str);
-    return MM_CALL_STATE_UNKNOWN;
+    return _enum_from_string (MM_TYPE_CALL_STATE,
+                              str,
+                              MM_CALL_STATE_UNKNOWN,
+                              error);
 }
 
 MMCallStateReason
 mm_common_get_call_state_reason_from_string (const gchar *str,
                                              GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_CALL_STATE_REASON));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMCallStateReason value",
-                 str);
-    return MM_CALL_STATE_REASON_UNKNOWN;
+    return _enum_from_string (MM_TYPE_CALL_STATE_REASON,
+                              str,
+                              MM_CALL_STATE_REASON_UNKNOWN,
+                              error);
 }
 
 MMOmaFeature
@@ -1221,24 +1135,10 @@ MMOmaSessionType
 mm_common_get_oma_session_type_from_string (const gchar *str,
                                             GError **error)
 {
-    GEnumClass *enum_class;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_OMA_SESSION_TYPE));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
-            return _enum_class_return_value (enum_class, i);
-    }
-
-    g_type_class_unref (enum_class);
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid MMOmaSessionType value",
-                 str);
-    return MM_OMA_SESSION_TYPE_UNKNOWN;
+    return _enum_from_string (MM_TYPE_OMA_SESSION_TYPE,
+                              str,
+                              MM_OMA_SESSION_TYPE_UNKNOWN,
+                              error);
 }
 
 GVariant *
