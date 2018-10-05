@@ -53,6 +53,7 @@ typedef struct {
     GArray            *supported_radio_interfaces;
     Feature            feature_nas_technology_preference;
     Feature            feature_nas_system_selection_preference;
+    Feature            feature_extended_lte_band_preference;
     gboolean           disable_4g_only_mode;
     GArray            *supported_bands;
 
@@ -1485,6 +1486,7 @@ dms_get_band_capabilities_ready (QmiClientDms *client,
     GArray                                 *mm_bands = NULL;
     QmiDmsBandCapability                    qmi_bands = 0;
     QmiDmsLteBandCapability                 qmi_lte_bands = 0;
+    GArray                                 *extended_qmi_lte_bands = NULL;
 
     self = g_task_get_source_object (task);
     priv = get_private (self);
@@ -1503,8 +1505,12 @@ dms_get_band_capabilities_ready (QmiClientDms *client,
         output,
         &qmi_lte_bands,
         NULL);
+    qmi_message_dms_get_band_capabilities_output_get_extended_lte_band_capability (
+        output,
+        &extended_qmi_lte_bands,
+        NULL);
 
-    mm_bands = mm_modem_bands_from_qmi_band_capabilities (qmi_bands, qmi_lte_bands);
+    mm_bands = mm_modem_bands_from_qmi_band_capabilities (qmi_bands, qmi_lte_bands, extended_qmi_lte_bands);
     if (mm_bands->len == 0) {
         g_clear_pointer (&mm_bands, g_array_unref);
         error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -1568,11 +1574,18 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
                                                   GAsyncResult *res,
                                                   GTask        *task)
 {
+    MMSharedQmi                                     *self;
+    Private                                         *priv;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError                                          *error = NULL;
     GArray                                          *mm_bands = NULL;
     QmiNasBandPreference                             band_preference_mask = 0;
     QmiNasLteBandPreference                          lte_band_preference_mask = 0;
+    guint64                                          extended_lte_band_preference[4] = { 0 };
+    guint                                            extended_lte_band_preference_size = 0;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output || !qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
@@ -1590,7 +1603,22 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
         &lte_band_preference_mask,
         NULL);
 
-    mm_bands = mm_modem_bands_from_qmi_band_preference (band_preference_mask, lte_band_preference_mask);
+    if (qmi_message_nas_get_system_selection_preference_output_get_extended_lte_band_preference (
+            output,
+            &extended_lte_band_preference[0],
+            &extended_lte_band_preference[1],
+            &extended_lte_band_preference[2],
+            &extended_lte_band_preference[3],
+            NULL))
+        extended_lte_band_preference_size = G_N_ELEMENTS (extended_lte_band_preference);
+
+    if (G_UNLIKELY (priv->feature_extended_lte_band_preference == FEATURE_UNKNOWN))
+        priv->feature_extended_lte_band_preference = extended_lte_band_preference_size ? FEATURE_SUPPORTED : FEATURE_UNSUPPORTED;
+
+    mm_bands = mm_modem_bands_from_qmi_band_preference (band_preference_mask,
+                                                        lte_band_preference_mask,
+                                                        extended_lte_band_preference_size ? extended_lte_band_preference : NULL,
+                                                        extended_lte_band_preference_size);
 
     if (mm_bands->len == 0) {
         g_clear_pointer (&mm_bands, g_array_unref);
@@ -1680,6 +1708,7 @@ mm_shared_qmi_set_current_bands (MMIfaceModem        *self,
     QmiClient                                      *client = NULL;
     QmiNasBandPreference                            qmi_bands = 0;
     QmiNasLteBandPreference                         qmi_lte_bands = 0;
+    guint64                                         extended_qmi_lte_bands[4] = { 0 };
 
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
                                       QMI_SERVICE_NAS, &client,
@@ -1697,14 +1726,29 @@ mm_shared_qmi_set_current_bands (MMIfaceModem        *self,
             g_object_unref (task);
             return;
         }
-        mm_modem_bands_to_qmi_band_preference (priv->supported_bands, &qmi_bands, &qmi_lte_bands);
-    } else
-        mm_modem_bands_to_qmi_band_preference (bands_array, &qmi_bands, &qmi_lte_bands);
+        bands_array = priv->supported_bands;
+    }
+
+    mm_modem_bands_to_qmi_band_preference (bands_array,
+                                           &qmi_bands,
+                                           &qmi_lte_bands,
+                                           priv->feature_extended_lte_band_preference == FEATURE_SUPPORTED ? extended_qmi_lte_bands : NULL,
+                                           G_N_ELEMENTS (extended_qmi_lte_bands));
 
     input = qmi_message_nas_set_system_selection_preference_input_new ();
     qmi_message_nas_set_system_selection_preference_input_set_band_preference (input, qmi_bands, NULL);
-    if (mm_iface_modem_is_3gpp_lte (self))
-        qmi_message_nas_set_system_selection_preference_input_set_lte_band_preference (input, qmi_lte_bands, NULL);
+    if (mm_iface_modem_is_3gpp_lte (self)) {
+        if (priv->feature_extended_lte_band_preference == FEATURE_SUPPORTED)
+            qmi_message_nas_set_system_selection_preference_input_set_extended_lte_band_preference (
+                input,
+                extended_qmi_lte_bands[0],
+                extended_qmi_lte_bands[1],
+                extended_qmi_lte_bands[2],
+                extended_qmi_lte_bands[3],
+                NULL);
+        else
+            qmi_message_nas_set_system_selection_preference_input_set_lte_band_preference (input, qmi_lte_bands, NULL);
+    }
     qmi_message_nas_set_system_selection_preference_input_set_change_duration (input, QMI_NAS_CHANGE_DURATION_PERMANENT, NULL);
 
     qmi_client_nas_set_system_selection_preference (

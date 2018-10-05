@@ -302,15 +302,51 @@ dms_add_qmi_lte_bands (GArray *mm_bands,
     }
 }
 
+static void
+dms_add_extended_qmi_lte_bands (GArray *mm_bands,
+                                GArray *extended_qmi_bands)
+{
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    if (!extended_qmi_bands)
+        return;
+
+    for (i = 0; i < extended_qmi_bands->len; i++) {
+        guint16 val;
+
+        val = g_array_index (extended_qmi_bands, guint16, i);
+
+        /* MM_MODEM_BAND_EUTRAN_1 = 31,
+         * ...
+         * MM_MODEM_BAND_EUTRAN_71 = 101
+         */
+        if (val < 1 || val > 71)
+            mm_dbg ("Unexpected LTE band supported by module: EUTRAN %u", val);
+        else {
+            MMModemBand band;
+
+            band = (MMModemBand)(val + MM_MODEM_BAND_EUTRAN_1 - 1);
+            g_array_append_val (mm_bands, band);
+        }
+    }
+}
+
 GArray *
 mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability qmi_bands,
-                                           QmiDmsLteBandCapability qmi_lte_bands)
+                                           QmiDmsLteBandCapability qmi_lte_bands,
+                                           GArray *extended_qmi_lte_bands)
 {
     GArray *mm_bands;
 
     mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
     dms_add_qmi_bands (mm_bands, qmi_bands);
-    dms_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
+
+    if (extended_qmi_lte_bands)
+        dms_add_extended_qmi_lte_bands (mm_bands, extended_qmi_lte_bands);
+    else
+        dms_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
 
     return mm_bands;
 }
@@ -463,15 +499,57 @@ nas_add_qmi_lte_bands (GArray *mm_bands,
     }
 }
 
+static void
+nas_add_extended_qmi_lte_bands (GArray *mm_bands,
+                                const guint64 *extended_qmi_lte_bands,
+                                guint extended_qmi_lte_bands_size)
+{
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    for (i = 0; i < extended_qmi_lte_bands_size; i++) {
+        guint j;
+
+        for (j = 0; j < 64; j++) {
+            guint val;
+
+            if (!(extended_qmi_lte_bands[i] & (((guint64) 1) << j)))
+                continue;
+
+            val = 1 + j + (i * 64);
+
+            /* MM_MODEM_BAND_EUTRAN_1 = 31,
+             * ...
+             * MM_MODEM_BAND_EUTRAN_71 = 101
+             */
+            if (val < 1 || val > 71)
+                mm_dbg ("Unexpected LTE band supported by module: EUTRAN %u", val);
+            else {
+                MMModemBand band;
+
+                band = (val + MM_MODEM_BAND_EUTRAN_1 - 1);
+                g_array_append_val (mm_bands, band);
+            }
+        }
+    }
+}
+
 GArray *
 mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
-                                         QmiNasLteBandPreference qmi_lte_bands)
+                                         QmiNasLteBandPreference qmi_lte_bands,
+                                         const guint64 *extended_qmi_lte_bands,
+                                         guint extended_qmi_lte_bands_size)
 {
     GArray *mm_bands;
 
     mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
     nas_add_qmi_bands (mm_bands, qmi_bands);
-    nas_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
+
+    if (extended_qmi_lte_bands && extended_qmi_lte_bands_size)
+        nas_add_extended_qmi_lte_bands (mm_bands, extended_qmi_lte_bands, extended_qmi_lte_bands_size);
+    else
+        nas_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
 
     return mm_bands;
 }
@@ -479,32 +557,51 @@ mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
 void
 mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
                                        QmiNasBandPreference *qmi_bands,
-                                       QmiNasLteBandPreference *qmi_lte_bands)
+                                       QmiNasLteBandPreference *qmi_lte_bands,
+                                       guint64 *extended_qmi_lte_bands,
+                                       guint extended_qmi_lte_bands_size)
 {
     guint i;
 
     *qmi_bands = 0;
     *qmi_lte_bands = 0;
+    memset (extended_qmi_lte_bands, 0, extended_qmi_lte_bands_size * sizeof (guint64));
 
     for (i = 0; i < mm_bands->len; i++) {
         MMModemBand band;
 
         band = g_array_index (mm_bands, MMModemBand, i);
 
-        if (band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_44) {
-            /* Add LTE band preference */
-            guint j;
+        if (band >= MM_MODEM_BAND_EUTRAN_1 && band <= MM_MODEM_BAND_EUTRAN_71) {
+            if (extended_qmi_lte_bands && extended_qmi_lte_bands_size) {
+                /* Add extended LTE band preference */
+                guint val;
+                guint j;
+                guint k;
 
-            for (j = 0; j < G_N_ELEMENTS (nas_lte_bands_map); j++) {
-                if (nas_lte_bands_map[j].mm_band == band) {
-                    *qmi_lte_bands |= nas_lte_bands_map[j].qmi_band;
-                    break;
+                /* it's really (band - MM_MODEM_BAND_EUTRAN_1 +1 -1), because
+                 * we want EUTRAN1 in index 0 */
+                val = band - MM_MODEM_BAND_EUTRAN_1;
+                j = val / 64;
+                g_assert (j < extended_qmi_lte_bands_size);
+                k = val % 64;
+
+                extended_qmi_lte_bands[j] |= ((guint64)1 << k);
+            } else {
+                /* Add LTE band preference */
+                guint j;
+
+                for (j = 0; j < G_N_ELEMENTS (nas_lte_bands_map); j++) {
+                    if (nas_lte_bands_map[j].mm_band == band) {
+                        *qmi_lte_bands |= nas_lte_bands_map[j].qmi_band;
+                        break;
+                    }
                 }
-            }
 
-            if (j == G_N_ELEMENTS (nas_lte_bands_map))
-                mm_dbg ("Cannot add the following LTE band: '%s'",
-                        mm_modem_band_get_string (band));
+                if (j == G_N_ELEMENTS (nas_lte_bands_map))
+                    mm_dbg ("Cannot add the following LTE band: '%s'",
+                            mm_modem_band_get_string (band));
+            }
         } else {
             /* Add non-LTE band preference */
             guint j;

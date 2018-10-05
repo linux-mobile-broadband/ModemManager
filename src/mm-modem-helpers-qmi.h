@@ -35,7 +35,8 @@ gboolean mm_pin_enabled_from_qmi_uim_pin_status (QmiDmsUimPinStatus status);
 QmiDmsUimFacility mm_3gpp_facility_to_qmi_uim_facility (MMModem3gppFacility mm);
 
 GArray *mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability qmi_bands,
-                                                   QmiDmsLteBandCapability qmi_lte_bands);
+                                                   QmiDmsLteBandCapability qmi_lte_bands,
+                                                   GArray *extended_qmi_lte_bands);
 
 /*****************************************************************************/
 /* QMI/NAS to MM translations */
@@ -77,10 +78,14 @@ QmiNasGsmWcdmaAcquisitionOrderPreference mm_modem_mode_to_qmi_gsm_wcdma_acquisit
 GArray *mm_modem_bands_from_qmi_rf_band_information_array (GArray *info_array);
 
 GArray *mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
-                                                 QmiNasLteBandPreference qmi_lte_bands);
+                                                 QmiNasLteBandPreference qmi_lte_bands,
+                                                 const guint64 *extended_qmi_lte_bands,
+                                                 guint extended_qmi_lte_bands_size);
 void mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
                                             QmiNasBandPreference *qmi_bands,
-                                            QmiNasLteBandPreference *qmi_lte_bands);
+                                            QmiNasLteBandPreference *qmi_lte_bands,
+                                            guint64 *extended_qmi_lte_bands,
+                                            guint extended_qmi_lte_bands_size);
 
 MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_qmi_registration_state (QmiNasAttachState attach_state,
                                                                                            QmiNasRegistrationState registration_state,
