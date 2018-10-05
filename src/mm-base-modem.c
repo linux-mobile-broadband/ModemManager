@@ -379,7 +379,7 @@ disable_ready (MMBaseModem  *self,
     }
     g_clear_error (&error);
 
-    g_list_free_full (disable_tasks, (GDestroyNotify)g_object_unref);
+    g_list_free_full (disable_tasks, g_object_unref);
 }
 
 void
@@ -439,7 +439,7 @@ enable_ready (MMBaseModem  *self,
     }
     g_clear_error (&error);
 
-    g_list_free_full (enable_tasks, (GDestroyNotify)g_object_unref);
+    g_list_free_full (enable_tasks, g_object_unref);
 }
 
 void
