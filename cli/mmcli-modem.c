@@ -461,7 +461,7 @@ print_modem_info (void)
     /* If available, 3GPP related stuff */
     if (ctx->modem_3gpp) {
         gchar *facility_locks;
-        GList *pco_list, *l;
+        GList *pco_list;
 
         facility_locks = (mm_modem_3gpp_facility_build_string_from_mask (
                               mm_modem_3gpp_get_enabled_facility_locks (ctx->modem_3gpp)));
@@ -473,8 +473,7 @@ print_modem_info (void)
                  "           |  operator name: '%s'\n"
                  "           |   subscription: '%s'\n"
                  "           |   registration: '%s'\n"
-                 "           |    EPS UE mode: '%s'\n"
-                 "           |            PCO:\n",
+                 "           |    EPS UE mode: '%s'\n",
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_imei (ctx->modem_3gpp)),
                  facility_locks,
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_code (ctx->modem_3gpp)),
@@ -486,25 +485,31 @@ print_modem_info (void)
                  mm_modem_3gpp_eps_ue_mode_operation_get_string (
                      mm_modem_3gpp_get_eps_ue_mode_operation (ctx->modem_3gpp)));
 
-        for (l = pco_list; l; l = g_list_next (l)) {
-            MMPco *pco = MM_PCO (l->data);
-            gchar *pco_data_hex = NULL;
-            const guint8 *pco_data;
-            gsize pco_data_size;
+        if (pco_list) {
+            GList *l;
 
-            pco_data = mm_pco_get_data (pco, &pco_data_size);
-            if (pco_data)
-                pco_data_hex = mm_utils_bin2hexstr (pco_data, pco_data_size);
+            g_print ("           |            PCO:\n");
+            for (l = pco_list; l; l = g_list_next (l)) {
+                MMPco *pco = MM_PCO (l->data);
+                gchar *pco_data_hex = NULL;
+                const guint8 *pco_data;
+                gsize pco_data_size;
 
-            g_print ("           |                 %u: (%s) '%s'\n",
-                     mm_pco_get_session_id (pco),
-                     mm_pco_is_complete (pco) ? "complete" : "partial",
-                     pco_data_hex ? pco_data_hex : "");
-            g_free (pco_data_hex);
-        }
+                pco_data = mm_pco_get_data (pco, &pco_data_size);
+                if (pco_data)
+                    pco_data_hex = mm_utils_bin2hexstr (pco_data, pco_data_size);
+
+                g_print ("           |                 %u: (%s) '%s'\n",
+                         mm_pco_get_session_id (pco),
+                         mm_pco_is_complete (pco) ? "complete" : "partial",
+                         pco_data_hex ? pco_data_hex : "");
+                g_free (pco_data_hex);
+            }
+            mm_pco_list_free (pco_list);
+        } else
+            g_print ("           |            PCO: 'n/a'\n");
 
         g_free (facility_locks);
-        mm_pco_list_free (pco_list);
     }
 
     /* If available, CDMA related stuff */
