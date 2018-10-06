@@ -265,13 +265,13 @@ print_bearer_info (MMBearer *bearer)
         if (val > 0)
             g_print ("                     |    Bytes received: '%" G_GUINT64_FORMAT "'\n", val);
         else
-            g_print ("                     |    Bytes received: 'N/A'\n");
+            g_print ("                     |    Bytes received: 'n/a'\n");
 
         val = mm_bearer_stats_get_tx_bytes (stats);
         if (val > 0)
             g_print ("                     | Bytes transmitted: '%" G_GUINT64_FORMAT "'\n", val);
         else
-            g_print ("                     | Bytes transmitted: 'N/A'\n");
+            g_print ("                     | Bytes transmitted: 'n/a'\n");
     }
 
     g_clear_object (&stats);
