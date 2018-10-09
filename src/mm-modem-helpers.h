@@ -181,6 +181,8 @@ typedef struct {
     gboolean active;
 } MM3gppPdpContextActive;
 void mm_3gpp_pdp_context_active_list_free (GList *pdp_active_list);
+gint mm_3gpp_pdp_context_active_cmp (MM3gppPdpContextActive *a,
+                                     MM3gppPdpContextActive *b);
 GList *mm_3gpp_parse_cgact_read_response (const gchar *reply,
                                           GError **error);
 

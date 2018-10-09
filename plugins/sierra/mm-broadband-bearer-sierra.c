@@ -31,6 +31,7 @@
 #include "mm-broadband-bearer-sierra.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-modem-helpers-sierra.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerSierra, mm_broadband_bearer_sierra, MM_TYPE_BROADBAND_BEARER);
 
@@ -43,6 +44,123 @@ enum {
     PROP_IS_ICERA,
     PROP_LAST
 };
+
+/*****************************************************************************/
+/* Connection status monitoring */
+
+static MMBearerConnectionStatus
+load_connection_status_finish (MMBaseBearer  *bearer,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    GError *inner_error = NULL;
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+    }
+    return (MMBearerConnectionStatus)value;
+}
+
+static void
+scact_periodic_query_ready (MMBaseModem  *modem,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    MMBroadbandBearer        *self;
+    const gchar              *response;
+    GError                   *error = NULL;
+    GList                    *pdp_active_list = NULL;
+    GList                    *l;
+    MMBearerConnectionStatus  status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+    guint                     cid;
+
+    self = MM_BROADBAND_BEARER (g_task_get_source_object (task));
+    cid = GPOINTER_TO_UINT (g_task_get_task_data (task));
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (response)
+        pdp_active_list = mm_sierra_parse_scact_read_response (response, &error);
+
+    if (error) {
+        g_assert (!pdp_active_list);
+        g_prefix_error (&error, "Couldn't check current list of active PDP contexts: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    for (l = pdp_active_list; l; l = g_list_next (l)) {
+        MM3gppPdpContextActive *pdp_active;
+
+        /* We look for the specific CID */
+        pdp_active = (MM3gppPdpContextActive *)(l->data);
+        if (pdp_active->cid == cid) {
+            status = (pdp_active->active ? MM_BEARER_CONNECTION_STATUS_CONNECTED : MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+            break;
+        }
+    }
+    mm_3gpp_pdp_context_active_list_free (pdp_active_list);
+
+    /* PDP context not found? This shouldn't happen, error out */
+    if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "PDP context not found in the known contexts list");
+    else
+        g_task_return_int (task, (gssize) status);
+    g_object_unref (task);
+}
+
+static void
+load_connection_status (MMBaseBearer        *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    GTask          *task;
+    MMBaseModem    *modem = NULL;
+    MMPortSerialAt *port;
+    guint           cid;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    g_object_get (MM_BASE_BEARER (self),
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+
+    /* If CID not defined, error out */
+    cid = mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (self));
+    if (!cid) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Couldn't load connection status: cid not defined");
+        g_object_unref (task);
+        goto out;
+    }
+    g_task_set_task_data (task, GUINT_TO_POINTER (cid), NULL);
+
+    /* If no control port available, error out */
+    port = mm_base_modem_peek_best_at_port (modem, NULL);
+    if (!port) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Couldn't load connection status: no control port available");
+        g_object_unref (task);
+        goto out;
+    }
+
+    mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
+                                   port,
+                                   "!SCACT?",
+                                   3,
+                                   FALSE, /* allow cached */
+                                   FALSE, /* raw */
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback) scact_periodic_query_ready,
+                                   task);
+
+out:
+    g_clear_object (&modem);
+}
 
 /*****************************************************************************/
 /* 3GPP Dialing (sub-step of the 3GPP Connection sequence) */
@@ -539,8 +657,8 @@ mm_broadband_bearer_sierra_class_init (MMBroadbandBearerSierraClass *klass)
     object_class->set_property = set_property;
     object_class->get_property = get_property;
 
-    base_bearer_class->load_connection_status = NULL;
-    base_bearer_class->load_connection_status_finish = NULL;
+    base_bearer_class->load_connection_status = load_connection_status;
+    base_bearer_class->load_connection_status_finish = load_connection_status_finish;
 
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;

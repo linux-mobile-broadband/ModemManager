@@ -180,6 +180,25 @@ MBM_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-mbm.la
 # common sierra support
 ################################################################################
 
+noinst_LTLIBRARIES += libhelpers-sierra.la
+libhelpers_sierra_la_SOURCES = \
+	sierra/mm-modem-helpers-sierra.c \
+	sierra/mm-modem-helpers-sierra.h \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-sierra
+test_modem_helpers_sierra_SOURCES = \
+	sierra/tests/test-modem-helpers-sierra.c \
+	$(NULL)
+test_modem_helpers_sierra_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/sierra \
+	$(NULL)
+test_modem_helpers_sierra_LDADD = \
+	$(builddir)/libhelpers-sierra.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 noinst_LTLIBRARIES += libmm-utils-sierra.la
 libmm_utils_sierra_la_SOURCES = \
 	sierra/mm-common-sierra.c \
@@ -190,6 +209,9 @@ libmm_utils_sierra_la_SOURCES = \
 	sierra/mm-broadband-bearer-sierra.h \
 	sierra/mm-broadband-modem-sierra.c  \
 	sierra/mm-broadband-modem-sierra.h  \
+	$(NULL)
+libmm_utils_sierra_la_LIBADD = \
+	$(builddir)/libhelpers-sierra.la \
 	$(NULL)
 
 SIERRA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/sierra

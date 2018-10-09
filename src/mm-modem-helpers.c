@@ -1554,7 +1554,7 @@ mm_3gpp_pdp_context_active_list_free (GList *pdp_active_list)
     g_list_free_full (pdp_active_list, (GDestroyNotify) mm_3gpp_pdp_context_active_free);
 }
 
-static gint
+gint
 mm_3gpp_pdp_context_active_cmp (MM3gppPdpContextActive *a,
                                 MM3gppPdpContextActive *b)
 {
