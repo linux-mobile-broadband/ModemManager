@@ -3387,6 +3387,9 @@ atds_location_query_ready (MbimDevice   *device,
         g_task_return_boolean (task, TRUE);
     }
     g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
 }
 
 static void
@@ -3775,8 +3778,7 @@ atds_signal_query_ready (MbimDevice   *device,
         !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
         !mbim_message_atds_signal_response_parse (response, &rssi, &error_rate, &rscp, &ecno, &rsrq, &rsrp, &snr, &error)) {
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
+        goto out;
     }
 
     result = g_slice_new0 (SignalLoadValuesResult);
@@ -3825,14 +3827,17 @@ atds_signal_query_ready (MbimDevice   *device,
     }
 
     if (!result->gsm && !result->umts && !result->lte) {
+        signal_load_values_result_free (result);
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "No signal details given");
-        g_object_unref (task);
-        signal_load_values_result_free (result);
-        return;
+        goto out;
     }
 
     g_task_return_pointer (task, result, (GDestroyNotify) signal_load_values_result_free);
+
+out:
+    if (response)
+        mbim_message_unref (response);
     g_object_unref (task);
 }
 
