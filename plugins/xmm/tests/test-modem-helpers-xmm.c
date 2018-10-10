@@ -654,7 +654,9 @@ test_xcesq_response_to_signal (void)
 typedef struct {
     const gchar *response;
     gboolean     expected_transport_protocol_invalid_supported;
+    gboolean     expected_transport_protocol_supl_supported;
     gboolean     expected_standalone_position_mode_supported;
+    gboolean     expected_ms_assisted_based_position_mode_supported;
     gboolean     expected_loc_response_type_nmea_supported;
     gboolean     expected_gnss_type_gps_glonass_supported;
 } XlcslsrTest;
@@ -662,15 +664,15 @@ typedef struct {
 static XlcslsrTest xlcslsr_tests[] = {
     {
         "+XLCSLSR:(0-2),(0-3), ,(0-1), ,(0-1),(0-7200),(0-255),(0-1),(0-2),(1-256),(0-1)",
-        TRUE, TRUE, TRUE, TRUE
+        TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
     },
     {
         "+XLCSLSR:(0,1,2),(0,1,2,3), ,(0,1), ,(0,1),(0-7200),(0-255),(0,1),(0,1,2),(1-256),(0,1)",
-        TRUE, TRUE, TRUE, TRUE
+        TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
     },
     {
         "+XLCSLSR:(0-1),(0-2), ,(0,1), ,(0,1),(0 -7200),(0-255),(0-1),(0),(1-256),(1)",
-        FALSE, FALSE, FALSE, FALSE
+        FALSE, TRUE, FALSE, TRUE, FALSE, FALSE
     },
 };
 
@@ -683,23 +685,69 @@ test_xlcslsr_test (void)
         GError   *error = NULL;
         gboolean  ret;
         gboolean  transport_protocol_invalid_supported;
+        gboolean  transport_protocol_supl_supported;
         gboolean  standalone_position_mode_supported;
+        gboolean  ms_assisted_based_position_mode_supported;
         gboolean  loc_response_type_nmea_supported;
         gboolean  gnss_type_gps_glonass_supported;
 
         ret = mm_xmm_parse_xlcslsr_test_response (xlcslsr_tests[i].response,
                                                   &transport_protocol_invalid_supported,
+                                                  &transport_protocol_supl_supported,
                                                   &standalone_position_mode_supported,
+                                                  &ms_assisted_based_position_mode_supported,
                                                   &loc_response_type_nmea_supported,
                                                   &gnss_type_gps_glonass_supported,
                                                   &error);
         g_assert_no_error (error);
         g_assert (ret);
 
-        g_assert (transport_protocol_invalid_supported == xlcslsr_tests[i].expected_transport_protocol_invalid_supported);
-        g_assert (standalone_position_mode_supported   == xlcslsr_tests[i].expected_standalone_position_mode_supported);
-        g_assert (loc_response_type_nmea_supported     == xlcslsr_tests[i].expected_loc_response_type_nmea_supported);
-        g_assert (gnss_type_gps_glonass_supported      == xlcslsr_tests[i].expected_gnss_type_gps_glonass_supported);
+        g_assert (transport_protocol_invalid_supported       == xlcslsr_tests[i].expected_transport_protocol_invalid_supported);
+        g_assert (transport_protocol_supl_supported          == xlcslsr_tests[i].expected_transport_protocol_supl_supported);
+        g_assert (standalone_position_mode_supported         == xlcslsr_tests[i].expected_standalone_position_mode_supported);
+        g_assert (ms_assisted_based_position_mode_supported  == xlcslsr_tests[i].expected_ms_assisted_based_position_mode_supported);
+        g_assert (loc_response_type_nmea_supported           == xlcslsr_tests[i].expected_loc_response_type_nmea_supported);
+        g_assert (gnss_type_gps_glonass_supported            == xlcslsr_tests[i].expected_gnss_type_gps_glonass_supported);
+    }
+}
+
+/*****************************************************************************/
+/* AT+XLCSSLP? response parser */
+
+typedef struct {
+    const gchar *response;
+    const gchar *expected;
+} XlcsslpQuery;
+
+static XlcsslpQuery xlcsslp_queries[] = {
+    {
+        "+XLCSSLP:1,\"www.spirent-lcs.com\",7275",
+        "www.spirent-lcs.com:7275"
+    },
+    {
+        "+XLCSSLP:0,\"123.123.123.123\",7275",
+        "123.123.123.123:7275"
+    },
+};
+
+static void
+test_xlcsslp_queries (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (xlcsslp_queries); i++) {
+        GError   *error = NULL;
+        gchar    *supl_server = NULL;
+        gboolean  ret;
+
+        ret = mm_xmm_parse_xlcsslp_query_response (xlcsslp_queries[i].response,
+                                                   &supl_server,
+                                                   &error);
+        g_assert_no_error (error);
+        g_assert (ret);
+
+        g_assert_cmpstr (supl_server, ==, xlcsslp_queries[i].expected);
+        g_free (supl_server);
     }
 }
 
@@ -744,6 +792,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/xmm/xcesq/query_response_to_signal", test_xcesq_response_to_signal);
 
     g_test_add_func ("/MM/xmm/xlcslsr/test", test_xlcslsr_test);
+
+    g_test_add_func ("/MM/xmm/xlcsslp/query", test_xlcsslp_queries);
 
     return g_test_run ();
 }

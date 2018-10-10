@@ -166,5 +166,18 @@ void                  mm_shared_xmm_disable_location_gathering        (MMIfaceMo
 gboolean              mm_shared_xmm_disable_location_gathering_finish (MMIfaceModemLocation   *self,
                                                                        GAsyncResult           *res,
                                                                        GError                **error);
+void                   mm_shared_xmm_location_load_supl_server        (MMIfaceModemLocation   *self,
+                                                                       GAsyncReadyCallback     callback,
+                                                                       gpointer                user_data);
+gchar                 *mm_shared_xmm_location_load_supl_server_finish (MMIfaceModemLocation   *self,
+                                                                       GAsyncResult           *res,
+                                                                       GError                **error);
+void                   mm_shared_xmm_location_set_supl_server         (MMIfaceModemLocation   *self,
+                                                                       const gchar            *supl,
+                                                                       GAsyncReadyCallback     callback,
+                                                                       gpointer                user_data);
+gboolean               mm_shared_xmm_location_set_supl_server_finish  (MMIfaceModemLocation   *self,
+                                                                       GAsyncResult           *res,
+                                                                       GError                **error);
 
 #endif /* MM_SHARED_XMM_H */

@@ -106,6 +106,10 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->enable_location_gathering_finish  = mm_shared_xmm_enable_location_gathering_finish;
     iface->disable_location_gathering        = mm_shared_xmm_disable_location_gathering;
     iface->disable_location_gathering_finish = mm_shared_xmm_disable_location_gathering_finish;
+    iface->load_supl_server                  = mm_shared_xmm_location_load_supl_server;
+    iface->load_supl_server_finish           = mm_shared_xmm_location_load_supl_server_finish;
+    iface->set_supl_server                   = mm_shared_xmm_location_set_supl_server;
+    iface->set_supl_server_finish            = mm_shared_xmm_location_set_supl_server_finish;
 }
 
 static MMBroadbandModemClass *

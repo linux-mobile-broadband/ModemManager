@@ -14,6 +14,7 @@
  */
 
 #include <config.h>
+#include <arpa/inet.h>
 
 #include <glib-object.h>
 #include <gio/gio.h>
@@ -39,6 +40,7 @@ static GQuark private_quark;
 typedef enum {
     GPS_ENGINE_STATE_OFF,
     GPS_ENGINE_STATE_STANDALONE,
+    GPS_ENGINE_STATE_ASSISTED,
 } GpsEngineState;
 
 typedef struct {
@@ -818,7 +820,9 @@ xlcslsr_test_ready (MMBaseModem  *self,
     GError                *error = NULL;
     Private               *priv;
     gboolean               transport_protocol_invalid_supported;
+    gboolean               transport_protocol_supl_supported;
     gboolean               standalone_position_mode_supported;
+    gboolean               ms_assisted_based_position_mode_supported;
     gboolean               loc_response_type_nmea_supported;
     gboolean               gnss_type_gps_glonass_supported;
 
@@ -831,7 +835,9 @@ xlcslsr_test_ready (MMBaseModem  *self,
     if (!response ||
         !mm_xmm_parse_xlcslsr_test_response (response,
                                              &transport_protocol_invalid_supported,
+                                             &transport_protocol_supl_supported,
                                              &standalone_position_mode_supported,
+                                             &ms_assisted_based_position_mode_supported,
                                              &loc_response_type_nmea_supported,
                                              &gnss_type_gps_glonass_supported,
                                              &error)) {
@@ -841,7 +847,7 @@ xlcslsr_test_ready (MMBaseModem  *self,
                !standalone_position_mode_supported ||
                !loc_response_type_nmea_supported ||
                !gnss_type_gps_glonass_supported) {
-        mm_dbg ("XLCSLSR based GPS control unsupported: protocol %s, standalone %s, nmea %s, gps/glonass %s",
+        mm_dbg ("XLCSLSR based GPS control unsupported: protocol invalid %s, standalone %s, nmea %s, gps/glonass %s",
                 transport_protocol_invalid_supported ? "supported" : "unsupported",
                 standalone_position_mode_supported   ? "supported" : "unsupported",
                 loc_response_type_nmea_supported     ? "supported" : "unsupported",
@@ -849,6 +855,16 @@ xlcslsr_test_ready (MMBaseModem  *self,
     } else {
         mm_dbg ("XLCSLSR based GPS control supported");
         priv->supported_sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
+
+        if (transport_protocol_supl_supported && ms_assisted_based_position_mode_supported) {
+            mm_dbg ("XLCSLSR based A-GPS control supported");
+            priv->supported_sources |= MM_MODEM_LOCATION_SOURCE_AGPS;
+        } else {
+            mm_dbg ("XLCSLSR based A-GPS control unsupported: protocol supl %s, ms assisted/based %s",
+                    transport_protocol_supl_supported         ? "supported" : "unsupported",
+                    ms_assisted_based_position_mode_supported ? "supported" : "unsupported");
+        }
+
         sources |= priv->supported_sources;
     }
 
@@ -1015,11 +1031,16 @@ xlcslsr_ready (MMBaseModem  *self,
 static void
 gps_engine_start (GTask *task)
 {
-    MMSharedXmm *self;
-    Private     *priv;
+    GpsEngineState  state;
+    MMSharedXmm    *self;
+    Private        *priv;
+    guint           transport_protocol = 0;
+    guint           pos_mode = 0;
+    gchar          *cmd;
 
-    self = g_task_get_source_object (task);
-    priv = get_private (self);
+    self  = g_task_get_source_object (task);
+    priv  = get_private (self);
+    state = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
     /* Look for an AT port to use for GPS. Prefer secondary port if there is one,
      * otherwise use primary */
@@ -1035,10 +1056,24 @@ gps_engine_start (GTask *task)
         }
     }
 
+    switch (state) {
+        case GPS_ENGINE_STATE_STANDALONE:
+            transport_protocol = 2;
+            pos_mode = 3;
+            break;
+        case GPS_ENGINE_STATE_ASSISTED:
+            transport_protocol = 1;
+            pos_mode = 2;
+            break;
+        default:
+            g_assert_not_reached ();
+            break;
+    }
+
     /*
      * AT+XLCSLSR
-     *    transport_protocol:  2 (invalid)
-     *    pos_mode:            3 (standalone)
+     *    transport_protocol:  2 (invalid)     or 1 (supl)
+     *    pos_mode:            3 (standalone)  or 2 (ms assisted+based)
      *    client_id:           <empty>
      *    client_id_type:      <empty>
      *    mlc_number:          <empty>
@@ -1051,15 +1086,17 @@ gps_engine_start (GTask *task)
      *    gnss_type:           0 (GPS or GLONASS)
      */
     g_assert (priv->gps_port);
+    cmd = g_strdup_printf ("AT+XLCSLSR=%u,%u,,,,,1,,,1,118,0", transport_protocol, pos_mode);
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                    priv->gps_port,
-                                   "AT+XLCSLSR=2,3,,,,,1,,,1,118,0",
+                                   cmd,
                                    3,
                                    FALSE,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)xlcslsr_ready,
                                    task);
+    g_free (cmd);
 }
 
 static void
@@ -1156,11 +1193,15 @@ static GpsEngineState
 gps_engine_state_get_expected (MMModemLocationSource sources)
 {
     /* If at lease one of GPS nmea/raw sources enabled, engine started */
-    if (sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW))
+    if (sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        /* If A-GPS is enabled, ASSISTED mode */
+        if (sources & MM_MODEM_LOCATION_SOURCE_AGPS)
+            return GPS_ENGINE_STATE_ASSISTED;
+        /* Otherwise, STANDALONE */
         return GPS_ENGINE_STATE_STANDALONE;
-
+    }
     /* If no GPS nmea/raw sources enabled, engine stopped */
-        return GPS_ENGINE_STATE_OFF;
+    return GPS_ENGINE_STATE_OFF;
 }
 
 /*****************************************************************************/
@@ -1250,7 +1291,9 @@ mm_shared_xmm_disable_location_gathering (MMIfaceModemLocation  *self,
     }
 
     /* We only expect GPS sources here */
-    g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW));
+    g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                        MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                        MM_MODEM_LOCATION_SOURCE_AGPS));
 
     /* Update engine based on the expected sources */
     gps_engine_state_select (MM_SHARED_XMM (self),
@@ -1340,13 +1383,122 @@ mm_shared_xmm_enable_location_gathering (MMIfaceModemLocation  *self,
     }
 
     /* We only expect GPS sources here */
-    g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW));
+    g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                        MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                        MM_MODEM_LOCATION_SOURCE_AGPS));
 
     /* Update engine based on the expected sources */
     gps_engine_state_select (MM_SHARED_XMM (self),
                              gps_engine_state_get_expected (priv->enabled_sources | source),
                              (GAsyncReadyCallback) enable_gps_engine_state_select_ready,
                              task);
+}
+
+/*****************************************************************************/
+/* Location: Load SUPL server */
+
+gchar *
+mm_shared_xmm_location_load_supl_server_finish (MMIfaceModemLocation  *self,
+                                                GAsyncResult          *res,
+                                                GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+xlcsslp_query_ready (MMBaseModem  *self,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    const gchar *response;
+    GError      *error = NULL;
+    gchar       *supl_address;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response || !mm_xmm_parse_xlcsslp_query_response (response, &supl_address, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, supl_address, g_free);
+    g_object_unref (task);
+}
+
+void
+mm_shared_xmm_location_load_supl_server (MMIfaceModemLocation *self,
+                                         GAsyncReadyCallback   callback,
+                                         gpointer              user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+XLCSSLP?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)xlcsslp_query_ready,
+                              task);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_shared_xmm_location_set_supl_server_finish (MMIfaceModemLocation  *self,
+                                               GAsyncResult          *res,
+                                               GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+xlcsslp_set_ready (MMBaseModem  *self,
+                   GAsyncResult *res,
+                   GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_shared_xmm_location_set_supl_server (MMIfaceModemLocation   *self,
+                                        const gchar            *supl,
+                                        GAsyncReadyCallback     callback,
+                                        gpointer                user_data)
+{
+    GTask   *task;
+    gchar   *cmd = NULL;
+    gchar   *fqdn = NULL;
+    guint32  ip;
+    guint16  port;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_parse_supl_address (supl, &fqdn, &ip, &port, NULL);
+    g_assert (port);
+    if (fqdn)
+        cmd = g_strdup_printf ("+XLCSSLP=1,%s,%u", fqdn, port);
+    else if (ip) {
+        struct in_addr a = { .s_addr = ip };
+        gchar buf[INET_ADDRSTRLEN + 1] = { 0 };
+
+        /* we got 'ip' from inet_pton(), so this next step should always succeed */
+        g_assert (inet_ntop (AF_INET, &a, buf, sizeof (buf) - 1));
+        cmd = g_strdup_printf ("+XLCSSLP=0,%s,%u", buf, port);
+    } else
+        g_assert_not_reached ();
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)xlcsslp_set_ready,
+                              task);
+    g_free (cmd);
+    g_free (fqdn);
 }
 
 /*****************************************************************************/
