@@ -55,4 +55,12 @@ gboolean mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
                                                MMSignal    **out_lte,
                                                GError      **error);
 
+/* AT+XLCSLSR=? response parser */
+gboolean mm_xmm_parse_xlcslsr_test_response (const gchar  *response,
+                                             gboolean     *transport_protocol_invalid_supported,
+                                             gboolean     *standalone_position_mode_supported,
+                                             gboolean     *loc_response_type_nmea_supported,
+                                             gboolean     *gnss_type_gps_glonass_supported,
+                                             GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_XMM_H */

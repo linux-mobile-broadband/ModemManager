@@ -649,6 +649,61 @@ test_xcesq_response_to_signal (void)
 }
 
 /*****************************************************************************/
+/* AT+XLCSLSR=? response parser */
+
+typedef struct {
+    const gchar *response;
+    gboolean     expected_transport_protocol_invalid_supported;
+    gboolean     expected_standalone_position_mode_supported;
+    gboolean     expected_loc_response_type_nmea_supported;
+    gboolean     expected_gnss_type_gps_glonass_supported;
+} XlcslsrTest;
+
+static XlcslsrTest xlcslsr_tests[] = {
+    {
+        "+XLCSLSR:(0-2),(0-3), ,(0-1), ,(0-1),(0-7200),(0-255),(0-1),(0-2),(1-256),(0-1)",
+        TRUE, TRUE, TRUE, TRUE
+    },
+    {
+        "+XLCSLSR:(0,1,2),(0,1,2,3), ,(0,1), ,(0,1),(0-7200),(0-255),(0,1),(0,1,2),(1-256),(0,1)",
+        TRUE, TRUE, TRUE, TRUE
+    },
+    {
+        "+XLCSLSR:(0-1),(0-2), ,(0,1), ,(0,1),(0 -7200),(0-255),(0-1),(0),(1-256),(1)",
+        FALSE, FALSE, FALSE, FALSE
+    },
+};
+
+static void
+test_xlcslsr_test (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (xlcslsr_tests); i++) {
+        GError   *error = NULL;
+        gboolean  ret;
+        gboolean  transport_protocol_invalid_supported;
+        gboolean  standalone_position_mode_supported;
+        gboolean  loc_response_type_nmea_supported;
+        gboolean  gnss_type_gps_glonass_supported;
+
+        ret = mm_xmm_parse_xlcslsr_test_response (xlcslsr_tests[i].response,
+                                                  &transport_protocol_invalid_supported,
+                                                  &standalone_position_mode_supported,
+                                                  &loc_response_type_nmea_supported,
+                                                  &gnss_type_gps_glonass_supported,
+                                                  &error);
+        g_assert_no_error (error);
+        g_assert (ret);
+
+        g_assert (transport_protocol_invalid_supported == xlcslsr_tests[i].expected_transport_protocol_invalid_supported);
+        g_assert (standalone_position_mode_supported   == xlcslsr_tests[i].expected_standalone_position_mode_supported);
+        g_assert (loc_response_type_nmea_supported     == xlcslsr_tests[i].expected_loc_response_type_nmea_supported);
+        g_assert (gnss_type_gps_glonass_supported      == xlcslsr_tests[i].expected_gnss_type_gps_glonass_supported);
+    }
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -687,6 +742,8 @@ int main (int argc, char **argv)
 
     g_test_add_func ("/MM/xmm/xcesq/query_response", test_xcesq_response);
     g_test_add_func ("/MM/xmm/xcesq/query_response_to_signal", test_xcesq_response_to_signal);
+
+    g_test_add_func ("/MM/xmm/xlcslsr/test", test_xlcslsr_test);
 
     return g_test_run ();
 }

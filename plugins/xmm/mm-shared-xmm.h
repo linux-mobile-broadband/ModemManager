@@ -22,8 +22,10 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-signal.h"
+#include "mm-iface-modem-location.h"
 
 #define MM_TYPE_SHARED_XMM               (mm_shared_xmm_get_type ())
 #define MM_SHARED_XMM(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_XMM, MMSharedXmm))
@@ -34,9 +36,19 @@ typedef struct _MMSharedXmm MMSharedXmm;
 
 struct _MMSharedXmm {
     GTypeInterface g_iface;
+
+    /* Peek broadband modem class of the parent class of the object */
+    MMBroadbandModemClass * (* peek_parent_broadband_modem_class) (MMSharedXmm *self);
+
+    /* Peek location interface of the parent class of the object */
+    MMIfaceModemLocation *  (* peek_parent_location_interface)    (MMSharedXmm *self);
 };
 
 GType mm_shared_xmm_get_type (void);
+
+/* Shared XMM device setup */
+
+void mm_shared_xmm_setup_ports (MMBroadbandModem *self);
 
 /* Shared XMM device management support */
 
@@ -133,5 +145,26 @@ void              mm_shared_xmm_signal_load_values             (MMIfaceModemSign
                                                                 GCancellable        *cancellable,
                                                                 GAsyncReadyCallback  callback,
                                                                 gpointer             user_data);
+
+void                  mm_shared_xmm_location_load_capabilities        (MMIfaceModemLocation   *self,
+                                                                       GAsyncReadyCallback     callback,
+                                                                       gpointer                user_data);
+MMModemLocationSource mm_shared_xmm_location_load_capabilities_finish (MMIfaceModemLocation   *self,
+                                                                       GAsyncResult           *res,
+                                                                       GError                **error);
+void                  mm_shared_xmm_enable_location_gathering         (MMIfaceModemLocation   *self,
+                                                                       MMModemLocationSource   source,
+                                                                       GAsyncReadyCallback     callback,
+                                                                       gpointer                user_data);
+gboolean              mm_shared_xmm_enable_location_gathering_finish  (MMIfaceModemLocation   *self,
+                                                                       GAsyncResult           *res,
+                                                                       GError                **error);
+void                  mm_shared_xmm_disable_location_gathering        (MMIfaceModemLocation   *self,
+                                                                       MMModemLocationSource   source,
+                                                                       GAsyncReadyCallback     callback,
+                                                                       gpointer                user_data);
+gboolean              mm_shared_xmm_disable_location_gathering_finish (MMIfaceModemLocation   *self,
+                                                                       GAsyncResult           *res,
+                                                                       GError                **error);
 
 #endif /* MM_SHARED_XMM_H */
