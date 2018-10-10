@@ -42,7 +42,8 @@ G_DEFINE_TYPE (MMLocationGpsRaw, mm_location_gps_raw, G_TYPE_OBJECT);
 #define PROPERTY_ALTITUDE  "altitude"
 
 struct _MMLocationGpsRawPrivate {
-    GRegex *gpgga_regex;
+    GRegex   *gga_regex;
+    gboolean  prefer_gngga;
 
     gchar   *utc_time;
     gdouble  latitude;
@@ -172,9 +173,22 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
 {
     GMatchInfo *match_info = NULL;
 
-    /* Current implementation works only with $GPGGA traces */
-    if (!g_str_has_prefix (trace, "$GPGGA"))
+    /* Current implementation works only with $GPGGA and $GNGGA traces */
+    do {
+        if (g_str_has_prefix (trace, "$GPGGA")) {
+            if (self->priv->prefer_gngga)
+                /* Ignore GPGGA, prefer GNGGA */
+                return FALSE;
+            break;
+        }
+        if (g_str_has_prefix (trace, "$GNGGA")) {
+            if (!self->priv->prefer_gngga)
+                self->priv->prefer_gngga = TRUE;
+            break;
+        }
+        /* Otherwise, ignore trace */
         return FALSE;
+    } while (0);
 
     /*
      * $GPGGA,hhmmss.ss,llll.ll,a,yyyyy.yy,a,x,xx,x.x,x.x,M,x.x,M,x.x,xxxx*hh
@@ -195,13 +209,13 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
      * 14   = Diff. reference station ID#
      * 15   = Checksum
      */
-    if (G_UNLIKELY (!self->priv->gpgga_regex))
-        self->priv->gpgga_regex = g_regex_new ("\\$GPGGA,(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*)\\*(.*).*",
-                                               G_REGEX_RAW | G_REGEX_OPTIMIZE,
-                                               0,
-                                               NULL);
+    if (G_UNLIKELY (!self->priv->gga_regex))
+        self->priv->gga_regex = g_regex_new ("\\$G(?:P|N)GGA,(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*),(.*)\\*(.*).*",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                                             0,
+                                             NULL);
 
-    if (g_regex_match (self->priv->gpgga_regex, trace, 0, &match_info)) {
+    if (g_regex_match (self->priv->gga_regex, trace, 0, &match_info)) {
         /* UTC time */
         if (self->priv->utc_time)
             g_free (self->priv->utc_time);
@@ -371,8 +385,8 @@ finalize (GObject *object)
 {
     MMLocationGpsRaw *self = MM_LOCATION_GPS_RAW (object);
 
-    if (self->priv->gpgga_regex)
-        g_regex_unref (self->priv->gpgga_regex);
+    if (self->priv->gga_regex)
+        g_regex_unref (self->priv->gga_regex);
 
     g_free (self->priv->utc_time);
 
