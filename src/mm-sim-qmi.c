@@ -449,7 +449,7 @@ uim_verify_pin (MMSimQmi *self,
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_UIM, &client))
         return;
 
@@ -504,7 +504,7 @@ dms_uim_verify_pin (MMSimQmi *self,
     QmiClient *client = NULL;
 
     if (!ensure_qmi_client (NULL,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_DMS, &client)) {
         /* Very unlikely that this will ever happen, but anyway, try with
          * UIM service instead */
@@ -605,7 +605,7 @@ uim_unblock_pin (MMSimQmi *self,
     UnblockPinContext *ctx;
 
     if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_UIM, &client))
         return;
 
@@ -664,7 +664,7 @@ dms_uim_unblock_pin (MMSimQmi *self,
     UnblockPinContext *ctx;
 
     if (!ensure_qmi_client (NULL,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_DMS, &client)) {
         /* Very unlikely that this will ever happen, but anyway, try with
          * UIM service instead */
@@ -772,7 +772,7 @@ uim_change_pin (MMSimQmi *self,
     ChangePinContext *ctx;
 
     if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_UIM, &client))
         return;
 
@@ -831,7 +831,7 @@ dms_uim_change_pin (MMSimQmi *self,
     ChangePinContext *ctx;
 
     if (!ensure_qmi_client (NULL,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_DMS, &client)) {
         /* Very unlikely that this will ever happen, but anyway, try with
          * UIM service instead */
