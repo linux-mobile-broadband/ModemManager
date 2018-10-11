@@ -91,12 +91,150 @@ ensure_qmi_client (GTask       *task,
 /*****************************************************************************/
 /* Load SIM ID (ICCID) */
 
+static GArray *
+uim_read_finish (QmiClientUim  *client,
+                 GAsyncResult  *res,
+                 GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+uim_read_ready (QmiClientUim *client,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    QmiMessageUimReadTransparentOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_uim_read_transparent_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_uim_read_transparent_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't read data from UIM: ");
+        g_task_return_error (task, error);
+    } else {
+        GArray *read_result = NULL;
+
+        qmi_message_uim_read_transparent_output_get_read_result (output, &read_result, NULL);
+        if (read_result)
+            g_task_return_pointer (task,
+                                   g_array_ref (read_result),
+                                   (GDestroyNotify) g_array_unref);
+        else
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Read malformed data from UIM");
+    }
+
+    if (output)
+        qmi_message_uim_read_transparent_output_unref (output);
+
+    g_object_unref (task);
+}
+
+static void
+uim_read (MMSimQmi            *self,
+          guint16              file_id,
+          const guint16       *file_path,
+          gsize                file_path_len,
+          GAsyncReadyCallback  callback,
+          gpointer             user_data)
+{
+    GTask *task;
+    QmiClient *client = NULL;
+    GArray *file_path_bytes;
+    gsize i;
+    QmiMessageUimReadTransparentInput *input;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!ensure_qmi_client (task,
+                            self,
+                            QMI_SERVICE_UIM, &client))
+        return;
+
+    file_path_bytes = g_array_sized_new (FALSE, FALSE, 1, file_path_len * 2);
+    for (i = 0; i < file_path_len; ++i) {
+        guint8 byte;
+
+        byte = file_path[i] & 0xFF;
+        g_array_append_val (file_path_bytes, byte);
+        byte = (file_path[i] >> 8) & 0xFF;
+        g_array_append_val (file_path_bytes, byte);
+    }
+
+    input = qmi_message_uim_read_transparent_input_new ();
+    qmi_message_uim_read_transparent_input_set_session_information (
+        input,
+        QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING,
+        "",
+        NULL);
+    qmi_message_uim_read_transparent_input_set_file (input,
+                                                     file_id,
+                                                     file_path_bytes,
+                                                     NULL);
+    qmi_message_uim_read_transparent_input_set_read_information (input,
+                                                                 0,
+                                                                 0,
+                                                                 NULL);
+    g_array_unref (file_path_bytes);
+
+    qmi_client_uim_read_transparent (QMI_CLIENT_UIM (client),
+                                     input,
+                                     10,
+                                     NULL,
+                                     (GAsyncReadyCallback)uim_read_ready,
+                                     task);
+    qmi_message_uim_read_transparent_input_unref (input);
+}
+
 static gchar *
 load_sim_identifier_finish (MMBaseSim     *self,
                             GAsyncResult  *res,
                             GError       **error)
 {
     return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+uim_get_iccid_ready (QmiClientUim *client,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    GError *error = NULL;
+    GArray *read_result;
+    gchar *iccid;
+
+    read_result = uim_read_finish (client, res, &error);
+    if (!read_result) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    iccid = mm_bcd_to_string ((const guint8 *) read_result->data, read_result->len);
+    g_assert (iccid);
+    g_task_return_pointer (task, iccid, g_free);
+    g_object_unref (task);
+
+    g_array_unref (read_result);
+}
+
+static void
+uim_get_iccid (MMSimQmi *self,
+               GTask    *task)
+{
+    static const guint16 file_path[] = { 0x3F00 };
+
+    uim_read (self,
+              0x2FE2,
+              file_path,
+              G_N_ELEMENTS (file_path),
+              (GAsyncReadyCallback)uim_get_iccid_ready,
+              task);
 }
 
 static void
@@ -128,26 +266,40 @@ dms_uim_get_iccid_ready (QmiClientDms *client,
 }
 
 static void
-load_sim_identifier (MMBaseSim           *self,
-                     GAsyncReadyCallback  callback,
-                     gpointer             user_data)
+dms_uim_get_iccid (MMSimQmi *self,
+                   GTask    *task)
 {
-    GTask *task;
     QmiClient *client = NULL;
 
-    task = g_task_new (self, NULL, callback, user_data);
     if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_DMS, &client))
         return;
 
-    mm_dbg ("loading SIM identifier...");
     qmi_client_dms_uim_get_iccid (QMI_CLIENT_DMS (client),
                                   NULL,
                                   5,
                                   NULL,
                                   (GAsyncReadyCallback)dms_uim_get_iccid_ready,
                                   task);
+}
+
+static void
+load_sim_identifier (MMBaseSim           *_self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    MMSimQmi *self;
+    GTask *task;
+
+    self = MM_SIM_QMI (_self);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_dbg ("loading SIM identifier...");
+    if (!self->priv->dms_uim_deprecated)
+        dms_uim_get_iccid (self, task);
+    else
+        uim_get_iccid (self, task);
 }
 
 /*****************************************************************************/
