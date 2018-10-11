@@ -314,6 +314,55 @@ load_imsi_finish (MMBaseSim     *self,
 }
 
 static void
+uim_get_imsi_ready (QmiClientUim *client,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    GError *error = NULL;
+    GArray *read_result;
+    gchar *imsi;
+
+    read_result = uim_read_finish (client, res, &error);
+    if (!read_result) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    imsi = mm_bcd_to_string ((const guint8 *) read_result->data, read_result->len);
+    g_assert (imsi);
+    if (strlen (imsi) < 3)
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "IMSI is malformed");
+    else
+        /* EFimsi contains a length byte, follwed by a nibble for parity,
+         * and then followed by the actual IMSI in BCD. After converting
+         * the BCD into a decimal string, we simply skip the first 3
+         * decimal digits to obtain the IMSI. */
+        g_task_return_pointer (task, g_strdup (imsi + 3), g_free);
+    g_object_unref (task);
+
+    g_free (imsi);
+    g_array_unref (read_result);
+}
+
+static void
+uim_get_imsi (MMSimQmi *self,
+              GTask    *task)
+{
+    static const guint16 file_path[] = { 0x3F00, 0x7FFF };
+
+    uim_read (self,
+              0x6F07,
+              file_path,
+              G_N_ELEMENTS (file_path),
+              (GAsyncReadyCallback)uim_get_imsi_ready,
+              task);
+}
+
+static void
 dms_uim_get_imsi_ready (QmiClientDms *client,
                         GAsyncResult *res,
                         GTask        *task)
@@ -342,26 +391,40 @@ dms_uim_get_imsi_ready (QmiClientDms *client,
 }
 
 static void
-load_imsi (MMBaseSim           *self,
-           GAsyncReadyCallback callback,
-           gpointer            user_data)
+dms_uim_get_imsi (MMSimQmi *self,
+                  GTask    *task)
 {
-    GTask *task;
     QmiClient *client = NULL;
 
-    task = g_task_new (self, NULL, callback, user_data);
     if (!ensure_qmi_client (task,
-                            MM_SIM_QMI (self),
+                            self,
                             QMI_SERVICE_DMS, &client))
         return;
 
-    mm_dbg ("loading IMSI...");
     qmi_client_dms_uim_get_imsi (QMI_CLIENT_DMS (client),
                                  NULL,
                                  5,
                                  NULL,
                                  (GAsyncReadyCallback)dms_uim_get_imsi_ready,
                                  task);
+}
+
+static void
+load_imsi (MMBaseSim           *_self,
+           GAsyncReadyCallback  callback,
+           gpointer             user_data)
+{
+    MMSimQmi *self;
+    GTask *task;
+
+    self = MM_SIM_QMI (_self);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_dbg ("loading IMSI...");
+    if (!self->priv->dms_uim_deprecated)
+        dms_uim_get_imsi (self, task);
+    else
+        uim_get_imsi (self, task);
 }
 
 /*****************************************************************************/
