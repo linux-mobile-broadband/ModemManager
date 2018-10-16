@@ -14,6 +14,8 @@
  * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
+#include <string.h>
+
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 
