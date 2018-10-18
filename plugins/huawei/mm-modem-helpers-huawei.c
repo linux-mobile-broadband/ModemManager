@@ -257,8 +257,7 @@ mm_huawei_parse_dhcp_response (const char *reply,
         }
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
     return matched;
 }
@@ -324,8 +323,7 @@ mm_huawei_parse_sysinfo_response (const char *reply,
         }
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
     return matched;
 }
@@ -389,8 +387,7 @@ mm_huawei_parse_sysinfoex_response (const char *reply,
         mm_get_uint_from_match_info (match_info, 8, out_sys_submode);
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
     return matched;
 }
@@ -1257,8 +1254,7 @@ gboolean mm_huawei_parse_nwtime_response (const gchar *response,
         }
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     return ret;
@@ -1329,8 +1325,7 @@ gboolean mm_huawei_parse_time_response (const gchar *response,
         }
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     return ret;
@@ -1400,8 +1395,7 @@ mm_huawei_parse_hcsq_response (const gchar *response,
     ret = TRUE;
 
 done:
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     return ret;
@@ -1463,8 +1457,7 @@ mm_huawei_parse_cvoice_response (const gchar  *response,
         }
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     return ret;

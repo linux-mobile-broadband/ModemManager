@@ -317,8 +317,7 @@ wwsm_read_ready (MMBaseModem  *self,
     g_object_unref (task);
 
     g_regex_unref (r);
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
 }
 
 static void

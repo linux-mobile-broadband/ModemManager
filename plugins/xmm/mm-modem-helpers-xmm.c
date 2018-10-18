@@ -449,8 +449,7 @@ mm_xmm_parse_xact_query_response (const gchar             *response,
     /* success */
 
 out:
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -672,9 +671,7 @@ mm_xmm_parse_xcesq_query_response (const gchar  *response,
     }
 
 out:
-
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -996,8 +993,7 @@ mm_xmm_parse_xlcsslp_query_response (const gchar  *response,
     }
 
 out:
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {

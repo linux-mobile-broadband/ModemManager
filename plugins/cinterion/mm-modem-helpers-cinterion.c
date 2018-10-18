@@ -147,8 +147,7 @@ mm_cinterion_parse_scfg_test (const gchar *response,
         g_free (maxbandstr);
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (!bands)
@@ -234,8 +233,7 @@ mm_cinterion_parse_scfg_response (const gchar *response,
         g_free (currentstr);
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (!bands)
@@ -341,8 +339,7 @@ mm_cinterion_parse_cnmi_test (const gchar *response,
 
 out:
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -457,8 +454,7 @@ mm_cinterion_parse_sind_response (const gchar *response,
     } else
         errors++;
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (errors > 0) {

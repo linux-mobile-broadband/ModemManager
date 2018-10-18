@@ -1158,8 +1158,7 @@ parse_nwltime_reply (const char *response,
     else
         g_free (result);
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
     return success;
 }

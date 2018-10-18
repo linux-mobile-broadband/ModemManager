@@ -159,8 +159,7 @@ mm_mbm_parse_e2ipcfg_response (const gchar *response,
     }
 
 done:
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
     return !!*ip_config;
 }

@@ -67,8 +67,7 @@ mm_sierra_parse_scact_read_response (const gchar  *reply,
         g_match_info_next (match_info, &inner_error);
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {

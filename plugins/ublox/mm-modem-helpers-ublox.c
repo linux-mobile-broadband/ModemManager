@@ -78,8 +78,7 @@ mm_ublox_parse_upincnt_response (const gchar  *response,
 
 out:
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -144,8 +143,7 @@ mm_ublox_parse_uusbconf_response (const gchar        *response,
         g_free (profile_name);
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -205,8 +203,7 @@ mm_ublox_parse_ubmconf_response (const gchar            *response,
         }
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -292,8 +289,7 @@ mm_ublox_parse_uipaddr_response (const gchar  *response,
 
 out:
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -982,8 +978,7 @@ mm_ublox_parse_uact_response (const gchar  *response,
         g_free (bandstr);
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -1097,8 +1092,7 @@ mm_ublox_parse_uact_test (const gchar  *response,
 
 out:
     g_strfreev (split);
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -1229,8 +1223,7 @@ out:
     g_free (allowed_str);
     g_free (preferred_str);
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -1449,8 +1442,7 @@ mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
 
 out:
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {

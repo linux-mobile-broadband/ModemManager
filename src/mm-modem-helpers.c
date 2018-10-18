@@ -1303,8 +1303,7 @@ mm_3gpp_parse_cops_read_response (const gchar              *response,
     }
 
 out:
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -1608,8 +1607,7 @@ mm_3gpp_parse_cgact_read_response (const gchar *reply,
         g_match_info_next (match_info, &inner_error);
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -2152,9 +2150,7 @@ mm_3gpp_parse_cgcontrdp_response (const gchar  *response,
         dns_secondary_address = mm_get_string_unquoted_from_match_info (match_info, 7 + field_format_extra_index);
 
 out:
-
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     g_free (local_address_and_subnet);
@@ -2238,8 +2234,7 @@ mm_3gpp_parse_cfun_query_response (const gchar  *response,
     *out_state = state;
 
 out:
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -2317,9 +2312,7 @@ mm_3gpp_parse_cesq_response (const gchar  *response,
     }
 
 out:
-
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (inner_error) {
@@ -2725,8 +2718,7 @@ end:
     if (r != NULL)
         g_regex_unref (r);
 
-    if (match_info != NULL)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
 
     return ret;
 }
@@ -4321,9 +4313,7 @@ mm_parse_cclk_response (const char *response,
     ret = TRUE;
 
  out:
-
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     return ret;

@@ -405,8 +405,7 @@ load_current_modes_finish (MMIfaceModem *self,
         g_assert_not_reached ();
 
 done:
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     if (r)
         g_regex_unref (r);
 

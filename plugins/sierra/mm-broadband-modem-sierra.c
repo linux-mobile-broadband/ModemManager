@@ -727,8 +727,7 @@ selrat_query_ready (MMBaseModem *self,
                              "Could not parse allowed mode response: Response didn't match: '%s'",
                              response);
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (error) {
@@ -1382,8 +1381,7 @@ parse_time (const gchar *response,
         }
     }
 
-    if (match_info)
-        g_match_info_free (match_info);
+    g_match_info_free (match_info);
     g_regex_unref (r);
     return result;
 }
