@@ -1376,8 +1376,7 @@ detailed_disconnect_finish (MMBroadbandBearer *self,
 static void
 detailed_disconnect_context_free (DetailedDisconnectContext *ctx)
 {
-    if (ctx->cgact_command)
-        g_free (ctx->cgact_command);
+    g_free (ctx->cgact_command);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     if (ctx->secondary)

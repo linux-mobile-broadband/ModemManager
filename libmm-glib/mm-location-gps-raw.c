@@ -217,8 +217,7 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
 
     if (g_regex_match (self->priv->gga_regex, trace, 0, &match_info)) {
         /* UTC time */
-        if (self->priv->utc_time)
-            g_free (self->priv->utc_time);
+        g_free (self->priv->utc_time);
         self->priv->utc_time = g_match_info_fetch (match_info, 1);
 
         /* Latitude */

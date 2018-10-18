@@ -215,10 +215,8 @@ generate_3gpp_submit_pdus (MMBaseSms *self,
     }
 
     /* Free array (not contents, which were taken for the part) */
-    if (split_text)
-        g_free (split_text);
-    if (split_data)
-        g_free (split_data);
+    g_free (split_text);
+    g_free (split_data);
 
     /* Set additional multipart specific properties */
     if (n_parts > 1) {
