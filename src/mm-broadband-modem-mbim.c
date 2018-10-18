@@ -2421,14 +2421,8 @@ update_registration_info (MMBroadbandModemMbim *self,
             self->priv->current_operator_name = operator_name_take;
         }
     } else {
-        if (self->priv->current_operator_id) {
-            g_free (self->priv->current_operator_id);
-            self->priv->current_operator_id = NULL;
-        }
-        if (self->priv->current_operator_name) {
-            g_free (self->priv->current_operator_name);
-            self->priv->current_operator_name = NULL;
-        }
+        g_clear_pointer (&self->priv->current_operator_id, g_free);
+        g_clear_pointer (&self->priv->current_operator_name, g_free);
         g_free (operator_id_take);
         g_free (operator_name_take);
     }

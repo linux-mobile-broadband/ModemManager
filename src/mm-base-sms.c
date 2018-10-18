@@ -939,10 +939,7 @@ sms_store_next_part (GTask *task)
         return;
     }
 
-    if (ctx->msg_data) {
-        g_free (ctx->msg_data);
-        ctx->msg_data = NULL;
-    }
+    g_clear_pointer (&ctx->msg_data, g_free);
 
     if (!sms_get_store_or_send_command ((MMSmsPart *)ctx->current->data,
                                         ctx->use_pdu_mode,
@@ -1218,10 +1215,7 @@ sms_send_next_part (GTask *task)
 
     /* Generic send */
 
-    if (ctx->msg_data) {
-        g_free (ctx->msg_data);
-        ctx->msg_data = NULL;
-    }
+    g_clear_pointer (&ctx->msg_data, g_free);
 
     if (!sms_get_store_or_send_command ((MMSmsPart *)ctx->current->data,
                                         ctx->use_pdu_mode,
