@@ -16,6 +16,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 #include <glib.h>
 #include <glib-object.h>
 #include <locale.h>
@@ -59,7 +60,7 @@ typedef struct {
 } CeerTest;
 
 static const CeerTest ceer_tests[] = {
-    { "", "" }, /* Special case, sometimes the response is empty, treat it as a valid response. */
+    { "", "" }, /* Special case, sometimes the response is empty, treat it as a good response. */
     { "+CEER:", "" },
     { "+CEER: EPS_AND_NON_EPS_SERVICES_NOT_ALLOWED", "EPS_AND_NON_EPS_SERVICES_NOT_ALLOWED" },
     { "+CEER: NO_SUITABLE_CELLS_IN_TRACKING_AREA", "NO_SUITABLE_CELLS_IN_TRACKING_AREA" },
@@ -97,45 +98,81 @@ test_parse_cid (void)
     g_assert (mm_altair_parse_cid ("%CGINFO:blah", NULL) == -1);
 }
 
+/*****************************************************************************/
+/* Test %PCOINFO responses */
+
+typedef struct {
+    const gchar *pco_info;
+    guint32 session_id;
+    gsize pco_data_size;
+    guint8 pco_data[50];
+} TestValidPcoInfo;
+
+static const TestValidPcoInfo good_pco_infos[] = {
+    /* Valid PCO values */
+    { "%PCOINFO: 1,1,FF00,13018400", 1, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x00 } },
+    { "%PCOINFO: 1,1,FF00,13018403", 1, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x03 } },
+    { "%PCOINFO: 1,1,FF00,13018405", 1, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x05 } },
+    { "%PCOINFO: 1,3,FF00,13018400", 3, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x00 } },
+    { "%PCOINFO: 1,3,FF00,13018403", 3, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x03 } },
+    { "%PCOINFO: 1,3,FF00,13018405", 3, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x05 } },
+    { "%PCOINFO:1,FF00,13018400", 1, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x00 } },
+    { "%PCOINFO:1,FF00,13018403", 1, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x03 } },
+    { "%PCOINFO:1,FF00,13018405", 1, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x05 } },
+    /* Different payload */
+    { "%PCOINFO: 1,3,FF00,130185", 3, 9,
+      { 0x27, 0x07, 0x80, 0xFF, 0x00, 0x03, 0x13, 0x01, 0x85 } },
+    /* Multiline PCO info */
+    { "%PCOINFO: 1,2,FF00,13018400\r\n%PCOINFO: 1,3,FF00,13018403", 3, 10,
+      { 0x27, 0x08, 0x80, 0xFF, 0x00, 0x04, 0x13, 0x01, 0x84, 0x03 } },
+};
+
+static const gchar *bad_pco_infos[] = {
+    /* Different container */
+    "%PCOINFO: 1,3,F000,13018401",
+    /* Ingood CID */
+    "%PCOINFO: 1,2,FF00,13018401",
+    /* Bad PCO info */
+    "%PCOINFO: blah,blah,FF00,13018401",
+    /* Bad PCO payload */
+    "%PCOINFO: 1,1,FF00,130184011",
+};
+
 static void
 test_parse_vendor_pco_info (void)
 {
-    guint pco_value;
+    MMPco *pco;
+    guint i;
 
-    /* Valid PCO values */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,1,FF00,13018400", NULL);
-    g_assert (pco_value == 0);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,1,FF00,13018403", NULL);
-    g_assert (pco_value == 3);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,1,FF00,13018405", NULL);
-    g_assert (pco_value == 5);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018400", NULL);
-    g_assert (pco_value == 0);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018403", NULL);
-    g_assert (pco_value == 3);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018405", NULL);
-    g_assert (pco_value == 5);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO:1,FF00,13018400", NULL);
-    g_assert (pco_value == 0);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO:1,FF00,13018403", NULL);
-    g_assert (pco_value == 3);
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO:1,FF00,13018405", NULL);
-    g_assert (pco_value == 5);
-    /* Different container */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,F000,13018401", NULL);
-    g_assert (pco_value == -1);
-    /* Invalid CID */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,2,FF00,13018401", NULL);
-    g_assert (pco_value == -1);
-    /* Different payload */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,3,FF00,13018501", NULL);
-    g_assert (pco_value == -1);
-    /* Bad PCO info */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: blah,blah,FF00,13018401", NULL);
-    g_assert (pco_value == -1);
-    /* Multiline PCO info */
-    pco_value = mm_altair_parse_vendor_pco_info ("%PCOINFO: 1,2,FF00,13018400\r\n%PCOINFO: 1,3,FF00,13018403", NULL);
-    g_assert (pco_value == 3);
+    for (i = 0; i < G_N_ELEMENTS (good_pco_infos); ++i) {
+        const guint8 *pco_data;
+        gsize pco_data_size;
+
+        pco = mm_altair_parse_vendor_pco_info (good_pco_infos[i].pco_info, NULL);
+        g_assert (pco != NULL);
+        g_assert_cmpuint (mm_pco_get_session_id (pco), ==, good_pco_infos[i].session_id);
+        g_assert (mm_pco_is_complete (pco));
+        pco_data = mm_pco_get_data (pco, &pco_data_size);
+        g_assert (pco_data != NULL);
+        g_assert_cmpuint (pco_data_size, ==, good_pco_infos[i].pco_data_size);
+        g_assert_cmpmem (pco_data, pco_data_size,
+                         good_pco_infos[i].pco_data, good_pco_infos[i].pco_data_size);
+        g_object_unref (pco);
+    }
+
+    for (i = 0; i < G_N_ELEMENTS (bad_pco_infos); ++i) {
+        pco = mm_altair_parse_vendor_pco_info (bad_pco_infos[i], NULL);
+        g_assert (pco == NULL);
+    }
 }
 
 int main (int argc, char **argv)

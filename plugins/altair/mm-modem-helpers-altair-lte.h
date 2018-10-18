@@ -19,6 +19,9 @@
 
 #include <glib.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 /* Bands response parser */
 GArray *mm_altair_parse_bands_response (const gchar *response);
 
@@ -30,6 +33,6 @@ gchar *mm_altair_parse_ceer_response (const gchar *response,
 guint mm_altair_parse_cid (const gchar *response, GError **error);
 
 /* %PCOINFO response parser */
-guint mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error);
+MMPco *mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error);
 
 #endif  /* MM_MODEM_HELPERS_ALTAIR_H */

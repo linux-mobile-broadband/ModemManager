@@ -141,62 +141,17 @@ mm_altair_parse_cid (const gchar *response, GError **error)
 /*****************************************************************************/
 /* %PCOINFO response parser */
 
-typedef enum {
-    MM_VZW_PCO_PROVISIONED = 0,
-    MM_VZW_PCO_LIMIT_REACHED = 1,
-    MM_VZW_PCO_OUT_OF_DATA = 3,
-    MM_VZW_PCO_UNPROVISIONED = 5
-} MMVzwPco;
-
-static guint
-altair_extract_vzw_pco_value (const gchar *pco_payload, GError **error)
-{
-    GRegex *regex;
-    GMatchInfo *match_info;
-    guint pco_value = -1;
-
-    /* Extract PCO value from PCO payload.
-     * The PCO value in the VZW network is after the VZW PLMN (MCC+MNC 311-480).
-     */
-    regex = g_regex_new ("130184(\\d+)", G_REGEX_RAW, 0, NULL);
-    g_assert (regex);
-    if (!g_regex_match_full (regex,
-                             pco_payload,
-                             strlen (pco_payload),
-                             0,
-                             0,
-                             &match_info,
-                             error)) {
-        g_match_info_free (match_info);
-        g_regex_unref (regex);
-        return -1;
-    }
-
-    if (!g_match_info_matches (match_info) ||
-        !mm_get_uint_from_match_info (match_info, 1, &pco_value))
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Failed to parse PCO value from PCO payload: '%s'",
-                     pco_payload);
-
-    g_match_info_free (match_info);
-    g_regex_unref (regex);
-
-    return pco_value;
-}
-
-guint
+MMPco *
 mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
 {
     GRegex *regex;
     GMatchInfo *match_info;
-    guint pco_value = -1;
+    MMPco *pco = NULL;
     gint num_matches;
 
     if (!pco_info[0])
         /* No APNs configured, all done */
-        return -1;
+        return NULL;
 
     /* Expected %PCOINFO response:
      *
@@ -210,7 +165,7 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
     if (!g_regex_match_full (regex, pco_info, strlen (pco_info), 0, 0, &match_info, error)) {
         g_match_info_free (match_info);
         g_regex_unref (regex);
-        return -1;
+        return NULL;
     }
 
     num_matches = g_match_info_get_match_count (match_info);
@@ -222,13 +177,19 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
                      num_matches);
         g_match_info_free (match_info);
         g_regex_unref (regex);
-        return -1;
+        return NULL;
     }
 
     while (g_match_info_matches (match_info)) {
         guint pco_cid;
         gchar *pco_id;
         gchar *pco_payload;
+        gsize pco_payload_len;
+        gchar *pco_payload_bytes = NULL;
+        gsize pco_payload_bytes_len;
+        guint8 pco_prefix[6];
+        GByteArray *pco_raw;
+        gsize pco_raw_len;
 
         if (!mm_get_uint_from_match_info (match_info, 1, &pco_cid)) {
             g_set_error (error,
@@ -237,6 +198,12 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
                          "Couldn't parse CID from PCO info: '%s'",
                          pco_info);
             break;
+        }
+
+        /* We are only interested in IMS and Internet PDN PCO. */
+        if (pco_cid != MM_ALTAIR_IMS_PDN_CID && pco_cid != MM_ALTAIR_INTERNET_PDN_CID) {
+            g_match_info_next (match_info, error);
+            continue;
         }
 
         pco_id = mm_get_string_unquoted_from_match_info (match_info, 3);
@@ -265,20 +232,64 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
             break;
         }
 
-        pco_value = altair_extract_vzw_pco_value (pco_payload, error);
+        pco_payload_len = strlen (pco_payload);
+        if (pco_payload_len % 2 == 0)
+            pco_payload_bytes = mm_utils_hexstr2bin (pco_payload, &pco_payload_bytes_len);
+
         g_free (pco_payload);
 
-        /* We are only interested in IMS and Internet PDN PCO. */
-        if (pco_cid == MM_ALTAIR_IMS_PDN_CID || pco_cid == MM_ALTAIR_INTERNET_PDN_CID) {
+        if (!pco_payload_bytes) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Invalid PCO payload from PCO info: '%s'",
+                         pco_info);
             break;
         }
 
-        pco_value = -1;
-        g_match_info_next (match_info, error);
+        /* Protocol Configuration Options (PCO) is an information element with an
+         * identifier (IEI) 0x27 and contains between 3 and 253 octets. See 3GPP TS
+         * 24.008 for more details on PCO.
+         *
+         * NOTE: The standard uses one-based indexing, but to better correlate to the
+         *       code, zero-based indexing is used in the description hereinafter.
+         *
+         *   Octet  | Value
+         *  --------+--------------------------------------------
+         *     0    | PCO IEI (= 0x27)
+         *     1    | Length of PCO contents (= total length - 2)
+         *     2    | bit 7      : ext
+         *          | bit 6 to 3 : spare (= 0b0000)
+         *          | bit 2 to 0 : Configuration protocol
+         *   3 to 4 | Element 1 ID
+         *     5    | Length of element 1 contents
+         *   6 to m | Element 1 contents
+         *    ...   |
+         */
+        pco_raw_len = sizeof (pco_prefix) + pco_payload_bytes_len;
+        pco_prefix[0] = 0x27;
+        pco_prefix[1] = pco_raw_len - 2;
+        pco_prefix[2] = 0x80;
+        /* Verizon uses element ID 0xFF00 for carrier-specific PCO content. */
+        pco_prefix[3] = 0xFF;
+        pco_prefix[4] = 0x00;
+        pco_prefix[5] = pco_payload_bytes_len;
+
+        pco_raw = g_byte_array_sized_new (pco_raw_len);
+        g_byte_array_append (pco_raw, pco_prefix, sizeof (pco_prefix));
+        g_byte_array_append (pco_raw, (guint8 *)pco_payload_bytes, pco_payload_bytes_len);
+        g_free (pco_payload_bytes);
+
+        pco = mm_pco_new ();
+        mm_pco_set_session_id (pco, pco_cid);
+        mm_pco_set_complete (pco, TRUE);
+        mm_pco_set_data (pco, pco_raw->data, pco_raw->len);
+        g_byte_array_unref (pco_raw);
+        break;
     }
 
     g_match_info_free (match_info);
     g_regex_unref (regex);
 
-    return pco_value;
+    return pco;
 }
