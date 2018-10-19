@@ -125,6 +125,7 @@ MMFlowControl mm_flow_control_from_string (const gchar  *str,
 GPtrArray *mm_3gpp_creg_regex_get     (gboolean solicited);
 void       mm_3gpp_creg_regex_destroy (GPtrArray *array);
 GRegex    *mm_3gpp_ciev_regex_get (void);
+GRegex    *mm_3gpp_cgev_regex_get (void);
 GRegex    *mm_3gpp_cusd_regex_get (void);
 GRegex    *mm_3gpp_cmti_regex_get (void);
 GRegex    *mm_3gpp_cds_regex_get (void);
@@ -271,6 +272,47 @@ gint         mm_3gpp_cind_response_get_max       (MM3gppCindResponse *r);
 /* AT+CIND? (Current indicators) response parser */
 GByteArray *mm_3gpp_parse_cind_read_response (const gchar *reply,
                                               GError **error);
+
+/* +CGEV indication parser */
+typedef enum {
+    MM_3GPP_CGEV_UNKNOWN,
+    MM_3GPP_CGEV_NW_DETACH,
+    MM_3GPP_CGEV_ME_DETACH,
+    MM_3GPP_CGEV_NW_CLASS,
+    MM_3GPP_CGEV_ME_CLASS,
+    MM_3GPP_CGEV_NW_ACT_PRIMARY,
+    MM_3GPP_CGEV_ME_ACT_PRIMARY,
+    MM_3GPP_CGEV_NW_ACT_SECONDARY,
+    MM_3GPP_CGEV_ME_ACT_SECONDARY,
+    MM_3GPP_CGEV_NW_DEACT_PRIMARY,
+    MM_3GPP_CGEV_ME_DEACT_PRIMARY,
+    MM_3GPP_CGEV_NW_DEACT_SECONDARY,
+    MM_3GPP_CGEV_ME_DEACT_SECONDARY,
+    MM_3GPP_CGEV_NW_DEACT_PDP,
+    MM_3GPP_CGEV_ME_DEACT_PDP,
+    MM_3GPP_CGEV_NW_MODIFY,
+    MM_3GPP_CGEV_ME_MODIFY,
+    MM_3GPP_CGEV_REJECT,
+    MM_3GPP_CGEV_NW_REACT,
+} MM3gppCgev;
+
+MM3gppCgev mm_3gpp_parse_cgev_indication_action    (const gchar *str);
+gboolean   mm_3gpp_parse_cgev_indication_pdp       (const gchar  *str,
+                                                    MM3gppCgev    type,
+                                                    gchar       **out_pdp_type,
+                                                    gchar       **out_pdp_addr,
+                                                    guint        *out_cid,
+                                                    GError      **error);
+gboolean   mm_3gpp_parse_cgev_indication_primary   (const gchar  *str,
+                                                    MM3gppCgev    type,
+                                                    guint        *out_cid,
+                                                    GError      **error);
+gboolean   mm_3gpp_parse_cgev_indication_secondary (const gchar  *str,
+                                                    MM3gppCgev    type,
+                                                    guint        *out_p_cid,
+                                                    guint        *out_cid,
+                                                    guint        *out_event_type,
+                                                    GError      **error);
 
 /* AT+CMGL=4 (list sms parts) response parser */
 typedef struct {

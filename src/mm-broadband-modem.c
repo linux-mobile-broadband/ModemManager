@@ -157,6 +157,8 @@ struct _MMBroadbandModemPrivate {
     MM3gppCmerMode modem_cmer_enable_mode;
     MM3gppCmerMode modem_cmer_disable_mode;
     MM3gppCmerInd modem_cmer_ind;
+    gboolean modem_cgerep_support_checked;
+    gboolean modem_cgerep_supported;
     MMFlowControl flow_control;
 
     /*<--- Modem 3GPP interface --->*/
@@ -2663,6 +2665,269 @@ modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
 }
 
 static void
+bearer_report_disconnected (MMBaseBearer *bearer,
+                            gpointer      user_data)
+{
+    guint cid;
+
+    cid = GPOINTER_TO_UINT (user_data);
+
+    /* If we're told to disconnect a single context and this is not the
+     * bearer associated to that context, ignore operation */
+    if (cid > 0 &&
+        MM_IS_BROADBAND_BEARER (bearer) &&
+        mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != cid)
+        return;
+
+    /* If already disconnected, ignore operation */
+    if (mm_base_bearer_get_status (bearer) == MM_BEARER_STATUS_DISCONNECTED)
+        return;
+
+    mm_info ("Bearer %s: explicitly disconnected", mm_base_bearer_get_path (bearer));
+    mm_base_bearer_report_connection_status (bearer, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+}
+
+static void
+bearer_list_report_disconnections (MMBroadbandModem *self,
+                                   guint             cid)
+{
+    MMBearerList *list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    /* If empty bearer list, nothing else to do */
+    if (!list)
+        return;
+
+    mm_bearer_list_foreach (list, (MMBearerListForeachFunc)bearer_report_disconnected, GUINT_TO_POINTER (cid));
+    g_object_unref (list);
+}
+
+static void
+cgev_process_detach (MMBroadbandModem *self,
+                     MM3gppCgev        type)
+{
+    switch (type) {
+    case MM_3GPP_CGEV_NW_DETACH:
+        mm_info ("network forced PS detach: all contexts have been deactivated");
+        bearer_list_report_disconnections (self, 0);
+        break;
+    case MM_3GPP_CGEV_ME_DETACH:
+        mm_info ("mobile equipment forced PS detach: all contexts have been deactivated");
+        bearer_list_report_disconnections (self, 0);
+        break;
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static void
+cgev_process_primary (MMBroadbandModem *self,
+                      MM3gppCgev        type,
+                      const gchar      *str)
+{
+    GError *error = NULL;
+    guint   cid = 0;
+
+    if (!mm_3gpp_parse_cgev_indication_primary (str, type, &cid, &error)) {
+        mm_warn ("couldn't parse cid info from +CGEV indication '%s': %s", str, error->message);
+        g_error_free (error);
+        return;
+    }
+
+    switch (type) {
+    case MM_3GPP_CGEV_NW_ACT_PRIMARY:
+        mm_info ("network request to activate context (cid %u)", cid);
+        break;
+    case MM_3GPP_CGEV_ME_ACT_PRIMARY:
+        mm_info ("mobile equipment request to activate context (cid %u)", cid);
+        break;
+    case MM_3GPP_CGEV_NW_DEACT_PRIMARY:
+        mm_info ("network request to deactivate context (cid %u)", cid);
+        bearer_list_report_disconnections (self, cid);
+        break;
+    case MM_3GPP_CGEV_ME_DEACT_PRIMARY:
+        mm_info ("mobile equipment request to deactivate context (cid %u)", cid);
+        bearer_list_report_disconnections (self, cid);
+        break;
+    default:
+        g_assert_not_reached ();
+        break;
+    }
+}
+
+static void
+cgev_process_secondary (MMBroadbandModem *self,
+                        MM3gppCgev        type,
+                        const gchar      *str)
+{
+    GError *error = NULL;
+    guint   p_cid = 0;
+    guint   cid = 0;
+
+    if (!mm_3gpp_parse_cgev_indication_secondary (str, type, &p_cid, &cid, NULL, &error)) {
+        mm_warn ("couldn't parse p_cid/cid info from +CGEV indication '%s': %s", str, error->message);
+        g_error_free (error);
+        return;
+    }
+
+    switch (type) {
+    case MM_3GPP_CGEV_NW_ACT_SECONDARY:
+        mm_info ("network request to activate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        break;
+    case MM_3GPP_CGEV_ME_ACT_SECONDARY:
+        mm_info ("mobile equipment request to activate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        break;
+    case MM_3GPP_CGEV_NW_DEACT_SECONDARY:
+        mm_info ("network request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        bearer_list_report_disconnections (self, cid);
+        break;
+    case MM_3GPP_CGEV_ME_DEACT_SECONDARY:
+        mm_info ("mobile equipment request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
+        bearer_list_report_disconnections (self, cid);
+        break;
+    default:
+        g_assert_not_reached ();
+        break;
+    }
+}
+
+static void
+cgev_process_pdp (MMBroadbandModem *self,
+                  MM3gppCgev        type,
+                  const gchar      *str)
+{
+    GError *error = NULL;
+    gchar  *pdp_type = NULL;
+    gchar  *pdp_addr = NULL;
+    guint   cid = 0;
+
+    if (!mm_3gpp_parse_cgev_indication_pdp (str, type, &pdp_type, &pdp_addr, &cid, &error)) {
+        mm_warn ("couldn't parse PDP info from +CGEV indication '%s': %s", str, error->message);
+        g_error_free (error);
+        return;
+    }
+
+    switch (type) {
+    case MM_3GPP_CGEV_REJECT:
+        mm_info ("network request to activate context (type %s, address %s) has been automatically rejected", pdp_type, pdp_addr);
+        break;
+    case MM_3GPP_CGEV_NW_REACT:
+        /* NOTE: we don't currently notify about automatic reconnections like this one */
+        if (cid)
+            mm_info ("network request to reactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
+        else
+            mm_info ("network request to reactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
+        break;
+    case MM_3GPP_CGEV_NW_DEACT_PDP:
+        if (cid) {
+            mm_info ("network request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
+            bearer_list_report_disconnections (self, cid);
+        } else
+            mm_info ("network request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
+        break;
+    case MM_3GPP_CGEV_ME_DEACT_PDP:
+        if (cid) {
+            mm_info ("mobile equipment request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
+            bearer_list_report_disconnections (self, cid);
+        } else
+            mm_info ("mobile equipment request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
+        break;
+    default:
+        g_assert_not_reached ();
+        break;
+    }
+
+    g_free (pdp_addr);
+    g_free (pdp_type);
+}
+
+static void
+cgev_received (MMPortSerialAt   *port,
+               GMatchInfo       *info,
+               MMBroadbandModem *self)
+{
+    gchar      *str;
+    MM3gppCgev  type;
+
+    str = mm_get_string_unquoted_from_match_info (info, 1);
+    if (!str)
+        return;
+
+    type = mm_3gpp_parse_cgev_indication_action (str);
+
+    switch (type) {
+    case MM_3GPP_CGEV_NW_DETACH:
+    case MM_3GPP_CGEV_ME_DETACH:
+        cgev_process_detach (self, type);
+        break;
+    case MM_3GPP_CGEV_NW_ACT_PRIMARY:
+    case MM_3GPP_CGEV_ME_ACT_PRIMARY:
+    case MM_3GPP_CGEV_NW_DEACT_PRIMARY:
+    case MM_3GPP_CGEV_ME_DEACT_PRIMARY:
+        cgev_process_primary (self, type, str);
+        break;
+    case MM_3GPP_CGEV_NW_ACT_SECONDARY:
+    case MM_3GPP_CGEV_ME_ACT_SECONDARY:
+    case MM_3GPP_CGEV_NW_DEACT_SECONDARY:
+    case MM_3GPP_CGEV_ME_DEACT_SECONDARY:
+        cgev_process_secondary (self, type, str);
+        break;
+    case MM_3GPP_CGEV_NW_DEACT_PDP:
+    case MM_3GPP_CGEV_ME_DEACT_PDP:
+    case MM_3GPP_CGEV_REJECT:
+    case MM_3GPP_CGEV_NW_REACT:
+        cgev_process_pdp (self, type, str);
+        break;
+    case MM_3GPP_CGEV_NW_CLASS:
+    case MM_3GPP_CGEV_ME_CLASS:
+    case MM_3GPP_CGEV_NW_MODIFY:
+    case MM_3GPP_CGEV_ME_MODIFY:
+        /* ignore */
+        break;
+    default:
+        mm_dbg ("unhandled +CGEV indication: %s", str);
+        break;
+    }
+
+    g_free (str);
+}
+
+static void
+set_cgev_unsolicited_events_handlers (MMBroadbandModem *self,
+                                      gboolean          enable)
+{
+    MMPortSerialAt *ports[2];
+    GRegex *cgev_regex;
+    guint i;
+
+    cgev_regex = mm_3gpp_cgev_regex_get ();
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        /* Set/unset unsolicited CGEV event handler */
+        mm_dbg ("(%s) %s 3GPP +CGEV unsolicited events handlers",
+                mm_port_get_device (MM_PORT (ports[i])),
+                enable ? "Setting" : "Removing");
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            cgev_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) cgev_received : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+
+    g_regex_unref (cgev_regex);
+}
+
+static void
 ciev_received (MMPortSerialAt *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
@@ -2701,8 +2966,8 @@ ciev_received (MMPortSerialAt *port,
 }
 
 static void
-set_unsolicited_events_handlers (MMBroadbandModem *self,
-                                 gboolean enable)
+set_ciev_unsolicited_events_handlers (MMBroadbandModem *self,
+                                      gboolean          enable)
 {
     MMPortSerialAt *ports[2];
     GRegex *ciev_regex;
@@ -2718,7 +2983,7 @@ set_unsolicited_events_handlers (MMBroadbandModem *self,
             continue;
 
         /* Set/unset unsolicited CIEV event handler */
-        mm_dbg ("(%s) %s 3GPP unsolicited events handlers",
+        mm_dbg ("(%s) %s 3GPP +CIEV unsolicited events handlers",
                 mm_port_get_device (MM_PORT (ports[i])),
                 enable ? "Setting" : "Removing");
         mm_port_serial_at_add_unsolicited_msg_handler (
@@ -2733,9 +2998,51 @@ set_unsolicited_events_handlers (MMBroadbandModem *self,
 }
 
 static void
-cmer_format_check_ready (MMBroadbandModem   *self,
-                         GAsyncResult       *res,
-                         GTask *task)
+support_checked_setup_unsolicited_events (GTask *task)
+{
+    MMBroadbandModem *self;
+
+    self = g_task_get_source_object (task);
+
+    if (self->priv->modem_cind_supported)
+        set_ciev_unsolicited_events_handlers (self, TRUE);
+
+    if (self->priv->modem_cgerep_supported)
+        set_cgev_unsolicited_events_handlers (self, TRUE);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void check_and_setup_3gpp_urc_support (GTask *task);
+
+static void
+cgerep_format_check_ready (MMBroadbandModem *self,
+                           GAsyncResult     *res,
+                           GTask            *task)
+{
+    GError *error = NULL;
+    const gchar *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!result) {
+        mm_dbg ("+CGEREP check failed, marking packet domain event reporting as unsupported: '%s'", error->message);
+        g_error_free (error);
+        goto out;
+    }
+
+    mm_dbg ("Modem supports packet domain event reporting");
+    self->priv->modem_cgerep_supported = TRUE;
+
+out:
+    /* go on with remaining checks */
+    check_and_setup_3gpp_urc_support (task);
+}
+
+static void
+cmer_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult     *res,
+                         GTask            *task)
 {
     MM3gppCmerMode  supported_modes = MM_3GPP_CMER_MODE_NONE;
     MM3gppCmerInd   supported_inds = MM_3GPP_CMER_IND_NONE;
@@ -2747,9 +3054,7 @@ cmer_format_check_ready (MMBroadbandModem   *self,
     if (error || !mm_3gpp_parse_cmer_test_response (result, &supported_modes, &supported_inds, &error)) {
         mm_dbg ("+CMER check failed, marking indications as unsupported: '%s'", error->message);
         g_error_free (error);
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
-        return;
+        goto out;
     }
 
     aux = mm_3gpp_cmer_mode_build_string_from_mask (supported_modes);
@@ -2789,17 +3094,15 @@ cmer_format_check_ready (MMBroadbandModem   *self,
     mm_dbg ("+CMER indication setting: %s", aux);
     g_free (aux);
 
-    /* Now, keep on setting up the ports */
-    set_unsolicited_events_handlers (self, TRUE);
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+out:
+    /* go on with remaining checks */
+    check_and_setup_3gpp_urc_support (task);
 }
 
 static void
 cind_format_check_ready (MMBroadbandModem *self,
-                         GAsyncResult *res,
-                         GTask *task)
+                         GAsyncResult     *res,
+                         GTask            *task)
 {
     GHashTable *indicators = NULL;
     GError *error = NULL;
@@ -2812,8 +3115,8 @@ cind_format_check_ready (MMBroadbandModem *self,
         /* unsupported indications */
         mm_dbg ("+CIND check failed, marking indications as unsupported: '%s'", error->message);
         g_error_free (error);
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
+        /* go on with remaining checks */
+        check_and_setup_3gpp_urc_support (task);
         return;
     }
 
@@ -2866,16 +3169,13 @@ cind_format_check_ready (MMBroadbandModem *self,
 }
 
 static void
-modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *_self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
+check_and_setup_3gpp_urc_support (GTask *task)
 {
-    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
-    GTask *task;
+    MMBroadbandModem *self;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    self = g_task_get_source_object (task);
 
-    /* Load supported indicators */
+    /* Check support for +CIEV indications, managed with +CIND/+CMER */
     if (!self->priv->modem_cind_support_checked) {
         mm_dbg ("Checking indicator support...");
         self->priv->modem_cind_support_checked = TRUE;
@@ -2888,27 +3188,48 @@ modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *_self,
         return;
     }
 
-    /* If supported, go on */
-    if (self->priv->modem_cind_supported)
-        set_unsolicited_events_handlers (self, TRUE);
+    /* Check support for +CGEV indications, managed with +CGEREP */
+    if (!self->priv->modem_cgerep_support_checked) {
+        mm_dbg ("Checking packet domain event reporting...");
+        self->priv->modem_cgerep_support_checked = TRUE;
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CGEREP=?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback)cgerep_format_check_ready,
+                                  task);
+        return;
+    }
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    support_checked_setup_unsolicited_events (task);
 }
 
 static void
-modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
-                                       GAsyncReadyCallback callback,
-                                       gpointer user_data)
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp    *self,
+                                     GAsyncReadyCallback  callback,
+                                     gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    check_and_setup_3gpp_urc_support (task);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp    *_self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /* If supported, go on */
     if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported)
-        set_unsolicited_events_handlers (self, FALSE);
+        set_ciev_unsolicited_events_handlers (self, FALSE);
+
+    if (self->priv->modem_cgerep_supported)
+        set_cgev_unsolicited_events_handlers (self, FALSE);
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -2918,16 +3239,26 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *_self,
 /* Enabling/disabling unsolicited events (3GPP interface) */
 
 typedef struct {
-    gchar *command;
-    gboolean enable;
-    gboolean cmer_primary_done;
-    gboolean cmer_secondary_done;
+    gboolean        enable;
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+    gchar          *cmer_command;
+    gboolean        cmer_primary_done;
+    gboolean        cmer_secondary_done;
+    gchar          *cgerep_command;
+    gboolean        cgerep_primary_done;
+    gboolean        cgerep_secondary_done;
 } UnsolicitedEventsContext;
 
 static void
 unsolicited_events_context_free (UnsolicitedEventsContext *ctx)
 {
-    g_free (ctx->command);
+    if (ctx->secondary)
+        g_object_unref (ctx->secondary);
+    if (ctx->primary)
+        g_object_unref (ctx->primary);
+    g_free (ctx->cgerep_command);
+    g_free (ctx->cmer_command);
     g_free (ctx);
 }
 
@@ -2943,53 +3274,70 @@ static void run_unsolicited_events_setup (GTask *task);
 
 static void
 unsolicited_events_setup_ready (MMBroadbandModem *self,
-                                GAsyncResult *res,
-                                GTask *task)
+                                GAsyncResult     *res,
+                                GTask            *task)
 {
     UnsolicitedEventsContext *ctx;
-    GError *error = NULL;
-
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!error) {
-        /* Run on next port, if any */
-        run_unsolicited_events_setup (task);
-        return;
-    }
+    GError                   *error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    mm_dbg ("Couldn't %s event reporting: '%s'",
-            ctx->enable ? "enable" : "disable",
-            error->message);
-    g_error_free (error);
-    /* Consider this operation complete, ignoring errors */
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
+        mm_dbg ("Couldn't %s event reporting: '%s'",
+                ctx->enable ? "enable" : "disable",
+                error->message);
+        g_error_free (error);
+    }
+
+    /* Continue on next port/command */
+    run_unsolicited_events_setup (task);
 }
 
 static void
 run_unsolicited_events_setup (GTask *task)
 {
-    MMBroadbandModem *self;
+    MMBroadbandModem         *self;
     UnsolicitedEventsContext *ctx;
-    MMPortSerialAt *port = NULL;
+    MMPortSerialAt           *port = NULL;
+    const gchar              *command = NULL;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    if (!ctx->cmer_primary_done) {
+    /* CMER on primary port */
+    if (!ctx->cmer_primary_done && ctx->cmer_command && ctx->primary) {
+        mm_dbg ("Enabling +CIND event reporting in primary port...");
         ctx->cmer_primary_done = TRUE;
-        port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    } else if (!ctx->cmer_secondary_done) {
+        command = ctx->cmer_command;
+        port = ctx->primary;
+    }
+    /* CMER on secondary port */
+    else if (!ctx->cmer_secondary_done && ctx->cmer_command && ctx->secondary) {
+        mm_dbg ("Enabling +CIND event reporting in secondary port...");
         ctx->cmer_secondary_done = TRUE;
-        port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+        command = ctx->cmer_command;
+        port = ctx->secondary;
+    }
+    /* CGEREP on primary port */
+    else if (!ctx->cgerep_primary_done && ctx->cgerep_command && ctx->primary) {
+        mm_dbg ("Enabling +CGEV event reporting in primary port...");
+        ctx->cgerep_primary_done = TRUE;
+        command = ctx->cgerep_command;
+        port = ctx->primary;
+    }
+    /* CGEREP on secondary port */
+    else if (!ctx->cgerep_secondary_done && ctx->cgerep_command && ctx->secondary) {
+        mm_dbg ("Enabling +CGEV event reporting in secondary port...");
+        ctx->cgerep_secondary_done = TRUE;
+        port = ctx->secondary;
+        command = ctx->cgerep_command;
     }
 
     /* Enable unsolicited events in given port */
-    if (port) {
+    if (port && command) {
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                        port,
-                                       ctx->command,
+                                       command,
                                        3,
                                        FALSE,
                                        FALSE, /* raw */
@@ -2999,7 +3347,7 @@ run_unsolicited_events_setup (GTask *task)
         return;
     }
 
-    /* If no more ports, we're fully done now */
+    /* Fully done now */
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -3009,34 +3357,25 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)
 {
-    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
-    GTask *task;
+    MMBroadbandModem         *self = MM_BROADBAND_MODEM (_self);
+    GTask                    *task;
+    UnsolicitedEventsContext *ctx;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /* If supported, go on */
-    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
-        gchar *cmd;
+    ctx = g_new0 (UnsolicitedEventsContext, 1);
+    ctx->enable = TRUE;
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    g_task_set_task_data (task, ctx, (GDestroyNotify)unsolicited_events_context_free);
 
-        /* If CMER command available, launch it */
-        cmd = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_enable_mode, self->priv->modem_cmer_ind);
-        if (cmd) {
-            UnsolicitedEventsContext *ctx;
+    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported)
+        ctx->cmer_command = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_enable_mode, self->priv->modem_cmer_ind);
 
-            ctx = g_new0 (UnsolicitedEventsContext, 1);
-            ctx->enable = TRUE;
-            ctx->command = cmd;
+    if (self->priv->modem_cgerep_support_checked && self->priv->modem_cgerep_supported)
+        ctx->cgerep_command = g_strdup ("+CGEREP=2");
 
-            g_task_set_task_data (task, ctx, (GDestroyNotify)unsolicited_events_context_free);
-
-            run_unsolicited_events_setup (task);
-            return;
-        }
-        mm_dbg ("Skipping +CMER enable command: not supported");
-    }
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    run_unsolicited_events_setup (task);
 }
 
 static void
@@ -3044,33 +3383,24 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data)
 {
-    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
-    GTask *task;
+    MMBroadbandModem         *self = MM_BROADBAND_MODEM (_self);
+    GTask                    *task;
+    UnsolicitedEventsContext *ctx;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /* If CIND supported, go on */
-    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported) {
-        gchar *cmd;
+    ctx = g_new0 (UnsolicitedEventsContext, 1);
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    g_task_set_task_data (task, ctx, (GDestroyNotify)unsolicited_events_context_free);
 
-        /* If CMER command available, launch it */
-        cmd = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_disable_mode, MM_3GPP_CMER_IND_NONE);
-        if (cmd) {
-            UnsolicitedEventsContext *ctx;
+    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported)
+        ctx->cmer_command = mm_3gpp_build_cmer_set_request (self->priv->modem_cmer_disable_mode, MM_3GPP_CMER_IND_NONE);
 
-            ctx = g_new0 (UnsolicitedEventsContext, 1);
-            ctx->command = cmd;
+    if (self->priv->modem_cgerep_support_checked && self->priv->modem_cgerep_supported)
+        ctx->cgerep_command = g_strdup ("+CGEREP=0");
 
-            g_task_set_task_data (task, ctx, (GDestroyNotify)unsolicited_events_context_free);
-
-            run_unsolicited_events_setup (task);
-            return;
-        }
-        mm_dbg ("Skipping +CMER disable command: not supported");
-    }
-
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    run_unsolicited_events_setup (task);
 }
 
 /*****************************************************************************/

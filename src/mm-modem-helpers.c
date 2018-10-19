@@ -865,6 +865,17 @@ mm_3gpp_ciev_regex_get (void)
 /*************************************************************************/
 
 GRegex *
+mm_3gpp_cgev_regex_get (void)
+{
+    return g_regex_new ("\\r\\n\\+CGEV:\\s*(.*)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
+/*************************************************************************/
+
+GRegex *
 mm_3gpp_cusd_regex_get (void)
 {
     return g_regex_new ("\\r\\n\\+CUSD:\\s*(.*)\\r\\n",
@@ -3262,6 +3273,310 @@ done:
     g_regex_unref (r);
 
     return array;
+}
+
+/*************************************************************************/
+/* +CGEV indication parser
+ *
+ * We provide full parsing support, including parameters, for these messages:
+ *    +CGEV: NW DETACH
+ *    +CGEV: ME DETACH
+ *    +CGEV: NW PDN ACT <cid>
+ *    +CGEV: ME PDN ACT <cid>[,<reason>[,<cid_other>]]
+ *    +CGEV: NW ACT <p_cid>, <cid>, <event_type>
+ *    +CGEV: ME ACT <p_cid>, <cid>, <event_type>
+ *    +CGEV: NW DEACT <PDP_type>, <PDP_addr>, [<cid>]
+ *    +CGEV: ME DEACT <PDP_type>, <PDP_addr>, [<cid>]
+ *    +CGEV: NW PDN DEACT <cid>
+ *    +CGEV: ME PDN DEACT <cid>
+ *    +CGEV: NW DEACT <p_cid>, <cid>, <event_type>
+ *    +CGEV: ME DEACT <p_cid>, <cid>, <event_type>
+ *    +CGEV: REJECT <PDP_type>, <PDP_addr>
+ *    +CGEV: NW REACT <PDP_type>, <PDP_addr>, [<cid>]
+ *
+ * We don't provide parameter parsing for these messages:
+ *    +CGEV: NW CLASS <class>
+ *    +CGEV: ME CLASS <class>
+ *    +CGEV: NW MODIFY <cid>, <change_reason>, <event_type>
+ *    +CGEV: ME MODIFY <cid>, <change_reason>, <event_type>
+ */
+
+static gboolean
+deact_secondary (const gchar *str)
+{
+    /* We need to detect the ME/NW DEACT format.
+     * Either,
+     *    +CGEV: NW DEACT <PDP_type>, <PDP_addr>, [<cid>]
+     *    +CGEV: ME DEACT <PDP_type>, <PDP_addr>, [<cid>]
+     * or,
+     *    +CGEV: NW DEACT <p_cid>, <cid>, <event_type>
+     *    +CGEV: ME DEACT <p_cid>, <cid>, <event_type>
+     */
+    str = strstr (str, "DEACT") + 5;
+    while (*str == ' ')
+        str++;
+
+    /* We will look for <p_cid> because we know it's NUMERIC */
+    return g_ascii_isdigit (*str);
+}
+
+MM3gppCgev
+mm_3gpp_parse_cgev_indication_action (const gchar *str)
+{
+    str = mm_strip_tag (str, "+CGEV:");
+    if (g_str_has_prefix (str, "NW DETACH"))
+        return MM_3GPP_CGEV_NW_DETACH;
+    if (g_str_has_prefix (str, "ME DETACH"))
+        return MM_3GPP_CGEV_ME_DETACH;
+    if (g_str_has_prefix (str, "NW CLASS"))
+        return MM_3GPP_CGEV_NW_CLASS;
+    if (g_str_has_prefix (str, "ME CLASS"))
+        return MM_3GPP_CGEV_ME_CLASS;
+    if (g_str_has_prefix (str, "NW PDN ACT"))
+        return MM_3GPP_CGEV_NW_ACT_PRIMARY;
+    if (g_str_has_prefix (str, "ME PDN ACT"))
+        return MM_3GPP_CGEV_ME_ACT_PRIMARY;
+    if (g_str_has_prefix (str, "NW ACT"))
+        return MM_3GPP_CGEV_NW_ACT_SECONDARY;
+    if (g_str_has_prefix (str, "ME ACT"))
+        return MM_3GPP_CGEV_ME_ACT_SECONDARY;
+    if (g_str_has_prefix (str, "NW DEACT"))
+        return (deact_secondary (str) ? MM_3GPP_CGEV_NW_DEACT_SECONDARY : MM_3GPP_CGEV_NW_DEACT_PDP);
+    if (g_str_has_prefix (str, "ME DEACT"))
+        return (deact_secondary (str) ? MM_3GPP_CGEV_ME_DEACT_SECONDARY : MM_3GPP_CGEV_ME_DEACT_PDP);
+    if (g_str_has_prefix (str, "NW PDN DEACT"))
+        return MM_3GPP_CGEV_NW_DEACT_PRIMARY;
+    if (g_str_has_prefix (str, "ME PDN DEACT"))
+        return MM_3GPP_CGEV_ME_DEACT_PRIMARY;
+    if (g_str_has_prefix (str, "NW MODIFY"))
+        return MM_3GPP_CGEV_NW_MODIFY;
+    if (g_str_has_prefix (str, "ME MODIFY"))
+        return MM_3GPP_CGEV_ME_MODIFY;
+    if (g_str_has_prefix (str, "NW REACT"))
+        return MM_3GPP_CGEV_NW_REACT;
+    if (g_str_has_prefix (str, "REJECT"))
+        return MM_3GPP_CGEV_REJECT;
+    return MM_3GPP_CGEV_UNKNOWN;
+}
+
+/*
+ * +CGEV: NW DEACT <PDP_type>, <PDP_addr>, [<cid>]
+ * +CGEV: ME DEACT <PDP_type>, <PDP_addr>, [<cid>]
+ * +CGEV: REJECT <PDP_type>, <PDP_addr>
+ * +CGEV: NW REACT <PDP_type>, <PDP_addr>, [<cid>]
+ */
+gboolean
+mm_3gpp_parse_cgev_indication_pdp (const gchar  *str,
+                                   MM3gppCgev    type,
+                                   gchar       **out_pdp_type,
+                                   gchar       **out_pdp_addr,
+                                   guint        *out_cid,
+                                   GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info = NULL;
+    GError     *inner_error = NULL;
+    gchar      *pdp_type = NULL;
+    gchar      *pdp_addr = NULL;
+    guint       cid = 0;
+
+    g_assert (type == MM_3GPP_CGEV_REJECT   ||
+              type == MM_3GPP_CGEV_NW_REACT ||
+              type == MM_3GPP_CGEV_NW_DEACT_PDP ||
+              type == MM_3GPP_CGEV_ME_DEACT_PDP);
+
+    r = g_regex_new ("(?:"
+                     "REJECT|"
+                     "NW REACT|"
+                     "NW DEACT|ME DEACT"
+                     ")\\s*([^,]*),\\s*([^,]*)(?:,\\s*([0-9]+))?", 0, 0, NULL);
+
+    str = mm_strip_tag (str, "+CGEV:");
+    g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
+        goto out;
+    }
+
+    if (out_pdp_type && !(pdp_type = mm_get_string_unquoted_from_match_info (match_info, 1))) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing PDP type");
+        goto out;
+    }
+
+    if (out_pdp_addr && !(pdp_addr = mm_get_string_unquoted_from_match_info (match_info, 2))) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing PDP addr");
+        goto out;
+    }
+
+    /* CID is optional */
+    if (out_cid &&
+        (g_match_info_get_match_count (match_info) >= 4) &&
+        !mm_get_uint_from_match_info (match_info, 3, &cid)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing CID");
+        goto out;
+    }
+
+out:
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_free (pdp_type);
+        g_free (pdp_addr);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (out_pdp_type)
+        *out_pdp_type = pdp_type;
+    if (out_pdp_addr)
+        *out_pdp_addr = pdp_addr;
+    if (out_cid)
+        *out_cid = cid;
+    return TRUE;
+}
+
+/*
+ * +CGEV: NW PDN ACT <cid>
+ * +CGEV: ME PDN ACT <cid>[,<reason>[,<cid_other>]]
+ * +CGEV: NW PDN DEACT <cid>
+ * +CGEV: ME PDN DEACT <cid>
+ *
+ * NOTE: the special case of a "ME PDN ACT" notification with the additional
+ * <reason> and <cid_other> fields is telling us that <cid> was NOT connected
+ * but <cid_other> was connected instead, which may happen when trying to
+ * connect a IPv4v6 context but the modem ended up connecting a IPv4-only or
+ * IPv6-only context instead. We are right now ignoring this, and assuming the
+ * <cid> that we requested is the one reported as connected.
+ */
+gboolean
+mm_3gpp_parse_cgev_indication_primary (const gchar  *str,
+                                       MM3gppCgev    type,
+                                       guint        *out_cid,
+                                       GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info = NULL;
+    GError     *inner_error = NULL;
+    guint       cid = 0;
+
+    g_assert ((type == MM_3GPP_CGEV_NW_ACT_PRIMARY)   ||
+              (type == MM_3GPP_CGEV_ME_ACT_PRIMARY)   ||
+              (type == MM_3GPP_CGEV_NW_DEACT_PRIMARY) ||
+              (type == MM_3GPP_CGEV_ME_DEACT_PRIMARY));
+
+    r = g_regex_new ("(?:"
+                     "NW PDN ACT|ME PDN ACT|"
+                     "NW PDN DEACT|ME PDN DEACT|"
+                     ")\\s*([0-9]+)", 0, 0, NULL);
+
+    str = mm_strip_tag (str, "+CGEV:");
+    g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
+        goto out;
+    }
+
+    if (out_cid && !mm_get_uint_from_match_info (match_info, 1, &cid)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing CID");
+        goto out;
+    }
+
+out:
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (out_cid)
+        *out_cid = cid;
+    return TRUE;
+}
+
+/*
+ * +CGEV: NW ACT <p_cid>, <cid>, <event_type>
+ * +CGEV: ME ACT <p_cid>, <cid>, <event_type>
+ * +CGEV: NW DEACT <p_cid>, <cid>, <event_type>
+ * +CGEV: ME DEACT <p_cid>, <cid>, <event_type>
+ */
+gboolean
+mm_3gpp_parse_cgev_indication_secondary (const gchar  *str,
+                                         MM3gppCgev    type,
+                                         guint        *out_p_cid,
+                                         guint        *out_cid,
+                                         guint        *out_event_type,
+                                         GError      **error)
+{
+    GRegex     *r;
+    GMatchInfo *match_info = NULL;
+    GError     *inner_error = NULL;
+    guint       p_cid = 0;
+    guint       cid = 0;
+    guint       event_type = 0;
+
+    g_assert (type == MM_3GPP_CGEV_NW_ACT_SECONDARY   ||
+              type == MM_3GPP_CGEV_ME_ACT_SECONDARY   ||
+              type == MM_3GPP_CGEV_NW_DEACT_SECONDARY ||
+              type == MM_3GPP_CGEV_ME_DEACT_SECONDARY);
+
+    r = g_regex_new ("(?:"
+                     "NW ACT|ME ACT|"
+                     "NW DEACT|ME DEACT"
+                     ")\\s*([0-9]+),\\s*([0-9]+),\\s*([0-9]+)", 0, 0, NULL);
+
+    str = mm_strip_tag (str, "+CGEV:");
+    g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    if (!g_match_info_matches (match_info)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't match response");
+        goto out;
+    }
+
+    if (out_p_cid && !mm_get_uint_from_match_info (match_info, 1, &p_cid)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing primary CID");
+        goto out;
+    }
+
+    if (out_cid && !mm_get_uint_from_match_info (match_info, 2, &cid)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing secondary CID");
+        goto out;
+    }
+
+    if (out_event_type && !mm_get_uint_from_match_info (match_info, 3, &event_type)) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing event type");
+        goto out;
+    }
+
+out:
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (out_p_cid)
+        *out_p_cid = p_cid;
+    if (out_cid)
+        *out_cid = cid;
+    if (out_event_type)
+        *out_event_type = event_type;
+    return TRUE;
 }
 
 /*************************************************************************/

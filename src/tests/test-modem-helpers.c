@@ -2046,6 +2046,161 @@ test_cind_response_moto_v3m (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test +CGEV indication parsing */
+
+typedef struct {
+    const gchar *str;
+    MM3gppCgev   expected_type;
+    const gchar *expected_pdp_type;
+    const gchar *expected_pdp_addr;
+    guint        expected_cid;
+    guint        expected_parent_cid;
+    guint        expected_event_type;
+} CgevIndicationTest;
+
+static const CgevIndicationTest cgev_indication_tests[] = {
+    { "+CGEV: REJECT IP, 123.123.123.123",      MM_3GPP_CGEV_REJECT,             "IP", "123.123.123.123", 0, 0, 0 },
+    { "REJECT IP, 123.123.123.123",             MM_3GPP_CGEV_REJECT,             "IP", "123.123.123.123", 0, 0, 0 },
+
+    { "+CGEV: NW REACT IP, 123.123.123.123",    MM_3GPP_CGEV_NW_REACT,           "IP", "123.123.123.123", 0, 0, 0 },
+    { "NW REACT IP, 123.123.123.123",           MM_3GPP_CGEV_NW_REACT,           "IP", "123.123.123.123", 0, 0, 0 },
+    { "+CGEV: NW REACT IP, 123.123.123.123, 1", MM_3GPP_CGEV_NW_REACT,           "IP", "123.123.123.123", 1, 0, 0 },
+
+    { "NW DEACT IP, 123.123.123.123, 1",        MM_3GPP_CGEV_NW_DEACT_PDP,       "IP", "123.123.123.123", 1, 0, 0 },
+    { "+CGEV: NW DEACT IP, 123.123.123.123",    MM_3GPP_CGEV_NW_DEACT_PDP,       "IP", "123.123.123.123", 0, 0, 0 },
+    { "NW DEACT IP, 123.123.123.123",           MM_3GPP_CGEV_NW_DEACT_PDP,       "IP", "123.123.123.123", 0, 0, 0 },
+    { "+CGEV: NW DEACT IP, 123.123.123.123, 1", MM_3GPP_CGEV_NW_DEACT_PDP,       "IP", "123.123.123.123", 1, 0, 0 },
+    { "NW DEACT IP, 123.123.123.123, 1",        MM_3GPP_CGEV_NW_DEACT_PDP,       "IP", "123.123.123.123", 1, 0, 0 },
+
+    { "ME DEACT IP, 123.123.123.123, 1",        MM_3GPP_CGEV_ME_DEACT_PDP,       "IP", "123.123.123.123", 1, 0, 0 },
+    { "+CGEV: ME DEACT IP, 123.123.123.123",    MM_3GPP_CGEV_ME_DEACT_PDP,       "IP", "123.123.123.123", 0, 0, 0 },
+    { "ME DEACT IP, 123.123.123.123",           MM_3GPP_CGEV_ME_DEACT_PDP,       "IP", "123.123.123.123", 0, 0, 0 },
+    { "+CGEV: ME DEACT IP, 123.123.123.123, 1", MM_3GPP_CGEV_ME_DEACT_PDP,       "IP", "123.123.123.123", 1, 0, 0 },
+    { "ME DEACT IP, 123.123.123.123, 1",        MM_3GPP_CGEV_ME_DEACT_PDP,       "IP", "123.123.123.123", 1, 0, 0 },
+
+    { "ME PDN ACT 2",                           MM_3GPP_CGEV_ME_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+    { "+CGEV: ME PDN ACT 2",                    MM_3GPP_CGEV_ME_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+    /* with ,<reason>[,<cid_other>]] */
+    { "ME PDN ACT 2, 3",                        MM_3GPP_CGEV_ME_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+    { "+CGEV: ME PDN ACT 2, 3",                 MM_3GPP_CGEV_ME_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+    { "ME PDN ACT 2, 3, 4",                     MM_3GPP_CGEV_ME_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+    { "+CGEV: ME PDN ACT 2, 3, 4",              MM_3GPP_CGEV_ME_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+
+    { "ME PDN DEACT 2",                         MM_3GPP_CGEV_ME_DEACT_PRIMARY,   NULL, NULL,              2, 0, 0 },
+    { "+CGEV: ME PDN DEACT 2",                  MM_3GPP_CGEV_ME_DEACT_PRIMARY,   NULL, NULL,              2, 0, 0 },
+
+    { "ME ACT 3, 2, 1",                         MM_3GPP_CGEV_ME_ACT_SECONDARY,   NULL, NULL,              2, 3, 1 },
+    { "+CGEV: ME ACT 3, 2, 1",                  MM_3GPP_CGEV_ME_ACT_SECONDARY,   NULL, NULL,              2, 3, 1 },
+
+    { "ME DEACT 3, 2, 1",                       MM_3GPP_CGEV_ME_DEACT_SECONDARY, NULL, NULL,              2, 3, 1 },
+    { "+CGEV: ME DEACT 3, 2, 1",                MM_3GPP_CGEV_ME_DEACT_SECONDARY, NULL, NULL,              2, 3, 1 },
+
+    { "NW PDN ACT 2",                           MM_3GPP_CGEV_NW_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+    { "+CGEV: NW PDN ACT 2",                    MM_3GPP_CGEV_NW_ACT_PRIMARY,     NULL, NULL,              2, 0, 0 },
+
+    { "NW PDN DEACT 2",                         MM_3GPP_CGEV_NW_DEACT_PRIMARY,   NULL, NULL,              2, 0, 0 },
+    { "+CGEV: NW PDN DEACT 2",                  MM_3GPP_CGEV_NW_DEACT_PRIMARY,   NULL, NULL,              2, 0, 0 },
+
+    { "NW ACT 3, 2, 1",                         MM_3GPP_CGEV_NW_ACT_SECONDARY,   NULL, NULL,              2, 3, 1 },
+    { "+CGEV: NW ACT 3, 2, 1",                  MM_3GPP_CGEV_NW_ACT_SECONDARY,   NULL, NULL,              2, 3, 1 },
+
+    { "NW DEACT 3, 2, 1",                       MM_3GPP_CGEV_NW_DEACT_SECONDARY, NULL, NULL,              2, 3, 1 },
+    { "+CGEV: NW DEACT 3, 2, 1",                MM_3GPP_CGEV_NW_DEACT_SECONDARY, NULL, NULL,              2, 3, 1 },
+
+    { "+CGEV: NW DETACH",                       MM_3GPP_CGEV_NW_DETACH,          NULL, NULL,              0, 0, 0 },
+    { "NW DETACH",                              MM_3GPP_CGEV_NW_DETACH,          NULL, NULL,              0, 0, 0 },
+    { "+CGEV: ME DETACH",                       MM_3GPP_CGEV_ME_DETACH,          NULL, NULL,              0, 0, 0 },
+    { "ME DETACH",                              MM_3GPP_CGEV_ME_DETACH,          NULL, NULL,              0, 0, 0 },
+
+    { "+CGEV: NW CLASS A",                      MM_3GPP_CGEV_NW_CLASS,           NULL, NULL,              0, 0, 0 },
+    { "NW CLASS A",                             MM_3GPP_CGEV_NW_CLASS,           NULL, NULL,              0, 0, 0 },
+    { "+CGEV: ME CLASS A",                      MM_3GPP_CGEV_ME_CLASS,           NULL, NULL,              0, 0, 0 },
+    { "ME CLASS A",                             MM_3GPP_CGEV_ME_CLASS,           NULL, NULL,              0, 0, 0 },
+};
+
+static void
+test_cgev_indication (const CgevIndicationTest *t)
+{
+    guint     i;
+    GError   *error = NULL;
+    gboolean  ret;
+
+    for (i = 0; i < G_N_ELEMENTS (cgev_indication_tests); i++) {
+        const CgevIndicationTest *test = &cgev_indication_tests[i];
+        MM3gppCgev                type;
+
+        type = mm_3gpp_parse_cgev_indication_action (test->str);
+        g_assert_cmpuint (type, ==, test->expected_type);
+
+        g_print ("[%u] type: %u\n", i, type);
+
+        switch (type) {
+        case MM_3GPP_CGEV_NW_DETACH:
+        case MM_3GPP_CGEV_ME_DETACH:
+            break;
+        case MM_3GPP_CGEV_NW_ACT_PRIMARY:
+        case MM_3GPP_CGEV_ME_ACT_PRIMARY:
+        case MM_3GPP_CGEV_NW_DEACT_PRIMARY:
+        case MM_3GPP_CGEV_ME_DEACT_PRIMARY: {
+            guint cid;
+
+            g_print ("[%u] parsing as primary\n", i);
+            ret = mm_3gpp_parse_cgev_indication_primary (test->str, type, &cid, &error);
+            g_assert_no_error (error);
+            g_assert (ret);
+            g_assert_cmpuint (cid, ==, test->expected_cid);
+            break;
+        }
+        case MM_3GPP_CGEV_NW_ACT_SECONDARY:
+        case MM_3GPP_CGEV_ME_ACT_SECONDARY:
+        case MM_3GPP_CGEV_NW_DEACT_SECONDARY:
+        case MM_3GPP_CGEV_ME_DEACT_SECONDARY: {
+            guint p_cid;
+            guint cid;
+            guint event_type;
+
+            g_print ("[%u] parsing as secondary\n", i);
+            ret = mm_3gpp_parse_cgev_indication_secondary (test->str, type, &p_cid, &cid, &event_type, &error);
+            g_assert_no_error (error);
+            g_assert (ret);
+            g_assert_cmpuint (cid, ==, test->expected_cid);
+            g_assert_cmpuint (p_cid, ==, test->expected_parent_cid);
+            g_assert_cmpuint (event_type, ==, test->expected_event_type);
+            break;
+        }
+        case MM_3GPP_CGEV_NW_DEACT_PDP:
+        case MM_3GPP_CGEV_ME_DEACT_PDP:
+        case MM_3GPP_CGEV_REJECT:
+        case MM_3GPP_CGEV_NW_REACT: {
+            gchar *pdp_type;
+            gchar *pdp_addr;
+            guint  cid;
+
+            g_print ("[%u] parsing as pdp\n", i);
+            ret = mm_3gpp_parse_cgev_indication_pdp (test->str, type, &pdp_type, &pdp_addr, &cid, &error);
+            g_assert_no_error (error);
+            g_assert (ret);
+            g_assert_cmpstr (pdp_type, ==, test->expected_pdp_type);
+            g_assert_cmpstr (pdp_addr, ==, test->expected_pdp_addr);
+            g_assert_cmpuint (cid, ==, test->expected_cid);
+
+            g_free (pdp_type);
+            g_free (pdp_addr);
+            break;
+        }
+        case MM_3GPP_CGEV_NW_CLASS:
+        case MM_3GPP_CGEV_ME_CLASS:
+        case MM_3GPP_CGEV_NW_MODIFY:
+        case MM_3GPP_CGEV_ME_MODIFY:
+            /* ignore */
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+/*****************************************************************************/
 /* Test ICCID parsing */
 
 static void
@@ -3998,6 +4153,8 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, NULL));
     g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cgev_indication, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_quoted_swap_19_digit, NULL));
     g_test_suite_add (suite, TESTCASE (test_iccid_parse_unquoted_swap_20_digit, NULL));
