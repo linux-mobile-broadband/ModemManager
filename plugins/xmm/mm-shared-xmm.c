@@ -297,10 +297,7 @@ xact_query_bands_ready (MMBaseModem  *self,
 {
     const gchar *response;
     GError      *error = NULL;
-    Private     *priv;
     GArray      *result = NULL;
-
-    priv = get_private (MM_SHARED_XMM (self));
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response ||
