@@ -875,11 +875,8 @@ call_start_ready (MMBaseModem *modem,
                   GAsyncResult *res,
                   GTask *task)
 {
-    MMBaseCall *self;
     GError *error = NULL;
     const gchar *response = NULL;
-
-    self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
 
@@ -931,11 +928,8 @@ call_accept_ready (MMBaseModem  *modem,
                    GAsyncResult *res,
                    GTask        *task)
 {
-    MMBaseCall  *self;
     GError      *error = NULL;
     const gchar *response;
-
-    self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
 
@@ -983,10 +977,7 @@ call_hangup_ready (MMBaseModem  *modem,
                    GAsyncResult *res,
                    GTask        *task)
 {
-    MMBaseCall *self;
     GError *error = NULL;
-
-    self = g_task_get_source_object (task);
 
     mm_base_modem_at_command_finish (modem, res, &error);
 
