@@ -69,7 +69,6 @@ scact_periodic_query_ready (MMBaseModem  *modem,
                             GAsyncResult *res,
                             GTask        *task)
 {
-    MMBroadbandBearer        *self;
     const gchar              *response;
     GError                   *error = NULL;
     GList                    *pdp_active_list = NULL;
@@ -77,7 +76,6 @@ scact_periodic_query_ready (MMBaseModem  *modem,
     MMBearerConnectionStatus  status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
     guint                     cid;
 
-    self = MM_BROADBAND_BEARER (g_task_get_source_object (task));
     cid = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
