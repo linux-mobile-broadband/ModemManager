@@ -88,6 +88,8 @@ GArray *mm_filter_supported_modes (const GArray *all,
 GArray *mm_filter_supported_capabilities (MMModemCapability all,
                                           const GArray *supported_combinations);
 
+gchar *mm_bcd_to_string (const guint8 *bcd, gsize bcd_len);
+
 /*****************************************************************************/
 /* VOICE specific helpers and utilities */
 /*****************************************************************************/

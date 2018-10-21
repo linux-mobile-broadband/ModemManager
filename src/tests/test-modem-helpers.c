@@ -3815,6 +3815,42 @@ test_parse_uint_list (void)
 
 /*****************************************************************************/
 
+typedef struct {
+    const guint8 bcd[10];
+    gsize bcd_len;
+    const gchar *str;
+} BcdToStringTest;
+
+static const BcdToStringTest bcd_to_string_tests[] = {
+    { { }, 0, "" },
+    { { 0x01 }, 1, "10" },
+    { { 0x1F }, 1, "" },
+    { { 0xE2 }, 1, "2" },
+    { { 0xD3 }, 1, "3" },
+    { { 0xC4 }, 1, "4" },
+    { { 0xB1, 0x23 }, 2, "1" },
+    { { 0x01, 0x23, 0x45, 0x67 }, 4, "10325476" },
+    { { 0x01, 0x23, 0x45, 0xA7 }, 4, "1032547" },
+    { { 0x01, 0x23, 0x45, 0x67 }, 2, "1032" },
+};
+
+static void
+test_bcd_to_string (void *f, gpointer d)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (bcd_to_string_tests); i++) {
+        gchar *str;
+
+        str = mm_bcd_to_string (bcd_to_string_tests[i].bcd,
+                                bcd_to_string_tests[i].bcd_len);
+        g_assert_cmpstr (str, ==, bcd_to_string_tests[i].str);
+        g_free (str);
+    }
+}
+
+/*****************************************************************************/
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -4044,6 +4080,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cesq_response_to_signal, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_parse_uint_list, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_bcd_to_string, NULL));
 
     result = g_test_run ();
 

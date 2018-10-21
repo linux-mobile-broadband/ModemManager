@@ -496,6 +496,26 @@ mm_filter_supported_capabilities (MMModemCapability all,
 
 /*****************************************************************************/
 
+static const gchar bcd_chars[] = "0123456789\0\0\0\0\0\0";
+
+gchar *
+mm_bcd_to_string (const guint8 *bcd, gsize bcd_len)
+{
+    GString *str;
+    gsize i;
+
+    g_return_val_if_fail (bcd != NULL, NULL);
+
+    str = g_string_sized_new (bcd_len * 2 + 1);
+    for (i = 0 ; i < bcd_len; i++) {
+        str = g_string_append_c (str, bcd_chars[bcd[i] & 0xF]);
+        str = g_string_append_c (str, bcd_chars[(bcd[i] >> 4) & 0xF]);
+    }
+    return g_string_free (str, FALSE);
+}
+
+/*****************************************************************************/
+
 GRegex *
 mm_voice_ring_regex_get (void)
 {
