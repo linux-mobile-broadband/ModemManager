@@ -457,8 +457,8 @@ out:
         cmd = g_strdup_printf ("+UAUTHREQ=%u,%u,%s,%s",
                                ctx->cid,
                                ublox_auth,
-                               quoted_password,
-                               quoted_user);
+                               quoted_user,
+                               quoted_password);
 
         g_free (quoted_user);
         g_free (quoted_password);
