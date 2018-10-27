@@ -158,6 +158,7 @@
       <title>The Call object</title>
       <xi:include href="xml/mm-call.xml"/>
       <xi:include href="xml/mm-call-properties.xml"/>
+      <xi:include href="xml/mm-call-audio-format.xml"/>
     </chapter>
 
   </part>
