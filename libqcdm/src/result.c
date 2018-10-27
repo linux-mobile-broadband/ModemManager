@@ -335,7 +335,6 @@ qcdm_result_add_u8_array (QcdmResult *r,
     qcdm_return_if_fail (r->refcount > 0);
     qcdm_return_if_fail (key != NULL);
     qcdm_return_if_fail (array != NULL);
-    qcdm_return_if_fail (array_len >= 0);
 
     v = val_new_u8_array (key, array, array_len);
     qcdm_return_if_fail (v != NULL);
@@ -415,7 +414,6 @@ qcdm_result_add_u16_array (QcdmResult *r,
     qcdm_return_if_fail (r->refcount > 0);
     qcdm_return_if_fail (key != NULL);
     qcdm_return_if_fail (array != NULL);
-    qcdm_return_if_fail (array_len >= 0);
 
     v = val_new_u16_array (key, array, array_len);
     qcdm_return_if_fail (v != NULL);
