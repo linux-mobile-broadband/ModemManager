@@ -13,8 +13,8 @@ mmcli_CPPFLAGS = \
 mmcli_SOURCES = \
 	mmcli.h \
 	mmcli.c \
-	mmcli-common.h \
-	mmcli-common.c \
+	mmcli-common.h mmcli-common.c \
+	mmcli-output.h mmcli-output.c \
 	mmcli-manager.c \
 	mmcli-modem.c \
 	mmcli-modem-3gpp.c \

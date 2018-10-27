@@ -34,6 +34,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -204,34 +205,6 @@ mmcli_modem_3gpp_shutdown (void)
 }
 
 static void
-print_network_info (MMModem3gppNetwork *network)
-{
-    const gchar *name;
-    gchar *access_technologies;
-
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "unknown")
-
-    access_technologies = (mm_modem_access_technology_build_string_from_mask (
-                               mm_modem_3gpp_network_get_access_technology (network)));
-
-    /* Prefer long name */
-    name = mm_modem_3gpp_network_get_operator_long (network);
-    if (!name)
-        name = mm_modem_3gpp_network_get_operator_short (network);
-
-    g_print ("%s - %s (%s, %s)\n",
-             VALIDATE (mm_modem_3gpp_network_get_operator_code (network)),
-             VALIDATE (name),
-             access_technologies,
-             mm_modem_3gpp_network_availability_get_string (
-                 mm_modem_3gpp_network_get_availability (network)));
-    g_free (access_technologies);
-}
-
-static void
 scan_process_reply (GList *result,
                     const GError *error)
 {
@@ -241,19 +214,10 @@ scan_process_reply (GList *result,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("\n");
-    if (!result)
-        g_print ("No networks were found\n");
-    else {
-        GList *l;
+    mmcli_output_scan_networks (result);
+    mmcli_output_dump ();
 
-        g_print ("Found %u networks:\n", g_list_length (result));
-        for (l = result; l; l = g_list_next (l)) {
-            print_network_info ((MMModem3gppNetwork *)(l->data));
-        }
-        g_list_free_full (result, (GDestroyNotify) mm_modem_3gpp_network_free);
-    }
-    g_print ("\n");
+    g_list_free_full (result, (GDestroyNotify) mm_modem_3gpp_network_free);
 }
 
 static void
@@ -339,22 +303,12 @@ parse_eps_ue_mode_operation (MMModem3gppEpsUeModeOperation *uemode)
 static void
 print_ussd_status (void)
 {
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "none")
-
-    g_print ("\n"
-             "%s\n"
-             "  ----------------------------\n"
-             "  USSD |               status: '%s'\n"
-             "       |      network request: '%s'\n"
-             "       | network notification: '%s'\n",
-             mm_modem_3gpp_ussd_get_path (ctx->modem_3gpp_ussd),
-             mm_modem_3gpp_ussd_session_state_get_string (
-                 mm_modem_3gpp_ussd_get_state (ctx->modem_3gpp_ussd)),
-             VALIDATE (mm_modem_3gpp_ussd_get_network_request (ctx->modem_3gpp_ussd)),
-             VALIDATE (mm_modem_3gpp_ussd_get_network_notification (ctx->modem_3gpp_ussd)));
+    mmcli_output_string (MMC_F_GENERAL_DBUS_PATH,              mm_modem_3gpp_ussd_get_path (ctx->modem_3gpp_ussd));
+    mmcli_output_string (MMC_F_3GPP_USSD_STATUS,               mm_modem_3gpp_ussd_session_state_get_string (
+                                                                 mm_modem_3gpp_ussd_get_state (ctx->modem_3gpp_ussd)));
+    mmcli_output_string (MMC_F_3GPP_USSD_NETWORK_REQUEST,      mm_modem_3gpp_ussd_get_network_request      (ctx->modem_3gpp_ussd));
+    mmcli_output_string (MMC_F_3GPP_USSD_NETWORK_NOTIFICATION, mm_modem_3gpp_ussd_get_network_notification (ctx->modem_3gpp_ussd));
+    mmcli_output_dump ();
 }
 
 static void

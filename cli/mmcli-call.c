@@ -34,6 +34,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -145,45 +146,31 @@ mmcli_call_shutdown (void)
 static void
 print_call_info (MMCall *call)
 {
-    const gchar *audio_port;
     MMCallAudioFormat *audio_format;
+    const gchar       *encoding = NULL;
+    const gchar       *resolution = NULL;
+    gchar             *rate = NULL;
 
-    audio_port = mm_call_get_audio_port (call);
     audio_format = mm_call_peek_audio_format (call);
 
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "unknown")
-
-    g_print ("CALL '%s'\n", mm_call_get_path (call));
-    g_print ("  -------------------------------\n"
-             "  Global     |          number: '%s'\n", VALIDATE (mm_call_get_number (call)));
-    g_print ("             |       direction: '%s'\n", mm_call_direction_get_string (mm_call_get_direction (call)) );
-
-    g_print ("  -------------------------------\n"
-             "  Properties |           state: '%s'\n", mm_call_state_get_string (mm_call_get_state (call)));
-
-    if (mm_call_get_state_reason(call) != MM_CALL_STATE_REASON_UNKNOWN)
-        g_print ("             |    state reason: '%s'\n",
-                 mm_call_state_reason_get_string(mm_call_get_state_reason (call)));
-
-    if (audio_port)
-        g_print ("             |      audio port: '%s'\n", VALIDATE (audio_port));
+    mmcli_output_string (MMC_F_CALL_GENERAL_DBUS_PATH,       mm_call_get_path (call));
+    mmcli_output_string (MMC_F_CALL_PROPERTIES_NUMBER,       mm_call_get_number (call));
+    mmcli_output_string (MMC_F_CALL_PROPERTIES_DIRECTION,    mm_call_direction_get_string (mm_call_get_direction (call)));
+    mmcli_output_string (MMC_F_CALL_PROPERTIES_STATE,        mm_call_state_get_string (mm_call_get_state (call)));
+    mmcli_output_string (MMC_F_CALL_PROPERTIES_STATE_REASON, mm_call_state_get_string (mm_call_get_state_reason (call)));
+    mmcli_output_string (MMC_F_CALL_PROPERTIES_AUDIO_PORT,   mm_call_get_audio_port (call));
 
     if (audio_format) {
-        guint rate = mm_call_audio_format_get_rate (audio_format);
-        gchar *rate_str = rate ? g_strdup_printf ("%u", rate) : NULL;
-
-        g_print ("  -------------------------\n"
-                 "  Audio Format       |    encoding: '%s'\n"
-                 "                     |  resolution: '%s'\n"
-                 "                     |        rate: '%s'\n",
-                 VALIDATE (mm_call_audio_format_get_encoding (audio_format)),
-                 VALIDATE (mm_call_audio_format_get_resolution (audio_format)),
-                 VALIDATE (rate_str));
-        g_free (rate_str);
+        rate       = g_strdup_printf ("%u", mm_call_audio_format_get_rate (audio_format));
+        encoding   = mm_call_audio_format_get_encoding (audio_format);
+        resolution = mm_call_audio_format_get_resolution (audio_format);
     }
+
+    mmcli_output_string      (MMC_F_CALL_AUDIO_FORMAT_ENCODING,   encoding);
+    mmcli_output_string      (MMC_F_CALL_AUDIO_FORMAT_RESOLUTION, resolution);
+    mmcli_output_string_take (MMC_F_CALL_AUDIO_FORMAT_RATE,       rate);
+
+    mmcli_output_dump ();
 }
 
 static void

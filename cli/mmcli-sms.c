@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -147,89 +148,49 @@ mmcli_sms_shutdown (void)
 static void
 print_sms_info (MMSms *sms)
 {
-    MMSmsPduType pdu_type;
-    const guint8 *data;
-    gsize data_size;
+    MMSmsPduType  pdu_type;
+    gchar        *data = NULL;
+    const guint8 *databin;
+    gsize         databin_size;
+    gchar        *validity = NULL;
+    gchar        *class = NULL;
+    const gchar  *delivery_report = NULL;
+    gchar        *message_reference = NULL;
+    const gchar  *delivery_state = NULL;
 
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "unknown")
-
-    pdu_type = mm_sms_get_pdu_type (sms);
-
-    g_print ("SMS '%s'\n",
-             mm_sms_get_path (sms));
-    g_print ("  -----------------------------------\n"
-             "  Content    |              number: '%s'\n",
-             VALIDATE (mm_sms_get_number (sms)));
-
-    if (mm_sms_get_text (sms))
-        g_print ("             |                text: '%s'\n",
-                 VALIDATE (mm_sms_get_text (sms)));
-
-    data = mm_sms_get_data (sms, &data_size);
-    if (data) {
-        gchar *data_hex;
-
-        data_hex = mm_utils_bin2hexstr (data, data_size);
-        g_print ("             |                data: '%s'\n",
-                 VALIDATE (data_hex));
-        g_free (data_hex);
-    }
-
-    g_print ("  -----------------------------------\n"
-             "  Properties |            PDU type: '%s'\n"
-             "             |               state: '%s'\n",
-             mm_sms_pdu_type_get_string (pdu_type),
-             mm_sms_state_get_string (mm_sms_get_state (sms)));
-
+    databin = mm_sms_get_data (sms, &databin_size);
+    if (databin)
+        data = mm_utils_bin2hexstr (databin, databin_size);
     if (mm_sms_get_validity_type (sms) == MM_SMS_VALIDITY_TYPE_RELATIVE)
-        g_print ("             | validity (relative): '%u'\n",
-                 mm_sms_get_validity_relative (sms));
-
-    g_print ("             |             storage: '%s'\n",
-             mm_sms_storage_get_string (mm_sms_get_storage (sms)));
-
-    /* Print properties which are set, regardless of the pdu type */
-
-    if (mm_sms_get_smsc (sms))
-        g_print ("             |                smsc: '%s'\n",
-                 mm_sms_get_smsc (sms));
-
+        validity = g_strdup_printf ("%u", mm_sms_get_validity_relative (sms));
     if (mm_sms_get_class (sms) >= 0)
-        g_print ("             |               class: '%d'\n",
-                 mm_sms_get_class (sms));
-
-    if (mm_sms_get_teleservice_id (sms) != MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN)
-        g_print ("             |      teleservice id: '%s'\n",
-                 mm_sms_cdma_teleservice_id_get_string (mm_sms_get_teleservice_id (sms)));
-
-    if (mm_sms_get_service_category (sms) != MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN)
-        g_print ("             |    service category: '%s'\n",
-                 mm_sms_cdma_service_category_get_string (mm_sms_get_service_category (sms)));
-
-    /* Delivery report request just in 3GPP submit PDUs */
+        class = g_strdup_printf ("%d", mm_sms_get_class (sms));
+    pdu_type = mm_sms_get_pdu_type (sms);
     if (pdu_type == MM_SMS_PDU_TYPE_SUBMIT)
-        g_print ("             |     delivery report: '%s'\n",
-                 mm_sms_get_delivery_report_request (sms) ? "requested" : "not requested");
-
+        delivery_report = mm_sms_get_delivery_report_request (sms) ? "requested" : "not requested";
     if (mm_sms_get_message_reference (sms) != 0)
-        g_print ("             |   message reference: '%u'\n",
-                 mm_sms_get_message_reference (sms));
-
-    if (mm_sms_get_timestamp (sms))
-        g_print ("             |           timestamp: '%s'\n",
-                 mm_sms_get_timestamp (sms));
-
+        message_reference = g_strdup_printf ("%u", mm_sms_get_message_reference (sms));
     if (mm_sms_get_delivery_state (sms) != MM_SMS_DELIVERY_STATE_UNKNOWN)
-        g_print ("             |      delivery state: '%s' (0x%X)\n",
-                 VALIDATE (mm_sms_delivery_state_get_string_extended (mm_sms_get_delivery_state (sms))),
-                 mm_sms_get_delivery_state (sms));
+        delivery_state = mm_sms_delivery_state_get_string_extended (mm_sms_get_delivery_state (sms));
 
-    if (mm_sms_get_discharge_timestamp (sms))
-        g_print ("             | discharge timestamp: '%s'\n",
-                 mm_sms_get_discharge_timestamp (sms));
+    mmcli_output_string           (MMC_F_SMS_GENERAL_DBUS_PATH,           mm_sms_get_path (sms));
+    mmcli_output_string           (MMC_F_SMS_CONTENT_NUMBER,              mm_sms_get_number (sms));
+    mmcli_output_string (MMC_F_SMS_CONTENT_TEXT,                mm_sms_get_text (sms));
+    mmcli_output_string_take      (MMC_F_SMS_CONTENT_DATA,                data);
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_PDU_TYPE,         mm_sms_pdu_type_get_string (pdu_type));
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_STATE,            mm_sms_state_get_string (mm_sms_get_state (sms)));
+    mmcli_output_string_take      (MMC_F_SMS_PROPERTIES_VALIDITY,         validity);
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_STORAGE,          mm_sms_storage_get_string (mm_sms_get_storage (sms)));
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_SMSC,             mm_sms_get_smsc (sms));
+    mmcli_output_string_take      (MMC_F_SMS_PROPERTIES_CLASS,            class);
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_TELESERVICE_ID,   mm_sms_cdma_teleservice_id_get_string (mm_sms_get_teleservice_id (sms)));
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_SERVICE_CATEGORY, mm_sms_cdma_service_category_get_string (mm_sms_get_service_category (sms)));
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_DELIVERY_REPORT,  delivery_report);
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_MSG_REFERENCE,    message_reference);
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_TIMESTAMP,        mm_sms_get_timestamp (sms));
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_DELIVERY_STATE,   delivery_state);
+    mmcli_output_string           (MMC_F_SMS_PROPERTIES_DISCH_TIMESTAMP,  mm_sms_get_discharge_timestamp (sms));
+    mmcli_output_dump ();
 }
 
 static void

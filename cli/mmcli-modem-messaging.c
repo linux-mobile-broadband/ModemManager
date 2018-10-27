@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -208,64 +209,47 @@ static void
 print_messaging_status (void)
 {
     MMSmsStorage *supported = NULL;
-    guint supported_len = 0;
-    gchar *supported_str = NULL;
+    guint         supported_len = 0;
+    gchar        *supported_str = NULL;
 
-    mm_modem_messaging_get_supported_storages (ctx->modem_messaging,
-                                               &supported,
-                                               &supported_len);
+    mm_modem_messaging_get_supported_storages (ctx->modem_messaging, &supported, &supported_len);
     if (supported)
         supported_str = mm_common_build_sms_storages_string (supported, supported_len);
 
-#undef VALIDATE_UNKNOWN
-#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
-
-    g_print ("\n"
-             "%s\n"
-             "  ----------------------------\n"
-             "  Messaging | supported storages: '%s'\n"
-             "            |    default storage: '%s'\n",
-             mm_modem_messaging_get_path (ctx->modem_messaging),
-             VALIDATE_UNKNOWN (supported_str),
-             VALIDATE_UNKNOWN (mm_sms_storage_get_string (
-                                   mm_modem_messaging_get_default_storage (
-                                       ctx->modem_messaging))));
-    g_free (supported_str);
+    mmcli_output_string_take (MMC_F_MESSAGING_SUPPORTED_STORAGES, supported_str);
+    mmcli_output_string      (MMC_F_MESSAGING_DEFAULT_STORAGES,   mm_sms_storage_get_string (
+                                                                    mm_modem_messaging_get_default_storage (ctx->modem_messaging)));
+    mmcli_output_dump ();
 }
 
 static void
-print_sms_short_info (MMSms *sms)
+output_sms_info (MMSms *sms)
 {
-    g_print ("\t%s (%s)\n",
-             mm_sms_get_path (sms),
-             mm_sms_state_get_string (mm_sms_get_state (sms)));
+    gchar *extra;
+
+    extra = g_strdup_printf ("(%s)", mm_sms_state_get_string (mm_sms_get_state (sms)));
+    mmcli_output_listitem (MMC_F_SMS_LIST_DBUS_PATH,
+                           "    ",
+                           mm_sms_get_path (sms),
+                           extra);
+    g_free (extra);
 }
 
 static void
 list_process_reply (GList        *result,
                     const GError *error)
 {
+    GList *l;
+
     if (error) {
         g_printerr ("error: couldn't list SMS: '%s'\n",
                     error->message);
         exit (EXIT_FAILURE);
     }
 
-    g_print ("\n");
-    if (!result) {
-        g_print ("No SMS messages were found\n");
-    } else {
-        GList *l;
-
-        g_print ("Found %u SMS messages:\n", g_list_length (result));
-        for (l = result; l; l = g_list_next (l)) {
-            MMSms *sms = MM_SMS (l->data);
-
-            print_sms_short_info (sms);
-            g_object_unref (sms);
-        }
-        g_list_free (result);
-    }
+    for (l = result; l; l = g_list_next (l))
+        output_sms_info (MM_SMS (l->data));
+    mmcli_output_list_dump (MMC_F_SMS_LIST_DBUS_PATH);
 }
 
 static void
@@ -292,8 +276,7 @@ create_process_reply (MMSms        *sms,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("Successfully created new SMS:\n");
-    print_sms_short_info (sms);
+    g_print ("Successfully created new SMS: %s\n", mm_sms_get_path (sms));
     g_object_unref (sms);
 }
 

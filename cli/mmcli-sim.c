@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011-2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include "config.h"
@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -157,22 +158,12 @@ mmcli_sim_shutdown (void)
 static void
 print_sim_info (MMSim *sim)
 {
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "unknown")
-
-    g_print ("SIM '%s'\n",
-             mm_sim_get_path (sim));
-    g_print ("  -------------------------\n"
-             "  Properties |          imsi : '%s'\n"
-             "             |            id : '%s'\n"
-             "             |   operator id : '%s'\n"
-             "             | operator name : '%s'\n",
-             VALIDATE (mm_sim_get_imsi (sim)),
-             VALIDATE (mm_sim_get_identifier (sim)),
-             VALIDATE (mm_sim_get_operator_identifier (sim)),
-             VALIDATE (mm_sim_get_operator_name (sim)));
+    mmcli_output_string (MMC_F_SIM_GENERAL_DBUS_PATH,        mm_sim_get_path (sim));
+    mmcli_output_string (MMC_F_SIM_PROPERTIES_IMSI,          mm_sim_get_imsi (sim));
+    mmcli_output_string (MMC_F_SIM_PROPERTIES_ICCID,         mm_sim_get_identifier (sim));
+    mmcli_output_string (MMC_F_SIM_PROPERTIES_OPERATOR_ID,   mm_sim_get_operator_identifier (sim));
+    mmcli_output_string (MMC_F_SIM_PROPERTIES_OPERATOR_NAME, mm_sim_get_operator_name (sim));
+    mmcli_output_dump ();
 }
 
 static void

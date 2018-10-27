@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -143,48 +144,11 @@ list_process_reply (MMFirmwareProperties *selected,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("\n");
-    if (!result) {
-        g_print ("No firmware images were found\n");
-    } else {
-        GList *l;
-        guint i;
+    mmcli_output_firmware_list (result, selected);
+    mmcli_output_dump ();
 
-        g_print ("Found %u firmware images:\n", g_list_length (result));
-        for (l = result, i = 0; l; l = g_list_next (l), i++) {
-            MMFirmwareProperties *props = MM_FIRMWARE_PROPERTIES (l->data);
-
-            g_print ("\t[%u] %s%s\n"
-                     "\t\tType: '%s'\n",
-                     i,
-                     mm_firmware_properties_get_unique_id (props),
-                     ((selected &&
-                       g_str_equal (mm_firmware_properties_get_unique_id (props),
-                                    mm_firmware_properties_get_unique_id (selected))) ?
-                      " (CURRENT)" : ""),
-                     mm_firmware_image_type_get_string (
-                         mm_firmware_properties_get_image_type (props)));
-
-            if (mm_firmware_properties_get_image_type (props) == MM_FIRMWARE_IMAGE_TYPE_GOBI) {
-                g_print ("\t\t[Gobi]     PRI version: '%s'\n"
-                         "\t\t[Gobi]        PRI info: '%s'\n"
-                         "\t\t[Gobi]    Boot version: '%s'\n"
-                         "\t\t[Gobi]   PRI Unique ID: '%s'\n"
-                         "\t\t[Gobi] Modem Unique ID: '%s'\n",
-                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_pri_version (props)),
-                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_pri_info (props)),
-                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_boot_version (props)),
-                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_pri_unique_id (props)),
-                         VALIDATE_UNKNOWN (mm_firmware_properties_get_gobi_modem_unique_id (props)));
-            }
-
-            g_object_unref (props);
-        }
-        g_list_free (result);
-    }
-
-    if (selected)
-        g_object_unref (selected);
+    g_list_free_full (result, g_object_unref);
+    g_clear_object (&selected);
 }
 
 static void

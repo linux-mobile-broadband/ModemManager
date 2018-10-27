@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -133,71 +134,92 @@ mmcli_modem_signal_shutdown (void)
 }
 
 static void
-print_signal_value (const gchar *prefix,
-                    gdouble      value,
-                    const gchar *units)
-{
-    if (value != MM_SIGNAL_UNKNOWN)
-        g_print ("%s'%.2lf' %s\n", prefix, value, units);
-    else
-        g_print ("%s'n/a'\n", prefix);
-}
-
-static void
 print_signal_info (void)
 {
     MMSignal *signal;
+    gdouble   value;
+    gchar    *refresh_rate;
+    gchar    *cdma1x_rssi = NULL;
+    gchar    *cdma1x_ecio = NULL;
+    gchar    *evdo_rssi = NULL;
+    gchar    *evdo_ecio = NULL;
+    gchar    *evdo_sinr = NULL;
+    gchar    *evdo_io = NULL;
+    gchar    *gsm_rssi = NULL;
+    gchar    *umts_rssi = NULL;
+    gchar    *umts_rscp = NULL;
+    gchar    *umts_ecio = NULL;
+    gchar    *lte_rssi = NULL;
+    gchar    *lte_rsrp = NULL;
+    gchar    *lte_rsrq = NULL;
+    gchar    *lte_snr = NULL;
 
-    g_print ("\n"
-             "%s\n"
-             "  -------------------------\n"
-             "  Signal | Refresh rate: '%u' seconds\n",
-             mm_modem_signal_get_path (ctx->modem_signal),
-             mm_modem_signal_get_rate (ctx->modem_signal));
+    refresh_rate = g_strdup_printf ("%u", mm_modem_signal_get_rate (ctx->modem_signal));
 
-    /* CDMA */
     signal = mm_modem_signal_peek_cdma (ctx->modem_signal);
     if (signal) {
-        g_print ("  -------------------------\n");
-        print_signal_value ("  CDMA1x | RSSI: ", mm_signal_get_rssi (signal), "dBm");
-        print_signal_value ("         | EcIo: ", mm_signal_get_ecio (signal), "dBm");
+        if ((value = mm_signal_get_rssi (signal)) != MM_SIGNAL_UNKNOWN)
+            cdma1x_rssi = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_ecio (signal)) != MM_SIGNAL_UNKNOWN)
+            cdma1x_ecio = g_strdup_printf ("%.2lf", value);
     }
 
-    /* EVDO */
     signal = mm_modem_signal_peek_evdo (ctx->modem_signal);
     if (signal) {
-        g_print ("  -------------------------\n");
-        print_signal_value ("  EV-DO  | RSSI: ", mm_signal_get_rssi (signal), "dBm");
-        print_signal_value ("         | EcIo: ", mm_signal_get_ecio (signal), "dB");
-        print_signal_value ("         | SINR: ", mm_signal_get_sinr (signal), "dB");
-        print_signal_value ("         |   Io: ", mm_signal_get_io   (signal), "dBm");
+        if ((value = mm_signal_get_rssi (signal)) != MM_SIGNAL_UNKNOWN)
+            evdo_rssi = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_ecio (signal)) != MM_SIGNAL_UNKNOWN)
+            evdo_ecio = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_sinr (signal)) != MM_SIGNAL_UNKNOWN)
+            evdo_sinr = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_io (signal)) != MM_SIGNAL_UNKNOWN)
+            evdo_io = g_strdup_printf ("%.2lf", value);
     }
 
-    /* GSM */
     signal = mm_modem_signal_peek_gsm (ctx->modem_signal);
     if (signal) {
-        g_print ("  -------------------------\n");
-        print_signal_value ("  GSM    | RSSI: ", mm_signal_get_rssi (signal), "dBm");
+        if ((value = mm_signal_get_rssi (signal)) != MM_SIGNAL_UNKNOWN)
+            gsm_rssi = g_strdup_printf ("%.2lf", value);
     }
 
-    /* UMTS */
     signal = mm_modem_signal_peek_umts (ctx->modem_signal);
     if (signal) {
-        g_print ("  -------------------------\n");
-        print_signal_value ("  UMTS   | RSSI: ", mm_signal_get_rssi (signal), "dBm");
-        print_signal_value ("         | RSCP: ", mm_signal_get_rscp (signal), "dBm");
-        print_signal_value ("         | EcIo: ", mm_signal_get_ecio (signal), "dB");
+        if ((value = mm_signal_get_rssi (signal)) != MM_SIGNAL_UNKNOWN)
+            umts_rssi = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_rscp (signal)) != MM_SIGNAL_UNKNOWN)
+            umts_rscp = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_ecio (signal)) != MM_SIGNAL_UNKNOWN)
+            umts_ecio = g_strdup_printf ("%.2lf", value);
     }
 
-    /* LTE */
     signal = mm_modem_signal_peek_lte (ctx->modem_signal);
     if (signal) {
-        g_print ("  -------------------------\n");
-        print_signal_value ("  LTE    | RSSI: ", mm_signal_get_rssi (signal), "dBm");
-        print_signal_value ("         | RSRQ: ", mm_signal_get_rsrq (signal), "dB");
-        print_signal_value ("         | RSRP: ", mm_signal_get_rsrp (signal), "dBm");
-        print_signal_value ("         |  S/N: ", mm_signal_get_snr  (signal), "dB");
+        if ((value = mm_signal_get_rssi (signal)) != MM_SIGNAL_UNKNOWN)
+            lte_rssi = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_rsrq (signal)) != MM_SIGNAL_UNKNOWN)
+            lte_rsrq = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_rsrp (signal)) != MM_SIGNAL_UNKNOWN)
+            lte_rsrp = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_snr (signal)) != MM_SIGNAL_UNKNOWN)
+            lte_snr = g_strdup_printf ("%.2lf", value);
     }
+
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_REFRESH_RATE, refresh_rate, "seconds");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_CDMA1X_RSSI,  cdma1x_rssi,  "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_CDMA1X_ECIO,  cdma1x_ecio,  "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_EVDO_RSSI,    evdo_rssi,    "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_EVDO_ECIO,    evdo_ecio,    "dB");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_EVDO_SINR,    evdo_sinr,    "dB");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_EVDO_IO,      evdo_io,      "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_GSM_RSSI,     gsm_rssi,     "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_UMTS_RSSI,    umts_rssi,    "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_UMTS_RSCP,    umts_rscp,    "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_UMTS_ECIO,    umts_ecio,    "dB");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_RSSI,     lte_rssi,     "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_RSRQ,     lte_rsrq,     "dB");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_RSRP,     lte_rsrp,     "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_SNR,      lte_snr,      "dB");
+    mmcli_output_dump ();
 }
 
 static void

@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -160,32 +161,19 @@ mmcli_modem_oma_shutdown (void)
 static void
 print_oma_status (void)
 {
-    gchar *features_str;
+    gchar                                     *features_str;
     const MMOmaPendingNetworkInitiatedSession *pending_sessions;
-    guint n_pending_sessions;
-
-#undef VALIDATE_UNKNOWN
-#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
+    guint                                      n_pending_sessions;
+    const gchar                               *current_session_type = NULL;
+    const gchar                               *current_session_state = NULL;
+    GPtrArray                                 *aux = NULL;
 
     features_str = mm_oma_feature_build_string_from_mask (mm_modem_oma_get_features (ctx->modem_oma));
 
-    /* Global IDs */
-    g_print ("\n"
-             "%s\n",
-             VALIDATE_UNKNOWN (mm_modem_oma_get_path (ctx->modem_oma)));
-
-    /* Overall setup */
-    g_print ("  -------------------------\n"
-             "  Setup            | features: '%s'\n",
-             VALIDATE_UNKNOWN (features_str));
-
     /* Current session */
     if (mm_modem_oma_get_session_type (ctx->modem_oma) != MM_OMA_SESSION_TYPE_UNKNOWN) {
-        g_print ("  -------------------------\n"
-                 "  Current session  |     type: '%s'\n"
-                 "                   |    state: '%s'\n",
-            VALIDATE_UNKNOWN (mm_oma_session_type_get_string (mm_modem_oma_get_session_type (ctx->modem_oma))),
-            VALIDATE_UNKNOWN (mm_oma_session_state_get_string (mm_modem_oma_get_session_state (ctx->modem_oma))));
+        current_session_type = mm_oma_session_type_get_string (mm_modem_oma_get_session_type (ctx->modem_oma));
+        current_session_state = mm_oma_session_state_get_string (mm_modem_oma_get_session_state (ctx->modem_oma));
     }
 
     /* If 1 or more pending sessions... */
@@ -193,18 +181,24 @@ print_oma_status (void)
         n_pending_sessions > 0) {
         guint i;
 
-        g_print ("  -------------------------\n"
-                 "  Pending sessions |\n");
+        aux = g_ptr_array_new ();
+
         for (i = 0; i < n_pending_sessions; i++) {
-            g_print ("               [%u] |     type: '%s'\n"
-                     "                    |       id: '%u'\n",
-                     i,
-                     VALIDATE_UNKNOWN (mm_oma_session_type_get_string (pending_sessions[i].session_type)),
-                     pending_sessions[i].session_id);
+            gchar *info;
+
+            info = g_strdup_printf ("id: %u, type: %s",
+                                    pending_sessions[i].session_id,
+                                    mm_oma_session_type_get_string (pending_sessions[i].session_type));
+            g_ptr_array_add (aux, info);
         }
+        g_ptr_array_add (aux, NULL);
     }
 
-    g_free (features_str);
+    mmcli_output_string_take       (MMC_F_OMA_FEATURES,         features_str);
+    mmcli_output_string            (MMC_F_OMA_CURRENT_TYPE,     current_session_type);
+    mmcli_output_string            (MMC_F_OMA_CURRENT_STATE,    current_session_state);
+    mmcli_output_string_array_take (MMC_F_OMA_PENDING_SESSIONS, aux ? (gchar **) g_ptr_array_free (aux, FALSE) : NULL, TRUE);
+    mmcli_output_dump ();
 }
 
 static void

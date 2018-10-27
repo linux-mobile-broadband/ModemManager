@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -137,14 +138,11 @@ get_network_time_process_reply (gchar *time_string,
     gchar *dst_offset = NULL;
     gchar *leap_seconds = NULL;
 
-    if (error)
+    if (error) {
         g_printerr ("error: couldn't get current network time: '%s'\n",
                     error->message);
-
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "not available")
+        exit (EXIT_FAILURE);
+    }
 
     if (timezone) {
         if (mm_network_timezone_get_offset (timezone) != MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN)
@@ -157,27 +155,11 @@ get_network_time_process_reply (gchar *time_string,
             leap_seconds = g_strdup_printf ("%" G_GINT32_FORMAT, mm_network_timezone_get_leap_seconds (timezone));
     }
 
-    g_print ("\n"
-             "%s\n"
-             "  ----------------------------\n"
-             "  Time     |      Current: '%s'\n"
-             "  ----------------------------\n"
-             "  Timezone |       Offset: '%s'\n"
-             "           |   DST offset: '%s'\n"
-             "           | Leap seconds: '%s'\n",
-             mm_modem_time_get_path (ctx->modem_time),
-             VALIDATE (time_string),
-             VALIDATE (offset),
-             VALIDATE (dst_offset),
-             VALIDATE (leap_seconds));
-
-    g_free (offset);
-    g_free (dst_offset);
-    g_free (leap_seconds);
-    g_free (time_string);
-
-    if (error)
-        exit (EXIT_FAILURE);
+    mmcli_output_string_take (MMC_F_TIME_CURRENT,          time_string);
+    mmcli_output_string_take (MMC_F_TIMEZONE_CURRENT,      offset);
+    mmcli_output_string_take (MMC_F_TIMEZONE_DST_OFFSET,   dst_offset);
+    mmcli_output_string_take (MMC_F_TIMEZONE_LEAP_SECONDS, leap_seconds);
+    mmcli_output_dump ();
 }
 
 static void

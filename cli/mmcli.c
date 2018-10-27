@@ -34,6 +34,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 #define PROGRAM_NAME    "mmcli"
 #define PROGRAM_VERSION PACKAGE_VERSION
@@ -43,12 +44,17 @@ static GMainLoop *loop;
 static GCancellable *cancellable;
 
 /* Context */
+static gboolean output_keyvalue_flag;
 static gboolean verbose_flag;
 static gboolean version_flag;
 static gboolean async_flag;
 static gint timeout = 30; /* by default, use 30s for all operations */
 
 static GOptionEntry main_entries[] = {
+    { "output-keyvalue", 'K', 0, G_OPTION_ARG_NONE, &output_keyvalue_flag,
+      "Run action with machine-friendly key-value output",
+      NULL
+    },
     { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose_flag,
       "Run action with verbose logs",
       NULL
@@ -229,6 +235,16 @@ main (gint argc, gchar **argv)
 
     if (verbose_flag)
         g_log_set_handler (G_LOG_DOMAIN, G_LOG_LEVEL_MASK, log_handler, NULL);
+
+    /* Setup output */
+    if (output_keyvalue_flag) {
+        if (verbose_flag) {
+            g_printerr ("error: cannot set verbose output in keyvalue output type\n");
+            exit (EXIT_FAILURE);
+        }
+        mmcli_output_set (MMC_OUTPUT_TYPE_KEYVALUE);
+    } else
+        mmcli_output_set (MMC_OUTPUT_TYPE_HUMAN);
 
     /* Setup signals */
     signal (SIGINT, signals_handler);

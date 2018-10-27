@@ -34,6 +34,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -160,39 +161,35 @@ build_call_properties_from_input (const gchar *properties_string)
 }
 
 static void
-print_call_short_info (MMCall *call)
+output_call_info (MMCall *call)
 {
-    g_print ("\t%s %s (%s)\n",
-             mm_call_get_path (call),
-             mm_call_direction_get_string (mm_call_get_direction (call)),
-             mm_call_state_get_string (mm_call_get_state (call)));
+    gchar *extra;
+
+    extra = g_strdup_printf ("%s (%s)",
+                             mm_call_direction_get_string (mm_call_get_direction (call)),
+                             mm_call_state_get_string (mm_call_get_state (call)));
+    mmcli_output_listitem (MMC_F_CALL_LIST_DBUS_PATH,
+                           "    ",
+                           mm_call_get_path (call),
+                           extra);
+    g_free (extra);
 }
 
 static void
 list_process_reply (GList        *result,
                     const GError *error)
 {
+    GList *l;
+
     if (error) {
         g_printerr ("error: couldn't list call: '%s'\n",
                     error->message);
         exit (EXIT_FAILURE);
     }
 
-    g_print ("\n");
-    if (!result) {
-        g_print ("No calls were found\n");
-    } else {
-        GList *l;
-
-        g_print ("Found %u calls:\n", g_list_length (result));
-        for (l = result; l; l = g_list_next (l)) {
-            MMCall *call = MM_CALL (l->data);
-
-            print_call_short_info (call);
-            g_object_unref (call);
-        }
-        g_list_free (result);
-    }
+    for (l = result; l; l = g_list_next (l))
+        output_call_info (MM_CALL (l->data));
+    mmcli_output_list_dump (MMC_F_CALL_LIST_DBUS_PATH);
 }
 
 static void
@@ -219,8 +216,7 @@ create_process_reply (MMCall        *call,
         exit (EXIT_FAILURE);
     }
 
-    g_print ("Successfully created new call:\n");
-    print_call_short_info (call);
+    g_print ("Successfully created new call: %s\n", mm_call_get_path (call));
     g_object_unref (call);
 }
 

@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011-2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include "config.h"
@@ -33,6 +33,7 @@
 
 #include "mmcli.h"
 #include "mmcli-common.h"
+#include "mmcli-output.h"
 
 /* Context */
 typedef struct {
@@ -132,147 +133,142 @@ mmcli_bearer_shutdown (void)
 static void
 print_bearer_info (MMBearer *bearer)
 {
-    MMBearerIpConfig *ipv4_config;
-    MMBearerIpConfig *ipv6_config;
+    MMBearerIpConfig   *ipv4_config;
+    MMBearerIpConfig   *ipv6_config;
     MMBearerProperties *properties;
-    MMBearerStats *stats;
+    MMBearerStats      *stats;
 
     ipv4_config = mm_bearer_get_ipv4_config (bearer);
     ipv6_config = mm_bearer_get_ipv6_config (bearer);
-    properties = mm_bearer_get_properties (bearer);
-    stats = mm_bearer_get_stats (bearer);
+    properties  = mm_bearer_get_properties (bearer);
+    stats       = mm_bearer_get_stats (bearer);
 
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE_UNKNOWN
-#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
-#undef VALIDATE_NONE
-#define VALIDATE_NONE(str) (str ? str : "none")
+    mmcli_output_string      (MMC_F_BEARER_GENERAL_DBUS_PATH, mm_bearer_get_path (bearer));
 
-    g_print ("Bearer '%s'\n",
-             mm_bearer_get_path (bearer));
-    g_print ("  -------------------------\n"
-             "  Status             |   connected: '%s'\n"
-             "                     |   suspended: '%s'\n"
-             "                     |   interface: '%s'\n"
-             "                     |  IP timeout: '%u'\n",
-             mm_bearer_get_connected (bearer) ? "yes" : "no",
-             mm_bearer_get_suspended (bearer) ? "yes" : "no",
-             VALIDATE_UNKNOWN (mm_bearer_get_interface (bearer)),
-             mm_bearer_get_ip_timeout (bearer));
+    mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTED,  mm_bearer_get_connected (bearer) ? "yes" : "no");
+    mmcli_output_string      (MMC_F_BEARER_STATUS_SUSPENDED,  mm_bearer_get_suspended (bearer) ? "yes" : "no");
+    mmcli_output_string      (MMC_F_BEARER_STATUS_INTERFACE,  mm_bearer_get_interface (bearer));
+    mmcli_output_string_take (MMC_F_BEARER_STATUS_IP_TIMEOUT, g_strdup_printf ("%u", mm_bearer_get_ip_timeout (bearer)));
 
-    if (properties) {
-        gchar *ip_family_str;
+    /* Properties */
+    {
+        const gchar *apn = NULL;
+        const gchar *roaming = NULL;
+        gchar       *ip_family_str = NULL;
+        const gchar *user = NULL;
+        const gchar *password = NULL;
+        const gchar *number = NULL;
+        const gchar *rm_protocol = NULL;
 
-        ip_family_str = (mm_bearer_ip_family_build_string_from_mask (
-                             mm_bearer_properties_get_ip_type (properties)));
-        g_print ("  -------------------------\n"
-                 "  Properties         |         apn: '%s'\n"
-                 "                     |     roaming: '%s'\n"
-                 "                     |     IP type: '%s'\n"
-                 "                     |        user: '%s'\n"
-                 "                     |    password: '%s'\n"
-                 "                     |      number: '%s'\n"
-                 "                     | Rm protocol: '%s'\n",
-                 VALIDATE_NONE (mm_bearer_properties_get_apn (properties)),
-                 mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden",
-                 VALIDATE_UNKNOWN (ip_family_str),
-                 VALIDATE_NONE (mm_bearer_properties_get_user (properties)),
-                 VALIDATE_NONE (mm_bearer_properties_get_password (properties)),
-                 VALIDATE_NONE (mm_bearer_properties_get_number (properties)),
-                 VALIDATE_UNKNOWN (mm_modem_cdma_rm_protocol_get_string (
-                                       mm_bearer_properties_get_rm_protocol (properties))));
-        g_free (ip_family_str);
-    }
-
-    /* IPv4 */
-    g_print ("  -------------------------\n"
-             "  IPv4 configuration |   method: '%s'\n",
-             (ipv4_config ?
-              mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv4_config)) :
-              "none"));
-    if (ipv4_config &&
-        mm_bearer_ip_config_get_method (ipv4_config) != MM_BEARER_IP_METHOD_UNKNOWN) {
-        const gchar **dns = mm_bearer_ip_config_get_dns (ipv4_config);
-        guint i, mtu;
-
-        g_print ("                     |  address: '%s'\n"
-                 "                     |   prefix: '%u'\n"
-                 "                     |  gateway: '%s'\n",
-                 VALIDATE_UNKNOWN (mm_bearer_ip_config_get_address (ipv4_config)),
-                 mm_bearer_ip_config_get_prefix (ipv4_config),
-                 VALIDATE_UNKNOWN (mm_bearer_ip_config_get_gateway (ipv4_config)));
-
-        if (dns && dns[0]) {
-            g_print (
-                 "                     |      DNS: '%s'", dns[0]);
-            /* Additional DNS addresses */
-            for (i = 1; dns[i]; i++)
-                g_print (", '%s'", dns[i]);
-        } else {
-            g_print (
-                 "                     |      DNS: none");
+        if (properties) {
+            apn           = mm_bearer_properties_get_apn (properties);
+            roaming       = mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden";
+            ip_family_str = (properties ? mm_bearer_ip_family_build_string_from_mask (mm_bearer_properties_get_ip_type (properties)) : NULL);
+            user          = mm_bearer_properties_get_user (properties);
+            password      = mm_bearer_properties_get_password (properties);
+            number        = mm_bearer_properties_get_number (properties);
+            rm_protocol   = mm_modem_cdma_rm_protocol_get_string (mm_bearer_properties_get_rm_protocol (properties));
         }
-        g_print ("\n");
 
-        mtu = mm_bearer_ip_config_get_mtu (ipv4_config);
-        if (mtu)
-            g_print ("                     |      MTU: '%u'\n", mtu);
+        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_APN,         apn);
+        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_ROAMING,     roaming);
+        mmcli_output_string_take (MMC_F_BEARER_PROPERTIES_IP_TYPE,     ip_family_str);
+        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_USER,        user);
+        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_PASSWORD,    password);
+        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_NUMBER,      number);
+        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_RM_PROTOCOL, rm_protocol);
     }
 
-    /* IPv6 */
-    g_print ("  -------------------------\n"
-             "  IPv6 configuration |   method: '%s'\n",
-             (ipv6_config ?
-              mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv6_config)) :
-              "none"));
-    if (ipv6_config &&
-        mm_bearer_ip_config_get_method (ipv6_config) != MM_BEARER_IP_METHOD_UNKNOWN) {
-        const gchar **dns = mm_bearer_ip_config_get_dns (ipv6_config);
-        guint i, mtu;
+    /* IPv4 config */
+    {
+        const gchar  *method = NULL;
+        const gchar  *address = NULL;
+        gchar        *prefix = NULL;
+        const gchar  *gateway = NULL;
+        const gchar **dns = NULL;
+        gchar        *mtu = NULL;
 
-        g_print ("                     |  address: '%s'\n"
-                 "                     |   prefix: '%u'\n"
-                 "                     |  gateway: '%s'\n",
-                 VALIDATE_UNKNOWN(mm_bearer_ip_config_get_address (ipv6_config)),
-                 mm_bearer_ip_config_get_prefix (ipv6_config),
-                 VALIDATE_UNKNOWN(mm_bearer_ip_config_get_gateway (ipv6_config)));
+        if (ipv4_config) {
+            method = mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv4_config));
+            if (mm_bearer_ip_config_get_method (ipv4_config) != MM_BEARER_IP_METHOD_UNKNOWN) {
+                guint mtu_n;
 
-        if (dns && dns[0]) {
-            g_print (
-                 "                     |      DNS: '%s'", dns[0]);
-            /* Additional DNS addresses */
-            for (i = 1; dns[i]; i++)
-                g_print (", '%s'", dns[i]);
-        } else {
-            g_print (
-                 "                     |      DNS: none");
+                address = mm_bearer_ip_config_get_address (ipv4_config);
+                prefix  = g_strdup_printf ("%u", mm_bearer_ip_config_get_prefix (ipv4_config));
+                gateway = mm_bearer_ip_config_get_gateway (ipv4_config);
+                dns     = mm_bearer_ip_config_get_dns (ipv4_config);
+                mtu_n   = mm_bearer_ip_config_get_mtu (ipv4_config);
+                if (mtu_n)
+                    mtu = g_strdup_printf ("%u", mtu_n);
+            }
         }
-        g_print ("\n");
 
-        mtu = mm_bearer_ip_config_get_mtu (ipv6_config);
-        if (mtu)
-            g_print ("                     |      MTU: '%u'\n", mtu);
+        mmcli_output_string       (MMC_F_BEARER_IPV4_CONFIG_METHOD,  method);
+        mmcli_output_string       (MMC_F_BEARER_IPV4_CONFIG_ADDRESS, address);
+        mmcli_output_string_take  (MMC_F_BEARER_IPV4_CONFIG_PREFIX,  prefix);
+        mmcli_output_string       (MMC_F_BEARER_IPV4_CONFIG_GATEWAY, gateway);
+        mmcli_output_string_array (MMC_F_BEARER_IPV4_CONFIG_DNS,     dns, FALSE);
+        mmcli_output_string_take  (MMC_F_BEARER_IPV4_CONFIG_MTU,     mtu);
     }
 
-    if (stats) {
-        guint64 val;
+    /* IPv6 config */
+    {
+        const gchar  *method = NULL;
+        const gchar  *address = NULL;
+        gchar        *prefix = NULL;
+        const gchar  *gateway = NULL;
+        const gchar **dns = NULL;
+        gchar        *mtu = NULL;
 
-        g_print ("  -------------------------\n"
-                 "  Stats              |          Duration: '%u'\n", mm_bearer_stats_get_duration (stats));
+        if (ipv6_config) {
+            method = mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv6_config));
+            if (mm_bearer_ip_config_get_method (ipv6_config) != MM_BEARER_IP_METHOD_UNKNOWN) {
+                guint mtu_n;
 
-        val = mm_bearer_stats_get_rx_bytes (stats);
-        if (val > 0)
-            g_print ("                     |    Bytes received: '%" G_GUINT64_FORMAT "'\n", val);
-        else
-            g_print ("                     |    Bytes received: 'n/a'\n");
+                address = mm_bearer_ip_config_get_address (ipv6_config);
+                prefix  = g_strdup_printf ("%u", mm_bearer_ip_config_get_prefix (ipv6_config));
+                gateway = mm_bearer_ip_config_get_gateway (ipv6_config);
+                dns     = mm_bearer_ip_config_get_dns (ipv6_config);
+                mtu_n   = mm_bearer_ip_config_get_mtu (ipv6_config);
+                if (mtu_n)
+                    mtu = g_strdup_printf ("%u", mtu_n);
+            }
+        }
 
-        val = mm_bearer_stats_get_tx_bytes (stats);
-        if (val > 0)
-            g_print ("                     | Bytes transmitted: '%" G_GUINT64_FORMAT "'\n", val);
-        else
-            g_print ("                     | Bytes transmitted: 'n/a'\n");
+        mmcli_output_string       (MMC_F_BEARER_IPV6_CONFIG_METHOD,  method);
+        mmcli_output_string       (MMC_F_BEARER_IPV6_CONFIG_ADDRESS, address);
+        mmcli_output_string_take  (MMC_F_BEARER_IPV6_CONFIG_PREFIX,  prefix);
+        mmcli_output_string       (MMC_F_BEARER_IPV6_CONFIG_GATEWAY, gateway);
+        mmcli_output_string_array (MMC_F_BEARER_IPV6_CONFIG_DNS,     dns, FALSE);
+        mmcli_output_string_take  (MMC_F_BEARER_IPV6_CONFIG_MTU,     mtu);
     }
+
+    /* Stats */
+    {
+        gchar *duration = NULL;
+        gchar *bytes_rx = NULL;
+        gchar *bytes_tx = NULL;
+
+        if (stats) {
+            guint64 val;
+
+            val = mm_bearer_stats_get_duration (stats);
+            if (val)
+                duration = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
+            val = mm_bearer_stats_get_rx_bytes (stats);
+            if (val)
+                bytes_rx = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
+            val = mm_bearer_stats_get_tx_bytes (stats);
+            if (val)
+                bytes_tx = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
+        }
+
+        mmcli_output_string_take (MMC_F_BEARER_STATS_DURATION, duration);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_RX, bytes_rx);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_TX, bytes_tx);
+    }
+
+    mmcli_output_dump ();
 
     g_clear_object (&stats);
     g_clear_object (&properties);
