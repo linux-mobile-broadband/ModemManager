@@ -3072,7 +3072,6 @@ cind_response_new (const gchar *desc, guint idx, gint min, gint max)
     gchar *p;
 
     g_return_val_if_fail (desc != NULL, NULL);
-    g_return_val_if_fail (idx >= 0, NULL);
 
     r = g_malloc0 (sizeof (MM3gppCindResponse));
 
