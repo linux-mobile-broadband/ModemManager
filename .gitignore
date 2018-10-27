@@ -27,6 +27,7 @@ Makefile.in
 /libtool
 /TAGS
 /ABOUT-NLS
+/ChangeLog
 
 /include/ModemManager-version.h
 /include/ModemManager-names.h
