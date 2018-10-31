@@ -55,6 +55,7 @@ struct _MMBroadbandBearerUbloxPrivate {
     MMUbloxNetworkingMode    mode;
     MMUbloxBearerAllowedAuth allowed_auths;
     FeatureSupport           statistics;
+    FeatureSupport           cedata;
 };
 
 /*****************************************************************************/
@@ -328,6 +329,25 @@ dial_3gpp_finish (MMBroadbandBearer  *self,
 }
 
 static void
+cedata_activate_ready (MMBaseModem            *modem,
+                       GAsyncResult           *res,
+                       MMBroadbandBearerUblox *self)
+{
+    const gchar *response;
+    GError      *error = NULL;
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!response) {
+        mm_warn ("ECM data connection attempt failed: %s", error->message);
+        mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
+                                                 MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+        g_error_free (error);
+    }
+    /* we received a full bearer object reference */
+    g_object_unref (self);
+}
+
+static void
 cgact_activate_ready (MMBaseModem  *modem,
                       GAsyncResult *res,
                       GTask        *task)
@@ -354,15 +374,80 @@ activate_3gpp (GTask *task)
 
     ctx = (CommonConnectContext *) g_task_get_task_data (task);
 
-    cmd = g_strdup_printf ("+CGACT=1,%u", ctx->cid);
-    mm_dbg ("activating PDP context #%u...", ctx->cid);
-    mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
-                              cmd,
-                              120,
-                              FALSE,
-                              (GAsyncReadyCallback) cgact_activate_ready,
-                              task);
+    if (ctx->self->priv->profile == MM_UBLOX_USB_PROFILE_ECM &&
+        ctx->self->priv->cedata == FEATURE_SUPPORTED) {
+        /* SARA-U2xx and LISA-U20x only expose one CDC-ECM interface. Hence,
+           the fixed 0 as the interface index here. When we see modems with
+           multiple interfaces, this needs to be revisited. */
+        cmd = g_strdup_printf ("+UCEDATA=%u,0", ctx->cid);
+        mm_dbg ("establishing ECM data connection for PDP context #%u...", ctx->cid);
+        mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
+                                  cmd,
+                                  180,
+                                  FALSE,
+                                  (GAsyncReadyCallback) cedata_activate_ready,
+                                  g_object_ref (ctx->self));
+        /* We'll mark the task done here since the modem expects the DHCP
+           discover packet while +UCEDATA runs. If the command fails, we'll
+           mark the bearer disconnected later in the callback. */
+        g_task_return_pointer (task, g_object_ref (ctx->data), g_object_unref);
+        g_object_unref (task);
+   } else {
+        cmd = g_strdup_printf ("+CGACT=1,%u", ctx->cid);
+        mm_dbg ("activating PDP context #%u...", ctx->cid);
+        mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
+                                  cmd,
+                                  120,
+                                  FALSE,
+                                  (GAsyncReadyCallback) cgact_activate_ready,
+                                  task);
+    }
     g_free (cmd);
+}
+
+static void
+test_cedata_ready (MMBaseModem  *modem,
+                   GAsyncResult *res,
+                   GTask        *task)
+{
+    CommonConnectContext *ctx;
+    const gchar         *response;
+
+    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (modem, res, NULL);
+    if (response)
+        ctx->self->priv->cedata = FEATURE_SUPPORTED;
+    else
+        ctx->self->priv->cedata = FEATURE_UNSUPPORTED;
+    mm_dbg ("u-blox: +UCEDATA command%s available",
+        (ctx->self->priv->cedata == FEATURE_SUPPORTED) ? "" : " not");
+
+    activate_3gpp (task);
+}
+
+static void
+test_cedata (GTask *task)
+{
+    CommonConnectContext *ctx;
+
+    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+
+    /* We don't need to test for +UCEDATA if we're not using CDC-ECM or if we
+       have tested before. Instead, we jump right to the activation. */
+    if (ctx->self->priv->profile != MM_UBLOX_USB_PROFILE_ECM ||
+        ctx->self->priv->cedata != FEATURE_SUPPORT_UNKNOWN) {
+        activate_3gpp (task);
+        return;
+    }
+
+    mm_dbg ("u-blox: checking availability of +UCEDATA command...");
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
+                              "+UCEDATA=?",
+                              3,
+                              TRUE, /* allow_cached */
+                              (GAsyncReadyCallback) test_cedata_ready,
+                              task);
 }
 
 static void
@@ -388,7 +473,7 @@ uauthreq_ready (MMBaseModem  *modem,
         g_error_free (error);
     }
 
-    activate_3gpp (task);
+    test_cedata (task);
 }
 
 static void
@@ -502,10 +587,10 @@ out:
             g_object_unref (task);
             return;
         }
-        /* Otherwise, ignore and jump to activate_3gpp directly as no auth setup
+        /* Otherwise, ignore and jump to test_cedata directly as no auth setup
          * is needed */
         g_error_free (error);
-        activate_3gpp (task);
+        test_cedata (task);
         return;
     }
 
@@ -879,6 +964,7 @@ mm_broadband_bearer_ublox_init (MMBroadbandBearerUblox *self)
     self->priv->mode          = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
     self->priv->allowed_auths = MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN;
     self->priv->statistics    = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->cedata        = FEATURE_SUPPORT_UNKNOWN;
 }
 
 static void
