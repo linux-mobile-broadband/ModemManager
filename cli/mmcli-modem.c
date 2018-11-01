@@ -56,7 +56,6 @@ static gboolean set_power_state_off_flag;
 static gboolean reset_flag;
 static gchar *factory_reset_str;
 static gchar *command_str;
-static gboolean list_bearers_flag;
 static gchar *create_bearer_str;
 static gchar *delete_bearer_str;
 static gchar *set_current_capabilities_str;
@@ -100,10 +99,6 @@ static GOptionEntry entries[] = {
     { "command", 0, 0, G_OPTION_ARG_STRING, &command_str,
       "Send an AT command to the modem",
       "[COMMAND]"
-    },
-    { "list-bearers", 0, 0, G_OPTION_ARG_NONE, &list_bearers_flag,
-      "List packet data bearers available in a given modem",
-      NULL
     },
     { "create-bearer", 0, 0, G_OPTION_ARG_STRING, &create_bearer_str,
       "Create a new packet data bearer in a given modem",
@@ -164,7 +159,6 @@ mmcli_modem_options_enabled (void)
                  set_power_state_low_flag +
                  set_power_state_off_flag +
                  reset_flag +
-                 list_bearers_flag +
                  !!create_bearer_str +
                  !!delete_bearer_str +
                  !!factory_reset_str +
@@ -761,48 +755,6 @@ command_get_timeout (MMModem *modem)
 }
 
 static void
-list_bearers_process_reply (GList        *result,
-                            const GError *error)
-{
-    if (error) {
-        g_printerr ("error: couldn't list bearers: '%s'\n",
-                    error->message);
-        exit (EXIT_FAILURE);
-    }
-
-    g_print ("\n");
-    if (!result) {
-        g_print ("No bearers were found\n");
-    } else {
-        GList *l;
-
-        g_print ("Found %u bearers:\n", g_list_length (result));
-        for (l = result; l; l = g_list_next (l)) {
-            MMBearer *bearer = MM_BEARER (l->data);
-
-            g_print ("\n");
-            print_bearer_short_info (bearer);
-            g_object_unref (bearer);
-        }
-        g_list_free (result);
-    }
-}
-
-static void
-list_bearers_ready (MMModem      *modem,
-                    GAsyncResult *result,
-                    gpointer      nothing)
-{
-    GList *operation_result;
-    GError *error = NULL;
-
-    operation_result = mm_modem_list_bearers_finish (modem, result, &error);
-    list_bearers_process_reply (operation_result, error);
-
-    mmcli_async_operation_done ();
-}
-
-static void
 create_bearer_process_reply (MMBearer     *bearer,
                              const GError *error)
 {
@@ -1166,16 +1118,6 @@ get_modem_ready (GObject      *source,
         return;
     }
 
-    /* Request to list bearers? */
-    if (list_bearers_flag) {
-        g_debug ("Asynchronously listing bearers in modem...");
-        mm_modem_list_bearers (ctx->modem,
-                               ctx->cancellable,
-                               (GAsyncReadyCallback)list_bearers_ready,
-                               NULL);
-        return;
-    }
-
     /* Request to create a new bearer? */
     if (create_bearer_str) {
         GError *error = NULL;
@@ -1394,16 +1336,6 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                         NULL,
                                         &error);
         command_process_reply (result, error);
-        return;
-    }
-
-    /* Request to list the bearers? */
-    if (list_bearers_flag) {
-        GList *result;
-
-        g_debug ("Synchronously listing bearers...");
-        result = mm_modem_list_bearers_sync (ctx->modem, NULL, &error);
-        list_bearers_process_reply (result, error);
         return;
     }
 

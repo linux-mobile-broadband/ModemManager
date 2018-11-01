@@ -42,6 +42,9 @@
 
         List configured packet data bearers (EPS Bearers, PDP Contexts, or
         CDMA2000 Packet Data Sessions).
+
+        Deprecated: 1.10.0. Use #org.freedesktop.ModemManager1.Modem:Bearers
+        property instead.
     -->
     <method name="ListBearers">
       <arg name="bearers" type="ao" direction="out" />
