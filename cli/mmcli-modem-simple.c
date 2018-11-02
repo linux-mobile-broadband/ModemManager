@@ -46,7 +46,6 @@ static Context *ctx;
 /* Options */
 static gchar *connect_str;
 static gboolean disconnect_flag;
-static gboolean status_flag;
 
 static GOptionEntry entries[] = {
     { "simple-connect", 0, 0, G_OPTION_ARG_STRING, &connect_str,
@@ -55,10 +54,6 @@ static GOptionEntry entries[] = {
     },
     { "simple-disconnect", 0, 0, G_OPTION_ARG_NONE, &disconnect_flag,
       "Disconnect all connected bearers.",
-      NULL
-    },
-    { "simple-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
-      "Show compilation of status properties.",
       NULL
     },
     { NULL }
@@ -89,8 +84,7 @@ mmcli_modem_simple_options_enabled (void)
         return !!n_actions;
 
     n_actions = (!!connect_str +
-                 disconnect_flag +
-                 status_flag);
+                 disconnect_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Simple actions requested\n");
@@ -196,142 +190,6 @@ disconnect_ready (MMModemSimple  *modem_simple,
 }
 
 static void
-status_process_reply (MMSimpleStatus *result,
-                      const GError *error)
-{
-    MMModemState state;
-
-    if (!result) {
-        g_printerr ("error: couldn't get status from the modem: '%s'\n",
-                    error ? error->message : "unknown error");
-        exit (EXIT_FAILURE);
-    }
-
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE_UNKNOWN
-#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
-
-    g_print ("\n"
-             "%s\n",
-             VALIDATE_UNKNOWN (mm_modem_simple_get_path (ctx->modem_simple)));
-
-    state = mm_simple_status_get_state (result);
-
-
-    g_print ("  -------------------------\n"
-             "  Status |          state: '%s'\n",
-             mm_modem_state_get_string (state));
-
-    if (state >= MM_MODEM_STATE_REGISTERED) {
-        const MMModemBand *bands = NULL;
-        guint n_bands = 0;
-        gchar *bands_str;
-        gchar *access_tech_str;
-        guint signal_quality;
-        gboolean signal_quality_recent = FALSE;
-
-        signal_quality = (mm_simple_status_get_signal_quality (
-                              result,
-                              &signal_quality_recent));
-        mm_simple_status_get_current_bands (result, &bands, &n_bands);
-        bands_str = mm_common_build_bands_string (bands, n_bands);
-        access_tech_str = (mm_modem_access_technology_build_string_from_mask (
-                               mm_simple_status_get_access_technologies (result)));
-
-        g_print ("         | signal quality: '%u' (%s)\n"
-                 "         |          bands: '%s'\n"
-                 "         |    access tech: '%s'\n",
-                 signal_quality, signal_quality_recent ? "recent" : "cached",
-                 VALIDATE_UNKNOWN (bands_str),
-                 VALIDATE_UNKNOWN (access_tech_str));
-
-        switch (mm_simple_status_get_3gpp_registration_state (result)) {
-        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED:
-            g_print ("  -------------------------\n"
-                     "  3GPP   |   registration: '%s'\n"
-                     "         |  operator code: '%s'\n"
-                     "         |  operator name: '%s'\n"
-                     "         |   subscription: '%s'\n",
-                     mm_modem_3gpp_registration_state_get_string (
-                         mm_simple_status_get_3gpp_registration_state (result)),
-                     VALIDATE_UNKNOWN (mm_simple_status_get_3gpp_operator_code (result)),
-                     VALIDATE_UNKNOWN (mm_simple_status_get_3gpp_operator_name (result)),
-                     mm_modem_3gpp_subscription_state_get_string (
-                         mm_simple_status_get_3gpp_subscription_state (result)));
-            break;
-        default:
-            break;
-        }
-
-        if ((mm_simple_status_get_cdma_cdma1x_registration_state (result) !=
-             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN) ||
-            (mm_simple_status_get_cdma_evdo_registration_state (result) !=
-             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)) {
-            guint sid;
-            guint nid;
-            gchar *sid_str = NULL;
-            gchar *nid_str = NULL;
-
-            sid = mm_simple_status_get_cdma_sid (result);
-            sid_str = (sid != MM_MODEM_CDMA_SID_UNKNOWN ?
-                       g_strdup_printf ("%u", sid) :
-                       NULL);
-            nid = mm_simple_status_get_cdma_nid (result);
-            nid_str = (nid != MM_MODEM_CDMA_NID_UNKNOWN ?
-                       g_strdup_printf ("%u", nid) :
-                       NULL);
-
-            g_print ("  -------------------------\n"
-                     "  CDMA   |            sid: '%s'\n"
-                     "         |            nid: '%s'\n"
-                     "         |   registration: CDMA1x '%s'\n"
-                     "         |                 EV-DO  '%s'\n",
-                     VALIDATE_UNKNOWN (sid_str),
-                     VALIDATE_UNKNOWN (nid_str),
-                     mm_modem_cdma_registration_state_get_string (
-                         mm_simple_status_get_cdma_cdma1x_registration_state (result)),
-                     mm_modem_cdma_registration_state_get_string (
-                         mm_simple_status_get_cdma_evdo_registration_state (result)));
-
-            g_free (sid_str);
-            g_free (nid_str);
-        }
-
-        g_free (access_tech_str);
-        g_free (bands_str);
-    } else {
-        g_print ("  -------------------------\n"
-                 "  3GPP   |   subscription: '%s'\n",
-                 mm_modem_3gpp_subscription_state_get_string (
-                     mm_simple_status_get_3gpp_subscription_state (result)));
-    }
-
-
-    g_print ("\n");
-    g_object_unref (result);
-}
-
-static void
-status_ready (MMModemSimple  *modem_simple,
-              GAsyncResult *result,
-              gpointer      nothing)
-{
-    MMSimpleStatus *operation_result;
-    GError *error = NULL;
-
-    operation_result = mm_modem_simple_get_status_finish (modem_simple, result, &error);
-    status_process_reply (operation_result, error);
-
-    mmcli_async_operation_done ();
-}
-
-static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -375,17 +233,6 @@ get_modem_ready (GObject      *source,
                                     NULL,
                                     ctx->cancellable,
                                     (GAsyncReadyCallback)disconnect_ready,
-                                    NULL);
-        return;
-    }
-
-    /* Request to get status from the modem? */
-    if (status_flag) {
-        g_debug ("Asynchronously getting status from the modem...");
-
-        mm_modem_simple_get_status (ctx->modem_simple,
-                                    ctx->cancellable,
-                                    (GAsyncReadyCallback)status_ready,
                                     NULL);
         return;
     }
@@ -442,19 +289,6 @@ mmcli_modem_simple_run_synchronous (GDBusConnection *connection)
                                                   NULL,
                                                   &error);
         disconnect_process_reply (result, error);
-        return;
-    }
-
-    /* Request to get status from the modem? */
-    if (status_flag) {
-        MMSimpleStatus *result;
-
-        g_debug ("Synchronously getting status from the modem...");
-
-        result = mm_modem_simple_get_status_sync (ctx->modem_simple,
-                                                  NULL,
-                                                  &error);
-        status_process_reply (result, error);
         return;
     }
 
