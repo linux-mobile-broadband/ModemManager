@@ -2009,9 +2009,9 @@ query_device_services_ready (MbimDevice   *device,
             service = mbim_uuid_to_service (&device_services[i]->device_service_id);
 
             switch (service) {
-                case MBIM_SERVICE_BASIC_CONNECT_EXTENSIONS:
+                case MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS:
                     for (j = 0; j < device_services[i]->cids_count; j++) {
-                        if (device_services[i]->cids[j] == MBIM_CID_BASIC_CONNECT_EXTENSIONS_PCO) {
+                        if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO) {
                             mm_dbg ("PCO is supported");
                             self->priv->is_pco_supported = TRUE;
                             break;
@@ -2754,7 +2754,7 @@ sms_notification (MMBroadbandModemMbim *self,
 }
 
 static void
-basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
+ms_basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
                                            MbimMessage *notification)
 {
     MbimPcoValue *pco_value;
@@ -2762,7 +2762,7 @@ basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
     gchar *pco_data_hex;
     MMPco *pco;
 
-    if (!mbim_message_basic_connect_extensions_pco_notification_parse (
+    if (!mbim_message_ms_basic_connect_extensions_pco_notification_parse (
             notification,
             &pco_value,
             &error)) {
@@ -2796,13 +2796,13 @@ basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
 }
 
 static void
-basic_connect_extensions_notification (MMBroadbandModemMbim *self,
+ms_basic_connect_extensions_notification (MMBroadbandModemMbim *self,
                                        MbimMessage *notification)
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
-    case MBIM_CID_BASIC_CONNECT_EXTENSIONS_PCO:
+    case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PCO)
-            basic_connect_extensions_notification_pco (self, notification);
+            ms_basic_connect_extensions_notification_pco (self, notification);
         break;
     default:
         /* Ignore */
@@ -2846,8 +2846,8 @@ device_notification_cb (MbimDevice *device,
     case MBIM_SERVICE_BASIC_CONNECT:
         basic_connect_notification (self, notification);
         break;
-    case MBIM_SERVICE_BASIC_CONNECT_EXTENSIONS:
-        basic_connect_extensions_notification (self, notification);
+    case MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS:
+        ms_basic_connect_extensions_notification (self, notification);
         break;
     case MBIM_SERVICE_SMS:
         sms_notification (self, notification);
@@ -3083,10 +3083,10 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
     /* Basic connect extensions service */
     if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO) {
         entries[n_entries] = g_new (MbimEventEntry, 1);
-        memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_BASIC_CONNECT_EXTENSIONS, sizeof (MbimUuid));
+        memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_MS_BASIC_CONNECT_EXTENSIONS, sizeof (MbimUuid));
         entries[n_entries]->cids_count = 1;
         entries[n_entries]->cids = g_new0 (guint32, 1);
-        entries[n_entries]->cids[0] = MBIM_CID_BASIC_CONNECT_EXTENSIONS_PCO;
+        entries[n_entries]->cids[0] = MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO;
         n_entries++;
     }
 
