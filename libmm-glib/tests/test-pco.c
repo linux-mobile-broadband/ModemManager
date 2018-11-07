@@ -76,8 +76,7 @@ test_pco_list_add (void)
         pco_data = mm_pco_get_data (pco, &pco_data_size);
         g_assert (pco_data != NULL);
         g_assert_cmpuint (pco_data_size, ==, expected_pco->pco_data_size);
-        g_assert_cmpmem (pco_data, pco_data_size,
-                         expected_pco->pco_data, expected_pco->pco_data_size);
+        g_assert_cmpint (memcmp (pco_data, expected_pco->pco_data, pco_data_size), ==, 0);
     }
 
     mm_pco_list_free (list);

@@ -164,8 +164,7 @@ test_parse_vendor_pco_info (void)
         pco_data = mm_pco_get_data (pco, &pco_data_size);
         g_assert (pco_data != NULL);
         g_assert_cmpuint (pco_data_size, ==, good_pco_infos[i].pco_data_size);
-        g_assert_cmpmem (pco_data, pco_data_size,
-                         good_pco_infos[i].pco_data, good_pco_infos[i].pco_data_size);
+        g_assert_cmpint (memcmp (pco_data, good_pco_infos[i].pco_data, pco_data_size), ==, 0);
         g_object_unref (pco);
     }
 
