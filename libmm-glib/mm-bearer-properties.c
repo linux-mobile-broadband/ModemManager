@@ -408,16 +408,6 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
 
 /*****************************************************************************/
 
-
-/**
- * mm_bearer_properties_consume_string:
- * @self: a #MMBearerProperties
- * @key: the key string.
- * @value: the value string.
- * @error: (allow-none): Return location for error or %NULL.
- *
- * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
- */
 gboolean
 mm_bearer_properties_consume_string (MMBearerProperties *self,
                                      const gchar *key,
@@ -527,15 +517,6 @@ mm_bearer_properties_new_from_string (const gchar *str,
 
 /*****************************************************************************/
 
-/**
- * mm_bearer_properties_consume_variant:
- * @properties: a #MMBearerProperties
- * @key: the key string.
- * @value: a #GVariant
- * @error: (allow-none): Return location for error or %NULL.
- *
- * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
- */
 gboolean
 mm_bearer_properties_consume_variant (MMBearerProperties *properties,
                                       const gchar *key,
