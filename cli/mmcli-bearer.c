@@ -144,6 +144,7 @@ print_bearer_info (MMBearer *bearer)
     stats       = mm_bearer_get_stats (bearer);
 
     mmcli_output_string      (MMC_F_BEARER_GENERAL_DBUS_PATH, mm_bearer_get_path (bearer));
+    mmcli_output_string      (MMC_F_BEARER_GENERAL_TYPE,      mm_bearer_type_get_string (mm_bearer_get_bearer_type (bearer)));
 
     mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTED,  mm_bearer_get_connected (bearer) ? "yes" : "no");
     mmcli_output_string      (MMC_F_BEARER_STATUS_SUSPENDED,  mm_bearer_get_suspended (bearer) ? "yes" : "no");

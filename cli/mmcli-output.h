@@ -197,6 +197,7 @@ typedef enum {
     MMC_F_FIRMWARE_LIST,
     /* Bearer general section */
     MMC_F_BEARER_GENERAL_DBUS_PATH,
+    MMC_F_BEARER_GENERAL_TYPE,
     /* Bearer status section */
     MMC_F_BEARER_STATUS_CONNECTED,
     MMC_F_BEARER_STATUS_SUSPENDED,

@@ -10,6 +10,7 @@ MM_CHECK_VERSION
 <SECTION>
 <FILE>mm-enums</FILE>
 <TITLE>Flags and Enumerations</TITLE>
+MMBearerType
 MMBearerIpFamily
 MMBearerIpMethod
 MMBearerAllowedAuth

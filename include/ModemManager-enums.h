@@ -971,6 +971,28 @@ typedef enum { /*< underscore_name=mm_modem_contacts_storage >*/
 } MMModemContactsStorage;
 
 /**
+ * MMBearerType:
+ * @MM_BEARER_TYPE_UNKNOWN: Unknown bearer.
+ * @MM_BEARER_TYPE_DEFAULT: Primary context (2G/3G) or default bearer (4G),
+ * defined by the user of the API.
+ * @MM_BEARER_TYPE_DEFAULT_ATTACH: The initial default bearer established
+ * during LTE attach procedure, automatically connected as long as the device is
+ * regitered in the LTE network.
+ * @MM_BEARER_TYPE_DEDICATED: Secondary context (2G/3G) or dedicated bearer
+ * (4G), defined by the user of the API. These bearers use the same IP address
+ * used by a primary context or default bearer and provide a dedicated flow for
+ * specific traffic with different QoS settings.
+ *
+ * Type of context (2G/3G) or bearer (4G).
+ */
+typedef enum { /*< underscore_name=mm_bearer_type >*/
+    MM_BEARER_TYPE_UNKNOWN        = 0,
+    MM_BEARER_TYPE_DEFAULT        = 1,
+    MM_BEARER_TYPE_DEFAULT_ATTACH = 2,
+    MM_BEARER_TYPE_DEDICATED      = 3,
+} MMBearerType;
+
+/**
  * MMBearerIpMethod:
  * @MM_BEARER_IP_METHOD_UNKNOWN: Unknown method.
  * @MM_BEARER_IP_METHOD_PPP: Use PPP to get IP addresses and DNS information.

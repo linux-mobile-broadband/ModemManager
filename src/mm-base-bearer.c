@@ -1365,15 +1365,16 @@ mm_base_bearer_init (MMBaseBearer *self)
     self->priv->default_ip_family = MM_BEARER_IP_FAMILY_IPV4;
 
     /* Set defaults */
-    mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
-    mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
-    mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
-    mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), NULL);
-    mm_gdbus_bearer_set_ip_timeout (MM_GDBUS_BEARER (self), BEARER_IP_TIMEOUT_DEFAULT);
-    mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self),
-                                    mm_bearer_ip_config_get_dictionary (NULL));
-    mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self),
-                                    mm_bearer_ip_config_get_dictionary (NULL));
+    mm_gdbus_bearer_set_interface   (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_connected   (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_suspended   (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_properties  (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_ip_timeout  (MM_GDBUS_BEARER (self), BEARER_IP_TIMEOUT_DEFAULT);
+    mm_gdbus_bearer_set_bearer_type (MM_GDBUS_BEARER (self), MM_BEARER_TYPE_DEFAULT);
+    mm_gdbus_bearer_set_ip4_config  (MM_GDBUS_BEARER (self),
+                                     mm_bearer_ip_config_get_dictionary (NULL));
+    mm_gdbus_bearer_set_ip6_config  (MM_GDBUS_BEARER (self),
+                                     mm_bearer_ip_config_get_dictionary (NULL));
 }
 
 static void

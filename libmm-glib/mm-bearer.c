@@ -204,6 +204,24 @@ mm_bearer_get_ip_timeout (MMBearer *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_get_bearer_type:
+ * @self: A #MMBearer.
+ *
+ * Gets the type of bearer.
+ *
+ * Returns: a #MMBearerType.
+ */
+MMBearerType
+mm_bearer_get_bearer_type (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), MM_BEARER_TYPE_UNKNOWN);
+
+    return mm_gdbus_bearer_get_bearer_type (MM_GDBUS_BEARER (self));
+}
+
+/*****************************************************************************/
+
 static void
 ipv4_config_updated (MMBearer *self,
                      GParamSpec *pspec)

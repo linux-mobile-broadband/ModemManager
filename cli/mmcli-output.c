@@ -184,6 +184,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_LOCATION_CDMABS_LAT]             = { "modem.location.cdma-bs.latitude",       "latitude",              MMC_S_MODEM_LOCATION_CDMABS, },
     [MMC_F_FIRMWARE_LIST]                   = { "modem.firmware-list",                   "list",                  MMC_S_MODEM_FIRMWARE,        },
     [MMC_F_BEARER_GENERAL_DBUS_PATH]        = { "bearer.dbus-path",                      "dbus path",             MMC_S_BEARER_GENERAL,        },
+    [MMC_F_BEARER_GENERAL_TYPE]             = { "bearer.type",                           "type",                  MMC_S_BEARER_GENERAL,        },
     [MMC_F_BEARER_STATUS_CONNECTED]         = { "bearer.status.connected",               "connected",             MMC_S_BEARER_STATUS,         },
     [MMC_F_BEARER_STATUS_SUSPENDED]         = { "bearer.status.suspended",               "suspended",             MMC_S_BEARER_STATUS,         },
     [MMC_F_BEARER_STATUS_INTERFACE]         = { "bearer.status.interface",               "interface",             MMC_S_BEARER_STATUS,         },

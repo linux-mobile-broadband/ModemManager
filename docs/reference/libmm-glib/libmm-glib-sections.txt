@@ -984,6 +984,7 @@ mm_bearer_dup_interface
 mm_bearer_get_connected
 mm_bearer_get_suspended
 mm_bearer_get_ip_timeout
+mm_bearer_get_bearer_type
 mm_bearer_peek_ipv4_config
 mm_bearer_get_ipv4_config
 mm_bearer_peek_ipv6_config
@@ -1385,6 +1386,7 @@ mm_call_audio_format_get_type
 <SECTION>
 <FILE>mm-enums-types</FILE>
 <TITLE>Flags and Enumerations</TITLE>
+mm_bearer_type_get_string
 mm_bearer_ip_method_get_string
 mm_bearer_ip_family_get_string
 mm_bearer_allowed_auth_build_string_from_mask
@@ -1445,6 +1447,7 @@ mm_sms_cdma_service_category_build_string_from_mask
 mm_modem_location_source_get_string
 mm_modem_location_assistance_data_type_get_string
 mm_modem_contacts_storage_build_string_from_mask
+mm_bearer_type_build_string_from_mask
 mm_bearer_ip_family_build_string_from_mask
 mm_bearer_ip_method_build_string_from_mask
 mm_bearer_allowed_auth_get_string
@@ -1467,6 +1470,7 @@ mm_call_direction_build_string_from_mask
 mm_call_state_build_string_from_mask
 mm_call_state_reason_build_string_from_mask
 <SUBSECTION Standard>
+MM_TYPE_BEARER_TYPE
 MM_TYPE_BEARER_IP_FAMILY
 MM_TYPE_BEARER_IP_METHOD
 MM_TYPE_BEARER_ALLOWED_AUTH
@@ -1507,6 +1511,7 @@ MM_TYPE_OMA_SESSION_TYPE
 MM_TYPE_CALL_DIRECTION
 MM_TYPE_CALL_STATE
 MM_TYPE_CALL_STATE_REASON
+mm_bearer_type_get_type
 mm_bearer_ip_family_get_type
 mm_bearer_ip_method_get_type
 mm_bearer_allowed_auth_get_type
@@ -1596,6 +1601,7 @@ mm_gdbus_bearer_get_properties
 mm_gdbus_bearer_dup_properties
 mm_gdbus_bearer_get_connected
 mm_gdbus_bearer_get_suspended
+mm_gdbus_bearer_get_bearer_type
 mm_gdbus_bearer_get_stats
 mm_gdbus_bearer_dup_stats
 <SUBSECTION Methods>
@@ -1614,6 +1620,7 @@ mm_gdbus_bearer_set_ip6_config
 mm_gdbus_bearer_set_ip_timeout
 mm_gdbus_bearer_set_properties
 mm_gdbus_bearer_set_suspended
+mm_gdbus_bearer_set_bearer_type
 mm_gdbus_bearer_set_stats
 mm_gdbus_bearer_override_properties
 mm_gdbus_bearer_complete_connect

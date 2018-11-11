@@ -280,6 +280,13 @@
     <property name="IpTimeout" type="u" access="read" />
 
     <!--
+        BearerType:
+
+        A <link linkend="MMBearerType">MMBearerType</link>
+    -->
+    <property name="BearerType" type="u" access="read" />
+
+    <!--
         Properties:
 
         List of properties used when creating the bearer.

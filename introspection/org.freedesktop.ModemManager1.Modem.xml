@@ -259,7 +259,9 @@
     <!--
         MaxActiveBearers:
 
-        The maximum number of active packet data bearers the modem supports.
+        The maximum number of active
+        <link linkend="MM-BEARER-TYPE-DEFAULT:CAPS"><constant>MM_BEARER_TYPE_DEFAULT</constant></link>
+        bearers that may be explicitly enabled by the user.
 
         POTS and CDMA2000-only devices support one active bearer, while GSM/UMTS
         and LTE-capable devices (including LTE/CDMA devices) typically support
