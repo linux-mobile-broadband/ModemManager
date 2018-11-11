@@ -652,6 +652,16 @@ mm_modem_3gpp_scan_sync (MMModem3gpp *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_3gpp_set_eps_ue_mode_operation_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_set_eps_ue_mode_operation().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_set_eps_ue_mode_operation().
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ */
 gboolean
 mm_modem_3gpp_set_eps_ue_mode_operation_finish (MMModem3gpp   *self,
                                                 GAsyncResult  *res,
@@ -662,6 +672,24 @@ mm_modem_3gpp_set_eps_ue_mode_operation_finish (MMModem3gpp   *self,
     return mm_gdbus_modem3gpp_call_set_eps_ue_mode_operation_finish (MM_GDBUS_MODEM3GPP (self), res, error);
 }
 
+/**
+ * mm_modem_3gpp_set_eps_ue_mode_operation:
+ * @self: A #MMModem3gpp.
+ * @mode: A #MMModem3gppEpsUeModeOperation.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to update the EPS UE mode of operation.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_3gpp_set_eps_ue_mode_operation_finish() to get the result of the operation.
+ *
+ * See mm_modem_3gpp_set_eps_ue_mode_operation_sync() for the synchronous, blocking
+ * version of this method. The calling thread is blocked until a reply is received.
+ */
 void
 mm_modem_3gpp_set_eps_ue_mode_operation (MMModem3gpp                    *self,
                                          MMModem3gppEpsUeModeOperation   mode,
@@ -675,6 +703,21 @@ mm_modem_3gpp_set_eps_ue_mode_operation (MMModem3gpp                    *self,
     mm_gdbus_modem3gpp_call_set_eps_ue_mode_operation (MM_GDBUS_MODEM3GPP (self), (guint) mode, cancellable, callback, user_data);
 }
 
+/**
+ * mm_modem_3gpp_set_eps_ue_mode_operation_sync:
+ * @self: A #MMModem3gpp.
+ * @mode: A #MMModem3gppEpsUeModeOperation.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to update the EPS UE mode of operation.
+ *
+ * The calling thread is blocked until a reply is received.
+ * See mm_modem_3gpp_set_eps_ue_mode_operation() for the asynchronous version
+ * of this method.
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ */
 gboolean
 mm_modem_3gpp_set_eps_ue_mode_operation_sync (MMModem3gpp                    *self,
                                               MMModem3gppEpsUeModeOperation   mode,
