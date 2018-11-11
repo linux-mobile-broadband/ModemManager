@@ -1325,34 +1325,6 @@ mm_call_properties_get_type
 </SECTION>
 
 <SECTION>
-<FILE>mm-call-audio-format</FILE>
-<TITLE>MMCallAudioFormat</TITLE>
-MMCallAudioFormat
-<SUBSECTION GettersSetters>
-mm_call_audio_format_get_encoding
-mm_call_audio_format_get_resolution
-mm_call_audio_format_get_rate
-<SUBSECTION Private>
-mm_call_audio_format_new
-mm_call_audio_format_new_from_dictionary
-mm_call_audio_format_get_dictionary
-mm_call_audio_format_dup
-mm_call_audio_format_set_encoding
-mm_call_audio_format_set_resolution
-mm_call_audio_format_set_rate
-<SUBSECTION Standard>
-MMCallAudioFormatClass
-MMCallAudioFormatPrivate
-MM_IS_CALL_AUDIO_FORMAT
-MM_IS_CALL_AUDIO_FORMAT_CLASS
-MM_CALL_AUDIO_FORMAT
-MM_CALL_AUDIO_FORMAT_CLASS
-MM_CALL_AUDIO_FORMAT_GET_CLASS
-MM_TYPE_CALL_AUDIO_FORMAT
-mm_call_audio_format_get_type
-</SECTION>
-
-<SECTION>
 <FILE>mm-pco</FILE>
 <TITLE>MMPco</TITLE>
 MMPco
