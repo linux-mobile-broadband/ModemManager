@@ -1327,8 +1327,6 @@ mm_call_properties_get_type
 <FILE>mm-pco</FILE>
 <TITLE>MMPco</TITLE>
 MMPco
-<SUBSECTION New>
-mm_pco_new
 <SUBSECTION GettersSetters>
 mm_pco_get_session_id
 mm_pco_is_complete
@@ -1337,6 +1335,7 @@ mm_pco_get_data
 mm_pco_list_add
 mm_pco_list_free
 <SUBSECTION Private>
+mm_pco_new
 mm_pco_from_variant
 mm_pco_to_variant
 mm_pco_set_session_id
