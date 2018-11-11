@@ -476,8 +476,6 @@ mm_location_3gpp_get_mobile_network_code
 mm_location_3gpp_get_location_area_code
 mm_location_3gpp_get_tracking_area_code
 mm_location_3gpp_get_cell_id
-<SUBSECTION Methods>
-mm_location_3gpp_reset
 <SUBSECTION Private>
 mm_location_3gpp_get_string_variant
 mm_location_3gpp_new
@@ -487,6 +485,7 @@ mm_location_3gpp_set_location_area_code
 mm_location_3gpp_set_tracking_area_code
 mm_location_3gpp_set_mobile_country_code
 mm_location_3gpp_set_mobile_network_code
+mm_location_3gpp_reset
 <SUBSECTION Standard>
 MMLocation3gppClass
 MMLocation3gppPrivate
