@@ -175,5 +175,12 @@
     -->
     <property name="Pco" type="a(ubay)" access="read" />
 
+    <!--
+        InitialEpsBearer:
+
+        The object path for the initial default EPS bearer.
+    -->
+    <property name="InitialEpsBearer" type="o" access="read" />
+
   </interface>
 </node>

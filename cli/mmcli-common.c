@@ -429,6 +429,74 @@ list_bearers_ready (MMModem      *modem,
 }
 
 static void
+look_for_bearer_in_modem_bearer_list (GTask *task)
+{
+    GetBearerContext *ctx;
+    MMModem          *modem;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->current);
+    modem = mm_object_get_modem (ctx->current);
+    mm_modem_list_bearers (modem,
+                           g_task_get_cancellable (task),
+                           (GAsyncReadyCallback)list_bearers_ready,
+                           task);
+    g_object_unref (modem);
+}
+
+static void
+get_initial_eps_bearer_ready (MMModem3gpp  *modem3gpp,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    GetBearerContext *ctx;
+    MMBearer         *bearer;
+    GetBearerResults *results;
+
+    ctx = g_task_get_task_data (task);
+
+    bearer = mm_modem_3gpp_get_initial_eps_bearer_finish (modem3gpp, res, NULL);
+    if (!bearer) {
+        look_for_bearer_in_modem_bearer_list (task);
+        return;
+    }
+
+    /* Found! */
+    results = g_new (GetBearerResults, 1);
+    results->manager = g_object_ref (ctx->manager);
+    results->object  = g_object_ref (ctx->current);
+    results->bearer  = bearer;
+    g_task_return_pointer (task, results, (GDestroyNotify) get_bearer_results_free);
+    g_object_unref (task);
+}
+
+static void
+look_for_bearer_in_modem_3gpp_eps_initial_bearer (GTask *task)
+{
+    GetBearerContext *ctx;
+    MMModem3gpp      *modem3gpp;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->current);
+    modem3gpp = mm_object_get_modem_3gpp (ctx->current);
+    if (!modem3gpp) {
+        look_for_bearer_in_modem_bearer_list (task);
+        return;
+    }
+
+    if (!g_strcmp0 (mm_modem_3gpp_get_initial_eps_bearer_path (modem3gpp), ctx->bearer_path))
+        mm_modem_3gpp_get_initial_eps_bearer (modem3gpp,
+                                              g_task_get_cancellable (task),
+                                              (GAsyncReadyCallback)get_initial_eps_bearer_ready,
+                                              task);
+    else
+        look_for_bearer_in_modem_bearer_list (task);
+    g_object_unref (modem3gpp);
+}
+
+static void
 look_for_bearer_in_modem (GTask *task)
 {
     GetBearerContext *ctx;
@@ -453,19 +521,14 @@ look_for_bearer_in_modem (GTask *task)
         g_debug ("Skipping modem '%s' when looking for bearers "
                  "(not fully initialized)",
                  mm_object_get_path (ctx->current));
-        g_object_unref (modem);
         look_for_bearer_in_modem (task);
-        return;
+    } else {
+        g_debug ("Looking for bearer '%s' in modem '%s'...",
+                 ctx->bearer_path,
+                 mm_object_get_path (ctx->current));
+        look_for_bearer_in_modem_3gpp_eps_initial_bearer (task);
     }
 
-    g_debug ("Looking for bearer '%s' in modem '%s'...",
-             ctx->bearer_path,
-             mm_object_get_path (ctx->current));
-
-    mm_modem_list_bearers (modem,
-                           g_task_get_cancellable (task),
-                           (GAsyncReadyCallback)list_bearers_ready,
-                           task);
     g_object_unref (modem);
 }
 
@@ -562,38 +625,52 @@ mmcli_get_bearer_sync (GDBusConnection  *connection,
     }
 
     for (l = modems; !found && l; l = g_list_next (l)) {
-        GError *error = NULL;
-        MMObject *object;
-        MMModem *modem;
-        GList *bearers;
+        GError      *error = NULL;
+        MMObject    *object;
+        MMModem     *modem;
+        MMModem3gpp *modem3gpp;
 
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
+        modem3gpp = mm_object_get_modem_3gpp (object);
 
         /* Don't look for bearers in modems which are not fully initialized */
         if (mm_modem_get_state (modem) < MM_MODEM_STATE_DISABLED) {
             g_debug ("Skipping modem '%s' when looking for bearers "
                      "(not fully initialized)",
                      mm_object_get_path (object));
-            g_object_unref (modem);
-            continue;
+            goto next;
         }
 
-        bearers = mm_modem_list_bearers_sync (modem, NULL, &error);
-        if (error) {
-            g_printerr ("error: couldn't list bearers at '%s': '%s'\n",
-                        mm_modem_get_path (modem),
-                        error->message);
-            exit (EXIT_FAILURE);
-        }
+        if (modem3gpp && !g_strcmp0 (mm_modem_3gpp_get_initial_eps_bearer_path (modem3gpp), bearer_path)) {
+            found = mm_modem_3gpp_get_initial_eps_bearer_sync (modem3gpp, NULL, &error);
+            if (!found) {
+                g_printerr ("error: couldn't get initial EPS bearer object at '%s': '%s'\n",
+                            mm_modem_get_path (modem),
+                            error->message);
+                exit (EXIT_FAILURE);
+            }
+        } else {
+            GList *bearers;
 
-        found = find_bearer_in_list (bearers, bearer_path);
-        g_list_free_full (bearers, g_object_unref);
+            bearers = mm_modem_list_bearers_sync (modem, NULL, &error);
+            if (error) {
+                g_printerr ("error: couldn't list bearers at '%s': '%s'\n",
+                            mm_modem_get_path (modem),
+                            error->message);
+                exit (EXIT_FAILURE);
+            }
+
+            found = find_bearer_in_list (bearers, bearer_path);
+            g_list_free_full (bearers, g_object_unref);
+        }
 
         if (found && o_object)
             *o_object = g_object_ref (object);
 
-        g_object_unref (modem);
+    next:
+        g_clear_object (&modem);
+        g_clear_object (&modem3gpp);
     }
 
     if (!found) {

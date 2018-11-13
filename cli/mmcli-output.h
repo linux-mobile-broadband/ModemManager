@@ -39,6 +39,7 @@ typedef enum {
     MMC_S_MODEM_BANDS,
     MMC_S_MODEM_IP,
     MMC_S_MODEM_3GPP,
+    MMC_S_MODEM_3GPP_EPS,
     MMC_S_MODEM_3GPP_SCAN,
     MMC_S_MODEM_3GPP_USSD,
     MMC_S_MODEM_CDMA,
@@ -124,8 +125,10 @@ typedef enum {
     MMC_F_3GPP_OPERATOR_ID,
     MMC_F_3GPP_OPERATOR_NAME,
     MMC_F_3GPP_REGISTRATION,
-    MMC_F_3GPP_EPS_UE_MODE,
     MMC_F_3GPP_PCO,
+    /* 3GPP EPS section */
+    MMC_F_3GPP_EPS_UE_MODE,
+    MMC_F_3GPP_EPS_INITIAL_BEARER_PATH,
     /* 3GPP scan section */
     MMC_F_3GPP_SCAN_NETWORKS,
     /* USSD section */

@@ -106,6 +106,7 @@ enum {
     PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS,
+    PROP_MODEM_3GPP_INITIAL_EPS_BEARER,
     PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
     PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE,
     PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
@@ -171,6 +172,7 @@ struct _MMBroadbandModemPrivate {
     /* Implementation helpers */
     GPtrArray *modem_3gpp_registration_regex;
     MMModem3gppFacility modem_3gpp_ignored_facility_locks;
+    MMBaseBearer *modem_3gpp_initial_eps_bearer;
 
     /*<--- Modem 3GPP USSD interface --->*/
     /* Properties */
@@ -4867,6 +4869,28 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)run_registration_checks_context_free);
 
     run_registration_checks_context_step (task);
+}
+
+/*****************************************************************************/
+/* Create initial EPS bearer object */
+
+static MMBaseBearer *
+modem_3gpp_create_initial_eps_bearer (MMIfaceModem3gpp   *self,
+                                      MMBearerProperties *config)
+{
+    MMBaseBearer *bearer;
+
+    /* NOTE: by default we create a bearer object that is CONNECTED but which doesn't
+     * have an associated data interface already set. This is so that upper layers don't
+     * attempt connection through this bearer object. */
+    bearer = g_object_new (MM_TYPE_BASE_BEARER,
+                           MM_BASE_BEARER_MODEM,  MM_BASE_MODEM (self),
+                           MM_BASE_BEARER_CONFIG, config,
+                           "bearer-type",         MM_BEARER_TYPE_DEFAULT_ATTACH,
+                           "connected",           TRUE,
+                           NULL);
+    mm_base_bearer_export (bearer);
+    return bearer;
 }
 
 /*****************************************************************************/
@@ -11117,6 +11141,10 @@ set_property (GObject *object,
     case PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS:
         self->priv->modem_3gpp_ignored_facility_locks = g_value_get_flags (value);
         break;
+    case PROP_MODEM_3GPP_INITIAL_EPS_BEARER:
+        g_clear_object (&self->priv->modem_3gpp_initial_eps_bearer);
+        self->priv->modem_3gpp_initial_eps_bearer = g_value_dup_object (value);
+        break;
     case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
         self->priv->modem_cdma_cdma1x_registration_state = g_value_get_enum (value);
         break;
@@ -11233,6 +11261,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS:
         g_value_set_flags (value, self->priv->modem_3gpp_ignored_facility_locks);
+        break;
+    case PROP_MODEM_3GPP_INITIAL_EPS_BEARER:
+        g_value_set_object (value, self->priv->modem_3gpp_initial_eps_bearer);
         break;
     case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
         g_value_set_enum (value, self->priv->modem_cdma_cdma1x_registration_state);
@@ -11381,6 +11412,7 @@ dispose (GObject *object)
         g_clear_object (&self->priv->modem_simple_dbus_skeleton);
     }
 
+    g_clear_object (&self->priv->modem_3gpp_initial_eps_bearer);
     g_clear_object (&self->priv->modem_sim);
     g_clear_object (&self->priv->modem_bearer_list);
     g_clear_object (&self->priv->modem_messaging_sms_list);
@@ -11489,6 +11521,7 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
     iface->set_eps_ue_mode_operation = modem_3gpp_set_eps_ue_mode_operation;
     iface->set_eps_ue_mode_operation_finish = modem_3gpp_set_eps_ue_mode_operation_finish;
+    iface->create_initial_eps_bearer = modem_3gpp_create_initial_eps_bearer;
 }
 
 static void
@@ -11743,6 +11776,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS,
                                       MM_IFACE_MODEM_3GPP_IGNORED_FACILITY_LOCKS);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_3GPP_INITIAL_EPS_BEARER,
+                                      MM_IFACE_MODEM_3GPP_INITIAL_EPS_BEARER);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,

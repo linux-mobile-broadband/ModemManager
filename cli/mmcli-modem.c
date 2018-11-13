@@ -347,6 +347,7 @@ print_modem_info (void)
         const gchar *registration = NULL;
         const gchar *eps_ue_mode = NULL;
         GList       *pco_list = NULL;
+        const gchar *initial_eps_bearer_path = NULL;
 
         if (ctx->modem_3gpp) {
             imei = mm_modem_3gpp_get_imei (ctx->modem_3gpp);
@@ -356,6 +357,7 @@ print_modem_info (void)
             registration = mm_modem_3gpp_registration_state_get_string (mm_modem_3gpp_get_registration_state (ctx->modem_3gpp));
             eps_ue_mode = mm_modem_3gpp_eps_ue_mode_operation_get_string (mm_modem_3gpp_get_eps_ue_mode_operation (ctx->modem_3gpp));
             pco_list = mm_modem_3gpp_get_pco (ctx->modem_3gpp);
+            initial_eps_bearer_path = mm_modem_3gpp_get_initial_eps_bearer_path (ctx->modem_3gpp);
         }
 
         mmcli_output_string      (MMC_F_3GPP_IMEI,          imei);
@@ -363,8 +365,12 @@ print_modem_info (void)
         mmcli_output_string      (MMC_F_3GPP_OPERATOR_ID,   operator_code);
         mmcli_output_string      (MMC_F_3GPP_OPERATOR_NAME, operator_name);
         mmcli_output_string      (MMC_F_3GPP_REGISTRATION,  registration);
-        mmcli_output_string      (MMC_F_3GPP_EPS_UE_MODE,   eps_ue_mode);
         mmcli_output_pco_list    (pco_list);
+
+        if (mm_modem_get_current_capabilities (ctx->modem) & (MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_LTE_ADVANCED)) {
+            mmcli_output_string (MMC_F_3GPP_EPS_UE_MODE,             eps_ue_mode);
+            mmcli_output_string (MMC_F_3GPP_EPS_INITIAL_BEARER_PATH, g_strcmp0 (initial_eps_bearer_path, "/") != 0 ? initial_eps_bearer_path : NULL);
+        }
 
         g_free (facility_locks);
         mm_pco_list_free (pco_list);

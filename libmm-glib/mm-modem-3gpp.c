@@ -26,6 +26,7 @@
 #include "mm-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-modem-3gpp.h"
+#include "mm-bearer.h"
 #include "mm-pco.h"
 
 /**
@@ -340,6 +341,46 @@ mm_modem_3gpp_get_pco (MMModem3gpp *self)
     }
 
     return pco_list;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_3gpp_get_initial_eps_bearer_path: (skip)
+ * @self: A #MMModem3gpp.
+ *
+ * Gets the DBus path of the initial EPS #MMBearer exposed in this #MMModem3gpp.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_3gpp_dup_initial_eps_bearer_path() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): The DBus path of the #MMBearer, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ */
+const gchar *
+mm_modem_3gpp_get_initial_eps_bearer_path (MMModem3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (mm_gdbus_modem3gpp_get_initial_eps_bearer (MM_GDBUS_MODEM3GPP (self)));
+}
+
+/**
+ * mm_modem_3gpp_dup_initial_eps_bearer_path:
+ * @self: A #MMModem3gpp.
+ *
+ * Gets a copy of the DBus path of the initial EPS #MMBearer exposed in this #MMModem3gpp.
+ *
+ * Returns: (transfer full): The DBus path of the #MMBearer, or %NULL if none available. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_3gpp_dup_initial_eps_bearer_path (MMModem3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem3gpp_dup_initial_eps_bearer (MM_GDBUS_MODEM3GPP (self)));
 }
 
 /*****************************************************************************/
@@ -728,6 +769,144 @@ mm_modem_3gpp_set_eps_ue_mode_operation_sync (MMModem3gpp                    *se
     g_return_val_if_fail (mode != MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN, FALSE);
 
     return mm_gdbus_modem3gpp_call_set_eps_ue_mode_operation_sync (MM_GDBUS_MODEM3GPP (self), (guint) mode, cancellable, error);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_3gpp_get_initial_eps_bearer_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_get_initial_eps_bearer().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_get_initial_eps_bearer().
+ *
+ * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned value should be freed with g_object_unref().
+ */
+MMBearer *
+mm_modem_3gpp_get_initial_eps_bearer_finish (MMModem3gpp   *self,
+                                             GAsyncResult  *res,
+                                             GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
+
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+modem_3gpp_get_initial_eps_bearer_ready (GDBusConnection *connection,
+                                         GAsyncResult    *res,
+                                         GTask           *task)
+{
+    GError *error = NULL;
+    GObject *sim;
+    GObject *source_object;
+
+    source_object = g_async_result_get_source_object (res);
+    sim = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
+    g_object_unref (source_object);
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, sim, g_object_unref);
+
+    g_object_unref (task);
+}
+
+/**
+ * mm_modem_3gpp_get_initial_eps_bearer:
+ * @self: A #MMModem3gpp.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously gets the initial EPS #MMBearer object exposed by this #MMModem3gpp.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_3gpp_get_initial_eps_bearer_finish() to get the result of the operation.
+ *
+ * See mm_modem_3gpp_get_initial_eps_bearer_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_3gpp_get_initial_eps_bearer (MMModem3gpp         *self,
+                                      GCancellable        *cancellable,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+    GTask       *task;
+    const gchar *bearer_path;
+
+    g_return_if_fail (MM_IS_MODEM_3GPP (self));
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    bearer_path = mm_modem_3gpp_get_initial_eps_bearer_path (self);
+    if (!bearer_path || g_str_equal (bearer_path, "/")) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "No initial EPS bearer object available");
+        g_object_unref (task);
+        return;
+    }
+
+    g_async_initable_new_async (MM_TYPE_BEARER,
+                                G_PRIORITY_DEFAULT,
+                                cancellable,
+                                (GAsyncReadyCallback)modem_3gpp_get_initial_eps_bearer_ready,
+                                task,
+                                "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                "g-name",           MM_DBUS_SERVICE,
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                "g-object-path",    bearer_path,
+                                "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
+                                NULL);
+}
+
+/**
+ * mm_modem_3gpp_get_initial_eps_bearer_sync:
+ * @self: A #MMModem3gpp.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously gets the initial EPS #MMBearer object exposed by this #MMModem3gpp.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_3gpp_get_initial_eps_bearer()
+ * for the asynchronous version of this method.
+ *
+ * Returns: (transfer full): a #MMBearer or #NULL if @error is set. The returned value should be freed with g_object_unref().
+ */
+MMBearer *
+mm_modem_3gpp_get_initial_eps_bearer_sync (MMModem3gpp   *self,
+                                           GCancellable  *cancellable,
+                                           GError       **error)
+{
+    GObject     *bearer;
+    const gchar *bearer_path;
+
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
+
+    bearer_path = mm_modem_3gpp_get_initial_eps_bearer_path (self);
+    if (!bearer_path || g_str_equal (bearer_path, "/")) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "No initial EPS bearer object available");
+        return NULL;
+    }
+
+    bearer = g_initable_new (MM_TYPE_BEARER,
+                             cancellable,
+                             error,
+                             "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                             "g-name",           MM_DBUS_SERVICE,
+                             "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                             "g-object-path",    bearer_path,
+                             "g-interface-name", "org.freedesktop.ModemManager1.Bearer",
+                             NULL);
+
+    return (bearer ? MM_BEARER (bearer) : NULL);
 }
 
 /*****************************************************************************/

@@ -764,8 +764,18 @@ mm_base_bearer_connect (MMBaseBearer *self,
 {
     GTask *task;
 
-    g_assert (MM_BASE_BEARER_GET_CLASS (self)->connect != NULL);
-    g_assert (MM_BASE_BEARER_GET_CLASS (self)->connect_finish != NULL);
+    if (!MM_BASE_BEARER_GET_CLASS (self)->connect) {
+        g_assert (!MM_BASE_BEARER_GET_CLASS (self)->connect_finish);
+        g_task_report_new_error (
+            self,
+            callback,
+            user_data,
+            mm_base_bearer_connect,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Bearer doesn't allow explicit connection requests");
+        return;
+    }
 
     /* If already connecting, return error, don't allow a second request. */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
@@ -975,10 +985,18 @@ mm_base_bearer_disconnect (MMBaseBearer *self,
 {
     GTask *task;
 
-    g_assert (MM_BASE_BEARER_GET_CLASS (self)->disconnect != NULL);
-    g_assert (MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish != NULL);
-
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect) {
+        g_assert (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish);
+        g_task_return_new_error (
+            task,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Bearer doesn't allow explicit disconnection requests");
+        g_object_unref (task);
+        return;
+    }
 
     /* If already disconnected, done */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {

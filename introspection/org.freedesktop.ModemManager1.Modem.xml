@@ -216,7 +216,10 @@
         Bearers:
 
         The list of bearer object paths (EPS Bearers, PDP Contexts, or
-        CDMA2000 Packet Data Sessions).
+        CDMA2000 Packet Data Sessions) as requested by the user.
+
+        This list does not include the initial EPS bearer details (see
+        #org.freedesktop.ModemManager1.Modem.Modem3gpp:InitialEpsBearer).
     -->
     <property name="Bearers" type="ao" access="read" />
 

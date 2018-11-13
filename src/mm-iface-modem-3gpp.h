@@ -21,6 +21,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-base-bearer.h"
 #include "mm-port-serial-at.h"
 
 #define MM_TYPE_IFACE_MODEM_3GPP               (mm_iface_modem_3gpp_get_type ())
@@ -34,6 +35,7 @@
 #define MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED    "iface-modem-3gpp-ps-network-supported"
 #define MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED   "iface-modem-3gpp-eps-network-supported"
 #define MM_IFACE_MODEM_3GPP_IGNORED_FACILITY_LOCKS  "iface-modem-3gpp-ignored-facility-locks"
+#define MM_IFACE_MODEM_3GPP_INITIAL_EPS_BEARER      "iface-modem-3gpp-initial-eps-bearer"
 
 #define MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK    \
     (MM_MODEM_ACCESS_TECHNOLOGY_GSM |                       \
@@ -145,6 +147,18 @@ struct _MMIfaceModem3gpp {
                                                                 GAsyncResult *res,
                                                                 GError **error);
 
+    /* Asynchronous initial default EPS bearer loading */
+    void                 (*load_initial_eps_bearer)        (MMIfaceModem3gpp     *self,
+                                                            GAsyncReadyCallback   callback,
+                                                            gpointer              user_data);
+    MMBearerProperties * (*load_initial_eps_bearer_finish) (MMIfaceModem3gpp     *self,
+                                                            GAsyncResult         *res,
+                                                            GError              **error);
+
+    /* Create initial default EPS bearer object */
+    MMBaseBearer * (*create_initial_eps_bearer) (MMIfaceModem3gpp   *self,
+                                                 MMBearerProperties *properties);
+
     /* Run CS/PS/EPS registration state checks..
      * Note that no registration state is returned, implementations should call
      * mm_iface_modem_3gpp_update_registration_state(). */
@@ -253,6 +267,8 @@ void mm_iface_modem_3gpp_update_location            (MMIfaceModem3gpp *self,
                                                      gulong cell_id);
 void mm_iface_modem_3gpp_update_pco_list            (MMIfaceModem3gpp *self,
                                                      const GList *pco_list);
+void mm_iface_modem_3gpp_update_initial_eps_bearer  (MMIfaceModem3gpp *self,
+                                                     MMBearerProperties *properties);
 
 /* Run all registration checks */
 void mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
