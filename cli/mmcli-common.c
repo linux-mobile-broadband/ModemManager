@@ -695,6 +695,7 @@ mmcli_get_bearer_sync (GDBusConnection  *connection,
 
 typedef struct {
     gchar     *sim_path;
+    gchar     *sim_maybe_uid;
     MMManager *manager;
     MMObject  *current;
 } GetSimContext;
@@ -721,6 +722,7 @@ get_sim_context_free (GetSimContext *ctx)
         g_object_unref (ctx->current);
     if (ctx->manager)
         g_object_unref (ctx->manager);
+    g_free (ctx->sim_maybe_uid);
     g_free (ctx->sim_path);
     g_free (ctx);
 }
@@ -800,6 +802,14 @@ get_sim_manager_ready (GDBusConnection *connection,
 
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
+        if (!ctx->sim_path) {
+            if (g_str_equal (ctx->sim_maybe_uid, mm_modem_get_device (modem)))
+                ctx->sim_path = g_strdup (mm_modem_get_sim_path (modem));
+            else {
+                g_object_unref (modem);
+                continue;
+            }
+        }
         if (g_str_equal (ctx->sim_path, mm_modem_get_sim_path (modem))) {
             ctx->current = g_object_ref (object);
             mm_modem_get_sim (modem,
@@ -811,6 +821,12 @@ get_sim_manager_ready (GDBusConnection *connection,
     }
     g_list_free_full (modems, g_object_unref);
 
+    if (!ctx->sim_path) {
+        g_printerr ("error: invalid index string specified: '%s'\n",
+                    ctx->sim_maybe_uid);
+        exit (EXIT_FAILURE);
+    }
+
     if (!ctx->current) {
         g_printerr ("error: couldn't find sim at '%s'\n",
                     ctx->sim_path);
@@ -821,7 +837,7 @@ get_sim_manager_ready (GDBusConnection *connection,
 static gchar *
 get_sim_path (const gchar *path_or_index)
 {
-    gchar *sim_path;
+    gchar *sim_path = NULL;
 
     /* We must have a given sim specified */
     if (!path_or_index) {
@@ -837,10 +853,6 @@ get_sim_path (const gchar *path_or_index)
     } else if (g_ascii_isdigit (path_or_index[0])) {
         g_debug ("Assuming '%s' is the SIM index", path_or_index);
         sim_path = g_strdup_printf (MM_DBUS_SIM_PREFIX "/%s", path_or_index);
-    } else {
-        g_printerr ("error: invalid index string specified: '%s'\n",
-                    path_or_index);
-        exit (EXIT_FAILURE);
     }
 
     return sim_path;
@@ -848,7 +860,7 @@ get_sim_path (const gchar *path_or_index)
 
 void
 mmcli_get_sim (GDBusConnection     *connection,
-               const gchar         *path_or_index,
+               const gchar         *path_or_index_or_uid,
                GCancellable        *cancellable,
                GAsyncReadyCallback  callback,
                gpointer             user_data)
@@ -859,7 +871,8 @@ mmcli_get_sim (GDBusConnection     *connection,
     task = g_task_new (connection, cancellable, callback, user_data);
 
     ctx = g_new0 (GetSimContext, 1);
-    ctx->sim_path = get_sim_path (path_or_index);
+    ctx->sim_path = get_sim_path (path_or_index_or_uid);
+    ctx->sim_maybe_uid = g_strdup (path_or_index_or_uid);
     g_task_set_task_data (task, ctx, (GDestroyNotify) get_sim_context_free);
 
     mmcli_get_manager (connection,
@@ -870,7 +883,7 @@ mmcli_get_sim (GDBusConnection     *connection,
 
 MMSim *
 mmcli_get_sim_sync (GDBusConnection  *connection,
-                    const gchar      *path_or_index,
+                    const gchar      *path_or_index_or_uid,
                     MMManager       **o_manager,
                     MMObject        **o_object)
 {
@@ -880,7 +893,7 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
     MMSim *found = NULL;
     gchar *sim_path;
 
-    sim_path = get_sim_path (path_or_index);
+    sim_path = get_sim_path (path_or_index_or_uid);
 
     manager = mmcli_get_manager_sync (connection);
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
@@ -897,6 +910,16 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
 
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
+
+        if (!sim_path) {
+            if (g_str_equal (path_or_index_or_uid, mm_modem_get_device (modem)))
+                sim_path = g_strdup (mm_modem_get_sim_path (modem));
+            else {
+                g_object_unref (modem);
+                continue;
+            }
+        }
+
         if (g_str_equal (sim_path, mm_modem_get_sim_path (modem))) {
             found = mm_modem_get_sim_sync (modem, NULL, &error);
             if (error) {
@@ -912,6 +935,12 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
         }
 
         g_object_unref (modem);
+    }
+
+    if (!sim_path) {
+        g_printerr ("error: invalid index string specified: '%s'\n",
+                    path_or_index_or_uid);
+        exit (EXIT_FAILURE);
     }
 
     if (!found) {
