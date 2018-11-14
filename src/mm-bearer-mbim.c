@@ -973,30 +973,10 @@ connect_context_step (GTask *task)
             g_free (str);
         }
 
-        if (ip_family == MM_BEARER_IP_FAMILY_IPV4)
-            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV4;
-        else if (ip_family == MM_BEARER_IP_FAMILY_IPV6)
-            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV6;
-        else if (ip_family == MM_BEARER_IP_FAMILY_IPV4V6)
-            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV4V6;
-        else if (ip_family == (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6))
-            ctx->ip_type = MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6;
-        else if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
-                 ip_family == MM_BEARER_IP_FAMILY_ANY)
-            /* A valid default IP family should have been specified */
-            g_assert_not_reached ();
-        else  {
-            gchar * str;
-
-            str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-            g_task_return_new_error (
-                task,
-                MM_CORE_ERROR,
-                MM_CORE_ERROR_UNSUPPORTED,
-                "Unsupported IP type configuration: '%s'",
-                str);
+        ctx->ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_family, &error);
+        if (error) {
+            g_task_return_error (task, error);
             g_object_unref (task);
-            g_free (str);
             return;
         }
 

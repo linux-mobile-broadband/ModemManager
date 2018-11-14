@@ -357,10 +357,64 @@ mm_bearer_allowed_auth_to_mbim_auth_protocol (MMBearerAllowedAuth   bearer_auth,
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_UNSUPPORTED,
-                 "No match for the requested authentication methods (%s)",
+                 "Unsupported authentication methods (%s)",
                  str);
     g_free (str);
     return MBIM_AUTH_PROTOCOL_NONE;
+}
+
+/*****************************************************************************/
+
+MMBearerIpFamily
+mm_bearer_ip_family_from_mbim_context_ip_type (MbimContextIpType ip_type)
+{
+    switch (ip_type) {
+    case MBIM_CONTEXT_IP_TYPE_IPV4:
+        return MM_BEARER_IP_FAMILY_IPV4;
+    case MBIM_CONTEXT_IP_TYPE_IPV6:
+        return MM_BEARER_IP_FAMILY_IPV6;
+    case MBIM_CONTEXT_IP_TYPE_IPV4V6:
+        return MM_BEARER_IP_FAMILY_IPV4V6;
+    case MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6:
+        return MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6;
+    default:
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+}
+
+MbimContextIpType
+mm_bearer_ip_family_to_mbim_context_ip_type (MMBearerIpFamily   ip_family,
+                                             GError           **error)
+{
+    gchar *str;
+
+    /* NOTE: the input is a BITMASK, so we try to find a "best match" */
+
+    switch ((guint)ip_family) {
+    case MM_BEARER_IP_FAMILY_IPV4:
+        return MBIM_CONTEXT_IP_TYPE_IPV4;
+    case MM_BEARER_IP_FAMILY_IPV6:
+        return MBIM_CONTEXT_IP_TYPE_IPV6;
+    case  MM_BEARER_IP_FAMILY_IPV4V6:
+        return MBIM_CONTEXT_IP_TYPE_IPV4V6;
+    case (MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6):
+        return MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6;
+    case MM_BEARER_IP_FAMILY_NONE:
+    case MM_BEARER_IP_FAMILY_ANY:
+        /* A valid default IP family should have been specified */
+        g_assert_not_reached ();
+    default:
+        break;
+    }
+
+    str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_UNSUPPORTED,
+                 "Unsupported IP type configuration: '%s'",
+                 str);
+    g_free (str);
+    return MBIM_CONTEXT_IP_TYPE_DEFAULT;
 }
 
 /*****************************************************************************/
