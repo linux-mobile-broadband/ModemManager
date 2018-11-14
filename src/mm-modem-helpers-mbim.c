@@ -315,6 +315,56 @@ mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
 
 /*****************************************************************************/
 
+MMBearerAllowedAuth
+mm_bearer_allowed_auth_from_mbim_auth_protocol (MbimAuthProtocol auth_protocol)
+{
+    switch (auth_protocol) {
+    case MBIM_AUTH_PROTOCOL_NONE:
+        return MM_BEARER_ALLOWED_AUTH_NONE;
+    case MBIM_AUTH_PROTOCOL_PAP:
+        return MM_BEARER_ALLOWED_AUTH_PAP;
+    case MBIM_AUTH_PROTOCOL_CHAP:
+        return MM_BEARER_ALLOWED_AUTH_CHAP;
+    case MBIM_AUTH_PROTOCOL_MSCHAPV2:
+        return MM_BEARER_ALLOWED_AUTH_MSCHAPV2;
+    default:
+        return MM_BEARER_ALLOWED_AUTH_UNKNOWN;
+    }
+}
+
+MbimAuthProtocol
+mm_bearer_allowed_auth_to_mbim_auth_protocol (MMBearerAllowedAuth   bearer_auth,
+                                              GError              **error)
+{
+    gchar *str;
+
+    /* NOTE: the input is a BITMASK, so we try to find a "best match" */
+
+    if (bearer_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+        mm_dbg ("Using default (PAP) authentication method");
+        return MBIM_AUTH_PROTOCOL_PAP;
+    }
+    if (bearer_auth & MM_BEARER_ALLOWED_AUTH_PAP)
+        return MBIM_AUTH_PROTOCOL_PAP;
+    if (bearer_auth & MM_BEARER_ALLOWED_AUTH_CHAP)
+        return MBIM_AUTH_PROTOCOL_CHAP;
+    if (bearer_auth & MM_BEARER_ALLOWED_AUTH_MSCHAPV2)
+        return MBIM_AUTH_PROTOCOL_MSCHAPV2;
+    if (bearer_auth & MM_BEARER_ALLOWED_AUTH_NONE)
+        return MBIM_AUTH_PROTOCOL_NONE;
+
+    str = mm_bearer_allowed_auth_build_string_from_mask (bearer_auth);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_UNSUPPORTED,
+                 "No match for the requested authentication methods (%s)",
+                 str);
+    g_free (str);
+    return MBIM_AUTH_PROTOCOL_NONE;
+}
+
+/*****************************************************************************/
+
 MMSmsState
 mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
 {

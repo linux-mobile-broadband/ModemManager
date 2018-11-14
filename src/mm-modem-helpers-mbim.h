@@ -39,6 +39,10 @@ GList *mm_3gpp_network_info_list_from_mbim_providers (const MbimProvider *const 
 
 GError *mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error);
 
+MMBearerAllowedAuth mm_bearer_allowed_auth_from_mbim_auth_protocol (MbimAuthProtocol      auth_protocol);
+MbimAuthProtocol    mm_bearer_allowed_auth_to_mbim_auth_protocol   (MMBearerAllowedAuth   bearer_auth,
+                                                                    GError              **error);
+
 /*****************************************************************************/
 /* MBIM/SMS to MM translations */
 
