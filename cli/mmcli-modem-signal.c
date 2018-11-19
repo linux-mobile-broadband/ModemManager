@@ -175,8 +175,10 @@ print_signal_info (void)
 
     /* GSM */
     signal = mm_modem_signal_peek_gsm (ctx->modem_signal);
-    if (signal)
+    if (signal) {
+        g_print ("  -------------------------\n");
         print_signal_value ("  GSM    | RSSI: ", mm_signal_get_rssi (signal), "dBm");
+    }
 
     /* UMTS */
     signal = mm_modem_signal_peek_umts (ctx->modem_signal);
