@@ -140,7 +140,7 @@ print_signal_value (const gchar *prefix,
     if (value != MM_SIGNAL_UNKNOWN)
         g_print ("%s'%.2lf' %s\n", prefix, value, units);
     else
-        g_print ("%sn/a\n", prefix);
+        g_print ("%s'n/a'\n", prefix);
 }
 
 static void
