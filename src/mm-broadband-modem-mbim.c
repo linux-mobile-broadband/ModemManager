@@ -2589,6 +2589,175 @@ modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *self,
 }
 
 /*****************************************************************************/
+/* Set initial EPS bearer settings
+ *
+ * The logic to set the EPS bearer settings requires us to first load the current
+ * settings from the module, because we are only going to change the settings
+ * associated to the HOME slot, we will leave untouched the PARTNER and NON-PARTNER
+ * slots.
+ */
+
+static gboolean
+modem_3gpp_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
+                                                   GAsyncResult      *res,
+                                                   GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_lte_attach_configuration_set_ready (MbimDevice   *device,
+                                        GAsyncResult *res,
+                                        GTask        *task)
+{
+    MMBroadbandModemMbim *self;
+    MbimMessage          *response;
+    GError               *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
+                                                 GAsyncResult *res,
+                                                 GTask        *task)
+{
+    MMBroadbandModemMbim        *self;
+    MbimMessage                 *request;
+    MbimMessage                 *response;
+    GError                      *error = NULL;
+    MMBearerProperties          *config;
+    guint32                      n_configurations = 0;
+    MbimLteAttachConfiguration **configurations = NULL;
+    guint                        i;
+
+    self   = g_task_get_source_object (task);
+    config = g_task_get_task_data (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_extensions_lte_attach_configuration_response_parse (
+            response,
+            &n_configurations,
+            &configurations,
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
+
+    /* We should always receive 3 configurations but the MBIM API doesn't force
+     * that so we'll just assume we don't get always the same fixed number */
+    for (i = 0; i < n_configurations; i++) {
+        MMBearerIpFamily ip_family;
+        MMBearerAllowedAuth auth;
+
+        /* We only support configuring the HOME settings */
+        if (configurations[i]->roaming != MBIM_LTE_ATTACH_CONTEXT_ROAMING_CONTROL_HOME)
+            continue;
+
+        ip_family = mm_bearer_properties_get_ip_type (config);
+        if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY)
+            configurations[i]->ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
+        else {
+            configurations[i]->ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_family, &error);
+            if (error) {
+                configurations[i]->ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
+                mm_warn ("unexpected IP type settings requested: %s", error->message);
+                g_clear_error (&error);
+            }
+        }
+
+        auth = mm_bearer_properties_get_allowed_auth (config);
+        if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN)
+            configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
+        else {
+            configurations[i]->auth_protocol = mm_bearer_allowed_auth_to_mbim_auth_protocol (auth, &error);
+            if (error) {
+                configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
+                mm_warn ("unexpected auth settings requested: %s", error->message);
+                g_clear_error (&error);
+            }
+        }
+
+        g_clear_pointer (&(configurations[i]->access_string), g_free);
+        configurations[i]->access_string = g_strdup (mm_bearer_properties_get_apn (config));
+
+        g_clear_pointer (&(configurations[i]->user_name), g_free);
+        configurations[i]->user_name = g_strdup (mm_bearer_properties_get_user (config));
+
+        g_clear_pointer (&(configurations[i]->password), g_free);
+        configurations[i]->password = g_strdup (mm_bearer_properties_get_user (config));
+
+        configurations[i]->source = MBIM_CONTEXT_SOURCE_USER;
+        configurations[i]->compression = MBIM_COMPRESSION_NONE;
+        break;
+    }
+
+    request = mbim_message_ms_basic_connect_extensions_lte_attach_configuration_set_new (
+                  MBIM_LTE_ATTACH_CONTEXT_OPERATION_DEFAULT,
+                  n_configurations,
+                  (const MbimLteAttachConfiguration *const *)configurations,
+                  &error);
+    if (!request) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
+    mbim_device_command (device,
+                         request,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)set_lte_attach_configuration_set_ready,
+                         task);
+    mbim_message_unref (request);
+
+ out:
+    if (configurations)
+        mbim_lte_attach_configuration_array_free (configurations);
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *self,
+                                            MMBearerProperties  *config,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data)
+{
+    GTask       *task;
+    MbimDevice  *device;
+    MbimMessage *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_object_ref (config), g_object_unref);
+
+    message = mbim_message_ms_basic_connect_extensions_lte_attach_configuration_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)before_set_lte_attach_configuration_query_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Common unsolicited events setup and cleanup */
 
 static void
@@ -5143,6 +5312,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_initial_eps_bearer_finish = modem_3gpp_load_initial_eps_bearer_finish;
     iface->load_initial_eps_bearer_settings = modem_3gpp_load_initial_eps_bearer_settings;
     iface->load_initial_eps_bearer_settings_finish = modem_3gpp_load_initial_eps_bearer_settings_finish;
+    iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
+    iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
     iface->register_in_network = modem_3gpp_register_in_network;
