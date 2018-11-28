@@ -616,12 +616,13 @@ test_supported_bands_sara_u280 (void)
 static void
 common_validate_ubandsel_response (const gchar       *str,
                                    const MMModemBand *expected_bands,
+                                   const gchar       *model,
                                    guint              n_expected_bands)
 {
     GError *error = NULL;
     GArray *bands;
 
-    bands = mm_ublox_parse_ubandsel_response (str, &error);
+    bands = mm_ublox_parse_ubandsel_response (str, model, &error);
     g_assert_no_error (error);
     g_assert (bands);
 
@@ -632,36 +633,38 @@ static void
 test_ubandsel_response_four (void)
 {
     const MMModemBand expected_bands[] = {
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_EUTRAN_5,
-        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_EUTRAN_8,
-        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_UTRAN_3, MM_MODEM_BAND_EUTRAN_3,
-        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_EUTRAN_2,
+        /*  700 */ MM_MODEM_BAND_EUTRAN_4,
+        /* 1700 */ MM_MODEM_BAND_EUTRAN_13
     };
 
-    common_validate_ubandsel_response ("+UBANDSEL: 850,900,1800,1900\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+    common_validate_ubandsel_response ("+UBANDSEL: 700,1700\r\n", expected_bands, "LARA-R204", G_N_ELEMENTS (expected_bands));
 }
 
 static void
 test_ubandsel_response_three (void)
 {
     const MMModemBand expected_bands[] = {
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_EUTRAN_5,
-        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_EUTRAN_8,
-        /* 1800 */ MM_MODEM_BAND_DCS, MM_MODEM_BAND_UTRAN_3, MM_MODEM_BAND_EUTRAN_3,
+        /*  800 */ MM_MODEM_BAND_UTRAN_6, 
+        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_UTRAN_5,
+        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_UTRAN_8,
+        /* 1900 */ MM_MODEM_BAND_PCS,  MM_MODEM_BAND_UTRAN_2, 
+        /* 2100 */ MM_MODEM_BAND_UTRAN_1 
     };
 
-    common_validate_ubandsel_response ("+UBANDSEL: 850,900,1800\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+    common_validate_ubandsel_response ("+UBANDSEL: 800,850,900,1900,2100\r\n", expected_bands, "SARA-U201", G_N_ELEMENTS (expected_bands));
 }
 
 static void
 test_ubandsel_response_two (void)
 {
     const MMModemBand expected_bands[] = {
-        /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_EUTRAN_5,
-        /*  900 */ MM_MODEM_BAND_EGSM, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_EUTRAN_8,
+        /*  850 */ MM_MODEM_BAND_G850,
+        /*  900 */ MM_MODEM_BAND_EGSM,
+        /* 1800 */ MM_MODEM_BAND_DCS,
+        /* 1900 */ MM_MODEM_BAND_PCS
     };
 
-    common_validate_ubandsel_response ("+UBANDSEL: 850,900\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+    common_validate_ubandsel_response ("+UBANDSEL: 850,900,1800,1900\r\n", expected_bands, "SARA-G310", G_N_ELEMENTS (expected_bands));
 }
 
 static void
@@ -669,9 +672,11 @@ test_ubandsel_response_one (void)
 {
     const MMModemBand expected_bands[] = {
         /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_EUTRAN_5,
+        /* 1700 */ MM_MODEM_BAND_EUTRAN_4,
+        /* 1900 */ MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_EUTRAN_2
     };
 
-    common_validate_ubandsel_response ("+UBANDSEL: 850\r\n", expected_bands, G_N_ELEMENTS (expected_bands));
+    common_validate_ubandsel_response ("+UBANDSEL: 850,1700,1900\r\n", expected_bands, "TOBY-R200", G_N_ELEMENTS (expected_bands));
 }
 
 /*****************************************************************************/
@@ -680,6 +685,7 @@ test_ubandsel_response_one (void)
 static void
 common_validate_ubandsel_request (const MMModemBand *bands,
                                   guint              n_bands,
+                                  const gchar       *model,
                                   const gchar       *expected_request)
 {
     GError *error = NULL;
@@ -689,7 +695,7 @@ common_validate_ubandsel_request (const MMModemBand *bands,
     bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands);
     g_array_append_vals (bands_array, bands, n_bands);
 
-    request = mm_ublox_build_ubandsel_set_command (bands_array, &error);
+    request = mm_ublox_build_ubandsel_set_command (bands_array, model, &error);
     g_assert_no_error (error);
     g_assert (request);
 
@@ -706,7 +712,7 @@ test_ubandsel_request_any (void)
         MM_MODEM_BAND_ANY
     };
 
-    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "+UBANDSEL=0");
+    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "TOBY-R200", "+UBANDSEL=0");
 }
 
 static void
@@ -716,7 +722,7 @@ test_ubandsel_request_2g (void)
         MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS
     };
 
-    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "+UBANDSEL=850,900,1800,1900");
+    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "SARA-G310", "+UBANDSEL=850,900,1800,1900");
 }
 
 static void
@@ -726,7 +732,7 @@ test_ubandsel_request_1800 (void)
         MM_MODEM_BAND_DCS, MM_MODEM_BAND_UTRAN_3, MM_MODEM_BAND_EUTRAN_3
     };
 
-    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "+UBANDSEL=1800");
+    common_validate_ubandsel_request (bands, G_N_ELEMENTS (bands), "TOBY-R200", "+UBANDSEL=1800");
 }
 
 /*****************************************************************************/

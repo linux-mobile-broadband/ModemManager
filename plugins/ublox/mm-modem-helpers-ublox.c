@@ -472,27 +472,507 @@ out:
     return combinations;
 }
 
+typedef struct {
+    const gchar    *model;
+    UpdateMethod    method;
+    FeatureSupport  uact;     
+    FeatureSupport  ubandsel;    
+    MMModemMode     mode;
+    MMModemBand     bands_2g[4];
+    MMModemBand     bands_3g[6];
+    MMModemBand     bands_4g[12];
+} BandConfiguration;
+
+static const BandConfiguration band_configuration[] = {
+    {
+        .model    = "SARA-G300",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G,
+        .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS }
+    },
+    {
+        .model    = "SARA-G310",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS }
+    },
+     {
+        .model    = "SARA-G340",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G,
+        .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS }
+    },
+    {
+        .model    = "SARA-G350",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS }
+    },
+    {
+        .model    = "SARA-G450",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS }
+    },
+    {
+        .model    = "LISA-U200",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+                      MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
+    },
+    {
+        .model    = "LISA-U201",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+                      MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
+    },
+    {
+        .model    = "LISA-U230",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+                      MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
+    },
+    {
+        .model    = "LISA-U260",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 }
+    },
+    {
+        .model    = "LISA-U270",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 }
+    },
+    {
+        .model    = "SARA-U201",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+                      MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
+    },
+    {
+        .model    = "SARA-U260",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 }
+    },
+    {
+        .model    = "SARA-U270",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
+        .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 }
+    },
+    {
+        .model    = "SARA-U280",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 }
+    },
+    {
+        .model    = "MPCI-L201",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17 }
+    },
+    {
+        .model    = "MPCI-L200",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_4, 
+                      MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_17 }
+    },
+    {
+        .model    = "MPCI-L210",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_2, 
+                      MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20 }
+    },
+    {
+        .model    = "MPCI-L220",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_19 }
+    },
+    {
+        .model    = "MPCI-L280",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_2, 
+                      MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_28 }
+    },
+    {
+        .model    = "TOBY-L200",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_4,
+                      MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_17 }
+    },
+    {
+        .model    = "TOBY-L201",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17 }
+    },
+    {
+        .model    = "TOBY-L210",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
+                      MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20 }
+    },
+    {
+        .model    = "TOBY-L220",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
+                      MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_19 }
+    },
+    {
+        .model    = "TOBY-L280",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
+                      MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_28 }
+    },
+    {
+        .model    = "TOBY-L4006",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_SUPPORTED,
+        .ubandsel = FEATURE_UNSUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_2 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13,
+                      MM_MODEM_BAND_EUTRAN_29 }
+    },
+    {
+        .model    = "TOBY-L4106",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_SUPPORTED,
+        .ubandsel = FEATURE_UNSUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7, 
+                      MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_38 }
+    },
+    {
+        .model    = "TOBY-L4206",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_SUPPORTED,
+        .ubandsel = FEATURE_UNSUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5,
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_9, 
+                      MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_28 }
+    },
+    {
+        .model    = "TOBY-L4906",
+        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .uact     = FEATURE_SUPPORTED,
+        .ubandsel = FEATURE_UNSUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_39, 
+                      MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41 }
+    },
+    {
+        .model    = "TOBY-R200",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
+                      MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_12 }
+    },
+    {
+        .model    = "TOBY-R202",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_12 }
+    },
+    {
+        .model    = "LARA-R202",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+                      MM_MODEM_BAND_EUTRAN_12 }
+    },
+    {
+        .model    = "LARA-R203",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_12 }
+    },
+    {
+        .model    = "LARA-R204",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_13 }
+    },
+    {
+        .model    = "LARA-R211",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_20 }
+    },
+    {
+        .model    = "LARA-R280",
+        .method   = BAND_UPDATE_NEEDS_COPS,
+        .uact     = FEATURE_UNSUPPORTED,
+        .ubandsel = FEATURE_SUPPORTED,
+        .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
+        .bands_3g = { MM_MODEM_BAND_UTRAN_1 },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_28 }
+    },
+    {
+        .model    = "LARA-R3121",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_20 }
+    },
+    {
+        .model    = "SARA-N200",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_8 }
+    },
+    {
+        .model    = "SARA-N201",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_5 }
+    },
+    {
+        .model    = "SARA-N210",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_20 }
+    },
+    {
+        .model    = "SARA-N211",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20 }
+    },
+    {
+        .model    = "SARA-N280",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_28 }
+    },
+    {
+        .model    = "SARA-R410M-52B",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5,
+                      MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13 }
+    },
+    {
+        .model    = "SARA-R410M-02B",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_3,
+                      MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, MM_MODEM_BAND_EUTRAN_8,
+                      MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_19,
+                      MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_39 }
+    },
+    {
+        .model    = "SARA-R412M-02B",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_4G,
+        .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_3,
+                      MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5,  MM_MODEM_BAND_EUTRAN_8,
+                      MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_19,
+                      MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_28, MM_MODEM_BAND_EUTRAN_39 }
+    },
+    {
+        .model    = "SARA-N410-02B",
+        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .uact     = FEATURE_SUPPORT_UNKNOWN,
+        .mode     = MM_MODEM_MODE_4G,
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_3,
+                      MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5,  MM_MODEM_BAND_EUTRAN_8,
+                      MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_19,
+                      MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_28 }
+    },
+};
+
+/* Returns AT command support configuration */
+
+gboolean mm_ublox_get_support_config (const gchar         *model,
+                                      UbloxSupportConfig  *config,
+                                      GError             **error) 
+{
+    guint i;
+
+    if (model) {
+        for (i = 0; i < G_N_ELEMENTS (band_configuration); i++)
+            if (g_str_has_prefix (model, band_configuration[i].model)) {
+                config->method   = band_configuration[i].method;
+                config->uact     = band_configuration[i].uact;
+                config->ubandsel = band_configuration[i].ubandsel;
+                return TRUE;
+            }
+    }
+
+    if (i == G_N_ELEMENTS (band_configuration) || !(model)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown support found for modem: %s", model);
+        return FALSE;
+    }
+ 
+    return FALSE;
+}
+
 /*****************************************************************************/
+/* Supported modes loading */
 
 static MMModemMode
 supported_modes_per_model (const gchar *model)
 {
-    MMModemMode all = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    MMModemMode mode; 
+    guint       i;
+
+    mode = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
 
     if (model) {
-        /* Some TOBY-L2/MPCI-L2 devices don't support 2G */
-        if (g_str_equal (model, "TOBY-L201") || g_str_equal (model, "TOBY-L220") || g_str_equal (model, "MPCI-L201"))
-            all &= ~MM_MODEM_MODE_2G;
-        /* None of the LISA-U or SARA-U devices support 4G */
-        else if (g_str_has_prefix (model, "LISA-U") || g_str_has_prefix (model, "SARA-U")) {
-            all &= ~MM_MODEM_MODE_4G;
-            /* Some SARA devices don't support 2G */
-            if (g_str_equal (model, "SARA-U270-53S") || g_str_equal (model, "SARA-U280"))
-                all &= ~MM_MODEM_MODE_2G;
-        }
+        for (i = 0; i < G_N_ELEMENTS (band_configuration); i++)
+            if (g_str_has_prefix (model, band_configuration[i].model)) {
+                mode = band_configuration[i].mode;
+                return mode;;
+            }
     }
 
-    return all;
+    return mode;
 }
 
 GArray *
@@ -538,97 +1018,47 @@ mm_ublox_filter_supported_modes (const gchar  *model,
 /*****************************************************************************/
 /* Supported bands loading */
 
-typedef struct {
-    guint       ubandsel_value;
-    MMModemBand bands_2g[2];
-    MMModemBand bands_3g[2];
-    MMModemBand bands_4g[2];
-} BandConfiguration;
-
-static const BandConfiguration band_configuration[] = {
-    {
-        .ubandsel_value = 700,
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17 }
-    },
-    {
-        .ubandsel_value = 800,
-        .bands_3g = { MM_MODEM_BAND_UTRAN_6 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_20 }
-    },
-    {
-        .ubandsel_value = 850,
-        .bands_2g = { MM_MODEM_BAND_G850 },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_5 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_5 }
-    },
-    {
-        .ubandsel_value = 900,
-        .bands_2g = { MM_MODEM_BAND_EGSM },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_8 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_8 }
-    },
-    {
-        .ubandsel_value = 1500,
-        .bands_3g = { MM_MODEM_BAND_UTRAN_11 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_11 }
-    },
-    {
-        .ubandsel_value = 1700,
-        .bands_3g = { MM_MODEM_BAND_UTRAN_4 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_4 }
-    },
-    {
-        .ubandsel_value = 1800,
-        .bands_2g = { MM_MODEM_BAND_DCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_3 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_3 }
-    },
-    {
-        .ubandsel_value = 1900,
-        .bands_2g = { MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_2 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2 }
-    },
-    {
-        .ubandsel_value = 2100,
-        .bands_3g = { MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1 }
-    },
-    {
-        .ubandsel_value = 2600,
-        .bands_3g = { MM_MODEM_BAND_UTRAN_7 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_7 }
-    },
-};
-
 GArray *
 mm_ublox_get_supported_bands (const gchar  *model,
                               GError      **error)
 {
     MMModemMode  mode;
     GArray      *bands;
-    guint        i;
+    guint        i, j;
 
-    mode = supported_modes_per_model (model);
-
+    mode  = supported_modes_per_model (model);
     bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
 
     for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
-        if ((mode & MM_MODEM_MODE_2G) && band_configuration[i].bands_2g[0]) {
-            bands = g_array_append_val (bands, band_configuration[i].bands_2g[0]);
-            if (band_configuration[i].bands_2g[1])
-                bands = g_array_append_val (bands, band_configuration[i].bands_2g[1]);
+        if (g_str_has_prefix (model, band_configuration[i].model)) {
+            mm_dbg("Found Model (Supported Bands): %s", band_configuration[i].model);
+            break; 
         }
-        if ((mode & MM_MODEM_MODE_3G) && band_configuration[i].bands_3g[0]) {
-            bands = g_array_append_val (bands, band_configuration[i].bands_3g[0]);
-            if (band_configuration[i].bands_3g[1])
-                bands = g_array_append_val (bands, band_configuration[i].bands_3g[1]);
+    }
+
+    if (i == G_N_ELEMENTS (band_configuration)) {
+        mm_warn ("Unknown model name given: %s", model);
+        return NULL;
+    }
+
+    mode = band_configuration[i].mode;
+
+    if (mode & MM_MODEM_MODE_2G) {
+        for (j = 0; band_configuration[i].bands_2g[j] && j < G_N_ELEMENTS (band_configuration[i].bands_2g); j++) {
+            bands = g_array_append_val (bands, band_configuration[i].bands_2g[j]);
         }
-        if ((mode & MM_MODEM_MODE_4G) && band_configuration[i].bands_4g[0]) {
-            bands = g_array_append_val (bands, band_configuration[i].bands_4g[0]);
-            if (band_configuration[i].bands_4g[1])
-                bands = g_array_append_val (bands, band_configuration[i].bands_4g[1]);
+    }
+
+    if (mode & MM_MODEM_MODE_3G) {
+        for (j = 0; band_configuration[i].bands_3g[j] && j < G_N_ELEMENTS (band_configuration[i].bands_3g); j++) {
+            bands = g_array_append_val (bands, band_configuration[i].bands_3g[j]);
         }
+    }
+
+    if (mode & MM_MODEM_MODE_4G) {
+        for (j = 0; band_configuration[i].bands_4g[j] && j < G_N_ELEMENTS (band_configuration[i].bands_4g); j++) {
+            bands = g_array_append_val (bands, band_configuration[i].bands_4g[j]);
+        }   
     }
 
     if (bands->len == 0) {
@@ -641,49 +1071,158 @@ mm_ublox_get_supported_bands (const gchar  *model,
     return bands;
 }
 
+typedef struct {
+    guint       num;
+    MMModemBand band[4];
+} NumToBand;
+
+/* 2G GSM Band Frequencies */
+static const NumToBand num_bands_2g [] = {
+    { .num =  850, .band = { MM_MODEM_BAND_G850 } },
+    { .num =  900, .band = { MM_MODEM_BAND_EGSM } },
+    { .num = 1900, .band = { MM_MODEM_BAND_PCS  } },
+    { .num = 1800, .band = { MM_MODEM_BAND_DCS  } },
+};
+
+/* 3G UMTS Band Frequencies */
+static const NumToBand num_bands_3g [] = {
+    { .num =  800, .band = { MM_MODEM_BAND_UTRAN_6 } },
+    { .num =  850, .band = { MM_MODEM_BAND_UTRAN_5 } },
+    { .num =  900, .band = { MM_MODEM_BAND_UTRAN_8 } },
+    { .num = 1700, .band = { MM_MODEM_BAND_UTRAN_4 } },
+    { .num = 1900, .band = { MM_MODEM_BAND_UTRAN_2 } },
+    { .num = 2100, .band = { MM_MODEM_BAND_UTRAN_1 } },
+};
+
+/* 4G LTE Band Frequencies */
+static const NumToBand num_bands_4g [] = {
+    { .num =  700, .band = { MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17 } },
+    { .num =  800, .band = { MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_27 } },
+    { .num =  850, .band = { MM_MODEM_BAND_EUTRAN_5, MM_MODEM_BAND_EUTRAN_18, MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_26 } },
+    { .num =  900, .band = { MM_MODEM_BAND_EUTRAN_8 } },
+    { .num = 1700, .band = { MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_10 } },
+    { .num = 1800, .band = { MM_MODEM_BAND_EUTRAN_3 } },
+    { .num = 1900, .band = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_39 } },
+    { .num = 2100, .band = { MM_MODEM_BAND_EUTRAN_1 } },
+    { .num = 2300, .band = { MM_MODEM_BAND_EUTRAN_40 } },
+    { .num = 2500, .band = { MM_MODEM_BAND_EUTRAN_41 } },
+    { .num = 2600, .band = { MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_38 } },
+};
 /*****************************************************************************/
 /* +UBANDSEL? response parser */
 
-static void
-append_bands (GArray *bands,
-              guint   ubandsel_value)
-{
+static MMModemBand num_to_band_2g (guint num) {
     guint i;
 
-    for (i = 0; i < G_N_ELEMENTS (band_configuration); i++)
-        if (ubandsel_value == band_configuration[i].ubandsel_value)
+    for (i = 0; i < G_N_ELEMENTS (num_bands_2g); i++) {
+        if (num == num_bands_2g[i].num)
+            return num_bands_2g[i].band[0];
+    }
+    return MM_MODEM_BAND_UNKNOWN;
+}
+
+static MMModemBand num_to_band_3g (guint num) {
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (num_bands_3g); i++) {
+        if (num == num_bands_3g[i].num)
+            return num_bands_3g[i].band[0];
+    }
+    return MM_MODEM_BAND_UNKNOWN;
+}
+
+static guint band_to_num (MMModemBand band) {
+    guint i, j;
+    guint num = 0;
+
+    /* Search 2G list */
+    for (i = 0; i < G_N_ELEMENTS (num_bands_2g); i++) {
+        for (j = 0; num_bands_2g[i].band[j] && j < G_N_ELEMENTS(num_bands_2g[i].band); j++) {
+            if (band == num_bands_2g[i].band[j]) {
+                num = num_bands_2g[i].num;
+                return num;
+            }
+        }
+    } 
+
+    /* Search 3G list */
+    for (i = 0; i < G_N_ELEMENTS (num_bands_3g); i++) {
+        for (j = 0; num_bands_3g[i].band[j] && j < G_N_ELEMENTS(num_bands_3g[i].band); j++) {
+            if (band == num_bands_3g[i].band[j]) {
+                num = num_bands_3g[i].num;
+                return num;
+            }
+        }
+    } 
+
+    /* Search 4G list */
+    for (i = 0; i < G_N_ELEMENTS (num_bands_4g); i++) {
+        for (j = 0; num_bands_4g[i].band[j] && j < G_N_ELEMENTS(num_bands_4g[i].band); j++) {
+            if (band == num_bands_4g[i].band[j]) {
+                num = num_bands_4g[i].num;
+                return num;
+            }
+        }
+    } 
+
+    return num;
+}
+
+static void
+append_bands (GArray *bands,
+              guint   ubandsel_value,
+              MMModemMode       mode,
+              const gchar     *model)
+{
+    guint i, j, k, x;
+
+    MMModemBand band;
+
+    /* Find Modem Model Index in band_configuration */
+    for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
+        if (g_str_has_prefix (model, band_configuration[i].model))
             break;
+    }
 
     if (i == G_N_ELEMENTS (band_configuration)) {
-        mm_warn ("Unknown band configuration value given: %u", ubandsel_value);
+        mm_warn ("Unknown Modem Model given: %s", model);
         return;
     }
 
-    /* Note: we don't care if the device doesn't support one of these modes;
-     * the generic logic will filter out all bands not supported before
-     * exposing them in the DBus property */
-
-    if (band_configuration[i].bands_2g[0]) {
-        g_array_append_val (bands, band_configuration[i].bands_2g[0]);
-        if (band_configuration[i].bands_2g[1])
-            g_array_append_val (bands, band_configuration[i].bands_2g[1]);
+    if (mode & MM_MODEM_MODE_2G) {
+        band = num_to_band_2g (ubandsel_value);
+        if (band != MM_MODEM_BAND_UNKNOWN)
+            g_array_append_val(bands, band);
+    }
+    
+    if (mode & MM_MODEM_MODE_3G) {
+        band = num_to_band_3g (ubandsel_value);
+        if (band != MM_MODEM_BAND_UNKNOWN)
+            g_array_append_val(bands, band);
     }
 
-    if (band_configuration[i].bands_3g[0]) {
-        g_array_append_val (bands, band_configuration[i].bands_3g[0]);
-        if (band_configuration[i].bands_3g[1])
-            g_array_append_val (bands, band_configuration[i].bands_3g[1]);
-    }
+/* Note: The wierd code segment below is to seperate out specific LTE bands since
+ * since UBANDSEL? reports back the frequency of the band and not the band itself 
+ */
 
-    if (band_configuration[i].bands_4g[0]) {
-        g_array_append_val (bands, band_configuration[i].bands_4g[0]);
-        if (band_configuration[i].bands_4g[1])
-            g_array_append_val (bands, band_configuration[i].bands_4g[1]);
+    band = MM_MODEM_BAND_UNKNOWN;
+    if ( mode & MM_MODEM_MODE_4G) {
+        for (j = 0; ubandsel_value == num_bands_4g[j].num && j < G_N_ELEMENTS (num_bands_4g); j++) {
+            for (k = 0; k < 5; k++) {
+                band = num_bands_4g[j].band[k];
+                for (x = 0; band_configuration[i].bands_4g[x] == band && 
+                     x < G_N_ELEMENTS (band_configuration[i].bands_4g); x++) {
+                    g_array_append_val(bands, band);
+                    break;
+                }
+            }
+        }
     }
 }
 
 GArray *
 mm_ublox_parse_ubandsel_response (const gchar  *response,
+                                  const gchar  *model,
                                   GError      **error)
 {
     GArray  *array_values = NULL;
@@ -691,6 +1230,8 @@ mm_ublox_parse_ubandsel_response (const gchar  *response,
     gchar   *dupstr = NULL;
     GError  *inner_error = NULL;
     guint    i;
+
+    MMModemMode mode = supported_modes_per_model(model);
 
     if (!g_str_has_prefix (response, "+UBANDSEL")) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -710,7 +1251,7 @@ mm_ublox_parse_ubandsel_response (const gchar  *response,
     /* Convert list of ubandsel numbers to MMModemBand values */
     array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
     for (i = 0; i < array_values->len; i++)
-        append_bands (array, g_array_index (array_values, guint, i));
+        append_bands (array, g_array_index (array_values, guint, i), mode, model);
 
     if (!array->len) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -738,31 +1279,60 @@ ubandsel_num_cmp (const guint *a, const guint *b)
 }
 
 gchar *
-mm_ublox_build_ubandsel_set_command (GArray  *bands,
-                                     GError **error)
+mm_ublox_build_ubandsel_set_command (GArray       *bands,
+                                     const gchar  *model,
+                                     GError      **error)
 {
     GString *command = NULL;
     GArray  *ubandsel_nums;
-    guint    i;
+    guint    num;
+    gboolean found;
 
     if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
         return g_strdup ("+UBANDSEL=0");
 
     ubandsel_nums = g_array_sized_new (FALSE, FALSE, sizeof (guint), G_N_ELEMENTS (band_configuration));
+    
+    guint i, j, k;
+
     for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
-        guint j;
+        if (g_str_has_prefix (model, band_configuration[i].model))
+            break;
+    }
 
-        for (j = 0; j < bands->len; j++) {
-            MMModemBand band;
+    if (i == G_N_ELEMENTS (band_configuration)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown modem model %s", model);
+        g_array_unref (ubandsel_nums);
+        return NULL;
+    }
 
-            band = g_array_index (bands, MMModemBand, j);
+    for (j = 0; j < bands->len; j++) {
+        MMModemBand band;
+        gboolean   found = FALSE;
 
-            if (band == band_configuration[i].bands_2g[0] || band == band_configuration[i].bands_2g[1] ||
-                band == band_configuration[i].bands_3g[0] || band == band_configuration[i].bands_3g[1] ||
-                band == band_configuration[i].bands_4g[0] || band == band_configuration[i].bands_4g[1]) {
-                g_array_append_val (ubandsel_nums, band_configuration[i].ubandsel_value);
-                break;
-            }
+        band = g_array_index (bands, MMModemBand, j);
+        
+        /* Check to see if band is supported by the model */
+        for (k = 0; band_configuration[i].bands_2g[k] && !found && k < G_N_ELEMENTS (band_configuration[i].bands_2g); k++) {
+            if (band == band_configuration[i].bands_2g[k])
+                found = TRUE;                     
+        }
+
+        for (k = 0; band_configuration[i].bands_3g[k] && !found && k < G_N_ELEMENTS (band_configuration[i].bands_3g); k++) {
+            if (band == band_configuration[i].bands_3g[k])
+                found = TRUE;                     
+        }
+        
+        for (k = 0; band_configuration[i].bands_4g[k] && !found && k < G_N_ELEMENTS (band_configuration[i].bands_4g); k++) {
+            if (band == band_configuration[i].bands_4g[k])
+                found = TRUE;                     
+        }
+
+        if (found) {
+            num = band_to_num (band);
+            if (num)
+                g_array_append_val (ubandsel_nums, num); 
         }
     }
 
@@ -780,6 +1350,7 @@ mm_ublox_build_ubandsel_set_command (GArray  *bands,
     command = g_string_new ("+UBANDSEL=");
     for (i = 0; i < ubandsel_nums->len; i++)
         g_string_append_printf (command, "%s%u", i == 0 ? "" : ",", g_array_index (ubandsel_nums, guint, i));
+
     return g_string_free (command, FALSE);
 }
 

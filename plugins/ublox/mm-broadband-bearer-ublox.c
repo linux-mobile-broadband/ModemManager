@@ -44,12 +44,6 @@ enum {
 
 static GParamSpec *properties[PROP_LAST];
 
-typedef enum {
-    FEATURE_SUPPORT_UNKNOWN,
-    FEATURE_SUPPORTED,
-    FEATURE_UNSUPPORTED,
-} FeatureSupport;
-
 struct _MMBroadbandBearerUbloxPrivate {
     MMUbloxUsbProfile        profile;
     MMUbloxNetworkingMode    mode;
