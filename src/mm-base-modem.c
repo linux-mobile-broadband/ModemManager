@@ -922,6 +922,9 @@ mm_base_modem_find_ports (MMBaseModem *self,
     gpointer value;
     gpointer key;
 
+    if (!self->priv->ports)
+        return NULL;
+
     /* We'll iterate the ht of ports, looking for any port which is matches
      * the compare function */
     g_hash_table_iter_init (&iter, self->priv->ports);
