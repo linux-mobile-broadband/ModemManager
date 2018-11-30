@@ -19,6 +19,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include <libmm-glib.h>
 #include "mm-common-helpers.h"
