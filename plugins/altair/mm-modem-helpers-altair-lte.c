@@ -71,8 +71,8 @@ gchar *
 mm_altair_parse_ceer_response (const gchar *response,
                                GError **error)
 {
-    GRegex *r;
-    GMatchInfo *match_info = NULL;
+    g_autoptr(GRegex) r = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
     gchar *ceer_response = NULL;
 
 
@@ -93,8 +93,6 @@ mm_altair_parse_ceer_response (const gchar *response,
 
     if (!g_regex_match (r, response, 0, &match_info)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Could not parse +CEER response");
-        g_match_info_free (match_info);
-        g_regex_unref (r);
         return NULL;
     }
 
@@ -104,8 +102,6 @@ mm_altair_parse_ceer_response (const gchar *response,
             ceer_response = g_strdup ("");
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
     return ceer_response;
 }
 
@@ -115,15 +111,13 @@ mm_altair_parse_ceer_response (const gchar *response,
 guint
 mm_altair_parse_cid (const gchar *response, GError **error)
 {
-    GRegex *regex;
-    GMatchInfo *match_info;
+    mm_autoptr(GRegex) regex = NULL;
+    mm_autoptr(GMatchInfo) match_info = NULL;
     guint cid = -1;
 
     regex = g_regex_new ("\\%CGINFO:\\s*(\\d+)", G_REGEX_RAW, 0, NULL);
     g_assert (regex);
     if (!g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, error)) {
-        g_match_info_free (match_info);
-        g_regex_unref (regex);
         return -1;
     }
 
@@ -133,8 +127,6 @@ mm_altair_parse_cid (const gchar *response, GError **error)
                      MM_CORE_ERROR_FAILED,
                      "Failed to parse %%CGINFO=\"cid\",1 response");
 
-    g_match_info_free (match_info);
-    g_regex_unref (regex);
     return cid;
 }
 
@@ -144,8 +136,8 @@ mm_altair_parse_cid (const gchar *response, GError **error)
 MMPco *
 mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
 {
-    GRegex *regex;
-    GMatchInfo *match_info;
+    g_autoptr(GRegex) regex = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
     MMPco *pco = NULL;
     gint num_matches;
 
@@ -163,8 +155,6 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
                          0, NULL);
     g_assert (regex);
     if (!g_regex_match_full (regex, pco_info, strlen (pco_info), 0, 0, &match_info, error)) {
-        g_match_info_free (match_info);
-        g_regex_unref (regex);
         return NULL;
     }
 
@@ -175,8 +165,6 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
                      MM_CORE_ERROR_FAILED,
                      "Failed to parse substrings, number of matches: %d",
                      num_matches);
-        g_match_info_free (match_info);
-        g_regex_unref (regex);
         return NULL;
     }
 
@@ -287,9 +275,6 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
         g_byte_array_unref (pco_raw);
         break;
     }
-
-    g_match_info_free (match_info);
-    g_regex_unref (regex);
 
     return pco;
 }
