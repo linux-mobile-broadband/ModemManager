@@ -36,6 +36,7 @@
 #include <mm-gdbus-manager.h>
 #include <mm-gdbus-test.h>
 
+#include "mm-context.h"
 #include "mm-base-manager.h"
 #include "mm-daemon-enums-types.h"
 #include "mm-device.h"
@@ -988,6 +989,7 @@ mm_base_manager_new (GDBusConnection  *connection,
                            MM_BASE_MANAGER_FILTER_POLICY,         filter_policy,
                            MM_BASE_MANAGER_INITIAL_KERNEL_EVENTS, initial_kernel_events,
                            MM_BASE_MANAGER_ENABLE_TEST,           enable_test,
+                           "version",                             MM_DIST_VERSION,
                            NULL);
 }
 

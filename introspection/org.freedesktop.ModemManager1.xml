@@ -106,5 +106,12 @@
       <arg name="properties" type="a{sv}" direction="in" />
     </method>
 
+    <!--
+        Version:
+
+        The runtime version of the ModemManager daemon.
+    -->
+    <property name="Version" type="s" access="read" />
+
   </interface>
 </node>

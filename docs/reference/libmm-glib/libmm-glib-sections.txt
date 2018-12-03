@@ -14,6 +14,7 @@ mm_manager_new
 mm_manager_new_finish
 mm_manager_new_sync
 <SUBSECTION Methods>
+mm_manager_get_version
 mm_manager_scan_devices
 mm_manager_scan_devices_finish
 mm_manager_scan_devices_sync

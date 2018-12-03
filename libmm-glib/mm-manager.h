@@ -85,6 +85,8 @@ MMManager *mm_manager_new_sync (
 GDBusProxy *mm_manager_peek_proxy (MMManager *manager);
 GDBusProxy *mm_manager_get_proxy  (MMManager *manager);
 
+const gchar *mm_manager_get_version (MMManager *manager);
+
 void mm_manager_set_logging (MMManager           *manager,
                              const gchar         *level,
                              GCancellable        *cancellable,

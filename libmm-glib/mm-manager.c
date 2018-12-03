@@ -17,14 +17,13 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
  * Copyright (C) 2011 - 2012 Google, Inc.
- *
- * Author: Aleksander Morgado <aleksander@lanedo.com>
+ * Copyright (C) 2011 - 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <ModemManager.h>
 
+#include "mm-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-gdbus-manager.h"
 #include "mm-manager.h"
@@ -261,6 +260,30 @@ mm_manager_get_proxy (MMManager *manager)
         return NULL;
 
     return G_DBUS_PROXY (g_object_ref (manager->priv->manager_iface_proxy));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_manager_get_version:
+ * @manager: A #MMManager.
+ *
+ * Gets the ModemManager version, as reported by the daemon.
+ *
+ * It is safe to assume this value never changes during runtime.
+ *
+ * Returns: (transfer none): The version, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ */
+const gchar *
+mm_manager_get_version (MMManager *manager)
+{
+    g_return_val_if_fail (MM_IS_MANAGER (manager), NULL);
+
+    if (!ensure_modem_manager1_proxy (manager, NULL))
+        return NULL;
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_org_freedesktop_modem_manager1_get_version (manager->priv->manager_iface_proxy));
 }
 
 /*****************************************************************************/
