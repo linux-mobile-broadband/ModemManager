@@ -96,7 +96,8 @@ ensure_modem_manager1_proxy (MMManager  *self,
 {
     gchar *name = NULL;
     gchar *object_path = NULL;
-    GDBusProxyFlags flags = G_DBUS_PROXY_FLAGS_NONE;
+    GDBusObjectManagerClientFlags obj_manager_flags = G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE;
+    GDBusProxyFlags proxy_flags = G_DBUS_PROXY_FLAGS_NONE;
     GDBusConnection *connection = NULL;
 
     if (self->priv->manager_iface_proxy)
@@ -106,13 +107,16 @@ ensure_modem_manager1_proxy (MMManager  *self,
     g_object_get (self,
                   "name",        &name,
                   "object-path", &object_path,
-                  "flags",       &flags,
+                  "flags",       &obj_manager_flags,
                   "connection",  &connection,
                   NULL);
 
+    if (obj_manager_flags & G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START)
+        proxy_flags |= G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START;
+
     self->priv->manager_iface_proxy =
         mm_gdbus_org_freedesktop_modem_manager1_proxy_new_sync (connection,
-                                                                flags,
+                                                                proxy_flags,
                                                                 name,
                                                                 object_path,
                                                                 NULL,
