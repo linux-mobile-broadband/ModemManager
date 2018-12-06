@@ -231,6 +231,33 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Helper to return an error when the modem is in failed state and so it
+ * cannot process a given method invocation
+ */
+
+static gboolean
+abort_invocation_if_state_not_reached (MMIfaceModem          *self,
+                                       GDBusMethodInvocation *invocation,
+                                       MMModemState           minimum_required)
+{
+    MMModemState state = MM_MODEM_STATE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &state,
+                  NULL);
+
+    if (state >= minimum_required)
+        return FALSE;
+
+    g_dbus_method_invocation_return_error (invocation,
+                                           MM_CORE_ERROR,
+                                           MM_CORE_ERROR_WRONG_STATE,
+                                           "modem in %s state",
+                                           mm_modem_state_get_string (state));
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Helper method to load unlock required, considering retries */
 
 #define MAX_RETRIES 6
@@ -627,6 +654,11 @@ handle_create_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
+    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
+        handle_create_bearer_context_free (ctx);
+        return;
+    }
+
     properties = mm_bearer_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -712,6 +744,11 @@ handle_command_auth_ready (MMBaseModem *self,
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_command_context_free (ctx);
+        return;
+    }
+
+    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
         handle_command_context_free (ctx);
         return;
     }
@@ -828,6 +865,11 @@ handle_delete_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
+    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
+        handle_delete_bearer_context_free (ctx);
+        return;
+    }
+
     if (!g_str_has_prefix (ctx->bearer_path, MM_DBUS_BEARER_PREFIX)) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
@@ -888,6 +930,9 @@ handle_list_bearers (MmGdbusModem *skeleton,
 {
     GStrv paths;
     MMBearerList *list = NULL;
+
+    if (abort_invocation_if_state_not_reached (self, invocation, MM_MODEM_STATE_LOCKED))
+        return TRUE;
 
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
@@ -1735,6 +1780,11 @@ handle_enable_auth_ready (MMBaseModem *self,
         return;
     }
 
+    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
+        handle_enable_context_free (ctx);
+        return;
+    }
+
     if (ctx->enable)
         mm_base_modem_enable (self,
                               (GAsyncReadyCallback)enable_ready,
@@ -2055,7 +2105,12 @@ handle_factory_reset (MmGdbusModem *skeleton,
 }
 
 /*****************************************************************************/
-/* Current capabilities setting */
+/* Current capabilities setting
+ *
+ * Setting capabilities allowed also in FAILED state. Just imagine a
+ * 3GPP+3GPP2 modem in 3GPP-only mode without SIM, we should allow
+ * changing caps to 3GPP2, which doesn't require SIM
+ */
 
 typedef struct {
     MmGdbusModem *skeleton;
@@ -2521,7 +2576,6 @@ handle_set_current_bands_auth_ready (MMBaseModem *self,
                                      HandleSetCurrentBandsContext *ctx)
 {
     GArray *bands_array;
-    MMModemState modem_state;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -2530,17 +2584,7 @@ handle_set_current_bands_auth_ready (MMBaseModem *self,
         return;
     }
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set current bands: "
-                                               "not initialized/unlocked yet");
+    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_DISABLED)) {
         handle_set_current_bands_context_free (ctx);
         return;
     }
@@ -2840,7 +2884,6 @@ handle_set_current_modes_auth_ready (MMBaseModem *self,
                                      GAsyncResult *res,
                                      HandleSetCurrentModesContext *ctx)
 {
-    MMModemState modem_state;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -2849,17 +2892,7 @@ handle_set_current_modes_auth_ready (MMBaseModem *self,
         return;
     }
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_DISABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set current modes: "
-                                               "not initialized/unlocked yet");
+    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_DISABLED)) {
         handle_set_current_modes_context_free (ctx);
         return;
     }
@@ -4956,66 +4989,20 @@ interface_initialization_step (GTask *task)
     }
 
     case INITIALIZATION_STEP_LAST:
-        /* Setting capabilities allowed also in FAILED state. Just imagine a
-         * 3GPP+3GPP2 modem in 3GPP-only mode without SIM, we should allow
-         * changing caps to 3GPP2, which doesn't require SIM */
-        g_signal_connect (ctx->skeleton,
-                          "handle-set-current-capabilities",
-                          G_CALLBACK (handle_set_current_capabilities),
-                          self);
-        /* Allow setting the power state to OFF even when the modem is in the
-         * FAILED state as this operation does not necessarily depend on the
-         * presence of a SIM. handle_set_power_state_auth_ready already ensures
-         * that the power state can only be set to OFF when the modem is in the
-         * FAILED state. */
-        g_signal_connect (ctx->skeleton,
-                          "handle-set-power-state",
-                          G_CALLBACK (handle_set_power_state),
-                          self);
-        /* Allow the reset and factory reset operation in FAILED state to rescue the modem.
-         * Also, for a modem that doesn't support SIM hot swapping, a reset is needed to
-         * force the modem to detect the newly inserted SIM. */
-        g_signal_connect (ctx->skeleton,
-                          "handle-reset",
-                          G_CALLBACK (handle_reset),
-                          self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-factory-reset",
-                          G_CALLBACK (handle_factory_reset),
-                          self);
-
-        if (!ctx->fatal_error) {
-            /* We are done without errors!
-             * Handle method invocations */
-            g_signal_connect (ctx->skeleton,
-                              "handle-create-bearer",
-                              G_CALLBACK (handle_create_bearer),
-                              self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-command",
-                              G_CALLBACK (handle_command),
-                              self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-delete-bearer",
-                              G_CALLBACK (handle_delete_bearer),
-                              self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-list-bearers",
-                              G_CALLBACK (handle_list_bearers),
-                              self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-enable",
-                              G_CALLBACK (handle_enable),
-                              self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-set-current-bands",
-                              G_CALLBACK (handle_set_current_bands),
-                              self);
-            g_signal_connect (ctx->skeleton,
-                              "handle-set-current-modes",
-                              G_CALLBACK (handle_set_current_modes),
-                              self);
-        }
+        /* Setup all method handlers */
+        g_object_connect (ctx->skeleton,
+                          "signal::handle-set-current-capabilities", G_CALLBACK (handle_set_current_capabilities), self,
+                          "signal::handle-set-power-state",          G_CALLBACK (handle_set_power_state),          self,
+                          "signal::handle-reset",                    G_CALLBACK (handle_reset),                    self,
+                          "signal::handle-factory-reset",            G_CALLBACK (handle_factory_reset),            self,
+                          "signal::handle-create-bearer",            G_CALLBACK (handle_create_bearer),            self,
+                          "signal::handle-command",                  G_CALLBACK (handle_command),                  self,
+                          "signal::handle-delete-bearer",            G_CALLBACK (handle_delete_bearer),            self,
+                          "signal::handle-list-bearers",             G_CALLBACK (handle_list_bearers),             self,
+                          "signal::handle-enable",                   G_CALLBACK (handle_enable),                   self,
+                          "signal::handle-set-current-bands",        G_CALLBACK (handle_set_current_bands),        self,
+                          "signal::handle-set-current-modes",        G_CALLBACK (handle_set_current_modes),        self,
+                          NULL);
 
         /* Finally, export the new interface, even if we got errors, but only if not
          * done already */
