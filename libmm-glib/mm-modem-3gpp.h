@@ -154,6 +154,19 @@ MMBearer *mm_modem_3gpp_get_initial_eps_bearer_sync   (MMModem3gpp          *sel
                                                        GCancellable         *cancellable,
                                                        GError              **error);
 
+void     mm_modem_3gpp_set_initial_eps_bearer_settings        (MMModem3gpp          *self,
+                                                               MMBearerProperties   *config,
+                                                               GCancellable         *cancellable,
+                                                               GAsyncReadyCallback   callback,
+                                                               gpointer              user_data);
+gboolean mm_modem_3gpp_set_initial_eps_bearer_settings_finish (MMModem3gpp          *self,
+                                                               GAsyncResult         *res,
+                                                               GError              **error);
+gboolean mm_modem_3gpp_set_initial_eps_bearer_settings_sync   (MMModem3gpp          *self,
+                                                               MMBearerProperties   *config,
+                                                               GCancellable         *cancellable,
+                                                               GError              **error);
+
 /* Deprecated APIs */
 G_DEPRECATED
 MMModem3gppSubscriptionState mm_modem_3gpp_get_subscription_state (MMModem3gpp *self);

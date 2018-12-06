@@ -913,6 +913,163 @@ handle_set_eps_ue_mode_operation (MmGdbusModem3gpp      *skeleton,
 
 /*****************************************************************************/
 
+typedef struct {
+    MmGdbusModem3gpp      *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gpp      *self;
+    GVariant              *dictionary;
+    MMBearerProperties    *config;
+} HandleSetInitialEpsBearerSettingsContext;
+
+static void
+handle_set_initial_eps_bearer_settings_context_free (HandleSetInitialEpsBearerSettingsContext *ctx)
+{
+    g_clear_object (&ctx->config);
+    g_variant_unref (ctx->dictionary);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleSetInitialEpsBearerSettingsContext, ctx);
+}
+
+static void
+after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         *self,
+                                                  GAsyncResult                             *res,
+                                                  HandleSetInitialEpsBearerSettingsContext *ctx)
+{
+    GError             *error = NULL;
+    MMBearerProperties *new_config;
+
+    new_config = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish (self, res, &error);
+    if (error) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_initial_eps_bearer_settings_context_free (ctx);
+        return;
+    }
+
+    if (!mm_bearer_properties_cmp (new_config, ctx->config)) {
+        g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                                       "Initial EPS bearer settings were not updated");
+    } else {
+        GVariant *dictionary;
+
+        dictionary = mm_bearer_properties_get_dictionary (new_config);
+        mm_gdbus_modem3gpp_set_initial_eps_bearer_settings (ctx->skeleton, dictionary);
+        if (dictionary)
+            g_variant_unref (dictionary);
+        mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
+    }
+
+    handle_set_initial_eps_bearer_settings_context_free (ctx);
+    g_object_unref (new_config);
+}
+
+static void
+set_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         *self,
+                                       GAsyncResult                             *res,
+                                       HandleSetInitialEpsBearerSettingsContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_initial_eps_bearer_settings_context_free (ctx);
+        return;
+    }
+
+    if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish) {
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings (
+            self,
+            (GAsyncReadyCallback)after_set_load_initial_eps_bearer_settings_ready,
+            ctx);
+        return;
+    }
+
+    /* Assume we're ok */
+    mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
+    handle_set_initial_eps_bearer_settings_context_free (ctx);
+}
+
+static void
+set_initial_eps_bearer_settings_auth_ready (MMBaseModem                              *self,
+                                            GAsyncResult                             *res,
+                                            HandleSetInitialEpsBearerSettingsContext *ctx)
+{
+    GError             *error = NULL;
+    MMBearerProperties *old_config = NULL;
+    GVariant           *old_dictionary;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_initial_eps_bearer_settings_context_free (ctx);
+        return;
+    }
+
+    /* If UE mode update is not implemented, report an error */
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings ||
+        !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set initial EPS bearer settings: operation not supported");
+        handle_set_initial_eps_bearer_settings_context_free (ctx);
+        return;
+    }
+
+    ctx->config = mm_bearer_properties_new_from_dictionary (ctx->dictionary, &error);
+    if (!ctx->config) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_initial_eps_bearer_settings_context_free (ctx);
+        return;
+    }
+
+    /* If the user doesn't specify explicit auth settings, assume NONE as default */
+    if (mm_bearer_properties_get_allowed_auth (ctx->config) == MM_BEARER_ALLOWED_AUTH_UNKNOWN)
+        mm_bearer_properties_set_allowed_auth (ctx->config, MM_BEARER_ALLOWED_AUTH_NONE);
+
+    old_dictionary = mm_gdbus_modem3gpp_get_initial_eps_bearer_settings (ctx->skeleton);
+    if (old_dictionary)
+        old_config = mm_bearer_properties_new_from_dictionary (old_dictionary, NULL);
+
+    if (old_config && mm_bearer_properties_cmp (ctx->config, old_config)) {
+        mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
+        handle_set_initial_eps_bearer_settings_context_free (ctx);
+    } else {
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_initial_eps_bearer_settings (
+            MM_IFACE_MODEM_3GPP (self),
+            ctx->config,
+            (GAsyncReadyCallback)set_initial_eps_bearer_settings_ready,
+            ctx);
+    }
+
+    g_clear_object (&old_config);
+}
+
+static gboolean
+handle_set_initial_eps_bearer_settings (MmGdbusModem3gpp      *skeleton,
+                                        GDBusMethodInvocation *invocation,
+                                        GVariant              *dictionary,
+                                        MMIfaceModem3gpp      *self)
+{
+    HandleSetInitialEpsBearerSettingsContext *ctx;
+
+    ctx = g_slice_new0 (HandleSetInitialEpsBearerSettingsContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+    ctx->dictionary = g_variant_ref (dictionary);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)set_initial_eps_bearer_settings_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_iface_modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
                                                     GAsyncResult *res,
@@ -2287,6 +2444,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-set-eps-ue-mode-operation",
                           G_CALLBACK (handle_set_eps_ue_mode_operation),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-initial-eps-bearer-settings",
+                          G_CALLBACK (handle_set_initial_eps_bearer_settings),
                           self);
 
         /* Finally, export the new interface */

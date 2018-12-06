@@ -222,6 +222,15 @@ struct _MMIfaceModem3gpp {
     gboolean (* set_eps_ue_mode_operation_finish) (MMIfaceModem3gpp               *self,
                                                    GAsyncResult                   *res,
                                                    GError                        **error);
+
+    /* Set initial EPS bearer settings */
+    void     (* set_initial_eps_bearer_settings)        (MMIfaceModem3gpp     *self,
+                                                         MMBearerProperties   *properties,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+    gboolean (* set_initial_eps_bearer_settings_finish) (MMIfaceModem3gpp     *self,
+                                                         GAsyncResult         *res,
+                                                         GError              **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
