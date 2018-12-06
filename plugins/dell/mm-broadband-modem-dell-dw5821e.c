@@ -30,6 +30,7 @@
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 #include "mm-broadband-modem-dell-dw5821e.h"
 
@@ -284,6 +285,9 @@ mm_broadband_modem_dell_dw5821e_new (const gchar  *device,
                          MM_BASE_MODEM_PLUGIN,     plugin,
                          MM_BASE_MODEM_VENDOR_ID,  vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
+                         MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED, TRUE,
                          NULL);
 }
 

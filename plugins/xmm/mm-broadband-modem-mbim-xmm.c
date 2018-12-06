@@ -54,6 +54,9 @@ mm_broadband_modem_mbim_xmm_new (const gchar  *device,
                          MM_BASE_MODEM_PLUGIN,     plugin,
                          MM_BASE_MODEM_VENDOR_ID,  vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
+                         MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED, TRUE,
                          NULL);
 }
 
