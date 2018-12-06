@@ -4984,21 +4984,7 @@ interface_initialization_step (GTask *task)
                           G_CALLBACK (handle_factory_reset),
                           self);
 
-        if (ctx->fatal_error) {
-            if (g_error_matches (ctx->fatal_error,
-                                 MM_MOBILE_EQUIPMENT_ERROR,
-                                 MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED)) {
-                gboolean is_sim_hot_swap_supported = FALSE;
-
-                g_object_get (self,
-                              MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
-                              NULL);
-
-                if (is_sim_hot_swap_supported) {
-                    mm_iface_modem_update_failed_state (self, MM_MODEM_STATE_FAILED_REASON_SIM_MISSING);
-                }
-            }
-        } else {
+        if (!ctx->fatal_error) {
             /* We are done without errors!
              * Handle method invocations */
             g_signal_connect (ctx->skeleton,
