@@ -44,6 +44,7 @@ G_BEGIN_DECLS
 
 typedef struct _MMModem3gpp MMModem3gpp;
 typedef struct _MMModem3gppClass MMModem3gppClass;
+typedef struct _MMModem3gppPrivate MMModem3gppPrivate;
 
 /**
  * MMModem3gpp:
@@ -53,8 +54,8 @@ typedef struct _MMModem3gppClass MMModem3gppClass;
  */
 struct _MMModem3gpp {
     /*< private >*/
-    MmGdbusModem3gppProxy parent;
-    gpointer unused;
+    MmGdbusModem3gppProxy  parent;
+    MMModem3gppPrivate    *priv;
 };
 
 struct _MMModem3gppClass {
@@ -86,6 +87,9 @@ GList       *mm_modem_3gpp_get_pco (MMModem3gpp *self);
 
 const gchar *mm_modem_3gpp_get_initial_eps_bearer_path (MMModem3gpp *self);
 gchar       *mm_modem_3gpp_dup_initial_eps_bearer_path (MMModem3gpp *self);
+
+MMBearerProperties *mm_modem_3gpp_get_initial_eps_bearer_settings  (MMModem3gpp *self);
+MMBearerProperties *mm_modem_3gpp_peek_initial_eps_bearer_settings (MMModem3gpp *self);
 
 void     mm_modem_3gpp_register        (MMModem3gpp *self,
                                         const gchar *network_id,

@@ -2049,6 +2049,7 @@ typedef enum {
     INITIALIZATION_STEP_IMEI,
     INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS,
     INITIALIZATION_STEP_EPS_UE_MODE_OPERATION,
+    INITIALIZATION_STEP_EPS_INITIAL_BEARER_SETTINGS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -2078,6 +2079,36 @@ sim_pin_lock_enabled_cb (MMBaseSim *self,
         facilities &= ~MM_MODEM_3GPP_FACILITY_SIM;
 
     mm_gdbus_modem3gpp_set_enabled_facility_locks (skeleton, facilities);
+}
+
+static void
+load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp *self,
+                                        GAsyncResult     *res,
+                                        GTask            *task)
+{
+    InitializationContext *ctx;
+    MMBearerProperties    *config;
+    GError                *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    config = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish (self, res, &error);
+    if (!config) {
+        mm_warn ("couldn't load initial EPS bearer settings: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        GVariant *dictionary;
+
+        dictionary = mm_bearer_properties_get_dictionary (config);
+        mm_gdbus_modem3gpp_set_initial_eps_bearer_settings (ctx->skeleton, dictionary);
+        g_object_unref (config);
+        if (dictionary)
+            g_variant_unref (dictionary);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
 }
 
 static void
@@ -2227,6 +2258,19 @@ interface_initialization_step (GTask *task)
         }
         /* Fall down to next step */
         ctx->step++;
+
+    case INITIALIZATION_STEP_EPS_INITIAL_BEARER_SETTINGS:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings (
+                self,
+                (GAsyncReadyCallback)load_initial_eps_bearer_settings_ready,
+                task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */

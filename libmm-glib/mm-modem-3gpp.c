@@ -43,6 +43,13 @@
 
 G_DEFINE_TYPE (MMModem3gpp, mm_modem_3gpp, MM_GDBUS_TYPE_MODEM3GPP_PROXY)
 
+struct _MMModem3gppPrivate {
+    /* Properties */
+    GMutex              initial_eps_bearer_settings_mutex;
+    guint               initial_eps_bearer_settings_id;
+    MMBearerProperties *initial_eps_bearer_settings;
+};
+
 /*****************************************************************************/
 
 /**
@@ -567,6 +574,117 @@ mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network)
 
 /*****************************************************************************/
 
+static void
+initial_eps_bearer_settings_updated (MMModem3gpp *self,
+                                     GParamSpec  *pspec)
+{
+    g_mutex_lock (&self->priv->initial_eps_bearer_settings_mutex);
+    {
+        GVariant *dictionary;
+
+        g_clear_object (&self->priv->initial_eps_bearer_settings);
+
+        dictionary = mm_gdbus_modem3gpp_get_initial_eps_bearer_settings (MM_GDBUS_MODEM3GPP (self));
+        if (dictionary) {
+            GError *error = NULL;
+
+            self->priv->initial_eps_bearer_settings = mm_bearer_properties_new_from_dictionary (dictionary, &error);
+            if (error) {
+                g_warning ("Invalid bearer properties received: %s", error->message);
+                g_error_free (error);
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->initial_eps_bearer_settings_mutex);
+}
+
+static void
+ensure_internal_initial_eps_bearer_settings (MMModem3gpp         *self,
+                                             MMBearerProperties **dup)
+{
+    g_mutex_lock (&self->priv->initial_eps_bearer_settings_mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->initial_eps_bearer_settings_id) {
+            GVariant *dictionary;
+
+            dictionary = mm_gdbus_modem3gpp_dup_initial_eps_bearer_settings (MM_GDBUS_MODEM3GPP (self));
+            if (dictionary) {
+                GError *error = NULL;
+
+                self->priv->initial_eps_bearer_settings = mm_bearer_properties_new_from_dictionary (dictionary, &error);
+                if (error) {
+                    g_warning ("Invalid initial bearer properties: %s", error->message);
+                    g_error_free (error);
+                }
+                g_variant_unref (dictionary);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->initial_eps_bearer_settings_id =
+                g_signal_connect (self,
+                                  "notify::initial-eps-bearer-properties",
+                                  G_CALLBACK (initial_eps_bearer_settings_updated),
+                                  NULL);
+        }
+
+        if (dup && self->priv->initial_eps_bearer_settings)
+            *dup = g_object_ref (self->priv->initial_eps_bearer_settings);
+    }
+    g_mutex_unlock (&self->priv->initial_eps_bearer_settings_mutex);
+}
+
+/**
+ * mm_modem_3gpp_get_initial_eps_bearer_settings:
+ * @self: A #MMModem3gpp.
+ *
+ * Gets a #MMBearerProperties object specifying the settings configured in
+ * the device to use when attaching to the LTE network.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_3gpp_get_initial_eps_bearer_settings() again to get a new #MMBearerProperties with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full): A #MMBearerProperties that must be freed with g_object_unref() or %NULL if unknown.
+ */
+MMBearerProperties *
+mm_modem_3gpp_get_initial_eps_bearer_settings (MMModem3gpp *self)
+{
+    MMBearerProperties *props = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
+
+    ensure_internal_initial_eps_bearer_settings (self, &props);
+    return props;
+}
+
+/**
+ * mm_modem_3gpp_peek_initial_eps_bearer_settings:
+ * @self: A #MMModem3gpp.
+ *
+ * Gets a #MMBearerProperties object specifying the settings configured in
+ * the device to use when attaching to the LTE network.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_3gpp_get_initial_eps_bearer_settings() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): A #MMBearerProperties. Do not free the returned value, it belongs to @self.
+ */
+MMBearerProperties *
+mm_modem_3gpp_peek_initial_eps_bearer_settings (MMModem3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
+
+    ensure_internal_initial_eps_bearer_settings (self, NULL);
+    return self->priv->initial_eps_bearer_settings;
+}
+
+/*****************************************************************************/
+
 static GList *
 create_networks_list (GVariant *variant)
 {
@@ -914,9 +1032,38 @@ mm_modem_3gpp_get_initial_eps_bearer_sync (MMModem3gpp   *self,
 static void
 mm_modem_3gpp_init (MMModem3gpp *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_3GPP, MMModem3gppPrivate);
+    g_mutex_init (&self->priv->initial_eps_bearer_settings_mutex);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMModem3gpp *self = MM_MODEM_3GPP (object);
+
+    g_mutex_clear (&self->priv->initial_eps_bearer_settings_mutex);
+
+    G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->finalize (object);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMModem3gpp *self = MM_MODEM_3GPP (object);
+
+    g_clear_object (&self->priv->initial_eps_bearer_settings);
+
+    G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->dispose (object);
 }
 
 static void
 mm_modem_3gpp_class_init (MMModem3gppClass *modem_class)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (modem_class);
+
+    g_type_class_add_private (object_class, sizeof (MMModem3gppPrivate));
+
+    /* Virtual methods */
+    object_class->dispose  = dispose;
+    object_class->finalize = finalize;
 }

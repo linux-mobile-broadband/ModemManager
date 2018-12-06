@@ -368,8 +368,29 @@ print_modem_info (void)
         mmcli_output_pco_list    (pco_list);
 
         if (mm_modem_get_current_capabilities (ctx->modem) & (MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_LTE_ADVANCED)) {
+            MMBearerProperties *properties = NULL;
+            const gchar        *apn = NULL;
+            gchar              *ip_family_str = NULL;
+            const gchar        *user = NULL;
+            const gchar        *password = NULL;
+
             mmcli_output_string (MMC_F_3GPP_EPS_UE_MODE,             eps_ue_mode);
             mmcli_output_string (MMC_F_3GPP_EPS_INITIAL_BEARER_PATH, g_strcmp0 (initial_eps_bearer_path, "/") != 0 ? initial_eps_bearer_path : NULL);
+
+            if (ctx->modem_3gpp) {
+                properties = mm_modem_3gpp_peek_initial_eps_bearer_settings (ctx->modem_3gpp);
+                if (properties) {
+                    apn           = mm_bearer_properties_get_apn (properties);
+                    ip_family_str = (properties ? mm_bearer_ip_family_build_string_from_mask (mm_bearer_properties_get_ip_type (properties)) : NULL);
+                    user          = mm_bearer_properties_get_user (properties);
+                    password      = mm_bearer_properties_get_password (properties);
+                }
+            }
+
+            mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_APN,      apn);
+            mmcli_output_string_take (MMC_F_3GPP_EPS_BEARER_SETTINGS_IP_TYPE,  ip_family_str);
+            mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_USER,     user);
+            mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_PASSWORD, password);
         }
 
         g_free (facility_locks);

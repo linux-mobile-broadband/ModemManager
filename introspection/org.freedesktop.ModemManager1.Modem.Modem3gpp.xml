@@ -182,5 +182,18 @@
     -->
     <property name="InitialEpsBearer" type="o" access="read" />
 
+    <!--
+        InitialEpsBearerSettings:
+
+        List of properties requested by the device for the initial EPS bearer during
+        LTE network attach procedure.
+
+        The network may decide to use different settings during the actual device attach
+        procedure, e.g. if the device is roaming or no explicit settings were requested,
+        so the properties shown in the #org.freedesktop.ModemManager1.Modem.Modem3gpp.InitialEpsBearer:InitialEpsBearer
+        may be totally different.
+    -->
+    <property name="InitialEpsBearerSettings" type="a{sv}" access="read" />
+
   </interface>
 </node>
