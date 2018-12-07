@@ -638,6 +638,242 @@ mm_manager_report_kernel_event_sync (MMManager                *manager,
 
 /*****************************************************************************/
 
+static gboolean
+common_inhibit_device_finish (MMManager     *manager,
+                              GAsyncResult  *res,
+                              GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+inhibit_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
+               GAsyncResult                       *res,
+               GTask                              *task)
+{
+    GError *error = NULL;
+
+    if (!mm_gdbus_org_freedesktop_modem_manager1_call_inhibit_device_finish (manager_iface_proxy, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_inhibit_device (MMManager           *manager,
+                       const gchar         *uid,
+                       gboolean             inhibit,
+                       GCancellable        *cancellable,
+                       GAsyncReadyCallback  callback,
+                       gpointer             user_data)
+{
+    GTask  *task;
+    GError *inner_error = NULL;
+
+    task = g_task_new (manager, cancellable, callback, user_data);
+
+    if (!ensure_modem_manager1_proxy (manager, &inner_error)) {
+        g_task_return_error (task, inner_error);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_gdbus_org_freedesktop_modem_manager1_call_inhibit_device (
+        manager->priv->manager_iface_proxy,
+        uid,
+        inhibit,
+        cancellable,
+        (GAsyncReadyCallback)inhibit_ready,
+        task);
+}
+
+static gboolean
+common_inhibit_device_sync (MMManager     *manager,
+                            const gchar   *uid,
+                            gboolean       inhibit,
+                            GCancellable  *cancellable,
+                            GError       **error)
+{
+    if (!ensure_modem_manager1_proxy (manager, error))
+        return FALSE;
+
+    return (mm_gdbus_org_freedesktop_modem_manager1_call_inhibit_device_sync (
+                manager->priv->manager_iface_proxy,
+                uid,
+                inhibit,
+                cancellable,
+                error));
+}
+
+/**
+ * mm_manager_inhibit_device_finish:
+ * @manager: A #MMManager.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_inhibit_device().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_manager_inhibit_device().
+ *
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_inhibit_device_finish (MMManager     *manager,
+                                  GAsyncResult  *res,
+                                  GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
+    return common_inhibit_device_finish (manager, res, error);
+}
+
+/**
+ * mm_manager_inhibit_device:
+ * @manager: A #MMManager.
+ * @uid: the unique ID of the physical device.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to add an inhibition on the device identified by @uid.
+ *
+ * The @uid must be the unique ID retrieved from an existing #MMModem using
+ * mm_modem_get_device(). The caller should keep track of this @uid and use it
+ * in the mm_manager_uninhibit_device() call when the inhibition is no longer required.
+ *
+ * The inhibition added with this method may also be automatically removed when
+ * the caller program disappears from the bus (e.g. if the program ends before
+ * having called mm_manager_uninhibit_device() explicitly).
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_manager_inhibit_device_finish() to get the result of the operation.
+ *
+ * See mm_manager_inhibit_device_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_manager_inhibit_device (MMManager           *manager,
+                           const gchar         *uid,
+                           GCancellable        *cancellable,
+                           GAsyncReadyCallback  callback,
+                           gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MANAGER (manager));
+    common_inhibit_device (manager, uid, TRUE, cancellable, callback, user_data);
+}
+
+/**
+ * mm_manager_inhibit_device_sync:
+ * @manager: A #MMManager.
+ * @uid: the unique ID of the physical device.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to add an inhibition on the device identified by @uid.
+ *
+ * The @uid must be the unique ID retrieved from an existing #MMModem using
+ * mm_modem_get_device(). The caller should keep track of this @uid and use it
+ * in the mm_manager_uninhibit_device_sync() call when the inhibition is no longer required.
+ *
+ * The inhibition added with this method may also be automatically removed when
+ * the caller program disappears from the bus (e.g. if the program ends before
+ * having called mm_manager_uninhibit_device_sync() explicitly).
+ *
+ * See mm_manager_inhibit_device() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_inhibit_device_sync (MMManager     *manager,
+                                const gchar   *uid,
+                                GCancellable  *cancellable,
+                                GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
+    return common_inhibit_device_sync (manager, uid, TRUE, cancellable, error);
+}
+
+/**
+ * mm_manager_uninhibit_device_finish:
+ * @manager: A #MMManager.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_uninhibit_device().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_manager_uninhibit_device().
+ *
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_uninhibit_device_finish (MMManager     *manager,
+                                    GAsyncResult  *res,
+                                    GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
+    return common_inhibit_device_finish (manager, res, error);
+}
+
+/**
+ * mm_manager_uninhibit_device:
+ * @manager: A #MMManager.
+ * @uid: the unique ID of the physical device.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to remove an inhibition on the device identified by @uid.
+ *
+ * The @uid must be the same unique ID that was sent in the inhibition request.
+ *
+ * Only the same program that placed an inhibition on a given device is able to remove
+ * the inhibition.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_manager_uninhibit_device_finish() to get the result of the operation.
+ *
+ * See mm_manager_uninhibit_device_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_manager_uninhibit_device (MMManager           *manager,
+                             const gchar         *uid,
+                             GCancellable        *cancellable,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MANAGER (manager));
+    common_inhibit_device (manager, uid, FALSE, cancellable, callback, user_data);
+}
+
+/**
+ * mm_manager_uninhibit_device_sync:
+ * @manager: A #MMManager.
+ * @uid: the unique ID of the physical device.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to remove an inhibition on the device identified by @uid.
+ *
+ * The @uid must be the same unique ID that was sent in the inhibition request.
+ *
+ * Only the same program that placed an inhibition on a given device is able to remove
+ * the inhibition.
+ *
+ * See mm_manager_uninhibit_device() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ */
+gboolean
+mm_manager_uninhibit_device_sync (MMManager     *manager,
+                                  const gchar   *uid,
+                                  GCancellable  *cancellable,
+                                  GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MANAGER (manager), FALSE);
+    return common_inhibit_device_sync (manager, uid, FALSE, cancellable, error);
+}
+
+/*****************************************************************************/
+
 static void
 register_dbus_errors (void)
 {

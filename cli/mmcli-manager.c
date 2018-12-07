@@ -56,6 +56,7 @@ static gboolean list_modems_flag;
 static gboolean monitor_modems_flag;
 static gboolean scan_modems_flag;
 static gchar *set_logging_str;
+static gchar *inhibit_device_str;
 static gchar *report_kernel_event_str;
 
 #if defined WITH_UDEV
@@ -82,6 +83,10 @@ static GOptionEntry entries[] = {
     { "scan-modems", 'S', 0, G_OPTION_ARG_NONE, &scan_modems_flag,
       "Request to re-scan looking for modems",
       NULL
+    },
+    { "inhibit-device", 'I', 0, G_OPTION_ARG_STRING, &inhibit_device_str,
+      "Inhibit device given a unique device identifier",
+      "[UID]"
     },
     { "report-kernel-event", 'K', 0, G_OPTION_ARG_STRING, &report_kernel_event_str,
       "Report kernel event",
@@ -126,6 +131,7 @@ mmcli_manager_options_enabled (void)
                  monitor_modems_flag +
                  scan_modems_flag +
                  !!set_logging_str +
+                 !!inhibit_device_str +
                  !!report_kernel_event_str);
 
 #if defined WITH_UDEV
@@ -145,7 +151,8 @@ mmcli_manager_options_enabled (void)
             exit (EXIT_FAILURE);
         }
         mmcli_force_async_operation ();
-    }
+    } else if (inhibit_device_str)
+        mmcli_force_async_operation ();
 
 #if defined WITH_UDEV
     if (report_kernel_event_auto_scan)
@@ -178,6 +185,41 @@ void
 mmcli_manager_shutdown (void)
 {
     context_free (ctx);
+}
+
+static void
+inhibition_cancelled (GCancellable *cancellable)
+{
+    GError *error = NULL;
+
+    if (!mm_manager_uninhibit_device_sync (ctx->manager, inhibit_device_str, NULL, &error)) {
+        g_printerr ("error: couldn't uninhibit device: '%s'\n",
+                    error ? error->message : "unknown error");
+    } else
+        g_print ("successfully uninhibited device with uid '%s'\n", inhibit_device_str);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+inhibit_device_ready (MMManager    *manager,
+                      GAsyncResult *result)
+{
+    GError *error = NULL;
+
+    if (!mm_manager_inhibit_device_finish (manager, result, &error)) {
+        g_printerr ("error: couldn't inhibit device: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully inhibited device with uid '%s'\n", inhibit_device_str);
+    g_print ("type Ctrl+C to abort this program and remove the inhibition\n");
+
+    g_cancellable_connect (ctx->cancellable,
+                           G_CALLBACK (inhibition_cancelled),
+                           NULL,
+                           NULL);
 }
 
 static void
@@ -460,6 +502,16 @@ get_manager_ready (GObject      *source,
     if (list_modems_flag) {
         list_current_modems (ctx->manager);
         mmcli_async_operation_done ();
+        return;
+    }
+
+    /* Request to inhibit device? */
+    if (inhibit_device_str) {
+        mm_manager_inhibit_device (ctx->manager,
+                                   inhibit_device_str,
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)inhibit_device_ready,
+                                   NULL);
         return;
     }
 

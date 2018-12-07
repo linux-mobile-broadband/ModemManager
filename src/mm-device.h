@@ -38,6 +38,7 @@ typedef struct _MMDevicePrivate MMDevicePrivate;
 #define MM_DEVICE_MODEM      "modem"
 #define MM_DEVICE_HOTPLUGGED "hotplugged"
 #define MM_DEVICE_VIRTUAL    "virtual"
+#define MM_DEVICE_INHIBITED  "inhibited"
 
 #define MM_DEVICE_PORT_GRABBED  "port-grabbed"
 #define MM_DEVICE_PORT_RELEASED "port-released"
@@ -77,6 +78,17 @@ gboolean mm_device_create_modem (MMDevice                  *self,
                                  GError                   **error);
 void     mm_device_remove_modem (MMDevice *self);
 
+void     mm_device_inhibit        (MMDevice                  *self,
+                                   GAsyncReadyCallback        callback,
+                                   gpointer                   user_data);
+gboolean mm_device_inhibit_finish (MMDevice                  *self,
+                                   GAsyncResult              *res,
+                                   GError                   **error);
+gboolean mm_device_uninhibit      (MMDevice                  *self,
+                                   GDBusObjectManagerServer  *object_manager,
+                                   GError                   **error);
+
+
 const gchar     *mm_device_get_uid              (MMDevice       *self);
 const gchar    **mm_device_get_drivers          (MMDevice       *self);
 guint16          mm_device_get_vendor           (MMDevice       *self);
@@ -94,6 +106,7 @@ GObject         *mm_device_get_port_probe       (MMDevice       *self,
 GList           *mm_device_peek_port_probe_list (MMDevice       *self);
 GList           *mm_device_get_port_probe_list  (MMDevice       *self);
 gboolean         mm_device_get_hotplugged       (MMDevice       *self);
+gboolean         mm_device_get_inhibited        (MMDevice       *self);
 
 /* For testing purposes */
 void          mm_device_virtual_grab_ports (MMDevice     *self,

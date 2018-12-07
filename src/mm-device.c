@@ -36,6 +36,7 @@ enum {
     PROP_MODEM,
     PROP_HOTPLUGGED,
     PROP_VIRTUAL,
+    PROP_INHIBITED,
     PROP_LAST
 };
 
@@ -78,6 +79,9 @@ struct _MMDevicePrivate {
 
     /* Whether the device was hot-plugged. */
     gboolean hotplugged;
+
+    /* Whether the device is inhibited. */
+    gboolean inhibited;
 
     /* Virtual ports */
     gchar **virtual_ports;
@@ -370,6 +374,12 @@ mm_device_create_modem (MMDevice                  *self,
     g_assert (self->priv->modem == NULL);
     g_assert (self->priv->object_manager == NULL);
 
+    if (self->priv->inhibited) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Device is inhibited");
+        return FALSE;
+    }
+
     if (!self->priv->virtual) {
         if (!self->priv->port_probes) {
             g_set_error (error,
@@ -520,6 +530,85 @@ mm_device_get_hotplugged (MMDevice *self)
     return self->priv->hotplugged;
 }
 
+gboolean
+mm_device_get_inhibited (MMDevice *self)
+{
+    return self->priv->inhibited;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_device_inhibit_finish (MMDevice      *self,
+                          GAsyncResult  *res,
+                          GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+inhibit_disable_ready (MMBaseModem  *modem,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMDevice *self;
+    GError   *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    if (!mm_base_modem_disable_finish (modem, res, &error))
+        g_task_return_error (task, error);
+    else {
+        g_cancellable_cancel (mm_base_modem_peek_cancellable (modem));
+        mm_device_remove_modem (self);
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+}
+
+void
+mm_device_inhibit (MMDevice            *self,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* We want to allow inhibiting only devices that are currently
+     * exported in the bus, because otherwise we may be inhibiting
+     * in the middle of port probing and that may lead to some ports
+     * tracked inside the device object during inhibition and some
+     * other ports tracked in the base manager. So, if the device
+     * does not have a valid modem created and exposed, do not allow
+     * the inhibition. */
+    if (!self->priv->modem || !g_dbus_object_get_object_path (G_DBUS_OBJECT (self->priv->modem))) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Modem not exported in the bus");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Flag as inhibited right away */
+    g_assert (!self->priv->inhibited);
+    self->priv->inhibited = TRUE;
+
+    /* Make sure modem is disabled while inhibited */
+    mm_base_modem_disable (self->priv->modem,
+                           (GAsyncReadyCallback)inhibit_disable_ready,
+                           task);
+}
+
+gboolean
+mm_device_uninhibit (MMDevice                  *self,
+                     GDBusObjectManagerServer  *object_manager,
+                     GError                   **error)
+{
+    g_assert (self->priv->inhibited);
+    self->priv->inhibited = FALSE;
+    return mm_device_create_modem (self, object_manager, error);
+}
+
 /*****************************************************************************/
 
 void
@@ -602,6 +691,9 @@ set_property (GObject *object,
     case PROP_VIRTUAL:
         self->priv->virtual = g_value_get_boolean (value);
         break;
+    case PROP_INHIBITED:
+        self->priv->inhibited = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -631,6 +723,9 @@ get_property (GObject *object,
         break;
     case PROP_VIRTUAL:
         g_value_set_boolean (value, self->priv->virtual);
+        break;
+    case PROP_INHIBITED:
+        g_value_set_boolean (value, self->priv->inhibited);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -718,6 +813,14 @@ mm_device_class_init (MMDeviceClass *klass)
                               FALSE,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_VIRTUAL, properties[PROP_VIRTUAL]);
+
+    properties[PROP_INHIBITED] =
+        g_param_spec_boolean (MM_DEVICE_INHIBITED,
+                              "Inhibited",
+                              "Whether the modem is inhibited",
+                              FALSE,
+                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_INHIBITED, properties[PROP_INHIBITED]);
 
     signals[SIGNAL_PORT_GRABBED] =
         g_signal_new (MM_DEVICE_PORT_GRABBED,

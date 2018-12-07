@@ -87,6 +87,8 @@ struct _MMBaseManagerPrivate {
     GHashTable *devices;
     /* The Object Manager server */
     GDBusObjectManagerServer *object_manager;
+    /* The map of inhibited devices */
+    GHashTable *inhibited_devices;
 
     /* The Test interface support */
     MmGdbusTest *test_skeleton;
@@ -205,6 +207,15 @@ device_support_check_ready (MMPluginManager          *plugin_manager,
     find_device_support_context_free (ctx);
 }
 
+static gboolean is_device_inhibited           (MMBaseManager  *self,
+                                               const gchar    *physdev_uid);
+static void     device_inhibited_track_port   (MMBaseManager  *self,
+                                               const gchar    *physdev_uid,
+                                               MMKernelDevice *port,
+                                               gboolean        manual_scan);
+static void     device_inhibited_untrack_port (MMBaseManager  *self,
+                                               MMKernelDevice *port);
+
 static void
 device_removed (MMBaseManager  *self,
                 MMKernelDevice *kernel_device)
@@ -246,8 +257,14 @@ device_removed (MMBaseManager  *self,
                 }
             }
             g_object_unref (device);
+            return;
         }
 
+        /* If the device was inhibited and the port is gone, untrack it.
+         * This is only needed for ports that were tracked out of device objects.
+         * In this case we don't rely on the physdev uid, as API-reported
+         * remove kernel events may not include uid. */
+        device_inhibited_untrack_port (self, kernel_device);
         return;
     }
 
@@ -318,6 +335,20 @@ device_added (MMBaseManager  *manager,
         return;
     }
 
+    /* Get the port's physical device's uid. All ports of the same physical
+     * device will share the same uid. */
+    physdev_uid = mm_kernel_device_get_physdev_uid (port);
+    g_assert (physdev_uid);
+
+    /* If the device is inhibited, do nothing else */
+    if (is_device_inhibited (manager, physdev_uid)) {
+        /* Note: we will not report as hotplugged an inhibited device port
+         * because we don't know what was done with the port out of our
+         * context. */
+        device_inhibited_track_port (manager, physdev_uid, port, manual_scan);
+        return;
+    }
+
     /* Run port filter */
     if (!mm_filter_port (manager->priv->filter, port, manual_scan))
         return;
@@ -327,11 +358,6 @@ device_added (MMBaseManager  *manager,
         mm_dbg ("(%s/%s): port already added", subsys, name);
         return;
     }
-
-    /* Get the port's physical device's uid. All ports of the same physical
-     * device will share the same uid. */
-    physdev_uid = mm_kernel_device_get_physdev_uid (port);
-    g_assert (physdev_uid);
 
     /* See if we already created an object to handle ports in this device */
     device = find_device_by_physdev_uid (manager, physdev_uid);
@@ -899,6 +925,333 @@ handle_report_kernel_event (MmGdbusOrgFreedesktopModemManager1 *manager,
 }
 
 /*****************************************************************************/
+/* Inhibit or uninhibit device */
+
+typedef struct {
+    MMKernelDevice *kernel_port;
+    gboolean        manual_scan;
+} InhibitedDevicePortInfo;
+
+static void
+inhibited_device_port_info_free (InhibitedDevicePortInfo *port_info)
+{
+    g_object_unref (port_info->kernel_port);
+    g_slice_free (InhibitedDevicePortInfo, port_info);
+}
+
+typedef struct {
+    gchar           *sender;
+    guint            name_lost_id;
+    GList           *port_infos;
+} InhibitedDeviceInfo;
+
+static void
+inhibited_device_info_free (InhibitedDeviceInfo *info)
+{
+    g_list_free_full (info->port_infos, (GDestroyNotify)inhibited_device_port_info_free);
+    g_bus_unwatch_name (info->name_lost_id);
+    g_free (info->sender);
+    g_slice_free (InhibitedDeviceInfo, info);
+}
+
+static InhibitedDeviceInfo *
+find_inhibited_device_info_by_physdev_uid (MMBaseManager *self,
+                                           const gchar   *physdev_uid)
+{
+    return (physdev_uid ? g_hash_table_lookup (self->priv->inhibited_devices, physdev_uid) : NULL);
+}
+
+static gboolean
+is_device_inhibited (MMBaseManager *self,
+                     const gchar   *physdev_uid)
+{
+    return !!find_inhibited_device_info_by_physdev_uid (self, physdev_uid);
+}
+
+static void
+device_inhibited_untrack_port (MMBaseManager  *self,
+                               MMKernelDevice *kernel_port)
+{
+    GHashTableIter       iter;
+    gchar               *uid;
+    InhibitedDeviceInfo *info;
+
+    g_hash_table_iter_init (&iter, self->priv->inhibited_devices);
+    while (g_hash_table_iter_next (&iter, (gpointer)&uid, (gpointer)&info)) {
+        GList *l;
+
+        for (l = info->port_infos; l; l = g_list_next (l)) {
+            InhibitedDevicePortInfo *port_info;
+
+            port_info = (InhibitedDevicePortInfo *)(l->data);
+            if (mm_kernel_device_cmp (port_info->kernel_port, kernel_port)) {
+                mm_dbg ("(%s/%s): released while inhibited",
+                        mm_kernel_device_get_subsystem (kernel_port),
+                        mm_kernel_device_get_name (kernel_port));
+                inhibited_device_port_info_free (port_info);
+                info->port_infos = g_list_delete_link (info->port_infos, l);
+                return;
+            }
+        }
+    }
+}
+
+static void
+device_inhibited_track_port (MMBaseManager  *self,
+                             const gchar    *physdev_uid,
+                             MMKernelDevice *kernel_port,
+                             gboolean        manual_scan)
+{
+    InhibitedDevicePortInfo *port_info;
+    InhibitedDeviceInfo     *info;
+    GList                   *l;
+
+    info = find_inhibited_device_info_by_physdev_uid (self, physdev_uid);
+    g_assert (info);
+
+    for (l = info->port_infos; l; l = g_list_next (l)) {
+        /* If device is already tracked, just overwrite the manual scan info */
+        port_info = (InhibitedDevicePortInfo *)(l->data);
+        if (mm_kernel_device_cmp (port_info->kernel_port, kernel_port)) {
+            port_info->manual_scan = manual_scan;
+            return;
+        }
+    }
+
+    mm_dbg ("(%s/%s): added while inhibited",
+            mm_kernel_device_get_subsystem (kernel_port),
+            mm_kernel_device_get_name (kernel_port));
+
+    port_info = g_slice_new0 (InhibitedDevicePortInfo);
+    port_info->kernel_port = g_object_ref (kernel_port);
+    port_info->manual_scan = manual_scan;
+    info->port_infos = g_list_append (info->port_infos, port_info);
+}
+
+typedef struct {
+    MMBaseManager *self;
+    gchar         *uid;
+} InhibitSenderLostContext;
+
+static void
+inhibit_sender_lost_context_free (InhibitSenderLostContext *lost_ctx)
+{
+    g_free (lost_ctx->uid);
+    g_slice_free (InhibitSenderLostContext, lost_ctx);
+}
+
+static void
+remove_device_inhibition (MMBaseManager *self,
+                          const gchar   *uid)
+{
+    InhibitedDeviceInfo *info;
+    MMDevice            *device;
+    GList               *port_infos;
+
+    info = find_inhibited_device_info_by_physdev_uid (self, uid);
+    g_assert (info);
+
+    device = find_device_by_physdev_uid (self, uid);
+    port_infos = info->port_infos;
+    info->port_infos = NULL;
+    g_hash_table_remove (self->priv->inhibited_devices, uid);
+
+    if (port_infos) {
+        GList *l;
+
+        /* Note that a device can only be inhibited if it had an existing
+         * modem exposed in the bus. And so, inhibition can only be placed
+         * AFTER all port probes have finished for a given device. This means
+         * that we either have a device tracked, or we have a list of port
+         * infos. Both at the same time should never happen. */
+        g_assert (!device);
+
+        /* Report as added all port infos that we had tracked while the
+         * device was inhibited. We can only report the added port after
+         * having removed the entry from the inhibited devices tracking
+         * table. */
+        for (l = port_infos; l; l = g_list_next (l)) {
+            InhibitedDevicePortInfo *port_info;
+
+            port_info = (InhibitedDevicePortInfo *)(l->data);
+            device_added (self, port_info->kernel_port, FALSE, port_info->manual_scan);
+        }
+        g_list_free_full (port_infos, (GDestroyNotify)inhibited_device_port_info_free);
+    }
+    /* The device may be totally gone from the system while we were
+     * keeping the inhibition, so do not error out if not found. */
+    else if (device) {
+        GError *error = NULL;
+
+        /* Uninhibit device, which will create and expose the modem object */
+        if (!mm_device_uninhibit (device, self->priv->object_manager, &error)) {
+            mm_warn ("Couldn't uninhibit device: %s", error->message);
+            g_error_free (error);
+        }
+    }
+}
+
+static void
+inhibit_sender_lost (GDBusConnection          *connection,
+                     const gchar              *sender_name,
+                     InhibitSenderLostContext *lost_ctx)
+{
+    mm_info ("Device inhibition teardown for uid '%s' (owner disappeared from bus)", lost_ctx->uid);
+    remove_device_inhibition (lost_ctx->self, lost_ctx->uid);
+}
+
+typedef struct {
+    MMBaseManager         *self;
+    GDBusMethodInvocation *invocation;
+    gchar                 *uid;
+    gboolean               inhibit;
+} InhibitDeviceContext;
+
+static void
+inhibit_device_context_free (InhibitDeviceContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx->uid);
+    g_slice_free (InhibitDeviceContext, ctx);
+}
+
+static void
+device_inhibit_ready (MMDevice             *device,
+                      GAsyncResult         *res,
+                      InhibitDeviceContext *ctx)
+{
+    InhibitSenderLostContext *lost_ctx;
+    InhibitedDeviceInfo      *info;
+    GError                   *error = NULL;
+
+    if (!mm_device_inhibit_finish (device, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        inhibit_device_context_free (ctx);
+        return;
+    }
+
+    info = g_slice_new0 (InhibitedDeviceInfo);
+    info->sender = g_strdup (g_dbus_method_invocation_get_sender (ctx->invocation));
+
+    /* This context will exist as long as the sender name watcher exists,
+     * i.e. as long as the associated InhibitDeviceInfo exists. We don't need
+     * an extra reference of self here because these contexts are stored within
+     * self, and therefore bound to its lifetime. */
+    lost_ctx = g_slice_new0 (InhibitSenderLostContext);
+    lost_ctx->self = ctx->self;
+    lost_ctx->uid = g_strdup (ctx->uid);
+    info->name_lost_id = g_bus_watch_name_on_connection (g_dbus_method_invocation_get_connection (ctx->invocation),
+                                                         info->sender,
+                                                         G_BUS_NAME_WATCHER_FLAGS_NONE,
+                                                         NULL,
+                                                         (GBusNameVanishedCallback)inhibit_sender_lost,
+                                                         lost_ctx,
+                                                         (GDestroyNotify)inhibit_sender_lost_context_free);
+
+    g_hash_table_insert (ctx->self->priv->inhibited_devices, g_strdup (ctx->uid), info);
+
+    mm_info ("Device inhibition setup for uid '%s'", ctx->uid);
+
+    mm_gdbus_org_freedesktop_modem_manager1_complete_inhibit_device (
+        MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
+        ctx->invocation);
+    inhibit_device_context_free (ctx);
+}
+
+static void
+base_manager_inhibit_device (InhibitDeviceContext *ctx)
+{
+    MMDevice *device;
+
+    device = find_device_by_physdev_uid (ctx->self, ctx->uid);
+    if (!device) {
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                               "No device found with uid '%s'", ctx->uid);
+        inhibit_device_context_free (ctx);
+        return;
+    }
+
+    if (mm_device_get_inhibited (device)) {
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
+                                               "Device '%s' is already inhibited", ctx->uid);
+        inhibit_device_context_free (ctx);
+        return;
+    }
+
+    mm_device_inhibit (device,
+                       (GAsyncReadyCallback) device_inhibit_ready,
+                       ctx);
+}
+
+static void
+base_manager_uninhibit_device (InhibitDeviceContext *ctx)
+{
+    InhibitedDeviceInfo *info;
+    const gchar         *sender;
+
+    /* Validate uninhibit request */
+    sender = g_dbus_method_invocation_get_sender (ctx->invocation);
+    info = find_inhibited_device_info_by_physdev_uid (ctx->self, ctx->uid);
+    if (!info || (g_strcmp0 (info->sender, sender) != 0)) {
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                               "No inhibition found for uid '%s'", ctx->uid);
+        inhibit_device_context_free (ctx);
+        return;
+    }
+
+    mm_info ("Device inhibition teardown for uid '%s'", ctx->uid);
+    remove_device_inhibition (ctx->self, ctx->uid);
+
+    mm_gdbus_org_freedesktop_modem_manager1_complete_inhibit_device (
+        MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
+        ctx->invocation);
+    inhibit_device_context_free (ctx);
+}
+
+static void
+inhibit_device_auth_ready (MMAuthProvider       *authp,
+                           GAsyncResult         *res,
+                           InhibitDeviceContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_auth_provider_authorize_finish (authp, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        inhibit_device_context_free (ctx);
+        return;
+    }
+
+    if (ctx->inhibit)
+        base_manager_inhibit_device (ctx);
+    else
+        base_manager_uninhibit_device (ctx);
+}
+
+static gboolean
+handle_inhibit_device (MmGdbusOrgFreedesktopModemManager1 *manager,
+                       GDBusMethodInvocation              *invocation,
+                       const gchar                        *uid,
+                       gboolean                            inhibit)
+{
+    InhibitDeviceContext *ctx;
+
+    ctx = g_new0 (InhibitDeviceContext, 1);
+    ctx->self = g_object_ref (manager);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->uid = g_strdup (uid);
+    ctx->inhibit = inhibit;
+
+    mm_auth_provider_authorize (ctx->self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_MANAGER_CONTROL,
+                                ctx->self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)inhibit_device_auth_ready,
+                                ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Test profile setup */
 
 static gboolean
@@ -1092,6 +1445,9 @@ mm_base_manager_init (MMBaseManager *manager)
     /* Setup internal lists of device objects */
     priv->devices = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
+    /* Setup internal list of inhibited devices */
+    priv->inhibited_devices = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify)inhibited_device_info_free);
+
 #if defined WITH_UDEV
     {
         const gchar *subsys[5] = { "tty", "net", "usb", "usbmisc", NULL };
@@ -1111,17 +1467,11 @@ mm_base_manager_init (MMBaseManager *manager)
     priv->object_manager = g_dbus_object_manager_server_new (MM_DBUS_PATH);
 
     /* Enable processing of input DBus messages */
-    g_signal_connect (manager,
-                      "handle-set-logging",
-                      G_CALLBACK (handle_set_logging),
-                      NULL);
-    g_signal_connect (manager,
-                      "handle-scan-devices",
-                      G_CALLBACK (handle_scan_devices),
-                      NULL);
-    g_signal_connect (manager,
-                      "handle-report-kernel-event",
-                      G_CALLBACK (handle_report_kernel_event),
+    g_object_connect (manager,
+                      "signal::handle-set-logging",         G_CALLBACK (handle_set_logging),         NULL,
+                      "signal::handle-scan-devices",        G_CALLBACK (handle_scan_devices),        NULL,
+                      "signal::handle-report-kernel-event", G_CALLBACK (handle_report_kernel_event), NULL,
+                      "signal::handle-inhibit-device",      G_CALLBACK (handle_inhibit_device),      NULL,
                       NULL);
 }
 
@@ -1185,6 +1535,7 @@ finalize (GObject *object)
     g_free (priv->initial_kernel_events);
     g_free (priv->plugin_dir);
 
+    g_hash_table_destroy (priv->inhibited_devices);
     g_hash_table_destroy (priv->devices);
 
 #if defined WITH_UDEV

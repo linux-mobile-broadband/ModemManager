@@ -128,6 +128,32 @@ gboolean mm_manager_report_kernel_event_sync   (MMManager                *manage
                                                 GCancellable             *cancellable,
                                                 GError                  **error);
 
+void     mm_manager_inhibit_device        (MMManager           *manager,
+                                           const gchar         *uid,
+                                           GCancellable        *cancellable,
+                                           GAsyncReadyCallback  callback,
+                                           gpointer             user_data);
+gboolean mm_manager_inhibit_device_finish (MMManager           *manager,
+                                           GAsyncResult        *res,
+                                           GError             **error);
+gboolean mm_manager_inhibit_device_sync   (MMManager           *manager,
+                                           const gchar         *uid,
+                                           GCancellable        *cancellable,
+                                           GError             **error);
+
+void     mm_manager_uninhibit_device        (MMManager           *manager,
+                                             const gchar         *uid,
+                                             GCancellable        *cancellable,
+                                             GAsyncReadyCallback  callback,
+                                             gpointer             user_data);
+gboolean mm_manager_uninhibit_device_finish (MMManager           *manager,
+                                             GAsyncResult        *res,
+                                             GError             **error);
+gboolean mm_manager_uninhibit_device_sync   (MMManager           *manager,
+                                             const gchar         *uid,
+                                             GCancellable        *cancellable,
+                                             GError             **error);
+
 G_END_DECLS
 
 #endif /* _MM_MANAGER_H_ */

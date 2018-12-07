@@ -107,6 +107,27 @@
     </method>
 
     <!--
+        InhibitDevice:
+        @uid: the unique ID of the physical device, given in the
+              #org.freedesktop.ModemManager1.Modem:Device property.
+        @inhibit: %TRUE to inhibit the modem and %FALSE to uninhibit it.
+
+        Inhibit or uninhibit the device.
+
+        When the modem is inhibited ModemManager will close all its ports and
+        unexport it from the bus, so that users of the interface are no longer
+        able to operate with it.
+
+        This operation binds the inhibition request to the existence of the
+        caller in the DBus bus. If the caller disappears from the bus, the
+        inhibition will automatically removed.
+    -->
+    <method name="InhibitDevice">
+      <arg name="uid"     type="s" direction="in" />
+      <arg name="inhibit" type="b" direction="in" />
+    </method>
+
+    <!--
         Version:
 
         The runtime version of the ModemManager daemon.
