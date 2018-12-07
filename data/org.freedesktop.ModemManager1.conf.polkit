@@ -234,7 +234,7 @@
 
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Call"
-           send_member="SendTone"/>
+           send_member="SendDtmf"/>
 
     <!-- org.freedesktop.ModemManager1.Modem.Signal.xml -->
 
