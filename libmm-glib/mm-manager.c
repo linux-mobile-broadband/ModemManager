@@ -406,7 +406,7 @@ scan_devices_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
 {
     GError *error = NULL;
 
-    if (mm_gdbus_org_freedesktop_modem_manager1_call_scan_devices_finish (
+    if (!mm_gdbus_org_freedesktop_modem_manager1_call_scan_devices_finish (
             manager_iface_proxy,
             res,
             &error))
