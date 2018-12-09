@@ -1075,7 +1075,17 @@ pkglib_LTLIBRARIES += libmm-plugin-quectel.la
 libmm_plugin_quectel_la_SOURCES = \
 	quectel/mm-plugin-quectel.c \
 	quectel/mm-plugin-quectel.h \
+	quectel/mm-shared-quectel.c \
+	quectel/mm-shared-quectel.h \
+	quectel/mm-broadband-modem-quectel.c \
+	quectel/mm-broadband-modem-quectel.h \
 	$(NULL)
+if WITH_QMI
+libmm_plugin_quectel_la_SOURCES += \
+	quectel/mm-broadband-modem-qmi-quectel.c \
+	quectel/mm-broadband-modem-qmi-quectel.h \
+	$(NULL)
+endif
 libmm_plugin_quectel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_quectel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 

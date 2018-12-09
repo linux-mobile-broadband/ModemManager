@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2017 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2017-2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <stdlib.h>
@@ -21,10 +21,10 @@
 
 #include "mm-log.h"
 #include "mm-plugin-quectel.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-quectel.h"
 
 #if defined WITH_QMI
-#include "mm-broadband-modem-qmi.h"
+#include "mm-broadband-modem-qmi-quectel.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginQuectel, mm_plugin_quectel, MM_TYPE_PLUGIN)
@@ -46,19 +46,19 @@ create_modem (MMPlugin     *self,
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_dbg ("QMI-powered Quectel modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_quectel_new (uid,
+                                                                  drivers,
+                                                                  mm_plugin_get_name (self),
+                                                                  vendor,
+                                                                  product));
+    }
+#endif
+
+    return MM_BASE_MODEM (mm_broadband_modem_quectel_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
                                                           vendor,
                                                           product));
-    }
-#endif
-
-    return MM_BASE_MODEM (mm_broadband_modem_new (uid,
-                                                  drivers,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
 }
 
 /*****************************************************************************/
