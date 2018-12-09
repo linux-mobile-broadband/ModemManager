@@ -34,14 +34,6 @@ typedef struct _MMIfaceModemFirmware MMIfaceModemFirmware;
 struct _MMIfaceModemFirmware {
     GTypeInterface g_iface;
 
-    /* Check for Firmware support (async) */
-    void (* check_support) (MMIfaceModemFirmware *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data);
-    gboolean (* check_support_finish) (MMIfaceModemFirmware *self,
-                                       GAsyncResult *res,
-                                       GError **error);
-
     /* Get update settings (async) */
     void                       (* load_update_settings)        (MMIfaceModemFirmware  *self,
                                                                 GAsyncReadyCallback    callback,

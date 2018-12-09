@@ -123,6 +123,7 @@ struct _MMBroadbandModemQmiPrivate {
     guint oma_event_report_indication_id;
 
     /* Firmware helpers */
+    gboolean firmware_list_preloaded;
     GList *firmware_list;
     MMFirmwareProperties *current_firmware;
 
@@ -7021,10 +7022,10 @@ oma_enable_unsolicited_events (MMIfaceModemOma *self,
 /* Check firmware support (Firmware interface) */
 
 typedef struct {
-    gchar *build_id;
-    GArray *modem_unique_id;
-    GArray *pri_unique_id;
-    gboolean current;
+    gchar    *build_id;
+    GArray   *modem_unique_id;
+    GArray   *pri_unique_id;
+    gboolean  current;
 } FirmwarePair;
 
 static void
@@ -7040,20 +7041,20 @@ typedef struct {
     QmiClientDms *client;
     GList *pairs;
     GList *l;
-} FirmwareCheckSupportContext;
+} FirmwareListPreloadContext;
 
 static void
-firmware_check_support_context_free (FirmwareCheckSupportContext *ctx)
+firmware_list_preload_context_free (FirmwareListPreloadContext *ctx)
 {
     g_list_free_full (ctx->pairs, (GDestroyNotify)firmware_pair_free);
     g_object_unref (ctx->client);
-    g_slice_free (FirmwareCheckSupportContext, ctx);
+    g_slice_free (FirmwareListPreloadContext, ctx);
 }
 
 static gboolean
-firmware_check_support_finish (MMIfaceModemFirmware *self,
-                               GAsyncResult *res,
-                               GError **error)
+firmware_list_preload_finish (MMBroadbandModemQmi  *self,
+                              GAsyncResult         *res,
+                              GError              **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -7066,7 +7067,7 @@ get_pri_image_info_ready (QmiClientDms *client,
                           GTask *task)
 {
     MMBroadbandModemQmi *self;
-    FirmwareCheckSupportContext *ctx;
+    FirmwareListPreloadContext *ctx;
     QmiMessageDmsGetStoredImageInfoOutput *output;
     GError *error = NULL;
     FirmwarePair *current;
@@ -7165,7 +7166,7 @@ static void
 get_next_image_info (GTask *task)
 {
     MMBroadbandModemQmi *self;
-    FirmwareCheckSupportContext *ctx;
+    FirmwareListPreloadContext *ctx;
     QmiMessageDmsGetStoredImageInfoInputImage image_id;
     QmiMessageDmsGetStoredImageInfoInput *input;
     FirmwarePair *current;
@@ -7231,7 +7232,7 @@ list_stored_images_ready (QmiClientDms *client,
                           GAsyncResult *res,
                           GTask *task)
 {
-    FirmwareCheckSupportContext *ctx;
+    FirmwareListPreloadContext *ctx;
     GArray *array;
     gint pri_id;
     gint modem_id;
@@ -7286,10 +7287,9 @@ list_stored_images_ready (QmiClientDms *client,
     }
 
     if (pri_id < 0 || modem_id < 0) {
-        mm_warn ("We need both PRI (%s) and MODEM (%s) images. "
-                 "Assuming firmware unsupported.",
-                 pri_id < 0 ? "not found" : "found",
-                 modem_id < 0 ? "not found" : "found");
+        mm_dbg ("We need both PRI (%s) and MODEM (%s) images",
+                pri_id < 0 ? "not found" : "found",
+                modem_id < 0 ? "not found" : "found");
         g_task_return_boolean (task, FALSE);
         g_object_unref (task);
         qmi_message_dms_list_stored_images_output_unref (output);
@@ -7338,8 +7338,7 @@ list_stored_images_ready (QmiClientDms *client,
     }
 
     if (!ctx->pairs) {
-        mm_warn ("No valid PRI+MODEM pairs found. "
-                 "Assuming firmware unsupported.");
+        mm_dbg ("No valid PRI+MODEM pairs found");
         g_task_return_boolean (task, FALSE);
         g_object_unref (task);
         qmi_message_dms_list_stored_images_output_unref (output);
@@ -7354,26 +7353,24 @@ list_stored_images_ready (QmiClientDms *client,
 }
 
 static void
-firmware_check_support (MMIfaceModemFirmware *self,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
+firmware_list_preload (MMBroadbandModemQmi *self,
+                       GAsyncReadyCallback  callback,
+                       gpointer             user_data)
 {
-    FirmwareCheckSupportContext *ctx;
-    GTask *task;
-    QmiClient *client = NULL;
+    FirmwareListPreloadContext *ctx;
+    GTask                      *task;
+    QmiClient                  *client = NULL;
 
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
                                       QMI_SERVICE_DMS, &client,
                                       callback, user_data))
         return;
 
-    ctx = g_slice_new0 (FirmwareCheckSupportContext);
+    ctx = g_slice_new0 (FirmwareListPreloadContext);
     ctx->client = g_object_ref (client);
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task,
-                          ctx,
-                          (GDestroyNotify)firmware_check_support_context_free);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)firmware_list_preload_context_free);
 
     mm_dbg ("loading firmware images...");
     qmi_client_dms_list_stored_images (QMI_CLIENT_DMS (client),
@@ -7402,24 +7399,58 @@ firmware_load_list_finish (MMIfaceModemFirmware *self,
 }
 
 static void
-firmware_load_list (MMIfaceModemFirmware *_self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+firmware_load_list_preloaded (GTask *task)
 {
-    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GList *dup;
-    GTask *task;
+    MMBroadbandModemQmi *self;
+    GList               *dup;
 
-    /* We'll return the new list of new references we create here */
+    self = g_task_get_source_object (task);
+    g_assert (self->priv->firmware_list_preloaded);
+
     dup = g_list_copy_deep (self->priv->firmware_list, (GCopyFunc)g_object_ref, NULL);
-
-    task = g_task_new (self, NULL, callback, user_data);
     if (dup)
         g_task_return_pointer (task, dup, (GDestroyNotify)firmware_list_free);
     else
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
                                  "firmware list unknown");
     g_object_unref (task);
+}
+
+static void
+firmware_list_preload_ready (MMBroadbandModemQmi *self,
+                             GAsyncResult        *res,
+                             GTask               *task)
+{
+    GError *error = NULL;
+
+    if (!firmware_list_preload_finish (self, res, &error)) {
+        mm_dbg ("firmware list loading failed: %s", error ? error->message : "unsupported");
+        g_clear_error (&error);
+    }
+
+    firmware_load_list_preloaded (task);
+}
+
+static void
+firmware_load_list (MMIfaceModemFirmware *_self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->firmware_list_preloaded) {
+        firmware_load_list_preloaded (task);
+        return;
+    }
+
+    self->priv->firmware_list_preloaded = TRUE;
+    firmware_list_preload (self,
+                           (GAsyncReadyCallback)firmware_list_preload_ready,
+                           task);
 }
 
 /*****************************************************************************/
@@ -8766,8 +8797,6 @@ iface_modem_oma_init (MMIfaceModemOma *iface)
 static void
 iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 {
-    iface->check_support = firmware_check_support;
-    iface->check_support_finish = firmware_check_support_finish;
     iface->load_list = firmware_load_list;
     iface->load_list_finish = firmware_load_list_finish;
     iface->load_current = firmware_load_current;
