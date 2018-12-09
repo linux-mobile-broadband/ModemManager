@@ -32,14 +32,17 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
+#include "mm-iface-modem-firmware.h"
 #include "mm-broadband-modem-dell-dw5821e.h"
 
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 
 static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemDellDw5821e, mm_broadband_modem_dell_dw5821e, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
 typedef enum {
     FEATURE_SUPPORT_UNKNOWN,
@@ -50,6 +53,34 @@ typedef enum {
 struct _MMBroadbandModemDellDw5821ePrivate {
     FeatureSupport unmanaged_gps_support;
 };
+
+/*****************************************************************************/
+/* Firmware update settings */
+
+static MMFirmwareUpdateSettings *
+firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
+                                      GAsyncResult          *res,
+                                      GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+firmware_load_update_settings (MMIfaceModemFirmware *self,
+                               GAsyncReadyCallback   callback,
+                               gpointer              user_data)
+{
+    MMFirmwareUpdateSettings *update_settings;
+    GTask                    *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
+    mm_firmware_update_settings_set_fastboot_at (update_settings, "AT^FASTBOOT");
+
+    g_task_return_pointer (task, update_settings, g_object_unref);
+    g_object_unref (task);
+}
 
 /*****************************************************************************/
 /* Location capabilities loading (Location interface) */
@@ -310,6 +341,13 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->enable_location_gathering_finish = enable_location_gathering_finish;
     iface->disable_location_gathering = disable_location_gathering;
     iface->disable_location_gathering_finish = disable_location_gathering_finish;
+}
+
+static void
+iface_modem_firmware_init (MMIfaceModemFirmware *iface)
+{
+    iface->load_update_settings = firmware_load_update_settings;
+    iface->load_update_settings_finish = firmware_load_update_settings_finish;
 }
 
 static void
