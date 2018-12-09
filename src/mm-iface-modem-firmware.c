@@ -251,6 +251,7 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CHECK_SUPPORT,
     INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED,
+    INITIALIZATION_STEP_UPDATE_SETTINGS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -264,6 +265,37 @@ initialization_context_free (InitializationContext *ctx)
 {
     g_object_unref (ctx->skeleton);
     g_free (ctx);
+}
+
+static void
+load_update_settings_ready (MMIfaceModemFirmware *self,
+                            GAsyncResult         *res,
+                            GTask                *task)
+{
+    InitializationContext    *ctx;
+    MMFirmwareUpdateSettings *update_settings;
+    GError                   *error = NULL;
+    GVariant                 *variant = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    update_settings = MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_update_settings_finish (self, res, &error);
+    if (!update_settings) {
+        mm_dbg ("Couldn't load update settings: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        variant = mm_firmware_update_settings_get_variant (update_settings);
+        g_object_unref (update_settings);
+    }
+
+    mm_gdbus_modem_firmware_set_update_settings (ctx->skeleton, variant);
+
+    if (variant)
+        g_variant_unref (variant);
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
 }
 
 static void
@@ -358,6 +390,18 @@ interface_initialization_step (GTask *task)
                                      MM_CORE_ERROR_UNSUPPORTED,
                                      "Firmware interface not available");
             g_object_unref (task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_UPDATE_SETTINGS:
+        if (MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_update_settings &&
+            MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_update_settings_finish) {
+            MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_update_settings (
+                self,
+                (GAsyncReadyCallback)load_update_settings_ready,
+                task);
             return;
         }
         /* Fall down to next step */

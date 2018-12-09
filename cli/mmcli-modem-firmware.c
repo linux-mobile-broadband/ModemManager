@@ -45,10 +45,15 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
+static gboolean status_flag;
 static gboolean list_flag;
 static gchar *select_str;
 
 static GOptionEntry entries[] = {
+    { "firmware-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
+      "Show status of firmware management.",
+      NULL
+    },
     { "firmware-list", 0, 0, G_OPTION_ARG_NONE, &list_flag,
       "List firmware images installed in a given modem",
       NULL
@@ -84,13 +89,17 @@ mmcli_modem_firmware_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (list_flag +
+    n_actions = (status_flag +
+                 list_flag +
                  !!select_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Firmware actions requested\n");
         exit (EXIT_FAILURE);
     }
+
+    if (status_flag)
+        mmcli_force_sync_operation ();
 
     checked = TRUE;
     return !!n_actions;
@@ -128,6 +137,34 @@ void
 mmcli_modem_firmware_shutdown (void)
 {
     context_free (ctx);
+}
+
+static void
+print_firmware_status (void)
+{
+    MMFirmwareUpdateSettings *update_settings;
+    const gchar              *method = NULL;
+    const gchar              *fastboot_at = NULL;
+
+    update_settings = mm_modem_firmware_peek_update_settings (ctx->modem_firmware);
+    if (update_settings) {
+        MMModemFirmwareUpdateMethod m;
+
+        m = mm_firmware_update_settings_get_method (update_settings);
+        method = mm_modem_firmware_update_method_get_string (m);
+
+        switch (m) {
+        case MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT:
+            fastboot_at = mm_firmware_update_settings_get_fastboot_at (update_settings);
+            break;
+        default:
+            break;
+        }
+    }
+
+    mmcli_output_string (MMC_F_FIRMWARE_METHOD,      method);
+    mmcli_output_string (MMC_F_FIRMWARE_FASTBOOT_AT, fastboot_at);
+    mmcli_output_dump ();
 }
 
 static void
@@ -205,6 +242,9 @@ get_modem_ready (GObject      *source,
 
     ensure_modem_firmware ();
 
+    if (status_flag)
+        g_assert_not_reached ();
+
     /* Request to list images? */
     if (list_flag) {
         g_debug ("Asynchronously listing firmware images in modem...");
@@ -263,6 +303,13 @@ mmcli_modem_firmware_run_synchronous (GDBusConnection *connection)
         mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_firmware));
 
     ensure_modem_firmware ();
+
+    /* Request to get firmware status? */
+    if (status_flag) {
+        g_debug ("Printing firmware status...");
+        print_firmware_status ();
+        return;
+    }
 
     /* Request to list firmware images? */
     if (list_flag) {

@@ -1403,4 +1403,16 @@ typedef enum { /*< underscore_name=mm_call_direction >*/
     MM_CALL_DIRECTION_OUTGOING  = 2
 } MMCallDirection;
 
+/**
+ * MMModemFirmwareUpdateMethod:
+ * @MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN: Unknown method.
+ * @MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT: Device supports fastboot-based update.
+ *
+ * Type of firmware update method supported by the module.
+ */
+typedef enum { /*< underscore_name=mm_modem_firmware_update_method >*/
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT,
+} MMModemFirmwareUpdateMethod;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

@@ -18,6 +18,7 @@
  * Boston, MA 02110-1301 USA.
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #ifndef _MM_MODEM_FIRMWARE_H_
@@ -31,6 +32,7 @@
 
 #include "mm-gdbus-modem.h"
 #include "mm-firmware-properties.h"
+#include "mm-firmware-update-settings.h"
 
 G_BEGIN_DECLS
 
@@ -43,6 +45,7 @@ G_BEGIN_DECLS
 
 typedef struct _MMModemFirmware MMModemFirmware;
 typedef struct _MMModemFirmwareClass MMModemFirmwareClass;
+typedef struct _MMModemFirmwarePrivate MMModemFirmwarePrivate;
 
 /**
  * MMModemFirmware:
@@ -53,7 +56,7 @@ typedef struct _MMModemFirmwareClass MMModemFirmwareClass;
 struct _MMModemFirmware {
     /*< private >*/
     MmGdbusModemFirmwareProxy parent;
-    gpointer unused;
+    MMModemFirmwarePrivate *priv;
 };
 
 struct _MMModemFirmwareClass {
@@ -69,6 +72,9 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemFirmware, g_object_unref)
 
 const gchar *mm_modem_firmware_get_path (MMModemFirmware *self);
 gchar       *mm_modem_firmware_dup_path (MMModemFirmware *self);
+
+MMFirmwareUpdateSettings *mm_modem_firmware_get_update_settings  (MMModemFirmware *self);
+MMFirmwareUpdateSettings *mm_modem_firmware_peek_update_settings (MMModemFirmware *self);
 
 void     mm_modem_firmware_list        (MMModemFirmware *self,
                                         GCancellable *cancellable,

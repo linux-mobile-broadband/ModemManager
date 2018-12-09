@@ -6,6 +6,7 @@
    Copyright (C) 2011-2013 Red Hat, Inc.
    Copyright (C) 2011-2013 Google, Inc.
    Copyright (C) 2011-2013 Lanedo GmbH
+   Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
 -->
 
 <node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
@@ -14,67 +15,15 @@
       org.freedesktop.ModemManager1.Modem.Firmware:
       @short_description: The ModemManager Firmware interface.
 
-      This interface allows clients to select or install firmware images on
-      modems.
+      This interface provides access to perform different firmware-related operations
+      in the modem, including listing the available firmware images in the module and
+      selecting which of them to use.
 
-      Firmware slots and firmware images are identified by arbitrary opaque
-      strings.
-
-      Firmware images are represented as dictionaries of properties.
-      Certain properties are pre-defined, and some are required:
-
-      <variablelist>
-        <varlistentry><term><literal>"image-type"</literal></term>
-          <listitem>
-            (Required) Type of the firmware image, given as a
-            <link linkend="MMFirmwareImageType">MMFirmwareImageType</link> value
-            (signature <literal>"u"</literal>). Firmware images of type
-            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GENERIC:CAPS">MM_FIRMWARE_IMAGE_TYPE_GENERIC</link>
-            will only expose only the mandatory properties.
-          </listitem>
-        </varlistentry>
-        <varlistentry><term><literal>"unique-id"</literal></term>
-          <listitem>
-            (Required) A user-readable unique ID for the firmware image, given as a
-            string value (signature <literal>"s"</literal>).
-          </listitem>
-        </varlistentry>
-        <varlistentry><term><literal>"gobi-pri-version"</literal></term>
-          <listitem>
-            (Optional) The version of the PRI firmware image, in images of type
-            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
-            given as a string value (signature <literal>"s"</literal>).
-          </listitem>
-        </varlistentry>
-        <varlistentry><term><literal>"gobi-pri-info"</literal></term>
-          <listitem>
-            (Optional) Additional information of the PRI image, in images of type
-            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
-            given as a string value (signature <literal>"s"</literal>).
-          </listitem>
-        </varlistentry>
-        <varlistentry><term><literal>"gobi-boot-version"</literal></term>
-          <listitem>
-            (Optional) The boot version of the PRI firmware image, in images of type
-            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
-            given as a string value (signature <literal>"s"</literal>).
-          </listitem>
-        </varlistentry>
-        <varlistentry><term><literal>"gobi-pri-unique-id"</literal></term>
-          <listitem>
-            (Optional) The unique ID of the PRI firmware image, in images of type
-            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
-            given as a string value (signature <literal>"s"</literal>).
-          </listitem>
-        </varlistentry>
-        <varlistentry><term><literal>"gobi-modem-unique-id"</literal></term>
-          <listitem>
-            (Optional) The unique ID of the Modem firmware image, in images of type
-            <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
-            given as a string value (signature <literal>"s"</literal>).
-          </listitem>
-        </varlistentry>
-      </variablelist>
+      This interface does not provide direct access to perform firmware updates in
+      the device. Instead, it exposes information about the expected firmware update
+      method as well as method-specific details required for the upgrade to happen.
+      The actual firmware upgrade may be performed via the Linux Vendor Firmware Service
+      and the <link linkend="https://fwupd.org">fwupd</link> daemon.
   -->
   <interface name="org.freedesktop.ModemManager1.Modem.Firmware">
 
@@ -85,13 +34,67 @@
 
         List installed firmware images.
 
-        Depending on the type of modem, installed images may be stored on the
-        host or the modem.
+        Firmware slots and firmware images are identified by arbitrary opaque
+        strings.
 
-        Installed images can be selected non-destructively.
+        Firmware images are represented as dictionaries of properties.
+        Certain properties are pre-defined, and some are required:
+
+        <variablelist>
+          <varlistentry><term><literal>"image-type"</literal></term>
+            <listitem>
+              (Required) Type of the firmware image, given as a
+              <link linkend="MMFirmwareImageType">MMFirmwareImageType</link> value
+              (signature <literal>"u"</literal>). Firmware images of type
+              <link linkend="MM-FIRMWARE-IMAGE-TYPE-GENERIC:CAPS">MM_FIRMWARE_IMAGE_TYPE_GENERIC</link>
+              will only expose only the mandatory properties.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"unique-id"</literal></term>
+            <listitem>
+              (Required) A user-readable unique ID for the firmware image, given as a
+              string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"gobi-pri-version"</literal></term>
+            <listitem>
+              (Optional) The version of the PRI firmware image, in images of type
+              <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"gobi-pri-info"</literal></term>
+            <listitem>
+              (Optional) Additional information of the PRI image, in images of type
+              <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"gobi-boot-version"</literal></term>
+            <listitem>
+              (Optional) The boot version of the PRI firmware image, in images of type
+              <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"gobi-pri-unique-id"</literal></term>
+            <listitem>
+              (Optional) The unique ID of the PRI firmware image, in images of type
+              <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"gobi-modem-unique-id"</literal></term>
+            <listitem>
+              (Optional) The unique ID of the Modem firmware image, in images of type
+              <link linkend="MM-FIRMWARE-IMAGE-TYPE-GOBI:CAPS">MM_FIRMWARE_IMAGE_TYPE_GOBI</link>,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
     -->
     <method name="List">
-      <arg name="selected"  type="s"        direction="out" />
+      <arg name="selected"  type="s"      direction="out" />
       <arg name="installed" type="aa{sv}" direction="out" />
     </method>
 
@@ -106,10 +109,43 @@
         returned by
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Firmware.List">List()</link>,
         or if the image could not be selected for some reason.
+
+        Installed images can be selected non-destructively.
     -->
     <method name="Select">
       <arg name="uniqueid" type="s" direction="in" />
     </method>
+
+    <!--
+        UpdateSettings:
+
+        Detailed settings that provide information about how the module should be
+        updated.
+
+        The settings are given as a <link linkend="MMModemFirmwareUpdateMethod">MMModemFirmwareUpdateMethod</link>
+        value specifying the type of firmware update procedure expected followed by a
+        dictionary that includes other parameters applicable to the specific method.
+
+        <variablelist>
+          <varlistentry><term><link linkend="MM-MODEM-FIRMWARE-UPDATE-METHOD-FASTBOOT:CAPS">MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT</link></term>
+            <listitem>
+              <para>
+                Devices supporting the fastboot firmware update method require exposing the
+                following additional settings:
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>"fastboot-at"</literal></term>
+                  <listitem>
+                    (Required) This property exposes the AT command that should be sent to the
+                    module to trigger a reset into fastboot mode (signature <literal>'s'</literal>)
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+        </variablelist>
+    -->
+    <property name="UpdateSettings" type="(ua{sv})" access="read" />
 
   </interface>
 </node>

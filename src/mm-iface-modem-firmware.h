@@ -42,6 +42,14 @@ struct _MMIfaceModemFirmware {
                                        GAsyncResult *res,
                                        GError **error);
 
+    /* Get update settings (async) */
+    void                       (* load_update_settings)        (MMIfaceModemFirmware  *self,
+                                                                GAsyncReadyCallback    callback,
+                                                                gpointer               user_data);
+    MMFirmwareUpdateSettings * (* load_update_settings_finish) (MMIfaceModemFirmware  *self,
+                                                                GAsyncResult          *res,
+                                                                GError               **error);
+
     /* Get Firmware list (async) */
     void (* load_list) (MMIfaceModemFirmware *self,
                         GAsyncReadyCallback callback,

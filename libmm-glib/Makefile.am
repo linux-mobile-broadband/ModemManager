@@ -77,6 +77,8 @@ libmm_glib_la_SOURCES = \
 	mm-network-timezone.c \
 	mm-firmware-properties.h \
 	mm-firmware-properties.c \
+	mm-firmware-update-settings.h \
+	mm-firmware-update-settings.c \
 	mm-cdma-manual-activation-properties.h \
 	mm-cdma-manual-activation-properties.c \
 	mm-signal.h \
@@ -153,6 +155,7 @@ include_HEADERS = \
 	mm-unlock-retries.h \
 	mm-network-timezone.h \
 	mm-firmware-properties.h \
+	mm-firmware-update-settings.h \
 	mm-cdma-manual-activation-properties.h \
 	mm-signal.h \
 	mm-kernel-event-properties.h \

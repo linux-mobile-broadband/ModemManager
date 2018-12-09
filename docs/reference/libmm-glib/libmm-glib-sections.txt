@@ -684,7 +684,10 @@ mm_modem_firmware_list_sync
 mm_modem_firmware_select
 mm_modem_firmware_select_finish
 mm_modem_firmware_select_sync
+mm_modem_firmware_get_update_settings
+mm_modem_firmware_peek_update_settings
 <SUBSECTION Standard>
+MMModemFirmwarePrivate
 MMModemFirmwareClass
 MM_IS_MODEM_FIRMWARE
 MM_IS_MODEM_FIRMWARE_CLASS
@@ -726,6 +729,30 @@ MM_IS_FIRMWARE_PROPERTIES
 MM_IS_FIRMWARE_PROPERTIES_CLASS
 MM_TYPE_FIRMWARE_PROPERTIES
 mm_firmware_properties_get_type
+</SECTION>
+
+<SECTION>
+<FILE>mm-firmware-update-settings</FILE>
+<TITLE>MMFirmwareUpdateSettings</TITLE>
+MMFirmwareUpdateSettings
+<SUBSECTION Getters>
+mm_firmware_update_settings_get_fastboot_at
+mm_firmware_update_settings_get_method
+<SUBSECTION Private>
+mm_firmware_update_settings_get_variant
+mm_firmware_update_settings_new
+mm_firmware_update_settings_new_from_variant
+mm_firmware_update_settings_set_fastboot_at
+<SUBSECTION Standard>
+MMFirmwareUpdateSettingsClass
+MMFirmwareUpdateSettingsPrivate
+MM_FIRMWARE_UPDATE_SETTINGS
+MM_FIRMWARE_UPDATE_SETTINGS_CLASS
+MM_FIRMWARE_UPDATE_SETTINGS_GET_CLASS
+MM_IS_FIRMWARE_UPDATE_SETTINGS
+MM_IS_FIRMWARE_UPDATE_SETTINGS_CLASS
+MM_TYPE_FIRMWARE_UPDATE_SETTINGS
+mm_firmware_update_settings_get_type
 </SECTION>
 
 <SECTION>
@@ -1423,6 +1450,7 @@ mm_modem_cdma_rm_protocol_get_string
 mm_modem_location_source_build_string_from_mask
 mm_modem_location_assistance_data_type_build_string_from_mask
 mm_modem_contacts_storage_get_string
+mm_modem_firmware_update_method_get_string
 mm_sms_pdu_type_get_string
 mm_sms_state_get_string
 mm_sms_delivery_state_get_string
@@ -1480,6 +1508,7 @@ mm_oma_session_state_failed_reason_build_string_from_mask
 mm_call_direction_build_string_from_mask
 mm_call_state_build_string_from_mask
 mm_call_state_reason_build_string_from_mask
+mm_modem_firmware_update_method_build_string_from_mask
 <SUBSECTION Standard>
 MM_TYPE_BEARER_TYPE
 MM_TYPE_BEARER_IP_FAMILY
@@ -1522,6 +1551,7 @@ MM_TYPE_OMA_SESSION_TYPE
 MM_TYPE_CALL_DIRECTION
 MM_TYPE_CALL_STATE
 MM_TYPE_CALL_STATE_REASON
+MM_TYPE_MODEM_FIRMWARE_UPDATE_METHOD
 mm_bearer_type_get_type
 mm_bearer_ip_family_get_type
 mm_bearer_ip_method_get_type
@@ -1563,6 +1593,7 @@ mm_oma_session_type_get_type
 mm_call_direction_get_type
 mm_call_state_get_type
 mm_call_state_reason_get_type
+mm_modem_firmware_update_method_get_type
 </SECTION>
 
 <SECTION>
@@ -2463,6 +2494,8 @@ mm_gdbus_modem_time_skeleton_get_type
 MmGdbusModemFirmware
 MmGdbusModemFirmwareIface
 <SUBSECTION Getters>
+mm_gdbus_modem_firmware_dup_update_settings
+mm_gdbus_modem_firmware_get_update_settings
 <SUBSECTION Methods>
 mm_gdbus_modem_firmware_call_list
 mm_gdbus_modem_firmware_call_list_finish
@@ -2471,6 +2504,7 @@ mm_gdbus_modem_firmware_call_select
 mm_gdbus_modem_firmware_call_select_finish
 mm_gdbus_modem_firmware_call_select_sync
 <SUBSECTION Private>
+mm_gdbus_modem_firmware_set_update_settings
 mm_gdbus_modem_firmware_complete_list
 mm_gdbus_modem_firmware_complete_select
 mm_gdbus_modem_firmware_interface_info

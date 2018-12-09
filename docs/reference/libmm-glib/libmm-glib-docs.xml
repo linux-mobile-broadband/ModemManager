@@ -116,6 +116,7 @@
         <title>Firmware support</title>
         <xi:include href="xml/mm-modem-firmware.xml"/>
         <xi:include href="xml/mm-firmware-properties.xml"/>
+        <xi:include href="xml/mm-firmware-update-settings.xml"/>
       </section>
       <section>
         <title>Extended signal information</title>

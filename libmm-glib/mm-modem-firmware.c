@@ -40,6 +40,12 @@
 
 G_DEFINE_TYPE (MMModemFirmware, mm_modem_firmware, MM_GDBUS_TYPE_MODEM_FIRMWARE_PROXY)
 
+struct _MMModemFirmwarePrivate {
+    GMutex                    update_settings_mutex;
+    guint                     update_settings_id;
+    MMFirmwareUpdateSettings *update_settings;
+};
+
 /*****************************************************************************/
 
 /**
@@ -78,6 +84,116 @@ mm_modem_firmware_dup_path (MMModemFirmware *self)
                   "g-object-path", &value,
                   NULL);
     RETURN_NON_EMPTY_STRING (value);
+}
+
+/*****************************************************************************/
+
+static void
+update_settings_updated (MMModemFirmware *self,
+                         GParamSpec      *pspec)
+{
+    g_mutex_lock (&self->priv->update_settings_mutex);
+    {
+        GVariant *variant;
+
+        g_clear_object (&self->priv->update_settings);
+        variant = mm_gdbus_modem_firmware_get_update_settings (MM_GDBUS_MODEM_FIRMWARE (self));
+        if (variant) {
+            GError *error = NULL;
+
+            self->priv->update_settings = mm_firmware_update_settings_new_from_variant (variant, &error);
+            if (error) {
+                g_warning ("Invalid update settings received: %s", error->message);
+                g_error_free (error);
+            }
+        }
+    }
+    g_mutex_unlock (&self->priv->update_settings_mutex);
+}
+
+static void
+ensure_internal_update_settings (MMModemFirmware           *self,
+                                 MMFirmwareUpdateSettings **dupl)
+{
+    g_mutex_lock (&self->priv->update_settings_mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->update_settings_id) {
+            GVariant *variant;
+
+            variant = mm_gdbus_modem_firmware_dup_update_settings (MM_GDBUS_MODEM_FIRMWARE (self));
+            if (variant) {
+                GError *error = NULL;
+
+                self->priv->update_settings = mm_firmware_update_settings_new_from_variant (variant, &error);
+                if (error) {
+                    g_warning ("Invalid initial update settings: %s", error->message);
+                    g_error_free (error);
+                }
+                g_variant_unref (variant);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->update_settings_id =
+                g_signal_connect (self,
+                                  "notify::update-settings",
+                                  G_CALLBACK (update_settings_updated),
+                                  NULL);
+        }
+
+        if (dupl && self->priv->update_settings)
+            *dupl = g_object_ref (self->priv->update_settings);
+    }
+    g_mutex_unlock (&self->priv->update_settings_mutex);
+}
+
+/**
+ * mm_modem_firmware_get_update_settings:
+ * @self: A #MMModemFirmware.
+ *
+ * Gets a #MMFirmwareUpdateSettings object specifying the expected update
+ * settings.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_firmware_get_update_settings() again to get a new #MMFirmwareUpdateSettings
+ * with the new values.</warning>
+ *
+ * Returns: (transfer full): A #MMFirmwareUpdateSettings that must be freed with g_object_unref() or %NULL if unknown.
+ */
+MMFirmwareUpdateSettings *
+mm_modem_firmware_get_update_settings (MMModemFirmware *self)
+{
+    MMFirmwareUpdateSettings *update_settings = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_FIRMWARE (self), NULL);
+
+    ensure_internal_update_settings (self, &update_settings);
+    return update_settings;
+}
+
+/**
+ * mm_modem_firmware_peek_update_settings:
+ * @self: A #MMModemFirmware.
+ *
+ * Gets a #MMFirmwareUpdateSettings object specifying the expected update
+ * settings.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_firmware_get_update_settings() if on
+ * another thread.</warning>
+ *
+ * Returns: (transfer none): A #MMFirmwareUpdateSettings. Do not free the returned value, it belongs to @self.
+ */
+MMFirmwareUpdateSettings *
+mm_modem_firmware_peek_update_settings (MMModemFirmware *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_FIRMWARE (self), NULL);
+
+    ensure_internal_update_settings (self, NULL);
+    return self->priv->update_settings;
 }
 
 /*****************************************************************************/
@@ -372,9 +488,38 @@ mm_modem_firmware_list_sync (MMModemFirmware *self,
 static void
 mm_modem_firmware_init (MMModemFirmware *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_FIRMWARE, MMModemFirmwarePrivate);
+    g_mutex_init (&self->priv->update_settings_mutex);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMModemFirmware *self = MM_MODEM_FIRMWARE (object);
+
+    g_mutex_clear (&self->priv->update_settings_mutex);
+
+    G_OBJECT_CLASS (mm_modem_firmware_parent_class)->finalize (object);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMModemFirmware *self = MM_MODEM_FIRMWARE (object);
+
+    g_clear_object (&self->priv->update_settings);
+
+    G_OBJECT_CLASS (mm_modem_firmware_parent_class)->dispose (object);
 }
 
 static void
 mm_modem_firmware_class_init (MMModemFirmwareClass *modem_class)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (modem_class);
+
+    g_type_class_add_private (object_class, sizeof (MMModemFirmwarePrivate));
+
+    /* Virtual methods */
+    object_class->dispose = dispose;
+    object_class->finalize = finalize;
 }
