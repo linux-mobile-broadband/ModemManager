@@ -111,25 +111,5 @@
       <arg name="uniqueid" type="s" direction="in" />
     </method>
 
-    <!--
-        Install:
-        @image: The identifier of the firmware image to install.
-        @slot: The identifier of the slot into which the firmware should be installed.
-
-        Install an available firmware image into a slot.
-
-        It does not guarantee that the image will be installed into the
-        specified slot, but does guarantee that, if the slot is empty, no
-        image will be overwritten, and if the slot is not empty, no image
-        other than the one in that slot will be overwritten.
-
-        The method will fail if either of the identifiers is invalid, or if the
-        image could not be installed into the slot for some reason.
-
-    <method name="Install">
-      <arg name="image" type="s" direction="in" />
-      <arg name="slot"  type="s" direction="in" />
-    </method-->
-
   </interface>
 </node>
