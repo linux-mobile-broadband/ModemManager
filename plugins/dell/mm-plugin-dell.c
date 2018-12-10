@@ -34,6 +34,7 @@
 #include "mm-broadband-modem-sierra.h"
 #include "mm-common-sierra.h"
 #include "mm-broadband-modem-telit.h"
+#include "mm-broadband-modem-xmm.h"
 #include "mm-common-telit.h"
 #include "mm-log.h"
 
@@ -43,6 +44,7 @@
 
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
+#include "mm-broadband-modem-mbim-xmm.h"
 #include "mm-broadband-modem-dell-dw5821e.h"
 #endif
 
@@ -405,6 +407,16 @@ create_modem (MMPlugin *self,
                                                                        vendor,
                                                                        product));
         }
+
+        if (mm_port_probe_list_is_xmm (probes)) {
+            mm_dbg ("MBIM-powered XMM-based modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_new (uid,
+                                                                   drivers,
+                                                                   mm_plugin_get_name (self),
+                                                                   vendor,
+                                                                   product));
+        }
+
         mm_dbg ("MBIM-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
@@ -439,6 +451,15 @@ create_modem (MMPlugin *self,
                                                             mm_plugin_get_name (self),
                                                             vendor,
                                                             product));
+    }
+
+    if (mm_port_probe_list_is_xmm (probes)) {
+        mm_dbg ("XMM-based modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_xmm_new (uid,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
     }
 
     mm_dbg ("Dell-branded generic modem found...");
@@ -484,14 +505,15 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_DELL,
-                      MM_PLUGIN_NAME,                  "Dell",
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,    subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS,    vendors,
-                      MM_PLUGIN_ALLOWED_AT,            TRUE,
-                      MM_PLUGIN_CUSTOM_INIT,           &custom_init,
-                      MM_PLUGIN_ALLOWED_QCDM,          TRUE,
-                      MM_PLUGIN_ALLOWED_QMI,           TRUE,
-                      MM_PLUGIN_ALLOWED_MBIM,          TRUE,
+                      MM_PLUGIN_NAME,               "Dell",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendors,
+                      MM_PLUGIN_ALLOWED_AT,         TRUE,
+                      MM_PLUGIN_CUSTOM_INIT,        &custom_init,
+                      MM_PLUGIN_ALLOWED_QCDM,       TRUE,
+                      MM_PLUGIN_ALLOWED_QMI,        TRUE,
+                      MM_PLUGIN_ALLOWED_MBIM,       TRUE,
+                      MM_PLUGIN_XMM_PROBE,          TRUE,
                       NULL));
 }
 
