@@ -99,7 +99,7 @@ common_setup_cleanup_unsolicited_events (MMBaseCall  *self,
     gint            i;
 
     if (G_UNLIKELY (!self->priv->in_call_events))
-        self->priv->in_call_events = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$",
+        self->priv->in_call_events = g_regex_new ("\\r\\n(NO CARRIER|BUSY|NO ANSWER|NO DIALTONE)\\r\\n$",
                                                   G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     g_object_get (self,
