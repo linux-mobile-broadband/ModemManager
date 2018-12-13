@@ -71,8 +71,8 @@ gchar *
 mm_altair_parse_ceer_response (const gchar *response,
                                GError **error)
 {
-    g_autoptr(GRegex) r = NULL;
-    g_autoptr(GMatchInfo) match_info = NULL;
+    mm_autoptr(GRegex) r = NULL;
+    mm_autoptr(GMatchInfo) match_info = NULL;
     gchar *ceer_response = NULL;
 
 
@@ -136,8 +136,8 @@ mm_altair_parse_cid (const gchar *response, GError **error)
 MMPco *
 mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
 {
-    g_autoptr(GRegex) regex = NULL;
-    g_autoptr(GMatchInfo) match_info = NULL;
+    mm_autoptr(GRegex) regex = NULL;
+    mm_autoptr(GMatchInfo) match_info = NULL;
     MMPco *pco = NULL;
     gint num_matches;
 
