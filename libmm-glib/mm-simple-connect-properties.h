@@ -79,8 +79,6 @@ void mm_simple_connect_properties_set_ip_type       (MMSimpleConnectProperties *
                                                      MMBearerIpFamily ip_type);
 void mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
                                                      gboolean allow_roaming);
-void mm_simple_connect_properties_set_number        (MMSimpleConnectProperties *self,
-                                                     const gchar *number);
 
 const gchar         *mm_simple_connect_properties_get_pin           (MMSimpleConnectProperties *self);
 const gchar         *mm_simple_connect_properties_get_operator_id   (MMSimpleConnectProperties *self);
@@ -90,7 +88,14 @@ const gchar         *mm_simple_connect_properties_get_user          (MMSimpleCon
 const gchar         *mm_simple_connect_properties_get_password      (MMSimpleConnectProperties *self);
 MMBearerIpFamily     mm_simple_connect_properties_get_ip_type       (MMSimpleConnectProperties *self);
 gboolean             mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self);
-const gchar         *mm_simple_connect_properties_get_number        (MMSimpleConnectProperties *self);
+
+#ifndef MM_DISABLE_DEPRECATED
+G_DEPRECATED
+void         mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
+                                                      const gchar               *number);
+G_DEPRECATED
+const gchar *mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self);
+#endif
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */

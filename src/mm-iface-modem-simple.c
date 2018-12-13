@@ -682,8 +682,6 @@ connect_auth_ready (MMBaseModem *self,
 
         mm_dbg ("   Password: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_password (ctx->properties)));
 
-        mm_dbg ("   Number: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_number (ctx->properties)));
-
 #undef VALIDATE_UNSPECIFIED
     }
 

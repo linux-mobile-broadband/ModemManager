@@ -328,12 +328,17 @@ mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self)
 
 /*****************************************************************************/
 
+#ifndef MM_DISABLE_DEPRECATED
+
 /**
  * mm_simple_connect_properties_set_number:
  * @self: a #MMSimpleConnectProperties.
  * @number: the number.
  *
  * Sets the number to use when performing the connection.
+ *
+ * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
+ * it doesn't make sense to expose it in the ModemManager interface.
  */
 void
 mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
@@ -341,8 +346,7 @@ mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
 {
     g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
 
-    mm_bearer_properties_set_number (self->priv->bearer_properties,
-                                     number);
+    /* NO-OP */
 }
 
 /**
@@ -352,14 +356,20 @@ mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
  * Gets the number to use when performing the connection.
  *
  * Returns: (transfer none): the number, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ *
+ * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
+ * it doesn't make sense to expose it in the ModemManager interface.
  */
 const gchar *
 mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
 {
     g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
 
-    return mm_bearer_properties_get_number (self->priv->bearer_properties);
+    /* NO-OP */
+    return NULL;
 }
+
+#endif /* MM_DISABLE_DEPRECATED */
 
 /*****************************************************************************/
 

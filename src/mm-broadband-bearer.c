@@ -261,34 +261,21 @@ dial_cdma_ready (MMBaseModem *modem,
 static void
 cdma_connect_context_dial (GTask *task)
 {
-    MMBroadbandBearer *self;
+    MMBroadbandBearer      *self;
     DetailedConnectContext *ctx;
-    gchar *command;
-    const gchar *number;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    number = mm_bearer_properties_get_number (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-
-    /* If a number was given when creating the bearer, use that one.
-     * Otherwise, use the default one, #777
-     */
-    if (number)
-        command = g_strconcat ("DT", number, NULL);
-    else
-        command = g_strdup ("DT#777");
-
     mm_base_modem_at_command_full (ctx->modem,
                                    MM_PORT_SERIAL_AT (ctx->data),
-                                   command,
+                                   "DT#777",
                                    90,
                                    FALSE,
                                    FALSE,
                                    NULL,
                                    (GAsyncReadyCallback)dial_cdma_ready,
                                    task);
-    g_free (command);
 }
 
 static void

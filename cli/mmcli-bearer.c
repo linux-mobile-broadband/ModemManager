@@ -158,7 +158,6 @@ print_bearer_info (MMBearer *bearer)
         gchar       *ip_family_str = NULL;
         const gchar *user = NULL;
         const gchar *password = NULL;
-        const gchar *number = NULL;
         const gchar *rm_protocol = NULL;
 
         if (properties) {
@@ -168,7 +167,6 @@ print_bearer_info (MMBearer *bearer)
             password      = mm_bearer_properties_get_password (properties);
             if (mm_bearer_get_bearer_type (bearer) != MM_BEARER_TYPE_DEFAULT_ATTACH) {
                 roaming     = mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden";
-                number      = mm_bearer_properties_get_number (properties);
                 rm_protocol = mm_modem_cdma_rm_protocol_get_string (mm_bearer_properties_get_rm_protocol (properties));
             }
         }
@@ -178,7 +176,6 @@ print_bearer_info (MMBearer *bearer)
         mmcli_output_string_take (MMC_F_BEARER_PROPERTIES_IP_TYPE,     ip_family_str);
         mmcli_output_string      (MMC_F_BEARER_PROPERTIES_USER,        user);
         mmcli_output_string      (MMC_F_BEARER_PROPERTIES_PASSWORD,    password);
-        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_NUMBER,      number);
         mmcli_output_string      (MMC_F_BEARER_PROPERTIES_RM_PROTOCOL, rm_protocol);
     }
 
