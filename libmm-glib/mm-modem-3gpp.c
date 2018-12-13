@@ -254,6 +254,8 @@ mm_modem_3gpp_get_registration_state (MMModem3gpp *self)
 
 /*****************************************************************************/
 
+#ifndef MM_DISABLE_DEPRECATED
+
 /**
  * mm_modem_3gpp_get_subscription_state:
  * @self: A #MMModem.
@@ -276,6 +278,8 @@ mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
 {
     return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
 }
+
+#endif /* MM_DISABLE_DEPRECATED */
 
 /*****************************************************************************/
 

@@ -167,9 +167,12 @@ gboolean mm_modem_3gpp_set_initial_eps_bearer_settings_sync   (MMModem3gpp      
                                                                GCancellable         *cancellable,
                                                                GError              **error);
 
-/* Deprecated APIs */
+#ifndef MM_DISABLE_DEPRECATED
+
 G_DEPRECATED
 MMModem3gppSubscriptionState mm_modem_3gpp_get_subscription_state (MMModem3gpp *self);
+
+#endif
 
 G_END_DECLS
 
