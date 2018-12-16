@@ -163,6 +163,7 @@ Makefile.in
 
 /plugins/test-suite.log
 /plugins/test-udev-rules
+/plugins/test-keyfiles
 /plugins/test-modem-helpers-*
 /plugins/test-service-*
 
