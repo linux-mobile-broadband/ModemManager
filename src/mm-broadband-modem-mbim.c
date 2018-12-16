@@ -1874,8 +1874,7 @@ enabling_started (MMBroadbandModem *self,
 typedef struct {
     MMPortMbim *mbim;
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    QmiService qmi_services[32];
-    guint      qmi_service_index;
+    guint       qmi_service_index;
 #endif
 } InitializationStartedContext;
 
@@ -1933,6 +1932,13 @@ parent_initialization_started (GTask *task)
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
+static const QmiService qmi_services[] = {
+    QMI_SERVICE_DMS,
+    QMI_SERVICE_NAS,
+    QMI_SERVICE_PDS,
+    QMI_SERVICE_LOC,
+};
+
 static void allocate_next_qmi_client (GTask *task);
 
 static void
@@ -1947,7 +1953,7 @@ mbim_port_allocate_qmi_client_ready (MMPortMbim   *mbim,
 
     if (!mm_port_mbim_allocate_qmi_client_finish (mbim, res, &error)) {
         mm_dbg ("Couldn't allocate QMI client for service '%s': %s",
-                qmi_service_get_string (ctx->qmi_services[ctx->qmi_service_index]),
+                qmi_service_get_string (qmi_services[ctx->qmi_service_index]),
                 error->message);
         g_error_free (error);
     }
@@ -1965,14 +1971,14 @@ allocate_next_qmi_client (GTask *task)
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    if (ctx->qmi_services[ctx->qmi_service_index] == QMI_SERVICE_UNKNOWN) {
+    if (ctx->qmi_service_index == G_N_ELEMENTS (qmi_services)) {
         parent_initialization_started (task);
         return;
     }
 
     /* Otherwise, allocate next client */
     mm_port_mbim_allocate_qmi_client (ctx->mbim,
-                                      ctx->qmi_services[ctx->qmi_service_index],
+                                      qmi_services[ctx->qmi_service_index],
                                       NULL,
                                       (GAsyncReadyCallback)mbim_port_allocate_qmi_client_ready,
                                       task);
@@ -2186,15 +2192,6 @@ initialization_started (MMBroadbandModem    *self,
         query_device_services (task);
         return;
     }
-
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    /* Setup services to open */
-    ctx->qmi_services[0] = QMI_SERVICE_DMS;
-    ctx->qmi_services[1] = QMI_SERVICE_NAS;
-    ctx->qmi_services[2] = QMI_SERVICE_PDS;
-    ctx->qmi_services[3] = QMI_SERVICE_LOC;
-    ctx->qmi_services[4] = QMI_SERVICE_UNKNOWN;
-#endif
 
     /* Now open our MBIM port */
     mm_port_mbim_open (ctx->mbim,
