@@ -9,6 +9,7 @@ AM_CFLAGS = \
 	$(MM_CFLAGS) \
 	$(CODE_COVERAGE_CFLAGS) \
 	$(GUDEV_CFLAGS)	\
+	-DPKGDATADIR=\"${pkgdatadir}\" \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/src \
 	-I$(top_builddir)/src \
@@ -63,6 +64,9 @@ BUILT_SOURCES =
 
 # Clean files
 CLEANFILES =
+
+# Data files
+dist_pkgdata_DATA =
 
 ################################################################################
 # common service test support
@@ -1064,6 +1068,8 @@ libmm_plugin_dell_la_LIBADD = \
 	$(NULL)
 
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
+
+dist_pkgdata_DATA += dell/mm-dell-dw5821e-carrier-mapping.conf
 
 AM_CFLAGS += -DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\"
 
