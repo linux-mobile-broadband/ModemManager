@@ -386,10 +386,11 @@ mm_broadband_modem_dell_dw5821e_new (const gchar  *device,
                          MM_BASE_MODEM_PLUGIN,     plugin,
                          MM_BASE_MODEM_VENDOR_ID,  vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
-                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
-                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,              TRUE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED,             FALSE,
                          MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      TRUE,
                          MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS, TRUE,
+                         MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,              PKGDATADIR "/mm-dell-dw5821e-carrier-mapping.conf",
                          NULL);
 }
 
