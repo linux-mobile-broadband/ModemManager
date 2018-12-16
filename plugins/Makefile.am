@@ -1071,7 +1071,10 @@ dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
 
 dist_pkgdata_DATA += dell/mm-dell-dw5821e-carrier-mapping.conf
 
-AM_CFLAGS += -DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\"
+AM_CFLAGS += \
+	-DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\" \
+	-DTESTKEYFILE_DELL_DW5821E=\"${srcdir}/dell/mm-dell-dw5821e-carrier-mapping.conf\" \
+	$(NULL)
 
 ################################################################################
 # plugin: quectel
@@ -1122,6 +1125,18 @@ test_udev_rules_SOURCES = \
 	$(NULL)
 test_udev_rules_LDADD = \
 	$(top_builddir)/src/libkerneldevice.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
+################################################################################
+# keyfile tester
+################################################################################
+
+noinst_PROGRAMS += test-keyfiles
+test_keyfiles_SOURCES = \
+	tests/test-keyfiles.c \
+	$(NULL)
+test_keyfiles_LDADD = \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)
 
