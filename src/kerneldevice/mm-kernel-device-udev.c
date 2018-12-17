@@ -43,6 +43,7 @@ struct _MMKernelDeviceUdevPrivate {
     GUdevDevice *physdev;
     guint16      vendor;
     guint16      product;
+    guint16      revision;
 
     MMKernelEventProperties *properties;
 };
@@ -52,10 +53,11 @@ struct _MMKernelDeviceUdevPrivate {
 static gboolean
 get_device_ids (GUdevDevice *device,
                 guint16     *vendor,
-                guint16     *product)
+                guint16     *product,
+                guint16     *revision)
 {
     GUdevDevice *parent = NULL;
-    const gchar *vid = NULL, *pid = NULL, *parent_subsys;
+    const gchar *vid = NULL, *pid = NULL, *rid = NULL, *parent_subsys;
     gboolean success = FALSE;
     char *pci_vid = NULL, *pci_pid = NULL;
 
@@ -94,6 +96,7 @@ get_device_ids (GUdevDevice *device,
                 if (qmi_parent) {
                     vid = g_udev_device_get_property (qmi_parent, "ID_VENDOR_ID");
                     pid = g_udev_device_get_property (qmi_parent, "ID_MODEL_ID");
+                    rid = g_udev_device_get_property (qmi_parent, "ID_REVISION");
                     g_object_unref (qmi_parent);
                 }
             } else if (g_str_equal (parent_subsys, "pci")) {
@@ -139,6 +142,20 @@ get_device_ids (GUdevDevice *device,
     *product = (guint16) (mm_utils_hex2byte (pid + 2) & 0xFF);
     *product |= (guint16) ((mm_utils_hex2byte (pid) & 0xFF) << 8);
 
+
+    /* Revision ID optional, default to 0x0000 if unknown */
+    *revision = 0;
+    if (!rid)
+        rid = g_udev_device_get_property (device, "ID_REVISION");
+    if (rid) {
+        if (strncmp (rid, "0x", 2) == 0)
+            rid += 2;
+        if (strlen (rid) == 4) {
+            *revision = (guint16) (mm_utils_hex2byte (rid + 2) & 0xFF);
+            *revision |= (guint16) ((mm_utils_hex2byte (rid) & 0xFF) << 8);
+        }
+    }
+
     success = TRUE;
 
 out:
@@ -152,13 +169,14 @@ out:
 static void
 ensure_device_ids (MMKernelDeviceUdev *self)
 {
+    /* Revision is optional */
     if (self->priv->vendor || self->priv->product)
         return;
 
     if (!self->priv->device)
         return;
 
-    if (!get_device_ids (self->priv->device, &self->priv->vendor, &self->priv->product))
+    if (!get_device_ids (self->priv->device, &self->priv->vendor, &self->priv->product, &self->priv->revision))
         mm_dbg ("(%s/%s) could not get vendor/product id",
                 g_udev_device_get_subsystem (self->priv->device),
                 g_udev_device_get_name      (self->priv->device));
@@ -394,6 +412,18 @@ kernel_device_get_physdev_pid (MMKernelDevice *_self)
     self = MM_KERNEL_DEVICE_UDEV (_self);
     ensure_device_ids (self);
     return self->priv->product;
+}
+
+static guint16
+kernel_device_get_physdev_revision (MMKernelDevice *_self)
+{
+    MMKernelDeviceUdev *self;
+
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), 0);
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+    ensure_device_ids (self);
+    return self->priv->revision;
 }
 
 static const gchar *
@@ -896,6 +926,7 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     kernel_device_class->get_physdev_uid                = kernel_device_get_physdev_uid;
     kernel_device_class->get_physdev_vid                = kernel_device_get_physdev_vid;
     kernel_device_class->get_physdev_pid                = kernel_device_get_physdev_pid;
+    kernel_device_class->get_physdev_revision           = kernel_device_get_physdev_revision;
     kernel_device_class->get_physdev_sysfs_path         = kernel_device_get_physdev_sysfs_path;
     kernel_device_class->get_physdev_subsystem          = kernel_device_get_physdev_subsystem;
     kernel_device_class->get_physdev_manufacturer       = kernel_device_get_physdev_manufacturer;

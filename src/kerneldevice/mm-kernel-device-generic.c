@@ -62,6 +62,7 @@ struct _MMKernelDeviceGenericPrivate {
     gchar   *physdev_sysfs_path;
     guint16  physdev_vid;
     guint16  physdev_pid;
+    guint16  physdev_revision;
     gchar   *physdev_subsystem;
     gchar   *physdev_manufacturer;
     gchar   *physdev_product;
@@ -303,6 +304,29 @@ preload_physdev_pid (MMKernelDeviceGeneric *self)
 }
 
 static void
+preload_physdev_revision (MMKernelDeviceGeneric *self)
+{
+    if (!self->priv->physdev_revision && self->priv->physdev_sysfs_path) {
+        guint val;
+
+        val = read_sysfs_property_as_hex (self->priv->physdev_sysfs_path, "bcdDevice");
+        if (val && val <= G_MAXUINT16)
+            self->priv->physdev_revision = val;
+    }
+
+    if (self->priv->physdev_revision) {
+        mm_dbg ("(%s/%s) revision (ID_REVISION): 0x%04x",
+                mm_kernel_event_properties_get_subsystem (self->priv->properties),
+                mm_kernel_event_properties_get_name      (self->priv->properties),
+                self->priv->physdev_revision);
+        g_object_set_data_full (G_OBJECT (self), "ID_REVISION", g_strdup_printf ("%04x", self->priv->physdev_revision), g_free);
+    } else
+        mm_dbg ("(%s/%s) revision: unknown",
+                mm_kernel_event_properties_get_subsystem (self->priv->properties),
+                mm_kernel_event_properties_get_name      (self->priv->properties));
+}
+
+static void
 preload_physdev_subsystem (MMKernelDeviceGeneric *self)
 {
     if (!self->priv->physdev_subsystem && self->priv->physdev_sysfs_path) {
@@ -415,6 +439,7 @@ preload_contents (MMKernelDeviceGeneric *self)
     preload_driver               (self);
     preload_physdev_vid          (self);
     preload_physdev_pid          (self);
+    preload_physdev_revision     (self);
     preload_physdev_subsystem    (self);
 }
 
@@ -521,6 +546,14 @@ kernel_device_get_physdev_pid (MMKernelDevice *self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_GENERIC (self), 0);
 
     return MM_KERNEL_DEVICE_GENERIC (self)->priv->physdev_pid;
+}
+
+static guint16
+kernel_device_get_physdev_revision (MMKernelDevice *self)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_GENERIC (self), 0);
+
+    return MM_KERNEL_DEVICE_GENERIC (self)->priv->physdev_revision;
 }
 
 static const gchar *
@@ -1088,6 +1121,7 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     kernel_device_class->get_physdev_uid          = kernel_device_get_physdev_uid;
     kernel_device_class->get_physdev_vid          = kernel_device_get_physdev_vid;
     kernel_device_class->get_physdev_pid          = kernel_device_get_physdev_pid;
+    kernel_device_class->get_physdev_revision     = kernel_device_get_physdev_revision;
     kernel_device_class->get_physdev_sysfs_path   = kernel_device_get_physdev_sysfs_path;
     kernel_device_class->get_physdev_subsystem    = kernel_device_get_physdev_subsystem;
     kernel_device_class->get_physdev_manufacturer = kernel_device_get_physdev_manufacturer;
