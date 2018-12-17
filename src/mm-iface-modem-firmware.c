@@ -126,6 +126,18 @@ list_auth_ready (MMBaseModem *self,
         return;
     }
 
+    if (!MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_list ||
+        !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_list_finish ||
+        !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current ||
+        !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot list firmware: operation not supported");
+        handle_list_context_free (ctx);
+        return;
+    }
+
     MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_list (MM_IFACE_MODEM_FIRMWARE (self),
                                                              (GAsyncReadyCallback)load_list_ready,
                                                              ctx);
@@ -137,11 +149,6 @@ handle_list (MmGdbusModemFirmware *skeleton,
              MMIfaceModemFirmware *self)
 {
     HandleListContext *ctx;
-
-    g_assert (MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_list != NULL);
-    g_assert (MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_list_finish != NULL);
-    g_assert (MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current != NULL);
-    g_assert (MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_current_finish != NULL);
 
     ctx = g_slice_new (HandleListContext);
     ctx->skeleton = g_object_ref (skeleton);
@@ -204,6 +211,17 @@ select_auth_ready (MMBaseModem *self,
         return;
     }
 
+
+    if (!MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current ||
+        !MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot select firmware: operation not supported");
+        handle_select_context_free (ctx);
+        return;
+    }
+
     MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current (MM_IFACE_MODEM_FIRMWARE (self),
                                                                   ctx->name,
                                                                   (GAsyncReadyCallback)change_current_ready,
@@ -217,9 +235,6 @@ handle_select (MmGdbusModemFirmware *skeleton,
                MMIfaceModemFirmware *self)
 {
     HandleSelectContext *ctx;
-
-    g_assert (MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current != NULL);
-    g_assert (MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->change_current_finish != NULL);
 
     ctx = g_slice_new (HandleSelectContext);
     ctx->skeleton = g_object_ref (skeleton);
