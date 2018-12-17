@@ -81,7 +81,7 @@ load_current_ready (MMIfaceModemFirmware *self,
     }
 
     /* Build array of dicts */
-    g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("aa{sv}"));
     for (l = ctx->list; l; l = g_list_next (l))
         g_variant_builder_add_value (
             &builder,
