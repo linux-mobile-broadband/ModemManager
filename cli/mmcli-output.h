@@ -204,6 +204,7 @@ typedef enum {
     /* Firmware status section */
     MMC_F_FIRMWARE_LIST,
     MMC_F_FIRMWARE_METHOD,
+    MMC_F_FIRMWARE_DEVICE_IDS,
     MMC_F_FIRMWARE_FASTBOOT_AT,
     /* Bearer general section */
     MMC_F_BEARER_GENERAL_DBUS_PATH,

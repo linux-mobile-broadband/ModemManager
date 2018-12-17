@@ -191,6 +191,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_LOCATION_CDMABS_LAT]               = { "modem.location.cdma-bs.latitude",                 "latitude",                 MMC_S_MODEM_LOCATION_CDMABS,   },
     [MMC_F_FIRMWARE_LIST]                     = { "modem.firmware.list",                             "list",                     MMC_S_MODEM_FIRMWARE,          },
     [MMC_F_FIRMWARE_METHOD]                   = { "modem.firmware.method",                           "method",                   MMC_S_MODEM_FIRMWARE,          },
+    [MMC_F_FIRMWARE_DEVICE_IDS]               = { "modem.firmware.device-ids",                       "device ids",               MMC_S_MODEM_FIRMWARE,          },
     [MMC_F_FIRMWARE_FASTBOOT_AT]              = { "modem.firmware.fastboot.at",                      "at command",               MMC_S_MODEM_FIRMWARE_FASTBOOT, },
     [MMC_F_BEARER_GENERAL_DBUS_PATH]          = { "bearer.dbus-path",                                "dbus path",                MMC_S_BEARER_GENERAL,          },
     [MMC_F_BEARER_GENERAL_TYPE]               = { "bearer.type",                                     "type",                     MMC_S_BEARER_GENERAL,          },

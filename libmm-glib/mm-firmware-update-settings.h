@@ -61,6 +61,9 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMFirmwareUpdateSettings, g_object_unref)
 
 MMModemFirmwareUpdateMethod mm_firmware_update_settings_get_method (MMFirmwareUpdateSettings *self);
 
+/* Generic */
+const gchar **mm_firmware_update_settings_get_device_ids (MMFirmwareUpdateSettings *self);
+
 /* Fastboot specific */
 const gchar *mm_firmware_update_settings_get_fastboot_at (MMFirmwareUpdateSettings *self);
 
@@ -77,6 +80,10 @@ MMFirmwareUpdateSettings *mm_firmware_update_settings_new_from_variant (GVariant
                                                                         GError   **error);
 
 GVariant *mm_firmware_update_settings_get_variant (MMFirmwareUpdateSettings *self);
+
+/* Generic */
+void mm_firmware_update_settings_set_device_ids (MMFirmwareUpdateSettings  *self,
+                                                 const gchar              **device_ids);
 
 /* Fastboot specific */
 void mm_firmware_update_settings_set_fastboot_at (MMFirmwareUpdateSettings *self,

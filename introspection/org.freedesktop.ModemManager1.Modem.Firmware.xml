@@ -134,6 +134,14 @@
                 following additional settings:
               </para>
               <variablelist>
+                <varlistentry><term><literal>"device-ids"</literal></term>
+                  <listitem>
+                    (Required) This property exposes the list of device IDs associated to a given
+                    device, from most specific to least specific. (signature <literal>'as'</literal>).
+                    E.g. a list containing: <literal>"USB\VID_413C&amp;PID_81D7&amp;REV_0001"</literal>,
+                    <literal>"USB\VID_413C&amp;PID_81D7"</literal> and <literal>"USB\VID_413C"</literal>.
+                  </listitem>
+                </varlistentry>
                 <varlistentry><term><literal>"fastboot-at"</literal></term>
                   <listitem>
                     (Required) This property exposes the AT command that should be sent to the

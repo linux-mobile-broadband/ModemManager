@@ -282,6 +282,51 @@ mm_iface_modem_firmware_initialize_finish (MMIfaceModemFirmware  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static gboolean
+add_generic_device_ids (MMBaseModem               *self,
+                        MMFirmwareUpdateSettings  *update_settings,
+                        GError                   **error)
+{
+    guint16      vid;
+    guint16      pid;
+    guint16      rid;
+    GPtrArray   *ids;
+    MMPort      *primary = NULL;
+    const gchar *subsystem;
+
+    vid = mm_base_modem_get_vendor_id (self);
+    pid = mm_base_modem_get_product_id (self);
+
+#if defined WITH_QMI
+    primary = MM_PORT (mm_base_modem_peek_port_qmi (self));
+#endif
+#if defined WITH_MBIM
+    if (!primary)
+        primary = MM_PORT (mm_base_modem_peek_port_mbim (self));
+#endif
+    if (!primary)
+        primary = MM_PORT (mm_base_modem_peek_port_primary (self));
+    g_assert (primary != NULL);
+    rid = mm_kernel_device_get_physdev_revision (mm_port_peek_kernel_device (primary));
+
+    subsystem = mm_kernel_device_get_physdev_subsystem (mm_port_peek_kernel_device (primary));
+    if (g_strcmp0 (subsystem, "usb")) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unsupported subsystem: %s", subsystem);
+        return FALSE;
+    }
+
+    ids = g_ptr_array_new_with_free_func ((GDestroyNotify)g_free);
+    g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X&REV_%04X", vid, pid, rid));
+    g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X", vid, pid));
+    g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X", vid));
+    g_ptr_array_add (ids, NULL);
+
+    mm_firmware_update_settings_set_device_ids (update_settings, (const gchar **)ids->pdata);
+    g_ptr_array_unref (ids);
+    return TRUE;
+}
+
 static void
 load_update_settings_ready (MMIfaceModemFirmware *self,
                             GAsyncResult         *res,
@@ -299,8 +344,15 @@ load_update_settings_ready (MMIfaceModemFirmware *self,
         mm_dbg ("Couldn't load update settings: '%s'", error->message);
         g_error_free (error);
     } else {
-        variant = mm_firmware_update_settings_get_variant (update_settings);
-        g_object_unref (update_settings);
+        /* If the plugin didn't specify custom device ids, add the default ones ourselves */
+        if (!mm_firmware_update_settings_get_device_ids (update_settings) &&
+            !add_generic_device_ids (MM_BASE_MODEM (self), update_settings, &error)) {
+            mm_warn ("Couldn't build device ids: '%s'", error->message);
+            g_error_free (error);
+        } else {
+            variant = mm_firmware_update_settings_get_variant (update_settings);
+            g_object_unref (update_settings);
+        }
     }
 
     mm_gdbus_modem_firmware_set_update_settings (ctx->skeleton, variant);
