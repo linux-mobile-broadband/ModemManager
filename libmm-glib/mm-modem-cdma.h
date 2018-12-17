@@ -64,6 +64,10 @@ struct _MMModemCdmaClass {
 
 GType mm_modem_cdma_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemCdma, g_object_unref)
+#endif
+
 const gchar *mm_modem_cdma_get_path (MMModemCdma *self);
 gchar       *mm_modem_cdma_dup_path (MMModemCdma *self);
 

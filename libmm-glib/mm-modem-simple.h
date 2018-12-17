@@ -66,6 +66,10 @@ struct _MMModemSimpleClass {
 
 GType mm_modem_simple_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemSimple, g_object_unref)
+#endif
+
 const gchar *mm_modem_simple_get_path (MMModemSimple *self);
 gchar       *mm_modem_simple_dup_path (MMModemSimple *self);
 

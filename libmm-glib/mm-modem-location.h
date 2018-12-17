@@ -67,6 +67,10 @@ struct _MMModemLocationClass {
 
 GType mm_modem_location_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemLocation, g_object_unref)
+#endif
+
 const gchar *mm_modem_location_get_path (MMModemLocation *self);
 gchar       *mm_modem_location_dup_path (MMModemLocation *self);
 

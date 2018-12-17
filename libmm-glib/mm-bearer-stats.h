@@ -57,6 +57,10 @@ struct _MMBearerStatsClass {
 
 GType mm_bearer_stats_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerStats, g_object_unref)
+#endif
+
 guint   mm_bearer_stats_get_duration (MMBearerStats *self);
 guint64 mm_bearer_stats_get_rx_bytes (MMBearerStats *self);
 guint64 mm_bearer_stats_get_tx_bytes (MMBearerStats *self);

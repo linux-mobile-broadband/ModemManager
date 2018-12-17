@@ -66,6 +66,10 @@ struct _MMModemVoiceClass {
 
 GType mm_modem_voice_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemVoice, g_object_unref)
+#endif
+
 const gchar *mm_modem_voice_get_path (MMModemVoice *self);
 gchar       *mm_modem_voice_dup_path (MMModemVoice *self);
 

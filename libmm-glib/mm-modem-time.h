@@ -65,6 +65,10 @@ struct _MMModemTimeClass {
 
 GType mm_modem_time_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemTime, g_object_unref)
+#endif
+
 const gchar *mm_modem_time_get_path (MMModemTime *self);
 gchar       *mm_modem_time_dup_path (MMModemTime *self);
 

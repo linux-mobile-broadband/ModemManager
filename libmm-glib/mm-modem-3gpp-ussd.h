@@ -63,6 +63,10 @@ struct _MMModem3gppUssdClass {
 
 GType mm_modem_3gpp_ussd_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModem3gppUssd, g_object_unref)
+#endif
+
 const gchar *mm_modem_3gpp_ussd_get_path (MMModem3gppUssd *self);
 gchar       *mm_modem_3gpp_ussd_dup_path (MMModem3gppUssd *self);
 

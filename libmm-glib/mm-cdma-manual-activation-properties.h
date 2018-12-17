@@ -55,6 +55,10 @@ struct _MMCdmaManualActivationPropertiesClass {
 
 GType mm_cdma_manual_activation_properties_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCdmaManualActivationProperties, g_object_unref)
+#endif
+
 MMCdmaManualActivationProperties *mm_cdma_manual_activation_properties_new (void);
 
 gboolean mm_cdma_manual_activation_properties_set_spc           (MMCdmaManualActivationProperties *self,

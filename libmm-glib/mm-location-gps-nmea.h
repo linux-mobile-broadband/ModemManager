@@ -55,6 +55,10 @@ struct _MMLocationGpsNmeaClass {
 
 GType mm_location_gps_nmea_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMLocationGpsNmea, g_object_unref)
+#endif
+
 const gchar *mm_location_gps_nmea_get_trace (MMLocationGpsNmea *self,
                                              const gchar *trace_type);
 gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);

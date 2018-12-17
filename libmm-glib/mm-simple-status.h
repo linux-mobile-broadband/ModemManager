@@ -55,6 +55,9 @@ struct _MMSimpleStatusClass {
 
 GType mm_simple_status_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSimpleStatus, g_object_unref)
+#endif
 
 MMModemState                  mm_simple_status_get_state               (MMSimpleStatus *self);
 guint32                       mm_simple_status_get_signal_quality      (MMSimpleStatus *self,

@@ -63,6 +63,10 @@ struct _MMSmsClass {
 
 GType mm_sms_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSms, g_object_unref)
+#endif
+
 const gchar *mm_sms_get_path                     (MMSms *self);
 gchar       *mm_sms_dup_path                     (MMSms *self);
 

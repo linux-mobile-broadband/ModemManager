@@ -55,6 +55,10 @@ struct _MMCallAudioFormatClass {
 
 GType mm_call_audio_format_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCallAudioFormat, g_object_unref)
+#endif
+
 const gchar *mm_call_audio_format_get_encoding   (MMCallAudioFormat *self);
 const gchar *mm_call_audio_format_get_resolution (MMCallAudioFormat *self);
 guint        mm_call_audio_format_get_rate       (MMCallAudioFormat *self);

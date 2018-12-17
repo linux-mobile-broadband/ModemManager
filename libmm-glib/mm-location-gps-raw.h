@@ -57,6 +57,10 @@ struct _MMLocationGpsRawClass {
 
 GType mm_location_gps_raw_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMLocationGpsRaw, g_object_unref)
+#endif
+
 const gchar *mm_location_gps_raw_get_utc_time  (MMLocationGpsRaw *self);
 gdouble      mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self);
 gdouble      mm_location_gps_raw_get_latitude  (MMLocationGpsRaw *self);

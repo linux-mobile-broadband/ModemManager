@@ -55,6 +55,10 @@ struct _MMFirmwarePropertiesClass {
 
 GType mm_firmware_properties_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMFirmwareProperties, g_object_unref)
+#endif
+
 const gchar         *mm_firmware_properties_get_unique_id  (MMFirmwareProperties *self);
 MMFirmwareImageType  mm_firmware_properties_get_image_type (MMFirmwareProperties *self);
 

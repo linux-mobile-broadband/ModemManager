@@ -63,6 +63,10 @@ struct _MMSimClass {
 
 GType mm_sim_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSim, g_object_unref)
+#endif
+
 const gchar *mm_sim_get_path                (MMSim *self);
 gchar       *mm_sim_dup_path                (MMSim *self);
 

@@ -60,6 +60,10 @@ struct _MMCallClass {
 
 GType mm_call_get_type (void);
 
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCall, g_object_unref)
+#endif
+
 const gchar       *mm_call_get_path         (MMCall *self);
 gchar             *mm_call_dup_path         (MMCall *self);
 
