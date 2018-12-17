@@ -151,7 +151,8 @@ print_firmware_status (void)
         MMModemFirmwareUpdateMethod m;
 
         m = mm_firmware_update_settings_get_method (update_settings);
-        method = mm_modem_firmware_update_method_get_string (m);
+        if (m != MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN)
+            method = mm_modem_firmware_update_method_get_string (m);
 
         switch (m) {
         case MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT:
@@ -160,6 +161,18 @@ print_firmware_status (void)
         default:
             break;
         }
+    }
+
+    /* There's not much to print in this status info, and if the modem
+     * does not support any firmware update method, we would just be returning
+     * an empty response to the --firmware-status action. So, instead, just
+     * return an error message explicitly when in human output type.
+     * We can remove this error message as soon as there is some parameter
+     * that will always be printed.
+     */
+    if (!method && !fastboot_at && mmcli_output_get () == MMC_OUTPUT_TYPE_HUMAN) {
+        g_printerr ("error: firmware status unsupported\n");
+        exit (EXIT_FAILURE);
     }
 
     mmcli_output_string (MMC_F_FIRMWARE_METHOD,      method);
