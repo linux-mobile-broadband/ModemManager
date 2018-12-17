@@ -63,6 +63,7 @@ static gchar *set_current_capabilities_str;
 static gchar *set_allowed_modes_str;
 static gchar *set_preferred_mode_str;
 static gchar *set_current_bands_str;
+static gboolean inhibit_flag;
 
 static GOptionEntry entries[] = {
     { "monitor-state", 'w', 0, G_OPTION_ARG_NONE, &monitor_state_flag,
@@ -125,6 +126,10 @@ static GOptionEntry entries[] = {
       "Set bands to be used by a given modem.",
       "[BAND1|BAND2...]"
     },
+    { "inhibit", 0, 0, G_OPTION_ARG_NONE, &inhibit_flag,
+      "Inhibit the modem",
+      NULL
+    },
     { NULL }
 };
 
@@ -167,7 +172,8 @@ mmcli_modem_options_enabled (void)
                  !!set_current_capabilities_str +
                  !!set_allowed_modes_str +
                  !!set_preferred_mode_str +
-                 !!set_current_bands_str);
+                 !!set_current_bands_str +
+                 inhibit_flag);
 
     if (n_actions == 0 && mmcli_get_common_modem_string ()) {
         /* default to info */
@@ -188,7 +194,7 @@ mmcli_modem_options_enabled (void)
         exit (EXIT_FAILURE);
     }
 
-    if (monitor_state_flag)
+    if (monitor_state_flag || inhibit_flag)
         mmcli_force_async_operation ();
 
     if (info_flag)
@@ -225,6 +231,42 @@ void
 mmcli_modem_shutdown (void)
 {
     context_free (ctx);
+}
+
+static void
+inhibition_cancelled (GCancellable *cancellable,
+                      const gchar  *uid)
+{
+    GError *error = NULL;
+
+    if (!mm_manager_uninhibit_device_sync (ctx->manager, uid, NULL, &error)) {
+        g_printerr ("error: couldn't uninhibit device: '%s'\n",
+                    error ? error->message : "unknown error");
+    } else
+        g_print ("successfully uninhibited device with uid '%s'\n", uid);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+inhibit_device_ready (MMManager    *manager,
+                      GAsyncResult *result,
+                      gchar        *uid)
+{
+    GError *error = NULL;
+
+    if (!mm_manager_inhibit_device_finish (manager, result, &error)) {
+        g_printerr ("error: couldn't inhibit device: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully inhibited device with uid '%s'\n", uid);
+    g_print ("type Ctrl+C to abort this program and remove the inhibition\n");
+
+    g_cancellable_connect (ctx->cancellable,
+                           G_CALLBACK (inhibition_cancelled),
+                           uid, g_free);
 }
 
 static void
@@ -1068,6 +1110,21 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to inhibit the modem? */
+    if (inhibit_flag) {
+        gchar *uid;
+
+        g_debug ("Asynchronously inhibiting modem...");
+        uid = mm_modem_dup_device (ctx->modem);
+
+        mm_manager_inhibit_device (ctx->manager,
+                                   uid,
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)inhibit_device_ready,
+                                   uid);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -1094,7 +1151,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 {
     GError *error = NULL;
 
-    if (monitor_state_flag)
+    if (monitor_state_flag || inhibit_flag)
         g_assert_not_reached ();
 
     /* Initialize context */
