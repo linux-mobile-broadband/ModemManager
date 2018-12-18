@@ -362,8 +362,10 @@ struct _MMIfaceModem {
     void     (* load_carrier_config)        (MMIfaceModem         *self,
                                              GAsyncReadyCallback   callback,
                                              gpointer              user_data);
-    gchar *  (* load_carrier_config_finish) (MMIfaceModem         *self,
+    gboolean (* load_carrier_config_finish) (MMIfaceModem         *self,
                                              GAsyncResult         *res,
+                                             gchar               **carrier_config_name,
+                                             gchar               **carrier_config_revision,
                                              GError              **error);
 
     /* Setup carrier config based on IMSI */
@@ -400,9 +402,11 @@ gboolean mm_iface_modem_is_4g      (MMIfaceModem *self);
 gboolean mm_iface_modem_is_4g_only (MMIfaceModem *self);
 
 /* Helpers to query properties */
-const gchar *mm_iface_modem_get_model          (MMIfaceModem *self);
-const gchar *mm_iface_modem_get_revision       (MMIfaceModem *self);
-const gchar *mm_iface_modem_get_carrier_config (MMIfaceModem *self);
+const gchar *mm_iface_modem_get_model          (MMIfaceModem  *self);
+const gchar *mm_iface_modem_get_revision       (MMIfaceModem  *self);
+gboolean     mm_iface_modem_get_carrier_config (MMIfaceModem  *self,
+                                                const gchar  **name,
+                                                const gchar  **revision);
 
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,

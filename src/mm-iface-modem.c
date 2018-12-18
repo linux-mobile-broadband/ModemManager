@@ -4363,17 +4363,19 @@ load_carrier_config_ready (MMIfaceModem *self,
 {
     InitializationContext *ctx;
     GError                *error = NULL;
-    gchar                 *carrier_configuration;
+    gchar                 *name = NULL;
+    gchar                 *revision = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    carrier_configuration = MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config_finish (self, res, &error);
-    if (!carrier_configuration) {
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config_finish (self, res, &name, &revision, &error)) {
         mm_warn ("couldn't load carrier config: '%s'", error->message);
         g_error_free (error);
     } else {
-        mm_gdbus_modem_set_carrier_configuration (ctx->skeleton, carrier_configuration);
-        g_free (carrier_configuration);
+        mm_gdbus_modem_set_carrier_configuration          (ctx->skeleton, name);
+        mm_gdbus_modem_set_carrier_configuration_revision (ctx->skeleton, revision);
+        g_free (name);
+        g_free (revision);
     }
 
     /* Go on to next step */
@@ -5452,22 +5454,25 @@ mm_iface_modem_get_revision (MMIfaceModem *self)
     return revision;
 }
 
-const gchar *
-mm_iface_modem_get_carrier_config (MMIfaceModem *self)
+gboolean
+mm_iface_modem_get_carrier_config (MMIfaceModem  *self,
+                                   const gchar  **name,
+                                   const gchar  **revision)
 {
-    const gchar *carrier_config = NULL;
     MmGdbusModem *skeleton;
 
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                   NULL);
+    if (!skeleton)
+        return FALSE;
 
-    if (skeleton) {
-        carrier_config = mm_gdbus_modem_get_carrier_configuration (skeleton);
-        g_object_unref (skeleton);
-    }
-
-    return carrier_config;
+    if (name)
+        *name = mm_gdbus_modem_get_carrier_configuration (skeleton);
+    if (revision)
+        *revision = mm_gdbus_modem_get_carrier_configuration_revision (skeleton);
+    g_object_unref (skeleton);
+    return TRUE;
 }
 
 /*****************************************************************************/

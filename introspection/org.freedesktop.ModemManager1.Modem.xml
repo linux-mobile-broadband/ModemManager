@@ -304,6 +304,13 @@
     <property name="CarrierConfiguration" type="s" access="read" />
 
     <!--
+        CarrierConfigurationRevision:
+
+        The revision identification of the carrier-specific configuration (MCFG) in use by the modem.
+    -->
+    <property name="CarrierConfigurationRevision" type="s" access="read" />
+
+    <!--
         HardwareRevision:
 
         The revision identification of the hardware, as reported by the modem.

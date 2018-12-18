@@ -150,8 +150,10 @@ gboolean           mm_shared_qmi_factory_reset_finish               (MMIfaceMode
 void               mm_shared_qmi_load_carrier_config                (MMIfaceModem         *self,
                                                                      GAsyncReadyCallback   callback,
                                                                      gpointer              user_data);
-gchar             *mm_shared_qmi_load_carrier_config_finish         (MMIfaceModem         *self,
+gboolean           mm_shared_qmi_load_carrier_config_finish         (MMIfaceModem         *self,
                                                                      GAsyncResult         *res,
+                                                                     gchar               **carrier_config_name,
+                                                                     gchar               **carrier_config_revision,
                                                                      GError              **error);
 void               mm_shared_qmi_setup_carrier_config               (MMIfaceModem         *self,
                                                                      const gchar          *imsi,

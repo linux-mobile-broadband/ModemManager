@@ -103,8 +103,10 @@ gchar             *mm_modem_dup_model                (MMModem *self);
 const gchar       *mm_modem_get_revision             (MMModem *self);
 gchar             *mm_modem_dup_revision             (MMModem *self);
 
-const gchar       *mm_modem_get_carrier_configuration (MMModem *self);
-gchar             *mm_modem_dup_carrier_configuration (MMModem *self);
+const gchar       *mm_modem_get_carrier_configuration          (MMModem *self);
+gchar             *mm_modem_dup_carrier_configuration          (MMModem *self);
+const gchar       *mm_modem_get_carrier_configuration_revision (MMModem *self);
+gchar             *mm_modem_dup_carrier_configuration_revision (MMModem *self);
 
 const gchar       *mm_modem_get_hardware_revision    (MMModem *self);
 gchar             *mm_modem_dup_hardware_revision    (MMModem *self);
