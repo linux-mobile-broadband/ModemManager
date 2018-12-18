@@ -8243,6 +8243,7 @@ static const QmiService qmi_services[] = {
     QMI_SERVICE_OMA,
     QMI_SERVICE_UIM,
     QMI_SERVICE_LOC,
+    QMI_SERVICE_PDC,
 };
 
 typedef struct {
@@ -8586,6 +8587,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_power_state_finish = load_power_state_finish;
     iface->load_supported_ip_families = modem_load_supported_ip_families;
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
+    iface->load_carrier_config = mm_shared_qmi_load_carrier_config;
+    iface->load_carrier_config_finish = mm_shared_qmi_load_carrier_config_finish;
+    iface->setup_carrier_config = mm_shared_qmi_setup_carrier_config;
+    iface->setup_carrier_config_finish = mm_shared_qmi_setup_carrier_config_finish;
 
     /* Enabling/disabling */
     iface->modem_power_up = modem_power_up;

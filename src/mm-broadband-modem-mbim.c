@@ -1937,6 +1937,7 @@ static const QmiService qmi_services[] = {
     QMI_SERVICE_NAS,
     QMI_SERVICE_PDS,
     QMI_SERVICE_LOC,
+    QMI_SERVICE_PDC,
 };
 
 static void allocate_next_qmi_client (GTask *task);
@@ -5231,6 +5232,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    iface->load_carrier_config = mm_shared_qmi_load_carrier_config;
+    iface->load_carrier_config_finish = mm_shared_qmi_load_carrier_config_finish;
+    iface->setup_carrier_config = mm_shared_qmi_setup_carrier_config;
+    iface->setup_carrier_config_finish = mm_shared_qmi_setup_carrier_config_finish;
     iface->load_supported_bands = mm_shared_qmi_load_supported_bands;
     iface->load_supported_bands_finish = mm_shared_qmi_load_supported_bands_finish;
     iface->load_current_bands = mm_shared_qmi_load_current_bands;
