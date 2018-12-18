@@ -311,6 +311,7 @@ add_generic_device_ids (MMBaseModem               *self,
     GPtrArray   *ids;
     MMPort      *primary = NULL;
     const gchar *subsystem;
+    const gchar *aux;
 
     vid = mm_base_modem_get_vendor_id (self);
     pid = mm_base_modem_get_product_id (self);
@@ -334,7 +335,17 @@ add_generic_device_ids (MMBaseModem               *self,
         return FALSE;
     }
 
+    /* carrier = g_ascii_strup (mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self)), -1);     */
+    aux = mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self));
+
     ids = g_ptr_array_new_with_free_func ((GDestroyNotify)g_free);
+    if (aux) {
+        gchar *carrier;
+
+        carrier = g_ascii_strup (aux, -1);
+        g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X&REV_%04X&CARRIER_%s", vid, pid, rid, carrier));
+        g_free (carrier);
+    }
     g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X&REV_%04X", vid, pid, rid));
     g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X", vid, pid));
     g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X", vid));
