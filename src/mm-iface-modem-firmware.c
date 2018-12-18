@@ -287,16 +287,27 @@ add_generic_version (MMBaseModem               *self,
                      MMFirmwareUpdateSettings  *update_settings,
                      GError                   **error)
 {
-    const gchar *revision;
+    const gchar *firmware_revision;
+    const gchar *carrier_revision;
+    gchar       *combined;
 
-    revision = mm_iface_modem_get_revision (MM_IFACE_MODEM (self));
-    if (!revision) {
+    firmware_revision = mm_iface_modem_get_revision (MM_IFACE_MODEM (self));
+    if (!firmware_revision) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Unknown revision");
         return FALSE;
     }
 
-    mm_firmware_update_settings_set_version (update_settings, revision);
+    mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self), NULL, &carrier_revision);
+
+    if (!carrier_revision) {
+        mm_firmware_update_settings_set_version (update_settings, firmware_revision);
+        return TRUE;
+    }
+
+    combined = g_strdup_printf ("%s - %s", firmware_revision, carrier_revision);
+    mm_firmware_update_settings_set_version (update_settings, combined);
+    g_free (combined);
     return TRUE;
 }
 
@@ -335,8 +346,7 @@ add_generic_device_ids (MMBaseModem               *self,
         return FALSE;
     }
 
-    /* carrier = g_ascii_strup (mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self)), -1);     */
-    aux = mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self));
+    mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self), &aux, NULL);
 
     ids = g_ptr_array_new_with_free_func ((GDestroyNotify)g_free);
     if (aux) {

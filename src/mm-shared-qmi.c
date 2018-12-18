@@ -2419,7 +2419,6 @@ typedef struct {
     GArray       *config_list;
     guint         configs_loaded;
     gint          config_active_i;
-    gchar        *config_active;
 
     guint         token;
     guint         timeout_id;
@@ -2458,17 +2457,31 @@ load_carrier_config_context_free (LoadCarrierConfigContext *ctx)
 
     if (ctx->config_list)
         g_array_unref (ctx->config_list);
-    g_free (ctx->config_active);
     g_clear_object (&ctx->client);
     g_slice_free (LoadCarrierConfigContext, ctx);
 }
 
-gchar *
+gboolean
 mm_shared_qmi_load_carrier_config_finish (MMIfaceModem  *self,
                                           GAsyncResult  *res,
+                                          gchar        **carrier_config_name,
+                                          gchar        **carrier_config_revision,
                                           GError       **error)
 {
-    return g_task_propagate_pointer (G_TASK (res), error);
+    Private    *priv;
+    ConfigInfo *config;
+    gssize      i;
+
+    i = g_task_propagate_int (G_TASK (res), error);
+    if (i < 0)
+        return FALSE;
+
+    priv = get_private (MM_SHARED_QMI (self));
+    config = &g_array_index (priv->config_list, ConfigInfo, i);
+
+    *carrier_config_name = g_strdup (config->description);
+    *carrier_config_revision = g_strdup_printf ("%08X", config->version);
+    return TRUE;
 }
 
 static void load_carrier_config_step (GTask *task);
@@ -2543,7 +2556,6 @@ get_selected_config_indication (QmiClientPdc                            *client,
         if ((config->id->len == active_id->len) &&
             !memcmp (config->id->data, active_id->data, active_id->len)) {
             ctx->config_active_i = i;
-            ctx->config_active = g_strdup (config->description);
             break;
         }
     }
@@ -2812,8 +2824,7 @@ load_carrier_config_step (GTask *task)
         priv->config_list = g_array_ref (ctx->config_list);
         priv->config_active_i = ctx->config_active_i;
 
-        g_assert (ctx->config_active);
-        g_task_return_pointer (task, g_strdup (ctx->config_active), g_free);
+        g_task_return_int (task, ctx->config_active_i);
         g_object_unref (task);
         break;
     }
