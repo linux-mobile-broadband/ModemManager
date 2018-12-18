@@ -5452,6 +5452,24 @@ mm_iface_modem_get_revision (MMIfaceModem *self)
     return revision;
 }
 
+const gchar *
+mm_iface_modem_get_carrier_config (MMIfaceModem *self)
+{
+    const gchar *carrier_config = NULL;
+    MmGdbusModem *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (skeleton) {
+        carrier_config = mm_gdbus_modem_get_carrier_configuration (skeleton);
+        g_object_unref (skeleton);
+    }
+
+    return carrier_config;
+}
+
 /*****************************************************************************/
 
 static void
