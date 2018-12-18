@@ -147,6 +147,20 @@ void               mm_shared_qmi_factory_reset                      (MMIfaceMode
 gboolean           mm_shared_qmi_factory_reset_finish               (MMIfaceModem         *self,
                                                                      GAsyncResult         *res,
                                                                      GError              **error);
+void               mm_shared_qmi_load_carrier_config                (MMIfaceModem         *self,
+                                                                     GAsyncReadyCallback   callback,
+                                                                     gpointer              user_data);
+gchar             *mm_shared_qmi_load_carrier_config_finish         (MMIfaceModem         *self,
+                                                                     GAsyncResult         *res,
+                                                                     GError              **error);
+void               mm_shared_qmi_setup_carrier_config               (MMIfaceModem         *self,
+                                                                     const gchar          *imsi,
+                                                                     const gchar          *carrier_config_mapping,
+                                                                     GAsyncReadyCallback   callback,
+                                                                     gpointer              user_data);
+gboolean           mm_shared_qmi_setup_carrier_config_finish        (MMIfaceModem         *self,
+                                                                     GAsyncResult         *res,
+                                                                     GError              **error);
 
 /* Shared QMI location support */
 
