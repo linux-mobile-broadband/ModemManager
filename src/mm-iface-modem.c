@@ -3942,6 +3942,7 @@ typedef enum {
     INITIALIZATION_STEP_MANUFACTURER,
     INITIALIZATION_STEP_MODEL,
     INITIALIZATION_STEP_REVISION,
+    INITIALIZATION_STEP_CARRIER_CONFIG,
     INITIALIZATION_STEP_HARDWARE_REVISION,
     INITIALIZATION_STEP_EQUIPMENT_ID,
     INITIALIZATION_STEP_DEVICE_ID,
@@ -3952,6 +3953,7 @@ typedef enum {
     INITIALIZATION_STEP_SIM_HOT_SWAP,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_SIM,
+    INITIALIZATION_STEP_SETUP_CARRIER_CONFIG,
     INITIALIZATION_STEP_OWN_NUMBERS,
     INITIALIZATION_STEP_CURRENT_MODES,
     INITIALIZATION_STEP_CURRENT_BANDS,
@@ -4334,6 +4336,51 @@ sim_reinit_ready (MMBaseSim *sim,
     interface_initialization_step (task);
 }
 
+static void
+setup_carrier_config_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    InitializationContext *ctx;
+    GError                *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config_finish (self, res, &error)) {
+        mm_warn ("couldn't setup carrier config: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
+}
+
+static void
+load_carrier_config_ready (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    InitializationContext *ctx;
+    GError                *error = NULL;
+    gchar                 *carrier_configuration;
+
+    ctx = g_task_get_task_data (task);
+
+    carrier_configuration = MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config_finish (self, res, &error);
+    if (!carrier_configuration) {
+        mm_warn ("couldn't load carrier config: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        mm_gdbus_modem_set_carrier_configuration (ctx->skeleton, carrier_configuration);
+        g_free (carrier_configuration);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
+}
+
 void
 mm_iface_modem_update_own_numbers (MMIfaceModem *self,
                                    const GStrv own_numbers)
@@ -4700,6 +4747,21 @@ interface_initialization_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
+    case INITIALIZATION_STEP_CARRIER_CONFIG:
+        /* Current carrier config is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_carrier_configuration (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_carrier_config (self,
+                                                                      (GAsyncReadyCallback)load_carrier_config_ready,
+                                                                      task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case INITIALIZATION_STEP_HARDWARE_REVISION:
         /* HardwareRevision is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
@@ -4895,6 +4957,49 @@ interface_initialization_step (GTask *task)
                                     task);
             g_object_unref (sim);
             return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_SETUP_CARRIER_CONFIG:
+        /* Setup and perform automatic carrier config switching as soon as the
+         * SIM initialization has been performed, only applicable if there is
+         * actually a SIM found with a valid IMSI read */
+        if (!mm_iface_modem_is_cdma_only (self) &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config_finish) {
+            MMBaseSim *sim = NULL;
+            gchar     *carrier_config_mapping = NULL;
+
+            g_object_get (self,
+                          MM_IFACE_MODEM_SIM, &sim,
+                          MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING, &carrier_config_mapping,
+                          NULL);
+
+            /* If we have a SIM object, and carrier config switching is supported,
+             * validate whether we're already using the best config or not. */
+            if (!sim)
+                mm_dbg ("not setting up carrier config: SIM not found");
+            else if (!carrier_config_mapping)
+                mm_dbg ("not setting up carrier config: mapping file not configured");
+            else {
+                const gchar *imsi;
+
+                imsi = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (sim));
+                if (imsi) {
+                    MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config (self,
+                                                                               imsi,
+                                                                               carrier_config_mapping,
+                                                                               (GAsyncReadyCallback)setup_carrier_config_ready,
+                                                                               task);
+                    g_object_unref (sim);
+                    g_free (carrier_config_mapping);
+                    return;
+                }
+                mm_warn ("couldn't setup carrier config: unknown IMSI");
+            }
+            g_clear_object (&sim);
+            g_free (carrier_config_mapping);
         }
         /* Fall down to next step */
         ctx->step++;
@@ -5413,6 +5518,14 @@ iface_modem_init (gpointer g_iface)
                                "Periodic signal check disabled",
                                "Whether periodic signal check is disabled.",
                                FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_string (MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,
+                              "Carrier config mapping table",
+                              "Path to the file including the carrier mapping for the module",
+                               NULL,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     initialized = TRUE;

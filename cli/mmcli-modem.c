@@ -351,6 +351,7 @@ print_modem_info (void)
     mmcli_output_string           (MMC_F_HARDWARE_MANUFACTURER,           mm_modem_get_manufacturer (ctx->modem));
     mmcli_output_string           (MMC_F_HARDWARE_MODEL,                  mm_modem_get_model (ctx->modem));
     mmcli_output_string           (MMC_F_HARDWARE_REVISION,               mm_modem_get_revision (ctx->modem));
+    mmcli_output_string           (MMC_F_HARDWARE_CARRIER_CONFIGURATION,  mm_modem_get_carrier_configuration (ctx->modem));
     mmcli_output_string           (MMC_F_HARDWARE_HW_REVISION,            mm_modem_get_hardware_revision (ctx->modem));
     mmcli_output_string_multiline (MMC_F_HARDWARE_SUPPORTED_CAPABILITIES, supported_capabilities_string);
     mmcli_output_string_multiline (MMC_F_HARDWARE_CURRENT_CAPABILITIES,   current_capabilities_string);

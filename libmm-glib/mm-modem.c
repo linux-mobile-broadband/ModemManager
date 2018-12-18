@@ -503,6 +503,47 @@ mm_modem_dup_revision (MMModem *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_get_carrier_configuration:
+ * @self: A #MMModem.
+ *
+ * Gets the carrier-specific configuration (MCFG) in use, as reported by this #MMModem.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_dup_carrier_configuration() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): The carrier configuration, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ */
+const gchar *
+mm_modem_get_carrier_configuration (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_carrier_configuration (MM_GDBUS_MODEM (self)));
+}
+
+/**
+ * mm_modem_dup_carrier_configuration:
+ * @self: A #MMModem.
+ *
+ * Gets a copy of the carrier-specific configuration (MCFG) in use, as reported by this #MMModem.
+ *
+ * Returns: (transfer full): The carrier configuration, or %NULL if none available. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_dup_carrier_configuration (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_carrier_configuration (MM_GDBUS_MODEM (self)));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_get_hardware_revision:
  * @self: A #MMModem.
  *

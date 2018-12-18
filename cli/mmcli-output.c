@@ -97,6 +97,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_HARDWARE_MANUFACTURER]             = { "modem.generic.manufacturer",                      "manufacturer",             MMC_S_MODEM_HARDWARE,          },
     [MMC_F_HARDWARE_MODEL]                    = { "modem.generic.model",                             "model",                    MMC_S_MODEM_HARDWARE,          },
     [MMC_F_HARDWARE_REVISION]                 = { "modem.generic.revision",                          "revision",                 MMC_S_MODEM_HARDWARE,          },
+    [MMC_F_HARDWARE_CARRIER_CONFIGURATION]    = { "modem.generic.carrier-configuration",             "carrier config",           MMC_S_MODEM_HARDWARE,          },
     [MMC_F_HARDWARE_HW_REVISION]              = { "modem.generic.hardware-revision",                 "h/w revision",             MMC_S_MODEM_HARDWARE,          },
     [MMC_F_HARDWARE_SUPPORTED_CAPABILITIES]   = { "modem.generic.supported-capabilities",            "supported",                MMC_S_MODEM_HARDWARE,          },
     [MMC_F_HARDWARE_CURRENT_CAPABILITIES]     = { "modem.generic.current-capabilities",              "current",                  MMC_S_MODEM_HARDWARE,          },

@@ -39,6 +39,7 @@
 #define MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED  "iface-modem-sim-hot-swap-supported"
 #define MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED "iface-modem-sim-hot-swap-configured"
 #define MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED "iface-modem-periodic-signal-check-disabled"
+#define MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING  "iface-modem-carrier-config-mapping"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
@@ -356,6 +357,24 @@ struct _MMIfaceModem {
     gboolean (*setup_sim_hot_swap_finish) (MMIfaceModem *self,
                                             GAsyncResult *res,
                                             GError **error);
+
+    /* Load carrier config */
+    void     (* load_carrier_config)        (MMIfaceModem         *self,
+                                             GAsyncReadyCallback   callback,
+                                             gpointer              user_data);
+    gchar *  (* load_carrier_config_finish) (MMIfaceModem         *self,
+                                             GAsyncResult         *res,
+                                             GError              **error);
+
+    /* Setup carrier config based on IMSI */
+    void     (* setup_carrier_config)        (MMIfaceModem         *self,
+                                              const gchar          *imsi,
+                                              const gchar          *carrier_config_mapping,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
+    gboolean (* setup_carrier_config_finish) (MMIfaceModem         *self,
+                                              GAsyncResult         *res,
+                                              GError              **error);
 };
 
 GType mm_iface_modem_get_type (void);
