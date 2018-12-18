@@ -283,6 +283,24 @@ mm_iface_modem_firmware_initialize_finish (MMIfaceModemFirmware  *self,
 }
 
 static gboolean
+add_generic_version (MMBaseModem               *self,
+                     MMFirmwareUpdateSettings  *update_settings,
+                     GError                   **error)
+{
+    const gchar *revision;
+
+    revision = mm_iface_modem_get_revision (MM_IFACE_MODEM (self));
+    if (!revision) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown revision");
+        return FALSE;
+    }
+
+    mm_firmware_update_settings_set_version (update_settings, revision);
+    return TRUE;
+}
+
+static gboolean
 add_generic_device_ids (MMBaseModem               *self,
                         MMFirmwareUpdateSettings  *update_settings,
                         GError                   **error)
@@ -343,20 +361,33 @@ load_update_settings_ready (MMIfaceModemFirmware *self,
     if (!update_settings) {
         mm_dbg ("Couldn't load update settings: '%s'", error->message);
         g_error_free (error);
-    } else {
-        /* If the plugin didn't specify custom device ids, add the default ones ourselves */
-        if (!mm_firmware_update_settings_get_device_ids (update_settings) &&
-            !add_generic_device_ids (MM_BASE_MODEM (self), update_settings, &error)) {
-            mm_warn ("Couldn't build device ids: '%s'", error->message);
-            g_error_free (error);
-        } else {
-            variant = mm_firmware_update_settings_get_variant (update_settings);
-            g_object_unref (update_settings);
-        }
+        goto out;
     }
 
-    mm_gdbus_modem_firmware_set_update_settings (ctx->skeleton, variant);
+    /* If the plugin didn't specify custom device ids, add the default ones ourselves */
+    if (!mm_firmware_update_settings_get_device_ids (update_settings) &&
+        !add_generic_device_ids (MM_BASE_MODEM (self), update_settings, &error)) {
+        mm_warn ("Couldn't build device ids: '%s'", error->message);
+        g_error_free (error);
+        g_clear_object (&update_settings);
+        goto out;
+    }
 
+    /* If the plugin didn't specify custom version, add the default one ourselves */
+    if (!mm_firmware_update_settings_get_version (update_settings) &&
+        !add_generic_version (MM_BASE_MODEM (self), update_settings, &error)) {
+        mm_warn ("Couldn't set version: '%s'", error->message);
+        g_error_free (error);
+        g_clear_object (&update_settings);
+        goto out;
+    }
+
+out:
+    if (update_settings) {
+        variant = mm_firmware_update_settings_get_variant (update_settings);
+        g_object_unref (update_settings);
+    }
+    mm_gdbus_modem_firmware_set_update_settings (ctx->skeleton, variant);
     if (variant)
         g_variant_unref (variant);
 

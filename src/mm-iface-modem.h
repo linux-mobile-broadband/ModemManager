@@ -380,8 +380,9 @@ gboolean mm_iface_modem_is_3g_only (MMIfaceModem *self);
 gboolean mm_iface_modem_is_4g      (MMIfaceModem *self);
 gboolean mm_iface_modem_is_4g_only (MMIfaceModem *self);
 
-/* Helper to query model */
-const gchar *mm_iface_modem_get_model (MMIfaceModem *self);
+/* Helpers to query properties */
+const gchar *mm_iface_modem_get_model    (MMIfaceModem *self);
+const gchar *mm_iface_modem_get_revision (MMIfaceModem *self);
 
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,

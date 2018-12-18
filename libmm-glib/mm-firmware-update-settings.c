@@ -31,12 +31,14 @@
 G_DEFINE_TYPE (MMFirmwareUpdateSettings, mm_firmware_update_settings, G_TYPE_OBJECT)
 
 #define PROPERTY_DEVICE_IDS  "device-ids"
+#define PROPERTY_VERSION     "version"
 #define PROPERTY_FASTBOOT_AT "fastboot-at"
 
 struct _MMFirmwareUpdateSettingsPrivate {
     /* Generic */
     MMModemFirmwareUpdateMethod   method;
     gchar                       **device_ids;
+    gchar                        *version;
     /* Fasboot specific */
     gchar *fastboot_at;
 };
@@ -86,6 +88,35 @@ mm_firmware_update_settings_set_device_ids (MMFirmwareUpdateSettings  *self,
 
     g_strfreev (self->priv->device_ids);
     self->priv->device_ids = g_strdupv ((gchar **)device_ids);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_firmware_update_settings_get_version:
+ * @self: a #MMFirmwareUpdateSettings.
+ *
+ * Gets firmware version string.
+ *
+ *
+ * Returns: The version string, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ */
+const gchar *
+mm_firmware_update_settings_get_version (MMFirmwareUpdateSettings *self)
+{
+    g_return_val_if_fail (MM_IS_FIRMWARE_UPDATE_SETTINGS (self), NULL);
+
+    return self->priv->version;
+}
+
+void
+mm_firmware_update_settings_set_version (MMFirmwareUpdateSettings *self,
+                                         const gchar              *version)
+{
+    g_return_if_fail (MM_IS_FIRMWARE_UPDATE_SETTINGS (self));
+
+    g_free (self->priv->version);
+    self->priv->version = g_strdup (version);
 }
 
 /*****************************************************************************/
@@ -149,6 +180,11 @@ mm_firmware_update_settings_get_variant (MMFirmwareUpdateSettings *self)
                                PROPERTY_DEVICE_IDS,
                                g_variant_new_strv ((const gchar * const *)self->priv->device_ids, -1));
 
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_VERSION,
+                               g_variant_new_string (self->priv->version));
+
         switch (method) {
         case MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT:
             g_variant_builder_add (&builder,
@@ -176,6 +212,9 @@ consume_variant (MMFirmwareUpdateSettings  *self,
     if (g_str_equal (key, PROPERTY_FASTBOOT_AT)) {
         g_free (self->priv->fastboot_at);
         self->priv->fastboot_at = g_variant_dup_string (value, NULL);
+    } else if (g_str_equal (key, PROPERTY_VERSION)) {
+        g_free (self->priv->version);
+        self->priv->version = g_variant_dup_string (value, NULL);
     } else if (g_str_equal (key, PROPERTY_DEVICE_IDS)) {
         g_strfreev (self->priv->device_ids);
         self->priv->device_ids = g_variant_dup_strv (value, NULL);
@@ -232,9 +271,15 @@ mm_firmware_update_settings_new_from_variant (GVariant  *variant,
             g_variant_unref (value);
         }
 
-        if (!inner_error && !self->priv->device_ids)
-            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                       "Missing required'" PROPERTY_DEVICE_IDS "' setting");
+        if (!inner_error) {
+            if (!self->priv->device_ids)
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                           "Missing required '" PROPERTY_DEVICE_IDS "' setting");
+            else if (!self->priv->version)
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                           "Missing required '" PROPERTY_VERSION "' setting");
+        }
+
         if (!inner_error) {
             switch (method) {
             case MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT:
@@ -281,6 +326,7 @@ finalize (GObject *object)
     MMFirmwareUpdateSettings *self = MM_FIRMWARE_UPDATE_SETTINGS (object);
 
     g_strfreev (self->priv->device_ids);
+    g_free (self->priv->version);
     g_free (self->priv->fastboot_at);
 
     G_OBJECT_CLASS (mm_firmware_update_settings_parent_class)->finalize (object);

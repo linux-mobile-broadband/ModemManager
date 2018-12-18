@@ -122,6 +122,7 @@
         Detailed settings that provide information about how the module should be
         updated.
 
+
         The settings are given as a <link linkend="MMModemFirmwareUpdateMethod">MMModemFirmwareUpdateMethod</link>
         value specifying the type of firmware update procedure expected followed by a
         dictionary that includes other parameters applicable to the specific method.
@@ -140,6 +141,15 @@
                     device, from most specific to least specific. (signature <literal>'as'</literal>).
                     E.g. a list containing: <literal>"USB\VID_413C&amp;PID_81D7&amp;REV_0001"</literal>,
                     <literal>"USB\VID_413C&amp;PID_81D7"</literal> and <literal>"USB\VID_413C"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"version"</literal></term>
+                  <listitem>
+                    (Required) This property exposes the current firmware version string of the module.
+                    If the module uses separate version numbers for firmware version and carrier configuration,
+                    this version string will be a combination of both, and so it may be different to the
+                    version string showed in the #org.freedesktop.ModemManager1.Modem:Revision property.
+                    (signature <literal>'s'</literal>)
                   </listitem>
                 </varlistentry>
                 <varlistentry><term><literal>"fastboot-at"</literal></term>

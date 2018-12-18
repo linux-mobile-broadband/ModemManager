@@ -5329,6 +5329,24 @@ mm_iface_modem_get_model (MMIfaceModem *self)
     return model;
 }
 
+const gchar *
+mm_iface_modem_get_revision (MMIfaceModem *self)
+{
+    const gchar *revision = NULL;
+    MmGdbusModem *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (skeleton) {
+        revision = mm_gdbus_modem_get_revision (skeleton);
+        g_object_unref (skeleton);
+    }
+
+    return revision;
+}
+
 /*****************************************************************************/
 
 static void

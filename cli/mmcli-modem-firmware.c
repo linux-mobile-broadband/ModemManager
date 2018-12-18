@@ -145,6 +145,7 @@ print_firmware_status (void)
     MMFirmwareUpdateSettings  *update_settings;
     const gchar               *method = NULL;
     const gchar              **device_ids = NULL;
+    const gchar               *version = NULL;
     const gchar               *fastboot_at = NULL;
 
     update_settings = mm_modem_firmware_peek_update_settings (ctx->modem_firmware);
@@ -155,6 +156,7 @@ print_firmware_status (void)
         if (m != MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN) {
             method = mm_modem_firmware_update_method_get_string (m);
             device_ids = mm_firmware_update_settings_get_device_ids (update_settings);
+            version = mm_firmware_update_settings_get_version (update_settings);
         }
 
         switch (m) {
@@ -179,7 +181,8 @@ print_firmware_status (void)
     }
 
     mmcli_output_string       (MMC_F_FIRMWARE_METHOD,      method);
-    mmcli_output_string_array (MMC_F_FIRMWARE_DEVICE_IDS,  device_ids, FALSE);
+    mmcli_output_string_array (MMC_F_FIRMWARE_DEVICE_IDS,  device_ids, TRUE);
+    mmcli_output_string       (MMC_F_FIRMWARE_VERSION,     version);
     mmcli_output_string       (MMC_F_FIRMWARE_FASTBOOT_AT, fastboot_at);
     mmcli_output_dump ();
 }
