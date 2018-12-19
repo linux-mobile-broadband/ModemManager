@@ -190,7 +190,7 @@ get_supported_modes_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Fail to get response %s", response);
+        mm_dbg ("Fail to get response");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
