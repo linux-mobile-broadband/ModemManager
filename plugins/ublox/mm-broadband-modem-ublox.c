@@ -175,8 +175,8 @@ load_supported_bands (MMIfaceModem        *self,
     GArray      *bands = NULL;
     const gchar *model;
 
-    model = mm_iface_modem_get_model (MM_BROADBAND_MODEM_UBLOX (self));
-    task  = g_task_new (_self, NULL, callback, user_data);
+    model = mm_iface_modem_get_model (self);
+    task  = g_task_new (self, NULL, callback, user_data);
 
     bands = mm_ublox_get_supported_bands (model, &error);
     if (!bands)
@@ -190,23 +190,67 @@ load_supported_bands (MMIfaceModem        *self,
 /* Load current bands (Modem interface) */
 
 static GArray *
-load_current_bands_finish (MMIfaceModem  *_self,
+load_current_bands_finish (MMIfaceModem  *self,
                            GAsyncResult  *res,
                            GError       **error)
 {
-    MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
-    const gchar           *response;
-    const gchar           *model;
+    return (GArray *) g_task_propagate_pointer (G_TASK (res), error);
+}
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    model    = mm_iface_modem_get_model (_self);
-    if (!response)
-        return NULL;
+static void
+uact_load_current_bands_ready (MMBaseModem  *self,
+                               GAsyncResult *res,
+                               GTask        *task)
+{
+    GError      *error = NULL;
+    const gchar *response;
+    GArray      *out;
 
-    if (self->priv->support_config.uact == FEATURE_SUPPORTED)
-        return mm_ublox_parse_uact_response (response, error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
-    return mm_ublox_parse_ubandsel_response (response, model, error);
+    out = mm_ublox_parse_uact_response (response, &error);
+    if (!out) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_pointer (task, out, (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
+}
+
+static void
+ubandsel_load_current_bands_ready (MMBaseModem  *self,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    GError      *error = NULL;
+    const gchar *response;
+    const gchar *model;
+    GArray      *out;
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    model = mm_iface_modem_get_model (MM_IFACE_MODEM (self));
+    out = mm_ublox_parse_ubandsel_response (response, model, &error);
+    if (!out) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_pointer (task, out, (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
 }
 
 static void
@@ -215,8 +259,11 @@ load_current_bands (MMIfaceModem        *_self,
                     gpointer             user_data)
 {
     MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
+    GTask                 *task;
 
     preload_support_config (self);
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->support_config.ubandsel == FEATURE_SUPPORTED) {
         mm_base_modem_at_command (
@@ -224,8 +271,8 @@ load_current_bands (MMIfaceModem        *_self,
             "+UBANDSEL?",
             3,
             FALSE,
-            (GAsyncReadyCallback)callback,
-            user_data);
+            (GAsyncReadyCallback)ubandsel_load_current_bands_ready,
+            task);
         return;
     }
 
@@ -235,10 +282,14 @@ load_current_bands (MMIfaceModem        *_self,
             "+UACT?",
             3,
             FALSE,
-            (GAsyncReadyCallback)callback,
-            user_data);
+            (GAsyncReadyCallback)uact_load_current_bands_ready,
+            task);
         return;
     }
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "loading current bands is unsupported");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
