@@ -117,16 +117,9 @@ load_supported_bands (MMIfaceModem        *_self,
     task  = g_task_new (_self, NULL, callback, user_data);
 
     bands = mm_ublox_get_supported_bands (model, &error);
-
-    if (!mm_ublox_get_support_config (model, &self->priv->support_config, &error)) {
-        g_assert (error);
+    if (!bands || !mm_ublox_get_support_config (model, &self->priv->support_config, &error))
         g_task_return_error (task, error);
-    }
-
-    if (!bands) {
-        g_assert (error);
-        g_task_return_error (task, error);
-    } else
+    else
         g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
 }
