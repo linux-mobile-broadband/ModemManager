@@ -29,16 +29,16 @@ typedef enum {
 } FeatureSupport;
 
 typedef enum {
-    BAND_UPDATE_NEEDS_UNKNOWN,
-    BAND_UPDATE_NEEDS_CFUN,
-    BAND_UPDATE_NEEDS_COPS,
-} UpdateMethod;
+    SETTINGS_UPDATE_METHOD_UNKNOWN,
+    SETTINGS_UPDATE_METHOD_CFUN,
+    SETTINGS_UPDATE_METHOD_COPS,
+} SettingsUpdateMethod;
 
 typedef struct UbloxSupportConfig {
-    gboolean       loaded;
-    UpdateMethod   method;
-    FeatureSupport uact;
-    FeatureSupport ubandsel;
+    gboolean             loaded;
+    SettingsUpdateMethod method;
+    FeatureSupport       uact;
+    FeatureSupport       ubandsel;
 } UbloxSupportConfig;
 
 /*****************************************************************************/

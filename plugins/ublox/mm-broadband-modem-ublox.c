@@ -91,20 +91,20 @@ preload_support_config (MMBroadbandModemUblox *self)
         g_error_free (error);
 
         /* default to NOT SUPPORTED if unknown model */
-        self->priv->support_config.method = BAND_UPDATE_NEEDS_UNKNOWN;
+        self->priv->support_config.method = SETTINGS_UPDATE_METHOD_UNKNOWN;
         self->priv->support_config.uact = FEATURE_UNSUPPORTED;
         self->priv->support_config.ubandsel = FEATURE_UNSUPPORTED;
     } else
         mm_dbg ("support configuration found for '%s'", model);
 
     switch (self->priv->support_config.method) {
-        case BAND_UPDATE_NEEDS_CFUN:
+        case SETTINGS_UPDATE_METHOD_CFUN:
             mm_dbg ("  band update requires low-power mode");
             break;
-        case BAND_UPDATE_NEEDS_COPS:
+        case SETTINGS_UPDATE_METHOD_COPS:
             mm_dbg ("  band update requires explicit unregistration");
             break;
-        case BAND_UPDATE_NEEDS_UNKNOWN:
+        case SETTINGS_UPDATE_METHOD_UNKNOWN:
             /* not an error, this just means we don't need anything special */
             break;
     }
@@ -458,7 +458,7 @@ set_current_modes_bands_step (GTask *task)
     case SET_CURRENT_MODES_BANDS_STEP_POWER_DOWN:
         if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
             mm_dbg ("powering down and deregistering from the network for configuration change...");
-            if (ctx->self->priv->support_config.method == BAND_UPDATE_NEEDS_COPS) {
+            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_COPS) {
                 mm_base_modem_at_command (
                     MM_BASE_MODEM (ctx->self),
                     "+COPS=2",
@@ -469,7 +469,7 @@ set_current_modes_bands_step (GTask *task)
                 return;
             }
 
-            if (ctx->self->priv->support_config.method == BAND_UPDATE_NEEDS_CFUN) {
+            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN) {
                 mm_base_modem_at_command (
                     MM_BASE_MODEM (ctx->self),
                     "+CFUN=4",
@@ -497,7 +497,7 @@ set_current_modes_bands_step (GTask *task)
     case SET_CURRENT_MODES_BANDS_STEP_RECOVER_CURRENT_POWER:
         if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
             mm_dbg ("recovering power state after configuration change...");
-            if (ctx->self->priv->support_config.method == BAND_UPDATE_NEEDS_COPS) {
+            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_COPS) {
                 gchar *command;
 
                 /* If the user sent a specific network to use, lock it in. */
@@ -518,7 +518,7 @@ set_current_modes_bands_step (GTask *task)
             }
 
             /* Use this to register if CFUN is needed */
-            if (ctx->self->priv->support_config.method == BAND_UPDATE_NEEDS_CFUN) {
+            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN) {
                 mm_base_modem_at_command (
                     MM_BASE_MODEM (ctx->self),
                     "+CFUN=1",
@@ -1379,7 +1379,7 @@ mm_broadband_modem_ublox_init (MMBroadbandModemUblox *self)
     self->priv->mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
     self->priv->any_allowed = MM_MODEM_MODE_NONE;
     self->priv->support_config.loaded   = FALSE;
-    self->priv->support_config.method   = BAND_UPDATE_NEEDS_UNKNOWN;
+    self->priv->support_config.method   = SETTINGS_UPDATE_METHOD_UNKNOWN;
     self->priv->support_config.uact     = FEATURE_SUPPORT_UNKNOWN;
     self->priv->support_config.ubandsel = FEATURE_SUPPORT_UNKNOWN;
     self->priv->pbready_regex = g_regex_new ("\\r\\n\\+PBREADY\\r\\n",

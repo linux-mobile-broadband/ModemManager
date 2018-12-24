@@ -473,20 +473,20 @@ out:
 }
 
 typedef struct {
-    const gchar    *model;
-    UpdateMethod    method;
-    FeatureSupport  uact;
-    FeatureSupport  ubandsel;
-    MMModemMode     mode;
-    MMModemBand     bands_2g[4];
-    MMModemBand     bands_3g[6];
-    MMModemBand     bands_4g[12];
+    const gchar          *model;
+    SettingsUpdateMethod  method;
+    FeatureSupport        uact;
+    FeatureSupport        ubandsel;
+    MMModemMode           mode;
+    MMModemBand           bands_2g[4];
+    MMModemBand           bands_3g[6];
+    MMModemBand           bands_4g[12];
 } BandConfiguration;
 
 static const BandConfiguration band_configuration[] = {
     {
         .model    = "SARA-G300",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G,
@@ -494,7 +494,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-G310",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G,
@@ -502,7 +502,7 @@ static const BandConfiguration band_configuration[] = {
     },
      {
         .model    = "SARA-G340",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G,
@@ -510,7 +510,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-G350",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G,
@@ -518,7 +518,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-G450",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G,
@@ -526,7 +526,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LISA-U200",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -536,7 +536,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LISA-U201",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -546,7 +546,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LISA-U230",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -556,7 +556,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LISA-U260",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -565,7 +565,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LISA-U270",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -574,7 +574,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-U201",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -584,7 +584,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-U260",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -593,7 +593,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-U270",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
@@ -602,7 +602,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-U280",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G,
@@ -610,7 +610,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "MPCI-L201",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -620,7 +620,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "MPCI-L200",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -632,7 +632,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "MPCI-L210",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -644,7 +644,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "MPCI-L220",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -654,7 +654,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "MPCI-L280",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -666,7 +666,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L200",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -678,7 +678,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L201",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -688,7 +688,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L210",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -700,7 +700,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L220",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -711,7 +711,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L280",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -723,7 +723,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L4006",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_SUPPORTED,
         .ubandsel = FEATURE_UNSUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -735,7 +735,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L4106",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_SUPPORTED,
         .ubandsel = FEATURE_UNSUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -746,7 +746,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L4206",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_SUPPORTED,
         .ubandsel = FEATURE_UNSUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -758,7 +758,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-L4906",
-        .method   = BAND_UPDATE_NEEDS_CFUN,
+        .method   = SETTINGS_UPDATE_METHOD_CFUN,
         .uact     = FEATURE_SUPPORTED,
         .ubandsel = FEATURE_UNSUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -769,7 +769,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-R200",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -781,7 +781,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "TOBY-R202",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -791,7 +791,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LARA-R202",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -801,7 +801,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LARA-R203",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_4G,
@@ -809,7 +809,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LARA-R204",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_4G,
@@ -817,7 +817,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LARA-R211",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_4G,
@@ -826,7 +826,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LARA-R280",
-        .method   = BAND_UPDATE_NEEDS_COPS,
+        .method   = SETTINGS_UPDATE_METHOD_COPS,
         .uact     = FEATURE_UNSUPPORTED,
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
@@ -835,7 +835,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "LARA-R3121",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -843,7 +843,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-N200",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -851,7 +851,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-N201",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -859,7 +859,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-N210",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -867,7 +867,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-N211",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -875,7 +875,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-N280",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -883,7 +883,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-R410M-52B",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -892,7 +892,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-R410M-02B",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
@@ -903,7 +903,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-R412M-02B",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_4G,
@@ -915,7 +915,7 @@ static const BandConfiguration band_configuration[] = {
     },
     {
         .model    = "SARA-N410-02B",
-        .method   = BAND_UPDATE_NEEDS_UNKNOWN,
+        .method   = SETTINGS_UPDATE_METHOD_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .uact     = FEATURE_SUPPORT_UNKNOWN,
         .mode     = MM_MODEM_MODE_4G,
