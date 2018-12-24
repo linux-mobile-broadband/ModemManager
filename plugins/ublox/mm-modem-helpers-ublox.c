@@ -1287,13 +1287,12 @@ mm_ublox_build_ubandsel_set_command (GArray       *bands,
     GArray  *ubandsel_nums;
     guint    num;
     gboolean found;
+    guint    i, j, k;
 
     if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
         return g_strdup ("+UBANDSEL=0");
 
     ubandsel_nums = g_array_sized_new (FALSE, FALSE, sizeof (guint), G_N_ELEMENTS (band_configuration));
-    
-    guint i, j, k;
 
     for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
         if (g_str_has_prefix (model, band_configuration[i].model))
