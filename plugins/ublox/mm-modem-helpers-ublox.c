@@ -1286,7 +1286,6 @@ mm_ublox_build_ubandsel_set_command (GArray       *bands,
     GString *command = NULL;
     GArray  *ubandsel_nums;
     guint    num;
-    gboolean found;
     guint    i, j, k;
 
     if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
