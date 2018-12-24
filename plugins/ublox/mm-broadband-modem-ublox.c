@@ -36,12 +36,14 @@
 #include "mm-call-ublox.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_voice_init (MMIfaceModemVoice *iface);
 
 static MMIfaceModemVoice *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemUblox, mm_broadband_modem_ublox, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init))
 
 
@@ -1301,6 +1303,13 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = load_current_bands_finish;
     iface->set_current_bands        = set_current_bands;
     iface->set_current_bands_finish = common_set_current_modes_bands_finish;
+}
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    iface->register_in_network = register_in_network;
+    iface->register_in_network_finish = register_in_network_finish;
 }
 
 static void
