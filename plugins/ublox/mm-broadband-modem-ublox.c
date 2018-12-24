@@ -115,14 +115,14 @@ load_supported_bands (MMIfaceModem        *_self,
     model = mm_iface_modem_get_model (_self);
 
     task  = g_task_new (_self, NULL, callback, user_data);
-    
+
     bands = mm_ublox_get_supported_bands (model, &error);
 
     if (!mm_ublox_get_support_config (model, &self->priv->support_config, &error)) {
-    	g_assert (error);
+        g_assert (error);
         g_task_return_error (task, error);
     }
-    
+
     if (!bands) {
         g_assert (error);
         g_task_return_error (task, error);
@@ -161,7 +161,7 @@ load_current_bands (MMIfaceModem        *_self,
 {
     MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
 
-    g_assert (self->priv->support_config.uact != FEATURE_SUPPORT_UNKNOWN && 
+    g_assert (self->priv->support_config.uact != FEATURE_SUPPORT_UNKNOWN &&
               self->priv->support_config.ubandsel != FEATURE_SUPPORT_UNKNOWN);
 
     if (self->priv->support_config.ubandsel == FEATURE_SUPPORTED) {
@@ -273,9 +273,9 @@ set_current_modes_bands_command_ready (MMBaseModem  *self,
 
     if (!mm_base_modem_at_command_finish (self, res, &ctx->saved_error))
         ctx->step = SET_CURRENT_MODES_BANDS_STEP_RELEASE;
-    else 
-    	ctx->step++;
-    
+    else
+        ctx->step++;
+
     set_current_modes_bands_step (task);
 }
 
@@ -365,14 +365,14 @@ set_current_modes_bands_step (GTask *task)
             }
 
             if (ctx->self->priv->support_config.method == BAND_UPDATE_NEEDS_CFUN) {
-	            mm_base_modem_at_command (
-	                MM_BASE_MODEM (ctx->self),
-	                "+CFUN=4",
-	                3,
-	                FALSE,
-	                (GAsyncReadyCallback) set_current_modes_bands_low_power_ready,
-	                task);
-	            return;
+                mm_base_modem_at_command (
+                    MM_BASE_MODEM (ctx->self),
+                    "+CFUN=4",
+                    3,
+                    FALSE,
+                    (GAsyncReadyCallback) set_current_modes_bands_low_power_ready,
+                    task);
+                return;
             }
         }
         ctx->step++;
@@ -401,28 +401,28 @@ set_current_modes_bands_step (GTask *task)
                 else
                     command = g_strdup ("+COPS=0");
 
-            	mm_base_modem_at_command (
-	                MM_BASE_MODEM (ctx->self),
-	                command,
-	                10,
-	                FALSE,
-	                (GAsyncReadyCallback) set_current_modes_bands_recover_power_ready,
-	                task);
-            	g_free (command);
-            	return;
+                mm_base_modem_at_command (
+                    MM_BASE_MODEM (ctx->self),
+                    command,
+                    10,
+                    FALSE,
+                    (GAsyncReadyCallback) set_current_modes_bands_recover_power_ready,
+                    task);
+                g_free (command);
+                return;
             }
 
             /* Use this to register if CFUN is needed */
             if (ctx->self->priv->support_config.method == BAND_UPDATE_NEEDS_CFUN) {
-	            mm_base_modem_at_command (
-	                MM_BASE_MODEM (ctx->self),
-	                "+CFUN=1",
-	                3,
-	                FALSE,
-	                (GAsyncReadyCallback) set_current_modes_bands_recover_power_ready,
-	                task);
-	            return;
-        	}
+                mm_base_modem_at_command (
+                    MM_BASE_MODEM (ctx->self),
+                    "+CFUN=1",
+                    3,
+                    FALSE,
+                    (GAsyncReadyCallback) set_current_modes_bands_recover_power_ready,
+                    task);
+                return;
+            }
         }
         ctx->step++;
         /* fall down */
@@ -483,11 +483,11 @@ set_current_bands (MMIfaceModem        *_self,
     GTask                 *task;
     GError                *error = NULL;
     gchar                 *command;
-    const gchar           *model; 
+    const gchar           *model;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    model = mm_iface_modem_get_model(_self);
+    model = mm_iface_modem_get_model (_self);
 
     /* Build command */
     if (self->priv->support_config.uact == FEATURE_SUPPORTED)

@@ -35,9 +35,9 @@ typedef enum {
 } UpdateMethod;
 
 typedef struct UbloxSupportConfig {
-  UpdateMethod   method;
-  FeatureSupport uact;
-  FeatureSupport ubandsel;
+    UpdateMethod   method;
+    FeatureSupport uact;
+    FeatureSupport ubandsel;
 } UbloxSupportConfig;
 
 /*****************************************************************************/
@@ -104,6 +104,7 @@ GArray *mm_ublox_parse_urat_test_response (const gchar  *response,
 
 /*****************************************************************************/
 /* Model-based config support loading */
+
 gboolean mm_ublox_get_support_config (const gchar         *model,
                                       UbloxSupportConfig  *config,
                                       GError             **error);

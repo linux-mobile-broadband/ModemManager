@@ -475,8 +475,8 @@ out:
 typedef struct {
     const gchar    *model;
     UpdateMethod    method;
-    FeatureSupport  uact;     
-    FeatureSupport  ubandsel;    
+    FeatureSupport  uact;
+    FeatureSupport  ubandsel;
     MMModemMode     mode;
     MMModemBand     bands_2g[4];
     MMModemBand     bands_3g[6];
@@ -531,7 +531,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8,
                       MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
     },
     {
@@ -541,7 +541,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8,
                       MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
     },
     {
@@ -551,7 +551,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8,
                       MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
     },
     {
@@ -579,7 +579,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, 
+        .bands_3g = { MM_MODEM_BAND_UTRAN_6, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8,
                       MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 }
     },
     {
@@ -615,7 +615,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17 }
     },
     {
@@ -625,9 +625,9 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_4, 
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_4,
                       MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_17 }
     },
     {
@@ -637,9 +637,9 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_2, 
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_2,
                       MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20 }
     },
     {
@@ -649,7 +649,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_19 }
     },
     {
@@ -659,9 +659,9 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
-        .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_2, 
+        .bands_3g = { MM_MODEM_BAND_UTRAN_5,  MM_MODEM_BAND_UTRAN_8,  MM_MODEM_BAND_UTRAN_2,
                       MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_28 }
     },
     {
@@ -673,7 +673,7 @@ static const BandConfiguration band_configuration[] = {
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_4,
                       MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_17 }
     },
     {
@@ -683,7 +683,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4,  MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_13, MM_MODEM_BAND_EUTRAN_17 }
     },
     {
@@ -695,7 +695,7 @@ static const BandConfiguration band_configuration[] = {
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
                       MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20 }
     },
     {
@@ -706,7 +706,7 @@ static const BandConfiguration band_configuration[] = {
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
                       MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3,  MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_19 }
     },
     {
@@ -718,7 +718,7 @@ static const BandConfiguration band_configuration[] = {
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
                       MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1,  MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_28 }
     },
     {
@@ -729,7 +729,7 @@ static const BandConfiguration band_configuration[] = {
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_PCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_4, MM_MODEM_BAND_UTRAN_2 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2,  MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_12, MM_MODEM_BAND_EUTRAN_13,
                       MM_MODEM_BAND_EUTRAN_29 }
     },
@@ -741,7 +741,7 @@ static const BandConfiguration band_configuration[] = {
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_7,
                       MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_20, MM_MODEM_BAND_EUTRAN_38 }
     },
     {
@@ -753,7 +753,7 @@ static const BandConfiguration band_configuration[] = {
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 },
         .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_5,
-                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_9, 
+                      MM_MODEM_BAND_EUTRAN_7, MM_MODEM_BAND_EUTRAN_8, MM_MODEM_BAND_EUTRAN_9,
                       MM_MODEM_BAND_EUTRAN_19, MM_MODEM_BAND_EUTRAN_28 }
     },
     {
@@ -764,7 +764,7 @@ static const BandConfiguration band_configuration[] = {
         .mode     = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_2g = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_39, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_1, MM_MODEM_BAND_EUTRAN_3, MM_MODEM_BAND_EUTRAN_39,
                       MM_MODEM_BAND_EUTRAN_40, MM_MODEM_BAND_EUTRAN_41 }
     },
     {
@@ -776,7 +776,7 @@ static const BandConfiguration band_configuration[] = {
         .bands_2g = { MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS },
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_8, MM_MODEM_BAND_UTRAN_2,
                       MM_MODEM_BAND_UTRAN_1 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_12 }
     },
     {
@@ -786,7 +786,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_12 }
     },
     {
@@ -796,7 +796,7 @@ static const BandConfiguration band_configuration[] = {
         .ubandsel = FEATURE_SUPPORTED,
         .mode     = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G,
         .bands_3g = { MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_UTRAN_2 },
-        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5, 
+        .bands_4g = { MM_MODEM_BAND_EUTRAN_2, MM_MODEM_BAND_EUTRAN_4, MM_MODEM_BAND_EUTRAN_5,
                       MM_MODEM_BAND_EUTRAN_12 }
     },
     {
@@ -959,7 +959,7 @@ gboolean mm_ublox_get_support_config (const gchar         *model,
 static MMModemMode
 supported_modes_per_model (const gchar *model)
 {
-    MMModemMode mode; 
+    MMModemMode mode;
     guint       i;
 
     mode = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
@@ -1032,7 +1032,7 @@ mm_ublox_get_supported_bands (const gchar  *model,
     for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
         if (g_str_has_prefix (model, band_configuration[i].model)) {
             mm_dbg("Found Model (Supported Bands): %s", band_configuration[i].model);
-            break; 
+            break;
         }
     }
 
@@ -1058,7 +1058,7 @@ mm_ublox_get_supported_bands (const gchar  *model,
     if (mode & MM_MODEM_MODE_4G) {
         for (j = 0; band_configuration[i].bands_4g[j] && j < G_N_ELEMENTS (band_configuration[i].bands_4g); j++) {
             bands = g_array_append_val (bands, band_configuration[i].bands_4g[j]);
-        }   
+        }
     }
 
     if (bands->len == 0) {
@@ -1143,7 +1143,7 @@ static guint band_to_num (MMModemBand band) {
                 return num;
             }
         }
-    } 
+    }
 
     /* Search 3G list */
     for (i = 0; i < G_N_ELEMENTS (num_bands_3g); i++) {
@@ -1153,7 +1153,7 @@ static guint band_to_num (MMModemBand band) {
                 return num;
             }
         }
-    } 
+    }
 
     /* Search 4G list */
     for (i = 0; i < G_N_ELEMENTS (num_bands_4g); i++) {
@@ -1163,7 +1163,7 @@ static guint band_to_num (MMModemBand band) {
                 return num;
             }
         }
-    } 
+    }
 
     return num;
 }
@@ -1194,7 +1194,7 @@ append_bands (GArray *bands,
         if (band != MM_MODEM_BAND_UNKNOWN)
             g_array_append_val(bands, band);
     }
-    
+
     if (mode & MM_MODEM_MODE_3G) {
         band = num_to_band_3g (ubandsel_value);
         if (band != MM_MODEM_BAND_UNKNOWN)
@@ -1202,7 +1202,7 @@ append_bands (GArray *bands,
     }
 
 /* Note: The wierd code segment below is to seperate out specific LTE bands since
- * since UBANDSEL? reports back the frequency of the band and not the band itself 
+ * since UBANDSEL? reports back the frequency of the band and not the band itself
  */
 
     band = MM_MODEM_BAND_UNKNOWN;
@@ -1210,7 +1210,7 @@ append_bands (GArray *bands,
         for (j = 0; ubandsel_value == num_bands_4g[j].num && j < G_N_ELEMENTS (num_bands_4g); j++) {
             for (k = 0; k < 5; k++) {
                 band = num_bands_4g[j].band[k];
-                for (x = 0; band_configuration[i].bands_4g[x] == band && 
+                for (x = 0; band_configuration[i].bands_4g[x] == band &&
                      x < G_N_ELEMENTS (band_configuration[i].bands_4g); x++) {
                     g_array_append_val(bands, band);
                     break;
@@ -1312,27 +1312,27 @@ mm_ublox_build_ubandsel_set_command (GArray       *bands,
         gboolean   found = FALSE;
 
         band = g_array_index (bands, MMModemBand, j);
-        
+
         /* Check to see if band is supported by the model */
         for (k = 0; band_configuration[i].bands_2g[k] && !found && k < G_N_ELEMENTS (band_configuration[i].bands_2g); k++) {
             if (band == band_configuration[i].bands_2g[k])
-                found = TRUE;                     
+                found = TRUE;
         }
 
         for (k = 0; band_configuration[i].bands_3g[k] && !found && k < G_N_ELEMENTS (band_configuration[i].bands_3g); k++) {
             if (band == band_configuration[i].bands_3g[k])
-                found = TRUE;                     
+                found = TRUE;
         }
-        
+
         for (k = 0; band_configuration[i].bands_4g[k] && !found && k < G_N_ELEMENTS (band_configuration[i].bands_4g); k++) {
             if (band == band_configuration[i].bands_4g[k])
-                found = TRUE;                     
+                found = TRUE;
         }
 
         if (found) {
             num = band_to_num (band);
             if (num)
-                g_array_append_val (ubandsel_nums, num); 
+                g_array_append_val (ubandsel_nums, num);
         }
     }
 
