@@ -71,6 +71,7 @@ struct _MMBroadbandModemUbloxPrivate {
 
 /*****************************************************************************/
 
+static gboolean
 acquire_power_operation (MMBroadbandModemUblox  *self,
                          GError                **error)
 {
