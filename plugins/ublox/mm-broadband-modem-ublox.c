@@ -589,7 +589,7 @@ set_current_bands (MMIfaceModem        *_self,
     MMBroadbandModemUblox *self  = MM_BROADBAND_MODEM_UBLOX (_self);
     GTask                 *task;
     GError                *error = NULL;
-    gchar                 *command;
+    gchar                 *command = NULL;
     const gchar           *model;
 
     preload_support_config (self);
