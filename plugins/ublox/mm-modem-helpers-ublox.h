@@ -35,6 +35,7 @@ typedef enum {
 } UpdateMethod;
 
 typedef struct UbloxSupportConfig {
+    gboolean       loaded;
     UpdateMethod   method;
     FeatureSupport uact;
     FeatureSupport ubandsel;

@@ -72,6 +72,67 @@ struct _MMBroadbandModemUbloxPrivate {
 };
 
 /*****************************************************************************/
+/* Per-model configuration loading */
+
+static void
+preload_support_config (MMBroadbandModemUblox *self)
+{
+    const gchar *model;
+    GError      *error = NULL;
+
+    /* Make sure we load only once */
+    if (self->priv->support_config.loaded)
+        return;
+
+    model = mm_iface_modem_get_model (MM_IFACE_MODEM (self));
+
+    if (!mm_ublox_get_support_config (model, &self->priv->support_config, &error)) {
+        mm_warn ("loading support configuration failed: %s", error->message);
+        g_error_free (error);
+
+        /* default to NOT SUPPORTED if unknown model */
+        self->priv->support_config.method = BAND_UPDATE_NEEDS_UNKNOWN;
+        self->priv->support_config.uact = FEATURE_UNSUPPORTED;
+        self->priv->support_config.ubandsel = FEATURE_UNSUPPORTED;
+    } else
+        mm_dbg ("support configuration found for '%s'", model);
+
+    switch (self->priv->support_config.method) {
+        case BAND_UPDATE_NEEDS_CFUN:
+            mm_dbg ("  band update requires low-power mode");
+            break;
+        case BAND_UPDATE_NEEDS_COPS:
+            mm_dbg ("  band update requires explicit unregistration");
+            break;
+        case BAND_UPDATE_NEEDS_UNKNOWN:
+            /* not an error, this just means we don't need anything special */
+            break;
+    }
+
+    switch (self->priv->support_config.uact) {
+        case FEATURE_SUPPORTED:
+            mm_dbg ("  UACT based band configuration supported");
+            break;
+        case FEATURE_UNSUPPORTED:
+            mm_dbg ("  UACT based band configuration unsupported");
+            break;
+        case FEATURE_SUPPORT_UNKNOWN:
+            g_assert_not_reached();
+    }
+
+    switch (self->priv->support_config.ubandsel) {
+        case FEATURE_SUPPORTED:
+            mm_dbg ("  UBANDSEL based band configuration supported");
+            break;
+        case FEATURE_UNSUPPORTED:
+            mm_dbg ("  UBANDSEL based band configuration unsupported");
+            break;
+        case FEATURE_SUPPORT_UNKNOWN:
+            g_assert_not_reached();
+    }
+}
+
+/*****************************************************************************/
 
 static gboolean
 acquire_power_operation (MMBroadbandModemUblox  *self,
@@ -105,22 +166,20 @@ load_supported_bands_finish (MMIfaceModem  *self,
 }
 
 static void
-load_supported_bands (MMIfaceModem        *_self,
+load_supported_bands (MMIfaceModem        *self,
                       GAsyncReadyCallback  callback,
                       gpointer             user_data)
 {
-    MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
-    GTask                 *task;
-    GError                *error = NULL;
-    GArray                *bands = NULL;
-    const gchar           *model;
+    GTask       *task;
+    GError      *error = NULL;
+    GArray      *bands = NULL;
+    const gchar *model;
 
-    model = mm_iface_modem_get_model (_self);
-
+    model = mm_iface_modem_get_model (MM_BROADBAND_MODEM_UBLOX (self));
     task  = g_task_new (_self, NULL, callback, user_data);
 
     bands = mm_ublox_get_supported_bands (model, &error);
-    if (!bands || !mm_ublox_get_support_config (model, &self->priv->support_config, &error))
+    if (!bands)
         g_task_return_error (task, error);
     else
         g_task_return_pointer (task, bands, (GDestroyNotify) g_array_unref);
@@ -157,8 +216,7 @@ load_current_bands (MMIfaceModem        *_self,
 {
     MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
 
-    g_assert (self->priv->support_config.uact != FEATURE_SUPPORT_UNKNOWN &&
-              self->priv->support_config.ubandsel != FEATURE_SUPPORT_UNKNOWN);
+    preload_support_config (self);
 
     if (self->priv->support_config.ubandsel == FEATURE_SUPPORTED) {
         mm_base_modem_at_command (
@@ -451,6 +509,8 @@ set_current_modes (MMIfaceModem        *self,
     gchar  *command;
     GError *error = NULL;
 
+    preload_support_config (MM_BROADBAND_MODEM_UBLOX (self));
+
     task = g_task_new (self, NULL, callback, user_data);
 
     /* Handle ANY */
@@ -480,6 +540,8 @@ set_current_bands (MMIfaceModem        *_self,
     GError                *error = NULL;
     gchar                 *command;
     const gchar           *model;
+
+    preload_support_config (self);
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1265,6 +1327,7 @@ mm_broadband_modem_ublox_init (MMBroadbandModemUblox *self)
     self->priv->profile = MM_UBLOX_USB_PROFILE_UNKNOWN;
     self->priv->mode = MM_UBLOX_NETWORKING_MODE_UNKNOWN;
     self->priv->any_allowed = MM_MODEM_MODE_NONE;
+    self->priv->support_config.loaded   = FALSE;
     self->priv->support_config.method   = BAND_UPDATE_NEEDS_UNKNOWN;
     self->priv->support_config.uact     = FEATURE_SUPPORT_UNKNOWN;
     self->priv->support_config.ubandsel = FEATURE_SUPPORT_UNKNOWN;

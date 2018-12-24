@@ -926,30 +926,32 @@ static const BandConfiguration band_configuration[] = {
     },
 };
 
-/* Returns AT command support configuration */
-
-gboolean mm_ublox_get_support_config (const gchar         *model,
-                                      UbloxSupportConfig  *config,
-                                      GError             **error) 
+gboolean
+mm_ublox_get_support_config (const gchar         *model,
+                             UbloxSupportConfig  *config,
+                             GError             **error)
 {
     guint i;
 
-    if (model) {
-        for (i = 0; i < G_N_ELEMENTS (band_configuration); i++)
-            if (g_str_has_prefix (model, band_configuration[i].model)) {
-                config->method   = band_configuration[i].method;
-                config->uact     = band_configuration[i].uact;
-                config->ubandsel = band_configuration[i].ubandsel;
-                return TRUE;
-            }
-    }
-
-    if (i == G_N_ELEMENTS (band_configuration) || !(model)) {
+    if (!model) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Unknown support found for modem: %s", model);
+                     "Support configuration unknown for unknown model");
         return FALSE;
     }
- 
+
+    for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
+        /* NOTE: matching by prefix! */
+        if (g_str_has_prefix (model, band_configuration[i].model)) {
+            config->loaded   = TRUE;
+            config->method   = band_configuration[i].method;
+            config->uact     = band_configuration[i].uact;
+            config->ubandsel = band_configuration[i].ubandsel;
+            return TRUE;
+        }
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "No support configuration found for modem: %s", model);
     return FALSE;
 }
 
