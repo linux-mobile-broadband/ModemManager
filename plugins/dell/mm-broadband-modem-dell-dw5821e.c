@@ -75,7 +75,8 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
+    update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT |
+                                                       MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC);
     mm_firmware_update_settings_set_fastboot_at (update_settings, "AT^FASTBOOT");
 
     g_task_return_pointer (task, update_settings, g_object_unref);
