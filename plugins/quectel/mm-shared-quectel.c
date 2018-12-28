@@ -45,7 +45,7 @@ qfastboot_test_ready (MMBaseModem  *self,
     MMFirmwareUpdateSettings *update_settings;
 
     if (!mm_base_modem_at_command_finish (self, res, NULL))
-        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN);
+        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
     else {
         update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
         mm_firmware_update_settings_set_fastboot_at (update_settings, "AT+QFASTBOOT");

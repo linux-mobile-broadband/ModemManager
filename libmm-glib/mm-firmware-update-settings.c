@@ -49,14 +49,14 @@ struct _MMFirmwareUpdateSettingsPrivate {
  * mm_firmware_update_settings_get_method:
  * @self: A #MMFirmwareUpdateSettings.
  *
- * Gets the method to use during the firmware update operation.
+ * Gets the methods to use during the firmware update operation.
  *
- * Returns: a #MMModemFirmwareUpdateMethod.
+ * Returns: a bitmask of #MMModemFirmwareUpdateMethod values.
  */
 MMModemFirmwareUpdateMethod
 mm_firmware_update_settings_get_method (MMFirmwareUpdateSettings *self)
 {
-    g_return_val_if_fail (MM_IS_FIRMWARE_UPDATE_SETTINGS (self), MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN);
+    g_return_val_if_fail (MM_IS_FIRMWARE_UPDATE_SETTINGS (self), MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
 
     return self->priv->method;
 }
@@ -128,7 +128,7 @@ mm_firmware_update_settings_set_version (MMFirmwareUpdateSettings *self,
  * Gets the AT command that should be sent to the module to trigger a reset
  * into fastboot mode.
  *
- * Only applicable if the update method is %MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT.
+ * Only applicable if the update method includes %MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT.
  *
  * Returns: The AT command string, or %NULL if unknown. Do not free the returned value, it is owned by @self.
  */
@@ -136,7 +136,7 @@ const gchar *
 mm_firmware_update_settings_get_fastboot_at (MMFirmwareUpdateSettings *self)
 {
     g_return_val_if_fail (MM_IS_FIRMWARE_UPDATE_SETTINGS (self), NULL);
-    g_return_val_if_fail (self->priv->method == MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT, NULL);
+    g_return_val_if_fail (self->priv->method & MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT, NULL);
 
     return self->priv->fastboot_at;
 }
@@ -146,7 +146,7 @@ mm_firmware_update_settings_set_fastboot_at (MMFirmwareUpdateSettings *self,
                                              const gchar              *fastboot_at)
 {
     g_return_if_fail (MM_IS_FIRMWARE_UPDATE_SETTINGS (self));
-    g_return_if_fail (self->priv->method == MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
+    g_return_if_fail (self->priv->method & MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
 
     g_free (self->priv->fastboot_at);
     self->priv->fastboot_at = g_strdup (fastboot_at);
@@ -168,7 +168,7 @@ mm_firmware_update_settings_get_variant (MMFirmwareUpdateSettings *self)
     MMModemFirmwareUpdateMethod method;
     GVariantBuilder             builder;
 
-    method = (self ? self->priv->method : MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN);
+    method = (self ? self->priv->method : MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("(ua{sv})"));
     g_variant_builder_add (&builder, "u", method);
@@ -185,15 +185,11 @@ mm_firmware_update_settings_get_variant (MMFirmwareUpdateSettings *self)
                                PROPERTY_VERSION,
                                g_variant_new_string (self->priv->version));
 
-        switch (method) {
-        case MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT:
+        if (method & MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT) {
             g_variant_builder_add (&builder,
                                    "{sv}",
                                    PROPERTY_FASTBOOT_AT,
                                    g_variant_new_string (self->priv->fastboot_at));
-            break;
-        default:
-            break;
         }
     }
     g_variant_builder_close (&builder);
@@ -240,7 +236,7 @@ mm_firmware_update_settings_new_from_variant (GVariant  *variant,
                                               GError   **error)
 {
     MMFirmwareUpdateSettings *self;
-    guint                     method = MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN;
+    guint                     method = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
     GVariant                 *dictionary = NULL;
     GError                   *inner_error = NULL;
 
@@ -281,13 +277,9 @@ mm_firmware_update_settings_new_from_variant (GVariant  *variant,
         }
 
         if (!inner_error) {
-            switch (method) {
-            case MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT:
-                if (!self->priv->fastboot_at)
-                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                               "Fastboot method requires the '" PROPERTY_FASTBOOT_AT "' setting");
-                break;
-            }
+            if ((method & MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT) && (!self->priv->fastboot_at))
+                inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                           "Fastboot method requires the '" PROPERTY_FASTBOOT_AT "' setting");
         }
         g_variant_unref (dictionary);
     }
@@ -317,7 +309,7 @@ static void
 mm_firmware_update_settings_init (MMFirmwareUpdateSettings *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_FIRMWARE_UPDATE_SETTINGS, MMFirmwareUpdateSettingsPrivate);
-    self->priv->method = MM_MODEM_FIRMWARE_UPDATE_METHOD_UNKNOWN;
+    self->priv->method = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
 }
 
 static void

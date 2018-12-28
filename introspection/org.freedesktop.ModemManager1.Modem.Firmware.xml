@@ -122,17 +122,16 @@
         Detailed settings that provide information about how the module should be
         updated.
 
-
-        The settings are given as a <link linkend="MMModemFirmwareUpdateMethod">MMModemFirmwareUpdateMethod</link>
-        value specifying the type of firmware update procedure expected followed by a
-        dictionary that includes other parameters applicable to the specific method.
+        The settings are given as a bitmask of <link linkend="MMModemFirmwareUpdateMethod">MMModemFirmwareUpdateMethod</link>
+        values specifying the type of firmware update procedures expected followed by a
+        dictionary that includes other parameters applicable to the specific methods reported.
 
         <variablelist>
-          <varlistentry><term><link linkend="MM-MODEM-FIRMWARE-UPDATE-METHOD-FASTBOOT:CAPS">MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT</link></term>
+          <varlistentry>
             <listitem>
               <para>
-                Devices supporting the fastboot firmware update method require exposing the
-                following additional settings:
+                The following settings are mandatory as long as the reported update method is not
+                <term><link linkend="MM-MODEM-FIRMWARE-UPDATE-METHOD-NONE:CAPS">MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE</link></term>.
               </para>
               <variablelist>
                 <varlistentry><term><literal>"device-ids"</literal></term>
@@ -152,6 +151,18 @@
                     (signature <literal>'s'</literal>)
                   </listitem>
                 </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        <variablelist>
+          <varlistentry><term><link linkend="MM-MODEM-FIRMWARE-UPDATE-METHOD-FASTBOOT:CAPS">MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT</link></term>
+            <listitem>
+              <para>
+                Devices supporting the fastboot firmware update method require exposing the
+                following additional settings:
+              </para>
                 <varlistentry><term><literal>"fastboot-at"</literal></term>
                   <listitem>
                     (Required) This property exposes the AT command that should be sent to the
