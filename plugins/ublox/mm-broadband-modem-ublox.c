@@ -520,7 +520,7 @@ set_current_modes_bands_step (GTask *task)
             mm_base_modem_at_command (
                 MM_BASE_MODEM (ctx->self),
                 command,
-                10,
+                120,
                 FALSE,
                 (GAsyncReadyCallback) set_current_modes_bands_after_command_ready,
                 task);
