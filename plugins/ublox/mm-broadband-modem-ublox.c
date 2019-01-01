@@ -299,9 +299,9 @@ typedef enum {
     SET_CURRENT_MODES_BANDS_STEP_FIRST,
     SET_CURRENT_MODES_BANDS_STEP_ACQUIRE,
     SET_CURRENT_MODES_BANDS_STEP_CURRENT_POWER,
-    SET_CURRENT_MODES_BANDS_STEP_POWER_DOWN,
+    SET_CURRENT_MODES_BANDS_STEP_BEFORE_COMMAND,
     SET_CURRENT_MODES_BANDS_STEP_COMMAND,
-    SET_CURRENT_MODES_BANDS_STEP_RECOVER_CURRENT_POWER,
+    SET_CURRENT_MODES_BANDS_STEP_AFTER_COMMAND,
     SET_CURRENT_MODES_BANDS_STEP_RELEASE,
     SET_CURRENT_MODES_BANDS_STEP_LAST,
 } SetCurrentModesBandsStep;
@@ -349,7 +349,7 @@ common_set_current_modes_bands_finish (MMIfaceModem  *self,
 static void set_current_modes_bands_step (GTask *task);
 
 static void
-set_current_modes_bands_recover_power_ready (MMBaseModem  *self,
+set_current_modes_bands_after_command_ready (MMBaseModem  *self,
                                              GAsyncResult *res,
                                              GTask        *task)
 {
@@ -385,9 +385,9 @@ set_current_modes_bands_command_ready (MMBaseModem  *self,
 }
 
 static void
-set_current_modes_bands_low_power_ready (MMBaseModem  *self,
-                                         GAsyncResult *res,
-                                         GTask        *task)
+set_current_modes_bands_before_command_ready (MMBaseModem  *self,
+                                              GAsyncResult *res,
+                                              GTask        *task)
 {
     SetCurrentModesBandsContext *ctx;
 
@@ -412,6 +412,7 @@ set_current_modes_bands_current_power_ready (MMBaseModem  *self,
 
     ctx = (SetCurrentModesBandsContext *) g_task_get_task_data (task);
     g_assert (ctx);
+    g_assert (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN);
 
     response = mm_base_modem_at_command_finish (self, res, &ctx->saved_error);
     if (!response || !mm_ublox_parse_cfun_response (response, &ctx->initial_state, &ctx->saved_error))
@@ -446,40 +447,51 @@ set_current_modes_bands_step (GTask *task)
         /* fall down */
 
     case SET_CURRENT_MODES_BANDS_STEP_CURRENT_POWER:
-        mm_dbg ("checking current power operation...");
-        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
-                                  "+CFUN?",
-                                  3,
-                                  FALSE,
-                                  (GAsyncReadyCallback) set_current_modes_bands_current_power_ready,
-                                  task);
-        return;
+        /* If using CFUN, we check whether we're already in low-power mode.
+         * And if we are, we just skip triggering low-power mode ourselves.
+         */
+        if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN) {
+            mm_dbg ("checking current power operation...");
+            mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                      "+CFUN?",
+                                      3,
+                                      FALSE,
+                                      (GAsyncReadyCallback) set_current_modes_bands_current_power_ready,
+                                      task);
+            return;
+        }
+        ctx->step++;
+        /* fall down */
 
-    case SET_CURRENT_MODES_BANDS_STEP_POWER_DOWN:
-        if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
-            mm_dbg ("powering down and deregistering from the network for configuration change...");
-            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_COPS) {
-                mm_base_modem_at_command (
+    case SET_CURRENT_MODES_BANDS_STEP_BEFORE_COMMAND:
+        /* If COPS required around the set command, run it unconditionally */
+        if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_COPS) {
+            mm_dbg ("deregistering from the network for configuration change...");
+            mm_base_modem_at_command (
                     MM_BASE_MODEM (ctx->self),
                     "+COPS=2",
                     10,
                     FALSE,
-                    (GAsyncReadyCallback) set_current_modes_bands_low_power_ready,
+                    (GAsyncReadyCallback) set_current_modes_bands_before_command_ready,
                     task);
                 return;
-            }
-
-            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN) {
+        }
+        /* If CFUN required, check initial state before triggering low-power mode ourselves */
+        else if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN) {
+            /* Do nothing if already in low-power mode */
+            if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
+                mm_dbg ("powering down for configuration change...");
                 mm_base_modem_at_command (
                     MM_BASE_MODEM (ctx->self),
                     "+CFUN=4",
                     3,
                     FALSE,
-                    (GAsyncReadyCallback) set_current_modes_bands_low_power_ready,
+                    (GAsyncReadyCallback) set_current_modes_bands_before_command_ready,
                     task);
                 return;
             }
         }
+
         ctx->step++;
         /* fall down */
 
@@ -494,37 +506,39 @@ set_current_modes_bands_step (GTask *task)
             task);
         return;
 
-    case SET_CURRENT_MODES_BANDS_STEP_RECOVER_CURRENT_POWER:
-        if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
-            mm_dbg ("recovering power state after configuration change...");
-            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_COPS) {
-                gchar *command;
+    case SET_CURRENT_MODES_BANDS_STEP_AFTER_COMMAND:
+        /* If COPS required around the set command, run it unconditionally */
+        if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_COPS) {
+            gchar *command;
 
-                /* If the user sent a specific network to use, lock it in. */
-                if (ctx->self->priv->operator_id)
-                    command = g_strdup_printf ("+COPS=1,2,\"%s\"", ctx->self->priv->operator_id);
-                else
-                    command = g_strdup ("+COPS=0");
+            /* If the user sent a specific network to use, lock it in. */
+            if (ctx->self->priv->operator_id)
+                command = g_strdup_printf ("+COPS=1,2,\"%s\"", ctx->self->priv->operator_id);
+            else
+                command = g_strdup ("+COPS=0");
 
-                mm_base_modem_at_command (
-                    MM_BASE_MODEM (ctx->self),
-                    command,
-                    10,
-                    FALSE,
-                    (GAsyncReadyCallback) set_current_modes_bands_recover_power_ready,
-                    task);
-                g_free (command);
-                return;
-            }
-
-            /* Use this to register if CFUN is needed */
-            if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN) {
+            mm_base_modem_at_command (
+                MM_BASE_MODEM (ctx->self),
+                command,
+                10,
+                FALSE,
+                (GAsyncReadyCallback) set_current_modes_bands_after_command_ready,
+                task);
+            g_free (command);
+            return;
+        }
+        /* If CFUN required, see if we need to recover power */
+        else if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_CFUN) {
+            /* If we were in low-power mode before the change, do nothing, otherwise,
+             * full power mode back */
+            if (ctx->initial_state != MM_MODEM_POWER_STATE_LOW) {
+                mm_dbg ("recovering power state after configuration change...");
                 mm_base_modem_at_command (
                     MM_BASE_MODEM (ctx->self),
                     "+CFUN=1",
                     3,
                     FALSE,
-                    (GAsyncReadyCallback) set_current_modes_bands_recover_power_ready,
+                    (GAsyncReadyCallback) set_current_modes_bands_after_command_ready,
                     task);
                 return;
             }
