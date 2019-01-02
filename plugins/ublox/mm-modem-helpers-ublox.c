@@ -1192,30 +1192,43 @@ append_bands (GArray      *bands,
 
     if (mode & MM_MODEM_MODE_2G) {
         band = num_to_band_2g (ubandsel_value);
-        if (band != MM_MODEM_BAND_UNKNOWN)
-            g_array_append_val (bands, band);
+        if (band != MM_MODEM_BAND_UNKNOWN) {
+            for (x = 0; x < G_N_ELEMENTS (band_configuration[i].bands_2g); x++) {
+                if (band_configuration[i].bands_2g[x] == band) {
+                    g_array_append_val (bands, band);
+                    break;
+                }
+            }
+        }
     }
 
     if (mode & MM_MODEM_MODE_3G) {
         band = num_to_band_3g (ubandsel_value);
-        if (band != MM_MODEM_BAND_UNKNOWN)
-            g_array_append_val (bands, band);
+        if (band != MM_MODEM_BAND_UNKNOWN) {
+            for (x = 0; x < G_N_ELEMENTS (band_configuration[i].bands_3g); x++) {
+                if (band_configuration[i].bands_3g[x] == band) {
+                    g_array_append_val (bands, band);
+                    break;
+                }
+            }
+        }
     }
 
     /* Note: The weird code segment below is to separate out specific LTE bands since
      * UBANDSEL? reports back the frequency of the band and not the band itself.
      */
 
-    band = MM_MODEM_BAND_UNKNOWN;
     if (mode & MM_MODEM_MODE_4G) {
         for (j = 0; j < G_N_ELEMENTS (num_bands_4g); j++) {
             if (ubandsel_value == num_bands_4g[j].num) {
                 for (k = 0; k < G_N_ELEMENTS (num_bands_4g[j].band); k++) {
                     band = num_bands_4g[j].band[k];
-                    for (x = 0; x < G_N_ELEMENTS (band_configuration[i].bands_4g); x++) {
-                        if (band_configuration[i].bands_4g[x] == band) {
-                            g_array_append_val (bands, band);
-                            break;
+                    if (band != MM_MODEM_BAND_UNKNOWN) {
+                        for (x = 0; x < G_N_ELEMENTS (band_configuration[i].bands_4g); x++) {
+                            if (band_configuration[i].bands_4g[x] == band) {
+                                g_array_append_val (bands, band);
+                                break;
+                            }
                         }
                     }
                 }
