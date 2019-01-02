@@ -1210,7 +1210,7 @@ append_bands (GArray      *bands,
     if (mode & MM_MODEM_MODE_4G) {
         for (j = 0; j < G_N_ELEMENTS (num_bands_4g); j++) {
             if (ubandsel_value == num_bands_4g[j].num) {
-                for (k = 0; k < 5; k++) {
+                for (k = 0; k < G_N_ELEMENTS (num_bands_4g[j].band); k++) {
                     band = num_bands_4g[j].band[k];
                     for (x = 0; x < G_N_ELEMENTS (band_configuration[i].bands_4g); x++) {
                         if (band_configuration[i].bands_4g[x] == band) {
