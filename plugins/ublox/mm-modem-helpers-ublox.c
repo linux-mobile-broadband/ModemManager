@@ -1113,7 +1113,9 @@ static const NumToBand num_bands_4g [] = {
 /*****************************************************************************/
 /* +UBANDSEL? response parser */
 
-static MMModemBand num_to_band_2g (guint num) {
+static MMModemBand
+num_to_band_2g (guint num)
+{
     guint i;
 
     for (i = 0; i < G_N_ELEMENTS (num_bands_2g); i++) {
@@ -1123,7 +1125,9 @@ static MMModemBand num_to_band_2g (guint num) {
     return MM_MODEM_BAND_UNKNOWN;
 }
 
-static MMModemBand num_to_band_3g (guint num) {
+static MMModemBand
+num_to_band_3g (guint num)
+{
     guint i;
 
     for (i = 0; i < G_N_ELEMENTS (num_bands_3g); i++) {
@@ -1133,51 +1137,45 @@ static MMModemBand num_to_band_3g (guint num) {
     return MM_MODEM_BAND_UNKNOWN;
 }
 
-static guint band_to_num (MMModemBand band) {
+static guint
+band_to_num (MMModemBand band)
+{
     guint i, j;
-    guint num = 0;
 
     /* Search 2G list */
     for (i = 0; i < G_N_ELEMENTS (num_bands_2g); i++) {
-        for (j = 0; num_bands_2g[i].band[j] && j < G_N_ELEMENTS(num_bands_2g[i].band); j++) {
-            if (band == num_bands_2g[i].band[j]) {
-                num = num_bands_2g[i].num;
-                return num;
-            }
+        for (j = 0; num_bands_2g[i].band[j] && j < G_N_ELEMENTS (num_bands_2g[i].band); j++) {
+            if (band == num_bands_2g[i].band[j])
+                return num_bands_2g[i].num;
         }
     }
 
     /* Search 3G list */
     for (i = 0; i < G_N_ELEMENTS (num_bands_3g); i++) {
-        for (j = 0; num_bands_3g[i].band[j] && j < G_N_ELEMENTS(num_bands_3g[i].band); j++) {
-            if (band == num_bands_3g[i].band[j]) {
-                num = num_bands_3g[i].num;
-                return num;
-            }
+        for (j = 0; num_bands_3g[i].band[j] && j < G_N_ELEMENTS (num_bands_3g[i].band); j++) {
+            if (band == num_bands_3g[i].band[j])
+                return num_bands_3g[i].num;
         }
     }
 
     /* Search 4G list */
     for (i = 0; i < G_N_ELEMENTS (num_bands_4g); i++) {
-        for (j = 0; num_bands_4g[i].band[j] && j < G_N_ELEMENTS(num_bands_4g[i].band); j++) {
-            if (band == num_bands_4g[i].band[j]) {
-                num = num_bands_4g[i].num;
-                return num;
-            }
+        for (j = 0; num_bands_4g[i].band[j] && j < G_N_ELEMENTS (num_bands_4g[i].band); j++) {
+            if (band == num_bands_4g[i].band[j])
+                return num_bands_4g[i].num;
         }
     }
 
-    return num;
+    return 0;
 }
 
 static void
-append_bands (GArray *bands,
-              guint   ubandsel_value,
-              MMModemMode       mode,
-              const gchar     *model)
+append_bands (GArray      *bands,
+              guint        ubandsel_value,
+              MMModemMode  mode,
+              const gchar *model)
 {
     guint i, j, k, x;
-
     MMModemBand band;
 
     /* Find Modem Model Index in band_configuration */
@@ -1194,27 +1192,26 @@ append_bands (GArray *bands,
     if (mode & MM_MODEM_MODE_2G) {
         band = num_to_band_2g (ubandsel_value);
         if (band != MM_MODEM_BAND_UNKNOWN)
-            g_array_append_val(bands, band);
+            g_array_append_val (bands, band);
     }
 
     if (mode & MM_MODEM_MODE_3G) {
         band = num_to_band_3g (ubandsel_value);
         if (band != MM_MODEM_BAND_UNKNOWN)
-            g_array_append_val(bands, band);
+            g_array_append_val (bands, band);
     }
 
-/* Note: The wierd code segment below is to seperate out specific LTE bands since
- * since UBANDSEL? reports back the frequency of the band and not the band itself
- */
+    /* Note: The weird code segment below is to separate out specific LTE bands since
+     * UBANDSEL? reports back the frequency of the band and not the band itself.
+     */
 
     band = MM_MODEM_BAND_UNKNOWN;
-    if ( mode & MM_MODEM_MODE_4G) {
+    if (mode & MM_MODEM_MODE_4G) {
         for (j = 0; ubandsel_value == num_bands_4g[j].num && j < G_N_ELEMENTS (num_bands_4g); j++) {
             for (k = 0; k < 5; k++) {
                 band = num_bands_4g[j].band[k];
-                for (x = 0; band_configuration[i].bands_4g[x] == band &&
-                     x < G_N_ELEMENTS (band_configuration[i].bands_4g); x++) {
-                    g_array_append_val(bands, band);
+                for (x = 0; (band_configuration[i].bands_4g[x] == band) && (x < G_N_ELEMENTS (band_configuration[i].bands_4g)); x++) {
+                    g_array_append_val (bands, band);
                     break;
                 }
             }
@@ -1227,13 +1224,12 @@ mm_ublox_parse_ubandsel_response (const gchar  *response,
                                   const gchar  *model,
                                   GError      **error)
 {
-    GArray  *array_values = NULL;
-    GArray  *array = NULL;
-    gchar   *dupstr = NULL;
-    GError  *inner_error = NULL;
-    guint    i;
-
-    MMModemMode mode = supported_modes_per_model(model);
+    GArray      *array_values = NULL;
+    GArray      *array = NULL;
+    gchar       *dupstr = NULL;
+    GError      *inner_error = NULL;
+    guint        i;
+    MMModemMode  mode;
 
     if (!g_str_has_prefix (response, "+UBANDSEL")) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -1251,6 +1247,7 @@ mm_ublox_parse_ubandsel_response (const gchar  *response,
         goto out;
 
     /* Convert list of ubandsel numbers to MMModemBand values */
+    mode = supported_modes_per_model (model);
     array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
     for (i = 0; i < array_values->len; i++)
         append_bands (array, g_array_index (array_values, guint, i), mode, model);
