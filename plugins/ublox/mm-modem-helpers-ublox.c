@@ -1290,8 +1290,6 @@ mm_ublox_build_ubandsel_set_command (GArray       *bands,
     if (bands->len == 1 && g_array_index (bands, MMModemBand, 0) == MM_MODEM_BAND_ANY)
         return g_strdup ("+UBANDSEL=0");
 
-    ubandsel_nums = g_array_sized_new (FALSE, FALSE, sizeof (guint), G_N_ELEMENTS (band_configuration));
-
     for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
         if (g_str_has_prefix (model, band_configuration[i].model))
             break;
@@ -1300,9 +1298,10 @@ mm_ublox_build_ubandsel_set_command (GArray       *bands,
     if (i == G_N_ELEMENTS (band_configuration)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Unknown modem model %s", model);
-        g_array_unref (ubandsel_nums);
         return NULL;
     }
+
+    ubandsel_nums = g_array_sized_new (FALSE, FALSE, sizeof (guint), bands->len);
 
     for (j = 0; j < bands->len; j++) {
         MMModemBand band;
