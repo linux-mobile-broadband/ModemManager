@@ -1166,6 +1166,7 @@ band_to_num (MMModemBand band)
         }
     }
 
+    /* Should never happen */
     return 0;
 }
 
@@ -1327,8 +1328,8 @@ mm_ublox_build_ubandsel_set_command (GArray       *bands,
 
         if (found) {
             num = band_to_num (band);
-            if (num)
-                g_array_append_val (ubandsel_nums, num);
+            g_assert (num != 0);
+            g_array_append_val (ubandsel_nums, num);
         }
     }
 
