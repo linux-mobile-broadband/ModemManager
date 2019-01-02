@@ -1208,13 +1208,18 @@ append_bands (GArray      *bands,
 
     band = MM_MODEM_BAND_UNKNOWN;
     if (mode & MM_MODEM_MODE_4G) {
-        for (j = 0; ubandsel_value == num_bands_4g[j].num && j < G_N_ELEMENTS (num_bands_4g); j++) {
-            for (k = 0; k < 5; k++) {
-                band = num_bands_4g[j].band[k];
-                for (x = 0; (band_configuration[i].bands_4g[x] == band) && (x < G_N_ELEMENTS (band_configuration[i].bands_4g)); x++) {
-                    g_array_append_val (bands, band);
-                    break;
+        for (j = 0; j < G_N_ELEMENTS (num_bands_4g); j++) {
+            if (ubandsel_value == num_bands_4g[j].num) {
+                for (k = 0; k < 5; k++) {
+                    band = num_bands_4g[j].band[k];
+                    for (x = 0; x < G_N_ELEMENTS (band_configuration[i].bands_4g); x++) {
+                        if (band_configuration[i].bands_4g[x] == band) {
+                            g_array_append_val (bands, band);
+                            break;
+                        }
+                    }
                 }
+                break;
             }
         }
     }
