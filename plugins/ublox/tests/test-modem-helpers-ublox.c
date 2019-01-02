@@ -577,7 +577,7 @@ test_ubandsel_response_one (void)
     const MMModemBand expected_bands[] = {
         /*  850 */ MM_MODEM_BAND_G850, MM_MODEM_BAND_UTRAN_5, MM_MODEM_BAND_EUTRAN_5,
         /* 1700 */ MM_MODEM_BAND_EUTRAN_4,
-        /* 1900 */ MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_EUTRAN_2
+        /* 1900 */ MM_MODEM_BAND_PCS, MM_MODEM_BAND_UTRAN_2, MM_MODEM_BAND_EUTRAN_2
     };
 
     common_validate_ubandsel_response ("+UBANDSEL: 850,1700,1900\r\n", expected_bands, "TOBY-R200", G_N_ELEMENTS (expected_bands));
