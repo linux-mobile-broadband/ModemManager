@@ -163,6 +163,7 @@
                 Devices supporting the fastboot firmware update method require exposing the
                 following additional settings:
               </para>
+              <variablelist>
                 <varlistentry><term><literal>"fastboot-at"</literal></term>
                   <listitem>
                     (Required) This property exposes the AT command that should be sent to the
