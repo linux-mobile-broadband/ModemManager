@@ -80,8 +80,13 @@ is related.
 
 .SH MANAGER OPTIONS
 .TP
+.B \-B, \-\-get\-daemon\-version
+Retrieve the version of the currently running ModemManager daemon.
+.TP
 .B \-G, \-\-set\-logging=[ERR|WARN|INFO|DEBUG]
-Set the logging level in ModemManager daemon. For debugging information you can supply \fBDEBUG\fR. Each value above \fBDEBUG\fR provides less detail. In most cases \fBERR\fR (for displaying errors) are the important messages.
+Set the logging level in ModemManager daemon. For debugging information you can
+supply \fBDEBUG\fR. Each value above \fBDEBUG\fR provides less detail. In most
+cases \fBERR\fR (for displaying errors) are the important messages.
 
 The default mode is \fBERR\fR.
 .TP
@@ -94,6 +99,53 @@ List available modems and monitor modems added or removed.
 .B \-S, \-\-scan-modems
 Scan for any potential new modems. This is only useful when expecting pure
 RS232 modems, as they are not notified automatically by the kernel.
+.TP
+.B \-I, \-\-inhibit\-device=[UID]
+Inhibit the specific device from being used by ModemManager. The \fBUID\fR
+that should be given is the value of the \fBDevice\fR property exposed by
+a given modem (i.e. equal to the \fBID_MM_PHYSDEV_UID\fR if one set, or
+otherwise equal to the full device sysfs path).
+
+This command will not exit right away, as that would implicitly remove the
+inhibition. The user must make sure to stop the mmcli process hitting Ctrl+C
+in order to un-inhibit the device.
+
+When a device is inhibited via this method, ModemManager will disable the modem
+(therefore stopping any ongoing connection) and will no longer use it until it
+is uninhibited.
+.TP
+.B \-\-report\-kernel\-event=['KEY1=VALUE1,KEY2=VALUE2,...']
+Manually report kernel events, instead of relying on udev (e.g. if the daemon
+is running with \fB\-\-no\-auto\-scan\fR or if the system was built without udev
+support).
+
+The supported \fBKEY\fRs are:
+.RS 9
+.TP
+\fB'action'\fR
+Action to report, one of 'add' or 'remove'. Required.
+.TP
+\fB'subsystem'\fR
+Subsystem of the specific port being reported, e.g. 'tty' (for serial ports),
+'net' (for network interfaces), or 'usbmisc' (for cdc-wdm ports)..
+.TP
+\fB'name'\fR
+Name of the port being reported, e.g. 'ttyACM0', 'wwan0' or 'cdc-wdm0'.
+.TP
+\fB'uid'\fR
+The specific UID of the device, equivalent to the \fBID_MM_PHYSDEV_UID\fR udev
+tag. All ports reported with the same 'UID' value will be considered part of the
+same device, which may be useful for e.g. modems with multiple platform TTYs.
+.RE
+
+.TP
+.B \-\-report\-kernel\-event\-auto\-scan
+When built with udev support but the daemon is running with
+\fB\-\-no\-auto\-scan\fR, this method may be used to automatically report kernel
+events based on udev.
+
+This command will not exit right away. The user must make sure to stop the mmcli
+process hitting Ctrl+C in order to stopping monitoring for new events.
 
 .SH COMMON OPTIONS
 All options below take a \fBPATH\fR or \fBINDEX\fR argument. If no action is
@@ -210,14 +262,18 @@ Protocol of the Rm interface, given as a MMModemCdmaRmProtocol value (e.g. 'asyn
 Telephone number to dial. Required in POTS.
 .RE
 .TP
-.B \-\-delete\-bearer=PATH
-Delete bearer from a given modem. This option explicitly uses a
-\fBPATH\fR to define the bearer, you can not use an \fBINDEX\fR to be
-deleted.
+.B \-\-delete\-bearer=[PATH|INDEX]
+Delete bearer from a given modem.
 .TP
 .B \-\-set\-allowed\-modes=[MODE1|MODE2|...]
 Set allowed modes for a given modem. For possible modes, see the
 beginning of this section.
+.TP
+.B \-\-set\-preferred\-mode=MODE
+Set the preferred \fBMODE\fR for the given modem. The \fBMODE\fR
+\fIMUST\fR be one of the allowed modes as set with the
+\fB\-\-set\-allowed\-modes\fR option. Possible \fBMODE\fR arguments
+are detailed at the beginning of this section.
 .TP
 .B \-\-set\-current\-bands=[BAND1|BAND2|...]
 Set bands to be used for a given modem. These are frequency ranges
@@ -228,11 +284,19 @@ MMModemBand documentation.
 An example would be: 'egsm|dcs|pcs|g850' to select all the GSM
 frequency bands.
 .TP
-.B \-\-set\-preferred\-mode=MODE
-Set the preferred \fBMODE\fR for the given modem. The \fBMODE\fR
-\fIMUST\fR be one of the allowed modes as set with the
-\fB\-\-set\-allowed\-modes\fR option. Possible \fBMODE\fR arguments
-are detailed at the beginning of this section.
+.B \-\-inhibit
+Inhibit the specific modem from being used by ModemManager. This method
+is completely equivalent to \fB\-\-inhibit\-device\fR, with the only
+difference being that in this case, the modem must be managed by the daemon
+at the time the inhibition is requested.
+
+This command will not exit right away, as that would implicitly remove the
+inhibition. The user must make sure to stop the mmcli process hitting Ctrl+C
+in order to un-inhibit the device.
+
+When a device is inhibited via this method, ModemManager will disable the modem
+(therefore stopping any ongoing connection) and will no longer use it until it
+is uninhibited.
 
 .SH 3GPP OPTIONS
 The 3rd Generation Partnership Project (3GPP) is a collaboration
@@ -305,9 +369,6 @@ ETSI MCC-MNC of a network to force registration.
 .TP
 .B \-\-simple\-disconnect
 Disconnect \fIALL\fR connected bearers for a given modem.
-.TP
-.B \-\-simple\-status
-Display the status of the given modem.
 
 .SH LOCATION OPTIONS
 These options detail how to discover your location using Global
@@ -329,27 +390,38 @@ Enable location discovery using the 3GPP network.
 .B \-\-location\-disable\-3gpp
 Disable location discovery using the 3GPP network.
 .TP
-.B \-\-location\-get\-3gpp
-Show 3GPP based location information (MCC, MNC, LAC, CI).
+.B \-\-location\-enable\-agps
+Enable A-GPS (MSA) support. This command does not implicitly start the GPS
+engine, it just specifies that A-GPS should be enabled when the engine is
+started. Therefore, the user should request enabling A-GPS before the raw
+or NMEA outputs are enabled with \fB\-\-location\-enable\-gps\-raw\fR or
+\fB\-\-location\-enable\-gps\-nmea\fR.
+.TP
+.B \-\-location\-disable\-agps
+Disable A-GPS (MSA) support.
 .TP
 .B \-\-location\-enable\-gps\-nmea
 Enable location discovery using GPS and reported with NMEA traces.
+
+This command will start the GPS engine, if it isn't started already.
 .TP
 .B \-\-location\-disable\-gps\-nmea
 Disable location discovery using GPS and NMEA traces.
-.TP
-.B \-\-location\-get\-gps\-nmea
-Show GPS based location with NMEA trace information.
+
+If the raw output is not enabled at the same time, the GPS engine will be
+stopped.
 .TP
 .B \-\-location\-enable\-gps\-raw
 Enable location discovery using GPS and reported with raw (i.e.
 longitude/latitude) values.
+
+This command will start the GPS engine, if it isn't started already.
 .TP
 .B \-\-location\-disable\-gps\-raw
 Disable location discovery using GPS and raw values.
-.TP
-.B \-\-location\-get\-gps\-raw
-Show GPS based location information with raw values (e.g. latitude, longitude).
+
+If the NMEA output is not enabled at the same time, the GPS engine will be
+stopped.
 .TP
 .B \-\-location\-enable\-cdma-bs
 Enable location discovery using the 3GPP2 network.
@@ -357,12 +429,10 @@ Enable location discovery using the 3GPP2 network.
 .B \-\-location\-disable\-cdma-bs
 Disable location discovery using the 3GPP2 network.
 .TP
-.B \-\-location\-get\-cdma-bs
-Show 3GPP2 based location information (location of the CDMA base station).
-.TP
 .B \-\-location\-enable\-gps\-unmanaged
 Enable location discovery using GPS but without taking control of the NMEA tty
-port.
+port. This allows other programs, e.g. gpsd, to use the NMEA tty once the GPS
+engine has been enabled.
 .TP
 .B \-\-location\-disable\-gps\-unmanaged
 Disable location discovery using GPS and unmanaged port.
@@ -371,6 +441,26 @@ Disable location discovery using GPS and unmanaged port.
 Set the location refresh rate on the DBus interface to SEC seconds. If set to
 0, the new location is published on the DBus interface as soon as ModemManager
 detects it.
+.TP
+.B \-\-location\-set\-supl\-server=[IP:PORT] or \-\-location\-set\-supl\-server=[FQDN:PORT]
+Configure the location of the A\-GPS SUPL server, either specifying the IP
+address (\fBIP:PORT\fR) or specifyng a fully qualified domain name
+(\fB[FQDN:PORT]\fR).
+.TP
+.B \-\-location\-inject\-assistance\-data=[PATH]
+Inject assistance data into the GNSS module, loaded from a local file at
+\fBPATH\fR. The assistance data should be in a format expected by the device,
+e.g. downloaded from the URLs exposed by the 'AssistanceDataServers' property.
+.TP
+.B \-\-location\-set\-enable\-signal
+Enable reporting location updates via DBus property signals. This is
+required if applications rely on listening to 'Location' property updates,
+instead of explicit queries with the policy-protected 'GetLocation' method.
+
+This DBus property signal updates are by default disabled.
+.TP
+.B \-\-location\-set\-disable\-signal
+Disable reporting location updates via DBus property signals.
 
 .SH MESSAGING OPTIONS
 All messaging options must be used with \fB\-\-modem\fR or \fB\-m\fR.
@@ -413,11 +503,11 @@ Specifies the storage where this message is kept. Storages may
 be 'sm', 'me', 'mt', 'sr', 'bm', 'ta'.
 .RE
 .TP
-.B \-\-messaging\-create-sms-with-data=PATH
+.B \-\-messaging\-create\-sms\-with\-data=PATH
 Use \fBPATH\fR to a filename as the data to create a new SMS.
 .TP
-.B \-\-messaging\-delete-sms=PATH
-Delete an SMS from a given modem. \fBPATH\fR indicates the SMS path.
+.B \-\-messaging\-delete\-sms=[PATH|INDEX]
+Delete an SMS from a given modem.
 
 .SH TIME OPTIONS
 All time operations require the \fB\-\-modem\fR or \fB\-m\fR option.
@@ -427,9 +517,31 @@ All time operations require the \fB\-\-modem\fR or \fB\-m\fR option.
 Display the current network time from the operator. This includes the
 timezone which is usually of importance.
 
+.SH VOICE OPTIONS
+All voice operations require the \fB\-\-modem\fR or \fB\-m\fR option.
+
+.TP
+.B \-\-voice\-list\-calls
+List calls managed (initiated, received, ongoing) on a given modem.
+.TP
+.B \-\-voice\-create-call=['KEY1=VALUE1,...']
+Create a new outgoing call on a given modem. \fBKEY\fRs can be any of the
+following:
+.RS 9
+.TP
+\fB'number'\fR
+Number to call.
+.RE
+.TP
+.B \-\-voice\-delete\-call=[PATH|INDEX]
+Delete a call from a given modem.
+
 .SH FIRMWARE OPTIONS
 All firmware options require the \fB\-\-modem\fR or \fB\-m\fR option.
 
+.TP
+.B \-\-firmware\-status
+Show firmware update specific details and properties.
 .TP
 .B \-\-firmware\-list
 List all the firmware images installed on a given modem.
@@ -440,6 +552,19 @@ of available firmware images can be seen using the
 \fB\-\-firmware\-list\fR option.
 
 The \fBID\fR provided is a \fIUNIQUE\fR identifier for the firmware.
+
+.SH SIGNAL OPTIONS
+All signal options require the \fB\-\-modem\fR or \fB\-m\fR option.
+
+.TP
+.B \-\-signal\-setup=[Rate]
+Setup extended signal quality information retrieval at the specified rate
+(in seconds).
+
+By default this is disabled (rate set to 0).
+.TP
+.B \-\-signal\-get
+Retrieve the last extended signal quality information loaded.
 
 .SH OMA OPTIONS
 All OMA options require the \fB\-\-modem\fR or \fB\-m\fR option.
@@ -539,7 +664,25 @@ This option takes an SMS that has \fIDATA\fR (not \fITEXT\fR) and will
 create a local file described by \fBPATH\fR and store the content of
 the SMS there.
 
+.SH CALL OPTIONS
+.TP
+.B \-\-start
+Initiate an outgoing call.
+.TP
+.B \-\-accept
+Accept an incoming call.
+.TP
+.B \-\-hangup
+Reject an incoming call or hangup an ongoing one.
+.TP
+.B \-\-send\-dtmf=[0\-9A\-D*#]
+Send a DTMF sequence through an ongoing call.
+
 .SH APPLICATION OPTIONS
+.TP
+.B \-K, \-\-output\-keyvalue
+Run action with machine-friendly key-value output, to be used e.g. by
+shell scripts that rely on mmcli operations.
 .TP
 .B \-v, \-\-verbose
 Perform actions with more details reported and/or logged.
@@ -554,7 +697,7 @@ practical benefit to most user operations.
 .B \-\-timeout=SECONDS
 Use \fBSECONDS\fR for the timeout when performing operations with this
 command. This option is useful when executing long running operations, like
-\-\-3gpp\-scan.
+\fB\-\-3gpp\-scan\fR.
 
 .SH EXAMPLES
 .SS Send the PIN to the SIM card
@@ -562,13 +705,13 @@ command. This option is useful when executing long running operations, like
 You'll need first to know which the proper path/index is for the SIM in your
 modem:
 .Bd -literal -compact
-    $ mmcli -m 0 | grep SIM
-    SIM | path: '/org/freedesktop/ModemManager1/SIM/0'
+    $ mmcli -m 0 -K | grep "modem.generic.sim" | awk -F ": " '{ print $2 }'
+    /org/freedesktop/ModemManager1/SIM/0
 .Ed
 
 And after that, you can just use the SIM index:
 .Bd -literal -compact
-    $ mmcli -i 0 --pin=1234
+    $ sudo mmcli -i 0 --pin=1234
     successfully sent PIN code to the SIM
 .Ed
 
@@ -576,13 +719,13 @@ And after that, you can just use the SIM index:
 
 You can launch the simple connection process like:
 .Bd -literal -compact
-    $ mmcli -m 0 --simple-connect="pin=1234,apn=internet"
+    $ sudo mmcli -m 0 --simple-connect="pin=1234,apn=internet"
     successfully connected the modem
 .Ed
 
 Then, you can disconnect it like:
 .Bd -literal -compact
-    $ mmcli -m 0 --simple-disconnect
+    $ sudo mmcli -m 0 --simple-disconnect
     successfully disconnected all bearers in the modem
 .Ed
 
@@ -591,13 +734,12 @@ Then, you can disconnect it like:
 Scanning for 3GPP networks may really take a long time, so a specific timeout
 must be given:
 .Bd -literal -compact
-    $ mmcli -m 0 --3gpp-scan --timeout=300
-
-    Found 4 networks:
-    21404 - Yoigo (umts, available)
-    21407 - Movistar (umts, current)
-    21401 - vodafone ES (umts, forbidden)
-    21403 - Orange (umts, forbidden)
+    $ sudo mmcli -m 0 --3gpp-scan --timeout=300
+      ---------------------
+      3GPP scan | networks: 21403 - Orange SP (gprs, unknown)
+                |           21407 - Movistar (gprs, unknown)
+                |           21404 - YOIGO (gprs, unknown)
+                |           21401 - vodafone ES (gprs, unknown)
 .Ed
 
 .SS Creating a new SMS message & storing it
@@ -605,7 +747,7 @@ must be given:
 Using the “sm” (SIM), you can do this using:
 
 .Bd -literal -compact
-    $ mmcli -m 0 --messaging-create-sms="text='Hello world',number='+1234567890'"
+    $ sudo mmcli -m 0 --messaging-create-sms="text='Hello world',number='+1234567890'"
     Successfully created new SMS:
         /org/freedesktop/ModemManager1/SMS/21 (unknown)
 
@@ -613,28 +755,28 @@ Using the “sm” (SIM), you can do this using:
     successfully stored the SMS
 
     $ sudo mmcli -s 21
-    SMS '/org/freedesktop/ModemManager1/SMS/21'
-      -----------------------------------
-      Content    |              number: '+1234567890'
-                 |                text: 'Hello world'
-      -----------------------------------
-      Properties |            PDU type: 'submit'
-                 |               state: 'stored'
-                 |                smsc: 'unknown'
-                 |            validity: '0'
-                 |               class: '0'
-                 |             storage: 'sm'
-                 |     delivery report: 'not requested'
-                 |   message reference: '0'
+      -------------------------------
+      General    |         dbus path: /org/freedesktop/ModemManager1/SMS/21
+      -------------------------------
+      Content    |            number: +1234567890
+                 |              text: Hello world
+      -------------------------------
+      Properties |          PDU type: submit
+                 |             state: stored
+                 |              smsc: unknown
+                 |          validity: 0
+                 |             class: 0
+                 |           storage: sm
+                 |   delivery report: not requested
+                 | message reference: 0
 
     $ sudo mmcli -m 0 --messaging-status
-    /org/freedesktop/ModemManager1/Modem/0
       ----------------------------
-      Messaging | supported storages: 'sm, me'
-                |    default storage: 'me'
+      Messaging | supported storages: sm, me
+                |    default storage: me
 .Ed
 
-.SS Sending SMS messages from files
+.SS Sending binary SMS messages from files
 
 As you can see below, the important part is the
 \fB\-\-messaging\-create\-sms\-with\-data\fR and the \fBPATH\fR provided.
@@ -658,7 +800,6 @@ ModemManager setup:
 
 .Bd -literal -compact
     $> sudo mmcli -m 0 --messaging-list-sms
-    Found 1 SMS messages:
         /org/freedesktop/ModemManager1/SMS/0 (received)
 
     $> sudo mmcli -s 0 --create-file-with-data=/path/to/the/output/file
@@ -673,11 +814,10 @@ proper modem index:
 
 .Bd -literal -compact
     $ mmcli -m 0 --location-status
-    /org/freedesktop/ModemManager1/Modem/0
       ----------------------------
-      Location | capabilities: '3gpp-lac-ci, gps-raw, gps-nmea'
-               |      enabled: 'none'
-               |      signals: 'no'
+      Location | capabilities: 3gpp-lac-ci, gps-raw, gps-nmea
+               |      enabled: none
+               |      signals: no
 .Ed
 
 The output says that the modem supports 3GPP Location area code/Cell
@@ -689,16 +829,15 @@ didn’t enable the modem, which we can do issuing:
     successfully enabled the modem
 
     $ mmcli -m 0 --location-status
-    /org/freedesktop/ModemManager1/Modem/0
       ----------------------------
-      Location | capabilities: '3gpp-lac-ci, gps-raw, gps-nmea'
-               |      enabled: '3gpp-lac-ci'
-               |      signals: 'no'
+      Location | capabilities: 3gpp-lac-ci, gps-raw, gps-nmea
+               |      enabled: 3gpp-lac-ci
+               |      signals: no
 .Ed
 
 .SS GPS location technology enabling
 
-We can enable the RAW and NMEA GPS location sources using:
+We can start the GPS engine by enabling the RAW or NMEA GPS location sources:
 
 .Bd -literal -compact
     $ sudo mmcli -m 0 \\
@@ -711,27 +850,25 @@ If we do check again the status, we’ll see the GPS-specific locations are enab
 
 .Bd -literal -compact
     $ mmcli -m 0 --location-status
-    /org/freedesktop/ModemManager1/Modem/0
-      ----------------------------
-      Location | capabilities: '3gpp-lac-ci, gps-raw, gps-nmea'
-               |      enabled: '3gpp-lac-ci, gps-raw, gps-nmea'
-               |      signals: 'no'
+      --------------------------------
+      Location | capabilities: 3gpp-lac-ci, gps-raw, gps-nmea
+               |      enabled: 3gpp-lac-ci, gps-raw, gps-nmea
+               |      signals: no
 .Ed
 
 .SS GPS location retrieval
 
-You can query location source specific information with
-\fB\-\-location\-get\-3gpp\fR, \fB\-\-location\-get\-gps\-nmea\fR and
-\fB\-\-location\-get\-gps\-raw\fR; but also for all at the same time:
+You can query all location information at the same time with a single command.
+If any of the specific outputs is not available, the corresponding section will
+be omitted from the output.
 
 .Bd -literal -compact
     $ sudo mmcli -m 0 --location-get
-    /org/freedesktop/ModemManager1/Modem/0
       -------------------------
-      3GPP location   | Mobile country code: '214'
-                      | Mobile network code: '3'
-                      |  Location area code: '21071'
-                      |             Cell ID: '7033737'
+      3GPP location   | Mobile country code: 214
+                      | Mobile network code: 3
+                      |  Location area code: 21071
+                      |             Cell ID: 7033737
       -------------------------
       GPS NMEA traces | $GPGGA,,,,,,0,,,,,,,,*66
                       | $GPRMC,,V,,,,,,,,,,N*53
@@ -741,26 +878,92 @@ You can query location source specific information with
                       | $GPGSV,4,3,16,03,,,,12,,,,30,,,,13,,,*78
                       | $GPGSV,4,4,16,23,,,,15,,,,27,,,,07,,,*79
                       | $GPVTG,,T,,M,,N,,K,N*2C
-      -------------------------
-      Raw GPS         | Not available
-      -------------------------
-      CDMA BS         | Not available
 .Ed
 
-An example of RAW GPS location information:
+.SS A-GPS support
+
+If A-GPS is enabled before starting the GPS engine, and if a data connection
+is available in the modem, the configured SUPL servers may be used to obtain
+a faster initial position fix.
+
+Note that the GPS engine will not be started when just A-GPS capability is
+enabled. An explicit output (RAW or NMEA) is required to be enabled in order
+to start the GPS engine.
 
 .Bd -literal -compact
-    $ sudo mmcli -m 0 --location-get-gps-raw
-    /org/freedesktop/ModemManager1/Modem/0
-      -------------------------
-      Raw GPS         |  UTC time: '155142.2'
-                      | Longitude: '-3.513941'
-                      |  Latitude: '40.502603'
-                      |  Altitude: '18.000000'
+    $ mmcli -m 0 --location-status
+      --------------------------------
+      Location |      capabilities: 3gpp-lac-ci, gps-raw, gps-nmea, agps
+               |           enabled: 3gpp-lac-ci
+               |           signals: no
+      -----------------------------
+      GPS      |      refresh rate: 30 seconds
+               | a-gps supl server: supl.google.com:7276
+
+    $ sudo mmcli -m 0 --location-enable-agps
+    successfully setup location gathering
+
+    $ sudo mmcli -m 0 --location-enable-gps-nmea
+    successfully setup location gathering
+
+    $ sudo mmcli -m 0 --location-enable-gps-raw
+    successfully setup location gathering
 .Ed
 
-.SH AUTHOR
-Martyn Russell <martyn@lanedo.com>
+.SS Injecting assistance data
+
+If the modem device does not have an ongoing connection (e.g. no mobile network
+coverage) but the system has other means to access the Internet (e.g. WiFi), the
+user may be able to download location assistance data and inject it in the
+module.
+
+E.g. If the device supports XTRA assistance data, the user may download it from
+one of the servers listed by ModemManager and manually inject it afterwards. The
+XTRA assistance data is usually valid for several days.
+
+.Bd -literal -compact
+    $ mmcli -m 0 --location-status
+      --------------------------------
+      Location |         capabilities: 3gpp-lac-ci, gps-raw, gps-nmea, agps
+               |              enabled: 3gpp-lac-ci
+               |              signals: no
+      --------------------------------
+      GPS      |         refresh rate: 30 seconds
+               |    a-gps supl server: supl.google.com:7276
+               | supported assistance: xtra
+               |   assistance servers: https://xtrapath3.izatcloud.net/xtra3grcej.bin
+               |                       https://xtrapath1.izatcloud.net/xtra3grcej.bin
+               |                       https://xtrapath2.izatcloud.net/xtra3grcej.bin
+
+    $ wget -q https://xtrapath3.izatcloud.net/xtra3grcej.bin
+
+    $ sudo mmcli -m 0 --location-inject-assistance-data=./xtra3grcej.bin
+    successfully injected assistance data
+
+    $ sudo mmcli -m 0 --location-enable-gps-nmea
+    successfully setup location gathering
+
+    $ sudo mmcli -m 0 --location-enable-gps-raw
+    successfully setup location gathering
+.Ed
+
+.SS Key-Value output
+
+Writing shell scripts that use mmcli to perform operations with the
+modem is easy when using the \fB\-\-output\-keyvalue\fR option. For
+example, you could gather all the main status information of the modem
+with a single call and then parse it to read single fields:
+
+.Bd -literal -compact
+    $ STATUS=$(mmcli -m 0 --output-keyvalue)
+    $ echo "${STATUS}" | grep "modem.generic.state " | awk -F ": " '{ print $2 }'
+    failed
+    $ echo "${STATUS}" | grep "modem.generic.state-failed-reason " | awk -F ": " '{ print $2 }'
+    sim-missing
+.Ed
+
+.SH AUTHORS
+Written by Martyn Russell <martyn@lanedo.com> and Aleksander Morgado <aleksander@aleksander.es>
 
 .SH SEE ALSO
 \fBModemManager\fR(8), \fBNetworkManager\fR(8)
