@@ -180,10 +180,10 @@ print_firmware_status (void)
         exit (EXIT_FAILURE);
     }
 
-    mmcli_output_string_take  (MMC_F_FIRMWARE_METHOD,      method);
-    mmcli_output_string_array (MMC_F_FIRMWARE_DEVICE_IDS,  device_ids, TRUE);
-    mmcli_output_string       (MMC_F_FIRMWARE_VERSION,     version);
-    mmcli_output_string       (MMC_F_FIRMWARE_FASTBOOT_AT, fastboot_at);
+    mmcli_output_string_list_take (MMC_F_FIRMWARE_METHOD,      method);
+    mmcli_output_string_array     (MMC_F_FIRMWARE_DEVICE_IDS,  device_ids, TRUE);
+    mmcli_output_string           (MMC_F_FIRMWARE_VERSION,     version);
+    mmcli_output_string           (MMC_F_FIRMWARE_FASTBOOT_AT, fastboot_at);
     mmcli_output_dump ();
 }
 
