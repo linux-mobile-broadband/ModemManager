@@ -49,7 +49,7 @@ const ModemWatcher = new Lang.Class({
 
     _ModemManagerNameOwnerChanged: function() {
         if (this._manager.name_owner)
-            print('[ModemWatcher] ModemManager service is available in bus');
+            print('[ModemWatcher] ModemManager ' + this._manager.get_version() + ' service is available in bus');
         else
             print('[ModemWatcher] ModemManager service not available in bus');
     },

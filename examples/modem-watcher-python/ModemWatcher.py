@@ -54,7 +54,7 @@ class ModemWatcher:
     """
     def set_available(self):
         if self.available == False or self.initializing == True:
-            print('[ModemWatcher] ModemManager service is available in bus')
+            print('[ModemWatcher] ModemManager %s service is available in bus' % self.manager.get_version())
         self.object_added_id = self.manager.connect('object-added', self.on_object_added)
         self.object_removed_id = self.manager.connect('object-removed', self.on_object_removed)
         self.available = True
