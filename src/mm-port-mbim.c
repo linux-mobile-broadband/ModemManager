@@ -188,6 +188,7 @@ qmi_device_open_ready (QmiDevice    *dev,
                  mm_port_get_device (MM_PORT (self)));
     }
 
+    self->priv->in_progress = FALSE;
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -211,6 +212,7 @@ qmi_device_new_ready (GObject      *unused,
         /* Ignore error and complete */
         mm_info ("[%s] MBIM device is not QMI capable",
                  mm_port_get_device (MM_PORT (self)));
+        self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -242,10 +244,9 @@ mbim_device_open_ready (MbimDevice   *mbim_device,
 
     self = g_task_get_source_object (task);
 
-    /* Reset the progress flag */
-    self->priv->in_progress = FALSE;
     if (!mbim_device_open_full_finish (mbim_device, res, &error)) {
         g_clear_object (&self->priv->mbim_device);
+        self->priv->in_progress = FALSE;
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -270,6 +271,7 @@ mbim_device_open_ready (MbimDevice   *mbim_device,
     }
 #endif
 
+    self->priv->in_progress = FALSE;
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 
