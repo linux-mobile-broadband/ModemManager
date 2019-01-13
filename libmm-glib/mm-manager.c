@@ -89,6 +89,15 @@ get_proxy_type (GDBusObjectManagerClient *manager,
 
 /*****************************************************************************/
 
+static void
+cleanup_modem_manager1_proxy (MMManager *self)
+{
+    if (self->priv->manager_iface_proxy) {
+        g_signal_handlers_disconnect_by_func (self, cleanup_modem_manager1_proxy, NULL);
+        g_clear_object (&self->priv->manager_iface_proxy);
+    }
+}
+
 static gboolean
 ensure_modem_manager1_proxy (MMManager  *self,
                              GError    **error)
@@ -123,6 +132,12 @@ ensure_modem_manager1_proxy (MMManager  *self,
     g_object_unref (connection);
     g_free (object_path);
     g_free (name);
+
+    if (self->priv->manager_iface_proxy)
+        g_signal_connect (self,
+                          "notify::name-owner",
+                          G_CALLBACK (cleanup_modem_manager1_proxy),
+                          NULL);
 
     return !!self->priv->manager_iface_proxy;
 }
