@@ -157,10 +157,7 @@ MMManager *
 mm_manager_new_finish (GAsyncResult  *res,
                        GError       **error)
 {
-    GDBusObjectManager *ret;
-
-    ret = mm_gdbus_object_manager_client_new_finish (res, error);
-    return (ret ? MM_MANAGER (ret) : NULL);
+    return MM_MANAGER (mm_gdbus_object_manager_client_new_finish (res, error));
 }
 
 /**
@@ -222,19 +219,15 @@ mm_manager_new_sync (GDBusConnection                *connection,
                      GCancellable                   *cancellable,
                      GError                        **error)
 {
-    GInitable *ret;
-
-    ret = g_initable_new (MM_TYPE_MANAGER,
-                          cancellable,
-                          error,
-                          "name", MM_DBUS_SERVICE,
-                          "object-path", MM_DBUS_PATH,
-                          "flags", flags,
-                          "connection", connection,
-                          "get-proxy-type-func", get_proxy_type,
-                          NULL);
-
-    return (ret ? MM_MANAGER (ret) : NULL);
+    return MM_MANAGER (g_initable_new (MM_TYPE_MANAGER,
+                                       cancellable,
+                                       error,
+                                       "name", MM_DBUS_SERVICE,
+                                       "object-path", MM_DBUS_PATH,
+                                       "flags", flags,
+                                       "connection", connection,
+                                       "get-proxy-type-func", get_proxy_type,
+                                       NULL));
 }
 
 /*****************************************************************************/
