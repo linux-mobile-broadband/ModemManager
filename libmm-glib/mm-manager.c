@@ -157,7 +157,13 @@ MMManager *
 mm_manager_new_finish (GAsyncResult  *res,
                        GError       **error)
 {
-    return MM_MANAGER (mm_gdbus_object_manager_client_new_finish (res, error));
+    GObject *ret;
+    GObject *source_object;
+
+    source_object = g_async_result_get_source_object (res);
+    ret = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, error);
+    g_object_unref (source_object);
+    return MM_MANAGER (ret);
 }
 
 /**
