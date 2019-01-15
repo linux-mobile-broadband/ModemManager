@@ -1,4 +1,123 @@
 
+ModemManager 1.10.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version requires:
+   ** libmbim >= 1.18.0 (for the optional MBIM support)
+   ** libqmi >= 1.22.0 (for the optional QMI support)
+
+The most important features and changes in this release are the following:
+
+ * udev:
+   ** Consolidated common tag names among all the supported plugins. E.g.
+      ID_MM_PORT_TYPE_GPS, ID_MM_PORT_TYPE_AT_*, ID_MM_PORT_TYPE_QCDM...
+      All these generic tags are included as symbols in the API, and
+      compatibility will be maintained for these. Custom setups of
+      ModemManager relying on previously available per-plugin udev tags may
+      need to manually port them to this new generic subset.
+   ** New tag to allow specifying flow control settings to use in serial ports.
+
+ * Core:
+   ** Avoid probing other protocols on TTYs tagged in udev with specific port
+      type tags (e.g. avoid probing QCDM if a port is tagged as AT). This allows
+      faster port probing and modem detection for known modem layouts.
+   ** Implemented support to enable and handle +CGEV URCs for asynchronous
+      connection state updates in AT-controlled devices.
+
+ * Manager interface:
+   ** New runtime daemon version reporting.
+   ** New support for requesting device inhibition, e.g. so that ModemManager
+      stops completely using a modem device until the inhibition is released.
+      This feature is implemented to allow fwupd taking over of a device
+      completely for as long as it needs during a firmware update.
+
+ * Modem interface:
+   ** All methods are always connected, even in Failed state.
+   ** Allow parallel Enable()/Disable() calls.
+   ** Deprecated redundant ListBearers() method, the read-only Bearers property
+      is already showing the same information.
+
+ * Bearer interface:
+   ** New 'BearerType' property, e.g. to specify whether a bearer is the initial
+      LTE default bearer or not.
+   ** Deprecated 'number' field in bearer settings. Applications do not need to
+      send the 'number' field in Bearer.Connect() or in Modem.Simple.Connect(),
+      as the setting is totally ignored.
+
+ * mmcli:
+   ** New 'key-value' output, easier to parse by scripts than the default.
+   ** Removed redundant '--location-get-XXX' actions, as the '--location-get'
+      already reports the location information for all sources.
+   ** Removed redundant '--simple-status' action, as the same information can be
+      obtained through different mmcli operations.
+   ** New manager '--inhibit-device' action and modem-specific '--inhibit', to
+      allow requesting device inhibition.
+
+ * 3GPP interface:
+   ** New support for exposing the network reported Protocol Configuration
+      Options (PCO), to be used instead of the new deprecated Subscription
+      State property.
+   ** New support for exposing the initial LTE default bearer status.
+   ** New support for configuring the initial LTE default bearer settings.
+
+ * Location interface:
+   ** New LTE Tracking Area Code (TAC) in 3GPP location information.
+   ** New support for injecting assistance data (e.g. Qualcomm XTRA) into the
+      GNSS engine, useful when there is no mobile connection to use MSA A-GPS.
+
+ * Firmware interface:
+   ** Support for reporting firmware update support properties, e.g. specifying
+      which update methods are supported. This information will be consumed by
+      fwupd in order to allow upgrading firmware in devices managed by
+      ModemManager.
+
+ * Voice interface:
+   ** Multiple improvements and fixes in the voice call management logic
+      implemented with generic AT commands.
+   ** Added AudioPort and AudioFormat properties to the Call object.
+   ** Added new generic audio channel setup/cleanup handlers in the Call object.
+
+ * QMI:
+   ** New LOC service based GNSS support, including A-GPS setup via SUPL server.
+   ** New support for the "extended" LTE band list.
+   ** New support for reading IMSI and ICCID with the UIM service.
+
+ * MBIM:
+   ** Implemented support for processing Protocol Configuration Options using
+      Microsoft-defined Basic Connect Extensions.
+   ** Implemented support for LTE attach status and configuration using
+      Microsoft-defined Basic Connect Extensions.
+   ** Implemented support for the extended signal interface and for 3GPP location
+      details using the AT&T specific service.
+   ** Implemented support for 3GPP USSD operations using the standard USSD
+      service.
+   ** For Qualcomm-based MBIM devices, those with QMI-over-MBIM support, a whole
+      new set of features is now available, including: QMI LOC/PDS location
+      support, allowed/preferred mode management, frequency band selection,
+      power management operations...
+
+ * Plugins:
+   ** xmm: new XMM plugin, with shared logic (allowed/preferred mode management,
+      frequency band selection, power management operations, extended signal
+      quality reporting, GPS/A-GPS...) for Intel XMM based devices.
+   ** fibocom: new plugin, with support for generic MBIM and XMM-based devices.
+   ** dell: added support for XMM-based devices, like the DW5820e.
+   ** dell: added custom support for the DW5821e, including 'unmanaged' GPS and
+      firmware update integration details.
+   ** cinterion: new shared interface to include all logic shared between Option
+      and Option/HSO devices.
+   ** sierra-legacy: implemented connection monitoring support.
+   ** u-blox: added support for extended call state transitions.
+   ** u-blox: added CDC-ECM support for SARA/LISA-U2xx modems.
+   ** altair-lte: migrated from SubscriptionState to PCO.
+
+All the features and fixes which were backported to 1.8.x releases are also present
+in ModemManager 1.10.0.
+
+
 ModemManager 1.8.0
 -------------------------------------------
 This is a new stable release of ModemManager.
