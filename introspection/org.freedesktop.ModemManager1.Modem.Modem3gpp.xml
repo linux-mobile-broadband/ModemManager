@@ -17,6 +17,11 @@
 
       This interface provides access to specific actions that may be performed
       in modems with 3GPP capabilities.
+
+      This interface will only be available once the modem is ready to be
+      registered in the cellular network. 3GPP devices will require a valid
+      unlocked SIM card before any of the features in the interface can be
+      used.
   -->
   <interface name="org.freedesktop.ModemManager1.Modem.Modem3gpp">
 

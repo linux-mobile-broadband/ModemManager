@@ -23,7 +23,10 @@
       the device. Instead, it exposes information about the expected firmware update
       method as well as method-specific details required for the upgrade to happen.
       The actual firmware upgrade may be performed via the Linux Vendor Firmware Service
-      and the <link linkend="https://fwupd.org">fwupd</link> daemon.
+      and the <ulink url="https://fwupd.org">fwupd</ulink> daemon.
+
+      This interface will always be available as long a the modem is considered
+      valid.
   -->
   <interface name="org.freedesktop.ModemManager1.Modem.Firmware">
 
