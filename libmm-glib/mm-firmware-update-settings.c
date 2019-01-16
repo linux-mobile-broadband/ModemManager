@@ -255,7 +255,7 @@ mm_firmware_update_settings_new_from_variant (GVariant  *variant,
     g_variant_get (variant, "(u@a{sv})", &method, &dictionary);
     self = mm_firmware_update_settings_new (method);
 
-    if (dictionary) {
+    if ((method != MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE) && dictionary) {
         GVariantIter  iter;
         gchar        *key;
         GVariant     *value;
