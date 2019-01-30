@@ -35,6 +35,9 @@
 /* Default session id to use in LOC operations */
 #define DEFAULT_LOC_SESSION_ID 0x10
 
+/* Default description for the default configuration of the firmware */
+#define DEFAULT_CONFIG_DESCRIPTION "default"
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -85,8 +88,9 @@ typedef struct {
     guint32                 loc_assistance_data_max_part_size;
 
     /* Carrier config helpers */
-    GArray *config_list;
-    gint    config_active_i;
+    gboolean  config_active_default;
+    GArray   *config_list;
+    gint      config_active_i;
 } Private;
 
 static void
@@ -2286,7 +2290,7 @@ setup_carrier_config_step (GTask *task)
 
     case SETUP_CARRIER_CONFIG_STEP_CHECK_CHANGE_NEEDED:
         g_assert (ctx->config_requested_i >= 0);
-        g_assert (priv->config_active_i >= 0);
+        g_assert (priv->config_active_i >= 0 || priv->config_active_default);
         if (ctx->config_requested_i == priv->config_active_i) {
             mm_info ("Carrier config switching not needed: already using '%s'", ctx->config_requested);
             ctx->step = SETUP_CARRIER_CONFIG_STEP_LAST;
@@ -2304,9 +2308,9 @@ setup_carrier_config_step (GTask *task)
         QmiConfigTypeAndId                   type_and_id;
 
         requested_config = &g_array_index (priv->config_list, ConfigInfo, ctx->config_requested_i);
-        active_config = &g_array_index (priv->config_list, ConfigInfo, priv->config_active_i);
+        active_config = (priv->config_active_default ? NULL : &g_array_index (priv->config_list, ConfigInfo, priv->config_active_i));
         mm_warn ("Carrier config switching needed: '%s' -> '%s'",
-                 active_config->description, requested_config->description);
+                 active_config ? active_config->description : DEFAULT_CONFIG_DESCRIPTION, requested_config->description);
 
         type_and_id.config_type = requested_config->config_type;;
         type_and_id.id = requested_config->id;
@@ -2418,6 +2422,7 @@ typedef struct {
 
     GArray       *config_list;
     guint         configs_loaded;
+    gboolean      config_active_default;
     gint          config_active_i;
 
     guint         token;
@@ -2468,19 +2473,26 @@ mm_shared_qmi_load_carrier_config_finish (MMIfaceModem  *self,
                                           gchar        **carrier_config_revision,
                                           GError       **error)
 {
-    Private    *priv;
-    ConfigInfo *config;
-    gssize      i;
+    Private *priv;
 
-    i = g_task_propagate_int (G_TASK (res), error);
-    if (i < 0)
+    if (!g_task_propagate_boolean (G_TASK (res), error))
         return FALSE;
 
     priv = get_private (MM_SHARED_QMI (self));
-    config = &g_array_index (priv->config_list, ConfigInfo, i);
+    g_assert (priv->config_active_i >= 0 || priv->config_active_default);
 
-    *carrier_config_name = g_strdup (config->description);
-    *carrier_config_revision = g_strdup_printf ("%08X", config->version);
+    if (priv->config_active_i >= 0) {
+        ConfigInfo *config;
+
+        config = &g_array_index (priv->config_list, ConfigInfo, priv->config_active_i);
+        *carrier_config_name = g_strdup (config->description);
+        *carrier_config_revision = g_strdup_printf ("%08X", config->version);
+    } else if (priv->config_active_default) {
+        *carrier_config_name = g_strdup (DEFAULT_CONFIG_DESCRIPTION);
+        *carrier_config_revision = NULL;
+    } else
+        g_assert_not_reached ();
+
     return TRUE;
 }
 
@@ -2541,9 +2553,9 @@ get_selected_config_indication (QmiClientPdc                            *client,
 
     qmi_indication_pdc_get_selected_config_output_get_active_id (output, &active_id, NULL);
     if (!active_id) {
-        load_carrier_config_abort (task, g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                                      "couldn't get selected config: no active id reported"));
-        return;
+        mm_dbg ("no carrier config currently selected (default in use)");
+        ctx->config_active_default = TRUE;
+        goto next;
     }
 
     g_assert (ctx->config_list);
@@ -2565,6 +2577,8 @@ get_selected_config_indication (QmiClientPdc                            *client,
                                                       "couldn't find currently selected config"));
         return;
     }
+
+ next:
 
     /* Go on */
     load_carrier_config_context_cleanup_action (ctx);
@@ -2700,9 +2714,11 @@ list_configs_indication (QmiClientPdc                      *client,
         return;
     }
 
+    /* If no configs are installed, the module is running with the default one */
     if (!configs || !configs->len) {
-        load_carrier_config_abort (task, g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
-                                                      "no configurations found"));
+        ctx->config_active_default = TRUE;
+        ctx->step = LOAD_CARRIER_CONFIG_STEP_LAST;
+        load_carrier_config_step (task);
         return;
     }
 
@@ -2819,12 +2835,13 @@ load_carrier_config_step (GTask *task)
         /* We will now store the loaded information so that we can later on use it
          * if needed during the automatic carrier config switching operation */
         g_assert (!priv->config_list);
-        g_assert (priv->config_active_i < 0);
-        g_assert (ctx->config_active_i >= 0);
+        g_assert (priv->config_active_i < 0 && !priv->config_active_default);
+        g_assert (ctx->config_active_i >= 0 || ctx->config_active_default);
         priv->config_list = g_array_ref (ctx->config_list);
         priv->config_active_i = ctx->config_active_i;
+        priv->config_active_default = ctx->config_active_default;
 
-        g_task_return_int (task, ctx->config_active_i);
+        g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         break;
     }
