@@ -1,0 +1,101 @@
+# Danish translation for ModemManager.
+# Copyright (C) 2019 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# scootergrisen, 2019.
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2019-02-11 17:22+0100\n"
+"PO-Revision-Date: 2019-02-10 16:46+0200\n"
+"Last-Translator: scootergrisen\n"
+"Language-Team: Danish\n"
+"Language: da\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Styr Modem Manager-dæmonen"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Systempolitikken forhindrer styring af Modem Manager."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Lås op for og styr en mobilt bredbånd-enhed"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Systempolitikken forhindrer oplåsning og styring af mobilt bredbånd-enheden."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Tilføj, rediger og slet mobilt bredbånd-kontakter"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Systempolitikken forhindrer tilføjelse, redigering eller sletning af "
+"enhedens kontakter."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Send, gem, rediger og slet tekstbeskeder"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Systempolitikken forhindrer afsendelse eller manipulering af enhedens "
+"tekstbeskeder."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Accepter indkommende stemmeopkald eller start udgående stemmeopkald."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Systempolitikken forhindrer stemmeopkald."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr "Aktivér og vis information om geografisk placering og positition"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Systempolitikken forhindrer aktivering og visning af information geografisk "
+"placering."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Forespørg og anvend netværksinformation og -tjenester"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Systempolitikken forhindrer forespørgsel eller anvendelse af "
+"netværksinformation og -tjenester."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Forespørg og håndter firmware på en mobilt bredbånd-enhed"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Systempolitikken forhindrer forespørgsel og håndtering af enhedens firmware."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager har brug for at nulstille enhederne"
