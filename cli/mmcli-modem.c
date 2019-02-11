@@ -901,6 +901,19 @@ state_changed (MMModem                  *modem,
 }
 
 static void
+device_removed (MMManager *manager,
+                MMObject  *object)
+{
+    if (object != ctx->object)
+        return;
+
+    g_print ("\t%s: Removed\n", mm_object_get_path (object));
+    fflush (stdout);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -928,6 +941,11 @@ get_modem_ready (GObject      *source,
         g_signal_connect (ctx->modem,
                           "state-changed",
                           G_CALLBACK (state_changed),
+                          NULL);
+
+        g_signal_connect (ctx->manager,
+                          "object-removed",
+                          G_CALLBACK (device_removed),
                           NULL);
 
         current = mm_modem_get_state (ctx->modem);
