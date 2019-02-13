@@ -1,0 +1,28 @@
+image: gcc
+
+stages:
+  - test
+
+before_script:
+  - apt update && apt -y install autoconf automake libtool libgudev-1.0-dev libgettextpo-dev autopoint xsltproc dbus
+  - export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+  - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+  - pushd libmbim
+  - ./autogen.sh
+  - make
+  - make install
+  - popd
+  - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+  - pushd libqmi
+  - ./autogen.sh
+  - make
+  - make install
+  - popd
+
+test:
+  stage: test
+  script:
+    - ./autogen.sh
+    - make
+    - make check
+    - make install
