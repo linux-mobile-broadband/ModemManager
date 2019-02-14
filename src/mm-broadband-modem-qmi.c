@@ -8422,6 +8422,8 @@ qmi_port_open_ready (MMPortQmi *qmi,
          * try without it.  The qmi_wwan driver will fix up any issues that
          * the device might have between raw-ip and 802.3 mode anyway.
          */
+        mm_dbg ("Couldn't open QMI port with data format update: %s", error->message);
+        g_error_free (error);
         mm_port_qmi_open (ctx->qmi,
                           FALSE,
                           NULL,
