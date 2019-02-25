@@ -912,6 +912,13 @@ libmm_utils_telit_la_SOURCES = \
 	$(NULL)
 libmm_utils_telit_la_CPPFLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
 
+if WITH_MBIM
+libmm_utils_telit_la_SOURCES += \
+	telit/mm-broadband-modem-mbim-telit.h \
+	telit/mm-broadband-modem-mbim-telit.c \
+	$(NULL)
+endif
+
 TELIT_COMMON_COMPILER_FLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
 TELIT_COMMON_LIBADD_FLAGS   = \
 	$(builddir)/libhelpers-telit.la \
