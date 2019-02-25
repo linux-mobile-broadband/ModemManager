@@ -33,16 +33,19 @@
 #include "mm-broadband-modem-telit.h"
 #include "mm-modem-helpers-telit.h"
 #include "mm-telit-enums-types.h"
+#include "mm-shared-telit.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void shared_telit_init (MMSharedTelit *iface);
 
 static MMIfaceModem *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_TELIT, shared_telit_init));
 
 #define CSIM_UNLOCK_MAX_TIMEOUT 3
 
@@ -344,228 +347,6 @@ modem_setup_sim_hot_swap (MMIfaceModem *self,
 
     g_task_set_task_data (task, ctx, (GDestroyNotify) qss_setup_context_free);
     qss_setup_step (task);
-}
-
-/*****************************************************************************/
-/* Set current bands (Modem interface) */
-
-static gboolean
-modem_set_current_bands_finish (MMIfaceModem *self,
-                                GAsyncResult *res,
-                                GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-modem_set_current_bands_ready (MMBaseModem *self,
-                               GAsyncResult *res,
-                               GTask *task)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_command_finish (self, res, &error);
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-
-    g_object_unref (task);
-}
-
-static void
-modem_set_current_bands (MMIfaceModem *self,
-                         GArray *bands_array,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
-{
-    gchar *cmd;
-    gint flag2g;
-    gint flag3g;
-    gint flag4g;
-    gboolean is_2g;
-    gboolean is_3g;
-    gboolean is_4g;
-    GTask *task;
-
-    mm_telit_get_band_flag (bands_array, &flag2g, &flag3g, &flag4g);
-
-    is_2g = mm_iface_modem_is_2g (self);
-    is_3g = mm_iface_modem_is_3g (self);
-    is_4g = mm_iface_modem_is_4g (self);
-
-    if (is_2g && flag2g == -1) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_NOT_FOUND,
-                                 "None or invalid 2G bands combination in the provided list");
-        return;
-    }
-
-    if (is_3g && flag3g == -1) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_NOT_FOUND,
-                                 "None or invalid 3G bands combination in the provided list");
-        return;
-    }
-
-    if (is_4g && flag4g == -1) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_NOT_FOUND,
-                                 "None or invalid 4G bands combination in the provided list");
-        return;
-    }
-
-    cmd = NULL;
-    if (is_2g && !is_3g && !is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d", flag2g);
-    else if (is_2g && is_3g && !is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d,%d", flag2g, flag3g);
-    else if (is_2g && is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d,%d,%d", flag2g, flag3g, flag4g);
-    else if (!is_2g && !is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=0,0,%d", flag4g);
-    else if (!is_2g && is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=0,%d,%d", flag3g, flag4g);
-    else if (is_2g && !is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d,0,%d", flag2g, flag4g);
-    else {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Unexpected error: could not compose AT#BND command");
-        return;
-    }
-    task = g_task_new (self, NULL, callback, user_data);
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              cmd,
-                              20,
-                              FALSE,
-                              (GAsyncReadyCallback)modem_set_current_bands_ready,
-                              task);
-    g_free (cmd);
-}
-
-/*****************************************************************************/
-/* Load current bands (Modem interface) */
-
-typedef struct {
-    gboolean mm_modem_is_2g;
-    gboolean mm_modem_is_3g;
-    gboolean mm_modem_is_4g;
-    MMTelitLoadBandsType band_type;
-} LoadBandsContext;
-
-static void
-load_bands_context_free (LoadBandsContext *ctx)
-{
-    g_slice_free (LoadBandsContext, ctx);
-}
-
-static GArray *
-modem_load_bands_finish (MMIfaceModem *self,
-                         GAsyncResult *res,
-                         GError **error)
-{
-    return (GArray *) g_task_propagate_pointer (G_TASK (res), error);
-}
-
-static void
-load_bands_ready (MMBaseModem *self,
-                  GAsyncResult *res,
-                  GTask *task)
-{
-    const gchar *response;
-    GError *error = NULL;
-    GArray *bands = NULL;
-    LoadBandsContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-    response = mm_base_modem_at_command_finish (self, res, &error);
-
-    if (!response)
-        g_task_return_error (task, error);
-    else if (!mm_telit_parse_bnd_response (response,
-                                           ctx->mm_modem_is_2g,
-                                           ctx->mm_modem_is_3g,
-                                           ctx->mm_modem_is_4g,
-                                           ctx->band_type,
-                                           &bands,
-                                           &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
-
-    g_object_unref (task);
-}
-
-static void
-modem_load_current_bands (MMIfaceModem *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
-{
-    GTask *task;
-    LoadBandsContext *ctx;
-
-    ctx = g_slice_new0 (LoadBandsContext);
-
-    ctx->mm_modem_is_2g = mm_iface_modem_is_2g (self);
-    ctx->mm_modem_is_3g = mm_iface_modem_is_3g (self);
-    ctx->mm_modem_is_4g = mm_iface_modem_is_4g (self);
-    ctx->band_type = LOAD_CURRENT_BANDS;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)load_bands_context_free);
-
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "#BND?",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback) load_bands_ready,
-                              task);
-}
-
-/*****************************************************************************/
-/* Load supported bands (Modem interface) */
-
-static void
-modem_load_supported_bands (MMIfaceModem *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
-{
-    GTask *task;
-    LoadBandsContext *ctx;
-
-    ctx = g_slice_new0 (LoadBandsContext);
-
-    ctx->mm_modem_is_2g = mm_iface_modem_is_2g (self);
-    ctx->mm_modem_is_3g = mm_iface_modem_is_3g (self);
-    ctx->mm_modem_is_4g = mm_iface_modem_is_4g (self);
-    ctx->band_type = LOAD_SUPPORTED_BANDS;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)load_bands_context_free);
-
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "#BND=?",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback) load_bands_ready,
-                              task);
 }
 
 /*****************************************************************************/
@@ -1084,177 +865,6 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Load current mode (Modem interface) */
-
-static gboolean
-load_current_modes_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           MMModemMode *allowed,
-                           MMModemMode *preferred,
-                           GError **error)
-{
-    const gchar *response;
-    const gchar *str;
-    gint a;
-
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!response)
-        return FALSE;
-
-    str = mm_strip_tag (response, "+WS46: ");
-
-    if (!sscanf (str, "%d", &a)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Couldn't parse +WS46 response: '%s'",
-                     response);
-        return FALSE;
-    }
-
-    *preferred = MM_MODEM_MODE_NONE;
-    switch (a) {
-    case 12:
-        *allowed = MM_MODEM_MODE_2G;
-        return TRUE;
-    case 22:
-        *allowed = MM_MODEM_MODE_3G;
-        return TRUE;
-    case 25:
-        if (mm_iface_modem_is_3gpp_lte (self))
-            *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-        else
-            *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        return TRUE;
-    case 28:
-        *allowed = MM_MODEM_MODE_4G;
-        return TRUE;
-    case 29:
-        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-        return TRUE;
-    case 30:
-        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
-        return TRUE;
-    case 31:
-        *allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-        return TRUE;
-    default:
-        break;
-    }
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_FAILED,
-                 "Couldn't parse unexpected +WS46 response: '%s'",
-                 response);
-    return FALSE;
-}
-
-static void
-load_current_modes (MMIfaceModem *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
-{
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+WS46?",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
-}
-
-/*****************************************************************************/
-/* Set current modes (Modem interface) */
-
-static gboolean
-set_current_modes_finish (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-ws46_set_ready (MMBaseModem *self,
-                GAsyncResult *res,
-                GTask *task)
-{
-    GError *error = NULL;
-
-    mm_base_modem_at_command_finish (self, res, &error);
-    if (error)
-        /* Let the error be critical. */
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
-set_current_modes (MMIfaceModem *self,
-                   MMModemMode allowed,
-                   MMModemMode preferred,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
-{
-    GTask *task;
-    gchar *command;
-    gint ws46_mode = -1;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    if (allowed == MM_MODEM_MODE_2G)
-        ws46_mode = 12;
-    else if (allowed == MM_MODEM_MODE_3G)
-        ws46_mode = 22;
-    else if (allowed == MM_MODEM_MODE_4G)
-        ws46_mode = 28;
-    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
-        if (mm_iface_modem_is_3gpp_lte (self))
-            ws46_mode = 29;
-        else
-            ws46_mode = 25;
-    } else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G))
-        ws46_mode = 30;
-    else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G))
-        ws46_mode = 31;
-    else if (allowed == (MM_MODEM_MODE_2G  | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G) ||
-             allowed == MM_MODEM_MODE_ANY)
-        ws46_mode = 25;
-
-    /* Telit modems do not support preferred mode selection */
-    if ((ws46_mode < 0) || (preferred != MM_MODEM_MODE_NONE)) {
-        gchar *allowed_str;
-        gchar *preferred_str;
-
-        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
-        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Requested mode (allowed: '%s', preferred: '%s') not "
-                                 "supported by the modem.",
-                                 allowed_str,
-                                 preferred_str);
-        g_free (allowed_str);
-        g_free (preferred_str);
-
-        g_object_unref (task);
-        return;
-    }
-
-    command = g_strdup_printf ("AT+WS46=%d", ws46_mode);
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        command,
-        10,
-        FALSE,
-        (GAsyncReadyCallback)ws46_set_ready,
-        task);
-    g_free (command);
-}
-
-/*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
 static GArray *
@@ -1274,7 +884,6 @@ parent_load_supported_modes_ready (MMIfaceModem *self,
     GArray *all;
     GArray *combinations;
     GArray *filtered;
-    MMModemModeCombination mode;
 
     all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
     if (!all) {
@@ -1290,39 +899,8 @@ parent_load_supported_modes_ready (MMIfaceModem *self,
         return;
     }
 
-    /* Build list of combinations for 3GPP devices */
-    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 7);
-
-    /* 2G only */
-    mode.allowed = MM_MODEM_MODE_2G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 3G only */
-    mode.allowed = MM_MODEM_MODE_3G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 2G and 3G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 4G only */
-    mode.allowed = MM_MODEM_MODE_4G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 2G and 4G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 3G and 4G */
-    mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    /* 2G, 3G and 4G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-
     /* Filter out those unsupported modes */
+    combinations = mm_telit_build_modes_list();
     filtered = mm_filter_supported_modes (all, combinations);
     g_array_unref (all);
     g_array_unref (combinations);
@@ -1450,12 +1028,12 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 
-    iface->set_current_bands = modem_set_current_bands;
-    iface->set_current_bands_finish = modem_set_current_bands_finish;
-    iface->load_current_bands = modem_load_current_bands;
-    iface->load_current_bands_finish = modem_load_bands_finish;
-    iface->load_supported_bands = modem_load_supported_bands;
-    iface->load_supported_bands_finish = modem_load_bands_finish;
+    iface->set_current_bands = mm_shared_telit_modem_set_current_bands;
+    iface->set_current_bands_finish = mm_shared_telit_modem_set_current_bands_finish;
+    iface->load_current_bands = mm_shared_telit_modem_load_current_bands;
+    iface->load_current_bands_finish = mm_shared_telit_modem_load_bands_finish;
+    iface->load_supported_bands = mm_shared_telit_modem_load_supported_bands;
+    iface->load_supported_bands_finish = mm_shared_telit_modem_load_bands_finish;
     iface->load_unlock_retries_finish = modem_load_unlock_retries_finish;
     iface->load_unlock_retries = modem_load_unlock_retries;
     iface->reset = modem_reset;
@@ -1468,10 +1046,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_current_modes = load_current_modes;
-    iface->load_current_modes_finish = load_current_modes_finish;
-    iface->set_current_modes = set_current_modes;
-    iface->set_current_modes_finish = set_current_modes_finish;
+    iface->load_current_modes = mm_shared_telit_load_current_modes;
+    iface->load_current_modes_finish = mm_shared_telit_load_current_modes_finish;
+    iface->set_current_modes = mm_shared_telit_set_current_modes;
+    iface->set_current_modes_finish = mm_shared_telit_set_current_modes_finish;
     iface->modem_after_sim_unlock = modem_after_sim_unlock;
     iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
@@ -1485,6 +1063,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 
     iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_unsolicited_events_finish;
+}
+
+static void
+shared_telit_init (MMSharedTelit *iface)
+{
 }
 
 static void

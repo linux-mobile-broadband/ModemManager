@@ -545,3 +545,47 @@ mm_telit_parse_qss_query (const gchar *response,
         return QSS_STATUS_UNKNOWN;
     }
 }
+
+/*****************************************************************************/
+/* Supported modes list helper */
+
+GArray *
+mm_telit_build_modes_list (void)
+{
+    GArray *combinations;
+    MMModemModeCombination mode;
+
+    /* Build list of combinations for 3GPP devices */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 7);
+
+    /* 2G only */
+    mode.allowed = MM_MODEM_MODE_2G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G only */
+    mode.allowed = MM_MODEM_MODE_3G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 3G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 4G only */
+    mode.allowed = MM_MODEM_MODE_4G;
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G and 4G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 3G and 4G */
+    mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+    /* 2G, 3G and 4G */
+    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    mode.preferred = MM_MODEM_MODE_NONE;
+    g_array_append_val (combinations, mode);
+
+    return combinations;
+}
