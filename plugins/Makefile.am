@@ -909,6 +909,8 @@ noinst_LTLIBRARIES += libmm-utils-telit.la
 libmm_utils_telit_la_SOURCES = \
 	telit/mm-common-telit.c \
 	telit/mm-common-telit.h \
+	telit/mm-shared-telit.c \
+	telit/mm-shared-telit.h \
 	telit/mm-broadband-modem-telit.c \
 	telit/mm-broadband-modem-telit.h \
 	$(NULL)
