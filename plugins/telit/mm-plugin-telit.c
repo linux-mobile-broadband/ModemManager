@@ -34,7 +34,7 @@
 #endif
 
 #if defined WITH_MBIM
-# include "mm-broadband-modem-mbim.h"
+# include "mm-broadband-modem-mbim-telit.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginTelit, mm_plugin_telit, MM_TYPE_PLUGIN)
@@ -67,11 +67,11 @@ create_modem (MMPlugin *self,
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
         mm_dbg ("MBIM-powered Telit modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
-                                                           drivers,
-                                                           mm_plugin_get_name (self),
-                                                           vendor,
-                                                           product));
+        return MM_BASE_MODEM (mm_broadband_modem_mbim_telit_new (uid,
+                                                                 drivers,
+                                                                 mm_plugin_get_name (self),
+                                                                 vendor,
+                                                                 product));
     }
 #endif
 
