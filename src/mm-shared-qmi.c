@@ -2203,6 +2203,8 @@ find_requested_carrier_config (GTask *task)
     Private                   *priv;
     gchar                      mccmnc[7];
     gchar                     *group;
+    gint                       config_fallback_i = -1;
+    gchar                     *config_fallback = NULL;
 
     ctx  = g_task_get_task_data (task);
     priv = get_private (g_task_get_source_object (task));
@@ -2210,38 +2212,29 @@ find_requested_carrier_config (GTask *task)
     /* Only one group expected per file, so get the start one */
     group = g_key_file_get_start_group (ctx->keyfile);
 
+    /* Match generic configuration */
+    config_fallback = g_key_file_get_string (ctx->keyfile, group, GENERIC_CONFIG_FALLBACK, NULL);
+    mm_dbg ("Fallback carrier configuration %sfound in group '%s'", config_fallback ? "" : "not ", group);
+
     /* First, try to match 6 MCCMNC digits (3-digit MNCs) */
     strncpy (mccmnc, ctx->imsi, 6);
     mccmnc[6] = '\0';
     ctx->config_requested = g_key_file_get_string (ctx->keyfile, group, mccmnc, NULL);
-    if (ctx->config_requested) {
-        mm_dbg ("Requested carrier configuration found for '%s' in group '%s': %s", mccmnc, group, ctx->config_requested);
-        goto out_config;
-    }
-
-    /* If not found, try to match 5 MCCMNC digits (2-digit MNCs) */
-    mccmnc[5] = '\0';
-    ctx->config_requested = g_key_file_get_string (ctx->keyfile, group, mccmnc, NULL);
-    if (ctx->config_requested) {
-        mm_dbg ("Requested carrier configuration found for '%s' in group '%s': %s", mccmnc, group, ctx->config_requested);
-        goto out_config;
-    }
-
-    /* If not found, try to match the generic configuration */
-    ctx->config_requested = g_key_file_get_string (ctx->keyfile, group, GENERIC_CONFIG_FALLBACK, NULL);
-    if (ctx->config_requested) {
-        mm_dbg ("Fallback carrier configuration found for '%s' in group '%s'", mccmnc, group);
-        goto out_config;
-    }
-
-out_config:
     if (!ctx->config_requested) {
+        /* If not found, try to match 5 MCCMNC digits (2-digit MNCs) */
+        mccmnc[5] = '\0';
+        ctx->config_requested = g_key_file_get_string (ctx->keyfile, group, mccmnc, NULL);
+    }
+    mm_dbg ("Requested carrier configuration %sfound for '%s' in group '%s': %s",
+            ctx->config_requested ? "" : "not ", mccmnc, group, ctx->config_requested ? ctx->config_requested : "n/a");
+
+    if (!ctx->config_requested && !config_fallback) {
         setup_carrier_config_abort (task, g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
-                                                       "no requested configuration found in group '%s'", group));
+                                                       "no valid configuration found in group '%s'", group));
         goto out;
     }
 
-    /* Now, look for the configuration among the ones available in the device */
+    /* Now, look for the configurations among the ones available in the device */
     if (priv->config_list) {
         guint i;
 
@@ -2249,24 +2242,41 @@ out_config:
             ConfigInfo *config;
 
             config = &g_array_index (priv->config_list, ConfigInfo, i);
-            if (!g_strcmp0 (ctx->config_requested, config->description)) {
+            if (ctx->config_requested && !g_strcmp0 (ctx->config_requested, config->description)) {
                 mm_dbg ("Requested carrier configuration '%s' is available", ctx->config_requested);
                 ctx->config_requested_i = i;
+            }
+            if (config_fallback && !g_strcmp0 (config_fallback, config->description)) {
+                mm_dbg ("Fallback carrier configuration '%s' is available", config_fallback);
+                config_fallback_i = i;
             }
         }
     }
 
     /* Fail operation if we didn't find the one we want */
-    if (ctx->config_requested_i < 0) {
+    if ((ctx->config_requested_i < 0) && (config_fallback_i < 0)) {
         setup_carrier_config_abort (task, g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                                       "requested carrier configuration '%s' is not available",
-                                                       ctx->config_requested));
-    } else {
-        ctx->step++;
-        setup_carrier_config_step (task);
+                                                       "carrier configurations (requested '%s', fallback '%s') are not available",
+                                                       ctx->config_requested, config_fallback));
+        goto out;
     }
-out:
 
+    /* If the mapping expects a given config, but the config isn't installed,
+     * we fallback to generic */
+    if (ctx->config_requested_i < 0) {
+        g_assert (config_fallback_i >= 0);
+        mm_dbg ("Using fallback carrier configuration");
+        g_free (ctx->config_requested);
+        ctx->config_requested = config_fallback;
+        ctx->config_requested_i = config_fallback_i;
+        config_fallback = NULL;
+    }
+
+    ctx->step++;
+    setup_carrier_config_step (task);
+
+out:
+    g_free (config_fallback);
     g_free (group);
 }
 
