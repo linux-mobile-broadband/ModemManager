@@ -114,6 +114,7 @@ enum {
     PROP_MODEM_MESSAGING_SMS_LIST,
     PROP_MODEM_MESSAGING_SMS_PDU_MODE,
     PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
+    PROP_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS,
     PROP_MODEM_VOICE_CALL_LIST,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
@@ -203,6 +204,7 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Location interface --->*/
     /* Properties */
     GObject *modem_location_dbus_skeleton;
+    gboolean modem_location_allow_gps_unmanaged_always;
 
     /*<--- Modem Messaging interface --->*/
     /* Properties */
@@ -11167,6 +11169,9 @@ set_property (GObject *object,
     case PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE:
         self->priv->modem_messaging_sms_default_storage = g_value_get_enum (value);
         break;
+    case PROP_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS:
+        self->priv->modem_location_allow_gps_unmanaged_always = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_VOICE_CALL_LIST:
         g_clear_object (&self->priv->modem_voice_call_list);
         self->priv->modem_voice_call_list = g_value_dup_object (value);
@@ -11285,6 +11290,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE:
         g_value_set_enum (value, self->priv->modem_messaging_sms_default_storage);
+        break;
+    case PROP_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS:
+        g_value_set_boolean (value, self->priv->modem_location_allow_gps_unmanaged_always);
         break;
     case PROP_MODEM_VOICE_CALL_LIST:
         g_value_set_object (value, self->priv->modem_voice_call_list);
@@ -11808,6 +11816,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
                                       MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS,
+                                      MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_VOICE_CALL_LIST,

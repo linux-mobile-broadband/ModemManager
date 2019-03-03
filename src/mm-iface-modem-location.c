@@ -692,6 +692,7 @@ setup_gathering (MMIfaceModemLocation *self,
     MMModemLocationSource currently_enabled;
     MMModemLocationSource source;
     gchar *str;
+    gboolean allow_gps_unmanaged_always = FALSE;
 
     ctx = g_new (SetupGatheringContext, 1);
 
@@ -699,7 +700,8 @@ setup_gathering (MMIfaceModemLocation *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)setup_gathering_context_free);
 
     g_object_get (self,
-                  MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &ctx->skeleton,
+                  MM_IFACE_MODEM_LOCATION_DBUS_SKELETON,              &ctx->skeleton,
+                  MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS, &allow_gps_unmanaged_always,
                   NULL);
     if (!ctx->skeleton) {
         g_task_return_new_error (task,
@@ -745,13 +747,16 @@ setup_gathering (MMIfaceModemLocation *self,
     }
 
     /* When standard GPS retrieval (RAW/NMEA) is enabled, we cannot enable the
-     * UNMANAGED setup, and viceversa. */
-    if ((ctx->to_enable & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED &&
-         currently_enabled & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) ||
-        (ctx->to_enable & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA) &&
-         currently_enabled & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED) ||
-        (ctx->to_enable & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA) &&
-         ctx->to_enable & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
+     * UNMANAGED setup, and viceversa, unless explicitly allowed to do so by the
+     * plugin implementation (e.g. if the RAW/NMEA sources don't use the same TTY
+     * as the GPS UNMANAGED setup. */
+    if (!allow_gps_unmanaged_always &&
+        ((ctx->to_enable & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED &&
+          currently_enabled & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) ||
+         (ctx->to_enable & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA) &&
+          currently_enabled & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED) ||
+         (ctx->to_enable & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA) &&
+          ctx->to_enable & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
@@ -1886,6 +1891,14 @@ iface_modem_location_init (gpointer g_iface)
                               "DBus skeleton for the Location interface",
                               MM_GDBUS_TYPE_MODEM_LOCATION_SKELETON,
                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS,
+                               "Allow unmanaged GPS always",
+                               "Whether to always allow GPS unmanaged, even when raw/nmea GPS sources are enabled",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     initialized = TRUE;
 }
