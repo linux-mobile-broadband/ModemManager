@@ -11161,15 +11161,15 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_messaging_sms_list);
         self->priv->modem_messaging_sms_list = g_value_dup_object (value);
         break;
-    case PROP_MODEM_VOICE_CALL_LIST:
-        g_clear_object (&self->priv->modem_voice_call_list);
-        self->priv->modem_voice_call_list = g_value_dup_object (value);
-        break;
     case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
         self->priv->modem_messaging_sms_pdu_mode = g_value_get_boolean (value);
         break;
     case PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE:
         self->priv->modem_messaging_sms_default_storage = g_value_get_enum (value);
+        break;
+    case PROP_MODEM_VOICE_CALL_LIST:
+        g_clear_object (&self->priv->modem_voice_call_list);
+        self->priv->modem_voice_call_list = g_value_dup_object (value);
         break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_clear_object (&self->priv->modem_simple_status);
@@ -11280,14 +11280,14 @@ get_property (GObject *object,
     case PROP_MODEM_MESSAGING_SMS_LIST:
         g_value_set_object (value, self->priv->modem_messaging_sms_list);
         break;
-    case PROP_MODEM_VOICE_CALL_LIST:
-        g_value_set_object (value, self->priv->modem_voice_call_list);
-        break;
     case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
         g_value_set_boolean (value, self->priv->modem_messaging_sms_pdu_mode);
         break;
     case PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE:
         g_value_set_enum (value, self->priv->modem_messaging_sms_default_storage);
+        break;
+    case PROP_MODEM_VOICE_CALL_LIST:
+        g_value_set_object (value, self->priv->modem_voice_call_list);
         break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
@@ -11802,16 +11802,16 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
                                       MM_IFACE_MODEM_MESSAGING_SMS_LIST);
 
     g_object_class_override_property (object_class,
-                                      PROP_MODEM_VOICE_CALL_LIST,
-                                      MM_IFACE_MODEM_VOICE_CALL_LIST);
-
-    g_object_class_override_property (object_class,
                                       PROP_MODEM_MESSAGING_SMS_PDU_MODE,
                                       MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_MESSAGING_SMS_DEFAULT_STORAGE,
                                       MM_IFACE_MODEM_MESSAGING_SMS_DEFAULT_STORAGE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_VOICE_CALL_LIST,
+                                      MM_IFACE_MODEM_VOICE_CALL_LIST);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,
