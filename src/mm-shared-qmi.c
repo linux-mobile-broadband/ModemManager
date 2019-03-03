@@ -2196,10 +2196,34 @@ out:
         qmi_message_pdc_set_selected_config_output_unref (output);
 }
 
+static gint
+select_newest_carrier_config (MMSharedQmi *self,
+                              gint         config_a_i,
+                              gint         config_b_i)
+{
+    Private    *priv;
+    ConfigInfo *config_a;
+    ConfigInfo *config_b;
+
+    priv = get_private (self);
+    config_a = &g_array_index (priv->config_list, ConfigInfo, config_a_i);
+    config_b = &g_array_index (priv->config_list, ConfigInfo, config_b_i);
+
+    g_assert (!g_strcmp0 (config_a->description, config_b->description));
+
+    if (config_a->version > config_b->version)
+        return config_a_i;
+    if (config_b->version > config_a->version)
+        return config_b_i;
+    /* if both are equal, return the first one found always */
+    return config_a_i;
+}
+
 static void
 find_requested_carrier_config (GTask *task)
 {
     SetupCarrierConfigContext *ctx;
+    MMSharedQmi               *self;
     Private                   *priv;
     gchar                      mccmnc[7];
     gchar                     *group;
@@ -2207,7 +2231,8 @@ find_requested_carrier_config (GTask *task)
     gchar                     *config_fallback = NULL;
 
     ctx  = g_task_get_task_data (task);
-    priv = get_private (g_task_get_source_object (task));
+    self = MM_SHARED_QMI (g_task_get_source_object (task));
+    priv = get_private (self);
 
     /* Only one group expected per file, so get the start one */
     group = g_key_file_get_start_group (ctx->keyfile);
@@ -2243,12 +2268,20 @@ find_requested_carrier_config (GTask *task)
 
             config = &g_array_index (priv->config_list, ConfigInfo, i);
             if (ctx->config_requested && !g_strcmp0 (ctx->config_requested, config->description)) {
-                mm_dbg ("Requested carrier configuration '%s' is available", ctx->config_requested);
-                ctx->config_requested_i = i;
+                mm_dbg ("Requested carrier configuration '%s' is available (version 0x%08x, size %u bytes)",
+                        config->description, config->version, config->total_size);
+                if (ctx->config_requested_i < 0)
+                    ctx->config_requested_i = i;
+                else
+                    ctx->config_requested_i = select_newest_carrier_config (self, ctx->config_requested_i, i);
             }
             if (config_fallback && !g_strcmp0 (config_fallback, config->description)) {
-                mm_dbg ("Fallback carrier configuration '%s' is available", config_fallback);
-                config_fallback_i = i;
+                mm_dbg ("Fallback carrier configuration '%s' is available (version 0x%08x, size %u bytes)",
+                        config->description, config->version, config->total_size);
+                if (config_fallback_i < 0)
+                    config_fallback_i = i;
+                else
+                    config_fallback_i = select_newest_carrier_config (self, config_fallback_i, i);
             }
         }
     }
@@ -2264,12 +2297,24 @@ find_requested_carrier_config (GTask *task)
     /* If the mapping expects a given config, but the config isn't installed,
      * we fallback to generic */
     if (ctx->config_requested_i < 0) {
+        ConfigInfo *config;
+
         g_assert (config_fallback_i >= 0);
-        mm_dbg ("Using fallback carrier configuration");
+
+        config = &g_array_index (priv->config_list, ConfigInfo, config_fallback_i);
+        mm_info ("Using fallback carrier configuration '%s' (version 0x%08x, size %u bytes)",
+                        config->description, config->version, config->total_size);
+
         g_free (ctx->config_requested);
         ctx->config_requested = config_fallback;
         ctx->config_requested_i = config_fallback_i;
         config_fallback = NULL;
+    } else {
+        ConfigInfo *config;
+
+        config = &g_array_index (priv->config_list, ConfigInfo, ctx->config_requested_i);
+        mm_dbg ("Using requested carrier configuration '%s' (version 0x%08x, size %u bytes)",
+                config->description, config->version, config->total_size);
     }
 
     ctx->step++;
