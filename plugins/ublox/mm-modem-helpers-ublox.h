@@ -197,10 +197,10 @@ MMUbloxBearerAllowedAuth mm_ublox_parse_uauthreq_test (const char  *response,
 
 gboolean mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
                                                   guint         in_cid,
-                                                  guint        *session_tx_bytes,
-                                                  guint        *session_rx_bytes,
-                                                  guint        *total_tx_bytes,
-                                                  guint        *total_rx_bytes,
+                                                  guint64      *session_tx_bytes,
+                                                  guint64      *session_rx_bytes,
+                                                  guint64      *total_tx_bytes,
+                                                  guint64      *total_rx_bytes,
                                                   GError      **error);
 
 #endif  /* MM_MODEM_HELPERS_UBLOX_H */

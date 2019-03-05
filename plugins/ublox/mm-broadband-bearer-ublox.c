@@ -748,8 +748,8 @@ ugcntrd_ready (MMBaseModem  *modem,
     MMBroadbandBearerUblox *self;
     const gchar            *response;
     GError                 *error = NULL;
-    guint                   tx_bytes = 0;
-    guint                   rx_bytes = 0;
+    guint64                 tx_bytes = 0;
+    guint64                 rx_bytes = 0;
     guint                   cid;
 
     self = MM_BROADBAND_BEARER_UBLOX (g_task_get_source_object (task));
@@ -775,7 +775,6 @@ ugcntrd_ready (MMBaseModem  *modem,
         result->bytes_tx = tx_bytes;
         g_task_return_pointer (task, result, g_free);
     }
-
     g_object_unref (task);
 }
 

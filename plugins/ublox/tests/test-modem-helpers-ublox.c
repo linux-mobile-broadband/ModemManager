@@ -909,10 +909,10 @@ test_uauthreq_less_fields (void)
 typedef struct {
     const gchar *str;
     guint        cid;
-    guint        session_tx_bytes;
-    guint        session_rx_bytes;
-    guint        total_tx_bytes;
-    guint        total_rx_bytes;
+    guint64      session_tx_bytes;
+    guint64      session_rx_bytes;
+    guint64      total_tx_bytes;
+    guint64      total_rx_bytes;
 } UgcntrdResponseTest;
 
 static const UgcntrdResponseTest ugcntrd_response_tests[] = {
@@ -949,6 +949,14 @@ static const UgcntrdResponseTest ugcntrd_response_tests[] = {
         .session_rx_bytes = 1819,
         .total_tx_bytes   = 2724,
         .total_rx_bytes   = 1839
+    },
+    {
+        .str = "+UGCNTRD: 2,1397316870,113728263578,1397316870,113728263578\r\n",
+        .cid = 2,
+        .session_tx_bytes = 1397316870ULL,
+        .session_rx_bytes = 113728263578ULL,
+        .total_tx_bytes   = 1397316870ULL,
+        .total_rx_bytes   = 113728263578ULL
     }
 };
 
@@ -960,10 +968,10 @@ test_ugcntrd_response (void)
     for (i = 0; i < G_N_ELEMENTS (ugcntrd_response_tests); i++) {
         GError   *error = NULL;
         gboolean  success;
-        guint     session_tx_bytes = G_MAXUINT;
-        guint     session_rx_bytes = G_MAXUINT;
-        guint     total_tx_bytes   = G_MAXUINT;
-        guint     total_rx_bytes   = G_MAXUINT;
+        guint64   session_tx_bytes = 0;
+        guint64   session_rx_bytes = 0;
+        guint64   total_tx_bytes   = 0;
+        guint64   total_rx_bytes   = 0;
 
         success = mm_ublox_parse_ugcntrd_response_for_cid (ugcntrd_response_tests[i].str,
                                                            ugcntrd_response_tests[i].cid,

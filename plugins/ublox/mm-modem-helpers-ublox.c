@@ -1958,19 +1958,19 @@ out:
 gboolean
 mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
                                          guint         in_cid,
-                                         guint        *out_session_tx_bytes,
-                                         guint        *out_session_rx_bytes,
-                                         guint        *out_total_tx_bytes,
-                                         guint        *out_total_rx_bytes,
+                                         guint64      *out_session_tx_bytes,
+                                         guint64      *out_session_rx_bytes,
+                                         guint64      *out_total_tx_bytes,
+                                         guint64      *out_total_rx_bytes,
                                          GError      **error)
 {
     GRegex     *r;
     GMatchInfo *match_info = NULL;
     GError     *inner_error = NULL;
-    guint       session_tx_bytes = 0;
-    guint       session_rx_bytes = 0;
-    guint       total_tx_bytes   = 0;
-    guint       total_rx_bytes   = 0;
+    guint64     session_tx_bytes = 0;
+    guint64     session_rx_bytes = 0;
+    guint64     total_tx_bytes   = 0;
+    guint64     total_rx_bytes   = 0;
     gboolean    matched = FALSE;
 
     /* Response may be e.g.:
@@ -1997,22 +1997,22 @@ mm_ublox_parse_ugcntrd_response_for_cid (const gchar  *response,
             continue;
         }
 
-        if (out_session_tx_bytes && !mm_get_uint_from_match_info (match_info, 2, &session_tx_bytes)) {
+        if (out_session_tx_bytes && !mm_get_u64_from_match_info (match_info, 2, &session_tx_bytes)) {
             inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing session TX bytes");
             goto out;
         }
 
-        if (out_session_rx_bytes && !mm_get_uint_from_match_info (match_info, 3, &session_rx_bytes)) {
+        if (out_session_rx_bytes && !mm_get_u64_from_match_info (match_info, 3, &session_rx_bytes)) {
             inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing session RX bytes");
             goto out;
         }
 
-        if (out_total_tx_bytes && !mm_get_uint_from_match_info (match_info, 4, &total_tx_bytes)) {
+        if (out_total_tx_bytes && !mm_get_u64_from_match_info (match_info, 4, &total_tx_bytes)) {
             inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing total TX bytes");
             goto out;
         }
 
-        if (out_total_rx_bytes && !mm_get_uint_from_match_info (match_info, 5, &total_rx_bytes)) {
+        if (out_total_rx_bytes && !mm_get_u64_from_match_info (match_info, 5, &total_rx_bytes)) {
             inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing total RX bytes");
             goto out;
         }
