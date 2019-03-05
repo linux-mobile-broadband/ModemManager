@@ -1353,22 +1353,24 @@ mm_get_int_from_match_info (GMatchInfo *match_info,
     return ret;
 }
 
-/**
- * mm_get_uint_from_str:
- * @str: the string to convert to an unsigned int
- * @out: on success, the number
- *
- * Converts a string to an unsigned number.  All characters in the string
- * MUST be valid digits (0 - 9), otherwise FALSE is returned.
- *
- * Returns: %TRUE if the string was converted, %FALSE if it was not or if it
- * did not contain only digits.
- */
 gboolean
 mm_get_uint_from_str (const gchar *str,
-                      guint *out)
+                      guint       *out)
 {
-    gulong num;
+    guint64 num;
+
+    if (!mm_get_u64_from_str (str, &num) || num > G_MAXUINT)
+        return FALSE;
+
+    *out = (guint)num;
+    return TRUE;
+}
+
+gboolean
+mm_get_u64_from_str (const gchar *str,
+                     guint64     *out)
+{
+    guint64 num;
 
     if (!str || !str[0])
         return FALSE;
@@ -1379,33 +1381,32 @@ mm_get_uint_from_str (const gchar *str,
     }
 
     errno = 0;
-    num = strtoul (str, NULL, 10);
-    if (!errno && num <= G_MAXUINT) {
-        *out = (guint)num;
+    num = (guint64) strtoull (str, NULL, 10);
+    if (!errno) {
+        *out = num;
         return TRUE;
     }
     return FALSE;
 }
 
-/**
- * mm_get_uint_from_hex_str:
- * @str: the hex string to convert to an unsigned int
- * @out: on success, the number
- *
- * Converts a string to an unsigned number.  All characters in the string
- * MUST be valid hexadecimal digits (0-9, A-F, a-f), otherwise FALSE is
- * returned.
- *
- * An optional "0x" prefix may be given in @str.
- *
- * Returns: %TRUE if the string was converted, %FALSE if it was not or if it
- * did not contain only digits.
- */
 gboolean
 mm_get_uint_from_hex_str (const gchar *str,
                           guint       *out)
 {
-    gulong num;
+    guint64 num;
+
+    if (!mm_get_u64_from_hex_str (str, &num) || num > G_MAXUINT)
+        return FALSE;
+
+    *out = (guint)num;
+    return TRUE;
+}
+
+gboolean
+mm_get_u64_from_hex_str (const gchar *str,
+                         guint64     *out)
+{
+    guint64 num;
 
     if (!str)
         return FALSE;
@@ -1422,9 +1423,9 @@ mm_get_uint_from_hex_str (const gchar *str,
     }
 
     errno = 0;
-    num = strtoul (str, NULL, 16);
-    if (!errno && num <= G_MAXUINT) {
-        *out = (guint)num;
+    num = (guint64) strtoull (str, NULL, 16);
+    if (!errno) {
+        *out = num;
         return TRUE;
     }
     return FALSE;
@@ -1432,8 +1433,22 @@ mm_get_uint_from_hex_str (const gchar *str,
 
 gboolean
 mm_get_uint_from_match_info (GMatchInfo *match_info,
-                             guint32 match_index,
-                             guint *out)
+                             guint32     match_index,
+                             guint      *out)
+{
+    guint64 num;
+
+    if (!mm_get_u64_from_match_info (match_info, match_index, &num) || num > G_MAXUINT)
+        return FALSE;
+
+    *out = (guint)num;
+    return TRUE;
+}
+
+gboolean
+mm_get_u64_from_match_info (GMatchInfo *match_info,
+                            guint32     match_index,
+                            guint64    *out)
 {
     gchar *s;
     gboolean ret;
@@ -1442,7 +1457,7 @@ mm_get_uint_from_match_info (GMatchInfo *match_info,
     if (!s)
         return FALSE;
 
-    ret = mm_get_uint_from_str (s, out);
+    ret = mm_get_u64_from_str (s, out);
     g_free (s);
 
     return ret;
