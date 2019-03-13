@@ -32,18 +32,26 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
-#include "mm-iface-modem-firmware.h"
 #include "mm-broadband-modem-dell-dw5821e.h"
-#include "mm-shared-qmi.h"
+
+#if defined WITH_QMI
+# include "mm-iface-modem-firmware.h"
+# include "mm-shared-qmi.h"
+#endif
 
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
+
+#if defined WITH_QMI
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
+#endif
 
 static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemDellDw5821e, mm_broadband_modem_dell_dw5821e, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
+#if defined WITH_QMI
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
+#endif
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
 
 typedef enum {
     FEATURE_SUPPORT_UNKNOWN,
@@ -56,7 +64,14 @@ struct _MMBroadbandModemDellDw5821ePrivate {
 };
 
 /*****************************************************************************/
-/* Firmware update settings */
+/* Firmware update settings
+ *
+ * We only support reporting firmware update settings when QMI support is built,
+ * because this is the only clean way to get the expected firmware version to
+ * report.
+ */
+
+#if defined WITH_QMI
 
 static MMFirmwareUpdateSettings *
 firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
@@ -109,7 +124,6 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
     QmiMessageDmsDellGetFirmwareVersionInput *input = NULL;
     QmiClient                                *client = NULL;
 
-
     task = g_task_new (self, NULL, callback, user_data);
 
     client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
@@ -135,6 +149,8 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
                                               task);
     qmi_message_dms_dell_get_firmware_version_input_unref (input);
 }
+
+#endif
 
 /*****************************************************************************/
 /* Location capabilities loading (Location interface) */
@@ -397,12 +413,16 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->disable_location_gathering_finish = disable_location_gathering_finish;
 }
 
+#if defined WITH_QMI
+
 static void
 iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 {
     iface->load_update_settings = firmware_load_update_settings;
     iface->load_update_settings_finish = firmware_load_update_settings_finish;
 }
+
+#endif
 
 static void
 mm_broadband_modem_dell_dw5821e_class_init (MMBroadbandModemDellDw5821eClass *klass)
