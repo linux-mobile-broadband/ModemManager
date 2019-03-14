@@ -161,6 +161,15 @@ mmcli_modem_location_get_option_group (void)
     return group;
 }
 
+#define any_location_setup_flag (                              \
+    enable_3gpp_flag          || disable_3gpp_flag          || \
+    enable_agps_flag          || disable_agps_flag          || \
+    enable_gps_nmea_flag      || disable_gps_nmea_flag      || \
+    enable_gps_raw_flag       || disable_gps_raw_flag       || \
+    enable_cdma_bs_flag       || disable_cdma_bs_flag       || \
+    enable_gps_unmanaged_flag || disable_gps_unmanaged_flag || \
+    set_enable_signal_flag    || set_disable_signal_flag)
+
 gboolean
 mmcli_modem_location_options_enabled (void)
 {
@@ -170,12 +179,12 @@ mmcli_modem_location_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    if ((enable_3gpp_flag && disable_3gpp_flag) ||
-        (enable_agps_flag && disable_agps_flag) ||
-        (enable_gps_nmea_flag && disable_gps_nmea_flag) ||
-        (enable_gps_raw_flag && disable_gps_raw_flag) ||
+    if ((enable_3gpp_flag          && disable_3gpp_flag)          ||
+        (enable_agps_flag          && disable_agps_flag)          ||
+        (enable_gps_nmea_flag      && disable_gps_nmea_flag)      ||
+        (enable_gps_raw_flag       && disable_gps_raw_flag)       ||
         (enable_gps_unmanaged_flag && disable_gps_unmanaged_flag) ||
-        (enable_cdma_bs_flag && disable_cdma_bs_flag)) {
+        (enable_cdma_bs_flag       && disable_cdma_bs_flag)) {
         g_printerr ("error: cannot enable and disable the same source\n");
         exit (EXIT_FAILURE);
     }
@@ -186,20 +195,7 @@ mmcli_modem_location_options_enabled (void)
     }
 
     n_actions = (status_flag +
-                 !!(enable_3gpp_flag +
-                    disable_3gpp_flag +
-                    enable_agps_flag +
-                    disable_agps_flag +
-                    enable_gps_nmea_flag +
-                    disable_gps_nmea_flag +
-                    enable_gps_raw_flag +
-                    disable_gps_raw_flag +
-                    enable_cdma_bs_flag +
-                    disable_cdma_bs_flag +
-                    enable_gps_unmanaged_flag +
-                    disable_gps_unmanaged_flag +
-                    set_enable_signal_flag +
-                    set_disable_signal_flag) +
+                 any_location_setup_flag +
                  get_flag +
                  !!set_supl_server_str +
                  !!inject_assistance_data_str +
@@ -597,20 +593,7 @@ get_modem_ready (GObject      *source,
         g_assert_not_reached ();
 
     /* Request to setup location gathering? */
-    if (enable_3gpp_flag ||
-        disable_3gpp_flag ||
-        enable_agps_flag ||
-        disable_agps_flag ||
-        enable_gps_nmea_flag ||
-        disable_gps_nmea_flag ||
-        enable_gps_raw_flag ||
-        disable_gps_raw_flag ||
-        enable_cdma_bs_flag ||
-        disable_cdma_bs_flag ||
-        enable_gps_unmanaged_flag ||
-        disable_gps_unmanaged_flag ||
-        set_enable_signal_flag ||
-        set_disable_signal_flag) {
+    if (any_location_setup_flag) {
         g_debug ("Asynchronously setting up location gathering...");
         mm_modem_location_setup (ctx->modem_location,
                                  build_sources_from_flags (),
@@ -727,20 +710,7 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
     }
 
     /* Request to setup location gathering? */
-    if (enable_3gpp_flag ||
-        disable_3gpp_flag ||
-        enable_agps_flag ||
-        disable_agps_flag ||
-        enable_gps_nmea_flag ||
-        disable_gps_nmea_flag ||
-        enable_gps_raw_flag ||
-        disable_gps_raw_flag ||
-        enable_cdma_bs_flag ||
-        disable_cdma_bs_flag ||
-        enable_gps_unmanaged_flag ||
-        disable_gps_unmanaged_flag ||
-        set_enable_signal_flag ||
-        set_disable_signal_flag) {
+    if (any_location_setup_flag) {
         gboolean result;
 
         g_debug ("Synchronously setting up location gathering...");
