@@ -940,6 +940,11 @@ typedef enum { /*< underscore_name=mm_modem_location_source >*/
     MM_MODEM_LOCATION_SOURCE_CDMA_BS       = 1 << 3,
     MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED = 1 << 4,
     MM_MODEM_LOCATION_SOURCE_AGPS_MSA      = 1 << 5,
+#if defined (MM_COMPILATION)
+    /* MM internal methods, not part of the API */
+    MM_MODEM_LOCATION_SOURCE_FIRST = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI, /*< skip >*/
+    MM_MODEM_LOCATION_SOURCE_LAST  = MM_MODEM_LOCATION_SOURCE_AGPS_MSA,    /*< skip >*/
+#endif
 } MMModemLocationSource;
 
 /**

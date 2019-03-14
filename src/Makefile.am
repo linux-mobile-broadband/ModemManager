@@ -267,6 +267,7 @@ CLEANFILES    += $(DAEMON_ENUMS_GENERATED)
 
 ModemManager_CPPFLAGS = \
 	-DPLUGINDIR=\"$(pkglibdir)\" \
+	-DMM_COMPILATION \
 	$(NULL)
 
 ModemManager_LDADD = \

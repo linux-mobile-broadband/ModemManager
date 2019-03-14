@@ -622,7 +622,7 @@ setup_gathering_step (GTask *task)
         return;
     }
 
-    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_AGPS_MSA) {
+    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_LAST) {
         gchar *source_str;
 
         if (ctx->to_enable & ctx->current) {
@@ -720,8 +720,8 @@ setup_gathering (MMIfaceModemLocation *self,
     ctx->to_disable = MM_MODEM_LOCATION_SOURCE_NONE;
 
     /* Loop through all known bits in the bitmask to enable/disable specific location sources */
-    for (source = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
-         source <= MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
+    for (source = MM_MODEM_LOCATION_SOURCE_FIRST;
+         source <= MM_MODEM_LOCATION_SOURCE_LAST;
          source = source << 1) {
         /* skip unsupported sources */
         if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & source))
@@ -778,7 +778,7 @@ setup_gathering (MMIfaceModemLocation *self,
     }
 
     /* Start enabling/disabling location sources */
-    ctx->current = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
+    ctx->current = MM_MODEM_LOCATION_SOURCE_FIRST;
     setup_gathering_step (task);
 }
 
