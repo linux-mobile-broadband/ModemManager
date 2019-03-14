@@ -3975,12 +3975,13 @@ start_gps_engine (MMSharedQmi         *self,
 }
 
 /*****************************************************************************/
-/* Location: internal helper: select operation mode (assisted/standalone) */
+/* Location: internal helper: select operation mode (msa/msb/standalone) */
 
 typedef enum {
     GPS_OPERATION_MODE_UNKNOWN,
     GPS_OPERATION_MODE_STANDALONE,
-    GPS_OPERATION_MODE_ASSISTED,
+    GPS_OPERATION_MODE_AGPS_MSA,
+    GPS_OPERATION_MODE_AGPS_MSB,
 } GpsOperationMode;
 
 typedef struct {
@@ -4040,7 +4041,19 @@ pds_set_default_tracking_session_ready (QmiClientPds *client,
 
     qmi_message_pds_set_default_tracking_session_output_unref (output);
 
-    mm_dbg ("A-GPS %s", ctx->mode == GPS_OPERATION_MODE_ASSISTED ? "enabled" : "disabled");
+    switch (ctx->mode) {
+        case GPS_OPERATION_MODE_AGPS_MSA:
+            mm_dbg ("MSA A-GPS operation mode enabled");
+            break;
+        case GPS_OPERATION_MODE_AGPS_MSB:
+            mm_dbg ("MSB A-GPS operation mode enabled");
+            break;
+        case GPS_OPERATION_MODE_STANDALONE:
+            mm_dbg ("Standalone mode enabled (A-GPS disabled)");
+            break;
+        default:
+            g_assert_not_reached ();
+    }
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -4087,15 +4100,24 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
 
     qmi_message_pds_get_default_tracking_session_output_unref (output);
 
-    if (ctx->mode == GPS_OPERATION_MODE_ASSISTED) {
+    if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSA) {
         if (session_operation == QMI_PDS_OPERATING_MODE_MS_ASSISTED) {
-            mm_dbg ("A-GPS already enabled");
+            mm_dbg ("MSA A-GPS already enabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to enable A-GPS");
+        mm_dbg ("Need to enable MSA A-GPS");
         session_operation = QMI_PDS_OPERATING_MODE_MS_ASSISTED;
+    } else if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSB) {
+        if (session_operation == QMI_PDS_OPERATING_MODE_MS_BASED) {
+            mm_dbg ("MSB A-GPS already enabled");
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        }
+        mm_dbg ("Need to enable MSB A-GPS");
+        session_operation = QMI_PDS_OPERATING_MODE_MS_BASED;
     } else if (ctx->mode == GPS_OPERATION_MODE_STANDALONE) {
         if (session_operation == QMI_PDS_OPERATING_MODE_STANDALONE) {
             mm_dbg ("A-GPS already disabled");
@@ -4164,7 +4186,19 @@ loc_location_set_operation_mode_indication_cb (QmiClientLoc                     
         return;
     }
 
-    mm_dbg ("A-GPS %s", ctx->mode == GPS_OPERATION_MODE_ASSISTED ? "enabled" : "disabled");
+    switch (ctx->mode) {
+        case GPS_OPERATION_MODE_AGPS_MSA:
+            mm_dbg ("MSA A-GPS operation mode enabled");
+            break;
+        case GPS_OPERATION_MODE_AGPS_MSB:
+            mm_dbg ("MSB A-GPS operation mode enabled");
+            break;
+        case GPS_OPERATION_MODE_STANDALONE:
+            mm_dbg ("Standalone mode enabled (A-GPS disabled)");
+            break;
+        default:
+            g_assert_not_reached ();
+    }
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -4236,15 +4270,24 @@ loc_location_get_operation_mode_indication_cb (QmiClientLoc                     
 
     qmi_indication_loc_get_operation_mode_output_get_operation_mode (output, &mode, NULL);
 
-    if (ctx->mode == GPS_OPERATION_MODE_ASSISTED) {
+    if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSA) {
         if (mode == QMI_LOC_OPERATION_MODE_MSA) {
-            mm_dbg ("A-GPS already enabled");
+            mm_dbg ("MSA A-GPS already enabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to enable A-GPS");
+        mm_dbg ("Need to enable MSA A-GPS");
         mode = QMI_LOC_OPERATION_MODE_MSA;
+    } else if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSB) {
+        if (mode == QMI_LOC_OPERATION_MODE_MSB) {
+            mm_dbg ("MSB A-GPS already enabled");
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        }
+        mm_dbg ("Need to enable MSB A-GPS");
+        mode = QMI_LOC_OPERATION_MODE_MSB;
     } else if (ctx->mode == GPS_OPERATION_MODE_STANDALONE) {
         if (mode == QMI_LOC_OPERATION_MODE_STANDALONE) {
             mm_dbg ("A-GPS already disabled");
@@ -4413,8 +4456,9 @@ set_gps_operation_mode_standalone_ready (MMSharedQmi  *self,
                                          GAsyncResult *res,
                                          GTask        *task)
 {
-    GError  *error = NULL;
-    Private *priv;
+    MMModemLocationSource  source;
+    Private               *priv;
+    GError                *error = NULL;
 
     if (!set_gps_operation_mode_finish (self, res, &error)) {
         g_task_return_error (task, error);
@@ -4422,9 +4466,10 @@ set_gps_operation_mode_standalone_ready (MMSharedQmi  *self,
         return;
     }
 
+    source = (MMModemLocationSource) GPOINTER_TO_UINT (g_task_get_task_data (task));
     priv = get_private (self);
 
-    priv->enabled_sources &= ~MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
+    priv->enabled_sources &= ~source;
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -4450,8 +4495,9 @@ mm_shared_qmi_disable_location_gathering (MMIfaceModemLocation  *_self,
     /* NOTE: no parent disable_location_gathering() implementation */
 
     if (!(source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                    MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA))) {
+                    MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA |
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSB))) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -4460,7 +4506,7 @@ mm_shared_qmi_disable_location_gathering (MMIfaceModemLocation  *_self,
     g_assert (!(priv->pds_client && priv->loc_client));
 
     /* Disable A-GPS? */
-    if (source == MM_MODEM_LOCATION_SOURCE_AGPS_MSA) {
+    if (source == MM_MODEM_LOCATION_SOURCE_AGPS_MSA || source == MM_MODEM_LOCATION_SOURCE_AGPS_MSB) {
         set_gps_operation_mode (self,
                                 GPS_OPERATION_MODE_STANDALONE,
                                 (GAsyncReadyCallback)set_gps_operation_mode_standalone_ready,
@@ -4521,12 +4567,13 @@ start_gps_engine_ready (MMSharedQmi  *self,
 }
 
 static void
-set_gps_operation_mode_assisted_ready (MMSharedQmi  *self,
-                                       GAsyncResult *res,
-                                       GTask        *task)
+set_gps_operation_mode_agps_ready (MMSharedQmi  *self,
+                                   GAsyncResult *res,
+                                   GTask        *task)
 {
-    GError  *error = NULL;
-    Private *priv;
+    MMModemLocationSource  source;
+    Private               *priv;
+    GError                *error = NULL;
 
     if (!set_gps_operation_mode_finish (self, res, &error)) {
         g_task_return_error (task, error);
@@ -4534,9 +4581,10 @@ set_gps_operation_mode_assisted_ready (MMSharedQmi  *self,
         return;
     }
 
+    source = (MMModemLocationSource) GPOINTER_TO_UINT (g_task_get_task_data (task));
     priv = get_private (self);
 
-    priv->enabled_sources |= MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
+    priv->enabled_sources |= source;
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -4565,17 +4613,27 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
     /* We only consider GPS related sources in this shared QMI implementation */
     if (!(source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA))) {
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA |
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSB))) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
 
-    /* Enabling A-GPS? */
+    /* Enabling MSA A-GPS? */
     if (source == MM_MODEM_LOCATION_SOURCE_AGPS_MSA) {
         set_gps_operation_mode (self,
-                                GPS_OPERATION_MODE_ASSISTED,
-                                (GAsyncReadyCallback)set_gps_operation_mode_assisted_ready,
+                                GPS_OPERATION_MODE_AGPS_MSA,
+                                (GAsyncReadyCallback)set_gps_operation_mode_agps_ready,
+                                task);
+        return;
+    }
+
+    /* Enabling MSB A-GPS? */
+    if (source == MM_MODEM_LOCATION_SOURCE_AGPS_MSB) {
+        set_gps_operation_mode (self,
+                                GPS_OPERATION_MODE_AGPS_MSB,
+                                (GAsyncReadyCallback)set_gps_operation_mode_agps_ready,
                                 task);
         return;
     }
@@ -4658,17 +4716,13 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     /* Now our own checks */
 
-    /* If we have support for the PDS client, GPS and A-GPS location is supported */
-    if (mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_PDS, MM_PORT_QMI_FLAG_DEFAULT, NULL))
+    /* If we have support for the PDS or LOC client, GPS and A-GPS location is supported */
+    if ((mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_PDS, MM_PORT_QMI_FLAG_DEFAULT, NULL)) ||
+        (mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_LOC, MM_PORT_QMI_FLAG_DEFAULT, NULL)))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA);
-
-    /* If we have support for the LOC client, GPS location is supported */
-    if (mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_LOC, MM_PORT_QMI_FLAG_DEFAULT, NULL))
-        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                    MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA);
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA |
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSB);
 
     /* So we're done, complete */
     g_task_return_int (task, sources);
