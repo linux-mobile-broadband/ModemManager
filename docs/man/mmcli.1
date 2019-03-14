@@ -390,14 +390,14 @@ Enable location discovery using the 3GPP network.
 .B \-\-location\-disable\-3gpp
 Disable location discovery using the 3GPP network.
 .TP
-.B \-\-location\-enable\-agps
+.B \-\-location\-enable\-agps-msa
 Enable A-GPS (MSA) support. This command does not implicitly start the GPS
 engine, it just specifies that A-GPS should be enabled when the engine is
 started. Therefore, the user should request enabling A-GPS before the raw
 or NMEA outputs are enabled with \fB\-\-location\-enable\-gps\-raw\fR or
 \fB\-\-location\-enable\-gps\-nmea\fR.
 .TP
-.B \-\-location\-disable\-agps
+.B \-\-location\-disable\-agps-msa
 Disable A-GPS (MSA) support.
 .TP
 .B \-\-location\-enable\-gps\-nmea
@@ -893,14 +893,14 @@ to start the GPS engine.
 .Bd -literal -compact
     $ mmcli -m 0 --location-status
       --------------------------------
-      Location |      capabilities: 3gpp-lac-ci, gps-raw, gps-nmea, agps
+      Location |      capabilities: 3gpp-lac-ci, gps-raw, gps-nmea, agps-msa
                |           enabled: 3gpp-lac-ci
                |           signals: no
       -----------------------------
       GPS      |      refresh rate: 30 seconds
                | a-gps supl server: supl.google.com:7276
 
-    $ sudo mmcli -m 0 --location-enable-agps
+    $ sudo mmcli -m 0 --location-enable-agps-msa
     successfully setup location gathering
 
     $ sudo mmcli -m 0 --location-enable-gps-nmea
@@ -924,7 +924,7 @@ XTRA assistance data is usually valid for several days.
 .Bd -literal -compact
     $ mmcli -m 0 --location-status
       --------------------------------
-      Location |         capabilities: 3gpp-lac-ci, gps-raw, gps-nmea, agps
+      Location |         capabilities: 3gpp-lac-ci, gps-raw, gps-nmea, agps-msa
                |              enabled: 3gpp-lac-ci
                |              signals: no
       --------------------------------

@@ -4424,7 +4424,7 @@ set_gps_operation_mode_standalone_ready (MMSharedQmi  *self,
 
     priv = get_private (self);
 
-    priv->enabled_sources &= ~MM_MODEM_LOCATION_SOURCE_AGPS;
+    priv->enabled_sources &= ~MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -4451,7 +4451,7 @@ mm_shared_qmi_disable_location_gathering (MMIfaceModemLocation  *_self,
 
     if (!(source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                    MM_MODEM_LOCATION_SOURCE_AGPS))) {
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA))) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -4460,7 +4460,7 @@ mm_shared_qmi_disable_location_gathering (MMIfaceModemLocation  *_self,
     g_assert (!(priv->pds_client && priv->loc_client));
 
     /* Disable A-GPS? */
-    if (source == MM_MODEM_LOCATION_SOURCE_AGPS) {
+    if (source == MM_MODEM_LOCATION_SOURCE_AGPS_MSA) {
         set_gps_operation_mode (self,
                                 GPS_OPERATION_MODE_STANDALONE,
                                 (GAsyncReadyCallback)set_gps_operation_mode_standalone_ready,
@@ -4536,7 +4536,7 @@ set_gps_operation_mode_assisted_ready (MMSharedQmi  *self,
 
     priv = get_private (self);
 
-    priv->enabled_sources |= MM_MODEM_LOCATION_SOURCE_AGPS;
+    priv->enabled_sources |= MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -4565,14 +4565,14 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
     /* We only consider GPS related sources in this shared QMI implementation */
     if (!(source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                    MM_MODEM_LOCATION_SOURCE_AGPS))) {
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA))) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
 
     /* Enabling A-GPS? */
-    if (source == MM_MODEM_LOCATION_SOURCE_AGPS) {
+    if (source == MM_MODEM_LOCATION_SOURCE_AGPS_MSA) {
         set_gps_operation_mode (self,
                                 GPS_OPERATION_MODE_ASSISTED,
                                 (GAsyncReadyCallback)set_gps_operation_mode_assisted_ready,
@@ -4662,13 +4662,13 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
     if (mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_PDS, MM_PORT_QMI_FLAG_DEFAULT, NULL))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                    MM_MODEM_LOCATION_SOURCE_AGPS);
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA);
 
     /* If we have support for the LOC client, GPS location is supported */
     if (mm_shared_qmi_peek_client (MM_SHARED_QMI (self), QMI_SERVICE_LOC, MM_PORT_QMI_FLAG_DEFAULT, NULL))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                    MM_MODEM_LOCATION_SOURCE_AGPS);
+                    MM_MODEM_LOCATION_SOURCE_AGPS_MSA);
 
     /* So we're done, complete */
     g_task_return_int (task, sources);

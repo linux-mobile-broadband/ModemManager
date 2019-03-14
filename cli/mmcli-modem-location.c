@@ -49,8 +49,8 @@ static Context *ctx;
 static gboolean status_flag;
 static gboolean enable_3gpp_flag;
 static gboolean disable_3gpp_flag;
-static gboolean enable_agps_flag;
-static gboolean disable_agps_flag;
+static gboolean enable_agps_msa_flag;
+static gboolean disable_agps_msa_flag;
 static gboolean enable_gps_nmea_flag;
 static gboolean disable_gps_nmea_flag;
 static gboolean enable_gps_raw_flag;
@@ -83,12 +83,12 @@ static GOptionEntry entries[] = {
       "Disable 3GPP location gathering.",
       NULL
     },
-    { "location-enable-agps", 0, 0, G_OPTION_ARG_NONE, &enable_agps_flag,
-      "Enable A-GPS location gathering.",
+    { "location-enable-agps-msa", 0, 0, G_OPTION_ARG_NONE, &enable_agps_msa_flag,
+      "Enable MSA A-GPS location gathering.",
       NULL
     },
-    { "location-disable-agps", 0, 0, G_OPTION_ARG_NONE, &disable_agps_flag,
-      "Disable A-GPS location gathering.",
+    { "location-disable-agps-msa", 0, 0, G_OPTION_ARG_NONE, &disable_agps_msa_flag,
+      "Disable MSA A-GPS location gathering.",
       NULL
     },
     { "location-enable-gps-nmea", 0, 0, G_OPTION_ARG_NONE, &enable_gps_nmea_flag,
@@ -163,7 +163,7 @@ mmcli_modem_location_get_option_group (void)
 
 #define any_location_setup_flag (                              \
     enable_3gpp_flag          || disable_3gpp_flag          || \
-    enable_agps_flag          || disable_agps_flag          || \
+    enable_agps_msa_flag      || disable_agps_msa_flag      || \
     enable_gps_nmea_flag      || disable_gps_nmea_flag      || \
     enable_gps_raw_flag       || disable_gps_raw_flag       || \
     enable_cdma_bs_flag       || disable_cdma_bs_flag       || \
@@ -180,7 +180,7 @@ mmcli_modem_location_options_enabled (void)
         return !!n_actions;
 
     if ((enable_3gpp_flag          && disable_3gpp_flag)          ||
-        (enable_agps_flag          && disable_agps_flag)          ||
+        (enable_agps_msa_flag      && disable_agps_msa_flag)      ||
         (enable_gps_nmea_flag      && disable_gps_nmea_flag)      ||
         (enable_gps_raw_flag       && disable_gps_raw_flag)       ||
         (enable_gps_unmanaged_flag && disable_gps_unmanaged_flag) ||
@@ -276,7 +276,7 @@ print_location_status (void)
         gps_refresh_rate = g_strdup_printf ("%u", rate);
 
         /* If A-GPS supported, show SUPL server setup */
-        if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS)
+        if (mm_modem_location_get_capabilities (ctx->modem_location) & MM_MODEM_LOCATION_SOURCE_AGPS_MSA)
             gps_supl_server = mm_modem_location_get_supl_server (ctx->modem_location);
 
         mask = mm_modem_location_get_supported_assistance_data (ctx->modem_location);
@@ -447,10 +447,10 @@ build_sources_from_flags (void)
     if (disable_3gpp_flag)
         sources &= ~MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
 
-    if (enable_agps_flag)
-        sources |= MM_MODEM_LOCATION_SOURCE_AGPS;
-    if (disable_agps_flag)
-        sources &= ~MM_MODEM_LOCATION_SOURCE_AGPS;
+    if (enable_agps_msa_flag)
+        sources |= MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
+    if (disable_agps_msa_flag)
+        sources &= ~MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
 
     if (enable_gps_nmea_flag)
         sources |= MM_MODEM_LOCATION_SOURCE_GPS_NMEA;

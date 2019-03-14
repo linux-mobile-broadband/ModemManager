@@ -694,6 +694,20 @@ typedef int MMModemBandDeprecated;
  */
 #define MM_MODEM_BAND_CDMA_BC19_US_LOWER_700 ((MMModemBandDeprecated)MM_MODEM_BAND_CDMA_BC19)
 
+/* The following type exists just so that we can get deprecation warnings */
+MM_DEPRECATED
+typedef int MMModemLocationSourceDeprecated;
+
+/**
+ * MM_MODEM_LOCATION_SOURCE_AGPS:
+ *
+ * A-GPS location requested.
+ *
+ * Since: 1.0
+ * Deprecated: 1.12.0: Use #MM_MODEM_LOCATION_SOURCE_AGPS_MSA instead.
+ */
+#define MM_MODEM_LOCATION_SOURCE_AGPS ((MMModemLocationSourceDeprecated)MM_MODEM_LOCATION_SOURCE_AGPS_MSA)
+
 #endif /* MM_DISABLE_DEPRECATED */
 
 #endif /* _MODEMMANAGER_COMPAT_H_ */

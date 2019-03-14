@@ -140,7 +140,7 @@ build_location_dictionary (GVariant *previous,
                 break;
             case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
                 g_assert_not_reached ();
-            case MM_MODEM_LOCATION_SOURCE_AGPS:
+            case MM_MODEM_LOCATION_SOURCE_AGPS_MSA:
                 g_assert_not_reached ();
             default:
                 g_warn_if_reached ();
@@ -506,7 +506,7 @@ update_location_source_status (MMIfaceModemLocation *self,
             g_clear_object (&ctx->location_cdma_bs);
         break;
     case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
-    case MM_MODEM_LOCATION_SOURCE_AGPS:
+    case MM_MODEM_LOCATION_SOURCE_AGPS_MSA:
         /* Nothing to setup in the context */
     default:
         break;
@@ -622,7 +622,7 @@ setup_gathering_step (GTask *task)
         return;
     }
 
-    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_AGPS) {
+    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_AGPS_MSA) {
         gchar *source_str;
 
         if (ctx->to_enable & ctx->current) {
@@ -721,7 +721,7 @@ setup_gathering (MMIfaceModemLocation *self,
 
     /* Loop through all known bits in the bitmask to enable/disable specific location sources */
     for (source = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
-         source <= MM_MODEM_LOCATION_SOURCE_AGPS;
+         source <= MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
          source = source << 1) {
         /* skip unsupported sources */
         if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & source))
@@ -982,7 +982,7 @@ handle_set_supl_server_auth_ready (MMBaseModem *self,
     }
 
     /* If A-GPS is NOT supported, set error */
-    if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & MM_MODEM_LOCATION_SOURCE_AGPS)) {
+    if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & MM_MODEM_LOCATION_SOURCE_AGPS_MSA)) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
@@ -1496,7 +1496,7 @@ interface_enabling_step (GTask *task)
         default_sources &= ~(MM_MODEM_LOCATION_SOURCE_GPS_RAW |
                              MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                              MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED |
-                             MM_MODEM_LOCATION_SOURCE_AGPS);
+                             MM_MODEM_LOCATION_SOURCE_AGPS_MSA);
 
         setup_gathering (self,
                          default_sources,
@@ -1723,7 +1723,7 @@ interface_initialization_step (GTask *task)
 
     case INITIALIZATION_STEP_SUPL_SERVER:
         /* If the modem supports A-GPS, load SUPL server */
-        if (ctx->capabilities & MM_MODEM_LOCATION_SOURCE_AGPS &&
+        if (ctx->capabilities & MM_MODEM_LOCATION_SOURCE_AGPS_MSA &&
             MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server &&
             MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server_finish) {
             MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server (
@@ -1737,7 +1737,7 @@ interface_initialization_step (GTask *task)
 
     case INITIALIZATION_STEP_SUPPORTED_ASSISTANCE_DATA:
         /* If the modem supports any GPS-related technology, check assistance data types supported */
-        if ((ctx->capabilities & (MM_MODEM_LOCATION_SOURCE_AGPS    |
+        if ((ctx->capabilities & (MM_MODEM_LOCATION_SOURCE_AGPS_MSA |
                                   MM_MODEM_LOCATION_SOURCE_GPS_RAW |
                                   MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) &&
             MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supported_assistance_data &&

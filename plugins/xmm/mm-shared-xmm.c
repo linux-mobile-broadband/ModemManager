@@ -855,7 +855,7 @@ xlcslsr_test_ready (MMBaseModem  *self,
 
         if (transport_protocol_supl_supported && ms_assisted_based_position_mode_supported) {
             mm_dbg ("XLCSLSR based A-GPS control supported");
-            priv->supported_sources |= MM_MODEM_LOCATION_SOURCE_AGPS;
+            priv->supported_sources |= MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
         } else {
             mm_dbg ("XLCSLSR based A-GPS control unsupported: protocol supl %s, ms assisted/based %s",
                     transport_protocol_supl_supported         ? "supported" : "unsupported",
@@ -1192,7 +1192,7 @@ gps_engine_state_get_expected (MMModemLocationSource sources)
     /* If at lease one of GPS nmea/raw sources enabled, engine started */
     if (sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
         /* If A-GPS is enabled, ASSISTED mode */
-        if (sources & MM_MODEM_LOCATION_SOURCE_AGPS)
+        if (sources & MM_MODEM_LOCATION_SOURCE_AGPS_MSA)
             return GPS_ENGINE_STATE_ASSISTED;
         /* Otherwise, STANDALONE */
         return GPS_ENGINE_STATE_STANDALONE;
@@ -1290,7 +1290,7 @@ mm_shared_xmm_disable_location_gathering (MMIfaceModemLocation  *self,
     /* We only expect GPS sources here */
     g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                         MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                        MM_MODEM_LOCATION_SOURCE_AGPS));
+                        MM_MODEM_LOCATION_SOURCE_AGPS_MSA));
 
     /* Update engine based on the expected sources */
     gps_engine_state_select (MM_SHARED_XMM (self),
@@ -1382,7 +1382,7 @@ mm_shared_xmm_enable_location_gathering (MMIfaceModemLocation  *self,
     /* We only expect GPS sources here */
     g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                         MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                        MM_MODEM_LOCATION_SOURCE_AGPS));
+                        MM_MODEM_LOCATION_SOURCE_AGPS_MSA));
 
     /* Update engine based on the expected sources */
     gps_engine_state_select (MM_SHARED_XMM (self),
