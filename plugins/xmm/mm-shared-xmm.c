@@ -40,7 +40,8 @@ static GQuark private_quark;
 typedef enum {
     GPS_ENGINE_STATE_OFF,
     GPS_ENGINE_STATE_STANDALONE,
-    GPS_ENGINE_STATE_ASSISTED,
+    GPS_ENGINE_STATE_AGPS_MSA,
+    GPS_ENGINE_STATE_AGPS_MSB,
 } GpsEngineState;
 
 typedef struct {
@@ -855,7 +856,7 @@ xlcslsr_test_ready (MMBaseModem  *self,
 
         if (transport_protocol_supl_supported && ms_assisted_based_position_mode_supported) {
             mm_dbg ("XLCSLSR based A-GPS control supported");
-            priv->supported_sources |= MM_MODEM_LOCATION_SOURCE_AGPS_MSA;
+            priv->supported_sources |= (MM_MODEM_LOCATION_SOURCE_AGPS_MSA | MM_MODEM_LOCATION_SOURCE_AGPS_MSB);
         } else {
             mm_dbg ("XLCSLSR based A-GPS control unsupported: protocol supl %s, ms assisted/based %s",
                     transport_protocol_supl_supported         ? "supported" : "unsupported",
@@ -1058,7 +1059,11 @@ gps_engine_start (GTask *task)
             transport_protocol = 2;
             pos_mode = 3;
             break;
-        case GPS_ENGINE_STATE_ASSISTED:
+        case GPS_ENGINE_STATE_AGPS_MSB:
+            transport_protocol = 1;
+            pos_mode = 1;
+            break;
+        case GPS_ENGINE_STATE_AGPS_MSA:
             transport_protocol = 1;
             pos_mode = 2;
             break;
@@ -1069,8 +1074,8 @@ gps_engine_start (GTask *task)
 
     /*
      * AT+XLCSLSR
-     *    transport_protocol:  2 (invalid)     or 1 (supl)
-     *    pos_mode:            3 (standalone)  or 2 (ms assisted+based)
+     *    transport_protocol:  2 (invalid) or 1 (supl)
+     *    pos_mode:            3 (standalone), 1 (msb) or 2 (msa)
      *    client_id:           <empty>
      *    client_id_type:      <empty>
      *    mlc_number:          <empty>
@@ -1191,9 +1196,12 @@ gps_engine_state_get_expected (MMModemLocationSource sources)
 {
     /* If at lease one of GPS nmea/raw sources enabled, engine started */
     if (sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        /* If A-GPS is enabled, ASSISTED mode */
+        /* If MSA A-GPS is enabled, MSA mode */
         if (sources & MM_MODEM_LOCATION_SOURCE_AGPS_MSA)
-            return GPS_ENGINE_STATE_ASSISTED;
+            return GPS_ENGINE_STATE_AGPS_MSA;
+        /* If MSB A-GPS is enabled, MSB mode */
+        if (sources & MM_MODEM_LOCATION_SOURCE_AGPS_MSB)
+            return GPS_ENGINE_STATE_AGPS_MSB;
         /* Otherwise, STANDALONE */
         return GPS_ENGINE_STATE_STANDALONE;
     }
@@ -1290,7 +1298,8 @@ mm_shared_xmm_disable_location_gathering (MMIfaceModemLocation  *self,
     /* We only expect GPS sources here */
     g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                         MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                        MM_MODEM_LOCATION_SOURCE_AGPS_MSA));
+                        MM_MODEM_LOCATION_SOURCE_AGPS_MSA |
+                        MM_MODEM_LOCATION_SOURCE_AGPS_MSB));
 
     /* Update engine based on the expected sources */
     gps_engine_state_select (MM_SHARED_XMM (self),
@@ -1382,7 +1391,8 @@ mm_shared_xmm_enable_location_gathering (MMIfaceModemLocation  *self,
     /* We only expect GPS sources here */
     g_assert (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                         MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
-                        MM_MODEM_LOCATION_SOURCE_AGPS_MSA));
+                        MM_MODEM_LOCATION_SOURCE_AGPS_MSA |
+                        MM_MODEM_LOCATION_SOURCE_AGPS_MSB));
 
     /* Update engine based on the expected sources */
     gps_engine_state_select (MM_SHARED_XMM (self),
