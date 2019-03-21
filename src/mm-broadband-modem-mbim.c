@@ -2985,24 +2985,41 @@ register_state_set_ready (MbimDevice *device,
 {
     MbimMessage *response;
     GError *error = NULL;
-    MbimNwError nw_error;
 
     response = mbim_device_command_finish (device, res, &error);
+    /* According to Mobile Broadband Interface Model specification 1.0,
+     * Errata 1, table 10.5.9.8: Status codes for MBIM_CID_REGISTER_STATE,
+     * NwError field of MBIM_REGISTRATION_STATE_INFO structure is valid
+     * if and only if MBIM_SET_REGISTRATION_STATE response status code equals
+     * MBIM_STATUS_FAILURE.
+     * Therefore it only makes sense to parse this value if MBIM_STATUS_FAILURE
+     * result is returned in response, contrary to usual "success" code.
+     * However, some modems do not set this value to 0 when registered,
+     * causing ModemManager to drop to idle state, while modem itself is
+     * registered.
+     * Also NwError "0" is defined in 3GPP TS 24.008 as "Unknown error",
+     * not "No error", making it unsuitable as condition for registration check.
+     */
     if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_register_state_response_parse (
-            response,
-            &nw_error,
-            NULL, /* &register_state */
-            NULL, /* register_mode */
-            NULL, /* available_data_classes */
-            NULL, /* current_cellular_class */
-            NULL, /* provider_id */
-            NULL, /* provider_name */
-            NULL, /* roaming_text */
-            NULL, /* registration_flag */
-            NULL)) {
-        if (nw_error)
+        !mbim_message_response_get_result (response,
+                                           MBIM_MESSAGE_TYPE_COMMAND_DONE,
+                                           &error) &&
+        g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE)) {
+        MbimNwError nw_error;
+
+        g_clear_error (&error);
+        if (mbim_message_register_state_response_parse (
+                response,
+                &nw_error,
+                NULL, /* &register_state */
+                NULL, /* register_mode */
+                NULL, /* available_data_classes */
+                NULL, /* current_cellular_class */
+                NULL, /* provider_id */
+                NULL, /* provider_name */
+                NULL, /* roaming_text */
+                NULL, /* registration_flag */
+                &error))
             error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
     }
 
