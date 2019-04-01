@@ -1236,7 +1236,7 @@ handle_inhibit_device (MmGdbusOrgFreedesktopModemManager1 *manager,
 {
     InhibitDeviceContext *ctx;
 
-    ctx = g_new0 (InhibitDeviceContext, 1);
+    ctx = g_slice_new0 (InhibitDeviceContext);
     ctx->self = g_object_ref (manager);
     ctx->invocation = g_object_ref (invocation);
     ctx->uid = g_strdup (uid);
