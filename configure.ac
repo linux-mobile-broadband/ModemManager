@@ -376,7 +376,6 @@ dnl Protocol libs
 dnl
 
 AM_CONDITIONAL(QCDM_STANDALONE, test "yes" = "no")
-AM_CONDITIONAL(WMC_STANDALONE, test "yes" = "no")
 
 dnl-----------------------------------------------------------------------------
 dnl Protocol libs
@@ -395,13 +394,9 @@ build-aux/Makefile
 libqcdm/Makefile
 libqcdm/src/Makefile
 libqcdm/tests/Makefile
-libwmc/Makefile
-libwmc/src/Makefile
-libwmc/tests/Makefile
 src/Makefile
 src/tests/Makefile
 plugins/Makefile
-uml290/Makefile
 test/Makefile
 introspection/Makefile
 introspection/tests/Makefile

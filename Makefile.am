@@ -6,14 +6,12 @@ SUBDIRS = \
 	data \
 	include \
 	libqcdm \
-	libwmc \
 	libmm-glib \
 	src \
 	plugins \
 	cli \
 	vapi \
 	introspection \
-	uml290 \
 	test \
 	examples \
 	docs \
