@@ -238,44 +238,47 @@ modem_load_current_capabilities_finish (MMIfaceModem *self,
 static void
 complete_current_capabilities (GTask *task)
 {
-    MMBroadbandModemMbim           *self;
     LoadCurrentCapabilitiesContext *ctx;
     MMModemCapability               result = 0;
 
-    self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    /* Warn if the MBIM loaded capabilities isn't a subset of the QMI loaded ones */
-    if (ctx->current_qmi && ctx->current_mbim) {
-        gchar *mbim_caps_str;
-        gchar *qmi_caps_str;
+    {
+        MMBroadbandModemMbim *self;
 
-        mbim_caps_str = mm_common_build_capabilities_string ((const MMModemCapability *)&(ctx->current_mbim), 1);
-        qmi_caps_str = mm_common_build_capabilities_string ((const MMModemCapability *)&(ctx->current_qmi), 1);
+        self = g_task_get_source_object (task);
+        /* Warn if the MBIM loaded capabilities isn't a subset of the QMI loaded ones */
+        if (ctx->current_qmi && ctx->current_mbim) {
+            gchar *mbim_caps_str;
+            gchar *qmi_caps_str;
 
-        if ((ctx->current_mbim & ctx->current_qmi) != ctx->current_mbim)
-            mm_warn ("MBIM reported current capabilities (%s) not found in QMI-over-MBIM reported ones (%s)",
-                     mbim_caps_str, qmi_caps_str);
-        else
-            mm_dbg ("MBIM reported current capabilities (%s) is a subset of the QMI-over-MBIM reported ones (%s)",
-                    mbim_caps_str, qmi_caps_str);
-        g_free (mbim_caps_str);
-        g_free (qmi_caps_str);
+            mbim_caps_str = mm_common_build_capabilities_string ((const MMModemCapability *)&(ctx->current_mbim), 1);
+            qmi_caps_str = mm_common_build_capabilities_string ((const MMModemCapability *)&(ctx->current_qmi), 1);
 
-        result = ctx->current_qmi;
-        self->priv->qmi_capability_and_mode_switching = TRUE;
-    } else if (ctx->current_qmi) {
-        result = ctx->current_qmi;
-        self->priv->qmi_capability_and_mode_switching = TRUE;
-    } else
-        result = ctx->current_mbim;
+            if ((ctx->current_mbim & ctx->current_qmi) != ctx->current_mbim)
+                mm_warn ("MBIM reported current capabilities (%s) not found in QMI-over-MBIM reported ones (%s)",
+                         mbim_caps_str, qmi_caps_str);
+            else
+                mm_dbg ("MBIM reported current capabilities (%s) is a subset of the QMI-over-MBIM reported ones (%s)",
+                        mbim_caps_str, qmi_caps_str);
+            g_free (mbim_caps_str);
+            g_free (qmi_caps_str);
 
-    /* If current capabilities loading is done via QMI, we can safely assume that all the other
-     * capability and mode related operations are going to be done via QMI as well, so that we
-     * don't mix both logics */
-    if (self->priv->qmi_capability_and_mode_switching)
-        mm_info ("QMI-based capability and mode switching support enabled");
+            result = ctx->current_qmi;
+            self->priv->qmi_capability_and_mode_switching = TRUE;
+        } else if (ctx->current_qmi) {
+            result = ctx->current_qmi;
+            self->priv->qmi_capability_and_mode_switching = TRUE;
+        } else
+            result = ctx->current_mbim;
+
+        /* If current capabilities loading is done via QMI, we can safely assume that all the other
+         * capability and mode related operations are going to be done via QMI as well, so that we
+         * don't mix both logics */
+        if (self->priv->qmi_capability_and_mode_switching)
+            mm_info ("QMI-based capability and mode switching support enabled");
+    }
 #else
     result = ctx->current_mbim;
 #endif
@@ -1967,9 +1970,7 @@ static void
 allocate_next_qmi_client (GTask *task)
 {
     InitializationStartedContext *ctx;
-    MMBroadbandModemMbim         *self;
 
-    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     if (ctx->qmi_service_index == G_N_ELEMENTS (qmi_services)) {
@@ -2608,11 +2609,8 @@ set_lte_attach_configuration_set_ready (MbimDevice   *device,
                                         GAsyncResult *res,
                                         GTask        *task)
 {
-    MMBroadbandModemMbim *self;
     MbimMessage          *response;
     GError               *error = NULL;
-
-    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error))
@@ -2630,7 +2628,6 @@ before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
                                                  GAsyncResult *res,
                                                  GTask        *task)
 {
-    MMBroadbandModemMbim        *self;
     MbimMessage                 *request;
     MbimMessage                 *response;
     GError                      *error = NULL;
@@ -2639,7 +2636,6 @@ before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
     MbimLteAttachConfiguration **configurations = NULL;
     guint                        i;
 
-    self   = g_task_get_source_object (task);
     config = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);

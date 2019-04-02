@@ -398,14 +398,10 @@ out:
 static void
 set_current_capabilities_system_selection_preference (GTask *task)
 {
-    MMSharedQmi                                    *self;
-    Private                                        *priv;
     SetCurrentCapabilitiesContext                  *ctx;
     QmiMessageNasSetSystemSelectionPreferenceInput *input;
     QmiNasRatModePreference                         pref;
 
-    self = g_task_get_source_object (task);
-    priv = get_private (MM_SHARED_QMI (self));
     ctx  = g_task_get_task_data (task);
 
     pref = mm_modem_capability_to_qmi_rat_mode_preference (ctx->capabilities);
@@ -919,11 +915,8 @@ set_current_modes_technology_preference_ready (QmiClientNas *client,
                                                GAsyncResult *res,
                                                GTask        *task)
 {
-    SetCurrentModesContext                     *ctx;
     QmiMessageNasSetTechnologyPreferenceOutput *output = NULL;
     GError                                     *error = NULL;
-
-    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_set_technology_preference_finish (client, res, &error);
     if (!output ||
@@ -993,11 +986,8 @@ set_current_modes_system_selection_preference_ready (QmiClientNas *client,
                                                      GAsyncResult *res,
                                                      GTask        *task)
 {
-    SetCurrentModesContext                          *ctx;
     QmiMessageNasSetSystemSelectionPreferenceOutput *output = NULL;
     GError                                          *error = NULL;
-
-    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
     if (!output || !qmi_message_nas_set_system_selection_preference_output_get_result (output, &error))
@@ -1016,11 +1006,9 @@ set_current_modes_system_selection_preference (GTask *task)
     MMIfaceModem                                   *self;
     SetCurrentModesContext                         *ctx;
     QmiMessageNasSetSystemSelectionPreferenceInput *input;
-    Private                                        *priv;
     QmiNasRatModePreference                         pref;
 
     self = g_task_get_source_object (task);
-    priv = get_private (MM_SHARED_QMI (self));
     ctx  = g_task_get_task_data (task);
 
     input = qmi_message_nas_set_system_selection_preference_input_new ();
@@ -1162,14 +1150,11 @@ get_technology_preference_ready (QmiClientNas *client,
                                  GAsyncResult *res,
                                  GTask        *task)
 {
-    LoadCurrentModesContext                    *ctx;
     LoadCurrentModesResult                     *result = NULL;
     QmiMessageNasGetTechnologyPreferenceOutput *output = NULL;
     GError                                     *error = NULL;
     MMModemMode                                 allowed;
     QmiNasRadioTechnologyPreference             preference_mask;
-
-    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
     if (!output || !qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
@@ -1226,14 +1211,11 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
                                                       GAsyncResult *res,
                                                       GTask        *task)
 {
-    LoadCurrentModesContext                         *ctx;
     LoadCurrentModesResult                          *result = NULL;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError                                          *error = NULL;
     QmiNasRatModePreference                          mode_preference_mask = 0;
     MMModemMode                                      allowed;
-
-    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output || !qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
@@ -4068,7 +4050,6 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
                                         GAsyncResult *res,
                                         GTask        *task)
 {
-    MMSharedQmi                                  *self;
     SetGpsOperationModeContext                   *ctx;
     QmiMessagePdsSetDefaultTrackingSessionInput  *input;
     QmiMessagePdsGetDefaultTrackingSessionOutput *output;
@@ -4094,7 +4075,6 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
         return;
     }
 
-    self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
     qmi_message_pds_get_default_tracking_session_output_get_info (

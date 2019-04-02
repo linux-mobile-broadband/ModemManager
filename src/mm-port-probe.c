@@ -1676,29 +1676,29 @@ MMPortType
 mm_port_probe_get_port_type (MMPortProbe *self)
 {
     const gchar *subsys;
-    const gchar *name;
 
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
     subsys = mm_kernel_device_get_subsystem (self->priv->port);
-    name = mm_kernel_device_get_name (self->priv->port);
 
     if (g_str_equal (subsys, "net"))
         return MM_PORT_TYPE_NET;
 
-#if defined WITH_QMI
-    if (g_str_has_prefix (subsys, "usb") &&
-        g_str_has_prefix (name, "cdc-wdm") &&
-        self->priv->is_qmi)
-        return MM_PORT_TYPE_QMI;
-#endif
+    if (g_str_has_prefix (subsys, "usb")) {
+        const gchar *name;
 
-#if defined WITH_MBIM
-    if (g_str_has_prefix (subsys, "usb") &&
-        g_str_has_prefix (name, "cdc-wdm") &&
-        self->priv->is_mbim)
-        return MM_PORT_TYPE_MBIM;
+        name = mm_kernel_device_get_name (self->priv->port);
+        if (g_str_has_prefix (name, "cdc-wdm")) {
+#if defined WITH_QMI
+            if (self->priv->is_qmi)
+                return MM_PORT_TYPE_QMI;
 #endif
+#if defined WITH_MBIM
+            if (self->priv->is_mbim)
+                return MM_PORT_TYPE_MBIM;
+#endif
+        }
+    }
 
     if (self->priv->flags & MM_PORT_PROBE_QCDM &&
         self->priv->is_qcdm)

@@ -11,9 +11,9 @@ if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
 		      -Wdeclaration-after-statement -Wstrict-prototypes \
 		      -Wno-unused-parameter -Wno-sign-compare \
 		      -Wno-deprecated-declarations \
-		      -Wno-unused-but-set-variable -Wformat-security; do
+		      -Wunused-but-set-variable -Wformat-security; do
 		SAVE_CFLAGS="$CFLAGS"
-		CFLAGS="$CFLAGS $option"
+		CFLAGS="$CFLAGS $option -Werror"
 		AC_MSG_CHECKING([whether gcc understands $option])
 		AC_TRY_COMPILE([], [],
 			has_option=yes,
