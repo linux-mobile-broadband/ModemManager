@@ -46,7 +46,7 @@ ATTRS{idVendor}=="1546", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="06", ENV{
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="08", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="0a", ENV{ID_MM_PORT_IGNORE}="1"
 
-# LISA-U2 port types
+# LISA-U2 / SARA-U2 port types
 #  ttyACM0 (if #0): primary
 #  ttyACM1 (if #2): secondary
 #  ttyACM2 (if #4): tertiary
@@ -58,5 +58,14 @@ ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1102", ENV{.MM_USBIFNUM}=="06", ENV{
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1102", ENV{.MM_USBIFNUM}=="08", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1102", ENV{.MM_USBIFNUM}=="0a", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1102", ENV{.MM_USBIFNUM}=="0c", ENV{ID_MM_PORT_IGNORE}="1"
+
+# LISA-U2 / SARA-U2 (alternative configuration) port types
+#  ttyACM0 (if #0): primary
+#  ttyACM1 (if #2): GNSS Tunneling (ignore)
+#  ttyACM2 (if #4): Primary Log for diagnostics (ignore)
+#  ttyACM3 (if #6): SAP (SIM Access Profile) (ignore)
+ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1104", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1104", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1546", ATTRS{idProduct}=="1104", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 
 LABEL="mm_ublox_port_types_end"
