@@ -111,6 +111,7 @@ parent_setup_registration_checks_ready (MMIfaceModemCdma *self,
                                                                     &results->skip_at_cdma1x_serving_system_step,
                                                                     &results->skip_detailed_registration_state,
                                                                     &error)) {
+        g_free (results);
         g_task_return_error (task, error);
     } else {
         /* Skip +CSS */
