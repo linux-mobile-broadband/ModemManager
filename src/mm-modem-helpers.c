@@ -3626,6 +3626,7 @@ mm_3gpp_parse_pdu_cmgl_response (const gchar *str,
             list = g_list_append (list, info);
             g_match_info_next (match_info, &inner_error);
         } else {
+            mm_3gpp_pdu_info_free (info);
             inner_error = g_error_new (MM_CORE_ERROR,
                                        MM_CORE_ERROR_FAILED,
                                        "Error parsing +CMGL response: '%s'",
