@@ -219,11 +219,9 @@ connect_3gpp (MMBroadbandBearer *self,
 /* 3GPP Disconnect sequence */
 
 typedef struct {
-    MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMPortSerialAt *primary;
     MMPort *data;
-    GSimpleAsyncResult *result;
 } DetailedDisconnectContext;
 
 static gboolean
