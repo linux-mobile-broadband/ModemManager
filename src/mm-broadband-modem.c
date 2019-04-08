@@ -7806,12 +7806,6 @@ typedef struct {
     guint operating_mode;
 } CallManagerStateResults;
 
-typedef struct {
-    MMBroadbandModem *self;
-    GSimpleAsyncResult *result;
-    MMPortSerialQcdm *qcdm;
-} CallManagerStateContext;
-
 static void
 cm_state_cleanup_port (MMPortSerial *port)
 {
