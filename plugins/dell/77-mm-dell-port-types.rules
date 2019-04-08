@@ -18,5 +18,11 @@ ATTRS{idVendor}=="413c", ATTRS{idProduct}=="81d7", ENV{.MM_USBIFNUM}=="03", ENV{
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="81d7", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="81d7", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_QCDM}="1"
 
+# Dell DW5820e
+#  if 02: AT port
+#  if 04: debug port (ignore)
+#  if 06: AT port
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="81d9", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+
 GOTO="mm_dell_port_types_end"
 LABEL="mm_dell_port_types_end"
