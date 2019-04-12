@@ -10,7 +10,7 @@ before_script:
 build-no-qmi:
   stage: build
   script:
-    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+    - git clone --depth 1 --branch mbim-1-18 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr
@@ -26,7 +26,7 @@ build-no-qmi:
 build-no-mbim:
   stage: build
   script:
-    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+    - git clone --depth 1 --branch qmi-1-22 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr --disable-mbim-qmux
@@ -52,14 +52,14 @@ build-default:
   stage: build
   script:
     - apt -y install autopoint gettext gtk-doc-tools gobject-introspection libgirepository1.0-dev libsystemd-dev libpolkit-gobject-1-dev libglib2.0-doc valac
-    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+    - git clone --depth 1 --branch mbim-1-18 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr
     - make
     - make install
     - popd
-    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+    - git clone --depth 1 --branch qmi-1-22 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr --enable-mbim-qmux
