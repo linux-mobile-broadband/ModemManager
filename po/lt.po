@@ -1,0 +1,110 @@
+# Lithuanian translation for ModemManager.
+# Copyright (C) 2019 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# Moo, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2019-04-25 10:07+0200\n"
+"PO-Revision-Date: 2019-04-13 22:08+0300\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: lt\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.2.1\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && (n%100<11 || n%100>19) ? 0 : n"
+"%10>=2 && n%10<=9 && (n%100<11 || n%100>19) ? 1 : 2);\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Valdyti modemo tvarkytuvės tarnybą"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Sistemos politika neleidžia valdyti modemo tvarkytuvę."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Atrakinti ir valdyti mobiliojo plačiajuosčio ryšio įrenginį"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Sistemos politika neleidžia atrakinti ir valdyti mobiliojo plačiajuosčio "
+"ryšio įrenginį."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr ""
+"Pridėti, modifikuoti bei ištrinti mobiliojo plačiajuosčio ryšio kontaktus"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Sistemos politika neleidžia pridėti, modifikuoti ar ištrinti šio įrenginio "
+"kontaktus."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Siųsti, įrašyti, modifikuoti bei ištrinti tekstines žinutes"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Sistemos politika neleidžia siųsti ar valdyti šio įrenginio tekstines "
+"žinutes."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr ""
+"Atsiliepti į gaunamus balso skambučius ar inicijuoti išsiunčiamuosius balso "
+"skambučius."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Sistemos politika neleidžia balso skambučių."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr "Įjungti ir rodyti geografinės vietos bei pozicionavimo informaciją"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Sistemos politika neleidžia įjungti ar rodyti geografinės vietos informaciją."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "Užklausti ir panaudoti tinklo informacija bei paslaugas"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Sistemos politika neleidžia užklausti ar panaudoti tinklo informacija ir "
+"paslaugas."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr ""
+"Užklausti ir tvarkyti programinę aparatinę įrangą mobiliojo plačiajuosčio "
+"ryšio įrenginyje"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Sistemos politika neleidžia užklausti ar tvarkyti šio įrenginio programinę "
+"aparatinę įrangą."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager turi atstatyti įrenginius"
