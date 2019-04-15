@@ -2871,10 +2871,9 @@ load_carrier_config_step (GTask *task)
     case LOAD_CARRIER_CONFIG_STEP_LAST:
         /* We will now store the loaded information so that we can later on use it
          * if needed during the automatic carrier config switching operation */
-        g_assert (!priv->config_list);
         g_assert (priv->config_active_i < 0 && !priv->config_active_default);
         g_assert (ctx->config_active_i >= 0 || ctx->config_active_default);
-        priv->config_list = g_array_ref (ctx->config_list);
+        priv->config_list = ctx->config_list ? g_array_ref (ctx->config_list) : NULL;
         priv->config_active_i = ctx->config_active_i;
         priv->config_active_default = ctx->config_active_default;
 
