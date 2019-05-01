@@ -8229,7 +8229,7 @@ modem_cdma_get_service_status_finish (MMIfaceModemCdma *self,
     GError *inner_error = NULL;
     gboolean value;
 
-    value = g_task_propagate_boolean (G_TASK (res), error);
+    value = g_task_propagate_boolean (G_TASK (res), &inner_error);
     if (inner_error) {
         g_propagate_error (error, inner_error);
         return FALSE;
