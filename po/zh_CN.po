@@ -1,0 +1,93 @@
+# Chinese (China) translation for ModemManager.
+# Copyright (C) 2019 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Estel Zhang <callmebedrockdigger@gmail.com>, 2018.
+# 王滋涵 Zephyr Waitzman <i@wi24rd.ml>, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2019-07-02 09:46+0200\n"
+"PO-Revision-Date: 2019-05-03 00:10+0800\n"
+"Last-Translator: 王滋涵 <i@wi24rd.ml>\n"
+"Language-Team: Chinese (China) <i18n-zh@googlegroups.com>\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.2.1\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "控制调制解调器管理器守护进程"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "系统策略禁止控制调制解调器管理器。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "解锁并控制移动宽带设备"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr "系统策略禁止解锁或控制移动宽带设备。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "添加、修改或删除移动宽带联系人"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr "系统策略禁止添加、修改或删除移动宽带联系人。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "发送、保存修改或删除文本消息"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr "系统策略禁止发送或操作此设备的文本消息。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "接听传入的语音呼叫或者开始传出语音呼叫。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "系统策略禁止语音呼叫。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Enable and view geographic location and positioning information"
+msgstr "启用和查看地理位置和定位信息"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr "系统策略禁止启用和查看地理位置和定位信息。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Query and utilize network information and services"
+msgstr "查询和利用网络信息和服务"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr "系统策略禁止查询和利用网络信息和服务。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "在移动宽带设备上查询和管理固件"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr "系统策略禁止在移动宽带设备上查询和管理固件。"
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "调制解调器管理器需要重置设备"
