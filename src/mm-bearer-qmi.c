@@ -1851,9 +1851,10 @@ disconnect_context_step (GTask *task)
                                                                            ctx->client_ipv4,
                                                                            FALSE,
                                                                            &self->priv->packet_service_status_ipv4_indication_id);
-            cleanup_event_report_unsolicited_events (self,
-                                                     ctx->client_ipv4,
-                                                     &self->priv->event_report_ipv4_indication_id);
+            if (self->priv->event_report_ipv4_indication_id)
+                cleanup_event_report_unsolicited_events (self,
+                                                         ctx->client_ipv4,
+                                                         &self->priv->event_report_ipv4_indication_id);
 
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv4, NULL);
@@ -1880,9 +1881,10 @@ disconnect_context_step (GTask *task)
                                                                            ctx->client_ipv6,
                                                                            FALSE,
                                                                            &self->priv->packet_service_status_ipv6_indication_id);
-            cleanup_event_report_unsolicited_events (self,
-                                                     ctx->client_ipv6,
-                                                     &self->priv->event_report_ipv6_indication_id);
+            if (self->priv->event_report_ipv6_indication_id)
+                cleanup_event_report_unsolicited_events (self,
+                                                         ctx->client_ipv6,
+                                                         &self->priv->event_report_ipv6_indication_id);
 
             input = qmi_message_wds_stop_network_input_new ();
             qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv6, NULL);
