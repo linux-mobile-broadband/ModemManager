@@ -709,9 +709,8 @@ connect_ready (MMBaseBearer *self,
         mm_dbg ("Couldn't connect bearer '%s': '%s'",
                 self->priv->path,
                 error->message);
-        if (g_error_matches (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_CANCELLED)) {
+        if (   g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED)
+            || g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
             /* Will launch disconnection */
             launch_disconnect = TRUE;
         } else
