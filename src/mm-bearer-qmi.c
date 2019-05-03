@@ -1698,7 +1698,6 @@ typedef enum {
 } DisconnectStep;
 
 typedef struct {
-    MMPort *data;
     DisconnectStep step;
 
     gboolean running_ipv4;
@@ -1723,7 +1722,6 @@ disconnect_context_free (DisconnectContext *ctx)
         g_object_unref (ctx->client_ipv4);
     if (ctx->client_ipv6)
         g_object_unref (ctx->client_ipv6);
-    g_object_unref (ctx->data);
     g_slice_free (DisconnectContext, ctx);
 }
 
@@ -1948,7 +1946,6 @@ disconnect (MMBaseBearer *_self,
     }
 
     ctx = g_slice_new0 (DisconnectContext);
-    ctx->data = g_object_ref (self->priv->data);
     ctx->client_ipv4 = self->priv->client_ipv4 ? g_object_ref (self->priv->client_ipv4) : NULL;
     ctx->packet_data_handle_ipv4 = self->priv->packet_data_handle_ipv4;
     ctx->client_ipv6 = self->priv->client_ipv6 ? g_object_ref (self->priv->client_ipv6) : NULL;
