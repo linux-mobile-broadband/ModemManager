@@ -498,6 +498,8 @@ update_message_list (MmGdbusModemMessaging *skeleton,
     paths = mm_sms_list_get_paths (list);
     mm_gdbus_modem_messaging_set_messages (skeleton, (const gchar *const *)paths);
     g_strfreev (paths);
+
+    g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
 }
 
 static void
