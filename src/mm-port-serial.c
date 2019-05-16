@@ -163,6 +163,7 @@ mm_port_serial_command (MMPortSerial *self,
                         GByteArray *command,
                         guint32 timeout_seconds,
                         gboolean allow_cached,
+                        gboolean run_next,
                         GCancellable *cancellable,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
@@ -203,7 +204,12 @@ mm_port_serial_command (MMPortSerial *self,
     if (!allow_cached)
         port_serial_set_cached_reply (self, ctx->command, NULL);
 
-    g_queue_push_tail (self->priv->queue, ctx);
+    /* If requested to run next, push to the head of the queue so that it really is
+     * the next one sent */
+    if (run_next)
+        g_queue_push_head (self->priv->queue, ctx);
+    else
+        g_queue_push_tail (self->priv->queue, ctx);
 
     if (g_queue_get_length (self->priv->queue) == 1)
         port_serial_schedule_queue_process (self, 0);

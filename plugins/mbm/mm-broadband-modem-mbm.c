@@ -1262,7 +1262,8 @@ gps_enabled_ready (MMBaseModem *self,
             mm_port_serial_command (MM_PORT_SERIAL (gps_port),
                                     buf,
                                     3,
-                                    FALSE,
+                                    FALSE, /* never cached */
+                                    FALSE, /* always queued last */
                                     NULL,
                                     NULL,
                                     NULL);

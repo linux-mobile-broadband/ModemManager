@@ -144,6 +144,7 @@ void        mm_port_serial_command        (MMPortSerial *self,
                                            GByteArray *command,
                                            guint32 timeout_seconds,
                                            gboolean allow_cached,
+                                           gboolean run_next,
                                            GCancellable *cancellable,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data);
