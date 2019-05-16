@@ -193,6 +193,7 @@ mm_port_serial_qcdm_command (MMPortSerialQcdm *self,
                             command,
                             timeout_seconds,
                             FALSE, /* never cached */
+                            FALSE, /* always queued last */
                             cancellable,
                             (GAsyncReadyCallback)serial_command_ready,
                             task);
