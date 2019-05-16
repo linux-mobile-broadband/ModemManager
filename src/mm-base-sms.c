@@ -1,3 +1,4 @@
+
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
  * This program is free software; you can redistribute it and/or modify
@@ -914,7 +915,11 @@ store_ready (MMBaseModem *modem,
 
     ctx = g_task_get_task_data (task);
 
-    /* Send the actual message data */
+    /* Send the actual message data.
+     * We send the data as 'raw' data because we do NOT want it to
+     * be treated as an AT command (i.e. we don't want it prefixed
+     * with AT+ and suffixed with <CR><LF>), plus, we want it to be
+     * sent right away (not queued after other AT commands). */
     mm_base_modem_at_command_raw (ctx->modem,
                                   ctx->msg_data,
                                   10,
@@ -1131,7 +1136,11 @@ send_generic_ready (MMBaseModem *modem,
 
     ctx = g_task_get_task_data (task);
 
-    /* Send the actual message data */
+    /* Send the actual message data.
+     * We send the data as 'raw' data because we do NOT want it to
+     * be treated as an AT command (i.e. we don't want it prefixed
+     * with AT+ and suffixed with <CR><LF>), plus, we want it to be
+     * sent right away (not queued after other AT commands). */
     mm_base_modem_at_command_raw (ctx->modem,
                                   ctx->msg_data,
                                   10,
