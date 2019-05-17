@@ -844,8 +844,8 @@ response_processor_service_ignore_at_errors (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand access_tech_commands[] = {
-    { "#PSNT?",  3, TRUE, response_processor_psnt_ignore_at_errors },
-    { "+SERVICE?", 3, TRUE, response_processor_service_ignore_at_errors },
+    { "#PSNT?",    3, FALSE, response_processor_psnt_ignore_at_errors },
+    { "+SERVICE?", 3, FALSE, response_processor_service_ignore_at_errors },
     { NULL }
 };
 
