@@ -301,7 +301,7 @@ mm_base_modem_at_sequence_full (MMBaseModem *self,
         ctx->current->command,
         ctx->current->timeout,
         FALSE,
-        FALSE,
+        ctx->current->allow_cached,
         ctx->cancellable,
         (GAsyncReadyCallback)at_sequence_parse_response,
         ctx);
