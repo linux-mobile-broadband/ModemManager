@@ -37,6 +37,13 @@
 #include "mm-log.h"
 #include "mm-daemon-enums-types.h"
 
+#if defined WITH_QMI
+# include "mm-broadband-modem-qmi.h"
+#endif
+#if defined WITH_MBIM
+# include "mm-broadband-modem-mbim.h"
+#endif
+
 G_DEFINE_TYPE (MMPlugin, mm_plugin, G_TYPE_OBJECT)
 
 /* Virtual port corresponding to the embedded modem */
@@ -920,9 +927,22 @@ mm_plugin_create_modem (MMPlugin  *self,
 
         /* Grab each port */
         for (l = port_probes; l; l = g_list_next (l)) {
-            GError *inner_error = NULL;
-            MMPortProbe *probe = MM_PORT_PROBE (l->data);
-            gboolean grabbed;
+            GError      *inner_error = NULL;
+            MMPortProbe *probe;
+            gboolean     grabbed = FALSE;
+            gboolean     force_ignored = FALSE;
+            const gchar *subsys;
+            const gchar *name;
+            const gchar *driver;
+            MMPortType   port_type;
+
+            probe = MM_PORT_PROBE (l->data);
+
+            subsys    = mm_port_probe_get_port_subsys (probe);
+            name      = mm_port_probe_get_port_name   (probe);
+            port_type = mm_port_probe_get_port_type   (probe);
+
+            driver    = mm_kernel_device_get_driver (mm_port_probe_peek_port (probe));
 
             /* If grabbing a port fails, just warn. We'll decide if the modem is
              * valid or not when all ports get organized */
@@ -931,45 +951,82 @@ mm_plugin_create_modem (MMPlugin  *self,
              * probed and accepted by the generic plugin, which is overwritten
              * by the specific one when needed. */
             if (apply_subsystem_filter (self, mm_port_probe_peek_port (probe))) {
-                grabbed = FALSE;
                 inner_error = g_error_new (MM_CORE_ERROR,
                                            MM_CORE_ERROR_UNSUPPORTED,
                                            "unsupported subsystem: '%s'",
-                                           mm_port_probe_get_port_subsys (probe));
+                                           subsys);
+                goto next;
             }
+
             /* Ports that are explicitly blacklisted will be grabbed as ignored */
-            else if (mm_port_probe_is_ignored (probe)) {
-                mm_dbg ("(%s/%s): port is blacklisted",
-                        mm_port_probe_get_port_subsys (probe),
-                        mm_port_probe_get_port_name (probe));
-                grabbed = mm_base_modem_grab_port (modem,
-                                                   mm_port_probe_peek_port (probe),
-                                                   MM_PORT_TYPE_IGNORED,
-                                                   MM_PORT_SERIAL_AT_FLAG_NONE,
-                                                   &inner_error);
+            if (mm_port_probe_is_ignored (probe)) {
+                mm_dbg ("(%s/%s): port is blacklisted", subsys, name);
+                force_ignored = TRUE;
+                goto grab_port;
             }
-#if !defined WITH_QMI
-            else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
-                     !g_strcmp0 (mm_kernel_device_get_driver (mm_port_probe_peek_port (probe)), "qmi_wwan")) {
-                /* Try to generically grab the port, but flagged as ignored */
-                grabbed = mm_base_modem_grab_port (modem,
-                                                   mm_port_probe_peek_port (probe),
-                                                   MM_PORT_TYPE_IGNORED,
-                                                   MM_PORT_SERIAL_AT_FLAG_NONE,
-                                                   &inner_error);
+
+#if defined WITH_QMI
+            if (MM_IS_BROADBAND_MODEM_QMI (modem) &&
+                port_type == MM_PORT_TYPE_NET &&
+                g_strcmp0 (driver, "qmi_wwan") != 0) {
+                /* Non-QMI net ports are ignored in QMI modems */
+                mm_dbg ("(%s/%s): ignoring non-QMI net port in QMI modem", subsys, name);
+                force_ignored = TRUE;
+                goto grab_port;
+            }
+
+            if (!MM_IS_BROADBAND_MODEM_QMI (modem) &&
+                port_type == MM_PORT_TYPE_NET &&
+                g_strcmp0 (driver, "qmi_wwan") == 0) {
+                /* QMI net ports are ignored in non-QMI modems */
+                mm_dbg ("(%s/%s): ignoring QMI net port in non-QMI modem", subsys, name);
+                force_ignored = TRUE;
+                goto grab_port;
+            }
+#else
+            if (port_type == MM_PORT_TYPE_NET &&
+                g_strcmp0 (driver, "qmi_wwan") != 0) {
+                /* QMI net ports are ignored if QMI support not built */
+                mm_dbg ("(%s/%s): ignoring QMI net port as QMI support isn't available", subsys, name);
+                force_ignored = TRUE;
+                goto grab_port;
             }
 #endif
-#if !defined WITH_MBIM
-            else if (mm_port_probe_get_port_type (probe) == MM_PORT_TYPE_NET &&
-                     !g_strcmp0 (mm_kernel_device_get_driver (mm_port_probe_peek_port (probe)), "cdc_mbim")) {
-                /* Try to generically grab the port, but flagged as ignored */
+
+#if defined WITH_MBIM
+            if (MM_IS_BROADBAND_MODEM_MBIM (modem) &&
+                port_type == MM_PORT_TYPE_NET &&
+                g_strcmp0 (driver, "cdc_mbim") != 0) {
+                /* Non-MBIM net ports are ignored in MBIM modems */
+                mm_dbg ("(%s/%s): ignoring non-MBIM net port in MBIM modem", subsys, name);
+                force_ignored = TRUE;
+                goto grab_port;
+            }
+
+            if (!MM_IS_BROADBAND_MODEM_MBIM (modem) &&
+                port_type == MM_PORT_TYPE_NET &&
+                g_strcmp0 (driver, "cdc_mbim") == 0) {
+                /* MBIM net ports are ignored in non-MBIM modems */
+                mm_dbg ("(%s/%s): ignoring MBIM net port in non-MBIM modem", subsys, name);
+                force_ignored = TRUE;
+                goto grab_port;
+            }
+#else
+            if (port_type == MM_PORT_TYPE_NET &&
+                g_strcmp0 (driver, "cdc_mbim") == 0) {
+                mm_dbg ("(%s/%s): ignoring MBIM net port as MBIM support isn't available", subsys, name);
+                force_ignored = TRUE;
+                goto grab_port;
+            }
+#endif
+
+        grab_port:
+            if (force_ignored)
                 grabbed = mm_base_modem_grab_port (modem,
                                                    mm_port_probe_peek_port (probe),
                                                    MM_PORT_TYPE_IGNORED,
                                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
-            }
-#endif
             else if (MM_PLUGIN_GET_CLASS (self)->grab_port)
                 grabbed = MM_PLUGIN_GET_CLASS (self)->grab_port (MM_PLUGIN (self),
                                                                  modem,
@@ -981,10 +1038,11 @@ mm_plugin_create_modem (MMPlugin  *self,
                                                    mm_port_probe_get_port_type (probe),
                                                    MM_PORT_SERIAL_AT_FLAG_NONE,
                                                    &inner_error);
+
+        next:
             if (!grabbed) {
                 mm_warn ("Could not grab port (%s/%s): '%s'",
-                         mm_port_probe_get_port_subsys (MM_PORT_PROBE (l->data)),
-                         mm_port_probe_get_port_name (MM_PORT_PROBE (l->data)),
+                         subsys, name,
                          inner_error ? inner_error->message : "unknown error");
                 g_clear_error (&inner_error);
             }
