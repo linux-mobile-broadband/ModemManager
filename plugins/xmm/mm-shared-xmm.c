@@ -871,6 +871,18 @@ xlcslsr_test_ready (MMBaseModem  *self,
 }
 
 static void
+run_xlcslsr_test (GTask *task)
+{
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (g_task_get_source_object (task)),
+        "+XLCSLSR=?",
+        3,
+        TRUE, /* allow caching */
+        (GAsyncReadyCallback)xlcslsr_test_ready,
+        task);
+}
+
+static void
 parent_load_capabilities_ready (MMIfaceModemLocation *self,
                                 GAsyncResult         *res,
                                 GTask                *task)
@@ -898,14 +910,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     /* Cache sources supported by the parent */
     g_task_set_task_data (task, GUINT_TO_POINTER (sources), NULL);
-
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (g_task_get_source_object (task)),
-        "+XLCSLSR=?",
-        3,
-        TRUE, /* allow caching */
-        (GAsyncReadyCallback)xlcslsr_test_ready,
-        task);
+    run_xlcslsr_test (task);
 }
 
 void
@@ -920,8 +925,14 @@ mm_shared_xmm_location_load_capabilities (MMIfaceModemLocation *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     g_assert (priv->iface_modem_location_parent);
-    g_assert (priv->iface_modem_location_parent->load_capabilities);
-    g_assert (priv->iface_modem_location_parent->load_capabilities_finish);
+
+    if (!priv->iface_modem_location_parent->load_capabilities ||
+        !priv->iface_modem_location_parent->load_capabilities_finish) {
+        /* no parent capabilities */
+        g_task_set_task_data (task, GUINT_TO_POINTER (MM_MODEM_LOCATION_SOURCE_NONE), NULL);
+        run_xlcslsr_test (task);
+        return;
+    }
 
     priv->iface_modem_location_parent->load_capabilities (self,
                                                           (GAsyncReadyCallback)parent_load_capabilities_ready,
@@ -1375,12 +1386,12 @@ mm_shared_xmm_enable_location_gathering (MMIfaceModemLocation  *self,
 
     priv = get_private (MM_SHARED_XMM (self));
     g_assert (priv->iface_modem_location_parent);
-    g_assert (priv->iface_modem_location_parent->enable_location_gathering);
-    g_assert (priv->iface_modem_location_parent->enable_location_gathering_finish);
 
     /* Only consider request if it applies to one of the sources we are
      * supporting, otherwise run parent enable */
-    if (!(priv->supported_sources & source)) {
+    if (priv->iface_modem_location_parent->enable_location_gathering &&
+        priv->iface_modem_location_parent->enable_location_gathering_finish &&
+        !(priv->supported_sources & source)) {
         priv->iface_modem_location_parent->enable_location_gathering (self,
                                                                       source,
                                                                       (GAsyncReadyCallback)parent_enable_location_gathering_ready,
