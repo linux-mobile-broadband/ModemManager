@@ -425,7 +425,7 @@ bearer_list_updated (MMBearerList *bearer_list,
 
 /*****************************************************************************/
 
-static MMModemState get_current_consolidated_state (MMIfaceModem *self, MMModemState modem_state);
+static MMModemState get_consolidated_subsystem_state (MMIfaceModem *self);
 
 typedef struct {
     MMBaseBearer *self;
@@ -490,7 +490,7 @@ bearer_status_changed (MMBaseBearer *bearer,
             new_state = MM_MODEM_STATE_DISCONNECTING;
             break;
         case MM_BEARER_STATUS_DISCONNECTED:
-            new_state = get_current_consolidated_state (self, MM_MODEM_STATE_UNKNOWN);
+            new_state = get_consolidated_subsystem_state (self);
             break;
         }
 
@@ -1518,7 +1518,7 @@ __iface_modem_update_state_internal (MMIfaceModem *self,
 
     /* Enabled may really be searching or registered */
     if (new_state == MM_MODEM_STATE_ENABLED)
-        new_state = get_current_consolidated_state (self, new_state);
+        new_state = get_consolidated_subsystem_state (self);
 
     /* Update state only if different */
     if (new_state != old_state) {
@@ -1612,9 +1612,12 @@ subsystem_state_array_free (GArray *array)
 }
 
 static MMModemState
-get_current_consolidated_state (MMIfaceModem *self, MMModemState modem_state)
+get_consolidated_subsystem_state (MMIfaceModem *self)
 {
-    MMModemState consolidated = modem_state;
+    /* Use as initial state ENABLED, which is the minimum one expected. Do not
+     * use the old modem state as initial state, as that would disallow reporting
+     * e.g. ENABLED if the old state was REGISTERED (as ENABLED < REGISTERED). */
+    MMModemState consolidated = MM_MODEM_STATE_ENABLED;
     GArray *subsystem_states;
 
     if (G_UNLIKELY (!state_update_context_quark))
@@ -1698,7 +1701,7 @@ get_updated_consolidated_state (MMIfaceModem *self,
         g_array_append_val (subsystem_states, s);
     }
 
-    return get_current_consolidated_state (self, modem_state);
+    return get_consolidated_subsystem_state (self);
 }
 
 void
