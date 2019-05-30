@@ -1089,6 +1089,8 @@ AM_CFLAGS += \
 # plugin: quectel
 ################################################################################
 
+dist_udevrules_DATA += quectel/77-mm-quectel-port-types.rules
+
 pkglib_LTLIBRARIES += libmm-plugin-quectel.la
 libmm_plugin_quectel_la_SOURCES = \
 	quectel/mm-plugin-quectel.c \
