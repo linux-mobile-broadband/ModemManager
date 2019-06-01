@@ -314,6 +314,23 @@ fi
 AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xno"])
 
 dnl-----------------------------------------------------------------------------
+dnl AT command via DBus support (disabled by default unless running in --debug)
+dnl
+dnl It is suggested that this option is only enabled in custom built systems and
+dnl only if truly required.
+dnl
+
+AC_ARG_WITH(at_command_via_dbus,
+            AS_HELP_STRING([--with-at-command-via-dbus],
+                           [Build with Modem.Command() interface enabled always]),
+            [],
+            [with_at_command_via_dbus=no])
+
+if test "x$with_at_command_via_dbus" = "xyes"; then
+    AC_DEFINE(WITH_AT_COMMAND_VIA_DBUS, 1, [Define if you want to enable AT commands via DBus])
+fi
+
+dnl-----------------------------------------------------------------------------
 dnl MBIM support (enabled by default)
 dnl
 
@@ -444,6 +461,7 @@ echo "
       qmi:                     ${with_qmi}
       systemd suspend/resume:  ${with_systemd_suspend_resume}
       systemd journal:         ${with_systemd_journal}
+      at command via dbus:     ${with_at_command_via_dbus}
 
     Miscellaneous:
       gobject introspection:   ${found_introspection}

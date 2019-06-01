@@ -753,6 +753,7 @@ handle_command_auth_ready (MMBaseModem *self,
         return;
     }
 
+#if ! defined WITH_AT_COMMAND_VIA_DBUS
     /* If we are not in Debug mode, report an error */
     if (!mm_context_get_debug ()) {
         g_dbus_method_invocation_return_error (ctx->invocation,
@@ -763,6 +764,7 @@ handle_command_auth_ready (MMBaseModem *self,
         handle_command_context_free (ctx);
         return;
     }
+#endif
 
     /* If command is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->command ||
