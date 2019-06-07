@@ -3312,28 +3312,28 @@ run_unsolicited_events_setup (GTask *task)
 
     /* CMER on primary port */
     if (!ctx->cmer_primary_done && ctx->cmer_command && ctx->primary) {
-        mm_dbg ("Enabling +CIND event reporting in primary port...");
+        mm_dbg ("%s +CIND event reporting in primary port...", ctx->enable ? "Enabling" : "Disabling");
         ctx->cmer_primary_done = TRUE;
         command = ctx->cmer_command;
         port = ctx->primary;
     }
     /* CMER on secondary port */
     else if (!ctx->cmer_secondary_done && ctx->cmer_command && ctx->secondary) {
-        mm_dbg ("Enabling +CIND event reporting in secondary port...");
+        mm_dbg ("%s +CIND event reporting in secondary port...", ctx->enable ? "Enabling" : "Disabling");
         ctx->cmer_secondary_done = TRUE;
         command = ctx->cmer_command;
         port = ctx->secondary;
     }
     /* CGEREP on primary port */
     else if (!ctx->cgerep_primary_done && ctx->cgerep_command && ctx->primary) {
-        mm_dbg ("Enabling +CGEV event reporting in primary port...");
+        mm_dbg ("%s +CGEV event reporting in primary port...", ctx->enable ? "Enabling" : "Disabling");
         ctx->cgerep_primary_done = TRUE;
         command = ctx->cgerep_command;
         port = ctx->primary;
     }
     /* CGEREP on secondary port */
     else if (!ctx->cgerep_secondary_done && ctx->cgerep_command && ctx->secondary) {
-        mm_dbg ("Enabling +CGEV event reporting in secondary port...");
+        mm_dbg ("%s +CGEV event reporting in secondary port...", ctx->enable ? "Enabling" : "Disabling");
         ctx->cgerep_secondary_done = TRUE;
         port = ctx->secondary;
         command = ctx->cgerep_command;
