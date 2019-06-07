@@ -558,6 +558,23 @@ mm_voice_clip_regex_get (void)
                         NULL);
 }
 
+GRegex *
+mm_voice_ccwa_regex_get (void)
+{
+    /*
+     * Only first 3 fields are mandatory, but we read only the first one
+     *   +CCWA: <number>,<type>,<class>,[<alpha>][,<CLI_validity>[,<subaddr>,<satype>[,<priority>]]]
+     *
+     * Example:
+     *   <CR><LF>+CCWA: "+393351391306",145,1
+     *                   \_ Number      \_ Type
+     */
+    return g_regex_new ("\\r\\n\\+CCWA:\\s*([^,\\s]*)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,?(.*)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
 /*************************************************************************/
 
 static MMFlowControl

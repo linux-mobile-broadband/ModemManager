@@ -7250,12 +7250,25 @@ modem_voice_setup_cleanup_unsolicited_events_finish (MMIfaceModemVoice *self,
 }
 
 static void
+ccwa_received (MMPortSerialAt *port,
+               GMatchInfo *info,
+               MMBroadbandModem *self)
+{
+    gchar *str;
+
+    str = mm_get_string_unquoted_from_match_info (info, 1);
+    mm_dbg ("Call waiting (%s)", str);
+    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), str, MM_CALL_STATE_WAITING);
+    g_free (str);
+}
+
+static void
 ring_received (MMPortSerialAt *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
     mm_dbg ("Ringing");
-    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), NULL);
+    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), NULL, MM_CALL_STATE_RINGING_IN);
 }
 
 static void
@@ -7271,7 +7284,7 @@ cring_received (MMPortSerialAt *port,
     mm_dbg ("Ringing (%s)", str);
     g_free (str);
 
-    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), NULL);
+    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), NULL, MM_CALL_STATE_RINGING_IN);
 }
 
 static void
@@ -7282,7 +7295,7 @@ clip_received (MMPortSerialAt *port,
     gchar *str;
 
     str = mm_get_string_unquoted_from_match_info (info, 1);
-    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), str);
+    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), str, MM_CALL_STATE_RINGING_IN);
     g_free (str);
 }
 
@@ -7296,12 +7309,14 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
     GRegex *cring_regex;
     GRegex *ring_regex;
     GRegex *clip_regex;
+    GRegex *ccwa_regex;
     guint i;
     GTask *task;
 
     cring_regex = mm_voice_cring_regex_get ();
     ring_regex  = mm_voice_ring_regex_get ();
     clip_regex  = mm_voice_clip_regex_get ();
+    ccwa_regex  = mm_voice_ccwa_regex_get ();
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
@@ -7332,8 +7347,15 @@ set_voice_unsolicited_events_handlers (MMIfaceModemVoice *self,
             enable ? (MMPortSerialAtUnsolicitedMsgFn) clip_received : NULL,
             enable ? self : NULL,
             NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            ccwa_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) ccwa_received : NULL,
+            enable ? self : NULL,
+            NULL);
     }
 
+    g_regex_unref (ccwa_regex);
     g_regex_unref (clip_regex);
     g_regex_unref (cring_regex);
     g_regex_unref (ring_regex);

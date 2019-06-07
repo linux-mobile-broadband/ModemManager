@@ -93,9 +93,11 @@ gchar *mm_bcd_to_string (const guint8 *bcd, gsize bcd_len);
 /*****************************************************************************/
 /* VOICE specific helpers and utilities */
 /*****************************************************************************/
+
 GRegex *mm_voice_ring_regex_get  (void);
 GRegex *mm_voice_cring_regex_get (void);
 GRegex *mm_voice_clip_regex_get  (void);
+GRegex *mm_voice_ccwa_regex_get  (void);
 
 /*****************************************************************************/
 /* SERIAL specific helpers and utilities */
