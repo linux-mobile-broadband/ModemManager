@@ -7372,6 +7372,9 @@ typedef struct {
     gchar          *crc_command;
     gboolean        crc_primary_done;
     gboolean        crc_secondary_done;
+    gchar          *ccwa_command;
+    gboolean        ccwa_primary_done;
+    gboolean        ccwa_secondary_done;
 } VoiceUnsolicitedEventsContext;
 
 static void
@@ -7381,6 +7384,7 @@ voice_unsolicited_events_context_free (VoiceUnsolicitedEventsContext *ctx)
     g_clear_object (&ctx->primary);
     g_free (ctx->clip_command);
     g_free (ctx->crc_command);
+    g_free (ctx->ccwa_command);
     g_slice_free (VoiceUnsolicitedEventsContext, ctx);
 }
 
@@ -7454,6 +7458,20 @@ run_voice_unsolicited_events_setup (GTask *task)
         command = ctx->crc_command;
         port = ctx->secondary;
     }
+    /* CCWA on primary port */
+    else if (!ctx->ccwa_primary_done && ctx->ccwa_command && ctx->primary) {
+        mm_dbg ("%s +CCWA call waiting indications in primary port...", ctx->enable ? "Enabling" : "Disabling");
+        ctx->ccwa_primary_done = TRUE;
+        command = ctx->ccwa_command;
+        port = ctx->primary;
+    }
+    /* CCWA on secondary port */
+    else if (!ctx->ccwa_secondary_done && ctx->ccwa_command && ctx->secondary) {
+        mm_dbg ("%s +CCWA call waiting indications in secondary port...", ctx->enable ? "Enabling" : "Disabling");
+        ctx->ccwa_secondary_done = TRUE;
+        command = ctx->ccwa_command;
+        port = ctx->secondary;
+    }
 
     /* Enable/Disable unsolicited events in given port */
     if (port && command) {
@@ -7494,6 +7512,8 @@ modem_voice_enable_unsolicited_events (MMIfaceModemVoice   *self,
     ctx->clip_command = g_strdup ("+CLIP=1");
     /* enable +CRING URCs instead of plain RING */
     ctx->crc_command = g_strdup ("+CRC=1");
+    /* enable +CCWA call waiting indications */
+    ctx->ccwa_command = g_strdup ("+CCWA=1");
 
     g_task_set_task_data (task, ctx, (GDestroyNotify) voice_unsolicited_events_context_free);
 
@@ -7518,6 +7538,8 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
     ctx->clip_command = g_strdup ("+CLIP=0");
     /* disable +CRING URCs instead of plain RING */
     ctx->crc_command = g_strdup ("+CRC=0");
+    /* disable +CCWA call waiting indications */
+    ctx->ccwa_command = g_strdup ("+CCWA=0");
 
     g_task_set_task_data (task, ctx, (GDestroyNotify) voice_unsolicited_events_context_free);
 
