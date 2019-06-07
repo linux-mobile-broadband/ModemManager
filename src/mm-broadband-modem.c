@@ -7385,9 +7385,9 @@ voice_unsolicited_events_context_free (VoiceUnsolicitedEventsContext *ctx)
 }
 
 static gboolean
-modem_voice_enable_unsolicited_events_finish (MMIfaceModemVoice  *self,
-                                              GAsyncResult       *res,
-                                              GError            **error)
+modem_voice_enable_disable_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                                      GAsyncResult       *res,
+                                                      GError            **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -7494,6 +7494,30 @@ modem_voice_enable_unsolicited_events (MMIfaceModemVoice   *self,
     ctx->clip_command = g_strdup ("+CLIP=1");
     /* enable +CRING URCs instead of plain RING */
     ctx->crc_command = g_strdup ("+CRC=1");
+
+    g_task_set_task_data (task, ctx, (GDestroyNotify) voice_unsolicited_events_context_free);
+
+    run_voice_unsolicited_events_setup (task);
+}
+
+static void
+modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
+                                        GAsyncReadyCallback  callback,
+                                        gpointer             user_data)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GTask                         *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (VoiceUnsolicitedEventsContext);
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    /* disable +CLIP URCs with calling line identity */
+    ctx->clip_command = g_strdup ("+CLIP=0");
+    /* disable +CRING URCs instead of plain RING */
+    ctx->crc_command = g_strdup ("+CRC=0");
 
     g_task_set_task_data (task, ctx, (GDestroyNotify) voice_unsolicited_events_context_free);
 
@@ -11718,7 +11742,9 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->setup_unsolicited_events = modem_voice_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = modem_voice_enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = modem_voice_enable_unsolicited_events_finish;
+    iface->enable_unsolicited_events_finish = modem_voice_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_voice_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_voice_enable_disable_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
     iface->create_call = modem_voice_create_call;

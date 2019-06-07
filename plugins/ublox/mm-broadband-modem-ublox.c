@@ -1005,6 +1005,23 @@ modem_voice_disable_unsolicited_events_finish (MMIfaceModemVoice  *self,
 }
 
 static void
+parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                               GAsyncResult      *res,
+                                               GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->disable_unsolicited_events_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 own_voice_disable_unsolicited_events_ready (MMBaseModem  *self,
                                             GAsyncResult *res,
                                             GTask        *task)
@@ -1012,11 +1029,17 @@ own_voice_disable_unsolicited_events_ready (MMBaseModem  *self,
     GError *error = NULL;
 
     mm_base_modem_at_command_full_finish (self, res, &error);
-    if (error)
+    if (error) {
         g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Chain up parent's disable */
+    iface_modem_voice_parent->disable_unsolicited_events (
+        MM_IFACE_MODEM_VOICE (self),
+        (GAsyncReadyCallback)parent_voice_disable_unsolicited_events_ready,
+        task);
 }
 
 static void
@@ -1027,8 +1050,6 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-
-    /* Note: no parent disable method */
 
     mm_base_modem_at_command_full (
         MM_BASE_MODEM (self),
