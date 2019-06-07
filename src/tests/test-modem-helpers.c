@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
@@ -3926,6 +3927,49 @@ test_csim_response (void)
 }
 
 /*****************************************************************************/
+/* +CLIP URC */
+
+typedef struct {
+    const gchar *str;
+    const gchar *number;
+    guint        type;
+} ClipUrcTest;
+
+static const ClipUrcTest clip_urc_tests[] = {
+    { "\r\n+CLIP: \"123456789\",129\r\n",      "123456789", 129 },
+    { "\r\n+CLIP: \"123456789\",129,,,,0\r\n", "123456789", 129 },
+};
+
+static void
+test_clip_indication (void)
+{
+    GRegex *r;
+    guint   i;
+
+    r = mm_voice_clip_regex_get ();
+
+    for (i = 0; i < G_N_ELEMENTS (clip_urc_tests); i++) {
+        GMatchInfo *match_info = NULL;
+        gchar      *number;
+        guint       type;
+
+        g_assert (g_regex_match (r, clip_urc_tests[i].str, 0, &match_info));
+        g_assert (g_match_info_matches (match_info));
+
+        number = mm_get_string_unquoted_from_match_info (match_info, 1);
+        g_assert_cmpstr (number, ==, clip_urc_tests[i].number);
+
+        g_assert (mm_get_uint_from_match_info (match_info, 2, &type));
+        g_assert_cmpuint (type, ==, clip_urc_tests[i].type);
+
+        g_free (number);
+        g_match_info_free (match_info);
+    }
+
+    g_regex_unref (r);
+}
+
+/*****************************************************************************/
 
 typedef struct {
     gchar *str;
@@ -4235,6 +4279,8 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cesq_response, NULL));
     g_test_suite_add (suite, TESTCASE (test_cesq_response_to_signal, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_clip_indication, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_parse_uint_list, NULL));
 

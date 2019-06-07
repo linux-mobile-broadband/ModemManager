@@ -544,11 +544,15 @@ mm_voice_cring_regex_get (void)
 GRegex *
 mm_voice_clip_regex_get (void)
 {
-    /* Example:
-     * <CR><LF>+CLIP: "+393351391306",145,,,,0<CR><LF>
-     *                 \_ Number      \_ Type \_ Validity
+    /*
+     * Only first 2 fields are mandatory:
+     *   +CLIP: <number>,<type>[,<subaddr>,<satype>[,[<alpha>][,<CLI_validity>]]]
+     *
+     * Example:
+     *   <CR><LF>+CLIP: "+393351391306",145,,,,0<CR><LF>
+     *                   \_ Number      \_ Type
      */
-    return g_regex_new ("\\r\\n\\+CLIP:\\s*(\\S+),\\s*(\\d+),\\s*,\\s*,\\s*,\\s*(\\d+)\\r\\n",
+    return g_regex_new ("\\r\\n\\+CLIP:\\s*([^,\\s]*)\\s*,\\s*(\\d+)\\s*,?(.*)\\r\\n",
                         G_REGEX_RAW | G_REGEX_OPTIMIZE,
                         0,
                         NULL);
