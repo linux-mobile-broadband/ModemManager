@@ -7362,66 +7362,142 @@ modem_voice_cleanup_unsolicited_events (MMIfaceModemVoice *self,
 /*****************************************************************************/
 /* Enable unsolicited events (CALL indications) (Voice interface) */
 
-static gboolean
-modem_voice_enable_unsolicited_events_finish (MMIfaceModemVoice *self,
-                                              GAsyncResult *res,
-                                              GError **error)
-{
-    GError *inner_error = NULL;
-
-    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-static gboolean
-ring_response_processor (MMBaseModem *self,
-                         gpointer none,
-                         const gchar *command,
-                         const gchar *response,
-                         gboolean last_command,
-                         const GError *error,
-                         GVariant **result,
-                         GError **result_error)
-{
-    if (error) {
-        /* If we get a not-supported error and we're not in the last command, we
-         * won't set 'result_error', so we'll keep on the sequence */
-        if (!g_error_matches (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_NOT_SUPPORTED) ||
-            last_command)
-            *result_error = g_error_copy (error);
-
-        return TRUE;
-    }
-
-    *result = NULL;
-    return FALSE;
-}
-
-static const MMBaseModemAtCommand ring_sequence[] = {
-    /* Show caller number on RING. */
-    { "+CLIP=1", 3, FALSE, ring_response_processor },
-    /* Show difference between data call and voice call */
-    { "+CRC=1", 3, FALSE, ring_response_processor },
-    { NULL }
-};
+typedef struct {
+    gboolean        enable;
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+    gchar          *clip_command;
+    gboolean        clip_primary_done;
+    gboolean        clip_secondary_done;
+    gchar          *crc_command;
+    gboolean        crc_primary_done;
+    gboolean        crc_secondary_done;
+} VoiceUnsolicitedEventsContext;
 
 static void
-modem_voice_enable_unsolicited_events (MMIfaceModemVoice *self,
-                                       GAsyncReadyCallback callback,
-                                       gpointer user_data)
+voice_unsolicited_events_context_free (VoiceUnsolicitedEventsContext *ctx)
 {
-    mm_base_modem_at_sequence (
-        MM_BASE_MODEM (self),
-        ring_sequence,
-        NULL, /* response_processor_context */
-        NULL, /* response_processor_context_free */
-        callback,
-        user_data);
+    g_clear_object (&ctx->secondary);
+    g_clear_object (&ctx->primary);
+    g_free (ctx->clip_command);
+    g_free (ctx->crc_command);
+    g_slice_free (VoiceUnsolicitedEventsContext, ctx);
+}
+
+static gboolean
+modem_voice_enable_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                              GAsyncResult       *res,
+                                              GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void run_voice_unsolicited_events_setup (GTask *task);
+
+static void
+voice_unsolicited_events_setup_ready (MMBroadbandModem *self,
+                                      GAsyncResult     *res,
+                                      GTask            *task)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GError                        *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
+        mm_dbg ("Couldn't %s voice event reporting: '%s'",
+                ctx->enable ? "enable" : "disable",
+                error->message);
+        g_error_free (error);
+    }
+
+    /* Continue on next port/command */
+    run_voice_unsolicited_events_setup (task);
+}
+
+static void
+run_voice_unsolicited_events_setup (GTask *task)
+{
+    MMBroadbandModem              *self;
+    VoiceUnsolicitedEventsContext *ctx;
+    MMPortSerialAt                *port = NULL;
+    const gchar                   *command = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    /* CLIP on primary port */
+    if (!ctx->clip_primary_done && ctx->clip_command && ctx->primary) {
+        mm_dbg ("%s +CLIP calling line reporting in primary port...", ctx->enable ? "Enabling" : "Disabling");
+        ctx->clip_primary_done = TRUE;
+        command = ctx->clip_command;
+        port = ctx->primary;
+    }
+    /* CLIP on secondary port */
+    else if (!ctx->clip_secondary_done && ctx->clip_command && ctx->secondary) {
+        mm_dbg ("%s +CLIP calling line reporting in primary port...", ctx->enable ? "Enabling" : "Disabling");
+        ctx->clip_secondary_done = TRUE;
+        command = ctx->clip_command;
+        port = ctx->secondary;
+    }
+    /* CRC on primary port */
+    else if (!ctx->crc_primary_done && ctx->crc_command && ctx->primary) {
+        mm_dbg ("%s +CRC extended format of incoming call indications in primary port...", ctx->enable ? "Enabling" : "Disabling");
+        ctx->crc_primary_done = TRUE;
+        command = ctx->crc_command;
+        port = ctx->primary;
+    }
+    /* CRC on secondary port */
+    else if (!ctx->crc_secondary_done && ctx->crc_command && ctx->secondary) {
+        mm_dbg ("%s +CRC extended format of incoming call indications in secondary port...", ctx->enable ? "Enabling" : "Disabling");
+        ctx->crc_secondary_done = TRUE;
+        command = ctx->crc_command;
+        port = ctx->secondary;
+    }
+
+    /* Enable/Disable unsolicited events in given port */
+    if (port && command) {
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                       port,
+                                       command,
+                                       3,
+                                       FALSE,
+                                       FALSE, /* raw */
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)voice_unsolicited_events_setup_ready,
+                                       task);
+        return;
+    }
+
+    /* Fully done now */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+
+}
+
+static void
+modem_voice_enable_unsolicited_events (MMIfaceModemVoice   *self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GTask                         *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (VoiceUnsolicitedEventsContext);
+    ctx->enable = TRUE;
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    /* enable +CLIP URCs with calling line identity */
+    ctx->clip_command = g_strdup ("+CLIP=1");
+    /* enable +CRING URCs instead of plain RING */
+    ctx->crc_command = g_strdup ("+CRC=1");
+
+    g_task_set_task_data (task, ctx, (GDestroyNotify) voice_unsolicited_events_context_free);
+
+    run_voice_unsolicited_events_setup (task);
 }
 
 /*****************************************************************************/
