@@ -68,6 +68,7 @@ gboolean mm_call_list_delete_call (MMCallList   *self,
                                    const gchar  *call_path,
                                    GError      **error);
 
-MMBaseCall *mm_call_list_get_first_ringing_in_call (MMCallList *self);
+MMBaseCall *mm_call_list_get_first_incoming_call (MMCallList  *self,
+                                                  MMCallState  incoming_state);
 
 #endif /* MM_CALL_LIST_H */

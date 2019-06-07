@@ -84,9 +84,12 @@ mm_call_list_get_paths (MMCallList *self)
 /*****************************************************************************/
 
 MMBaseCall *
-mm_call_list_get_first_ringing_in_call (MMCallList *self)
+mm_call_list_get_first_incoming_call (MMCallList  *self,
+                                      MMCallState  incoming_state)
 {
     GList *l;
+
+    g_assert (incoming_state == MM_CALL_STATE_RINGING_IN || incoming_state == MM_CALL_STATE_WAITING);
 
     for (l = self->priv->list; l; l = g_list_next (l)) {
         MMBaseCall       *call;
@@ -101,7 +104,7 @@ mm_call_list_get_first_ringing_in_call (MMCallList *self)
                       NULL);
 
         if (direction == MM_CALL_DIRECTION_INCOMING &&
-            state     == MM_CALL_STATE_RINGING_IN) {
+            state     == incoming_state) {
             return call;
         }
     }

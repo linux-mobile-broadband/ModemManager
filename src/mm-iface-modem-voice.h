@@ -120,6 +120,7 @@ void mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
 
 /* Incoming call management */
 void mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
-                                                const gchar       *number);
+                                                const gchar       *number,
+                                                MMCallState        state);
 
 #endif /* MM_IFACE_MODEM_VOICE_H */

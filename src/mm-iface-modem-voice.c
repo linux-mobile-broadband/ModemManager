@@ -73,10 +73,13 @@ create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
 
 void
 mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
-                                           const gchar       *number)
+                                           const gchar       *number,
+                                           MMCallState        state)
 {
     MMBaseCall *call = NULL;
     MMCallList *list = NULL;
+
+    g_assert (state == MM_CALL_STATE_RINGING_IN || state == MM_CALL_STATE_WAITING);
 
     g_object_get (MM_BASE_MODEM (self),
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
@@ -87,7 +90,7 @@ mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
         return;
     }
 
-    call = mm_call_list_get_first_ringing_in_call (list);
+    call = mm_call_list_get_first_incoming_call (list, state);
 
     /* If call exists already, refresh its validity and set number if it wasn't set */
     if (call) {
@@ -101,8 +104,8 @@ mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
     mm_dbg ("Creating new incoming call...");
     call = create_incoming_call (self, number);
 
-    /* Set the state as ringing in */
-    mm_base_call_change_state (call, MM_CALL_STATE_RINGING_IN, MM_CALL_STATE_REASON_INCOMING_NEW);
+    /* Set the state */
+    mm_base_call_change_state (call, state, MM_CALL_STATE_REASON_INCOMING_NEW);
 
     /* Start its validity timeout */
     mm_base_call_incoming_refresh (call);
