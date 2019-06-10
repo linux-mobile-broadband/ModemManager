@@ -1,4 +1,76 @@
 
+ModemManager 1.10.2
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+Unlike previous bugfix releases of stable branches, this release comes with a
+new feature that may require packaging updates:
+
+ * Carrier configuration reporting and automatic selection.
+
+   It is now possible to load and expose in the modem interface the currently
+   selected carrier configuration in the module, if any, via the new
+   'CarrierConfiguration' and 'CarrierConfigurationRevision' properties.
+
+   Additionally, if the modem/plugin supports it via a custom mapping,
+   ModemManager will also automatically select the best carrier configuration
+   for the currently available SIM card. The mapping is provided via an external
+   file that associates a SIM card MCCMNC with a given carrier ID string as
+   reported by the specific module.
+
+   Initially the carrier configuration reporting is available to all QMI modems
+   with PDC service support, and the automatic carrier configuration switching
+   only to the Dell DW5821e, for which a mapping configuration file is provided.
+
+   This carrier configuration support provides the foundation for "carrier based
+   firmware upgrade paths" in the fwupd/LVFS integration. E.g. a modem running
+   with a Vodafone-specific carrier configuration will only be suggested firmware
+   upgrades providing Vodafone-specific carrier configurations, as the specific
+   GUIDs generated for fwupd contain the USB VID/PID/REV plus the currently used
+   carrier name: USB\VID_413C&PID_81D7&REV_0318&CARRIER_VODAFONE.
+
+   Some notes to distribution packagers:
+   ** The mapping files will be installed under ${pkgdatadir}, e.g.:
+      /usr/share/ModemManager/mm-dell-dw5821e-carrier-mapping.conf
+   ** libqmi 1.22.4 is required as a buildtime and runtime dependency.
+
+The list of changes in this version includes:
+
+ * Manager interface:
+   ** Fixed inhibition alloc/dealloc mixup.
+
+ * Modem interface:
+   ** New 'CarrierConfiguration' property that shows which is the currently
+      selected carrier configuration in the device, if known.
+   ** New automatic carrier configuration selection logic, based on per-device
+      or per-vendor mapping.
+
+ * Messaging interface:
+   ** Flush SMS list update before notifying added/removed signals.
+
+ * SMS:
+   ** Fixed sending binary PDUs via AT commands when other AT command operations
+      are scheduled at the same time.
+
+ * QMI:
+   ** Increased the number of open retries from 10 to 20, required e.g. for
+      the Telit LM940/960 modems.
+   ** Implemented QMI PDC based carrier config loading and automatic switching.
+
+ * Plugins:
+   ** dell: added port type hints for the DW5820e.
+   ** dell: use QMI DMS extension method to load properly formatted firmware
+      version strings.
+   ** quectel: added port type hints for the EG06.
+   ** ublox: added alternative port type hints for the LISA/SARA-U2.
+   ** telit: added support for MBIM-based telit modems.
+
+ * mmcli:
+   ** Updated --monitor-state to report modem removal.
+
+ * Several memory leak fixes in different modules.
+
+
 ModemManager 1.10.0
 -------------------------------------------
 This is a new stable release of ModemManager.
