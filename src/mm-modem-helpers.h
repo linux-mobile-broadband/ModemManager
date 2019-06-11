@@ -403,29 +403,19 @@ MMBearerIpFamily  mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type);
 
 char *mm_3gpp_parse_iccid (const char *raw_iccid, GError **error);
 
-gboolean
-mm_3gpp_rscp_level_to_rscp (guint    rscp_level,
-                            gdouble *out_rscp);
 
-gboolean
-mm_3gpp_rxlev_to_rssi (guint    rxlev,
-                       gdouble *out_rssi);
-
-gboolean
-mm_3gpp_ecn0_level_to_ecio (guint    ecn0_level,
-                            gdouble *out_ecio);
-
-gboolean
-mm_3gpp_rsrq_level_to_rsrq (guint    rsrq_level,
-                            gdouble *out_rsrq);
-
-gboolean
-mm_3gpp_rsrp_level_to_rsrp (guint    rsrp_level,
-                            gdouble *out_rsrp);
-
-gboolean
-mm_3gpp_rssnr_level_to_rssnr (gint     rssnr_level,
-                              gdouble *out_rssnr);
+gboolean mm_3gpp_rscp_level_to_rscp   (guint    rscp_level,
+                                       gdouble *out_rscp);
+gboolean mm_3gpp_rxlev_to_rssi        (guint    rxlev,
+                                       gdouble *out_rssi);
+gboolean mm_3gpp_ecn0_level_to_ecio   (guint    ecn0_level,
+                                       gdouble *out_ecio);
+gboolean mm_3gpp_rsrq_level_to_rsrq   (guint    rsrq_level,
+                                       gdouble *out_rsrq);
+gboolean mm_3gpp_rsrp_level_to_rsrp   (guint    rsrp_level,
+                                       gdouble *out_rsrp);
+gboolean mm_3gpp_rssnr_level_to_rssnr (gint     rssnr_level,
+                                       gdouble *out_rssnr);
 
 /*****************************************************************************/
 /* CDMA specific helpers and utilities */
