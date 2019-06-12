@@ -795,6 +795,7 @@ parse_pdp_list (MMBaseModem             *modem,
     GList *pdp_list;
     GList *l;
     guint cid;
+    guint prev_cid;
 
     /* If cancelled, set result error */
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
@@ -832,6 +833,7 @@ parse_pdp_list (MMBaseModem             *modem,
     }
 
     cid = 0;
+    prev_cid = 0;
 
     /* Show all found PDP contexts in debug log */
     mm_dbg ("Found '%u' PDP contexts", g_list_length (pdp_list));
@@ -871,13 +873,32 @@ parse_pdp_list (MMBaseModem             *modem,
                 break;
             }
 
-            /* PDP with no APN set? we may use that one if not exact match found */
-            if (!pdp->apn || !pdp->apn[0]) {
-                mm_dbg ("Found PDP context with CID %u and no APN",
-                        pdp->cid);
-                cid = pdp->cid;
+            /* If an open CID was not found yet and the previous CID is not (CID - 1),
+             * this means that (previous CID + 1) is a blank CID that can be used.
+             */
+            if (prev_cid != G_MAXUINT && (prev_cid + 1) < pdp->cid) {
+                mm_dbg ("Found the first unused PDP context with CID %u", (prev_cid + 1));
+                cid = prev_cid + 1;
+
+                /* Set prev_cid to G_MAXUINT to show an open CID was found and only an
+                 * exact APN match would change the CID after
+                 */
+                prev_cid = G_MAXUINT;
+            } else {
+                /* PDP with no APN set? we may use that one if not exact match found */
+                if (!pdp->apn || !pdp->apn[0]) {
+                    mm_dbg ("Found PDP context with CID %u and no APN",
+                            pdp->cid);
+                    cid = pdp->cid;
+                }
             }
         }
+
+        /* Update previous CID value to the current CID for use in the next loop,
+         * unless an unused CID was found
+         */
+        if (prev_cid != G_MAXUINT)
+            prev_cid = pdp->cid;
 
         if (ctx->max_cid < pdp->cid)
             ctx->max_cid = pdp->cid;
