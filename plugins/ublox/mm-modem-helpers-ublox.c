@@ -1578,6 +1578,10 @@ mm_ublox_parse_uact_response (const gchar  *response,
         g_array_unref (nums);
     }
 
+    if (!bands)
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No known band selection values matched in +UACT response: '%s'", response);
+
     return bands;
 }
 
