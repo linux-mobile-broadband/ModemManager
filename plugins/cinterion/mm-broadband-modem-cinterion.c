@@ -80,8 +80,8 @@ struct _MMBroadbandModemCinterionPrivate {
     GArray *cnmi_supported_ds;
     GArray *cnmi_supported_bfr;
 
-    /* +CIEV 'psinfo' indications */
-    GRegex *ciev_psinfo_regex;
+    /* +CIEV indications as configured via AT^SIND */
+    GRegex *ciev_regex;
 
     /* Flags for feature support checks */
     FeatureSupport swwan_support;
@@ -814,20 +814,25 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp    *self,
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static void
-sind_psinfo_received (MMPortSerialAt            *port,
-                      GMatchInfo                *match_info,
-                      MMBroadbandModemCinterion *self)
+sind_ciev_received (MMPortSerialAt            *port,
+                    GMatchInfo                *match_info,
+                    MMBroadbandModemCinterion *self)
 {
-    guint val;
+    guint  val = 0;
+    gchar *indicator;
 
-    if (!mm_get_uint_from_match_info (match_info, 1, &val)) {
-        mm_dbg ("Failed to convert psinfo value");
-        return;
+    indicator = mm_get_string_unquoted_from_match_info (match_info, 1);
+    if (!mm_get_uint_from_match_info (match_info, 2, &val))
+        mm_dbg ("couldn't parse indicator '%s' value", indicator);
+    else {
+        mm_dbg ("received indicator '%s' update: %u", indicator, val);
+        if (g_strcmp0 (indicator, "psinfo") == 0) {
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       mm_cinterion_get_access_technology_from_sind_psinfo (val),
+                                                       MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+        }
     }
-
-    mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                               mm_cinterion_get_access_technology_from_sind_psinfo (val),
-                                               MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    g_free (indicator);
 }
 
 static void
@@ -847,8 +852,8 @@ set_unsolicited_events_handlers (MMBroadbandModemCinterion *self,
 
         mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
-            self->priv->ciev_psinfo_regex,
-            enable ? (MMPortSerialAtUnsolicitedMsgFn)sind_psinfo_received : NULL,
+            self->priv->ciev_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)sind_ciev_received : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -1819,8 +1824,8 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
     self->priv->sind_psinfo_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->swwan_support       = FEATURE_SUPPORT_UNKNOWN;
 
-    self->priv->ciev_psinfo_regex = g_regex_new ("\\r\\n\\+CIEV: psinfo,(\\d+)\\r\\n",
-                                                 G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV:\\s*([a-z]+),(\\d+)\\r\\n",
+                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -1842,7 +1847,7 @@ finalize (GObject *object)
     if (self->priv->cnmi_supported_bfr)
         g_array_unref (self->priv->cnmi_supported_bfr);
 
-    g_regex_unref (self->priv->ciev_psinfo_regex);
+    g_regex_unref (self->priv->ciev_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_cinterion_parent_class)->finalize (object);
 }
