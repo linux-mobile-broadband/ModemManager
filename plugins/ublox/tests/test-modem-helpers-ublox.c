@@ -651,14 +651,22 @@ common_validate_uact_response (const gchar       *str,
     GArray *bands;
 
     bands = mm_ublox_parse_uact_response (str, &error);
-    g_assert_no_error (error);
 
-    common_compare_bands (bands, expected_bands, n_expected_bands);
+    if (n_expected_bands > 0) {
+        g_assert (bands);
+        g_assert_no_error (error);
+        common_compare_bands (bands, expected_bands, n_expected_bands);
+    } else {
+        g_assert (!bands);
+        g_assert (error);
+        g_error_free (error);
+    }
 }
 
 static void
 test_uact_response_empty_list (void)
 {
+    common_validate_uact_response ("", NULL, 0);
     common_validate_uact_response ("+UACT: ,,,\r\n", NULL, 0);
 }
 
