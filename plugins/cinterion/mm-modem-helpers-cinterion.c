@@ -667,3 +667,131 @@ mm_cinterion_get_access_technology_from_sind_psinfo (guint val)
         return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     }
 }
+
+/*****************************************************************************/
+/* ^SLCC psinfo helper */
+
+GRegex *
+mm_cinterion_get_slcc_regex (void)
+{
+    /* The list of active calls displayed with this URC will always be terminated
+     * with an empty line preceded by prefix "^SLCC: ", in order to indicate the end
+     * of the list.
+     */
+    return g_regex_new ("\\r\\n(\\^SLCC: .*\\r\\n)*\\^SLCC: \\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+static void
+cinterion_call_info_free (MMCallInfo *info)
+{
+    if (!info)
+        return;
+    g_free (info->number);
+    g_slice_free (MMCallInfo, info);
+}
+
+gboolean
+mm_cinterion_parse_slcc_list (const gchar *str,
+                              GList      **out_list,
+                              GError     **error)
+{
+    GRegex     *r;
+    GList      *list = NULL;
+    GError     *inner_error = NULL;
+    GMatchInfo *match_info  = NULL;
+
+    static const MMCallDirection cinterion_call_direction[] = {
+        [0] = MM_CALL_DIRECTION_OUTGOING,
+        [1] = MM_CALL_DIRECTION_INCOMING,
+    };
+
+    static const MMCallState cinterion_call_state[] = {
+        [0] = MM_CALL_STATE_ACTIVE,
+        [1] = MM_CALL_STATE_HELD,
+        [2] = MM_CALL_STATE_DIALING,     /* Dialing  (MOC) */
+        [3] = MM_CALL_STATE_RINGING_OUT, /* Alerting (MOC) */
+        [4] = MM_CALL_STATE_RINGING_IN,  /* Incoming (MTC) */
+        [5] = MM_CALL_STATE_WAITING,     /* Waiting  (MTC) */
+    };
+
+    g_assert (out_list);
+
+    /*
+     *         1      2      3       4       5       6            7         8     9
+     *  ^SLCC: <idx>, <dir>, <stat>, <mode>, <mpty>, <Reserved>[, <number>, <type>[,<alpha>]]
+     *  [^SLCC: <idx>, <dir>, <stat>, <mode>, <mpty>, <Reserved>[, <number>, <type>[,<alpha>]]]
+     *  [... ]
+     *  ^SLCC :
+     */
+
+    r = g_regex_new ("\\^SLCC:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)" /* mandatory fields */
+                     "(?:,\\s*([^,]*),\\s*(\\d+)"                                                /* number and type */
+                     "(?:,\\s*([^,]*)"                                                           /* alpha */
+                     ")?)?$",
+                     G_REGEX_RAW | G_REGEX_MULTILINE | G_REGEX_NEWLINE_CRLF,
+                     G_REGEX_MATCH_NEWLINE_CRLF,
+                     NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    /* Parse the results */
+    while (g_match_info_matches (match_info)) {
+        MMCallInfo *call_info;
+        guint       aux;
+
+        call_info = g_slice_new0 (MMCallInfo);
+
+        if (!mm_get_uint_from_match_info (match_info, 1, &call_info->index)) {
+            mm_warn ("couldn't parse call index from ^SLCC line");
+            goto next;
+        }
+
+        if (!mm_get_uint_from_match_info (match_info, 2, &aux) ||
+            (aux >= G_N_ELEMENTS (cinterion_call_direction))) {
+            mm_warn ("couldn't parse call direction from ^SLCC line");
+            goto next;
+        }
+        call_info->direction = cinterion_call_direction[aux];
+
+        if (!mm_get_uint_from_match_info (match_info, 3, &aux) ||
+            (aux >= G_N_ELEMENTS (cinterion_call_state))) {
+            mm_warn ("couldn't parse call state from ^SLCC line");
+            goto next;
+        }
+        call_info->state = cinterion_call_state[aux];
+
+        if (g_match_info_get_match_count (match_info) >= 8)
+            call_info->number = mm_get_string_unquoted_from_match_info (match_info, 7);
+
+        list = g_list_append (list, call_info);
+        call_info = NULL;
+
+    next:
+        cinterion_call_info_free (call_info);
+        g_match_info_next (match_info, NULL);
+    }
+
+out:
+    g_clear_pointer (&match_info, g_match_info_free);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        mm_cinterion_call_info_list_free (list);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *out_list = list;
+
+    return TRUE;
+}
+
+void
+mm_cinterion_call_info_list_free (GList *call_info_list)
+{
+    g_list_free_full (call_info_list, (GDestroyNotify) cinterion_call_info_free);
+}

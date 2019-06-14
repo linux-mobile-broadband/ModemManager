@@ -668,6 +668,131 @@ test_smong_response_other (void)
 }
 
 /*****************************************************************************/
+/* Test ^SLCC URCs */
+
+static void
+common_test_slcc_urc (const gchar               *urc,
+                      const MMCallInfo *expected_call_info_list,
+                      guint                      expected_call_info_list_size)
+{
+    GError     *error = NULL;
+    GRegex     *slcc_regex = NULL;
+    gboolean    result;
+    GMatchInfo *match_info = NULL;
+    gchar      *str;
+    GList      *call_info_list = NULL;
+    GList      *l;
+
+
+    slcc_regex = mm_cinterion_get_slcc_regex ();
+
+    /* Same matching logic as done in MMSerialPortAt when processing URCs! */
+    result = g_regex_match_full (slcc_regex, urc, -1, 0, 0, &match_info, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    /* read full matched content */
+    str = g_match_info_fetch (match_info, 0);
+    g_assert (str);
+
+    result = mm_cinterion_parse_slcc_list (str, &call_info_list, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    g_print ("found %u calls\n", g_list_length (call_info_list));
+
+    if (expected_call_info_list) {
+        g_assert (call_info_list);
+        g_assert_cmpuint (g_list_length (call_info_list), ==, expected_call_info_list_size);
+    } else
+        g_assert (!call_info_list);
+
+    for (l = call_info_list; l; l = g_list_next (l)) {
+        const MMCallInfo *call_info = (const MMCallInfo *)(l->data);
+        gboolean                   found = FALSE;
+        guint                      i;
+
+        g_print ("call at index %u: direction %s, state %s, number %s\n",
+                 call_info->index,
+                 mm_call_direction_get_string (call_info->direction),
+                 mm_call_state_get_string (call_info->state),
+                 call_info->number ? call_info->number : "n/a");
+
+        for (i = 0; !found && i < expected_call_info_list_size; i++)
+            found = ((call_info->index == expected_call_info_list[i].index) &&
+                     (call_info->direction  == expected_call_info_list[i].direction) &&
+                     (call_info->state  == expected_call_info_list[i].state) &&
+                     (g_strcmp0 (call_info->number, expected_call_info_list[i].number) == 0));
+
+        g_assert (found);
+    }
+
+    g_match_info_free (match_info);
+    g_regex_unref (slcc_regex);
+    g_free (str);
+
+    mm_cinterion_call_info_list_free (call_info_list);
+}
+
+static void
+test_slcc_urc_empty (void)
+{
+    const gchar *urc = "\r\n^SLCC: \r\n";
+
+    common_test_slcc_urc (urc, NULL, 0);
+}
+
+static void
+test_slcc_urc_single (void)
+{
+    static const MMCallInfo expected_call_info_list[] = {
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE, "123456789" }
+    };
+
+    const gchar *urc =
+        "\r\n^SLCC: 1,1,0,0,0,0,\"123456789\",161"
+        "\r\n^SLCC: \r\n";
+
+    common_test_slcc_urc (urc, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
+}
+
+static void
+test_slcc_urc_multiple (void)
+{
+    static const MMCallInfo expected_call_info_list[] = {
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  NULL        },
+        { 2, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "123456789" },
+        { 3, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "987654321" },
+    };
+
+    const gchar *urc =
+        "\r\n^SLCC: 1,1,0,0,1,0" /* number unknown */
+        "\r\n^SLCC: 2,1,0,0,1,0,\"123456789\",161"
+        "\r\n^SLCC: 3,1,0,0,1,0,\"987654321\",161,\"Alice\""
+        "\r\n^SLCC: \r\n";
+
+    common_test_slcc_urc (urc, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
+}
+
+static void
+test_slcc_urc_complex (void)
+{
+    static const MMCallInfo expected_call_info_list[] = {
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "123456789" },
+        { 2, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_WAITING, "987654321" },
+    };
+
+    const gchar *urc =
+        "\r\n^CIEV: 1,0" /* some different URC before our match */
+        "\r\n^SLCC: 1,1,0,0,0,0,\"123456789\",161"
+        "\r\n^SLCC: 2,1,5,0,0,0,\"987654321\",161"
+        "\r\n^SLCC: \r\n"
+        "\r\n^CIEV: 1,0" /* some different URC after our match */;
+
+    common_test_slcc_urc (urc, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -706,6 +831,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/sind/response/simstatus", test_sind_response_simstatus);
     g_test_add_func ("/MM/cinterion/smong/response/tc63i",    test_smong_response_tc63i);
     g_test_add_func ("/MM/cinterion/smong/response/other",    test_smong_response_other);
+    g_test_add_func ("/MM/cinterion/slcc/urc/empty",          test_slcc_urc_empty);
+    g_test_add_func ("/MM/cinterion/slcc/urc/single",         test_slcc_urc_single);
+    g_test_add_func ("/MM/cinterion/slcc/urc/multiple",       test_slcc_urc_multiple);
+    g_test_add_func ("/MM/cinterion/slcc/urc/complex",        test_slcc_urc_complex);
 
     return g_test_run ();
 }

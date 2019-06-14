@@ -26,16 +26,20 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem-location.h"
+#include "mm-iface-modem-voice.h"
 #include "mm-broadband-modem-qmi-cinterion.h"
 #include "mm-shared-cinterion.h"
 
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void iface_modem_voice_init    (MMIfaceModemVoice *iface);
 static void shared_cinterion_init     (MMSharedCinterion    *iface);
 
 static MMIfaceModemLocation *iface_modem_location_parent;
+static MMIfaceModemVoice    *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiCinterion, mm_broadband_modem_qmi_cinterion, MM_TYPE_BROADBAND_MODEM_QMI, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_CINTERION, shared_cinterion_init))
 
 /*****************************************************************************/
@@ -81,9 +85,31 @@ peek_parent_location_interface (MMSharedCinterion *self)
 }
 
 static void
+iface_modem_voice_init (MMIfaceModemVoice *iface)
+{
+    iface_modem_voice_parent = g_type_interface_peek_parent (iface);
+
+    iface->enable_unsolicited_events         = mm_shared_cinterion_voice_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish  = mm_shared_cinterion_voice_enable_unsolicited_events_finish;
+    iface->disable_unsolicited_events        = mm_shared_cinterion_voice_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = mm_shared_cinterion_voice_disable_unsolicited_events_finish;
+    iface->setup_unsolicited_events          = mm_shared_cinterion_voice_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish   = mm_shared_cinterion_voice_setup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events        = mm_shared_cinterion_voice_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = mm_shared_cinterion_voice_cleanup_unsolicited_events_finish;
+}
+
+static MMIfaceModemVoice *
+peek_parent_voice_interface (MMSharedCinterion *self)
+{
+    return iface_modem_voice_parent;
+}
+
+static void
 shared_cinterion_init (MMSharedCinterion *iface)
 {
     iface->peek_parent_location_interface = peek_parent_location_interface;
+    iface->peek_parent_voice_interface    = peek_parent_voice_interface;
 }
 
 static void

@@ -26,6 +26,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
+#include "mm-iface-modem-voice.h"
 
 #define MM_TYPE_SHARED_CINTERION               (mm_shared_cinterion_get_type ())
 #define MM_SHARED_CINTERION(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_CINTERION, MMSharedCinterion))
@@ -39,6 +40,9 @@ struct _MMSharedCinterion {
 
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedCinterion *self);
+
+    /* Peek voice interface of the parent class of the object */
+    MMIfaceModemVoice *  (* peek_parent_voice_interface) (MMSharedCinterion *self);
 };
 
 GType mm_shared_cinterion_get_type (void);
@@ -65,5 +69,33 @@ void                  mm_shared_cinterion_disable_location_gathering        (MMI
 gboolean              mm_shared_cinterion_disable_location_gathering_finish (MMIfaceModemLocation *self,
                                                                              GAsyncResult *res,
                                                                              GError **error);
+
+void     mm_shared_cinterion_voice_setup_unsolicited_events          (MMIfaceModemVoice    *self,
+                                                                      GAsyncReadyCallback   callback,
+                                                                      gpointer              user_data);
+gboolean mm_shared_cinterion_voice_setup_unsolicited_events_finish   (MMIfaceModemVoice    *self,
+                                                                      GAsyncResult         *res,
+                                                                      GError              **error);
+
+void     mm_shared_cinterion_voice_cleanup_unsolicited_events        (MMIfaceModemVoice    *self,
+                                                                      GAsyncReadyCallback   callback,
+                                                                      gpointer              user_data);
+gboolean mm_shared_cinterion_voice_cleanup_unsolicited_events_finish (MMIfaceModemVoice    *self,
+                                                                      GAsyncResult         *res,
+                                                                      GError              **error);
+
+void     mm_shared_cinterion_voice_enable_unsolicited_events         (MMIfaceModemVoice    *self,
+                                                                      GAsyncReadyCallback   callback,
+                                                                      gpointer              user_data);
+gboolean mm_shared_cinterion_voice_enable_unsolicited_events_finish  (MMIfaceModemVoice    *self,
+                                                                      GAsyncResult         *res,
+                                                                      GError              **error);
+
+void     mm_shared_cinterion_voice_disable_unsolicited_events        (MMIfaceModemVoice    *self,
+                                                                      GAsyncReadyCallback   callback,
+                                                                      gpointer              user_data);
+gboolean mm_shared_cinterion_voice_disable_unsolicited_events_finish (MMIfaceModemVoice    *self,
+                                                                      GAsyncResult         *res,
+                                                                      GError              **error);
 
 #endif  /* MM_SHARED_CINTERION_H */

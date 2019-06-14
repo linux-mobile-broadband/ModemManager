@@ -87,4 +87,15 @@ gboolean mm_cinterion_parse_smong_response (const gchar              *response,
 
 MMModemAccessTechnology mm_cinterion_get_access_technology_from_sind_psinfo (guint val);
 
+/*****************************************************************************/
+/* ^SLCC URC helpers */
+
+GRegex *mm_cinterion_get_slcc_regex (void);
+
+/* MMCallInfo list management */
+gboolean mm_cinterion_parse_slcc_list     (const gchar  *str,
+                                           GList       **out_list,
+                                           GError      **error);
+void     mm_cinterion_call_info_list_free (GList        *call_info_list);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */
