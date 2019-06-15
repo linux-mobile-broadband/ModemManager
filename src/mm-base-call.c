@@ -40,6 +40,7 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_MODEM,
+    PROP_SKIP_INCOMING_TIMEOUT,
     PROP_SUPPORTS_DIALING_TO_RINGING,
     PROP_SUPPORTS_RINGING_TO_ACTIVE,
     PROP_LAST
@@ -55,6 +56,7 @@ struct _MMBaseCallPrivate {
     /* The path where the call object is exported */
     gchar *path;
     /* Features */
+    gboolean skip_incoming_timeout;
     gboolean supports_dialing_to_ringing;
     gboolean supports_ringing_to_active;
 
@@ -164,6 +166,9 @@ incoming_timeout_cb (MMBaseCall *self)
 void
 mm_base_call_incoming_refresh (MMBaseCall *self)
 {
+    if (self->priv->skip_incoming_timeout)
+        return;
+
     if (self->priv->incoming_timeout)
         g_source_remove (self->priv->incoming_timeout);
     self->priv->incoming_timeout = g_timeout_add_seconds (INCOMING_TIMEOUT_SECS, (GSourceFunc)incoming_timeout_cb, self);
@@ -1162,6 +1167,9 @@ set_property (GObject *object,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         }
         break;
+    case PROP_SKIP_INCOMING_TIMEOUT:
+        self->priv->skip_incoming_timeout = g_value_get_boolean (value);
+        break;
     case PROP_SUPPORTS_DIALING_TO_RINGING:
         self->priv->supports_dialing_to_ringing = g_value_get_boolean (value);
         break;
@@ -1191,6 +1199,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
+        break;
+    case PROP_SKIP_INCOMING_TIMEOUT:
+        g_value_set_boolean (value, self->priv->skip_incoming_timeout);
         break;
     case PROP_SUPPORTS_DIALING_TO_RINGING:
         g_value_set_boolean (value, self->priv->supports_dialing_to_ringing);
@@ -1295,6 +1306,14 @@ mm_base_call_class_init (MMBaseCallClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    properties[PROP_SKIP_INCOMING_TIMEOUT] =
+        g_param_spec_boolean (MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,
+                              "Skip incoming timeout",
+                              "There is no need to setup a timeout for incoming calls",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_SKIP_INCOMING_TIMEOUT, properties[PROP_SKIP_INCOMING_TIMEOUT]);
 
     properties[PROP_SUPPORTS_DIALING_TO_RINGING] =
         g_param_spec_boolean (MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING,
