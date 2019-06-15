@@ -900,6 +900,11 @@ mm_base_call_change_state (MMBaseCall        *self,
         }
         /* reset index */
         self->priv->index = 0;
+        /* cleanup incoming timeout, if any */
+        if (self->priv->incoming_timeout) {
+            g_source_remove (self->priv->incoming_timeout);
+            self->priv->incoming_timeout = 0;
+        }
     }
 
     mm_gdbus_call_set_state (MM_GDBUS_CALL (self), new_state);
