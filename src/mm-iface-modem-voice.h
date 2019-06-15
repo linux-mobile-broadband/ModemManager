@@ -116,11 +116,15 @@ void mm_iface_modem_voice_shutdown (MMIfaceModemVoice *self);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
-                                              MMSimpleStatus *status);
+                                              MMSimpleStatus    *status);
 
-/* Incoming call management */
+/* Incoming call reporting */
 void mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
                                                 const gchar       *number,
                                                 MMCallState        state);
+
+/* Full current call list reporting (MMCallInfo list) */
+void mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
+                                            GList             *call_info_list);
 
 #endif /* MM_IFACE_MODEM_VOICE_H */
