@@ -63,6 +63,9 @@ struct _MMBaseCallPrivate {
 
     /* The port used for audio while call is ongoing, if known */
     MMPort *audio_port;
+
+    /* Ongoing call index */
+    guint index;
 };
 
 /*****************************************************************************/
@@ -812,6 +815,24 @@ mm_base_call_get_state (MMBaseCall *self)
 }
 
 /*****************************************************************************/
+/* Current call index, only applicable while the call is ongoing
+ * See 3GPP TS 22.030 [27], subclause 6.5.5.1.
+ */
+
+guint
+mm_base_call_get_index (MMBaseCall *self)
+{
+    return self->priv->index;
+}
+
+void
+mm_base_call_set_index (MMBaseCall *self,
+                        guint       index)
+{
+    self->priv->index = index;
+}
+
+/*****************************************************************************/
 
 /* Define the states in which we want to handle in-call events */
 #define MM_CALL_STATE_IS_IN_CALL(state)         \
@@ -872,6 +893,8 @@ mm_base_call_change_state (MMBaseCall        *self,
                                                                   (GAsyncReadyCallback) cleanup_audio_channel_ready,
                                                                   NULL);
         }
+        /* reset index */
+        self->priv->index = 0;
     }
 
     mm_gdbus_call_set_state (MM_GDBUS_CALL (self), new_state);

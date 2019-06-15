@@ -120,9 +120,12 @@ const gchar     *mm_base_call_get_path      (MMBaseCall *self);
 const gchar     *mm_base_call_get_number    (MMBaseCall *self);
 MMCallDirection  mm_base_call_get_direction (MMBaseCall *self);
 MMCallState      mm_base_call_get_state     (MMBaseCall *self);
+guint            mm_base_call_get_index     (MMBaseCall *self);
 
 void             mm_base_call_set_number    (MMBaseCall  *self,
                                              const gchar *number);
+void             mm_base_call_set_index     (MMBaseCall  *self,
+                                             guint        index);
 
 void         mm_base_call_change_state (MMBaseCall *self,
                                         MMCallState new_state,
