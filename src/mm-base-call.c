@@ -786,6 +786,33 @@ mm_base_call_get_path (MMBaseCall *self)
     return self->priv->path;
 }
 
+const gchar *
+mm_base_call_get_number (MMBaseCall *self)
+{
+    return mm_gdbus_call_get_number (MM_GDBUS_CALL (self));
+}
+
+void
+mm_base_call_set_number (MMBaseCall  *self,
+                         const gchar *number)
+{
+    return mm_gdbus_call_set_number (MM_GDBUS_CALL (self), number);
+}
+
+MMCallDirection
+mm_base_call_get_direction (MMBaseCall *self)
+{
+    return (MMCallDirection) mm_gdbus_call_get_direction (MM_GDBUS_CALL (self));
+}
+
+MMCallState
+mm_base_call_get_state (MMBaseCall *self)
+{
+    return (MMCallState) mm_gdbus_call_get_state (MM_GDBUS_CALL (self));
+}
+
+/*****************************************************************************/
+
 /* Define the states in which we want to handle in-call events */
 #define MM_CALL_STATE_IS_IN_CALL(state)         \
     (state == MM_CALL_STATE_DIALING ||          \
