@@ -54,6 +54,20 @@ struct _MMCallListPrivate {
 
 /*****************************************************************************/
 
+void
+mm_call_list_foreach (MMCallList            *self,
+                      MMCallListForeachFunc  callback,
+                      gpointer               user_data)
+{
+    GList *l;
+
+    g_assert (callback);
+    for (l = self->priv->list; l; l = g_list_next (l))
+        callback (MM_BASE_CALL (l->data), user_data);
+}
+
+/*****************************************************************************/
+
 guint
 mm_call_list_get_count (MMCallList *self)
 {
