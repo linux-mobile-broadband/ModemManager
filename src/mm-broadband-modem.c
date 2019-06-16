@@ -7210,6 +7210,11 @@ clcc_format_check_ready (MMBroadbandModem *self,
     /* +CLCC supported unless we got any error response */
     self->priv->clcc_supported = !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
 
+    /* If +CLCC unsupported we disable polling in the parent directly */
+    g_object_set (self,
+                  MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, !self->priv->clcc_supported,
+                  NULL);
+
     /* ATH command is supported; assume we have full voice capabilities */
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -7255,6 +7260,62 @@ modem_voice_check_support (MMIfaceModemVoice *self,
                               3,
                               TRUE,
                               (GAsyncReadyCallback)ath_format_check_ready,
+                              task);
+}
+
+/*****************************************************************************/
+/* Load full list of calls (Voice interface) */
+
+static gboolean
+modem_voice_load_call_list_finish (MMIfaceModemVoice  *self,
+                                   GAsyncResult       *res,
+                                   GList             **out_call_info_list,
+                                   GError            **error)
+{
+    GList  *call_info_list;
+    GError *inner_error = NULL;
+
+    call_info_list = g_task_propagate_pointer (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_assert (!call_info_list);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *out_call_info_list = call_info_list;
+    return TRUE;
+}
+
+static void
+clcc_ready (MMBaseModem  *modem,
+            GAsyncResult *res,
+            GTask        *task)
+{
+    const gchar *response;
+    GError      *error = NULL;
+    GList       *call_info_list = NULL;
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!response || !mm_3gpp_parse_clcc_response (response, &call_info_list, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, call_info_list, (GDestroyNotify)mm_3gpp_call_info_list_free);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_load_call_list (MMIfaceModemVoice   *self,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CLCC",
+                              5,
+                              FALSE,
+                              (GAsyncReadyCallback)clcc_ready,
                               task);
 }
 
@@ -11829,6 +11890,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
     iface->create_call = modem_voice_create_call;
+    iface->load_call_list = modem_voice_load_call_list;
+    iface->load_call_list_finish = modem_voice_load_call_list_finish;
 }
 
 static void
