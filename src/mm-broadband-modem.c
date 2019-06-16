@@ -223,8 +223,9 @@ struct _MMBroadbandModemPrivate {
 
     /*<--- Modem Voice interface --->*/
     /* Properties */
-    GObject *modem_voice_dbus_skeleton;
+    GObject    *modem_voice_dbus_skeleton;
     MMCallList *modem_voice_call_list;
+    gboolean    clcc_supported;
 
     /*<--- Modem Time interface --->*/
     /* Properties */
@@ -7200,6 +7201,19 @@ modem_voice_check_support_finish (MMIfaceModemVoice *self,
 }
 
 static void
+clcc_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult     *res,
+                         GTask            *task)
+{
+    /* +CLCC supported unless we got any error response */
+    self->priv->clcc_supported = !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+
+    /* ATH command is supported; assume we have full voice capabilities */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 ath_format_check_ready (MMBroadbandModem *self,
                         GAsyncResult *res,
                         GTask *task)
@@ -7213,9 +7227,13 @@ ath_format_check_ready (MMBroadbandModem *self,
         return;
     }
 
-    /* ATH command is supported; assume we have full voice capabilities */
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    /* Also check if +CLCC is supported */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CLCC=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)clcc_format_check_ready,
+                              task);
 }
 
 static void
@@ -7572,11 +7590,21 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 /* Create CALL (Voice interface) */
 
 static MMBaseCall *
-modem_voice_create_call (MMIfaceModemVoice *self,
+modem_voice_create_call (MMIfaceModemVoice *_self,
                          MMCallDirection    direction,
                          const gchar       *number)
 {
-    return mm_base_call_new (MM_BASE_MODEM (self), direction, number);
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
+
+    return mm_base_call_new (MM_BASE_MODEM (self),
+                             direction,
+                             number,
+                             /* If +CLCC is supported, we want no incoming timeout.
+                              * Also, we're able to support detailed call state updates without
+                              * additional vendor-specific commands. */
+                             self->priv->clcc_supported,   /* skip incoming timeout */
+                             self->priv->clcc_supported,   /* dialing->ringing supported */
+                             self->priv->clcc_supported);  /* ringing->active supported */
 }
 
 /*****************************************************************************/

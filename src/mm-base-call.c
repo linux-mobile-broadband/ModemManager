@@ -542,10 +542,7 @@ handle_hangup_ready (MMBaseCall *self,
     if (!MM_BASE_CALL_GET_CLASS (self)->hangup_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
-        if (ctx->self->priv->incoming_timeout) {
-            g_source_remove (ctx->self->priv->incoming_timeout);
-            ctx->self->priv->incoming_timeout = 0;
-        }
+        /* note: timeouts are already removed when setting state as TERMINATED */
         mm_gdbus_call_complete_hangup (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     }
 
@@ -1121,12 +1118,18 @@ call_send_dtmf (MMBaseCall *self,
 MMBaseCall *
 mm_base_call_new (MMBaseModem     *modem,
                   MMCallDirection  direction,
-                  const gchar     *number)
+                  const gchar     *number,
+                  gboolean         skip_incoming_timeout,
+                  gboolean         supports_dialing_to_ringing,
+                  gboolean         supports_ringing_to_active)
 {
     return MM_BASE_CALL (g_object_new (MM_TYPE_BASE_CALL,
                                        MM_BASE_CALL_MODEM, modem,
                                        "direction",        direction,
                                        "number",           number,
+                                       MM_BASE_CALL_SKIP_INCOMING_TIMEOUT,       skip_incoming_timeout,
+                                       MM_BASE_CALL_SUPPORTS_DIALING_TO_RINGING, supports_dialing_to_ringing,
+                                       MM_BASE_CALL_SUPPORTS_RINGING_TO_ACTIVE,  supports_ringing_to_active,
                                        NULL));
 }
 
