@@ -22,11 +22,13 @@
 #include "mm-call-list.h"
 #include "mm-log.h"
 
-#define SUPPORT_CHECKED_TAG "voice-support-checked-tag"
-#define SUPPORTED_TAG       "voice-supported-tag"
+#define SUPPORT_CHECKED_TAG           "voice-support-checked-tag"
+#define SUPPORTED_TAG                 "voice-supported-tag"
+#define CALL_LIST_POLLING_CONTEXT_TAG "voice-call-list-polling-context-tag"
 
 static GQuark support_checked_quark;
 static GQuark supported_quark;
+static GQuark call_list_polling_context_quark;
 
 /*****************************************************************************/
 
@@ -541,6 +543,159 @@ handle_list (MmGdbusModemVoice *skeleton,
 }
 
 /*****************************************************************************/
+/* Call list polling logic
+ *
+ * The call list polling is exclusively used to detect detailed call state
+ * updates while a call is being established. Therefore, if there is no call
+ * being established (i.e. all terminated, unknown or active), then there is
+ * no polling to do.
+ *
+ * Any time we add a new call to the list, we'll setup polling if it's not
+ * already running, and the polling logic itself will decide when the polling
+ * should stop.
+ */
+
+#define CALL_LIST_POLLING_TIMEOUT_SECS 2
+
+typedef struct {
+    guint    polling_id;
+    gboolean polling_ongoing;
+} CallListPollingContext;
+
+static void
+call_list_polling_context_free (CallListPollingContext *ctx)
+{
+    if (ctx->polling_id)
+        g_source_remove (ctx->polling_id);
+    g_slice_free (CallListPollingContext, ctx);
+}
+
+static CallListPollingContext *
+get_call_list_polling_context (MMIfaceModemVoice *self)
+{
+    CallListPollingContext *ctx;
+
+    if (G_UNLIKELY (!call_list_polling_context_quark))
+        call_list_polling_context_quark =  (g_quark_from_static_string (
+                                                 CALL_LIST_POLLING_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), call_list_polling_context_quark);
+    if (!ctx) {
+        /* Create context and keep it as object data */
+        ctx = g_slice_new0 (CallListPollingContext);
+
+        g_object_set_qdata_full (
+            G_OBJECT (self),
+            call_list_polling_context_quark,
+            ctx,
+            (GDestroyNotify)call_list_polling_context_free);
+    }
+
+    return ctx;
+}
+
+static gboolean call_list_poll (MMIfaceModemVoice *self);
+
+static void
+load_call_list_ready (MMIfaceModemVoice *self,
+                      GAsyncResult      *res)
+{
+    CallListPollingContext *ctx;
+    GList                  *call_info_list = NULL;
+    GError                 *error = NULL;
+
+    ctx = get_call_list_polling_context (self);
+    ctx->polling_ongoing = FALSE;
+
+    g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish);
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
+        mm_warn ("couldn't load call list: %s", error->message);
+        g_error_free (error);
+    }
+
+    /* Always report the list even if NULL (it would mean no ongoing calls) */
+    mm_iface_modem_voice_report_all_calls (self, call_info_list);
+    mm_3gpp_call_info_list_free (call_info_list);
+
+    /* setup the polling again */
+    g_assert (!ctx->polling_id);
+    ctx->polling_id = g_timeout_add_seconds (CALL_LIST_POLLING_TIMEOUT_SECS,
+                                             (GSourceFunc) call_list_poll,
+                                             self);
+}
+
+static void
+call_list_foreach_count_establishing (MMBaseCall *call,
+                                      gpointer    user_data)
+{
+    guint *n_calls_establishing = (guint *)user_data;
+
+    switch (mm_base_call_get_state (call)) {
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_RINGING_OUT:
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_HELD:
+    case MM_CALL_STATE_WAITING:
+        *n_calls_establishing = *n_calls_establishing + 1;
+        break;
+    default:
+        break;
+    }
+}
+
+static gboolean
+call_list_poll (MMIfaceModemVoice *self)
+{
+    CallListPollingContext *ctx;
+    MMCallList             *list = NULL;
+    guint                   n_calls_establishing = 0;
+
+    ctx = get_call_list_polling_context (self);
+    ctx->polling_id = 0;
+
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+
+    if (!list) {
+        mm_warn ("Cannot poll call list: missing internal call list");
+        goto out;
+    }
+
+    mm_call_list_foreach (list, (MMCallListForeachFunc) call_list_foreach_count_establishing, &n_calls_establishing);
+
+    /* If there is at least ONE call being established, we need the call list */
+    if (n_calls_establishing > 0) {
+        mm_dbg ("%u calls being established: call list polling required", n_calls_establishing);
+        ctx->polling_ongoing = TRUE;
+        g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list);
+        MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list (self,
+                                                                   (GAsyncReadyCallback)load_call_list_ready,
+                                                                   NULL);
+    } else
+        mm_dbg ("no calls being established: call list polling stopped");
+
+out:
+    g_clear_object (&list);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+setup_call_list_polling (MMCallList        *call_list,
+                         const gchar       *call_path_added,
+                         MMIfaceModemVoice *self)
+{
+    CallListPollingContext *ctx;
+
+    ctx = get_call_list_polling_context (self);
+
+    if (!ctx->polling_id && !ctx->polling_ongoing)
+        ctx->polling_id = g_timeout_add_seconds (CALL_LIST_POLLING_TIMEOUT_SECS,
+                                                 (GSourceFunc) call_list_poll,
+                                                 self);
+}
+
+/*****************************************************************************/
 
 static void
 update_message_list (MmGdbusModemVoice *skeleton,
@@ -843,6 +998,23 @@ interface_enabling_step (GTask *task)
                           G_CALLBACK (call_deleted),
                           ctx->skeleton);
 
+        /* Unless we're told not to, setup call list polling logic */
+        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list &&
+            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish) {
+            gboolean periodic_call_list_check_disabled = FALSE;
+
+            g_object_get (self,
+                          MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, &periodic_call_list_check_disabled,
+                          NULL);
+            if (!periodic_call_list_check_disabled) {
+                mm_dbg ("periodic call list polling will be used if supported");
+                g_signal_connect (list,
+                                  MM_CALL_ADDED,
+                                  G_CALLBACK (setup_call_list_polling),
+                                  self);
+            }
+        }
+
         g_object_unref (list);
 
         /* Fall down to next step */
@@ -1143,6 +1315,14 @@ iface_modem_voice_init (gpointer g_iface)
                               "List of CALL objects managed in the interface",
                               MM_TYPE_CALL_LIST,
                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED,
+                               "Periodic call list checks disabled",
+                               "Whether periodic call list check are disabled.",
+                               FALSE,
+                               G_PARAM_READWRITE));
 
     initialized = TRUE;
 }

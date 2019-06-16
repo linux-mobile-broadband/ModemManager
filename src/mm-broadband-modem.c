@@ -120,6 +120,7 @@ enum {
     PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
     PROP_MODEM_SIM_HOT_SWAP_CONFIGURED,
     PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
+    PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED,
     PROP_MODEM_CARRIER_CONFIG_MAPPING,
     PROP_FLOW_CONTROL,
     PROP_LAST
@@ -225,6 +226,7 @@ struct _MMBroadbandModemPrivate {
     /* Properties */
     GObject    *modem_voice_dbus_skeleton;
     MMCallList *modem_voice_call_list;
+    gboolean    periodic_call_list_check_disabled;
     gboolean    clcc_supported;
 
     /*<--- Modem Time interface --->*/
@@ -11357,6 +11359,9 @@ set_property (GObject *object,
     case PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED:
         self->priv->periodic_signal_check_disabled = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED:
+        self->priv->periodic_call_list_check_disabled = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_CARRIER_CONFIG_MAPPING:
         self->priv->carrier_config_mapping = g_value_dup_string (value);
         break;
@@ -11480,6 +11485,9 @@ get_property (GObject *object,
     case PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED:
         g_value_set_boolean (value, self->priv->periodic_signal_check_disabled);
         break;
+    case PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED:
+        g_value_set_boolean (value, self->priv->periodic_call_list_check_disabled);
+        break;
     case PROP_MODEM_CARRIER_CONFIG_MAPPING:
         g_value_set_string (value, self->priv->carrier_config_mapping);
         break;
@@ -11516,6 +11524,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->current_sms_mem2_storage = MM_SMS_STORAGE_UNKNOWN;
     self->priv->sim_hot_swap_supported = FALSE;
     self->priv->periodic_signal_check_disabled = FALSE;
+    self->priv->periodic_call_list_check_disabled = FALSE;
     self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_disable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_ind = MM_3GPP_CMER_IND_NONE;
@@ -12018,6 +12027,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
                                       MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED,
+                                      MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_CARRIER_CONFIG_MAPPING,

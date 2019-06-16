@@ -29,8 +29,9 @@
 #define MM_IS_IFACE_MODEM_VOICE(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_VOICE))
 #define MM_IFACE_MODEM_VOICE_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_VOICE, MMIfaceModemVoice))
 
-#define MM_IFACE_MODEM_VOICE_DBUS_SKELETON          "iface-modem-voice-dbus-skeleton"
-#define MM_IFACE_MODEM_VOICE_CALL_LIST              "iface-modem-voice-call-list"
+#define MM_IFACE_MODEM_VOICE_DBUS_SKELETON                     "iface-modem-voice-dbus-skeleton"
+#define MM_IFACE_MODEM_VOICE_CALL_LIST                         "iface-modem-voice-call-list"
+#define MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED "iface-modem-voice-periodic-call-list-check-disabled"
 
 typedef struct _MMIfaceModemVoice MMIfaceModemVoice;
 
@@ -77,7 +78,16 @@ struct _MMIfaceModemVoice {
                                                     GAsyncResult *res,
                                                     GError **error);
 
-    /* Create CALL objects */
+    /* Load full list of calls (MMCallInfo list) */
+    void     (* load_call_list)        (MMIfaceModemVoice    *self,
+                                        GAsyncReadyCallback   callback,
+                                        gpointer              user_data);
+    gboolean (* load_call_list_finish) (MMIfaceModemVoice    *self,
+                                        GAsyncResult         *res,
+                                        GList               **call_info_list,
+                                        GError              **error);
+
+    /* Create call objects */
     MMBaseCall * (* create_call) (MMIfaceModemVoice *self,
                                   MMCallDirection    direction,
                                   const gchar       *number);
