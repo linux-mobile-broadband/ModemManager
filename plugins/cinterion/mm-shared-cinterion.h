@@ -77,6 +77,13 @@ MMBaseCall *mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
                                              MMCallDirection    direction,
                                              const gchar       *number);
 
+void     mm_shared_cinterion_voice_check_support                     (MMIfaceModemVoice   *self,
+                                                                      GAsyncReadyCallback  callback,
+                                                                      gpointer             user_data);
+gboolean mm_shared_cinterion_voice_check_support_finish              (MMIfaceModemVoice    *self,
+                                                                      GAsyncResult         *res,
+                                                                      GError              **error);
+
 void     mm_shared_cinterion_voice_setup_unsolicited_events          (MMIfaceModemVoice    *self,
                                                                       GAsyncReadyCallback   callback,
                                                                       gpointer              user_data);

@@ -863,22 +863,17 @@ slcc_command_ready (MMBaseModem  *self,
                     GAsyncResult *res,
                     GTask        *task)
 {
-    Private                       *priv;
     VoiceUnsolicitedEventsContext *ctx;
     GError                        *error = NULL;
 
-    priv = get_private (MM_SHARED_CINTERION (self));
-    ctx  = g_task_get_task_data (task);
+    ctx = g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        if (priv->slcc_support == FEATURE_SUPPORT_UNKNOWN)
-            priv->slcc_support = FEATURE_NOT_SUPPORTED;
         mm_dbg ("Couldn't %s ^SLCC reporting: '%s'",
                 ctx->enable ? "enable" : "disable",
                 error->message);
         g_error_free (error);
-    } else if (priv->slcc_support == FEATURE_SUPPORT_UNKNOWN)
-        priv->slcc_support = FEATURE_SUPPORTED;
+    }
 
     /* Continue on next port */
     run_voice_enable_disable_unsolicited_events (task);
@@ -1255,6 +1250,86 @@ mm_shared_cinterion_voice_setup_unsolicited_events (MMIfaceModemVoice   *self,
     priv->iface_modem_voice_parent->setup_unsolicited_events (
         self,
         (GAsyncReadyCallback)parent_voice_setup_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Check if Voice supported (Voice interface) */
+
+gboolean
+mm_shared_cinterion_voice_check_support_finish (MMIfaceModemVoice  *self,
+                                                GAsyncResult       *res,
+                                                GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+slcc_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult     *res,
+                         GTask            *task)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+
+    /* ^SLCC supported unless we got any error response */
+    priv->slcc_support = (!!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL) ?
+                          FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
+
+    /* If ^SLCC supported we won't need polling in the parent */
+    g_object_set (self,
+                  MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, (priv->slcc_support == FEATURE_SUPPORTED),
+                  NULL);
+
+    /* ^SLCC command is supported; assume we have full voice capabilities */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_voice_check_support_ready (MMIfaceModemVoice *self,
+                                  GAsyncResult      *res,
+                                  GTask             *task)
+{
+    Private *priv;
+    GError  *error = NULL;
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+    if (!priv->iface_modem_voice_parent->check_support_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* voice is supported, check if ^SLCC is available */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SLCC=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback) slcc_format_check_ready,
+                              task);
+}
+
+void
+mm_shared_cinterion_voice_check_support (MMIfaceModemVoice   *self,
+                                         GAsyncReadyCallback  callback,
+                                         gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+    g_assert (priv->iface_modem_voice_parent);
+    g_assert (priv->iface_modem_voice_parent->check_support);
+    g_assert (priv->iface_modem_voice_parent->check_support_finish);
+
+    /* chain up parent's setup first */
+    priv->iface_modem_voice_parent->check_support (
+        self,
+        (GAsyncReadyCallback)parent_voice_check_support_ready,
         task);
 }
 

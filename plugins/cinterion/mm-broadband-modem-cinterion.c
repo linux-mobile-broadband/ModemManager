@@ -1967,6 +1967,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
 
     iface->create_call = mm_shared_cinterion_create_call;
 
+    iface->check_support                     = mm_shared_cinterion_voice_check_support;
+    iface->check_support_finish              = mm_shared_cinterion_voice_check_support_finish;
     iface->enable_unsolicited_events         = mm_shared_cinterion_voice_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish  = mm_shared_cinterion_voice_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events        = mm_shared_cinterion_voice_disable_unsolicited_events;
