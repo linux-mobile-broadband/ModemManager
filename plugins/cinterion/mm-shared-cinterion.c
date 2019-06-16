@@ -799,6 +799,35 @@ mm_shared_cinterion_enable_location_gathering (MMIfaceModemLocation  *self,
 }
 
 /*****************************************************************************/
+
+MMBaseCall *
+mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
+                                 MMCallDirection    direction,
+                                 const gchar       *number)
+{
+    Private *priv;
+
+    /* If ^SLCC is supported create a cinterion call object */
+    priv = get_private (MM_SHARED_CINTERION (self));
+    if (priv->slcc_support == FEATURE_SUPPORTED) {
+        mm_dbg ("Created new call with ^SLCC support");
+        return mm_base_call_new (MM_BASE_MODEM (self),
+                                 direction,
+                                 number,
+                                 /* When SLCC is supported we have support for detailed
+                                  * call list events via call list report URCs */
+                                 TRUE,   /* incoming timeout not required */
+                                 TRUE,   /* dialing->ringing supported */
+                                 TRUE);  /* ringing->active supported */
+    }
+
+    /* otherwise, run parent's generic base call logic */
+    g_assert (priv->iface_modem_voice_parent);
+    g_assert (priv->iface_modem_voice_parent->create_call);
+    return priv->iface_modem_voice_parent->create_call (self, direction, number);
+}
+
+/*****************************************************************************/
 /* Common enable/disable voice unsolicited events */
 
 typedef struct {

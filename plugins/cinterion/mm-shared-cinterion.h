@@ -70,6 +70,13 @@ gboolean              mm_shared_cinterion_disable_location_gathering_finish (MMI
                                                                              GAsyncResult *res,
                                                                              GError **error);
 
+/*****************************************************************************/
+/* Create call (Voice interface) */
+
+MMBaseCall *mm_shared_cinterion_create_call (MMIfaceModemVoice *self,
+                                             MMCallDirection    direction,
+                                             const gchar       *number);
+
 void     mm_shared_cinterion_voice_setup_unsolicited_events          (MMIfaceModemVoice    *self,
                                                                       GAsyncReadyCallback   callback,
                                                                       gpointer              user_data);
