@@ -99,6 +99,18 @@ GRegex *mm_voice_cring_regex_get (void);
 GRegex *mm_voice_clip_regex_get  (void);
 GRegex *mm_voice_ccwa_regex_get  (void);
 
+/* +CLCC response parser */
+typedef struct {
+    guint            index;
+    MMCallDirection  direction;
+    MMCallState      state;
+    gchar           *number; /* optional */
+} MMCallInfo;
+gboolean mm_3gpp_parse_clcc_response (const gchar  *str,
+                                      GList       **out_list,
+                                      GError      **error);
+void     mm_3gpp_call_info_list_free (GList        *call_info_list);
+
 /*****************************************************************************/
 /* SERIAL specific helpers and utilities */
 

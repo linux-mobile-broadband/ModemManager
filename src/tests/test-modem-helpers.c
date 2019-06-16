@@ -4019,6 +4019,110 @@ test_ccwa_indication (void)
 }
 
 /*****************************************************************************/
+/* Test +CLCC URCs */
+
+static void
+common_test_clcc_response (const gchar      *str,
+                           const MMCallInfo *expected_call_info_list,
+                           guint             expected_call_info_list_size)
+{
+    GError     *error = NULL;
+    gboolean    result;
+    GList      *call_info_list = NULL;
+    GList      *l;
+
+    result = mm_3gpp_parse_clcc_response (str, &call_info_list, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    g_print ("found %u calls\n", g_list_length (call_info_list));
+
+    if (expected_call_info_list) {
+        g_assert (call_info_list);
+        g_assert_cmpuint (g_list_length (call_info_list), ==, expected_call_info_list_size);
+    } else
+        g_assert (!call_info_list);
+
+    for (l = call_info_list; l; l = g_list_next (l)) {
+        const MMCallInfo *call_info = (const MMCallInfo *)(l->data);
+        gboolean                   found = FALSE;
+        guint                      i;
+
+        g_print ("call at index %u: direction %s, state %s, number %s\n",
+                 call_info->index,
+                 mm_call_direction_get_string (call_info->direction),
+                 mm_call_state_get_string (call_info->state),
+                 call_info->number ? call_info->number : "n/a");
+
+        for (i = 0; !found && i < expected_call_info_list_size; i++)
+            found = ((call_info->index == expected_call_info_list[i].index) &&
+                     (call_info->direction  == expected_call_info_list[i].direction) &&
+                     (call_info->state  == expected_call_info_list[i].state) &&
+                     (g_strcmp0 (call_info->number, expected_call_info_list[i].number) == 0));
+
+        g_assert (found);
+    }
+
+    mm_3gpp_call_info_list_free (call_info_list);
+}
+
+static void
+test_clcc_response_empty (void)
+{
+    const gchar *response = "";
+
+    common_test_clcc_response (response, NULL, 0);
+}
+
+static void
+test_clcc_response_single (void)
+{
+    static const MMCallInfo expected_call_info_list[] = {
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE, "123456789" }
+    };
+
+    const gchar *response =
+        "+CLCC: 1,1,0,0,0,\"123456789\",161";
+
+    common_test_clcc_response (response, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
+}
+
+static void
+test_clcc_response_single_long (void)
+{
+    static const MMCallInfo expected_call_info_list[] = {
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_RINGING_IN, "123456789" }
+    };
+
+    /* NOTE: priority field is EMPTY */
+    const gchar *response =
+        "+CLCC: 1,1,4,0,0,\"123456789\",129,\"\",,0";
+
+    common_test_clcc_response (response, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
+}
+
+static void
+test_clcc_response_multiple (void)
+{
+    static const MMCallInfo expected_call_info_list[] = {
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  NULL        },
+        { 2, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "123456789" },
+        { 3, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "987654321" },
+        { 4, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "000000000" },
+        { 5, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_WAITING, "555555555" },
+    };
+
+    const gchar *response =
+        "+CLCC: 1,1,0,0,1\r\n" /* number unknown */
+        "+CLCC: 2,1,0,0,1,\"123456789\",161\r\n"
+        "+CLCC: 3,1,0,0,1,\"987654321\",161,\"Alice\"\r\n"
+        "+CLCC: 4,1,0,0,1,\"000000000\",161,\"Bob\",1\r\n"
+        "+CLCC: 5,1,5,0,0,\"555555555\",161,\"Mallory\",2,0\r\n";
+
+    common_test_clcc_response (response, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
+}
+
+/*****************************************************************************/
 
 typedef struct {
     gchar *str;
@@ -4331,6 +4435,11 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_clip_indication, NULL));
     g_test_suite_add (suite, TESTCASE (test_ccwa_indication, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_clcc_response_empty, NULL));
+    g_test_suite_add (suite, TESTCASE (test_clcc_response_single, NULL));
+    g_test_suite_add (suite, TESTCASE (test_clcc_response_single_long, NULL));
+    g_test_suite_add (suite, TESTCASE (test_clcc_response_multiple, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_parse_uint_list, NULL));
 
