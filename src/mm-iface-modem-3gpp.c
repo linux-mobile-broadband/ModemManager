@@ -501,7 +501,7 @@ handle_register_ready (MMIfaceModem3gpp *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self, res,&error))
+    if (!mm_iface_modem_3gpp_register_in_network_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem3gpp_complete_register (ctx->skeleton, ctx->invocation);
