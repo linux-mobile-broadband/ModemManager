@@ -982,6 +982,137 @@ handle_hangup_all (MmGdbusModemVoice     *skeleton,
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemVoice     *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemVoice     *self;
+    GList                 *calls;
+} HandleTransferContext;
+
+static void
+handle_transfer_context_free (HandleTransferContext *ctx)
+{
+    g_list_free_full (ctx->calls, g_object_unref);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleTransferContext, ctx);
+}
+
+static void
+transfer_ready (MMIfaceModemVoice     *self,
+                GAsyncResult          *res,
+                HandleTransferContext *ctx)
+{
+    GError *error = NULL;
+    GList  *l;
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_transfer_context_free (ctx);
+        return;
+    }
+
+    for (l = ctx->calls; l; l = g_list_next (l))
+        mm_base_call_change_state (MM_BASE_CALL (l->data), MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TRANSFERRED);
+
+    mm_gdbus_modem_voice_complete_transfer (ctx->skeleton, ctx->invocation);
+    handle_transfer_context_free (ctx);
+}
+
+static void
+prepare_transfer_foreach (MMBaseCall            *call,
+                          HandleTransferContext *ctx)
+{
+    switch (mm_base_call_get_state (call)) {
+    case MM_CALL_STATE_ACTIVE:
+    case MM_CALL_STATE_HELD:
+        ctx->calls = g_list_append (ctx->calls, g_object_ref (call));
+        break;
+    default:
+        break;
+    }
+}
+
+static void
+handle_transfer_auth_ready (MMBaseModem           *self,
+                            GAsyncResult          *res,
+                            HandleTransferContext *ctx)
+{
+    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
+    GError       *error = NULL;
+    MMCallList   *list = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_transfer_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot transfer: device not yet enabled");
+        handle_transfer_context_free (ctx);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot transfer: unsupported");
+        handle_transfer_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+    if (!list) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot transfer: missing call list");
+        handle_transfer_context_free (ctx);
+        return;
+    }
+    mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_transfer_foreach, ctx);
+    g_object_unref (list);
+
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->transfer (MM_IFACE_MODEM_VOICE (self),
+                                                         (GAsyncReadyCallback)transfer_ready,
+                                                         ctx);
+}
+
+static gboolean
+handle_transfer (MmGdbusModemVoice     *skeleton,
+                 GDBusMethodInvocation *invocation,
+                 MMIfaceModemVoice     *self)
+{
+    HandleTransferContext *ctx;
+
+    ctx = g_slice_new0 (HandleTransferContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_transfer_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Call list polling logic
  *
  * The call list polling is exclusively used to detect detailed call state
@@ -1674,6 +1805,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-hangup-all",
                           G_CALLBACK (handle_hangup_all),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-transfer",
+                          G_CALLBACK (handle_transfer),
                           self);
 
         /* Finally, export the new interface */

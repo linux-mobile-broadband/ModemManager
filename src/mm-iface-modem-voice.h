@@ -115,6 +115,14 @@ struct _MMIfaceModemVoice {
     gboolean (* hangup_all_finish) (MMIfaceModemVoice    *self,
                                     GAsyncResult         *res,
                                     GError              **error);
+
+    /* Transfer */
+    void     (* transfer)        (MMIfaceModemVoice    *self,
+                                  GAsyncReadyCallback   callback,
+                                  gpointer              user_data);
+    gboolean (* transfer_finish) (MMIfaceModemVoice    *self,
+                                  GAsyncResult         *res,
+                                  GError              **error);
 };
 
 GType mm_iface_modem_voice_get_type (void);

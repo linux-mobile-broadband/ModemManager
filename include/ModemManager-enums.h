@@ -1386,6 +1386,7 @@ typedef enum { /*< underscore_name=mm_call_state >*/
  * @MM_CALL_STATE_REASON_REFUSED_OR_BUSY: Remote peer is busy or refused call.
  * @MM_CALL_STATE_REASON_ERROR: Wrong number or generic network error.
  * @MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED: Error setting up audio channel.
+ * @MM_CALL_STATE_REASON_TRANSFERRED: Call has been transferred. Since 1.12.
  *
  * Reason for the state change in the call.
  */
@@ -1397,7 +1398,8 @@ typedef enum { /*< underscore_name=mm_call_state_reason >*/
     MM_CALL_STATE_REASON_TERMINATED         = 4,
     MM_CALL_STATE_REASON_REFUSED_OR_BUSY    = 5,
     MM_CALL_STATE_REASON_ERROR              = 6,
-    MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED = 7
+    MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED = 7,
+    MM_CALL_STATE_REASON_TRANSFERRED        = 8,
 } MMCallStateReason;
 
 /**

@@ -112,6 +112,17 @@
     <method name="HangupAll" />
 
     <!--
+        Transfer:
+
+        Join the currently active and held calls together into a single
+        multiparty call, but disconnects from them.
+
+        The affected calls will be considered terminated from the point of
+        view of the subscriber.
+    -->
+    <method name="Transfer" />
+
+    <!--
         CallAdded:
         @path: Object path of the new call.
 

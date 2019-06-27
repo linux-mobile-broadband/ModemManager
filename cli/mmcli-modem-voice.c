@@ -53,6 +53,7 @@ static gchar *delete_str;
 static gboolean hold_and_accept_flag;
 static gboolean hangup_and_accept_flag;
 static gboolean hangup_all_flag;
+static gboolean transfer_flag;
 
 static GOptionEntry entries[] = {
     { "voice-list-calls", 0, 0, G_OPTION_ARG_NONE, &list_flag,
@@ -77,6 +78,10 @@ static GOptionEntry entries[] = {
     },
     { "voice-hangup-all", 0, 0, G_OPTION_ARG_NONE, &hangup_all_flag,
       "Hangs up all ongoing (active, waiting, held) calls",
+      NULL
+    },
+    { "voice-transfer", 0, 0, G_OPTION_ARG_NONE, &transfer_flag,
+      "Joins active and held calls and disconnects from them",
       NULL
     },
     { NULL }
@@ -111,7 +116,8 @@ mmcli_modem_voice_options_enabled (void)
                  !!delete_str +
                  hold_and_accept_flag +
                  hangup_and_accept_flag +
-                 hangup_all_flag);
+                 hangup_all_flag +
+                 transfer_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Voice actions requested\n");
@@ -191,6 +197,31 @@ output_call_info (MMCall *call)
                            mm_call_get_path (call),
                            extra);
     g_free (extra);
+}
+
+static void
+transfer_process_reply (const GError *error)
+{
+    if (error) {
+        g_printerr ("error: couldn't hangup all: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("operation successful\n");
+}
+
+static void
+transfer_ready (MMModemVoice *modem,
+                GAsyncResult *result,
+                gpointer     nothing)
+{
+    GError *error = NULL;
+
+    mm_modem_voice_transfer_finish (modem, result, &error);
+    transfer_process_reply (error);
+
+    mmcli_async_operation_done ();
 }
 
 static void
@@ -457,6 +488,16 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to transfer? */
+    if (transfer_flag) {
+        g_debug ("Asynchronously transferring calls...");
+        mm_modem_voice_transfer (ctx->modem_voice,
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)transfer_ready,
+                                 NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -574,6 +615,14 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
         g_debug ("Synchronously hanging up all calls...");
         mm_modem_voice_hangup_all_sync (ctx->modem_voice, NULL, &error);
         hangup_all_process_reply (error);
+        return;
+    }
+
+    /* Request to transfer? */
+    if (transfer_flag) {
+        g_debug ("Synchronously transferring calls...");
+        mm_modem_voice_transfer_sync (ctx->modem_voice, NULL, &error);
+        transfer_process_reply (error);
         return;
     }
 

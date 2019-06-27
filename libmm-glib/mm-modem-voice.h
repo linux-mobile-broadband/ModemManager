@@ -143,6 +143,17 @@ gboolean mm_modem_voice_hangup_all_sync    (MMModemVoice        *self,
                                             GCancellable        *cancellable,
                                             GError             **error);
 
+void     mm_modem_voice_transfer         (MMModemVoice        *self,
+                                          GCancellable        *cancellable,
+                                          GAsyncReadyCallback  callback,
+                                          gpointer             user_data);
+gboolean mm_modem_voice_transfer_finish  (MMModemVoice        *self,
+                                          GAsyncResult        *res,
+                                          GError             **error);
+gboolean mm_modem_voice_transfer_sync    (MMModemVoice        *self,
+                                          GCancellable        *cancellable,
+                                          GError             **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_VOICE_H_ */
