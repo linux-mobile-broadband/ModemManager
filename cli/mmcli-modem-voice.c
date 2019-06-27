@@ -52,6 +52,7 @@ static gchar *create_str;
 static gchar *delete_str;
 static gboolean hold_and_accept_flag;
 static gboolean hangup_and_accept_flag;
+static gboolean hangup_all_flag;
 
 static GOptionEntry entries[] = {
     { "voice-list-calls", 0, 0, G_OPTION_ARG_NONE, &list_flag,
@@ -72,6 +73,10 @@ static GOptionEntry entries[] = {
     },
     { "voice-hangup-and-accept", 0, 0, G_OPTION_ARG_NONE, &hangup_and_accept_flag,
       "Hangs up all active calls and accepts the next waiting or held call",
+      NULL
+    },
+    { "voice-hangup-all", 0, 0, G_OPTION_ARG_NONE, &hangup_all_flag,
+      "Hangs up all ongoing (active, waiting, held) calls",
       NULL
     },
     { NULL }
@@ -105,7 +110,8 @@ mmcli_modem_voice_options_enabled (void)
                  !!create_str +
                  !!delete_str +
                  hold_and_accept_flag +
-                 hangup_and_accept_flag);
+                 hangup_and_accept_flag +
+                 hangup_all_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Voice actions requested\n");
@@ -185,6 +191,31 @@ output_call_info (MMCall *call)
                            mm_call_get_path (call),
                            extra);
     g_free (extra);
+}
+
+static void
+hangup_all_process_reply (const GError *error)
+{
+    if (error) {
+        g_printerr ("error: couldn't hangup all: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("operation successful\n");
+}
+
+static void
+hangup_all_ready (MMModemVoice *modem,
+                  GAsyncResult *result,
+                  gpointer     nothing)
+{
+    GError *error = NULL;
+
+    mm_modem_voice_hangup_all_finish (modem, result, &error);
+    hangup_all_process_reply (error);
+
+    mmcli_async_operation_done ();
 }
 
 static void
@@ -416,6 +447,16 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to hangup all? */
+    if (hangup_all_flag) {
+        g_debug ("Asynchronously hanging up all calls...");
+        mm_modem_voice_hangup_all (ctx->modem_voice,
+                                   ctx->cancellable,
+                                   (GAsyncReadyCallback)hangup_all_ready,
+                                   NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -525,6 +566,14 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
         g_debug ("Synchronously hanging up and accepting call...");
         mm_modem_voice_hangup_and_accept_sync (ctx->modem_voice, NULL, &error);
         hangup_and_accept_process_reply (error);
+        return;
+    }
+
+    /* Request to hangup all? */
+    if (hangup_all_flag) {
+        g_debug ("Synchronously hanging up all calls...");
+        mm_modem_voice_hangup_all_sync (ctx->modem_voice, NULL, &error);
+        hangup_all_process_reply (error);
         return;
     }
 

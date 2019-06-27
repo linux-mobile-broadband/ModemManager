@@ -690,6 +690,85 @@ mm_modem_voice_hangup_and_accept_sync (MMModemVoice  *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_voice_hangup_all_finish:
+ * @self: A #MMModemVoice.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_voice_hangup_all().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_voice_hangup_all().
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ * Since: 1.12
+ */
+gboolean
+mm_modem_voice_hangup_all_finish (MMModemVoice  *self,
+                                  GAsyncResult  *res,
+                                  GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
+
+    return mm_gdbus_modem_voice_call_hangup_all_finish (MM_GDBUS_MODEM_VOICE (self), res, error);
+}
+
+/**
+ * mm_modem_voice_hangup_all:
+ * @self: A #MMModemVoice.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously hangs up all ongoing (active, waiting, held) calls.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_voice_hangup_all_finish() to get the result of the operation.
+ *
+ * See mm_modem_voice_hangup_all_sync() for the synchronous, blocking version of this method.
+ *
+ * Since: 1.12
+ */
+void
+mm_modem_voice_hangup_all (MMModemVoice        *self,
+                           GCancellable        *cancellable,
+                           GAsyncReadyCallback  callback,
+                           gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_VOICE (self));
+
+    mm_gdbus_modem_voice_call_hangup_all (MM_GDBUS_MODEM_VOICE (self),
+                                          cancellable,
+                                          callback,
+                                          user_data);
+}
+
+/**
+ * mm_modem_voice_hangup_all_sync:
+ * @self: A #MMModemVoice.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously hangs up all ongoing (active, waiting, held) calls.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_voice_hangup_all()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ * Since: 1.12
+ */
+gboolean
+mm_modem_voice_hangup_all_sync (MMModemVoice  *self,
+                                GCancellable  *cancellable,
+                                GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
+
+    return mm_gdbus_modem_voice_call_hangup_all_sync (MM_GDBUS_MODEM_VOICE (self),
+                                                      cancellable,
+                                                      error);
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_voice_init (MMModemVoice *self)
 {

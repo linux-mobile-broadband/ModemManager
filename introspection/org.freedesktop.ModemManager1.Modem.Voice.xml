@@ -100,6 +100,18 @@
     <method name="HangupAndAccept" />
 
     <!--
+        HangupAll:
+
+        Hangup all active calls.
+
+        Depending on how the device implements the action, calls on
+        hold or in waiting state may also be terminated.
+
+        No error is returned if there are no ongoing calls.
+    -->
+    <method name="HangupAll" />
+
+    <!--
         CallAdded:
         @path: Object path of the new call.
 

@@ -827,6 +827,161 @@ handle_hangup_and_accept (MmGdbusModemVoice     *skeleton,
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemVoice     *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemVoice     *self;
+    GList                 *calls;
+} HandleHangupAllContext;
+
+static void
+handle_hangup_all_context_free (HandleHangupAllContext *ctx)
+{
+    g_list_free_full (ctx->calls, g_object_unref);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleHangupAllContext, ctx);
+}
+
+static void
+hangup_all_ready (MMIfaceModemVoice      *self,
+                  GAsyncResult           *res,
+                  HandleHangupAllContext *ctx)
+{
+    GError *error = NULL;
+    GList  *l;
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_hangup_all_context_free (ctx);
+        return;
+    }
+
+    for (l = ctx->calls; l; l = g_list_next (l))
+        mm_base_call_change_state (MM_BASE_CALL (l->data), MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
+
+    mm_gdbus_modem_voice_complete_hangup_all (ctx->skeleton, ctx->invocation);
+    handle_hangup_all_context_free (ctx);
+}
+
+static void
+prepare_hangup_all_foreach (MMBaseCall             *call,
+                            HandleHangupAllContext *ctx)
+{
+    /* The implementation of this operation will usually be done with +CHUP, and we
+     * know that +CHUP is implemented in different ways by different manufacturers.
+     *
+     * The 3GPP TS27.007 spec for +CHUP states that the "Execution command causes
+     * the TA to hangup the current call of the MT." This sentence leaves a bit of open
+     * interpretation to the implementors, because a current call can be considered only
+     * the active ones, or otherwise any call (active, held or waiting).
+     *
+     * And so, the u-blox TOBY-L4 takes one interpretation and "In case of multiple
+     * calls, all active calls will be released, while waiting and held calls are not".
+     *
+     * And the Cinterion PLS-8 takes a different interpretation and cancels all calls,
+     * including the waiting and held ones.
+     *
+     * In this logic, we're going to terminate exclusively the ACTIVE calls only, and we
+     * will leave the possible termination of waiting/held calls to be reported via
+     * call state updates, e.g. +CLCC polling or other plugin-specific method. In the
+     * case of the Cinterion PLS-8, we'll detect the termination of the waiting and
+     * held calls via ^SLCC URCs.
+     */
+    switch (mm_base_call_get_state (call)) {
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_RINGING_OUT:
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_ACTIVE:
+        ctx->calls = g_list_append (ctx->calls, g_object_ref (call));
+        break;
+    case MM_CALL_STATE_WAITING:
+    case MM_CALL_STATE_HELD:
+    default:
+        break;
+    }
+}
+
+static void
+handle_hangup_all_auth_ready (MMBaseModem            *self,
+                              GAsyncResult           *res,
+                              HandleHangupAllContext *ctx)
+{
+    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
+    GError       *error = NULL;
+    MMCallList   *list = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_hangup_all_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot hangup all: device not yet enabled");
+        handle_hangup_all_context_free (ctx);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot hangup all: unsupported");
+        handle_hangup_all_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+    if (!list) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot hangup all: missing call list");
+        handle_hangup_all_context_free (ctx);
+        return;
+    }
+    mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_hangup_all_foreach, ctx);
+    g_object_unref (list);
+
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_all (MM_IFACE_MODEM_VOICE (self),
+                                                           (GAsyncReadyCallback)hangup_all_ready,
+                                                           ctx);
+}
+
+static gboolean
+handle_hangup_all (MmGdbusModemVoice     *skeleton,
+                   GDBusMethodInvocation *invocation,
+                   MMIfaceModemVoice     *self)
+{
+    HandleHangupAllContext *ctx;
+
+    ctx = g_slice_new0 (HandleHangupAllContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_hangup_all_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Call list polling logic
  *
  * The call list polling is exclusively used to detect detailed call state
@@ -1515,6 +1670,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-hold-and-accept",
                           G_CALLBACK (handle_hold_and_accept),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-hangup-all",
+                          G_CALLBACK (handle_hangup_all),
                           self);
 
         /* Finally, export the new interface */
