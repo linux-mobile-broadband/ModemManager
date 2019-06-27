@@ -50,6 +50,7 @@ static Context *ctx;
 static gboolean list_flag;
 static gchar *create_str;
 static gchar *delete_str;
+static gboolean hangup_and_accept_flag;
 
 static GOptionEntry entries[] = {
     { "voice-list-calls", 0, 0, G_OPTION_ARG_NONE, &list_flag,
@@ -63,6 +64,10 @@ static GOptionEntry entries[] = {
     { "voice-delete-call", 0, 0, G_OPTION_ARG_STRING, &delete_str,
       "Delete a call from a given modem",
       "[PATH|INDEX]"
+    },
+    { "voice-hangup-and-accept", 0, 0, G_OPTION_ARG_NONE, &hangup_and_accept_flag,
+      "Hangs up all active calls and accepts the next waiting or held call",
+      NULL
     },
     { NULL }
 };
@@ -93,7 +98,8 @@ mmcli_modem_voice_options_enabled (void)
 
     n_actions = (list_flag +
                  !!create_str +
-                 !!delete_str);
+                 !!delete_str +
+                 hangup_and_accept_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Voice actions requested\n");
@@ -173,6 +179,31 @@ output_call_info (MMCall *call)
                            mm_call_get_path (call),
                            extra);
     g_free (extra);
+}
+
+static void
+hangup_and_accept_process_reply (const GError *error)
+{
+    if (error) {
+        g_printerr ("error: couldn't hangup and accept: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("operation successful\n");
+}
+
+static void
+hangup_and_accept_ready (MMModemVoice *modem,
+                         GAsyncResult *result,
+                         gpointer     nothing)
+{
+    GError *error = NULL;
+
+    mm_modem_voice_hangup_and_accept_finish (modem, result, &error);
+    hangup_and_accept_process_reply (error);
+
+    mmcli_async_operation_done ();
 }
 
 static void
@@ -334,6 +365,16 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to hangup and accept? */
+    if (hangup_and_accept_flag) {
+        g_debug ("Asynchronously hanging up and accepting next call...");
+        mm_modem_voice_hangup_and_accept (ctx->modem_voice,
+                                          ctx->cancellable,
+                                          (GAsyncReadyCallback)hangup_and_accept_ready,
+                                          NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -427,6 +468,14 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
         g_object_unref (obj);
 
         delete_process_reply (result, error);
+        return;
+    }
+
+    /* Request to hangup and accept? */
+    if (hangup_and_accept_flag) {
+        g_debug ("Synchronously hanging up and accepting call...");
+        mm_modem_voice_hangup_and_accept_sync (ctx->modem_voice, NULL, &error);
+        hangup_and_accept_process_reply (error);
         return;
     }
 

@@ -64,6 +64,25 @@
     </method>
 
     <!--
+        HangupAndAccept:
+
+        Hangup all active calls, if any, and accept the next call.
+
+        Waiting calls have preference over held calls, so the next
+        call being active will be any waiting call, or otherwise,
+        any held call.
+
+        The user should monitor the state of all available ongoing
+        calls to be reported of which one becomes active.
+
+        No error is returned if there are no waiting or held calls.
+        In this case, this method would be equivalent to calling
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Call.Hangup">Hangup()</link>
+        on the active call.
+    -->
+    <method name="HangupAndAccept" />
+
+    <!--
         CallAdded:
         @path: Object path of the new call.
 

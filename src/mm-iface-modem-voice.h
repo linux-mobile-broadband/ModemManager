@@ -91,6 +91,14 @@ struct _MMIfaceModemVoice {
     MMBaseCall * (* create_call) (MMIfaceModemVoice *self,
                                   MMCallDirection    direction,
                                   const gchar       *number);
+
+    /* Hangup and accept */
+    void     (* hangup_and_accept)        (MMIfaceModemVoice    *self,
+                                           GAsyncReadyCallback   callback,
+                                           gpointer              user_data);
+    gboolean (* hangup_and_accept_finish) (MMIfaceModemVoice    *self,
+                                           GAsyncResult         *res,
+                                           GError              **error);
 };
 
 GType mm_iface_modem_voice_get_type (void);

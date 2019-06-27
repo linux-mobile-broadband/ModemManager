@@ -543,6 +543,148 @@ handle_list (MmGdbusModemVoice *skeleton,
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemVoice     *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemVoice     *self;
+    GList                 *active_calls;
+    MMBaseCall            *next_call;
+} HandleHangupAndAcceptContext;
+
+static void
+handle_hangup_and_accept_context_free (HandleHangupAndAcceptContext *ctx)
+{
+    g_list_free_full (ctx->active_calls, g_object_unref);
+    g_clear_object (&ctx->next_call);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleHangupAndAcceptContext, ctx);
+}
+
+static void
+hangup_and_accept_ready (MMIfaceModemVoice            *self,
+                         GAsyncResult                 *res,
+                         HandleHangupAndAcceptContext *ctx)
+{
+    GError *error = NULL;
+    GList  *l;
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_hangup_and_accept_context_free (ctx);
+        return;
+    }
+
+    for (l = ctx->active_calls; l; l = g_list_next (l))
+        mm_base_call_change_state (MM_BASE_CALL (l->data), MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
+    if (ctx->next_call)
+        mm_base_call_change_state (ctx->next_call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
+
+    mm_gdbus_modem_voice_complete_hangup_and_accept (ctx->skeleton, ctx->invocation);
+    handle_hangup_and_accept_context_free (ctx);
+}
+
+static void
+prepare_hangup_and_accept_foreach (MMBaseCall                   *call,
+                                   HandleHangupAndAcceptContext *ctx)
+{
+    switch (mm_base_call_get_state (call)) {
+    case MM_CALL_STATE_ACTIVE:
+        ctx->active_calls = g_list_append (ctx->active_calls, g_object_ref (call));
+        break;
+    case MM_CALL_STATE_WAITING:
+        g_clear_object (&ctx->next_call);
+        ctx->next_call = g_object_ref (call);
+        break;
+    case MM_CALL_STATE_HELD:
+        if (!ctx->next_call)
+            ctx->next_call = g_object_ref (call);
+        break;
+    default:
+        break;
+    }
+}
+
+static void
+handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
+                                     GAsyncResult                 *res,
+                                     HandleHangupAndAcceptContext *ctx)
+{
+    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
+    GError       *error = NULL;
+    MMCallList   *list = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_hangup_and_accept_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot hangup and accept: device not yet enabled");
+        handle_hangup_and_accept_context_free (ctx);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot hangup and accept: unsupported");
+        handle_hangup_and_accept_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+    if (!list) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot hangup and accept: missing call list");
+        handle_hangup_and_accept_context_free (ctx);
+        return;
+    }
+    mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_hangup_and_accept_foreach, ctx);
+    g_object_unref (list);
+
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hangup_and_accept (MM_IFACE_MODEM_VOICE (self),
+                                                                  (GAsyncReadyCallback)hangup_and_accept_ready,
+                                                                  ctx);
+}
+
+static gboolean
+handle_hangup_and_accept (MmGdbusModemVoice     *skeleton,
+                          GDBusMethodInvocation *invocation,
+                          MMIfaceModemVoice     *self)
+{
+    HandleHangupAndAcceptContext *ctx;
+
+    ctx = g_slice_new0 (HandleHangupAndAcceptContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_hangup_and_accept_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Call list polling logic
  *
  * The call list polling is exclusively used to detect detailed call state
@@ -1223,6 +1365,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-list-calls",
                           G_CALLBACK (handle_list),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-hangup-and-accept",
+                          G_CALLBACK (handle_hangup_and_accept),
                           self);
 
         /* Finally, export the new interface */
