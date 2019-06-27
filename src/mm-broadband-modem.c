@@ -7671,6 +7671,30 @@ modem_voice_create_call (MMIfaceModemVoice *_self,
 }
 
 /*****************************************************************************/
+/* Hold and accept (Voice interface) */
+
+static gboolean
+modem_voice_hold_and_accept_finish (MMIfaceModemVoice  *self,
+                                    GAsyncResult       *res,
+                                    GError            **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_voice_hold_and_accept (MMIfaceModemVoice   *self,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CHLD=2",
+                              20,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Hangup and accept (Voice interface) */
 
 static gboolean
@@ -11916,6 +11940,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->create_call = modem_voice_create_call;
     iface->load_call_list = modem_voice_load_call_list;
     iface->load_call_list_finish = modem_voice_load_call_list_finish;
+    iface->hold_and_accept = modem_voice_hold_and_accept;
+    iface->hold_and_accept_finish = modem_voice_hold_and_accept_finish;
     iface->hangup_and_accept = modem_voice_hangup_and_accept;
     iface->hangup_and_accept_finish = modem_voice_hangup_and_accept_finish;
 }
