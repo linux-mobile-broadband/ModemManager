@@ -1030,18 +1030,54 @@ call_hangup_finish (MMBaseCall    *self,
 }
 
 static void
-call_hangup_ready (MMBaseModem  *modem,
-                   GAsyncResult *res,
-                   GTask        *task)
+chup_ready (MMBaseModem  *modem,
+            GAsyncResult *res,
+            GTask        *task)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (modem, res, &error);
-
     if (error)
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+chup_fallback (GTask *task)
+{
+    MMBaseCall *self;
+
+    self = g_task_get_source_object (task);
+    mm_base_modem_at_command (self->priv->modem,
+                              "+CHUP",
+                              2,
+                              FALSE,
+                              (GAsyncReadyCallback)chup_ready,
+                              task);
+}
+
+static void
+chld_hangup_ready (MMBaseModem  *modem,
+                   GAsyncResult *res,
+                   GTask        *task)
+{
+    MMBaseCall *self;
+    GError     *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_warn ("couldn't hangup single call with call id '%u': %s",
+                 self->priv->index, error->message);
+        g_error_free (error);
+        chup_fallback (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
@@ -1053,12 +1089,24 @@ call_hangup (MMBaseCall          *self,
     GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-    mm_base_modem_at_command (self->priv->modem,
-                              "+CHUP",
-                              2,
-                              FALSE,
-                              (GAsyncReadyCallback)call_hangup_ready,
-                              task);
+
+    /* Try to hangup the single call id */
+    if (self->priv->index) {
+        gchar *cmd;
+
+        cmd = g_strdup_printf ("+CHLD=1%u", self->priv->index);
+        mm_base_modem_at_command (self->priv->modem,
+                                  cmd,
+                                  2,
+                                  FALSE,
+                                  (GAsyncReadyCallback)chld_hangup_ready,
+                                  task);
+        g_free (cmd);
+        return;
+    }
+
+    /* otherwise terminate all */
+    chup_fallback (task);
 }
 
 /*****************************************************************************/
