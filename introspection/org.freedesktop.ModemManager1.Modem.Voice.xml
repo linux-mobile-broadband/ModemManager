@@ -67,7 +67,7 @@
         CallAdded:
         @path: Object path of the new call.
 
-        Emitted when any part of a Call has been received or added.
+        Emitted when a call has been added.
     -->
     <signal name="CallAdded">
       <arg name="path" type="o" />
