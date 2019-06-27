@@ -7743,6 +7743,30 @@ modem_voice_hangup_all (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* Transfer (Voice interface) */
+
+static gboolean
+modem_voice_transfer_finish (MMIfaceModemVoice  *self,
+                             GAsyncResult       *res,
+                             GError            **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_voice_transfer (MMIfaceModemVoice   *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CHLD=4",
+                              20,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* ESN loading (CDMA interface) */
 
 static gchar *
@@ -11970,6 +11994,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->hangup_and_accept_finish = modem_voice_hangup_and_accept_finish;
     iface->hangup_all = modem_voice_hangup_all;
     iface->hangup_all_finish = modem_voice_hangup_all_finish;
+    iface->transfer = modem_voice_transfer;
+    iface->transfer_finish = modem_voice_transfer_finish;
 }
 
 static void
