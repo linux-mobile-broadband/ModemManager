@@ -110,6 +110,17 @@ gboolean mm_modem_voice_delete_call_sync    (MMModemVoice *self,
                                              GCancellable *cancellable,
                                              GError **error);
 
+void     mm_modem_voice_hold_and_accept         (MMModemVoice        *self,
+                                                 GCancellable        *cancellable,
+                                                 GAsyncReadyCallback  callback,
+                                                 gpointer             user_data);
+gboolean mm_modem_voice_hold_and_accept_finish  (MMModemVoice        *self,
+                                                 GAsyncResult        *res,
+                                                 GError             **error);
+gboolean mm_modem_voice_hold_and_accept_sync    (MMModemVoice        *self,
+                                                 GCancellable        *cancellable,
+                                                 GError             **error);
+
 void     mm_modem_voice_hangup_and_accept         (MMModemVoice        *self,
                                                    GCancellable        *cancellable,
                                                    GAsyncReadyCallback  callback,

@@ -550,6 +550,148 @@ typedef struct {
     MMIfaceModemVoice     *self;
     GList                 *active_calls;
     MMBaseCall            *next_call;
+} HandleHoldAndAcceptContext;
+
+static void
+handle_hold_and_accept_context_free (HandleHoldAndAcceptContext *ctx)
+{
+    g_list_free_full (ctx->active_calls, g_object_unref);
+    g_clear_object (&ctx->next_call);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleHoldAndAcceptContext, ctx);
+}
+
+static void
+hold_and_accept_ready (MMIfaceModemVoice          *self,
+                       GAsyncResult               *res,
+                       HandleHoldAndAcceptContext *ctx)
+{
+    GError *error = NULL;
+    GList  *l;
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_hold_and_accept_context_free (ctx);
+        return;
+    }
+
+    for (l = ctx->active_calls; l; l = g_list_next (l))
+        mm_base_call_change_state (MM_BASE_CALL (l->data), MM_CALL_STATE_HELD, MM_CALL_STATE_REASON_UNKNOWN);
+    if (ctx->next_call)
+        mm_base_call_change_state (ctx->next_call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_ACCEPTED);
+
+    mm_gdbus_modem_voice_complete_hold_and_accept (ctx->skeleton, ctx->invocation);
+    handle_hold_and_accept_context_free (ctx);
+}
+
+static void
+prepare_hold_and_accept_foreach (MMBaseCall                 *call,
+                                 HandleHoldAndAcceptContext *ctx)
+{
+    switch (mm_base_call_get_state (call)) {
+    case MM_CALL_STATE_ACTIVE:
+        ctx->active_calls = g_list_append (ctx->active_calls, g_object_ref (call));
+        break;
+    case MM_CALL_STATE_WAITING:
+        g_clear_object (&ctx->next_call);
+        ctx->next_call = g_object_ref (call);
+        break;
+    case MM_CALL_STATE_HELD:
+        if (!ctx->next_call)
+            ctx->next_call = g_object_ref (call);
+        break;
+    default:
+        break;
+    }
+}
+
+static void
+handle_hold_and_accept_auth_ready (MMBaseModem                *self,
+                                   GAsyncResult               *res,
+                                   HandleHoldAndAcceptContext *ctx)
+{
+    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
+    GError       *error = NULL;
+    MMCallList   *list = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_hold_and_accept_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot hold and accept: device not yet enabled");
+        handle_hold_and_accept_context_free (ctx);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot hold and accept: unsupported");
+        handle_hold_and_accept_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+    if (!list) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot hold and accept: missing call list");
+        handle_hold_and_accept_context_free (ctx);
+        return;
+    }
+    mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_hold_and_accept_foreach, ctx);
+    g_object_unref (list);
+
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->hold_and_accept (MM_IFACE_MODEM_VOICE (self),
+                                                                (GAsyncReadyCallback)hold_and_accept_ready,
+                                                                ctx);
+}
+
+static gboolean
+handle_hold_and_accept (MmGdbusModemVoice     *skeleton,
+                        GDBusMethodInvocation *invocation,
+                        MMIfaceModemVoice     *self)
+{
+    HandleHoldAndAcceptContext *ctx;
+
+    ctx = g_slice_new0 (HandleHoldAndAcceptContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_hold_and_accept_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemVoice     *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemVoice     *self;
+    GList                 *active_calls;
+    MMBaseCall            *next_call;
 } HandleHangupAndAcceptContext;
 
 static void
@@ -1369,6 +1511,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-hangup-and-accept",
                           G_CALLBACK (handle_hangup_and_accept),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-hold-and-accept",
+                          G_CALLBACK (handle_hold_and_accept),
                           self);
 
         /* Finally, export the new interface */

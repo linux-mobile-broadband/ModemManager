@@ -92,6 +92,14 @@ struct _MMIfaceModemVoice {
                                   MMCallDirection    direction,
                                   const gchar       *number);
 
+    /* Hold and accept */
+    void     (* hold_and_accept)        (MMIfaceModemVoice    *self,
+                                         GAsyncReadyCallback   callback,
+                                         gpointer              user_data);
+    gboolean (* hold_and_accept_finish) (MMIfaceModemVoice    *self,
+                                         GAsyncResult         *res,
+                                         GError              **error);
+
     /* Hangup and accept */
     void     (* hangup_and_accept)        (MMIfaceModemVoice    *self,
                                            GAsyncReadyCallback   callback,
