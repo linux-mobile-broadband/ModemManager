@@ -1268,8 +1268,8 @@ setup_call_list_polling (MMCallList        *call_list,
 /*****************************************************************************/
 
 static void
-update_message_list (MmGdbusModemVoice *skeleton,
-                     MMCallList *list)
+update_call_list (MmGdbusModemVoice *skeleton,
+                  MMCallList        *list)
 {
     gchar **paths;
 
@@ -1281,22 +1281,22 @@ update_message_list (MmGdbusModemVoice *skeleton,
 }
 
 static void
-call_added (MMCallList *list,
-           const gchar *call_path,
-           MmGdbusModemVoice *skeleton)
+call_added (MMCallList        *list,
+            const gchar       *call_path,
+            MmGdbusModemVoice *skeleton)
 {
-    mm_dbg ("Added CALL at '%s'", call_path);
-    update_message_list (skeleton, list);
+    mm_dbg ("Added call at '%s'", call_path);
+    update_call_list (skeleton, list);
     mm_gdbus_modem_voice_emit_call_added (skeleton, call_path);
 }
 
 static void
-call_deleted (MMCallList *list,
-             const gchar *call_path,
-             MmGdbusModemVoice *skeleton)
+call_deleted (MMCallList        *list,
+              const gchar       *call_path,
+              MmGdbusModemVoice *skeleton)
 {
-    mm_dbg ("Deleted CALL at '%s'", call_path);
-    update_message_list (skeleton, list);
+    mm_dbg ("Deleted call at '%s'", call_path);
+    update_call_list (skeleton, list);
     mm_gdbus_modem_voice_emit_call_deleted (skeleton, call_path);
 }
 
