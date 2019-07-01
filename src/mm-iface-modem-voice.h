@@ -78,6 +78,40 @@ struct _MMIfaceModemVoice {
                                                     GAsyncResult *res,
                                                     GError **error);
 
+    /* Asynchronous setup of in-call unsolicited events */
+    void     (* setup_in_call_unsolicited_events)        (MMIfaceModemVoice   *self,
+                                                          GAsyncReadyCallback  callback,
+                                                          gpointer             user_data);
+    gboolean (* setup_in_call_unsolicited_events_finish) (MMIfaceModemVoice   *self,
+                                                          GAsyncResult        *res,
+                                                          GError             **error);
+
+    /* Asynchronous cleanup of in-call unsolicited events */
+    void     (* cleanup_in_call_unsolicited_events)        (MMIfaceModemVoice   *self,
+                                                            GAsyncReadyCallback  callback,
+                                                            gpointer             user_data);
+    gboolean (* cleanup_in_call_unsolicited_events_finish) (MMIfaceModemVoice   *self,
+                                                            GAsyncResult        *res,
+                                                            GError             **error);
+
+    /* Asynchronous setup of in-call audio channel */
+    void     (* setup_in_call_audio_channel)        (MMIfaceModemVoice   *self,
+                                                     GAsyncReadyCallback  callback,
+                                                     gpointer             user_data);
+    gboolean (* setup_in_call_audio_channel_finish) (MMIfaceModemVoice   *self,
+                                                     GAsyncResult        *res,
+                                                     MMPort             **audio_port,   /* optional */
+                                                     MMCallAudioFormat  **audio_format, /* optional */
+                                                     GError             **error);
+
+    /* Asynchronous cleanup of in-call audio channel */
+    void     (* cleanup_in_call_audio_channel)        (MMIfaceModemVoice   *self,
+                                                       GAsyncReadyCallback  callback,
+                                                       gpointer             user_data);
+    gboolean (* cleanup_in_call_audio_channel_finish) (MMIfaceModemVoice   *self,
+                                                       GAsyncResult        *res,
+                                                       GError             **error);
+
     /* Load full list of calls (MMCallInfo list) */
     void     (* load_call_list)        (MMIfaceModemVoice    *self,
                                         GAsyncReadyCallback   callback,
