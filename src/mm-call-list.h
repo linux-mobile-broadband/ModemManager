@@ -64,6 +64,9 @@ guint mm_call_list_get_count (MMCallList *self);
 void mm_call_list_add_call  (MMCallList *self,
                              MMBaseCall *call);
 
+MMBaseCall *mm_call_list_get_call (MMCallList   *self,
+                                   const gchar  *call_path);
+
 gboolean mm_call_list_delete_call (MMCallList   *self,
                                    const gchar  *call_path,
                                    GError      **error);

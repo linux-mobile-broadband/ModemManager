@@ -135,6 +135,19 @@ cmp_call_by_path (MMBaseCall *call,
     return g_strcmp0 (mm_base_call_get_path (call), path);
 }
 
+MMBaseCall *
+mm_call_list_get_call (MMCallList  *self,
+                       const gchar *call_path)
+{
+    GList *l;
+
+    l = g_list_find_custom (self->priv->list,
+                            (gpointer)call_path,
+                            (GCompareFunc)cmp_call_by_path);
+
+    return (l ? MM_BASE_CALL (l->data) : NULL);
+}
+
 gboolean
 mm_call_list_delete_call (MMCallList   *self,
                           const gchar  *call_path,
