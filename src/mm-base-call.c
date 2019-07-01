@@ -1130,6 +1130,53 @@ call_accept (MMBaseCall          *self,
 }
 
 /*****************************************************************************/
+/* Deflect the call */
+
+static gboolean
+call_deflect_finish (MMBaseCall    *self,
+                     GAsyncResult  *res,
+                     GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+call_deflect_ready (MMBaseModem  *modem,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+call_deflect (MMBaseCall          *self,
+              const gchar         *number,
+              GAsyncReadyCallback  callback,
+              gpointer             user_data)
+{
+    GTask *task;
+    gchar *cmd;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    cmd = g_strdup_printf ("+CTFR=%s", number);
+    mm_base_modem_at_command (self->priv->modem,
+                              cmd,
+                              20,
+                              FALSE,
+                              (GAsyncReadyCallback)call_deflect_ready,
+                              task);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* Hangup the call */
 
 static gboolean
@@ -1442,6 +1489,8 @@ mm_base_call_class_init (MMBaseCallClass *klass)
     klass->start_finish               = call_start_finish;
     klass->accept                     = call_accept;
     klass->accept_finish              = call_accept_finish;
+    klass->deflect                    = call_deflect;
+    klass->deflect_finish             = call_deflect_finish;
     klass->hangup                     = call_hangup;
     klass->hangup_finish              = call_hangup_finish;
     klass->send_dtmf                  = call_send_dtmf;
