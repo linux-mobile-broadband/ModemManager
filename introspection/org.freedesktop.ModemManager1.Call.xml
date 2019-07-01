@@ -38,6 +38,21 @@
     <method name="Accept" />
 
     <!--
+        Deflect:
+	@number: new number where the call will be deflected.
+
+        Deflect an incoming or waiting call to a new number. This call will be
+	considered terminated once the deflection is performed.
+
+        Applicable only if state is <link linkend="MM-CALL-STATE-RINGING-IN:CAPS"><constant>MM_CALL_STATE_RINGING_IN</constant></link> or
+	<link linkend="MM-CALL-STATE-WAITING:CAPS"><constant>MM_CALL_STATE_WAITING</constant></link> and direction is
+        <link linkend="MM-CALL-DIRECTION-INCOMING:CAPS"><constant>MM_CALL_DIRECTION_INCOMING</constant></link>.
+    -->
+    <method name="Deflect">
+      <arg name="number" type="s" />
+    </method>
+
+    <!--
         Hangup:
 
         Hangup the active call.

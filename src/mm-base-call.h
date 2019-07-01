@@ -67,6 +67,15 @@ struct _MMBaseCallClass {
                                 GAsyncResult *res,
                                 GError **error);
 
+    /* Deflect the call */
+    void     (* deflect)        (MMBaseCall           *self,
+                                 const gchar          *number,
+                                 GAsyncReadyCallback   callback,
+                                 gpointer              user_data);
+    gboolean (* deflect_finish) (MMBaseCall           *self,
+                                 GAsyncResult         *res,
+                                 GError              **error);
+
     /* Hangup the call */
     void     (* hangup)        (MMBaseCall *self,
                                 GAsyncReadyCallback callback,

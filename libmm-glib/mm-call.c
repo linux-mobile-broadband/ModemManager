@@ -492,6 +492,91 @@ mm_call_accept_sync (MMCall *self,
 /*****************************************************************************/
 
 /**
+ * mm_call_deflect_finish:
+ * @self: A #MMCall.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_call_deflect().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_call_deflect().
+ *
+ * Returns:  %TRUE if the operation succeeded, %FALSE if @error is set.
+ */
+gboolean
+mm_call_deflect_finish (MMCall *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    g_return_val_if_fail (MM_IS_CALL (self), FALSE);
+
+    return mm_gdbus_call_call_deflect_finish (MM_GDBUS_CALL (self), res, error);
+}
+
+/**
+ * mm_call_deflect:
+ * @self: A #MMCall.
+ * @number: new number where the call will be deflected.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to deflect the incoming call.
+ *
+ * This call will be considered terminated once the deflection is performed.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_call_deflect_finish() to get the result of the operation.
+ *
+ * See mm_call_deflect_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_call_deflect (MMCall *self,
+                 const gchar *number,
+                 GCancellable *cancellable,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    g_return_if_fail (MM_IS_CALL (self));
+
+    mm_gdbus_call_call_deflect (MM_GDBUS_CALL (self),
+                                number,
+                                cancellable,
+                                callback,
+                                user_data);
+}
+
+/**
+ * mm_call_deflect_sync:
+ * @self: A #MMCall.
+ * @number: new number where the call will be deflected.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to deflect the incoming call.
+ *
+ * This call will be considered terminated once the deflection is performed.
+ *
+ * The calling thread is blocked until an incoming call is ready.
+ * See mm_call_deflect() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ */
+gboolean
+mm_call_deflect_sync (MMCall *self,
+                      const gchar *number,
+                      GCancellable *cancellable,
+                      GError **error)
+{
+    g_return_val_if_fail (MM_IS_CALL (self), FALSE);
+
+    return mm_gdbus_call_call_deflect_sync (MM_GDBUS_CALL (self),
+                                            number,
+                                            cancellable,
+                                            error);
+}
+
+ /*****************************************************************************/
+
+/**
  * mm_call_hangup_finish:
  * @self: A #MMCall.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_call_hangup().

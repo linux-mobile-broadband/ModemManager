@@ -46,11 +46,12 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
-static gboolean info_flag; /* set when no action found */
-static gboolean start_flag;
-static gboolean accept_flag;
-static gboolean hangup_flag;
-static gchar *dtmf_request;
+static gboolean  info_flag; /* set when no action found */
+static gboolean  start_flag;
+static gboolean  accept_flag;
+static gchar    *deflect_str;
+static gboolean  hangup_flag;
+static gchar    *dtmf_request;
 
 static GOptionEntry entries[] = {
     { "start", 0, 0, G_OPTION_ARG_NONE, &start_flag,
@@ -60,6 +61,10 @@ static GOptionEntry entries[] = {
     { "accept", 0, 0, G_OPTION_ARG_NONE, &accept_flag,
       "Accept the incoming call",
       NULL,
+    },
+    { "deflect", 0, 0, G_OPTION_ARG_STRING, &deflect_str,
+      "Deflect the incoming call",
+      "[NUMBER]",
     },
     { "hangup", 0, 0, G_OPTION_ARG_NONE, &hangup_flag,
       "Hang up the call",
@@ -99,6 +104,7 @@ mmcli_call_options_enabled (void)
 
     n_actions = (start_flag +
                  accept_flag +
+                 !!deflect_str +
                  hangup_flag +
                  !!dtmf_request);
 
@@ -228,6 +234,33 @@ accept_ready (MMCall        *call,
 }
 
 static void
+deflect_process_reply (gboolean      result,
+                       const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't deflect the call: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully deflected the call\n");
+}
+
+static void
+deflect_ready (MMCall        *call,
+               GAsyncResult *result,
+               gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_call_deflect_finish (call, result, &error);
+    deflect_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 hangup_process_reply (gboolean      result,
                       const GError *error)
 {
@@ -313,6 +346,16 @@ get_call_ready (GObject      *source,
         return;
     }
 
+    /* Requesting to deflect the call? */
+    if (deflect_str) {
+        mm_call_deflect (ctx->call,
+                         deflect_str,
+                         ctx->cancellable,
+                         (GAsyncReadyCallback)deflect_ready,
+                         NULL);
+        return;
+    }
+
     /* Requesting to hangup the call? */
     if (hangup_flag) {
         mm_call_hangup (ctx->call,
@@ -395,6 +438,18 @@ mmcli_call_run_synchronous (GDBusConnection *connection)
                                                 NULL,
                                                 &error);
         accept_process_reply (operation_result, error);
+        return;
+    }
+
+    /* Requesting to deflect the call? */
+    if (deflect_str) {
+        gboolean operation_result;
+
+        operation_result = mm_call_deflect_sync (ctx->call,
+                                                 deflect_str,
+                                                 NULL,
+                                                 &error);
+        deflect_process_reply (operation_result, error);
         return;
     }
 

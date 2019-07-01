@@ -110,6 +110,21 @@ gboolean           mm_call_accept_sync      (MMCall *self,
                                              GCancellable *cancellable,
                                              GError **error);
 
+void               mm_call_deflect          (MMCall *self,
+                                             const gchar *number,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
+
+gboolean           mm_call_deflect_finish   (MMCall *self,
+                                             GAsyncResult *res,
+                                             GError **error);
+
+gboolean           mm_call_deflect_sync     (MMCall *self,
+                                             const gchar *number,
+                                             GCancellable *cancellable,
+                                             GError **error);
+
 
 void               mm_call_hangup           (MMCall *self,
                                              GCancellable *cancellable,

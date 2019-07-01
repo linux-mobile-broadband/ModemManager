@@ -511,7 +511,114 @@ handle_accept (MMBaseCall *self,
 }
 
 /*****************************************************************************/
+/* Deflect call (DBus call handling) */
 
+typedef struct {
+    MMBaseCall            *self;
+    MMBaseModem           *modem;
+    GDBusMethodInvocation *invocation;
+    gchar                 *number;
+} HandleDeflectContext;
+
+static void
+handle_deflect_context_free (HandleDeflectContext *ctx)
+{
+    g_free (ctx->number);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleDeflectContext, ctx);
+}
+
+static void
+handle_deflect_ready (MMBaseCall           *self,
+                      GAsyncResult         *res,
+                      HandleDeflectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BASE_CALL_GET_CLASS (self)->deflect_finish (self, res, &error)) {
+        mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_deflect_context_free (ctx);
+        return;
+    }
+
+    mm_info ("call is deflected to '%s'", ctx->number);
+    mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_DEFLECTED);
+    mm_gdbus_call_complete_deflect (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+    handle_deflect_context_free (ctx);
+}
+
+static void
+handle_deflect_auth_ready (MMBaseModem          *modem,
+                           GAsyncResult         *res,
+                           HandleDeflectContext *ctx)
+{
+    MMCallState state;
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_deflect_context_free (ctx);
+        return;
+    }
+
+    state = mm_gdbus_call_get_state (MM_GDBUS_CALL (ctx->self));
+
+    /* We can only deflect incoming call in ringing or waiting state */
+    if (state != MM_CALL_STATE_RINGING_IN && state != MM_CALL_STATE_WAITING) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_FAILED,
+                                               "This call was not ringing/waiting, cannot deflect");
+        handle_deflect_context_free (ctx);
+        return;
+    }
+
+    mm_info ("user request to deflect call");
+
+    /* Check if we do support doing it */
+    if (!MM_BASE_CALL_GET_CLASS (ctx->self)->deflect ||
+        !MM_BASE_CALL_GET_CLASS (ctx->self)->deflect_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Deflecting call is not supported by this modem");
+        handle_deflect_context_free (ctx);
+        return;
+    }
+
+    MM_BASE_CALL_GET_CLASS (ctx->self)->deflect (ctx->self,
+                                                 ctx->number,
+                                                 (GAsyncReadyCallback)handle_deflect_ready,
+                                                 ctx);
+}
+
+static gboolean
+handle_deflect (MMBaseCall            *self,
+                GDBusMethodInvocation *invocation,
+                const gchar           *number)
+{
+    HandleDeflectContext *ctx;
+
+    ctx = g_slice_new0 (HandleDeflectContext);
+    ctx->self       = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->number     = g_strdup (number);
+    g_object_get (self,
+                  MM_BASE_CALL_MODEM, &ctx->modem,
+                  NULL);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_deflect_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Hangup call (DBus call handling) */
 
 typedef struct {
@@ -754,6 +861,10 @@ call_dbus_export (MMBaseCall *self)
     g_signal_connect (self,
                       "handle-accept",
                       G_CALLBACK (handle_accept),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-deflect",
+                      G_CALLBACK (handle_deflect),
                       NULL);
     g_signal_connect (self,
                       "handle-hangup",
