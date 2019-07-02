@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2016-2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2016-2019 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -33,7 +33,6 @@
 #include "mm-sim-ublox.h"
 #include "mm-modem-helpers-ublox.h"
 #include "mm-ublox-enums-types.h"
-#include "mm-call-ublox.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -66,6 +65,9 @@ struct _MMBroadbandModemUbloxPrivate {
 
     /* Operator ID for manual registration */
     gchar *operator_id;
+
+    /* Voice +UCALLSTAT support */
+    GRegex *ucallstat_regex;
 
     /* Regex to ignore */
     GRegex *pbready_regex;
@@ -1064,6 +1066,177 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* Common setup/cleanup voice unsolicited events */
+
+static void
+ucallstat_received (MMPortSerialAt        *port,
+                    GMatchInfo            *match_info,
+                    MMBroadbandModemUblox *self)
+{
+    static const MMCallState ublox_call_state[] = {
+        [0] = MM_CALL_STATE_ACTIVE,
+        [1] = MM_CALL_STATE_HELD,
+        [2] = MM_CALL_STATE_DIALING,     /* Dialing  (MOC) */
+        [3] = MM_CALL_STATE_RINGING_OUT, /* Alerting (MOC) */
+        [4] = MM_CALL_STATE_RINGING_IN,  /* Incoming (MTC) */
+        [5] = MM_CALL_STATE_WAITING,     /* Waiting  (MTC) */
+        [6] = MM_CALL_STATE_TERMINATED,
+        [7] = MM_CALL_STATE_ACTIVE,      /* Treated same way as ACTIVE */
+    };
+
+    MMCallInfo call_info = { 0 };
+    guint      aux;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &aux)) {
+        mm_warn ("couldn't parse call index from +UCALLSTAT");
+        return;
+    }
+    call_info.index = aux;
+
+    if (!mm_get_uint_from_match_info (match_info, 2, &aux) ||
+        (aux >= G_N_ELEMENTS (ublox_call_state))) {
+        mm_warn ("couldn't parse call state from +UCALLSTAT");
+        return;
+    }
+    call_info.state = ublox_call_state[aux];
+
+    /* guess direction for some of the states */
+    switch (call_info.state) {
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_RINGING_OUT:
+        call_info.direction = MM_CALL_DIRECTION_OUTGOING;
+        break;
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_WAITING:
+        call_info.direction = MM_CALL_DIRECTION_INCOMING;
+        break;
+    default:
+        call_info.direction = MM_CALL_DIRECTION_UNKNOWN;
+        break;
+    }
+
+    mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
+}
+
+static void
+common_voice_setup_cleanup_unsolicited_events (MMBroadbandModemUblox *self,
+                                               gboolean               enable)
+{
+    MMPortSerialAt *ports[2];
+    guint           i;
+
+    if (G_UNLIKELY (!self->priv->ucallstat_regex))
+        self->priv->ucallstat_regex = g_regex_new ("\\r\\n\\+UCALLSTAT:\\s*(\\d+),(\\d+)\\r\\n",
+                                                   G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       self->priv->ucallstat_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)ucallstat_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+    }
+}
+
+/*****************************************************************************/
+/* Cleanup unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_cleanup_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                               GAsyncResult       *res,
+                                               GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                               GAsyncResult      *res,
+                                               GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't cleanup parent voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_cleanup_unsolicited_events (MMIfaceModemVoice   *self,
+                                        GAsyncReadyCallback  callback,
+                                        gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* our own cleanup first */
+    common_voice_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_UBLOX (self), FALSE);
+
+    /* Chain up parent's cleanup */
+    iface_modem_voice_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_cleanup_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Setup unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_setup_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                             GAsyncResult       *res,
+                                             GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                             GAsyncResult      *res,
+                                             GTask             *task)
+{
+    GError  *error = NULL;
+
+    if (!iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't cleanup parent voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    /* our own setup next */
+    common_voice_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_UBLOX (self), TRUE);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_setup_unsolicited_events (MMIfaceModemVoice   *self,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* chain up parent's setup first */
+    iface_modem_voice_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_setup_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
 /* Create call (Voice interface) */
 
 static MMBaseCall *
@@ -1071,8 +1244,12 @@ create_call (MMIfaceModemVoice *self,
              MMCallDirection    direction,
              const gchar       *number)
 {
-    /* New u-blox Call */
-    return mm_call_ublox_new (MM_BASE_MODEM (self), direction, number);
+    return mm_base_call_new (MM_BASE_MODEM (self),
+                             direction,
+                             number,
+                             TRUE,  /* skip_incoming_timeout */
+                             TRUE,  /* supports_dialing_to_ringing */
+                             TRUE); /* supports_ringing_to_active */
 }
 
 /*****************************************************************************/
@@ -1466,6 +1643,10 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
 
+    iface->setup_unsolicited_events = modem_voice_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_voice_setup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_voice_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = modem_voice_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = modem_voice_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_voice_disable_unsolicited_events;
@@ -1481,6 +1662,8 @@ finalize (GObject *object)
 
     g_regex_unref (self->priv->pbready_regex);
 
+    if (self->priv->ucallstat_regex)
+        g_regex_unref (self->priv->ucallstat_regex);
     g_free (self->priv->operator_id);
 
     G_OBJECT_CLASS (mm_broadband_modem_ublox_parent_class)->finalize (object);

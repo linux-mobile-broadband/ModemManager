@@ -1029,8 +1029,6 @@ pkglib_LTLIBRARIES += libmm-plugin-ublox.la
 libmm_plugin_ublox_la_SOURCES = \
 	ublox/mm-plugin-ublox.c \
 	ublox/mm-plugin-ublox.h \
-	ublox/mm-call-ublox.c \
-	ublox/mm-call-ublox.h \
 	ublox/mm-broadband-bearer-ublox.h \
 	ublox/mm-broadband-bearer-ublox.c \
 	ublox/mm-broadband-modem-ublox.h \
