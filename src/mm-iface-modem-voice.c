@@ -2770,37 +2770,16 @@ interface_initialization_step (GTask *task)
         ctx->step++;
 
     case INITIALIZATION_STEP_LAST:
-        /* We are done without errors! */
-
-        /* Handle method invocations */
-        g_signal_connect (ctx->skeleton,
-                          "handle-create-call",
-                          G_CALLBACK (handle_create),
-                          self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-delete-call",
-                          G_CALLBACK (handle_delete),
-                          self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-list-calls",
-                          G_CALLBACK (handle_list),
-                          self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-hangup-and-accept",
-                          G_CALLBACK (handle_hangup_and_accept),
-                          self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-hold-and-accept",
-                          G_CALLBACK (handle_hold_and_accept),
-                          self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-hangup-all",
-                          G_CALLBACK (handle_hangup_all),
-                          self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-transfer",
-                          G_CALLBACK (handle_transfer),
-                          self);
+        /* Setup all method handlers */
+        g_object_connect (ctx->skeleton,
+                          "signal::handle-create-call",       G_CALLBACK (handle_create),            self,
+                          "signal::handle-delete-call",       G_CALLBACK (handle_delete),            self,
+                          "signal::handle-list-calls",        G_CALLBACK (handle_list),              self,
+                          "signal::handle-hangup-and-accept", G_CALLBACK (handle_hangup_and_accept), self,
+                          "signal::handle-hold-and-accept",   G_CALLBACK (handle_hold_and_accept),   self,
+                          "signal::handle-hangup-all",        G_CALLBACK (handle_hangup_all),        self,
+                          "signal::handle-transfer",          G_CALLBACK (handle_transfer),          self,
+                          NULL);
 
         /* Finally, export the new interface */
         mm_gdbus_object_skeleton_set_modem_voice (MM_GDBUS_OBJECT_SKELETON (self),
