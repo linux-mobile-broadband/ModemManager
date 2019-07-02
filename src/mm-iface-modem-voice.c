@@ -117,11 +117,16 @@ match_single_call_info (const MMCallInfo *call_info,
         (!call_info->index || !idx || match_index))
         match_direction_and_state = TRUE;
 
-    /* Match special terminated event */
+    /* Match special terminated event.
+     * We cannot apply this match if the call is part of a multiparty
+     * call, because we don't know which of the calls in the multiparty
+     * is the one that finished. Must rely on other reports that do
+     * provide call index. */
     if ((call_info->state == MM_CALL_STATE_TERMINATED) &&
         (call_info->direction == MM_CALL_DIRECTION_UNKNOWN) &&
         !call_info->index &&
-        !call_info->number)
+        !call_info->number &&
+        !mm_base_call_get_multiparty (call))
         match_terminated = TRUE;
 
     /* If no clear match, nothing to do */
