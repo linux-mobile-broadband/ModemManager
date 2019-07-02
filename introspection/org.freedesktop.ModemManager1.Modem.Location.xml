@@ -47,18 +47,18 @@
         location information.
 
         The optional
-        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSA</link>
+        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSA:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSA</link>
         and
-        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSB</link>
+        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSB:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSB</link>
         allow to request MSA/MSB A-GPS operation, and they must be given along with either
         <link linkend="MM-MODEM-LOCATION-SOURCE-GPS-RAW:CAPS">MM_MODEM_LOCATION_SOURCE_GPS_RAW</link>
         or
         <link linkend="MM-MODEM-LOCATION-SOURCE-GPS-NMEA:CAPS">MM_MODEM_LOCATION_SOURCE_GPS_NMEA</link>.
 
         Both
-        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSA</link>
+        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSA:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSA</link>
         and
-        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSB</link>
+        <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSB:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSB</link>
         cannot be given at the same time, and if none given, standalone GPS is assumed.
 
     -->
