@@ -7320,6 +7320,93 @@ modem_voice_load_call_list (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* Setup/cleanup voice related in-call unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_setup_cleanup_in_call_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                                             GAsyncResult       *res,
+                                                             GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+in_call_event_received (MMPortSerialAt   *port,
+                        GMatchInfo       *info,
+                        MMBroadbandModem *self)
+{
+    MMCallInfo  call_info;
+    gchar      *str;
+
+    call_info.index     = 0;
+    call_info.direction = MM_CALL_DIRECTION_UNKNOWN;
+    call_info.state     = MM_CALL_STATE_TERMINATED;
+    call_info.number    = NULL;
+
+    str = g_match_info_fetch (info, 1);
+    mm_dbg ("Call terminated: %s", str);
+    g_free (str);
+
+    mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
+}
+
+static void
+set_voice_in_call_unsolicited_events_handlers (MMIfaceModemVoice   *self,
+                                               gboolean             enable,
+                                               GAsyncReadyCallback  callback,
+                                               gpointer             user_data)
+{
+    MMPortSerialAt *ports[2];
+    GRegex         *in_call_event_regex;
+    guint           i;
+    GTask          *task;
+
+    in_call_event_regex = g_regex_new ("\\r\\n(NO CARRIER|BUSY|NO ANSWER|NO DIALTONE)\\r\\n$",
+                                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        mm_dbg ("(%s) %s voice in-call unsolicited events handlers",
+                mm_port_get_device (MM_PORT (ports[i])),
+                enable ? "Setting" : "Removing");
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            in_call_event_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn) in_call_event_received : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+
+    g_regex_unref (in_call_event_regex);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_setup_in_call_unsolicited_events (MMIfaceModemVoice   *self,
+                                              GAsyncReadyCallback  callback,
+                                              gpointer             user_data)
+{
+    set_voice_in_call_unsolicited_events_handlers (self, TRUE, callback, user_data);
+}
+
+static void
+modem_voice_cleanup_in_call_unsolicited_events (MMIfaceModemVoice   *self,
+                                                GAsyncReadyCallback  callback,
+                                                gpointer             user_data)
+{
+    set_voice_in_call_unsolicited_events_handlers (self, FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
 /* Setup/cleanup voice related unsolicited events (Voice interface) */
 
 static gboolean
@@ -12008,6 +12095,12 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->disable_unsolicited_events_finish = modem_voice_enable_disable_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_voice_setup_cleanup_unsolicited_events_finish;
+
+    iface->setup_in_call_unsolicited_events = modem_voice_setup_in_call_unsolicited_events;
+    iface->setup_in_call_unsolicited_events_finish = modem_voice_setup_cleanup_in_call_unsolicited_events_finish;
+    iface->cleanup_in_call_unsolicited_events = modem_voice_cleanup_in_call_unsolicited_events;
+    iface->cleanup_in_call_unsolicited_events_finish = modem_voice_setup_cleanup_in_call_unsolicited_events_finish;
+
     iface->create_call = modem_voice_create_call;
     iface->load_call_list = modem_voice_load_call_list;
     iface->load_call_list_finish = modem_voice_load_call_list_finish;
