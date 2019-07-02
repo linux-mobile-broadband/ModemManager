@@ -848,33 +848,14 @@ call_dbus_export (MMBaseCall *self)
     GError *error = NULL;
 
     /* Handle method invocations */
-    g_signal_connect (self,
-                      "handle-start",
-                      G_CALLBACK (handle_start),
-                      NULL);
-    g_signal_connect (self,
-                      "handle-accept",
-                      G_CALLBACK (handle_accept),
-                      NULL);
-    g_signal_connect (self,
-                      "handle-deflect",
-                      G_CALLBACK (handle_deflect),
-                      NULL);
-    g_signal_connect (self,
-                      "handle-join-multiparty",
-                      G_CALLBACK (handle_join_multiparty),
-                      NULL);
-    g_signal_connect (self,
-                      "handle-leave-multiparty",
-                      G_CALLBACK (handle_leave_multiparty),
-                      NULL);
-    g_signal_connect (self,
-                      "handle-hangup",
-                      G_CALLBACK (handle_hangup),
-                      NULL);
-    g_signal_connect (self,
-                      "handle-send-dtmf",
-                      G_CALLBACK (handle_send_dtmf),
+    g_object_connect (self,
+                      "signal::handle-start",            G_CALLBACK (handle_start),            NULL,
+                      "signal::handle-accept",           G_CALLBACK (handle_accept),           NULL,
+                      "signal::handle-deflect",          G_CALLBACK (handle_deflect),          NULL,
+                      "signal::handle-join-multiparty",  G_CALLBACK (handle_join_multiparty),  NULL,
+                      "signal::handle-leave-multiparty", G_CALLBACK (handle_leave_multiparty), NULL,
+                      "signal::handle-hangup",           G_CALLBACK (handle_hangup),           NULL,
+                      "signal::handle-send-dtmf",        G_CALLBACK (handle_send_dtmf),        NULL,
                       NULL);
 
     if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self),
