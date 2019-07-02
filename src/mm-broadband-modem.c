@@ -7877,6 +7877,61 @@ modem_voice_join_multiparty (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* Leave multiparty (Voice interface) */
+
+static gboolean
+modem_voice_leave_multiparty_finish (MMIfaceModemVoice  *self,
+                                     GAsyncResult       *res,
+                                     GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+chld_leave_multiparty_ready (MMBaseModem  *self,
+                             GAsyncResult *res,
+                             GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_leave_multiparty (MMIfaceModemVoice   *self,
+                              MMBaseCall          *call,
+                              GAsyncReadyCallback  callback,
+                              gpointer             user_data)
+{
+    GTask *task;
+    guint  idx;
+    gchar *cmd;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    idx = mm_base_call_get_index (call);
+    if (!idx) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "unknown call index");
+        g_object_unref (task);
+        return;
+    }
+
+    cmd = g_strdup_printf ("+CHLD=2%u", idx);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              20,
+                              FALSE,
+                              (GAsyncReadyCallback) chld_leave_multiparty_ready,
+                              task);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* Transfer (Voice interface) */
 
 static gboolean
@@ -12136,6 +12191,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->hangup_all_finish = modem_voice_hangup_all_finish;
     iface->join_multiparty = modem_voice_join_multiparty;
     iface->join_multiparty_finish = modem_voice_join_multiparty_finish;
+    iface->leave_multiparty = modem_voice_leave_multiparty;
+    iface->leave_multiparty_finish = modem_voice_leave_multiparty_finish;
     iface->transfer = modem_voice_transfer;
     iface->transfer_finish = modem_voice_transfer_finish;
 }
