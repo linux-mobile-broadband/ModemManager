@@ -14,8 +14,8 @@
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google Inc.
  * Copyright (C) 2012 Huawei Technologies Co., Ltd
- * Copyright (C) 2012 - 2013 Aleksander Morgado <aleksander@gnu.org>
  * Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
+ * Copyright (C) 2012 - 2019 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -49,7 +49,6 @@
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sim-huawei.h"
-#include "mm-call-huawei.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -2940,6 +2939,89 @@ modem_voice_check_support (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* In-call audio channel setup/cleanup */
+
+static gboolean
+modem_voice_setup_in_call_audio_channel_finish (MMIfaceModemVoice  *_self,
+                                                GAsyncResult       *res,
+                                                MMPort            **audio_port,
+                                                MMCallAudioFormat **audio_format,
+                                                GError            **error)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    if (self->priv->cvoice_support == FEATURE_SUPPORTED) {
+        /* Setup audio format */
+        if (audio_format) {
+            gchar *resolution_str;
+
+            resolution_str = g_strdup_printf ("s%ule", self->priv->audio_bits);
+            *audio_format = mm_call_audio_format_new ();
+            mm_call_audio_format_set_encoding   (*audio_format, "pcm");
+            mm_call_audio_format_set_resolution (*audio_format, resolution_str);
+            mm_call_audio_format_set_rate       (*audio_format, self->priv->audio_hz);
+            g_free (resolution_str);
+        }
+
+        /* The QCDM port, if present, switches from QCDM to voice while
+         * a voice call is active. */
+        if (audio_port)
+            *audio_port = MM_PORT (mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self)));
+    } else {
+        if (audio_format)
+            *audio_format =  NULL;
+        if (audio_port)
+            *audio_port =  NULL;
+    }
+
+    return TRUE;
+}
+
+static void
+ddsetex_ready (MMBaseModem  *self,
+               GAsyncResult *res,
+               GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_setup_in_call_audio_channel (MMIfaceModemVoice   *_self,
+                                         GAsyncReadyCallback  callback,
+                                         gpointer             user_data)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    GTask                  *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* If there is no CVOICE support, no custom audio setup required
+     * (i.e. audio path is externally managed) */
+    if (self->priv->cvoice_support != FEATURE_SUPPORTED) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Enable audio streaming on the audio port */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^DDSETEX=2",
+                              5,
+                              FALSE,
+                              (GAsyncReadyCallback)ddsetex_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Common setup/cleanup voice unsolicited events */
 
 typedef enum {
@@ -3260,21 +3342,16 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 /* Create call (Voice interface) */
 
 static MMBaseCall *
-create_call (MMIfaceModemVoice *_self,
+create_call (MMIfaceModemVoice *self,
              MMCallDirection    direction,
              const gchar       *number)
 {
-    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
-
-    /* If CVOICE is supported we must have audio settings */
-    g_assert (self->priv->cvoice_support == FEATURE_NOT_SUPPORTED ||
-              (self->priv->cvoice_support == FEATURE_SUPPORTED && self->priv->audio_hz && self->priv->audio_bits));
-
-    return mm_call_huawei_new (MM_BASE_MODEM (self),
-                               direction,
-                               number,
-                               self->priv->audio_hz,
-                               self->priv->audio_bits);
+    return mm_base_call_new (MM_BASE_MODEM (self),
+                             direction,
+                             number,
+                             TRUE,  /* skip_incoming_timeout */
+                             TRUE,  /* supports_dialing_to_ringing */
+                             TRUE); /* supports_ringing_to_active) */
 }
 
 /*****************************************************************************/
@@ -4528,6 +4605,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->enable_unsolicited_events_finish = modem_voice_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_voice_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = modem_voice_disable_unsolicited_events_finish;
+    iface->setup_in_call_audio_channel = modem_voice_setup_in_call_audio_channel;
+    iface->setup_in_call_audio_channel_finish = modem_voice_setup_in_call_audio_channel_finish;
 
     iface->create_call = create_call;
 }
