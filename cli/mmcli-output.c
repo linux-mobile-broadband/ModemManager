@@ -227,6 +227,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_CALL_GENERAL_DBUS_PATH]            = { "call.dbus-path",                                  "dbus path",                MMC_S_CALL_GENERAL,            },
     [MMC_F_CALL_PROPERTIES_NUMBER]            = { "call.properties.number",                          "number",                   MMC_S_CALL_PROPERTIES,         },
     [MMC_F_CALL_PROPERTIES_DIRECTION]         = { "call.properties.direction",                       "direction",                MMC_S_CALL_PROPERTIES,         },
+    [MMC_F_CALL_PROPERTIES_MULTIPARTY]        = { "call.properties.multiparty",                      "multiparty",               MMC_S_CALL_PROPERTIES,         },
     [MMC_F_CALL_PROPERTIES_STATE]             = { "call.properties.state",                           "state",                    MMC_S_CALL_PROPERTIES,         },
     [MMC_F_CALL_PROPERTIES_STATE_REASON]      = { "call.properties.state-reason",                    "state reason",             MMC_S_CALL_PROPERTIES,         },
     [MMC_F_CALL_PROPERTIES_AUDIO_PORT]        = { "call.properties.audio-port",                      "audio port",               MMC_S_CALL_PROPERTIES,         },

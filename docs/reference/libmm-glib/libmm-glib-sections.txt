@@ -1332,6 +1332,7 @@ mm_call_get_audio_port
 mm_call_dup_audio_port
 mm_call_get_audio_format
 mm_call_peek_audio_format
+mm_call_get_multiparty
 <SUBSECTION Methods>
 mm_call_start
 mm_call_start_finish
@@ -3246,6 +3247,7 @@ mm_gdbus_call_dup_audio_format
 mm_gdbus_call_dup_audio_port
 mm_gdbus_call_get_audio_format
 mm_gdbus_call_get_audio_port
+mm_gdbus_call_get_multiparty
 <SUBSECTION Methods>
 mm_gdbus_call_call_accept
 mm_gdbus_call_call_accept_finish
@@ -3269,6 +3271,7 @@ mm_gdbus_call_set_state
 mm_gdbus_call_set_state_reason
 mm_gdbus_call_set_audio_format
 mm_gdbus_call_set_audio_port
+mm_gdbus_call_set_multiparty
 mm_gdbus_call_complete_accept
 mm_gdbus_call_complete_hangup
 mm_gdbus_call_complete_send_dtmf

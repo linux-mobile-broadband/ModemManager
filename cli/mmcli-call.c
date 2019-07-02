@@ -162,6 +162,7 @@ print_call_info (MMCall *call)
     mmcli_output_string (MMC_F_CALL_GENERAL_DBUS_PATH,       mm_call_get_path (call));
     mmcli_output_string (MMC_F_CALL_PROPERTIES_NUMBER,       mm_call_get_number (call));
     mmcli_output_string (MMC_F_CALL_PROPERTIES_DIRECTION,    mm_call_direction_get_string (mm_call_get_direction (call)));
+    mmcli_output_string (MMC_F_CALL_PROPERTIES_MULTIPARTY,   mm_call_get_multiparty (call) ? "yes" : "no");
     mmcli_output_string (MMC_F_CALL_PROPERTIES_STATE,        mm_call_state_get_string (mm_call_get_state (call)));
     mmcli_output_string (MMC_F_CALL_PROPERTIES_STATE_REASON, mm_call_state_reason_get_string (mm_call_get_state_reason (call)));
     mmcli_output_string (MMC_F_CALL_PROPERTIES_AUDIO_PORT,   mm_call_get_audio_port (call));

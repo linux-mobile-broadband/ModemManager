@@ -76,6 +76,8 @@ MMCallStateReason  mm_call_get_state_reason (MMCall *self);
 
 MMCallDirection    mm_call_get_direction    (MMCall *self);
 
+gboolean           mm_call_get_multiparty   (MMCall *self);
+
 const gchar       *mm_call_get_audio_port   (MMCall *self);
 gchar             *mm_call_dup_audio_port   (MMCall *self);
 

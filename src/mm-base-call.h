@@ -104,19 +104,22 @@ MMBaseCall *mm_base_call_new (MMBaseModem     *modem,
                               gboolean         supports_dialing_to_ringing,
                               gboolean         supports_ringing_to_active);
 
-void             mm_base_call_export        (MMBaseCall *self);
-void             mm_base_call_unexport      (MMBaseCall *self);
+void             mm_base_call_export         (MMBaseCall *self);
+void             mm_base_call_unexport       (MMBaseCall *self);
 
-const gchar     *mm_base_call_get_path      (MMBaseCall *self);
-const gchar     *mm_base_call_get_number    (MMBaseCall *self);
-MMCallDirection  mm_base_call_get_direction (MMBaseCall *self);
-MMCallState      mm_base_call_get_state     (MMBaseCall *self);
-guint            mm_base_call_get_index     (MMBaseCall *self);
+const gchar     *mm_base_call_get_path       (MMBaseCall *self);
+const gchar     *mm_base_call_get_number     (MMBaseCall *self);
+MMCallDirection  mm_base_call_get_direction  (MMBaseCall *self);
+MMCallState      mm_base_call_get_state      (MMBaseCall *self);
+guint            mm_base_call_get_index      (MMBaseCall *self);
+gboolean         mm_base_call_get_multiparty (MMBaseCall *self);
 
-void             mm_base_call_set_number    (MMBaseCall  *self,
-                                             const gchar *number);
-void             mm_base_call_set_index     (MMBaseCall  *self,
-                                             guint        index);
+void             mm_base_call_set_number     (MMBaseCall  *self,
+                                              const gchar *number);
+void             mm_base_call_set_index      (MMBaseCall  *self,
+                                              guint        index);
+void             mm_base_call_set_multiparty (MMBaseCall  *self,
+                                              gboolean     multiparty);
 
 void         mm_base_call_change_state (MMBaseCall *self,
                                         MMCallState new_state,

@@ -770,6 +770,19 @@ mm_base_call_get_state (MMBaseCall *self)
     return (MMCallState) mm_gdbus_call_get_state (MM_GDBUS_CALL (self));
 }
 
+gboolean
+mm_base_call_get_multiparty (MMBaseCall *self)
+{
+    return mm_gdbus_call_get_multiparty (MM_GDBUS_CALL (self));
+}
+
+void
+mm_base_call_set_multiparty (MMBaseCall *self,
+                             gboolean    multiparty)
+{
+    return mm_gdbus_call_set_multiparty (MM_GDBUS_CALL (self), multiparty);
+}
+
 /*****************************************************************************/
 /* Current call index, only applicable while the call is ongoing
  * See 3GPP TS 22.030 [27], subclause 6.5.5.1.

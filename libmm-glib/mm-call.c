@@ -148,6 +148,24 @@ mm_call_get_direction (MMCall *self)
 /*****************************************************************************/
 
 /**
+ * mm_call_get_multiparty:
+ * @self: A #MMCall.
+ *
+ * Gets whether the call is part of a multiparty call.
+ *
+ * Returns: %TRUE if the call is part of a multiparty call, %FALSE otherwise..
+ */
+gboolean
+mm_call_get_multiparty (MMCall *self)
+{
+    g_return_val_if_fail (MM_IS_CALL (self), FALSE);
+
+    return mm_gdbus_call_get_multiparty (MM_GDBUS_CALL (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_call_get_state:
  * @self: A #MMCall.
  *
