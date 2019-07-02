@@ -92,28 +92,6 @@ struct _MMBaseCallClass {
     gboolean (* send_dtmf_finish) (MMBaseCall *self,
                                    GAsyncResult *res,
                                    GError **error);
-
-    /* Setup/cleanup in-call unsolicited events */
-    gboolean (* setup_unsolicited_events)   (MMBaseCall  *self,
-                                             GError     **error);
-    gboolean (* cleanup_unsolicited_events) (MMBaseCall  *self,
-                                             GError     **error);
-
-    /* Setup/cleanup audio channel */
-    void     (* setup_audio_channel)          (MMBaseCall           *self,
-                                               GAsyncReadyCallback   callback,
-                                               gpointer              user_data);
-    gboolean (* setup_audio_channel_finish)   (MMBaseCall           *self,
-                                               GAsyncResult         *res,
-                                               MMPort              **audio_port,
-                                               MMCallAudioFormat   **audio_format,
-                                               GError              **error);
-    void     (* cleanup_audio_channel)        (MMBaseCall           *self,
-                                               GAsyncReadyCallback   callback,
-                                               gpointer              user_data);
-    gboolean (* cleanup_audio_channel_finish) (MMBaseCall           *self,
-                                               GAsyncResult         *res,
-                                               GError              **error);
 };
 
 GType mm_base_call_get_type (void);
