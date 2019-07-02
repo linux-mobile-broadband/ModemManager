@@ -394,6 +394,47 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
 }
 
 /*****************************************************************************/
+/* Incoming DTMF reception, not associated to a specific call */
+
+typedef struct {
+    guint        index;
+    const gchar *dtmf;
+} ReceivedDtmfContext;
+
+static void
+received_dtmf_foreach (MMBaseCall          *call,
+                       ReceivedDtmfContext *ctx)
+{
+    if ((!ctx->index || (ctx->index == mm_base_call_get_index (call))) &&
+        (mm_base_call_get_state (call) == MM_CALL_STATE_ACTIVE))
+        mm_base_call_received_dtmf (call, ctx->dtmf);
+}
+
+void
+mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
+                                    guint              index,
+                                    const gchar       *dtmf)
+{
+    MMCallList          *list = NULL;
+    ReceivedDtmfContext  ctx = {
+        .index = index,
+        .dtmf  = dtmf
+    };
+
+    /* Retrieve list of known calls */
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+    if (!list) {
+        mm_warn ("Cannot report received DTMF: missing call list");
+        return;
+    }
+
+    mm_call_list_foreach (list, (MMCallListForeachFunc)received_dtmf_foreach, &ctx);
+    g_object_unref (list);
+}
+
+/*****************************************************************************/
 
 typedef struct {
     MmGdbusModemVoice *skeleton;

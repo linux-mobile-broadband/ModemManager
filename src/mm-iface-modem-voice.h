@@ -202,4 +202,9 @@ void mm_iface_modem_voice_report_call (MMIfaceModemVoice *self,
 void mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
                                             GList             *call_info_list);
 
+/* Report an incoming DTMF received */
+void mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
+                                         guint              index,
+                                         const gchar       *dtmf);
+
 #endif /* MM_IFACE_MODEM_VOICE_H */
