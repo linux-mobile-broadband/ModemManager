@@ -144,6 +144,10 @@ void         mm_base_call_change_state (MMBaseCall *self,
                                         MMCallState new_state,
                                         MMCallStateReason reason);
 
+void         mm_base_call_change_audio_settings (MMBaseCall        *self,
+                                                 MMPort            *audio_port,
+                                                 MMCallAudioFormat *audio_format);
+
 void         mm_base_call_received_dtmf (MMBaseCall *self,
                                          const gchar *dtmf);
 

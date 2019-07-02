@@ -177,10 +177,10 @@ mm_base_call_incoming_refresh (MMBaseCall *self)
 /*****************************************************************************/
 /* Update audio settings */
 
-static void
-update_audio_settings (MMBaseCall        *self,
-                       MMPort            *audio_port,
-                       MMCallAudioFormat *audio_format)
+void
+mm_base_call_change_audio_settings (MMBaseCall        *self,
+                                    MMPort            *audio_port,
+                                    MMCallAudioFormat *audio_format)
 {
     if (!audio_port && self->priv->audio_port && mm_port_get_connected (self->priv->audio_port))
         mm_port_set_connected (self->priv->audio_port, FALSE);
@@ -249,7 +249,7 @@ start_setup_audio_channel_ready (MMBaseCall         *self,
     }
 
     if (audio_port || audio_format) {
-        update_audio_settings (self, audio_port, audio_format);
+        mm_base_call_change_audio_settings (self, audio_port, audio_format);
         g_clear_object (&audio_port);
         g_clear_object (&audio_format);
     }
@@ -410,7 +410,7 @@ accept_setup_audio_channel_ready (MMBaseCall          *self,
     }
 
     if (audio_port || audio_format) {
-        update_audio_settings (self, audio_port, audio_format);
+        mm_base_call_change_audio_settings (self, audio_port, audio_format);
         g_clear_object (&audio_port);
         g_clear_object (&audio_format);
     }
@@ -1001,7 +1001,7 @@ mm_base_call_change_state (MMBaseCall        *self,
         }
         if (MM_BASE_CALL_GET_CLASS (self)->cleanup_audio_channel) {
             mm_info ("cleaning up audio channel...");
-            update_audio_settings (self, NULL, NULL);
+            mm_base_call_change_audio_settings (self, NULL, NULL);
             MM_BASE_CALL_GET_CLASS (self)->cleanup_audio_channel (self,
                                                                   (GAsyncReadyCallback) cleanup_audio_channel_ready,
                                                                   NULL);
