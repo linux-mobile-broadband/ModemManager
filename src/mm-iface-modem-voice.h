@@ -194,10 +194,9 @@ void mm_iface_modem_voice_shutdown (MMIfaceModemVoice *self);
 void mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
                                               MMSimpleStatus    *status);
 
-/* Incoming call reporting */
-void mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
-                                                const gchar       *number,
-                                                MMCallState        state);
+/* Single call info reporting */
+void mm_iface_modem_voice_report_call (MMIfaceModemVoice *self,
+                                       const MMCallInfo  *call_info);
 
 /* Full current call list reporting (MMCallInfo list) */
 void mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,

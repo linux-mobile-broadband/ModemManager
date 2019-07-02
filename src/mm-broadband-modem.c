@@ -7331,53 +7331,76 @@ modem_voice_setup_cleanup_unsolicited_events_finish (MMIfaceModemVoice *self,
 }
 
 static void
-ccwa_received (MMPortSerialAt *port,
-               GMatchInfo *info,
+ccwa_received (MMPortSerialAt   *port,
+               GMatchInfo       *info,
                MMBroadbandModem *self)
 {
-    gchar *str;
+    MMCallInfo call_info;
 
-    str = mm_get_string_unquoted_from_match_info (info, 1);
-    mm_dbg ("Call waiting (%s)", str);
-    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), str, MM_CALL_STATE_WAITING);
-    g_free (str);
+    call_info.index     = 0;
+    call_info.direction = MM_CALL_DIRECTION_INCOMING;
+    call_info.state     = MM_CALL_STATE_WAITING;
+    call_info.number    = mm_get_string_unquoted_from_match_info (info, 1);
+
+    mm_dbg ("Call waiting (%s)", call_info.number);
+    mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
+
+    g_free (call_info.number);
 }
 
 static void
-ring_received (MMPortSerialAt *port,
-               GMatchInfo *info,
+ring_received (MMPortSerialAt   *port,
+               GMatchInfo       *info,
                MMBroadbandModem *self)
 {
+    MMCallInfo call_info;
+
+    call_info.index     = 0;
+    call_info.direction = MM_CALL_DIRECTION_INCOMING;
+    call_info.state     = MM_CALL_STATE_RINGING_IN;
+    call_info.number    = NULL;
+
     mm_dbg ("Ringing");
-    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), NULL, MM_CALL_STATE_RINGING_IN);
+    mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
 }
 
 static void
-cring_received (MMPortSerialAt *port,
-                GMatchInfo *info,
+cring_received (MMPortSerialAt   *port,
+                GMatchInfo       *info,
                 MMBroadbandModem *self)
 {
-    gchar *str;
+    MMCallInfo  call_info;
+    gchar      *str;
 
     /* We could have "VOICE" or "DATA". Now consider only "VOICE" */
-
     str = mm_get_string_unquoted_from_match_info (info, 1);
     mm_dbg ("Ringing (%s)", str);
     g_free (str);
 
-    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), NULL, MM_CALL_STATE_RINGING_IN);
+    call_info.index     = 0;
+    call_info.direction = MM_CALL_DIRECTION_INCOMING;
+    call_info.state     = MM_CALL_STATE_RINGING_IN;
+    call_info.number    = NULL;
+
+    mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
 }
 
 static void
-clip_received (MMPortSerialAt *port,
-               GMatchInfo *info,
+clip_received (MMPortSerialAt   *port,
+               GMatchInfo       *info,
                MMBroadbandModem *self)
 {
-    gchar *str;
+    MMCallInfo call_info;
 
-    str = mm_get_string_unquoted_from_match_info (info, 1);
-    mm_iface_modem_voice_report_incoming_call (MM_IFACE_MODEM_VOICE (self), str, MM_CALL_STATE_RINGING_IN);
-    g_free (str);
+    call_info.index     = 0;
+    call_info.direction = MM_CALL_DIRECTION_INCOMING;
+    call_info.state     = MM_CALL_STATE_RINGING_IN;
+    call_info.number    = mm_get_string_unquoted_from_match_info (info, 1);
+
+    mm_dbg ("Ringing (%s)", call_info.number);
+    mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
+
+    g_free (call_info.number);
 }
 
 static void

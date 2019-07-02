@@ -85,42 +85,169 @@ create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
 }
 
 /*****************************************************************************/
+/* Common helper to match call info against a known call object */
+
+static gboolean
+match_single_call_info (const MMCallInfo *call_info,
+                        MMBaseCall       *call)
+{
+    MMCallState      state;
+    MMCallDirection  direction;
+    const gchar     *number;
+    guint            idx;
+    gboolean         match_direction_and_state = FALSE;
+    gboolean         match_index = FALSE;
+    gboolean         match_terminated = FALSE;
+
+    /* try to look for a matching call by direction/number/index */
+    state     = mm_base_call_get_state     (call);
+    direction = mm_base_call_get_direction (call);
+    number    = mm_base_call_get_number    (call);
+    idx       = mm_base_call_get_index     (call);
+
+    /* Match index */
+    if (call_info->index && (call_info->index == idx))
+        match_index = TRUE;
+
+    /* Match direction and state.
+     * We cannot apply this match if both call info and call have an index set
+     * and they're different already. */
+    if ((call_info->direction == direction) &&
+        (call_info->state == state) &&
+        (!call_info->index || !idx || match_index))
+        match_direction_and_state = TRUE;
+
+    /* Match special terminated event */
+    if ((call_info->state == MM_CALL_STATE_TERMINATED) &&
+        (call_info->direction == MM_CALL_DIRECTION_UNKNOWN) &&
+        !call_info->index &&
+        !call_info->number)
+        match_terminated = TRUE;
+
+    /* If no clear match, nothing to do */
+    if (!match_index && !match_direction_and_state && !match_terminated)
+        return FALSE;
+
+    mm_dbg ("call info matched (matched direction/state %s, matched index %s, matched terminated %s) with call at '%s'",
+            match_direction_and_state ? "yes" : "no",
+            match_index ? "yes" : "no",
+            match_terminated ? "yes" : "no",
+            mm_base_call_get_path (call));
+
+    /* Early detect if a known incoming call that was created
+     * from a plain CRING URC (i.e. without caller number)
+     * needs to have the number provided.
+     */
+    if (call_info->number && !number) {
+        mm_dbg ("  number set: %s", call_info->number);
+        mm_base_call_set_number (call, call_info->number);
+    }
+
+    /* Early detect if a known incoming/outgoing call does
+     * not have a known call index yet.
+     */
+    if (call_info->index && !idx) {
+        mm_dbg ("  index set: %u", call_info->index);
+        mm_base_call_set_index (call, call_info->index);
+    }
+
+    /* Update state if it changed */
+    if (call_info->state != state) {
+        mm_dbg ("  state updated: %s", mm_call_state_get_string (call_info->state));
+        mm_base_call_change_state (call, call_info->state, MM_CALL_STATE_REASON_UNKNOWN);
+    }
+
+    /* refresh if incoming and new state is not terminated */
+    if ((call_info->state != MM_CALL_STATE_TERMINATED) &&
+        (direction == MM_CALL_DIRECTION_INCOMING)) {
+        mm_dbg ("  incoming refreshed");
+        mm_base_call_incoming_refresh (call);
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    const MMCallInfo *call_info;
+} ReportCallForeachContext;
+
+static void
+report_call_foreach (MMBaseCall               *call,
+                     ReportCallForeachContext *ctx)
+{
+    /* Do nothing if already matched */
+    if (!ctx->call_info)
+        return;
+
+    /* fully ignore already terminated calls */
+    if (mm_base_call_get_state (call) == MM_CALL_STATE_TERMINATED)
+        return;
+
+    /* Reset call info in context if the call info matches an existing call */
+    if (match_single_call_info (ctx->call_info, call))
+        ctx->call_info = NULL;
+}
 
 void
-mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
-                                           const gchar       *number,
-                                           MMCallState        state)
+mm_iface_modem_voice_report_call (MMIfaceModemVoice *self,
+                                  const MMCallInfo  *call_info)
 {
-    MMBaseCall *call = NULL;
-    MMCallList *list = NULL;
+    ReportCallForeachContext  ctx = { 0 };
+    MMBaseCall               *call = NULL;
+    MMCallList               *list = NULL;
 
-    g_assert (state == MM_CALL_STATE_RINGING_IN || state == MM_CALL_STATE_WAITING);
+    /* When reporting single call, the only mandatory parameter is the state:
+     *   - index is optional (e.g. unavailable when receiving +CLIP URCs)
+     *   - number is optional (e.g. unavailable when receiving +CRING URCs)
+     *   - direction is optional (e.g. unavailable when receiving some vendor-specific URCs)
+     */
+    g_assert (call_info->state != MM_CALL_STATE_UNKNOWN);
+
+    /* Early debugging of the call state update */
+    mm_dbg ("call at index %u: direction %s, state %s, number %s",
+            call_info->index,
+            mm_call_direction_get_string (call_info->direction),
+            mm_call_state_get_string (call_info->state),
+            call_info->number ? call_info->number : "n/a");
 
     g_object_get (MM_BASE_MODEM (self),
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
     if (!list) {
-        mm_warn ("Cannot create incoming call: missing call list");
+        mm_warn ("Cannot process call state update: missing call list");
         return;
     }
 
-    call = mm_call_list_get_first_incoming_call (list, state);
+    /* Iterate over all known calls and try to match a known one */
+    ctx.call_info = call_info;
+    mm_call_list_foreach (list, (MMCallListForeachFunc)report_call_foreach, &ctx);
 
-    /* If call exists already, refresh its validity and set number if it wasn't set */
-    if (call) {
-        if (number && !mm_base_call_get_number (call))
-            mm_base_call_set_number (call, number);
-        mm_base_call_incoming_refresh (call);
-        g_object_unref (list);
-        return;
+    /* If call info matched with an existing one, the context call info would have been reseted */
+    if (!ctx.call_info)
+        goto out;
+
+    /* If call info didn't match with any known call, it may be because we're being
+     * reported a NEW incoming call. If that's not the case, we'll ignore the report. */
+    if ((call_info->direction != MM_CALL_DIRECTION_INCOMING) ||
+        ((call_info->state != MM_CALL_STATE_WAITING) && (call_info->state != MM_CALL_STATE_RINGING_IN))) {
+        mm_dbg ("unhandled call state update reported: direction: %s, state %s",
+                mm_call_direction_get_string (call_info->direction),
+                mm_call_state_get_string (call_info->state));
+        goto out;
     }
 
     mm_dbg ("Creating new incoming call...");
-    call = create_incoming_call (self, number);
+    call = create_incoming_call (self, call_info->number);
 
     /* Set the state */
-    mm_base_call_change_state (call, state, MM_CALL_STATE_REASON_INCOMING_NEW);
+    mm_base_call_change_state (call, call_info->state, MM_CALL_STATE_REASON_INCOMING_NEW);
+
+    /* Set the index, if known */
+    if (call_info->index)
+        mm_base_call_set_index (call, call_info->index);
 
     /* Start its validity timeout */
     mm_base_call_incoming_refresh (call);
@@ -129,6 +256,8 @@ mm_iface_modem_voice_report_incoming_call (MMIfaceModemVoice *self,
     mm_base_call_export (call);
     mm_call_list_add_call (list, call);
     g_object_unref (call);
+
+ out:
     g_object_unref (list);
 }
 
@@ -155,61 +284,18 @@ static void
 report_all_calls_foreach (MMBaseCall                   *call,
                           ReportAllCallsForeachContext *ctx)
 {
-    GList            *l;
-    MMCallState      state;
-    MMCallDirection  direction;
-    const gchar     *number;
-    guint            idx;
+    GList *l;
 
     /* fully ignore already terminated calls */
-    state = mm_base_call_get_state (call);
-    if (state == MM_CALL_STATE_TERMINATED)
+    if (mm_base_call_get_state (call) == MM_CALL_STATE_TERMINATED)
         return;
 
-    /* try to look for a matching call by direction/number/index */
-    direction = mm_base_call_get_direction (call);
-    number    = mm_base_call_get_number    (call);
-    idx       = mm_base_call_get_index     (call);
+    /* Iterate over the call info list */
     for (l = ctx->call_info_list; l; l = g_list_next (l)) {
         MMCallInfo *call_info = (MMCallInfo *)(l->data);
 
-        /* Early detect if a known incoming call that was created
-         * from a plain CRING URC (i.e. without caller number)
-         * needs to have the number provided. We match by state
-         * as well as there may be different types of incoming
-         * calls reported here (e.g. ringing, waiting).
-         */
-        if ((direction == MM_CALL_DIRECTION_INCOMING) &&
-            (call_info->direction == direction) &&
-            (call_info->state == state) &&
-            (call_info->number && !number))
-            mm_base_call_set_number (call, call_info->number);
-
-        /* Early detect if a known incoming/outgoing call does
-         * not have a known call index yet.
-         */
-        if ((call_info->direction == direction) &&
-            (call_info->state == state) &&
-            (call_info->index && !idx)) {
-            mm_base_call_set_index (call, call_info->index);
-            idx = call_info->index; /* so that we match next properly */
-        }
-
-        /* Exact match? note that if both numbers are NULL, it will
-         * also match (e.g. if network doesn't report the caller number).
-         */
-        if ((call_info->direction == direction) &&
-            (g_strcmp0 (call_info->number, number) == 0) &&
-            (call_info->index == idx)) {
-            /* Update state if it changed */
-            if (state != call_info->state)
-                mm_base_call_change_state (call, call_info->state, MM_CALL_STATE_REASON_UNKNOWN);
-            /* refresh if incoming and new state is not terminated */
-            if ((call_info->state != MM_CALL_STATE_TERMINATED) &&
-                (direction == MM_CALL_DIRECTION_INCOMING)) {
-                mm_base_call_incoming_refresh (call);
-            }
-            /* delete item from list and halt iteration right away */
+        /* if match found, delete item from list and halt iteration right away */
+        if (match_single_call_info (call_info, call)) {
             ctx->call_info_list = g_list_delete_link (ctx->call_info_list, l);
             return;
         }
@@ -231,6 +317,10 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
     mm_dbg ("Reported %u ongoing calls", g_list_length (call_info_list));
     for (l = call_info_list; l; l = g_list_next (l)) {
         MMCallInfo *call_info = (MMCallInfo *)(l->data);
+
+        /* When reporting full list of calls, index and state are mandatory */
+        g_assert (call_info->index != 0);
+        g_assert (call_info->state != MM_CALL_STATE_UNKNOWN);
 
         mm_dbg ("call at index %u: direction %s, state %s, number %s",
                 call_info->index,
