@@ -7853,6 +7853,30 @@ modem_voice_hangup_all (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* Join multiparty (Voice interface) */
+
+static gboolean
+modem_voice_join_multiparty_finish (MMIfaceModemVoice  *self,
+                                    GAsyncResult       *res,
+                                    GError            **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_voice_join_multiparty (MMIfaceModemVoice   *self,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CHLD=3",
+                              20,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Transfer (Voice interface) */
 
 static gboolean
@@ -12110,6 +12134,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->hangup_and_accept_finish = modem_voice_hangup_and_accept_finish;
     iface->hangup_all = modem_voice_hangup_all;
     iface->hangup_all_finish = modem_voice_hangup_all_finish;
+    iface->join_multiparty = modem_voice_join_multiparty;
+    iface->join_multiparty_finish = modem_voice_join_multiparty_finish;
     iface->transfer = modem_voice_transfer;
     iface->transfer_finish = modem_voice_transfer_finish;
 }
