@@ -462,6 +462,157 @@ handle_deflect (MMBaseCall            *self,
 }
 
 /*****************************************************************************/
+/* Join multiparty call (DBus call handling) */
+
+typedef struct {
+    MMBaseCall            *self;
+    MMBaseModem           *modem;
+    GDBusMethodInvocation *invocation;
+} HandleJoinMultipartyContext;
+
+static void
+handle_join_multiparty_context_free (HandleJoinMultipartyContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+modem_voice_join_multiparty_ready (MMIfaceModemVoice           *modem,
+                                   GAsyncResult                *res,
+                                   HandleJoinMultipartyContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_voice_join_multiparty_finish (modem, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_call_complete_join_multiparty (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+    handle_join_multiparty_context_free (ctx);
+}
+
+static void
+handle_join_multiparty_auth_ready (MMBaseModem                  *modem,
+                                   GAsyncResult                 *res,
+                                   HandleJoinMultipartyContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_join_multiparty_context_free (ctx);
+        return;
+    }
+
+    /* This action is provided in the Call API, but implemented in the Modem.Voice interface
+     * logic, because the action affects not only one call object, but all call objects that
+     * are part of the multiparty call. */
+    mm_iface_modem_voice_join_multiparty (MM_IFACE_MODEM_VOICE (ctx->modem),
+                                          ctx->self,
+                                          (GAsyncReadyCallback)modem_voice_join_multiparty_ready,
+                                          ctx);
+}
+
+static gboolean
+handle_join_multiparty (MMBaseCall            *self,
+                        GDBusMethodInvocation *invocation)
+{
+    HandleJoinMultipartyContext *ctx;
+
+    ctx = g_new0 (HandleJoinMultipartyContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_BASE_CALL_MODEM, &ctx->modem,
+                  NULL);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_join_multiparty_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Leave multiparty call (DBus call handling) */
+
+typedef struct {
+    MMBaseCall            *self;
+    MMBaseModem           *modem;
+    GDBusMethodInvocation *invocation;
+} HandleLeaveMultipartyContext;
+
+static void
+handle_leave_multiparty_context_free (HandleLeaveMultipartyContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+modem_voice_leave_multiparty_ready (MMIfaceModemVoice            *modem,
+                                    GAsyncResult                 *res,
+                                    HandleLeaveMultipartyContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_voice_leave_multiparty_finish (modem, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_call_complete_leave_multiparty (MM_GDBUS_CALL (ctx->self), ctx->invocation);
+
+    handle_leave_multiparty_context_free (ctx);
+}
+
+static void
+handle_leave_multiparty_auth_ready (MMBaseModem                  *modem,
+                                    GAsyncResult                 *res,
+                                    HandleLeaveMultipartyContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_leave_multiparty_context_free (ctx);
+        return;
+    }
+
+    /* This action is provided in the Call API, but implemented in the Modem.Voice interface
+     * logic, because the action affects not only one call object, but all call objects that
+     * are part of the multiparty call. */
+    mm_iface_modem_voice_leave_multiparty (MM_IFACE_MODEM_VOICE (ctx->modem),
+                                           ctx->self,
+                                           (GAsyncReadyCallback)modem_voice_leave_multiparty_ready,
+                                           ctx);
+}
+
+static gboolean
+handle_leave_multiparty (MMBaseCall            *self,
+                         GDBusMethodInvocation *invocation)
+{
+    HandleLeaveMultipartyContext *ctx;
+
+    ctx = g_new0 (HandleLeaveMultipartyContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_BASE_CALL_MODEM, &ctx->modem,
+                  NULL);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_leave_multiparty_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Hangup call (DBus call handling) */
 
 typedef struct {
@@ -708,6 +859,14 @@ call_dbus_export (MMBaseCall *self)
     g_signal_connect (self,
                       "handle-deflect",
                       G_CALLBACK (handle_deflect),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-join-multiparty",
+                      G_CALLBACK (handle_join_multiparty),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-leave-multiparty",
+                      G_CALLBACK (handle_leave_multiparty),
                       NULL);
     g_signal_connect (self,
                       "handle-hangup",

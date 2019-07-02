@@ -1262,6 +1262,288 @@ handle_transfer (MmGdbusModemVoice     *skeleton,
 }
 
 /*****************************************************************************/
+/* Leave one of the calls from the multiparty call */
+
+typedef struct {
+    MMBaseCall *call;
+    GList      *other_calls;
+} LeaveMultipartyContext;
+
+static void
+leave_multiparty_context_free (LeaveMultipartyContext *ctx)
+{
+    g_list_free_full (ctx->other_calls, g_object_unref);
+    g_object_unref (ctx->call);
+    g_slice_free (LeaveMultipartyContext, ctx);
+}
+
+static void
+prepare_leave_multiparty_foreach (MMBaseCall             *call,
+                                  LeaveMultipartyContext *ctx)
+{
+    /* ignore call that is leaving */
+    if ((call == ctx->call) || (g_strcmp0 (mm_base_call_get_path (call), mm_base_call_get_path (ctx->call)) == 0))
+        return;
+
+    /* ignore non-multiparty calls */
+    if (!mm_base_call_get_multiparty (call))
+        return;
+
+    /* ignore calls not currently ongoing */
+    switch (mm_base_call_get_state (call)) {
+    case MM_CALL_STATE_ACTIVE:
+    case MM_CALL_STATE_HELD:
+        ctx->other_calls = g_list_append (ctx->other_calls, g_object_ref (call));
+        break;
+    default:
+        break;
+    }
+}
+
+gboolean
+mm_iface_modem_voice_leave_multiparty_finish (MMIfaceModemVoice  *self,
+                                              GAsyncResult       *res,
+                                              GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+leave_multiparty_ready (MMIfaceModemVoice *self,
+                        GAsyncResult      *res,
+                        GTask             *task)
+{
+    GError                 *error = NULL;
+    LeaveMultipartyContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* If there is only one remaining call that was part of the multiparty, consider that
+     * one also no longer part of any multiparty, and put it on hold right away */
+    if (g_list_length (ctx->other_calls) == 1) {
+        mm_base_call_set_multiparty (MM_BASE_CALL (ctx->other_calls->data), FALSE);
+        mm_base_call_change_state (MM_BASE_CALL (ctx->other_calls->data), MM_CALL_STATE_HELD, MM_CALL_STATE_REASON_UNKNOWN);
+    }
+    /* If there are still more than one calls in the multiparty, just change state of all
+     * of them. */
+    else {
+        GList *l;
+
+        for (l = ctx->other_calls; l; l = g_list_next (l))
+            mm_base_call_change_state (MM_BASE_CALL (l->data), MM_CALL_STATE_HELD, MM_CALL_STATE_REASON_UNKNOWN);
+    }
+
+    /* The call that left would now be active */
+    mm_base_call_set_multiparty (ctx->call, FALSE);
+    mm_base_call_change_state (ctx->call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_UNKNOWN);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_iface_modem_voice_leave_multiparty (MMIfaceModemVoice   *self,
+                                       MMBaseCall          *call,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    GTask                  *task;
+    LeaveMultipartyContext *ctx;
+    MMCallList             *list = NULL;
+    MMCallState             call_state;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* validate multiparty status */
+    if (!mm_base_call_get_multiparty (call)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "this call is not part of a multiparty call");
+        g_object_unref (task);
+        return;
+    }
+    /* validate call state */
+    call_state = mm_base_call_get_state (call);
+    if ((call_state != MM_CALL_STATE_ACTIVE) && (call_state != MM_CALL_STATE_HELD)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "invalid call state (%s): must be either active or held",
+                                 mm_call_state_get_string (call_state));
+        g_object_unref (task);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty_finish) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot leave multiparty: unsupported");
+        g_object_unref (task);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+    if (!list) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot leave multiparty: missing call list");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (LeaveMultipartyContext);
+    ctx->call = g_object_ref (call);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) leave_multiparty_context_free);
+
+    mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_leave_multiparty_foreach, ctx);
+    g_object_unref (list);
+
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->leave_multiparty (self,
+                                                                 call,
+                                                                 (GAsyncReadyCallback)leave_multiparty_ready,
+                                                                 task);
+}
+
+/*****************************************************************************/
+/* Join calls into a multiparty call */
+
+typedef struct {
+    MMBaseCall *call;
+    GList      *all_calls;
+    gboolean    added;
+} JoinMultipartyContext;
+
+static void
+join_multiparty_context_free (JoinMultipartyContext *ctx)
+{
+    g_list_free_full (ctx->all_calls, g_object_unref);
+    g_object_unref (ctx->call);
+    g_slice_free (JoinMultipartyContext, ctx);
+}
+
+static void
+prepare_join_multiparty_foreach (MMBaseCall            *call,
+                                 JoinMultipartyContext *ctx)
+{
+    /* always add call that is being added */
+    if ((call == ctx->call) || (g_strcmp0 (mm_base_call_get_path (call), mm_base_call_get_path (ctx->call)) == 0))
+        ctx->added = TRUE;
+
+    /* ignore calls not currently ongoing */
+    switch (mm_base_call_get_state (call)) {
+    case MM_CALL_STATE_ACTIVE:
+    case MM_CALL_STATE_HELD:
+        ctx->all_calls = g_list_append (ctx->all_calls, g_object_ref (call));
+        break;
+    default:
+        break;
+    }
+}
+
+gboolean
+mm_iface_modem_voice_join_multiparty_finish (MMIfaceModemVoice  *self,
+                                             GAsyncResult       *res,
+                                             GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+join_multiparty_ready (MMIfaceModemVoice *self,
+                       GAsyncResult      *res,
+                       GTask             *task)
+{
+    GError                *error = NULL;
+    JoinMultipartyContext *ctx;
+    GList                 *l;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    for (l = ctx->all_calls; l; l = g_list_next (l)) {
+        mm_base_call_set_multiparty (MM_BASE_CALL (l->data), TRUE);
+        mm_base_call_change_state (MM_BASE_CALL (l->data), MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_UNKNOWN);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_iface_modem_voice_join_multiparty (MMIfaceModemVoice   *self,
+                                      MMBaseCall          *call,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+    GTask                 *task;
+    JoinMultipartyContext *ctx;
+    MMCallList            *list = NULL;
+    MMCallState            call_state;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* validate multiparty status */
+    if (mm_base_call_get_multiparty (call)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "this call is already part of a multiparty call");
+        g_object_unref (task);
+        return;
+    }
+    /* validate call state */
+    call_state = mm_base_call_get_state (call);
+    if (call_state != MM_CALL_STATE_HELD) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "invalid call state (%s): must be held",
+                                 mm_call_state_get_string (call_state));
+        g_object_unref (task);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty_finish) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot join multiparty: unsupported");
+        g_object_unref (task);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
+                  NULL);
+    if (!list) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot join multiparty: missing call list");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (JoinMultipartyContext);
+    ctx->call = g_object_ref (call);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) join_multiparty_context_free);
+
+    mm_call_list_foreach (list, (MMCallListForeachFunc)prepare_join_multiparty_foreach, ctx);
+    g_object_unref (list);
+
+    /* our logic makes sure that we would be adding the incoming call into the multiparty call */
+    g_assert (ctx->added);
+
+    /* NOTE: we do not give the call we want to join, because the join operation acts on all
+     * active/held calls. */
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->join_multiparty (self,
+                                                                (GAsyncReadyCallback)join_multiparty_ready,
+                                                                task);
+}
+
+/*****************************************************************************/
 /* In-call setup operation
  *
  * It will setup URC handlers for all in-call URCs, and also setup the audio

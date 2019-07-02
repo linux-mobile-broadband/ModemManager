@@ -53,6 +53,33 @@
     </method>
 
     <!--
+        JoinMultiparty:
+
+        Join the currently held call into a single multiparty call with another
+	already active call.
+
+        The calls will be flagged with the
+        '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Call.Multiparty">Multiparty</link>'
+        property while they are part of the multiparty call.
+
+        Applicable only if state is <link linkend="MM-CALL-STATE-HELD:CAPS"><constant>MM_CALL_STATE_HELD</constant></link>.
+    -->
+    <method name="JoinMultiparty" />
+
+    <!--
+        LeaveMultiparty:
+
+        If this call is part of an ongoing multiparty call, detach it from the multiparty call,
+        put the multiparty call on hold, and activate this one alone. This operation makes this
+        call private again between both ends of the call.
+
+        Applicable only if state is <link linkend="MM-CALL-STATE-ACTIVE:CAPS"><constant>MM_CALL_STATE_ACTIVE</constant></link> or
+        <link linkend="MM-CALL-STATE-HELD:CAPS"><constant>MM_CALL_STATE_HELD</constant></link> and
+        the call is a multiparty call.
+    -->
+    <method name="LeaveMultiparty"/>
+
+    <!--
         Hangup:
 
         Hangup the active call.

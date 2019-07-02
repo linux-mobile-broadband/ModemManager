@@ -150,6 +150,23 @@ struct _MMIfaceModemVoice {
                                     GAsyncResult         *res,
                                     GError              **error);
 
+    /* Join multiparty */
+    void     (* join_multiparty)        (MMIfaceModemVoice    *self,
+                                         GAsyncReadyCallback   callback,
+                                         gpointer              user_data);
+    gboolean (* join_multiparty_finish) (MMIfaceModemVoice    *self,
+                                         GAsyncResult         *res,
+                                         GError              **error);
+
+    /* Leave multiparty */
+    void     (* leave_multiparty)        (MMIfaceModemVoice    *self,
+                                          MMBaseCall           *call,
+                                          GAsyncReadyCallback   callback,
+                                          gpointer              user_data);
+    gboolean (* leave_multiparty_finish) (MMIfaceModemVoice    *self,
+                                          GAsyncResult         *res,
+                                          GError              **error);
+
     /* Transfer */
     void     (* transfer)        (MMIfaceModemVoice    *self,
                                   GAsyncReadyCallback   callback,
@@ -206,5 +223,26 @@ void mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
 void mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
                                          guint              index,
                                          const gchar       *dtmf);
+
+/* Join/Leave multiparty calls
+ *
+ * These actions are provided in the Call API, but implemented in the
+ * modem Voice interface because they really affect multiple calls at
+ * the same time.
+ */
+void     mm_iface_modem_voice_join_multiparty         (MMIfaceModemVoice    *self,
+                                                       MMBaseCall           *call,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+gboolean mm_iface_modem_voice_join_multiparty_finish  (MMIfaceModemVoice    *self,
+                                                       GAsyncResult         *res,
+                                                       GError              **error);
+void     mm_iface_modem_voice_leave_multiparty        (MMIfaceModemVoice    *self,
+                                                       MMBaseCall           *call,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+gboolean mm_iface_modem_voice_leave_multiparty_finish (MMIfaceModemVoice    *self,
+                                                       GAsyncResult         *res,
+                                                       GError              **error);
 
 #endif /* MM_IFACE_MODEM_VOICE_H */

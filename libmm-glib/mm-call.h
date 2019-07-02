@@ -127,6 +127,31 @@ gboolean           mm_call_deflect_sync     (MMCall *self,
                                              GCancellable *cancellable,
                                              GError **error);
 
+void               mm_call_join_multiparty        (MMCall              *self,
+                                                   GCancellable        *cancellable,
+                                                   GAsyncReadyCallback  callback,
+                                                   gpointer             user_data);
+
+gboolean           mm_call_join_multiparty_finish (MMCall        *self,
+                                                   GAsyncResult  *res,
+                                                   GError       **error);
+
+gboolean           mm_call_join_multiparty_sync   (MMCall        *self,
+                                                   GCancellable  *cancellable,
+                                                   GError       **error);
+
+void               mm_call_leave_multiparty        (MMCall              *self,
+                                                    GCancellable        *cancellable,
+                                                    GAsyncReadyCallback  callback,
+                                                    gpointer             user_data);
+
+gboolean           mm_call_leave_multiparty_finish (MMCall        *self,
+                                                    GAsyncResult  *res,
+                                                    GError       **error);
+
+gboolean           mm_call_leave_multiparty_sync   (MMCall        *self,
+                                                    GCancellable  *cancellable,
+                                                    GError       **error);
 
 void               mm_call_hangup           (MMCall *self,
                                              GCancellable *cancellable,
