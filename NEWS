@@ -1,3 +1,33 @@
+
+ModemManager 1.8.4
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * QMI:
+   ** Fix assertion when cleaning up event report indications.
+   ** Increased the number of open retries from 10 to 20, required e.g. for
+      the Telit LM940/960 modems.
+
+ * MBIM:
+   ** Fix detecting errors in "Register State Set" responses.
+
+ * 3GPP interface:
+   ** Use correct finish() method to complete user registration.
+
+ * Plugins:
+   ** u-blox: fix segfault when UACT? returns empty band list.
+
+ * Base/Broadband modem:
+   ** Fix error propagation in CDMA service status.
+   ** Fix segfault when disposing modem.
+
+ * libmm-glib:
+   ** Fix mm_manager_set_logging() operation.
+   ** Fix manager interface proxy creation.
+
+
 ModemManager 1.8.2
 -------------------------------------------
 This is a new bugfix release of ModemManager.
