@@ -1,4 +1,23 @@
 
+ModemManager 1.10.4
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * QMI:
+   ** Fix assertion when cleaning up event report indications.
+
+ * MBIM:
+   ** Fix detecting errors in "Register State Set" responses.
+
+ * 3GPP interface:
+   ** Use correct finish() method to complete user registration.
+
+ * Plugins:
+   ** u-blox: fix segfault when UACT? returns empty band list.
+
+
 ModemManager 1.10.2
 -------------------------------------------
 This is a new bugfix release of ModemManager.
