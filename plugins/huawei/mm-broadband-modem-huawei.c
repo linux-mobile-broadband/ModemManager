@@ -3190,6 +3190,96 @@ common_voice_setup_cleanup_unsolicited_events (MMBroadbandModemHuawei *self,
     }
 }
 
+/*****************************************************************************/
+/* Setup unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_setup_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                             GAsyncResult       *res,
+                                             GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                              GAsyncResult      *res,
+                                              GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->setup_unsolicited_events_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Our own setup now */
+    common_voice_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_HUAWEI (self), TRUE);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_setup_unsolicited_events (MMIfaceModemVoice   *self,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Chain up parent's setup */
+    iface_modem_voice_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_setup_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Cleanup unsolicited events (Voice interface) */
+
+static gboolean
+modem_voice_cleanup_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                               GAsyncResult       *res,
+                                               GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                               GAsyncResult      *res,
+                                               GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_cleanup_unsolicited_events (MMIfaceModemVoice   *self,
+                                        GAsyncReadyCallback  callback,
+                                        gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* cleanup our own */
+    common_voice_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_HUAWEI (self), FALSE);
+
+    /* Chain up parent's cleanup */
+    iface_modem_voice_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_cleanup_unsolicited_events_ready,
+        task);
+}
 
 /*****************************************************************************/
 /* Enabling unsolicited events (Voice interface) */
@@ -4601,6 +4691,10 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
 
     iface->check_support = modem_voice_check_support;
     iface->check_support_finish = modem_voice_check_support_finish;
+    iface->setup_unsolicited_events = modem_voice_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_voice_setup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_voice_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = modem_voice_enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = modem_voice_enable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_voice_disable_unsolicited_events;
