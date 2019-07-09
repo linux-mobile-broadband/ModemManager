@@ -130,7 +130,9 @@ void mm_iface_modem_time_bind_simple_status (MMIfaceModemTime *self,
 
 /* Implementations of the unsolicited events handling should call this method
  * to notify about the updated time */
-void mm_iface_modem_time_update_network_time (MMIfaceModemTime *self,
-                                              const gchar *network_time);
+void mm_iface_modem_time_update_network_time     (MMIfaceModemTime  *self,
+                                                  const gchar       *network_time);
+void mm_iface_modem_time_update_network_timezone (MMIfaceModemTime  *self,
+                                                  MMNetworkTimezone *tz);
 
 #endif /* MM_IFACE_MODEM_TIME_H */

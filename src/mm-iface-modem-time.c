@@ -354,6 +354,27 @@ mm_iface_modem_time_update_network_time (MMIfaceModemTime *self,
     g_object_unref (skeleton);
 }
 
+void
+mm_iface_modem_time_update_network_timezone (MMIfaceModemTime  *self,
+                                             MMNetworkTimezone *tz)
+{
+    MmGdbusModemTime *skeleton;
+    GVariant         *dictionary;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_TIME_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (!skeleton)
+        return;
+
+    dictionary = mm_network_timezone_get_dictionary (tz);
+    mm_gdbus_modem_time_set_network_timezone (skeleton, dictionary);
+    if (dictionary)
+        g_variant_unref (dictionary);
+
+    g_object_unref (skeleton);
+}
+
 /*****************************************************************************/
 
 typedef struct _DisablingContext DisablingContext;
