@@ -46,12 +46,14 @@ static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_location_init  (MMIfaceModemLocation  *iface);
 static void iface_modem_voice_init     (MMIfaceModemVoice     *iface);
+static void iface_modem_time_init      (MMIfaceModemTime      *iface);
 static void shared_cinterion_init      (MMSharedCinterion     *iface);
 
 static MMIfaceModem         *iface_modem_parent;
 static MMIfaceModem3gpp     *iface_modem_3gpp_parent;
 static MMIfaceModemLocation *iface_modem_location_parent;
 static MMIfaceModemVoice    *iface_modem_voice_parent;
+static MMIfaceModemTime     *iface_modem_time_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -59,6 +61,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_CINTERION, shared_cinterion_init))
 
 typedef enum {
@@ -1986,10 +1989,28 @@ peek_parent_voice_interface (MMSharedCinterion *self)
 }
 
 static void
+iface_modem_time_init (MMIfaceModemTime *iface)
+{
+    iface_modem_time_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_unsolicited_events          = mm_shared_cinterion_time_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish   = mm_shared_cinterion_time_setup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events        = mm_shared_cinterion_time_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = mm_shared_cinterion_time_cleanup_unsolicited_events_finish;
+}
+
+static MMIfaceModemTime *
+peek_parent_time_interface (MMSharedCinterion *self)
+{
+    return iface_modem_time_parent;
+}
+
+static void
 shared_cinterion_init (MMSharedCinterion *iface)
 {
     iface->peek_parent_location_interface = peek_parent_location_interface;
     iface->peek_parent_voice_interface    = peek_parent_voice_interface;
+    iface->peek_parent_time_interface     = peek_parent_time_interface;
 }
 
 static void

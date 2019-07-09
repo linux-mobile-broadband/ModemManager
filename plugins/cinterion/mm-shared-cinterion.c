@@ -53,11 +53,15 @@ typedef struct {
     MMIfaceModemVoice     *iface_modem_voice_parent;
     FeatureSupport         slcc_support;
     GRegex                *slcc_regex;
+    /* time */
+    MMIfaceModemTime      *iface_modem_time_parent;
+    GRegex                *ctzu_regex;
 } Private;
 
 static void
 private_free (Private *ctx)
 {
+    g_regex_unref (ctx->ctzu_regex);
     g_regex_unref (ctx->slcc_regex);
     g_slice_free (Private, ctx);
 }
@@ -80,14 +84,18 @@ get_private (MMSharedCinterion *self)
         priv->sgpsc_support = FEATURE_SUPPORT_UNKNOWN;
         priv->slcc_support = FEATURE_SUPPORT_UNKNOWN;
         priv->slcc_regex = mm_cinterion_get_slcc_regex ();
+        priv->ctzu_regex = mm_cinterion_get_ctzu_regex ();
 
-        /* Setup parent class' MMIfaceModemLocation and MMIfaceModemVoice */
+        /* Setup parent class' MMIfaceModemLocation, MMIfaceModemVoice and MMIfaceModemTime */
 
         g_assert (MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_location_interface (self);
 
         g_assert (MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_voice_interface);
         priv->iface_modem_voice_parent = MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_voice_interface (self);
+
+        g_assert (MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_time_interface);
+        priv->iface_modem_time_parent = MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_time_interface (self);
 
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
@@ -1331,6 +1339,191 @@ mm_shared_cinterion_voice_check_support (MMIfaceModemVoice   *self,
         self,
         (GAsyncReadyCallback)parent_voice_check_support_ready,
         task);
+}
+
+/*****************************************************************************/
+/* Common setup/cleanup time unsolicited events */
+
+static void
+ctzu_received (MMPortSerialAt    *port,
+               GMatchInfo        *match_info,
+               MMSharedCinterion *self)
+{
+    gchar             *iso8601 = NULL;
+    MMNetworkTimezone *tz = NULL;
+    GError            *error = NULL;
+
+    if (!mm_cinterion_parse_ctzu_urc (match_info, &iso8601, &tz, &error)) {
+        mm_dbg ("Couldn't process +CTZU URC: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+
+    g_assert (iso8601);
+    mm_dbg ("+CTZU URC received: %s", iso8601);
+    mm_iface_modem_time_update_network_time (MM_IFACE_MODEM_TIME (self), iso8601);
+    g_free (iso8601);
+
+    g_assert (tz);
+    mm_iface_modem_time_update_network_timezone (MM_IFACE_MODEM_TIME (self), tz);
+    g_object_unref (tz);
+}
+
+static void
+common_time_setup_cleanup_unsolicited_events (MMSharedCinterion *self,
+                                              gboolean           enable)
+{
+    Private        *priv;
+    MMPortSerialAt *ports[2];
+    guint           i;
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    mm_dbg ("%s up time unsolicited events...",
+            enable ? "Setting" : "Cleaning");
+
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       priv->ctzu_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)ctzu_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+    }
+}
+
+/*****************************************************************************/
+/* Cleanup unsolicited events (Time interface) */
+
+gboolean
+mm_shared_cinterion_time_cleanup_unsolicited_events_finish (MMIfaceModemTime  *self,
+                                                            GAsyncResult      *res,
+                                                            GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_time_cleanup_unsolicited_events_ready (MMIfaceModemTime *self,
+                                              GAsyncResult     *res,
+                                              GTask            *task)
+{
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+
+    if (!priv->iface_modem_time_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't cleanup parent time unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_shared_cinterion_time_cleanup_unsolicited_events (MMIfaceModemTime    *self,
+                                                     GAsyncReadyCallback  callback,
+                                                     gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+    g_assert (priv->iface_modem_time_parent);
+
+    /* our own cleanup first */
+    common_time_setup_cleanup_unsolicited_events (MM_SHARED_CINTERION (self), FALSE);
+
+    if (priv->iface_modem_time_parent->cleanup_unsolicited_events &&
+        priv->iface_modem_time_parent->cleanup_unsolicited_events_finish) {
+        /* Chain up parent's cleanup */
+        priv->iface_modem_time_parent->cleanup_unsolicited_events (
+            self,
+            (GAsyncReadyCallback)parent_time_cleanup_unsolicited_events_ready,
+            task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Setup unsolicited events (Time interface) */
+
+gboolean
+mm_shared_cinterion_time_setup_unsolicited_events_finish (MMIfaceModemTime  *self,
+                                                          GAsyncResult      *res,
+                                                          GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+own_time_setup_unsolicited_events (GTask *task)
+{
+    MMSharedCinterion *self;
+
+    self = g_task_get_source_object (task);
+
+    /* our own setup next */
+    common_time_setup_cleanup_unsolicited_events (MM_SHARED_CINTERION (self), TRUE);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_time_setup_unsolicited_events_ready (MMIfaceModemTime *self,
+                                            GAsyncResult     *res,
+                                            GTask            *task)
+{
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+
+    if (!priv->iface_modem_time_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't cleanup parent time unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    own_time_setup_unsolicited_events (task);
+}
+
+void
+mm_shared_cinterion_time_setup_unsolicited_events (MMIfaceModemTime    *self,
+                                                   GAsyncReadyCallback  callback,
+                                                   gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+    g_assert (priv->iface_modem_time_parent);
+
+    if (priv->iface_modem_time_parent->setup_unsolicited_events &&
+        priv->iface_modem_time_parent->setup_unsolicited_events_finish) {
+        /* chain up parent's setup first */
+        priv->iface_modem_time_parent->setup_unsolicited_events (
+            self,
+            (GAsyncReadyCallback)parent_time_setup_unsolicited_events_ready,
+            task);
+        return;
+    }
+
+    own_time_setup_unsolicited_events (task);
 }
 
 /*****************************************************************************/
