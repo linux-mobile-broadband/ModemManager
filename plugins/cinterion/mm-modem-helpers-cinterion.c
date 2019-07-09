@@ -795,3 +795,73 @@ mm_cinterion_call_info_list_free (GList *call_info_list)
 {
     g_list_free_full (call_info_list, (GDestroyNotify) cinterion_call_info_free);
 }
+
+/*****************************************************************************/
+/* +CTZU URC helpers */
+
+GRegex *
+mm_cinterion_get_ctzu_regex (void)
+{
+    /*
+     * From PLS-8 AT command spec:
+     *  +CTZU:<nitzUT>, <nitzTZ>[, <nitzDST>]
+     * E.g.:
+     *  +CTZU: "19/07/09,10:19:15",+08,1
+     */
+
+    return g_regex_new ("\\r\\n\\+CTZU:\\s*\"(\\d+)\\/(\\d+)\\/(\\d+),(\\d+):(\\d+):(\\d+)\",([\\-\\+\\d]+)(?:,(\\d+))?(?:\\r\\n)?",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+gboolean
+mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
+                             gchar             **iso8601p,
+                             MMNetworkTimezone **tzp,
+                             GError            **error)
+{
+    guint year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0, dst = 0;
+    gint tz = 0;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &year)   ||
+        !mm_get_uint_from_match_info (match_info, 2, &month)  ||
+        !mm_get_uint_from_match_info (match_info, 3, &day)    ||
+        !mm_get_uint_from_match_info (match_info, 4, &hour)   ||
+        !mm_get_uint_from_match_info (match_info, 5, &minute) ||
+        !mm_get_uint_from_match_info (match_info, 6, &second) ||
+        !mm_get_int_from_match_info  (match_info, 7, &tz)) {
+        g_set_error_literal (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Failed to parse +CTZU URC");
+        return FALSE;
+    }
+
+    /* adjust year */
+    if (year < 100)
+        year += 2000;
+
+    /*
+     * tz = timezone offset in 15 minute intervals
+     */
+    if (iso8601p) {
+        /* Return ISO-8601 format date/time string */
+        *iso8601p = mm_new_iso8601_time (year, month, day, hour,
+                                         minute, second,
+                                         TRUE, tz * 15);
+    }
+
+    if (tzp) {
+        *tzp = mm_network_timezone_new ();
+        mm_network_timezone_set_offset (*tzp, tz * 15);
+    }
+
+    /* dst flag is optional in the URC
+    *
+     * tz = timezone offset in 15 minute intervals
+     * dst = daylight adjustment, 0 = none, 1 = 1 hour, 2 = 2 hours
+     */
+    if (tzp && mm_get_uint_from_match_info (match_info, 8, &dst))
+        mm_network_timezone_set_dst_offset (*tzp, dst * 60);
+
+    return TRUE;
+}

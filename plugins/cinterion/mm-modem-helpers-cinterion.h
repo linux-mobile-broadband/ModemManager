@@ -22,6 +22,8 @@
 
 #include <ModemManager.h>
 #include <mm-base-bearer.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
 
 /*****************************************************************************/
 /* ^SCFG test parser */
@@ -97,5 +99,14 @@ gboolean mm_cinterion_parse_slcc_list     (const gchar  *str,
                                            GList       **out_list,
                                            GError      **error);
 void     mm_cinterion_call_info_list_free (GList        *call_info_list);
+
+/*****************************************************************************/
+/* +CTZU URC helpers */
+
+GRegex   *mm_cinterion_get_ctzu_regex (void);
+gboolean  mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
+                                       gchar             **iso8601p,
+                                       MMNetworkTimezone **tzp,
+                                       GError            **error);
 
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

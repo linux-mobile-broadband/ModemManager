@@ -793,6 +793,69 @@ test_slcc_urc_complex (void)
 }
 
 /*****************************************************************************/
+/* Test +CTZU URCs */
+
+static void
+common_test_ctzu_urc (const gchar *urc,
+                      const gchar *expected_iso8601,
+                      gint         expected_offset,
+                      gint         expected_dst_offset)
+{
+    GError            *error = NULL;
+    GRegex            *ctzu_regex = NULL;
+    gboolean           result;
+    GMatchInfo        *match_info = NULL;
+    gchar             *iso8601;
+    MMNetworkTimezone *tz = NULL;
+
+    ctzu_regex = mm_cinterion_get_ctzu_regex ();
+
+    /* Same matching logic as done in MMSerialPortAt when processing URCs! */
+    result = g_regex_match_full (ctzu_regex, urc, -1, 0, 0, &match_info, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    result = mm_cinterion_parse_ctzu_urc (match_info, &iso8601, &tz, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    g_assert (iso8601);
+    g_assert_cmpstr (expected_iso8601, ==, iso8601);
+    g_free (iso8601);
+
+    g_assert (tz);
+    g_assert_cmpint (expected_offset, ==, mm_network_timezone_get_offset (tz));
+
+    if (expected_dst_offset >= 0)
+        g_assert_cmpuint ((guint)expected_dst_offset, ==, mm_network_timezone_get_dst_offset (tz));
+
+    g_object_unref (tz);
+    g_regex_unref (ctzu_regex);
+}
+
+static void
+test_ctzu_urc_simple (void)
+{
+    const gchar *urc = "\r\n+CTZU: \"19/07/09,11:15:40\",+08\r\n";
+    const gchar *expected_iso8601    = "2019-07-09T11:15:40+02:00";
+    gint         expected_offset     = 120;
+    gint         expected_dst_offset = -1; /* not given */
+
+    common_test_ctzu_urc (urc, expected_iso8601, expected_offset, expected_dst_offset);
+}
+
+static void
+test_ctzu_urc_full (void)
+{
+    const gchar *urc = "\r\n+CTZU: \"19/07/09,11:15:40\",+08,1\r\n";
+    const gchar *expected_iso8601    = "2019-07-09T11:15:40+02:00";
+    gint         expected_offset     = 120;
+    gint         expected_dst_offset = 60;
+
+    common_test_ctzu_urc (urc, expected_iso8601, expected_offset, expected_dst_offset);
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -835,6 +898,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/slcc/urc/single",         test_slcc_urc_single);
     g_test_add_func ("/MM/cinterion/slcc/urc/multiple",       test_slcc_urc_multiple);
     g_test_add_func ("/MM/cinterion/slcc/urc/complex",        test_slcc_urc_complex);
+    g_test_add_func ("/MM/cinterion/ctzu/urc/simple",         test_ctzu_urc_simple);
+    g_test_add_func ("/MM/cinterion/ctzu/urc/full",           test_ctzu_urc_full);
 
     return g_test_run ();
 }
