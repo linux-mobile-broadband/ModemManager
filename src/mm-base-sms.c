@@ -1143,7 +1143,7 @@ send_generic_ready (MMBaseModem *modem,
      * sent right away (not queued after other AT commands). */
     mm_base_modem_at_command_raw (ctx->modem,
                                   ctx->msg_data,
-                                  10,
+                                  60,
                                   FALSE,
                                   (GAsyncReadyCallback)send_generic_msg_data_ready,
                                   task);
@@ -1214,7 +1214,7 @@ sms_send_next_part (GTask *task)
                                mm_sms_part_get_index ((MMSmsPart *)ctx->current->data));
         mm_base_modem_at_command (ctx->modem,
                                   cmd,
-                                  30,
+                                  60,
                                   FALSE,
                                   (GAsyncReadyCallback)send_from_storage_ready,
                                   task);
@@ -1241,7 +1241,7 @@ sms_send_next_part (GTask *task)
     g_assert (ctx->msg_data != NULL);
     mm_base_modem_at_command (ctx->modem,
                               cmd,
-                              30,
+                              60,
                               FALSE,
                               (GAsyncReadyCallback)send_generic_ready,
                               task);
