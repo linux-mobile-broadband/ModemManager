@@ -201,7 +201,7 @@ mm_cinterion_parse_scfg_response (const gchar *response,
     r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*\"?([0-9a-fA-F]*)\"?", 0, 0, NULL);
     g_assert (r != NULL);
 
-    if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+    if (g_regex_match (r, response, 0, &match_info)) {
         gchar *currentstr;
         guint current = 0;
 
@@ -441,7 +441,7 @@ mm_cinterion_parse_sind_response (const gchar *response,
     r = g_regex_new ("\\^SIND:\\s*(.*),(\\d+),(\\d+)(\\r\\n)?", 0, 0, NULL);
     g_assert (r != NULL);
 
-    if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+    if (g_regex_match (r, response, 0, &match_info)) {
         if (description) {
             *description = mm_get_string_unquoted_from_match_info (match_info, 1);
             if (*description == NULL)

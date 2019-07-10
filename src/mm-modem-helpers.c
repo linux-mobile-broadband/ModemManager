@@ -1880,7 +1880,7 @@ mm_3gpp_parse_cmgf_test_response (const gchar *reply,
     if (!r)
         return FALSE;
 
-    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+    if (!g_regex_match (r, reply, 0, &match_info)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -1931,7 +1931,7 @@ mm_3gpp_parse_cmgr_read_response (const gchar *reply,
     r = g_regex_new ("\\+CMGR:\\s*(\\d+)\\s*,([^,]*),\\s*(\\d+)\\s*([^\\r\\n]*)", 0, 0, NULL);
     g_assert (r);
 
-    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+    if (!g_regex_match (r, reply, 0, &match_info)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -2013,7 +2013,7 @@ mm_3gpp_parse_crsm_response (const gchar *reply,
                      G_REGEX_RAW, 0, NULL);
     g_assert (r != NULL);
 
-    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL) &&
+    if (g_regex_match (r, reply, 0, &match_info) &&
         mm_get_uint_from_match_info (match_info, 1, sw1) &&
         mm_get_uint_from_match_info (match_info, 2, sw2))
         *hex = mm_get_string_unquoted_from_match_info (match_info, 3);
@@ -2652,7 +2652,7 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
         array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
 
         /* Got a range group to match */
-        if (g_regex_match_full (r, split[i], strlen (split[i]), 0, 0, &match_info, NULL)) {
+        if (g_regex_match (r, split[i], 0, &match_info)) {
             while (g_match_info_matches (match_info)) {
                 gchar *str;
 
@@ -2816,7 +2816,7 @@ mm_3gpp_parse_cscs_test_response (const gchar *reply,
     if (!r)
         return FALSE;
 
-    if (g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
+    if (g_regex_match (r, p, 0, &match_info)) {
         while (g_match_info_matches (match_info)) {
             str = g_match_info_fetch (match_info, 1);
             charsets |= mm_modem_charset_from_string (str);
@@ -2858,7 +2858,7 @@ mm_3gpp_parse_clck_test_response (const gchar *reply,
     g_assert (r != NULL);
 
     *out_facilities = MM_MODEM_3GPP_FACILITY_NONE;
-    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+    if (g_regex_match (r, reply, 0, &match_info)) {
         while (g_match_info_matches (match_info)) {
             gchar *str;
 
@@ -3175,7 +3175,7 @@ mm_3gpp_parse_cind_test_response (const gchar *reply,
 
     hash = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) cind_response_free);
 
-    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+    if (g_regex_match (r, reply, 0, &match_info)) {
         while (g_match_info_matches (match_info)) {
             MM3gppCindResponse *resp;
             gchar *desc, *tmp;
@@ -3232,7 +3232,7 @@ mm_3gpp_parse_cind_read_response (const gchar *reply,
     r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
-    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+    if (!g_regex_match (r, reply, 0, &match_info)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Could not parse the +CIND response '%s': didn't match",
                      reply);

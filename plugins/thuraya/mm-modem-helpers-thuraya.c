@@ -99,7 +99,7 @@ mm_thuraya_3gpp_parse_cpms_test_response (const gchar *reply,
         array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
 
         /* Got a range group to match */
-        if (g_regex_match_full (r, splita[i], strlen (splita[i]), 0, 0, &match_info, NULL)) {
+        if (g_regex_match (r, splita[i], 0, &match_info)) {
             while (g_match_info_matches (match_info)) {
                 gchar *str;
 

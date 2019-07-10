@@ -261,7 +261,7 @@ wwsm_read_ready (MMBaseModem  *self,
     r = g_regex_new ("\\r\\n\\+WWSM: ([0-2])(,([0-2]))?.*$", 0, 0, NULL);
     g_assert (r != NULL);
 
-    if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+    if (g_regex_match (r, response, 0, &match_info)) {
         guint allowed = 0;
 
         if (mm_get_uint_from_match_info (match_info, 1, &allowed)) {

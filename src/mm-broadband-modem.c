@@ -6959,7 +6959,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
                      0, 0, NULL);
     g_assert (r);
 
-    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+    if (!g_regex_match (r, response, 0, &match_info)) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_INVALID_ARGS,
