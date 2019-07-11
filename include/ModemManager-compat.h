@@ -27,6 +27,7 @@
 /**
  * SECTION:mm-compat
  * @title: API break replacements
+ * @short_description: List of deprecated methods, types and symbols.
  *
  * These compatibility types and methods are flagged as deprecated and
  * therefore shouldn't be used in newly written code. They are provided to
