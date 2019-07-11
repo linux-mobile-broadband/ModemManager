@@ -58,6 +58,8 @@
  * @minor: minor version (e.g. 2 for version 1.2.5)
  * @micro: micro version (e.g. 5 for version 1.2.5)
  *
+ * Checks the version of ModemManager at compile time.
+ *
  * Returns: %TRUE if the version of the ModemManager header files
  * is the same as or newer than the passed-in version.
  */
