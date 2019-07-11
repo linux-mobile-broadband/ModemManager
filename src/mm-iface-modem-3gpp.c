@@ -129,46 +129,64 @@ reg_state_is_registered (MMModem3gppRegistrationState state)
 static MMModem3gppRegistrationState
 get_consolidated_reg_state (RegistrationStateContext *ctx)
 {
+    MMModem3gppRegistrationState consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+
     /* Some devices (Blackberries for example) will respond to +CGREG, but
      * return ERROR for +CREG, probably because their firmware is just stupid.
      * So here we prefer the +CREG response, but if we never got a successful
      * +CREG response, we'll take +CGREG instead.
      */
     if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
-        return ctx->cs;
+        ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        consolidated = ctx->cs;
+        goto out;
+    }
     if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
-        return ctx->ps;
+        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        consolidated = ctx->ps;
+        goto out;
+    }
     if (ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
-        return ctx->eps;
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        consolidated = ctx->eps;
+        goto out;
+    }
 
     /* Searching? */
     if (ctx->cs  == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
         ctx->ps  == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
-         return MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING;
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING) {
+         consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING;
+         goto out;
+    }
 
-    /* If one state is DENIED and the others are UNKNOWN, use DENIED */
+    /* If one state is DENIED and the others are UNKNOWN or IDLE, use DENIED */
     if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED &&
         ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN)
-        return ctx->cs;
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN) {
+        consolidated = ctx->cs;
+        goto out;
+    }
     if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
         ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED &&
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN)
-        return ctx->ps;
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN) {
+        consolidated = ctx->ps;
+        goto out;
+    }
     if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
         ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN &&
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
-        return ctx->eps;
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) {
+        consolidated = ctx->eps;
+        goto out;
+    }
 
     /* Emergency services? */
     if (ctx->cs  == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
         ctx->ps  == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY)
-         return MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY;
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY) {
+         consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY;
+         goto out;
+    }
 
     /* Support for additional registration states reported when on LTE.
      *
@@ -188,17 +206,27 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
         ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
         mm_warn ("3GPP CSFB registration state is consolidated: %s",
                  mm_modem_3gpp_registration_state_get_string (ctx->cs));
-        return ctx->cs;
+        consolidated = ctx->cs;
+        goto out;
     }
 
     /* Idle? */
     if (ctx->cs  == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||
         ctx->ps  == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE)
-         return MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE) {
+         consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+         goto out;
+    }
 
-    /* Just unknown at this point */
-    return MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+
+ out:
+    mm_dbg ("building consolidated registration state: cs '%s', ps '%s', eps '%s' --> '%s'",
+            mm_modem_3gpp_registration_state_get_string (ctx->cs),
+            mm_modem_3gpp_registration_state_get_string (ctx->ps),
+            mm_modem_3gpp_registration_state_get_string (ctx->eps),
+            mm_modem_3gpp_registration_state_get_string (consolidated));
+
+    return consolidated;
 }
 
 /*****************************************************************************/
