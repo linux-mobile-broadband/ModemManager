@@ -1403,6 +1403,8 @@ typedef enum { /*< underscore_name=mm_call_state_reason >*/
  * @MM_CALL_DIRECTION_UNKNOWN: unknown.
  * @MM_CALL_DIRECTION_INCOMING: call from network.
  * @MM_CALL_DIRECTION_OUTGOING: call to network.
+ *
+ * Direction of the call.
  */
 typedef enum { /*< underscore_name=mm_call_direction >*/
     MM_CALL_DIRECTION_UNKNOWN   = 0,
