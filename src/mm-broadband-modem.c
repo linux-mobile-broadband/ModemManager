@@ -13,7 +13,8 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2011 - 2012 Google, Inc.
- * Copyright (C) 2015 - Marco Bascetta <marco.bascetta@sadel.it>
+ * Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
+ * Copyright (C) 2019 Purism SPC
  */
 
 #include <config.h>

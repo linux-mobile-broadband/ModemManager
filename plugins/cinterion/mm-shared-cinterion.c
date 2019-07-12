@@ -12,6 +12,7 @@
  *
  * Copyright (C) 2014 Ammonit Measurement GmbH
  * Copyright (C) 2014 - 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2019 Purism SPC
  */
 
 #include <config.h>

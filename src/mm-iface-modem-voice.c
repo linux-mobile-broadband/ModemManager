@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2015 - Marco Bascetta <marco.bascetta@sadel.it>
+ * Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
+ * Copyright (C) 2019 Purism SPC
  */
 
 #include <ModemManager.h>

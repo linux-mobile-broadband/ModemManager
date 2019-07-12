@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2015 Riccardo Vangelisti <riccardo.vangelisti@sadel.it>
+ * Copyright (C) 2019 Purism SPC
  */
 
 #ifndef MM_BASE_CALL_H

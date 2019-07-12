@@ -10,9 +10,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2016 Trimble Navigation Limited
  * Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
- * Contributor: Matthew Stanger <matthew_stanger@trimble.com>
+ * Copyright (C) 2016 Trimble Navigation Limited
+ * Copyright (C) 2016 Matthew Stanger <matthew_stanger@trimble.com>
+ * Copyright (C) 2019 Purism SPC
  */
 
 #include <config.h>
