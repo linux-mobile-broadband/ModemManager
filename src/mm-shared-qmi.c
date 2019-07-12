@@ -143,6 +143,31 @@ get_private (MMSharedQmi *self)
 /*****************************************************************************/
 /* Register in network (3GPP interface) */
 
+/* wait this amount of time at most if we don't get the serving system
+ * indication earlier */
+#define REGISTER_IN_NETWORK_TIMEOUT_SECS 25
+
+typedef struct {
+    guint         timeout_id;
+    gulong        serving_system_indication_id;
+    GCancellable *cancellable;
+    gulong        cancellable_id;
+    QmiClientNas *client;
+} RegisterInNetworkContext;
+
+static void
+register_in_network_context_free (RegisterInNetworkContext *ctx)
+{
+    g_assert (!ctx->cancellable_id);
+    g_assert (!ctx->timeout_id);
+    if (ctx->client) {
+        g_assert (!ctx->serving_system_indication_id);
+        g_object_unref (ctx->client);
+    }
+    g_clear_object (&ctx->cancellable);
+    g_slice_free (RegisterInNetworkContext, ctx);
+}
+
 gboolean
 mm_shared_qmi_3gpp_register_in_network_finish (MMIfaceModem3gpp  *self,
                                                GAsyncResult      *res,
@@ -152,27 +177,150 @@ mm_shared_qmi_3gpp_register_in_network_finish (MMIfaceModem3gpp  *self,
 }
 
 static void
+register_in_network_cancelled (GCancellable *cancellable,
+                               GTask        *task)
+{
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->cancellable);
+    g_assert (ctx->cancellable_id);
+    ctx->cancellable_id = 0;
+
+    g_assert (ctx->timeout_id);
+    g_source_remove (ctx->timeout_id);
+    ctx->timeout_id = 0;
+
+    g_assert (ctx->client);
+    g_assert (ctx->serving_system_indication_id);
+    g_signal_handler_disconnect (ctx->client, ctx->serving_system_indication_id);
+    ctx->serving_system_indication_id = 0;
+
+    g_assert (g_task_return_error_if_cancelled (task));
+    g_object_unref (task);
+}
+
+static gboolean
+register_in_network_timeout (GTask *task)
+{
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->timeout_id);
+    ctx->timeout_id = 0;
+
+    g_assert (ctx->client);
+    g_assert (ctx->serving_system_indication_id);
+    g_signal_handler_disconnect (ctx->client, ctx->serving_system_indication_id);
+    ctx->serving_system_indication_id = 0;
+
+    g_assert (!ctx->cancellable || ctx->cancellable_id);
+    g_cancellable_disconnect (ctx->cancellable, ctx->cancellable_id);
+    ctx->cancellable_id = 0;
+
+    /* the 3GPP interface will take care of checking if the registration is
+     * the one we asked for */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+register_in_network_ready (GTask                               *task,
+                           QmiIndicationNasServingSystemOutput *output)
+{
+    RegisterInNetworkContext *ctx;
+    QmiNasRegistrationState   registration_state;
+
+    /* ignore indication updates reporting "searching" */
+    qmi_indication_nas_serving_system_output_get_serving_system (
+            output,
+            &registration_state,
+            NULL, /* cs_attach_state  */
+            NULL, /* ps_attach_state  */
+            NULL, /* selected_network */
+            NULL, /* radio_interfaces */
+            NULL);
+    if (registration_state == QMI_NAS_REGISTRATION_STATE_NOT_REGISTERED_SEARCHING)
+        return;
+
+    ctx = g_task_get_task_data (task);
+
+    g_assert (ctx->client);
+    g_assert (ctx->serving_system_indication_id);
+    g_signal_handler_disconnect (ctx->client, ctx->serving_system_indication_id);
+    ctx->serving_system_indication_id = 0;
+
+    g_assert (ctx->timeout_id);
+    g_source_remove (ctx->timeout_id);
+    ctx->timeout_id = 0;
+
+    g_assert (!ctx->cancellable || ctx->cancellable_id);
+    g_cancellable_disconnect (ctx->cancellable, ctx->cancellable_id);
+    ctx->cancellable_id = 0;
+
+    /* the 3GPP interface will take care of checking if the registration is
+     * the one we asked for */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 initiate_network_register_ready (QmiClientNas *client,
                                  GAsyncResult *res,
                                  GTask        *task)
 {
     GError                                     *error = NULL;
     QmiMessageNasInitiateNetworkRegisterOutput *output;
+    RegisterInNetworkContext                   *ctx;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_nas_initiate_network_register_finish (client, res, &error);
     if (!output || !qmi_message_nas_initiate_network_register_output_get_result (output, &error)) {
-        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+        /* No effect would mean we're already in the desired network */
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_task_return_boolean (task, TRUE);
+            g_error_free (error);
+        } else {
             g_prefix_error (&error, "Couldn't initiate network register: ");
             g_task_return_error (task, error);
-            goto out;
         }
-        g_error_free (error);
+        g_object_unref (task);
+        goto out;
     }
 
-    g_task_return_boolean (task, TRUE);
+    /* Registration attempt started, now we need to monitor "serving system" indications
+     * to get notified when the registration changed. Note that we won't need to process
+     * the indication, because we already have that logic setup (and it runs before this
+     * new signal handler), we just need to get notified of when it happens. We will also
+     * setup a maximum operation timeuot plus a cancellability point, as this operation
+     * may be explicitly cancelled by the 3GPP interface if a new registration request
+     * arrives while the current one is being processed.
+     *
+     * Task is shared among cancellable, indication and timeout. The first one triggered
+     * will cancel the others.
+     */
+
+    if (ctx->cancellable)
+        ctx->cancellable_id = g_cancellable_connect (ctx->cancellable,
+                                                     G_CALLBACK (register_in_network_cancelled),
+                                                     task,
+                                                     NULL);
+
+    ctx->serving_system_indication_id = g_signal_connect_swapped (client,
+                                                                  "serving-system",
+                                                                  G_CALLBACK (register_in_network_ready),
+                                                                  task);
+
+    ctx->timeout_id = g_timeout_add_seconds (REGISTER_IN_NETWORK_TIMEOUT_SECS,
+                                             (GSourceFunc) register_in_network_timeout,
+                                             task);
 
 out:
-    g_object_unref (task);
 
     if (output)
         qmi_message_nas_initiate_network_register_output_unref (output);
@@ -186,9 +334,10 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
                                         gpointer             user_data)
 {
     GTask                                     *task;
+    RegisterInNetworkContext                  *ctx;
     QmiMessageNasInitiateNetworkRegisterInput *input;
-    guint16                                    mcc = 0;
-    guint16                                    mnc = 0;
+    guint16                                    mcc;
+    guint16                                    mnc;
     QmiClient                                 *client = NULL;
     GError                                    *error = NULL;
 
@@ -198,7 +347,12 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
                                       callback, user_data))
         return;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    ctx = g_slice_new0 (RegisterInNetworkContext);
+    ctx->client = g_object_ref (client);
+    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
 
     /* Parse input MCC/MNC */
     if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error)) {
