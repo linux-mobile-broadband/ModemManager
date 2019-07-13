@@ -26,6 +26,8 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-ublox.h"
 
+#include "test-helpers.h"
+
 /*****************************************************************************/
 /* Test +UPINCNT responses */
 
@@ -488,36 +490,6 @@ test_urat_write_command (void)
 /* Test +UBANDSEL? response parser */
 
 static void
-common_compare_bands (GArray            *bands,
-                      const MMModemBand *expected_bands,
-                      guint              n_expected_bands)
-{
-    gchar  *bands_str;
-    GArray *expected_bands_array;
-    gchar  *expected_bands_str;
-
-    if (!expected_bands || !n_expected_bands) {
-        g_assert (!bands);
-        return;
-    }
-
-    g_assert (bands);
-    mm_common_bands_garray_sort (bands);
-    bands_str = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
-    g_array_unref (bands);
-
-    expected_bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_expected_bands);
-    g_array_append_vals (expected_bands_array, expected_bands, n_expected_bands);
-    mm_common_bands_garray_sort (expected_bands_array);
-    expected_bands_str = mm_common_build_bands_string ((MMModemBand *)(expected_bands_array->data), expected_bands_array->len);
-    g_array_unref (expected_bands_array);
-
-    g_assert_cmpstr (bands_str, ==, expected_bands_str);
-    g_free (bands_str);
-    g_free (expected_bands_str);
-}
-
-static void
 common_validate_ubandsel_response (const gchar       *str,
                                    const MMModemBand *expected_bands,
                                    const gchar       *model,
@@ -530,7 +502,8 @@ common_validate_ubandsel_response (const gchar       *str,
     g_assert_no_error (error);
     g_assert (bands);
 
-    common_compare_bands (bands, expected_bands, n_expected_bands);
+    mm_test_helpers_compare_bands (bands, expected_bands, n_expected_bands);
+    g_array_unref (bands);
 }
 
 static void
@@ -655,7 +628,8 @@ common_validate_uact_response (const gchar       *str,
     if (n_expected_bands > 0) {
         g_assert (bands);
         g_assert_no_error (error);
-        common_compare_bands (bands, expected_bands, n_expected_bands);
+        mm_test_helpers_compare_bands (bands, expected_bands, n_expected_bands);
+        g_array_unref (bands);
     } else {
         g_assert (!bands);
         g_assert (error);
@@ -731,9 +705,15 @@ common_validate_uact_test (const gchar       *str,
     g_assert_no_error (error);
     g_assert (result);
 
-    common_compare_bands (bands_2g, expected_bands_2g, n_expected_bands_2g);
-    common_compare_bands (bands_3g, expected_bands_3g, n_expected_bands_3g);
-    common_compare_bands (bands_4g, expected_bands_4g, n_expected_bands_4g);
+    mm_test_helpers_compare_bands (bands_2g, expected_bands_2g, n_expected_bands_2g);
+    if (bands_2g)
+        g_array_unref (bands_2g);
+    mm_test_helpers_compare_bands (bands_3g, expected_bands_3g, n_expected_bands_3g);
+    if (bands_3g)
+        g_array_unref (bands_3g);
+    mm_test_helpers_compare_bands (bands_4g, expected_bands_4g, n_expected_bands_4g);
+    if (bands_4g)
+        g_array_unref (bands_4g);
 }
 
 static void

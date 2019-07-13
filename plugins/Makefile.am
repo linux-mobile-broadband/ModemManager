@@ -78,6 +78,8 @@ libmm_test_common_la_SOURCES = \
 	tests/test-fixture.c \
 	tests/test-port-context.h \
 	tests/test-port-context.c \
+	tests/test-helpers.h \
+	tests/test-helpers.c \
 	$(NULL)
 libmm_test_common_la_CPPFLAGS = \
 	-I$(top_builddir)/libmm-glib/generated/tests \
@@ -98,11 +100,12 @@ TEST_COMMON_COMPILER_FLAGS = \
 	-I$(top_srcdir)/libmm-glib/generated \
 	-I$(top_builddir)/libmm-glib/generated \
 	-I$(top_builddir)/libmm-glib/generated/tests \
-	-DCOMMON_GSM_PORT_CONF=\""$(abs_top_srcdir)/plugins/tests/gsm-port.conf"\"
+	-DCOMMON_GSM_PORT_CONF=\""$(abs_top_srcdir)/plugins/tests/gsm-port.conf"\" \
+	$(NULL)
 
 TEST_COMMON_LIBADD_FLAGS = \
 	$(builddir)/libmm-test-common.la \
-	$(top_builddir)/libmm-glib/libmm-glib.la
+	$(NULL)
 
 ################################################################################
 # common icera support
@@ -310,7 +313,10 @@ libmm_plugin_generic_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 noinst_PROGRAMS += test-service-generic
 test_service_generic_SOURCES  = generic/tests/test-service-generic.c
 test_service_generic_CPPFLAGS = $(TEST_COMMON_COMPILER_FLAGS)
-test_service_generic_LDADD    = $(TEST_COMMON_LIBADD_FLAGS)
+test_service_generic_LDADD    = \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(TEST_COMMON_LIBADD_FLAGS) \
+	$(NULL)
 
 ################################################################################
 # plugin: motorola
@@ -1016,8 +1022,12 @@ noinst_PROGRAMS += test-modem-helpers-ublox
 test_modem_helpers_ublox_SOURCES = \
 	ublox/tests/test-modem-helpers-ublox.c \
 	$(NULL)
-test_modem_helpers_ublox_CPPFLAGS = $(PLUGIN_UBLOX_COMPILER_FLAGS)
+test_modem_helpers_ublox_CPPFLAGS = \
+	$(PLUGIN_UBLOX_COMPILER_FLAGS) \
+	$(TEST_COMMON_COMPILER_FLAGS) \
+	$(NULL)
 test_modem_helpers_ublox_LDADD = \
+	$(TEST_COMMON_LIBADD_FLAGS) \
 	$(builddir)/libhelpers-ublox.la \
 	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
