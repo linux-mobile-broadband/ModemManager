@@ -7957,6 +7957,74 @@ modem_voice_transfer (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* Call waiting setup (Voice interface) */
+
+static gboolean
+modem_voice_call_waiting_setup_finish (MMIfaceModemVoice  *self,
+                                       GAsyncResult       *res,
+                                       GError            **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_voice_call_waiting_setup (MMIfaceModemVoice   *self,
+                                gboolean             enable,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
+{
+    gchar *cmd;
+
+    /* Enabling or disabling the call waiting service will only be allowed when
+     * the modem is registered in the network, and so, CCWA URC handling will
+     * always be setup at this point (as it's part of the modem enabling phase).
+     * So, just enable or disable the service (second field) but leaving URCs
+     * (first field) always enabled. */
+    cmd = g_strdup_printf ("+CCWA=1,%u", enable);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              60,
+                              FALSE,
+                              callback,
+                              user_data);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
+/* Call waiting query (Voice interface) */
+
+static gboolean
+modem_voice_call_waiting_query_finish (MMIfaceModemVoice  *self,
+                                       GAsyncResult       *res,
+                                       gboolean           *status,
+                                       GError            **error)
+{
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    return mm_3gpp_parse_ccwa_service_query_response (response, status, error);
+}
+
+static void
+modem_voice_call_waiting_query (MMIfaceModemVoice   *self,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
+{
+    /* This operation will only be allowed while enabled, and so, CCWA URC
+     * handling would always be enabled at this point. So, just perform the
+     * query, but leaving URCs enabled either way. */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CCWA=1,2",
+                              60,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* ESN loading (CDMA interface) */
 
 static gchar *
@@ -12196,6 +12264,10 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->leave_multiparty_finish = modem_voice_leave_multiparty_finish;
     iface->transfer = modem_voice_transfer;
     iface->transfer_finish = modem_voice_transfer_finish;
+    iface->call_waiting_setup = modem_voice_call_waiting_setup;
+    iface->call_waiting_setup_finish = modem_voice_call_waiting_setup_finish;
+    iface->call_waiting_query = modem_voice_call_waiting_query;
+    iface->call_waiting_query_finish = modem_voice_call_waiting_query_finish;
 }
 
 static void

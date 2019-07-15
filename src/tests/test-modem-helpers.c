@@ -4019,6 +4019,63 @@ test_ccwa_indication (void)
 }
 
 /*****************************************************************************/
+/* +CCWA service query response testing */
+
+static void
+common_test_ccwa_response (const gchar *response,
+                           gboolean     expected_status,
+                           gboolean     expected_error)
+{
+    gboolean  status = FALSE;
+    GError   *error = NULL;
+    gboolean  result;
+
+    result = mm_3gpp_parse_ccwa_service_query_response (response, &status, &error);
+
+    if (expected_error) {
+        g_assert (!result);
+        g_assert (error);
+        g_error_free (error);
+    } else {
+        g_assert (result);
+        g_assert_no_error (error);
+        g_assert_cmpuint (status, ==, expected_status);
+    }
+}
+
+typedef struct {
+    const gchar *response;
+    gboolean     expected_status;
+    gboolean     expected_error;
+} TestCcwa;
+
+static TestCcwa test_ccwa[] = {
+    { "+CCWA: 0,255", FALSE, FALSE }, /* all disabled */
+    { "+CCWA: 1,255", TRUE,  FALSE }, /* all enabled */
+    { "+CCWA: 0,1\r\n"
+      "+CCWA: 0,4\r\n", FALSE,  FALSE }, /* voice and fax disabled */
+    { "+CCWA: 1,1\r\n"
+      "+CCWA: 1,4\r\n", TRUE,  FALSE }, /* voice and fax enabled */
+    { "+CCWA: 0,2\r\n"
+      "+CCWA: 0,4\r\n"
+      "+CCWA: 0,8\r\n", FALSE,  TRUE }, /* data, fax, sms disabled, voice not given */
+    { "+CCWA: 1,2\r\n"
+      "+CCWA: 1,4\r\n"
+      "+CCWA: 1,8\r\n", FALSE,  TRUE }, /* data, fax, sms enabled, voice not given */
+    { "+CCWA: 2,1\r\n"
+      "+CCWA: 2,4\r\n", FALSE,  TRUE }, /* voice and fax enabled but unexpected state */
+};
+
+static void
+test_ccwa_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_ccwa); i++)
+        common_test_ccwa_response (test_ccwa[i].response, test_ccwa[i].expected_status, test_ccwa[i].expected_error);
+}
+
+/*****************************************************************************/
 /* Test +CLCC URCs */
 
 static void
@@ -4435,6 +4492,7 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_clip_indication, NULL));
     g_test_suite_add (suite, TESTCASE (test_ccwa_indication, NULL));
+    g_test_suite_add (suite, TESTCASE (test_ccwa_response, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_clcc_response_empty, NULL));
     g_test_suite_add (suite, TESTCASE (test_clcc_response_single, NULL));

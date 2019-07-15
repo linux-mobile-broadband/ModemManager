@@ -2724,6 +2724,85 @@ mm_3gpp_parse_cemode_query_response (const gchar                    *response,
 }
 
 /*************************************************************************/
+/* CCWA service query response parser */
+
+gboolean
+mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
+                                           gboolean     *status,
+                                           GError      **error)
+{
+    GRegex     *r;
+    GError     *inner_error = NULL;
+    GMatchInfo *match_info  = NULL;
+    gint        class_1_status = -1;
+
+    /*
+     * AT+CCWA=<n>[,<mode>]
+     *   +CCWA: <status>,<class1>
+     *   [+CCWA: <status>,<class2>
+     *   [...]]
+     *   OK
+     *
+     * If <classX> is 255 it applies to ALL classes.
+     *
+     * We're only interested in class 1 (voice)
+     */
+    r = g_regex_new ("\\+CCWA:\\s*(\\d+),\\s*(\\d+)$",
+                     G_REGEX_RAW | G_REGEX_MULTILINE | G_REGEX_NEWLINE_CRLF,
+                     G_REGEX_MATCH_NEWLINE_CRLF,
+                     NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        goto out;
+
+    /* Parse the results */
+    while (g_match_info_matches (match_info)) {
+        guint st;
+        guint class;
+
+        if (!mm_get_uint_from_match_info (match_info, 2, &class))
+            mm_warn ("couldn't parse class from +CCWA line");
+        else if (class == 1 || class == 255) {
+            if (!mm_get_uint_from_match_info (match_info, 1, &st))
+                mm_warn ("couldn't parse status from +CCWA line");
+            else {
+                class_1_status = st;
+                break;
+            }
+        }
+        g_match_info_next (match_info, NULL);
+    }
+
+out:
+    g_clear_pointer (&match_info, g_match_info_free);
+    g_regex_unref (r);
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (class_1_status < 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                     "call waiting status for voice class missing");
+        return FALSE;
+    }
+
+    if (class_1_status != 0 && class_1_status != 1) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "call waiting status for voice class invalid: %d", class_1_status);
+        return FALSE;
+    }
+
+    if (status)
+        *status = (gboolean) class_1_status;
+
+    return TRUE;
+}
+
+/*************************************************************************/
 
 static MMSmsStorage
 storage_from_str (const gchar *str)

@@ -397,6 +397,12 @@ gboolean  mm_3gpp_parse_cemode_query_response (const gchar                    *r
                                                MMModem3gppEpsUeModeOperation  *out_mode,
                                                GError                        **error);
 
+/* CCWA service query response parser */
+gboolean mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
+                                                    gboolean     *status,
+                                                    GError      **error);
+
+
 /* Additional 3GPP-specific helpers */
 
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);
