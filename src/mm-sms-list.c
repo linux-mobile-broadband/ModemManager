@@ -278,9 +278,12 @@ take_multipart (MMSmsList *self,
     l = g_list_find_custom (self->priv->list,
                             GUINT_TO_POINTER (concat_reference),
                             (GCompareFunc)cmp_sms_by_concat_reference);
-    if (l)
+    if (l) {
         /* Try to take the part */
+        mm_dbg ("Found existing multipart SMS object with reference '%u': adding new part",
+                concat_reference);
         return mm_base_sms_multipart_take_part (MM_BASE_SMS (l->data), part, error);
+    }
 
     /* Create new Multipart */
     sms = mm_base_sms_multipart_new (self->priv->modem,
@@ -293,6 +296,9 @@ take_multipart (MMSmsList *self,
     if (!sms)
         return FALSE;
 
+    mm_dbg ("Creating new multipart SMS object: need to receive %u parts with reference '%u'",
+            mm_sms_part_get_concat_max (part),
+            concat_reference);
     self->priv->list = g_list_prepend (self->priv->list, sms);
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
                    mm_base_sms_get_path (sms),
@@ -343,15 +349,17 @@ mm_sms_list_take_part (MMSmsList *self,
     /* Did we just get a part of a multi-part SMS? */
     if (mm_sms_part_should_concat (part)) {
         if (mm_sms_part_get_index (part) != SMS_PART_INVALID_INDEX)
-            mm_dbg ("SMS part at '%s/%u' is from a multipart SMS (reference: '%u', sequence: '%u')",
+            mm_dbg ("SMS part at '%s/%u' is from a multipart SMS (reference: '%u', sequence: '%u/%u')",
                     mm_sms_storage_get_string (storage),
                     mm_sms_part_get_index (part),
                     mm_sms_part_get_concat_reference (part),
-                    mm_sms_part_get_concat_sequence (part));
+                    mm_sms_part_get_concat_sequence (part),
+                    mm_sms_part_get_concat_max (part));
         else
-            mm_dbg ("SMS part (not stored) is from a multipart SMS (reference: '%u', sequence: '%u')",
+            mm_dbg ("SMS part (not stored) is from a multipart SMS (reference: '%u', sequence: '%u/%u')",
                     mm_sms_part_get_concat_reference (part),
-                    mm_sms_part_get_concat_sequence (part));
+                    mm_sms_part_get_concat_sequence (part),
+                    mm_sms_part_get_concat_max (part));
 
         return take_multipart (self, part, state, storage, error);
     }
