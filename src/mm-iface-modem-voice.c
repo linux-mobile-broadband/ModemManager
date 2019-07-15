@@ -1263,6 +1263,204 @@ handle_transfer (MmGdbusModemVoice     *skeleton,
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemVoice     *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemVoice     *self;
+    gboolean               enable;
+} HandleCallWaitingSetupContext;
+
+static void
+handle_call_waiting_setup_context_free (HandleCallWaitingSetupContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleCallWaitingSetupContext, ctx);
+}
+
+static void
+call_waiting_setup_ready (MMIfaceModemVoice             *self,
+                          GAsyncResult                  *res,
+                          HandleCallWaitingSetupContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_call_waiting_setup_context_free (ctx);
+        return;
+    }
+
+    mm_gdbus_modem_voice_complete_call_waiting_setup (ctx->skeleton, ctx->invocation);
+    handle_call_waiting_setup_context_free (ctx);
+}
+
+static void
+handle_call_waiting_setup_auth_ready (MMBaseModem                   *self,
+                                      GAsyncResult                  *res,
+                                      HandleCallWaitingSetupContext *ctx)
+{
+    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
+    GError       *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_call_waiting_setup_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot setup call waiting: device not yet enabled");
+        handle_call_waiting_setup_context_free (ctx);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot setup call waiting: unsupported");
+        handle_call_waiting_setup_context_free (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_setup (MM_IFACE_MODEM_VOICE (self),
+                                                                   ctx->enable,
+                                                                   (GAsyncReadyCallback)call_waiting_setup_ready,
+                                                                   ctx);
+}
+
+static gboolean
+handle_call_waiting_setup (MmGdbusModemVoice     *skeleton,
+                           GDBusMethodInvocation *invocation,
+                           gboolean               enable,
+                           MMIfaceModemVoice     *self)
+{
+    HandleCallWaitingSetupContext *ctx;
+
+    ctx = g_slice_new0 (HandleCallWaitingSetupContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+    ctx->enable     = enable;
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_call_waiting_setup_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemVoice     *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemVoice     *self;
+    gboolean               enable;
+} HandleCallWaitingQueryContext;
+
+static void
+handle_call_waiting_query_context_free (HandleCallWaitingQueryContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_slice_free (HandleCallWaitingQueryContext, ctx);
+}
+
+static void
+call_waiting_query_ready (MMIfaceModemVoice             *self,
+                          GAsyncResult                  *res,
+                          HandleCallWaitingQueryContext *ctx)
+{
+    GError   *error = NULL;
+    gboolean  status = FALSE;
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query_finish (self, res, &status, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_call_waiting_query_context_free (ctx);
+        return;
+    }
+
+    mm_gdbus_modem_voice_complete_call_waiting_query (ctx->skeleton, ctx->invocation, status);
+    handle_call_waiting_query_context_free (ctx);
+}
+
+static void
+handle_call_waiting_query_auth_ready (MMBaseModem                   *self,
+                                      GAsyncResult                  *res,
+                                      HandleCallWaitingQueryContext *ctx)
+{
+    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
+    GError       *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_call_waiting_query_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot query call waiting: device not yet enabled");
+        handle_call_waiting_query_context_free (ctx);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query ||
+        !MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot query call waiting: unsupported");
+        handle_call_waiting_query_context_free (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->call_waiting_query (MM_IFACE_MODEM_VOICE (self),
+                                                                   (GAsyncReadyCallback)call_waiting_query_ready,
+                                                                   ctx);
+}
+
+static gboolean
+handle_call_waiting_query (MmGdbusModemVoice     *skeleton,
+                           GDBusMethodInvocation *invocation,
+                           MMIfaceModemVoice     *self)
+{
+    HandleCallWaitingQueryContext *ctx;
+
+    ctx = g_slice_new0 (HandleCallWaitingQueryContext);
+    ctx->skeleton   = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self       = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_VOICE,
+                             (GAsyncReadyCallback)handle_call_waiting_query_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Leave one of the calls from the multiparty call */
 
 typedef struct {
@@ -2773,13 +2971,15 @@ interface_initialization_step (GTask *task)
     case INITIALIZATION_STEP_LAST:
         /* Setup all method handlers */
         g_object_connect (ctx->skeleton,
-                          "signal::handle-create-call",       G_CALLBACK (handle_create),            self,
-                          "signal::handle-delete-call",       G_CALLBACK (handle_delete),            self,
-                          "signal::handle-list-calls",        G_CALLBACK (handle_list),              self,
-                          "signal::handle-hangup-and-accept", G_CALLBACK (handle_hangup_and_accept), self,
-                          "signal::handle-hold-and-accept",   G_CALLBACK (handle_hold_and_accept),   self,
-                          "signal::handle-hangup-all",        G_CALLBACK (handle_hangup_all),        self,
-                          "signal::handle-transfer",          G_CALLBACK (handle_transfer),          self,
+                          "signal::handle-create-call",        G_CALLBACK (handle_create),             self,
+                          "signal::handle-delete-call",        G_CALLBACK (handle_delete),             self,
+                          "signal::handle-list-calls",         G_CALLBACK (handle_list),               self,
+                          "signal::handle-hangup-and-accept",  G_CALLBACK (handle_hangup_and_accept),  self,
+                          "signal::handle-hold-and-accept",    G_CALLBACK (handle_hold_and_accept),    self,
+                          "signal::handle-hangup-all",         G_CALLBACK (handle_hangup_all),         self,
+                          "signal::handle-transfer",           G_CALLBACK (handle_transfer),           self,
+                          "signal::handle-call-waiting-setup", G_CALLBACK (handle_call_waiting_setup), self,
+                          "signal::handle-call-waiting-query", G_CALLBACK (handle_call_waiting_query), self,
                           NULL);
 
         /* Finally, export the new interface */

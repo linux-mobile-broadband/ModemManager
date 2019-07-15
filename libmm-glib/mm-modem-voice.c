@@ -848,6 +848,175 @@ mm_modem_voice_transfer_sync (MMModemVoice  *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_voice_call_waiting_setup_finish:
+ * @self: A #MMModemVoice.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_voice_call_waiting_setup().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_voice_call_waiting_setup().
+ *
+ * Returns: %TRUE if  @status is set, %FALSE if @error is set.
+ * Since: 1.12
+ */
+gboolean
+mm_modem_voice_call_waiting_setup_finish (MMModemVoice  *self,
+                                          GAsyncResult  *res,
+                                          GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
+
+    return mm_gdbus_modem_voice_call_call_waiting_setup_finish (MM_GDBUS_MODEM_VOICE (self), res, error);
+}
+
+/**
+ * mm_modem_voice_call_waiting_setup:
+ * @self: A #MMModemVoice.
+ * @enable: Whether the call waiting service should be enabled.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously enables or disables the call waiting network service.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_voice_call_waiting_setup_finish() to get the result of the operation.
+ *
+ * See mm_modem_voice_call_waiting_setup_sync() for the synchronous, blocking version of this method.
+ *
+ * Since: 1.12
+ */
+void
+mm_modem_voice_call_waiting_setup (MMModemVoice        *self,
+                                   gboolean             enable,
+                                   GCancellable        *cancellable,
+                                   GAsyncReadyCallback  callback,
+                                   gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_VOICE (self));
+
+    mm_gdbus_modem_voice_call_call_waiting_setup (MM_GDBUS_MODEM_VOICE (self),
+                                                  enable,
+                                                  cancellable,
+                                                  callback,
+                                                  user_data);
+}
+
+/**
+ * mm_modem_voice_call_waiting_setup_sync:
+ * @self: A #MMModemVoice.
+ * @enable: Whether the call waiting service should be enabled.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously enables or disables the call waiting network service.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_voice_call_waiting_setup()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the operation is successful, %FALSE if @error is set.
+ * Since: 1.12
+ */
+gboolean
+mm_modem_voice_call_waiting_setup_sync (MMModemVoice  *self,
+                                        gboolean       enable,
+                                        GCancellable  *cancellable,
+                                        GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
+
+    return mm_gdbus_modem_voice_call_call_waiting_setup_sync (MM_GDBUS_MODEM_VOICE (self),
+                                                              enable,
+                                                              cancellable,
+                                                              error);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_voice_call_waiting_query_finish:
+ * @self: A #MMModemVoice.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_voice_call_waiting_query().
+ * @status: Output location where to store the status.
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_voice_call_waiting_query().
+ *
+ * Returns: %TRUE if @status is set, %FALSE if @error is set.
+ * Since: 1.12
+ */
+gboolean
+mm_modem_voice_call_waiting_query_finish (MMModemVoice  *self,
+                                          GAsyncResult  *res,
+                                          gboolean      *status,
+                                          GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
+
+    return mm_gdbus_modem_voice_call_call_waiting_query_finish (MM_GDBUS_MODEM_VOICE (self), status, res, error);
+}
+
+/**
+ * mm_modem_voice_call_waiting_query:
+ * @self: A #MMModemVoice.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously queries the status of the call waiting network service.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_voice_call_waiting_query_finish() to get the result of the operation.
+ *
+ * See mm_modem_voice_call_waiting_query_sync() for the synchronous, blocking version of this method.
+ *
+ * Since: 1.12
+ */
+void
+mm_modem_voice_call_waiting_query (MMModemVoice        *self,
+                                   GCancellable        *cancellable,
+                                   GAsyncReadyCallback  callback,
+                                   gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_VOICE (self));
+
+    mm_gdbus_modem_voice_call_call_waiting_query (MM_GDBUS_MODEM_VOICE (self),
+                                                  cancellable,
+                                                  callback,
+                                                  user_data);
+}
+
+/**
+ * mm_modem_voice_call_waiting_query_sync:
+ * @self: A #MMModemVoice.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @status: Output location where to store the status.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously queries the status of the call waiting network service.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_voice_call_waiting_query()
+ * for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if @status is set, %FALSE if @error is set.
+ * Since: 1.12
+ */
+gboolean
+mm_modem_voice_call_waiting_query_sync (MMModemVoice  *self,
+                                        GCancellable  *cancellable,
+                                        gboolean      *status,
+                                        GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_VOICE (self), FALSE);
+
+    return mm_gdbus_modem_voice_call_call_waiting_query_sync (MM_GDBUS_MODEM_VOICE (self),
+                                                              status,
+                                                              cancellable,
+                                                              error);
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_voice_init (MMModemVoice *self)
 {

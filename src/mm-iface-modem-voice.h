@@ -175,6 +175,24 @@ struct _MMIfaceModemVoice {
     gboolean (* transfer_finish) (MMIfaceModemVoice    *self,
                                   GAsyncResult         *res,
                                   GError              **error);
+
+    /* Call waiting setup */
+    void     (* call_waiting_setup)        (MMIfaceModemVoice    *self,
+                                            gboolean              enable,
+                                            GAsyncReadyCallback   callback,
+                                            gpointer              user_data);
+    gboolean (* call_waiting_setup_finish) (MMIfaceModemVoice    *self,
+                                            GAsyncResult         *res,
+                                            GError              **error);
+
+    /* Call waiting query */
+    void     (* call_waiting_query)        (MMIfaceModemVoice    *self,
+                                            GAsyncReadyCallback   callback,
+                                            gpointer              user_data);
+    gboolean (* call_waiting_query_finish) (MMIfaceModemVoice    *self,
+                                            GAsyncResult         *res,
+                                            gboolean             *status,
+                                            GError              **error);
 };
 
 GType mm_iface_modem_voice_get_type (void);
