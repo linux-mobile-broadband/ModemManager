@@ -170,6 +170,7 @@ Makefile.in
 /test/lsudev
 /test/mmtty
 /test/mmrules
+/test/mmsmspdu
 
 /ModemManager-*-coverage.info
 /ModemManager-*-coverage/
