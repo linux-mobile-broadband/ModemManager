@@ -1507,16 +1507,45 @@ mm_base_sms_delete (MMBaseSms *self,
 
 /*****************************************************************************/
 
-static gboolean
-assemble_sms (MMBaseSms *self,
-              GError **error)
+static void
+initialize_sms (MMBaseSms *self)
 {
-    GList *l;
-    guint idx;
+    MMSmsPart *part;
+    guint      validity_relative;
+
+    /* Some of the fields of the SMS object may be initialized as soon as we have
+     * one part already available, even if it's not exactly the first one */
+    g_assert (self->priv->parts);
+    part = (MMSmsPart *)(self->priv->parts->data);
+
+    /* Prepare for validity tuple */
+    validity_relative = mm_sms_part_get_validity_relative (part);
+
+    g_object_set (self,
+                  "pdu-type",            mm_sms_part_get_pdu_type (part),
+                  "smsc",                mm_sms_part_get_smsc (part),
+                  "class",               mm_sms_part_get_class (part),
+                  "teleservice-id",      mm_sms_part_get_cdma_teleservice_id (part),
+                  "service-category",    mm_sms_part_get_cdma_service_category (part),
+                  "number",              mm_sms_part_get_number (part),
+                  "validity",            (validity_relative ?
+                                          g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (validity_relative)) :
+                                          g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_UNKNOWN, g_variant_new_boolean (FALSE))),
+                  "timestamp",           mm_sms_part_get_timestamp (part),
+                  "discharge-timestamp", mm_sms_part_get_discharge_timestamp (part),
+                  "delivery-state",      mm_sms_part_get_delivery_state (part),
+                  NULL);
+}
+
+static gboolean
+assemble_sms (MMBaseSms  *self,
+              GError    **error)
+{
+    GList      *l;
+    guint       idx;
     MMSmsPart **sorted_parts;
-    GString *fulltext;
+    GString    *fulltext;
     GByteArray *fulldata;
-    guint validity_relative;
 
     sorted_parts = g_new0 (MMSmsPart *, self->priv->max_parts);
 
@@ -1604,30 +1633,15 @@ assemble_sms (MMBaseSms *self,
     /* If we got all parts, we also have the first one always */
     g_assert (sorted_parts[0] != NULL);
 
-    /* Prepare for validity tuple */
-    validity_relative = mm_sms_part_get_validity_relative (sorted_parts[0]);
-
     /* If we got everything, assemble the text! */
     g_object_set (self,
-                  "pdu-type",  mm_sms_part_get_pdu_type (sorted_parts[0]),
-                  "text",      fulltext->str,
-                  "data",      g_variant_new_from_data (G_VARIANT_TYPE ("ay"),
-                                                        fulldata->data,
-                                                        fulldata->len * sizeof (guint8),
-                                                        TRUE,
-                                                        (GDestroyNotify) g_byte_array_unref,
-                                                        g_byte_array_ref (fulldata)),
-                  "smsc",      mm_sms_part_get_smsc (sorted_parts[0]),
-                  "class",     mm_sms_part_get_class (sorted_parts[0]),
-                  "teleservice-id",   mm_sms_part_get_cdma_teleservice_id (sorted_parts[0]),
-                  "service-category", mm_sms_part_get_cdma_service_category (sorted_parts[0]),
-                  "number",    mm_sms_part_get_number (sorted_parts[0]),
-                  "validity",                (validity_relative ?
-                                              g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (validity_relative)) :
-                                              g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_UNKNOWN, g_variant_new_boolean (FALSE))),
-                  "timestamp",               mm_sms_part_get_timestamp (sorted_parts[0]),
-                  "discharge-timestamp",     mm_sms_part_get_discharge_timestamp (sorted_parts[0]),
-                  "delivery-state",          mm_sms_part_get_delivery_state (sorted_parts[0]),
+                  "text", fulltext->str,
+                  "data", g_variant_new_from_data (G_VARIANT_TYPE ("ay"),
+                                                   fulldata->data,
+                                                   fulldata->len * sizeof (guint8),
+                                                   TRUE,
+                                                   (GDestroyNotify) g_byte_array_unref,
+                                                   g_byte_array_ref (fulldata)),
                   /* delivery report request and message reference taken always from the last part */
                   "message-reference",       mm_sms_part_get_message_reference (sorted_parts[self->priv->max_parts - 1]),
                   "delivery-report-request", mm_sms_part_get_delivery_report_request (sorted_parts[self->priv->max_parts - 1]),
@@ -1699,6 +1713,10 @@ mm_base_sms_multipart_take_part (MMBaseSms *self,
                                               part,
                                               (GCompareFunc)cmp_sms_part_sequence);
 
+    /* If this is the first part we take, initialize common SMS fields */
+    if (g_list_length (self->priv->parts) == 1)
+        initialize_sms (self);
+
     /* We only populate contents when the multipart SMS is complete */
     if (mm_base_sms_multipart_is_complete (self)) {
         GError *inner_error = NULL;
@@ -1748,6 +1766,9 @@ mm_base_sms_singlepart_new (MMBaseModem *modem,
 
     /* Keep the single part in the list */
     self->priv->parts = g_list_prepend (self->priv->parts, part);
+
+    /* Initialize common SMS fields */
+    initialize_sms (self);
 
     if (!assemble_sms (self, error)) {
         /* Note: we need to remove the part from the list, as we really didn't
