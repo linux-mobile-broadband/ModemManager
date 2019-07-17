@@ -171,6 +171,7 @@ Makefile.in
 /test/mmtty
 /test/mmrules
 /test/mmsmspdu
+/test/mmsmsmonitor
 
 /ModemManager-*-coverage.info
 /ModemManager-*-coverage/
