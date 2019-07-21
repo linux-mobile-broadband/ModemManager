@@ -2696,10 +2696,14 @@ handle_set_current_bands (MmGdbusModem *skeleton,
 /*****************************************************************************/
 /* Set current modes */
 
+#define AFTER_SET_LOAD_CURRENT_MODES_RETRIES      5
+#define AFTER_SET_LOAD_CURRENT_MODES_TIMEOUT_SECS 1
+
 typedef struct {
     MmGdbusModem *skeleton;
-    MMModemMode allowed;
-    MMModemMode preferred;
+    MMModemMode   allowed;
+    MMModemMode   preferred;
+    guint         retries;
 } SetCurrentModesContext;
 
 static void
@@ -2707,7 +2711,7 @@ set_current_modes_context_free (SetCurrentModesContext *ctx)
 {
     if (ctx->skeleton)
         g_object_unref (ctx->skeleton);
-    g_free (ctx);
+    g_slice_free (SetCurrentModesContext, ctx);
 }
 
 gboolean
@@ -2717,6 +2721,8 @@ mm_iface_modem_set_current_modes_finish (MMIfaceModem *self,
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
+
+static void set_current_modes_reload_schedule (GTask *task);
 
 static void
 after_set_load_current_modes_ready (MMIfaceModem *self,
@@ -2735,18 +2741,92 @@ after_set_load_current_modes_ready (MMIfaceModem *self,
                                                                          &allowed,
                                                                          &preferred,
                                                                          &error)) {
+        /* If we can retry, do it */
+        if (ctx->retries > 0) {
+            mm_dbg ("couldn't load current allowed/preferred modes: '%s'", error->message);
+            g_error_free (error);
+            set_current_modes_reload_schedule (task);
+            return;
+        }
+
         /* Errors when getting allowed/preferred won't be critical */
         mm_warn ("couldn't load current allowed/preferred modes: '%s'", error->message);
-        g_error_free (error);
+        g_clear_error (&error);
 
         /* If errors getting allowed modes, default to the ones we asked for */
         mm_gdbus_modem_set_current_modes (ctx->skeleton, g_variant_new ("(uu)", ctx->allowed, ctx->preferred));
-    } else
-        mm_gdbus_modem_set_current_modes (ctx->skeleton, g_variant_new ("(uu)", allowed, preferred));
+        goto out;
+    }
 
-    /* Done */
-    g_task_return_boolean (task, TRUE);
+    /* Store as current the last loaded ones and set operation result */
+    mm_gdbus_modem_set_current_modes (ctx->skeleton, g_variant_new ("(uu)", allowed, preferred));
+
+    /* Compare modes. If the requested one was ANY, we won't consider an error if the
+     * result differs. */
+    if (((allowed != ctx->allowed) || (preferred != ctx->preferred)) && (ctx->allowed != MM_MODEM_MODE_ANY)) {
+        gchar *requested_allowed_str;
+        gchar *requested_preferred_str;
+        gchar *current_allowed_str;
+        gchar *current_preferred_str;
+
+        /* If we can retry, do it */
+        if (ctx->retries > 0) {
+            mm_dbg ("reloaded current modes different to the requested ones (will retry)");
+            set_current_modes_reload_schedule (task);
+            return;
+        }
+
+        requested_allowed_str = mm_modem_mode_build_string_from_mask (ctx->allowed);
+        requested_preferred_str = mm_modem_mode_build_string_from_mask (ctx->preferred);
+        current_allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        current_preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "reloaded modes (allowed '%s' and preferred '%s') different "
+                             "to the requested ones (allowed '%s' and preferred '%s')",
+                             requested_allowed_str, requested_preferred_str,
+                             current_allowed_str, current_preferred_str);
+
+        g_free (requested_allowed_str);
+        g_free (requested_preferred_str);
+        g_free (current_allowed_str);
+        g_free (current_preferred_str);
+    }
+
+out:
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
     g_object_unref (task);
+}
+
+static gboolean
+set_current_modes_reload (GTask *task)
+{
+    MMIfaceModem           *self;
+    SetCurrentModesContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    g_assert (ctx->retries > 0);
+    ctx->retries--;
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes (
+        self,
+        (GAsyncReadyCallback)after_set_load_current_modes_ready,
+        task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+set_current_modes_reload_schedule (GTask *task)
+{
+    g_timeout_add_seconds (AFTER_SET_LOAD_CURRENT_MODES_TIMEOUT_SECS,
+                           (GSourceFunc) set_current_modes_reload,
+                           task);
 }
 
 static void
@@ -2765,10 +2845,7 @@ set_current_modes_ready (MMIfaceModem *self,
 
     if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes &&
         MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes_finish) {
-        MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_modes (
-            self,
-            (GAsyncReadyCallback)after_set_load_current_modes_ready,
-            task);
+        set_current_modes_reload (task);
         return;
     }
 
@@ -2812,7 +2889,8 @@ mm_iface_modem_set_current_modes (MMIfaceModem *self,
     }
 
     /* Setup context */
-    ctx = g_new0 (SetCurrentModesContext, 1);
+    ctx = g_slice_new0 (SetCurrentModesContext);
+    ctx->retries = AFTER_SET_LOAD_CURRENT_MODES_RETRIES;
     ctx->allowed = allowed;
     ctx->preferred = preferred;
 
