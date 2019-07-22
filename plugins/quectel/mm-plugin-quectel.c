@@ -67,18 +67,18 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *vendor_strings[] = { "quectel", NULL };
     static const guint16 vendor_ids[] = { 0x2c7c, 0 };
-    static const gchar *drivers[] = { "qmi_wwan", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_QUECTEL,
-                      MM_PLUGIN_NAME,               "Quectel",
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_ALLOWED_DRIVERS,    drivers,
-                      MM_PLUGIN_ALLOWED_AT,         TRUE,
-                      MM_PLUGIN_ALLOWED_QCDM,       TRUE,
-                      MM_PLUGIN_ALLOWED_QMI,        TRUE,
+                      MM_PLUGIN_NAME,                   "Quectel",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,     subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
+                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
+                      MM_PLUGIN_ALLOWED_AT,             TRUE,
+                      MM_PLUGIN_ALLOWED_QCDM,           TRUE,
+                      MM_PLUGIN_ALLOWED_QMI,            TRUE,
                       NULL));
 }
 
