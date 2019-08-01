@@ -82,6 +82,9 @@ struct _MMBaseBearerPrivate {
     gchar *path;
     /* Status of this bearer */
     MMBearerStatus status;
+    /* Whether we must ignore all disconnection updates if they're
+     * detected by ModemManager itself. */
+    gboolean ignore_disconnection_reports;
     /* Configuration of the bearer */
     MMBearerProperties *config;
     /* Default IP family of this bearer */
@@ -373,6 +376,8 @@ bearer_update_status (MMBaseBearer *self,
      * interface when going into disconnected state. */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
         bearer_reset_interface_status (self);
+        /* Cleanup flag to ignore disconnection reports */
+        self->priv->ignore_disconnection_reports = FALSE;
         /* Stop statistics */
         bearer_stats_stop (self);
         /* Stop connection monitoring */
@@ -395,6 +400,16 @@ bearer_update_status_connected (MMBaseBearer *self,
     mm_gdbus_bearer_set_ip6_config (
         MM_GDBUS_BEARER (self),
         mm_bearer_ip_config_get_dictionary (ipv6_config));
+
+    /* If PPP is involved in the requested IP config, we must ignore
+     * all disconnection reports found via CGACT? polling or CGEV URCs.
+     * In this case, upper layers should always explicitly disconnect
+     * the bearer when ownership of the TTY is given back to MM. */
+    if ((ipv4_config && mm_bearer_ip_config_get_method (ipv4_config) == MM_BEARER_IP_METHOD_PPP) ||
+        (ipv6_config && mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_PPP)) {
+        mm_dbg ("PPP is required for connection, will ignore disconnection reports");
+        self->priv->ignore_disconnection_reports = TRUE;
+    }
 
     /* Start statistics */
     bearer_stats_start (self);
@@ -1255,12 +1270,45 @@ report_connection_status (MMBaseBearer *self,
         bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
 }
 
+/*
+ * This method is used exclusively in two different scenarios:
+ *  a) to report disconnections detected by ModemManager itself (e.g. based on
+ *     CGACT polling or CGEV URCs), applicable to bearers using both NET and
+ *     PPP data ports.
+ *  b) to report failed or successful connection attempts by plugins using NET
+ *     data ports that rely on vendor-specific URCs (e.g. Icera, MBM, Option
+ *     HSO).
+ *
+ * The method is also subclass-able because plugins may require specific
+ * cleanup operations to be done when a bearer is reported as disconnected.
+ * (e.g. the QMI or MBIM implementations require removing signal handlers).
+ *
+ * For all the scenarios involving a) the plugins are required to call the
+ * parent report_connection_status() implementation to report the
+ * DISCONNECTED state. For scenarios involving b) the parent reporting is not
+ * expected at all. In other words, the parent report_connection_status()
+ * is exclusively used in processing disconnections detected by ModemManager
+ * itself.
+ *
+ * If the bearer has been connected and it has required PPP method, we will
+ * ignore all disconnection reports because we cannot disconnect a PPP-based
+ * bearer before the upper layers have stopped using the TTY. In this case,
+ * we must wait for upper layers to detect the disconnection themselves (e.g.
+ * pppd should detect it) and disconnect the bearer through DBus.
+ */
 void
-mm_base_bearer_report_connection_status (MMBaseBearer *self,
-                                         MMBearerConnectionStatus status)
+mm_base_bearer_report_connection_status (MMBaseBearer             *self,
+                                         MMBearerConnectionStatus  status)
 {
+    if ((status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) && self->priv->ignore_disconnection_reports) {
+        mm_info ("ignoring disconnection report for bearer '%s'", self->priv->path);
+        return;
+    }
+
     return MM_BASE_BEARER_GET_CLASS (self)->report_connection_status (self, status);
 }
+
+/*****************************************************************************/
 
 static void
 set_property (GObject *object,
