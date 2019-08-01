@@ -37,7 +37,7 @@ test_enable_disable (TestFixture *fixture)
 
     /* Create port name, and add process ID so that multiple runs of this test
      * in the same system don't clash with each other */
-	ports[0] = g_strdup_printf ("abstract:port0:%ld", (glong) getpid ());
+    ports[0] = g_strdup_printf ("abstract:port0:%ld", (glong) getpid ());
     g_debug ("test service generic: using abstract port at '%s'", ports[0]);
 
     /* Setup new port context */

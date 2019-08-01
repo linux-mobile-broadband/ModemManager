@@ -86,16 +86,16 @@ show_part_info (MMSmsPart *part)
     switch (encoding) {
     case MM_SMS_ENCODING_GSM7:
         g_print ("encoding: GSM7\n");
-	break;
+        break;
     case MM_SMS_ENCODING_UCS2:
         g_print ("encoding: UCS2\n");
-	break;
+        break;
     case MM_SMS_ENCODING_8BIT:
         g_print ("encoding: 8BIT\n");
-	break;
+        break;
     default:
         g_print ("encoding: unknown (0x%x)\n", encoding);
-	break;
+        break;
     }
 
     text = mm_sms_part_get_text (part);
@@ -152,13 +152,13 @@ show_part_info (MMSmsPart *part)
 
     if (MM_SMS_PART_IS_CDMA (part)) {
         MMSmsCdmaTeleserviceId   teleservice_id;
-	MMSmsCdmaServiceCategory service_category;
+        MMSmsCdmaServiceCategory service_category;
 
-	teleservice_id = mm_sms_part_get_cdma_teleservice_id (part);
-	g_print ("teleservice id: %s\n", mm_sms_cdma_teleservice_id_get_string (teleservice_id));
+        teleservice_id = mm_sms_part_get_cdma_teleservice_id (part);
+        g_print ("teleservice id: %s\n", mm_sms_cdma_teleservice_id_get_string (teleservice_id));
 
-	service_category = mm_sms_part_get_cdma_service_category (part);
-	g_print ("service category: %s\n", mm_sms_cdma_service_category_get_string (service_category));
+        service_category = mm_sms_part_get_cdma_service_category (part);
+        g_print ("service category: %s\n", mm_sms_cdma_service_category_get_string (service_category));
     }
 }
 
