@@ -348,7 +348,7 @@ add_generic_device_ids (MMBaseModem               *self,
 
     mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self), &aux, NULL);
 
-    ids = g_ptr_array_new_with_free_func ((GDestroyNotify)g_free);
+    ids = g_ptr_array_new_with_free_func (g_free);
     if (aux) {
         gchar *carrier;
 
