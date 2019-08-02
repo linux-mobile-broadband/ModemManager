@@ -541,7 +541,7 @@ pccp437_is_subset (gunichar c, const char *utf8, gsize ulen)
 
     if (c <= 0x7F)
         return TRUE;
-    for (i = 0; i < sizeof (t) / sizeof (t[0]); i++) {
+    for (i = 0; i < G_N_ELEMENTS (t); i++) {
         if (c == t[i])
             return TRUE;
     }
