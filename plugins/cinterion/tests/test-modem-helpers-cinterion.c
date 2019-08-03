@@ -830,6 +830,7 @@ common_test_ctzu_urc (const gchar *urc,
         g_assert_cmpuint ((guint)expected_dst_offset, ==, mm_network_timezone_get_dst_offset (tz));
 
     g_object_unref (tz);
+    g_match_info_free (match_info);
     g_regex_unref (ctzu_regex);
 }
 
