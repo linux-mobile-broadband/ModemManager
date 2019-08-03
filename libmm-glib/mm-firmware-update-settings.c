@@ -174,7 +174,7 @@ mm_firmware_update_settings_get_variant (MMFirmwareUpdateSettings *self)
     g_variant_builder_add (&builder, "u", method);
 
     g_variant_builder_open (&builder, G_VARIANT_TYPE ("a{sv}"));
-    {
+    if (self) {
         g_variant_builder_add (&builder,
                                "{sv}",
                                PROPERTY_DEVICE_IDS,
