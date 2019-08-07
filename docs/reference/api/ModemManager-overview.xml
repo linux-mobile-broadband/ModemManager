@@ -193,7 +193,7 @@ $ sudo udevadm trigger
             <para><emphasis>MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY</emphasis></para>
             <para>
               This filter will not allow automatic probing any of the devices flagged as
-              <emphasis>ID_MM_DEVICE_MANUAL_SCAN_ONLY</emphasis>, like the ones in the default
+              <emphasis>ID_MM_TTY_MANUAL_SCAN_ONLY</emphasis>, like the ones in the default
               USB serial adapters greylist shipped by ModemManager. Devices flagged like
               this will only be probed when a manual scan is requested via the
               <link linkend="gdbus-method-org-freedesktop-ModemManager1.ScanDevices">ScanDevices</link>

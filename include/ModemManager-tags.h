@@ -111,7 +111,7 @@
 #define ID_MM_TTY_BLACKLIST "ID_MM_TTY_BLACKLIST"
 
 /**
- * ID_MM_DEVICE_MANUAL_SCAN_ONLY:
+ * ID_MM_TTY_MANUAL_SCAN_ONLY:
  *
  * This is a device-specific tag that allows explicitly greylisting
  * devices that expose TTY devices so that they are never probed
@@ -125,7 +125,7 @@
  *
  * This tag is ignored when the STRICT filter policy is used.
  */
-#define ID_MM_DEVICE_MANUAL_SCAN_ONLY "ID_MM_DEVICE_MANUAL_SCAN_ONLY"
+#define ID_MM_TTY_MANUAL_SCAN_ONLY "ID_MM_TTY_MANUAL_SCAN_ONLY"
 
 /**
  * ID_MM_PLATFORM_DRIVER_PROBE:

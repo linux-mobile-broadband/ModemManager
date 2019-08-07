@@ -107,8 +107,8 @@ mm_filter_port (MMFilter        *self,
         /* Is the device in the manual-only greylist? If so, return if this is an
          * automatic scan. */
         if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY) &&
-            (!manual_scan && mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_MANUAL_SCAN_ONLY))) {
-            mm_dbg ("[filter] (%s/%s): port filtered: device probed only in manual scan", subsystem, name);
+            (!manual_scan && mm_kernel_device_get_global_property_as_boolean (port, ID_MM_TTY_MANUAL_SCAN_ONLY))) {
+            mm_dbg ("[filter] (%s/%s): port filtered: tty probed only in manual scan", subsystem, name);
             return FALSE;
         }
 
