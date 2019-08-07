@@ -60,6 +60,13 @@ mm_filter_port (MMFilter        *self,
         return TRUE;
     }
 
+    /* If the device is explicitly blacklisted, we ignore every port. */
+    if ((self->priv->enabled_rules & MM_FILTER_RULE_EXPLICIT_BLACKLIST) &&
+        (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_IGNORE))) {
+        mm_dbg ("[filter] (%s/%s): port filtered: device is blacklisted", subsystem, name);
+        return FALSE;
+    }
+
     /* If this is a virtual device, don't allow it */
     if ((self->priv->enabled_rules & MM_FILTER_RULE_VIRTUAL) &&
         (!mm_kernel_device_get_physdev_sysfs_path (port))) {
@@ -92,8 +99,8 @@ mm_filter_port (MMFilter        *self,
 
         /* Ignore blacklisted tty devices. */
         if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_BLACKLIST) &&
-            (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_IGNORE))) {
-            mm_dbg ("[filter] (%s/%s): port filtered: device is blacklisted", subsystem, name);
+            (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_TTY_BLACKLIST))) {
+            mm_dbg ("[filter] (%s/%s): port filtered: tty is blacklisted", subsystem, name);
             return FALSE;
         }
 
@@ -285,6 +292,7 @@ mm_filter_new (MMFilterRule   enabled_rules,
 
     mm_dbg ("[filter] created");
     mm_dbg ("[filter]   explicit whitelist:         %s", RULE_ENABLED_STR (MM_FILTER_RULE_EXPLICIT_WHITELIST));
+    mm_dbg ("[filter]   explicit blacklist:         %s", RULE_ENABLED_STR (MM_FILTER_RULE_EXPLICIT_BLACKLIST));
     mm_dbg ("[filter]   virtual devices forbidden:  %s", RULE_ENABLED_STR (MM_FILTER_RULE_VIRTUAL));
     mm_dbg ("[filter]   net devices allowed:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_NET));
     mm_dbg ("[filter]   cdc-wdm devices allowed:    %s", RULE_ENABLED_STR (MM_FILTER_RULE_CDC_WDM));
