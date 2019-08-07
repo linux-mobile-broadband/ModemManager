@@ -73,6 +73,20 @@
 #define ID_MM_DEVICE_PROCESS "ID_MM_DEVICE_PROCESS"
 
 /**
+ * ID_MM_DEVICE_IGNORE:
+ *
+ * This is a device-specific tag that allows explicitly requesting to
+ * ignore all ports exposed by the device.
+ *
+ * This tag was originally applicable to TTY ports and only when running
+ * in DEFAULT or PARANOID filter policy types. Since 1.12, this tag
+ * applies to all filter types (including STRICT), and to all port types
+ * (not only TTYs), and is associated to the
+ * MM_FILTER_RULE_EXPLICIT_BLACKLIST rule.
+ */
+#define ID_MM_DEVICE_IGNORE "ID_MM_DEVICE_IGNORE"
+
+/**
  * ID_MM_PORT_IGNORE:
  *
  * This is a port-specific tag that allows explicitly ignoring a given port
@@ -82,8 +96,8 @@
  */
 #define ID_MM_PORT_IGNORE "ID_MM_PORT_IGNORE"
 
-/**
- * ID_MM_DEVICE_IGNORE:
+ /**
+ * ID_MM_TTY_BLACKLIST:
  *
  * This is a device-specific tag that allows explicitly blacklisting
  * devices that expose TTY devices so that they are never probed.
@@ -94,7 +108,7 @@
  *
  * This tag is ignored when the STRICT filter policy is used.
  */
-#define ID_MM_DEVICE_IGNORE "ID_MM_DEVICE_IGNORE"
+#define ID_MM_TTY_BLACKLIST "ID_MM_TTY_BLACKLIST"
 
 /**
  * ID_MM_DEVICE_MANUAL_SCAN_ONLY:

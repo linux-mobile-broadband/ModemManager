@@ -125,6 +125,24 @@ $ sudo udevadm trigger
             </programlisting>
           </listitem>
           <listitem>
+            <para><emphasis>MM_FILTER_RULE_EXPLICIT_BLACKLIST</emphasis></para>
+            <para>
+              This filter allows users to manually tag devices and/or device ports with the
+              <emphasis>ID_MM_DEVICE_IGNORE</emphasis> udev tag. If the filter finds this tag,
+              the device and/or device ports will be automatically ignored and port probing
+              will be never run on them.
+            </para>
+            <programlisting>
+$ sudo vim /lib/udev/rules.d/78-mm-blacklist-internal-modem.rules
+    ACTION!="add|change|move", GOTO="mm_blacklist_internal_modem_end"
+    ATTRS{idVendor}=="1199", ATTRS{idProduct}=="a001", ENV{ID_MM_DEVICE_IGNORE}="1"
+    LABEL="mm_blacklist_internal_modem_end"
+// Apply new rules without reboot
+$ sudo udevadm control --reload
+$ sudo udevadm trigger
+            </programlisting>
+          </listitem>
+          <listitem>
             <para><emphasis>MM_FILTER_RULE_VIRTUAL</emphasis></para>
             <para>
               This filter will automatically flag as forbidden all ports exposed by virtual
@@ -167,7 +185,7 @@ $ sudo udevadm trigger
             <para><emphasis>MM_FILTER_RULE_TTY_BLACKLIST</emphasis></para>
             <para>
               This filter will not allow probing any of the devices flagged as
-              <emphasis>ID_MM_DEVICE_IGNORE</emphasis>, like the ones in the default blacklist
+              <emphasis>ID_MM_TTY_BLACKLIST</emphasis>, like the ones in the default blacklist
               shipped by ModemManager.
             </para>
           </listitem>
@@ -239,6 +257,7 @@ $ sudo udevadm trigger
               This is a policy where the following rules are enabled:
               <itemizedlist>
                 <listitem>MM_FILTER_RULE_EXPLICIT_WHITELIST</listitem>
+                <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
                 <listitem>MM_FILTER_RULE_CDC_WDM</listitem>
@@ -264,6 +283,7 @@ $ sudo udevadm trigger
               This is a policy where the following rules are enabled:
               <itemizedlist>
                 <listitem>MM_FILTER_RULE_EXPLICIT_WHITELIST</listitem>
+                <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
                 <listitem>MM_FILTER_RULE_CDC_WDM</listitem>
@@ -290,6 +310,7 @@ $ sudo udevadm trigger
               This policy is a mix of the Default and Strict ones:
               <itemizedlist>
                 <listitem>MM_FILTER_RULE_EXPLICIT_WHITELIST</listitem>
+                <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
                 <listitem>MM_FILTER_RULE_CDC_WDM</listitem>
