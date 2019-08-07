@@ -128,22 +128,6 @@
 #define ID_MM_TTY_MANUAL_SCAN_ONLY "ID_MM_TTY_MANUAL_SCAN_ONLY"
 
 /**
- * ID_MM_PLATFORM_DRIVER_PROBE:
- *
- * This is a port-specific tag applied to platform ports so that they
- * are probed automatically by the daemon. Platform ports that don't
- * have this tag will never probed. This tag is a bit redundant, as
- * the user could also use ID_MM_DEVICE_PROCESS for the same purpose.
- *
- * This tag is associated to the MM_FILTER_RULE_TTY_PLATFORM_DRIVER
- * rule, which is only meaningful when the daemon runs with the
- * DEFAULT filter policy type, as that is the only one that would
- * allow probing all ports not explicitly forbidden before the last
- * MM_FILTER_RULE_TTY_DEFAULT_ALLOWED rule.
- */
-#define ID_MM_PLATFORM_DRIVER_PROBE "ID_MM_PLATFORM_DRIVER_PROBE"
-
-/**
  * ID_MM_PORT_TYPE_AT_PRIMARY:
  *
  * This is a port-specific tag applied to TTYs that we know in advance

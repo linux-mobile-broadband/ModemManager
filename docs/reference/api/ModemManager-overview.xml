@@ -203,13 +203,7 @@ $ sudo udevadm trigger
           <listitem>
             <para><emphasis>MM_FILTER_RULE_TTY_PLATFORM_DRIVER</emphasis></para>
             <para>
-              If this filter is enabled, all platform TTY ports not explicitly flagged with the
-              <emphasis>ID_MM_PLATFORM_DRIVER_PROBE</emphasis> will be forbidden. If the flag
-              is found in a platform TTY port, port probing will be allowed directly.
-            </para>
-            <para>
-              Note that this filter is obsoleted by the more generic MM_FILTER_RULE_EXPLICIT_WHITELIST
-              filter. It is maintained for backwards compatibility with older ModemManager versions.
+              If this filter is enabled, all platform TTY ports will be forbidden automatically.
             </para>
           </listitem>
           <listitem>

@@ -121,12 +121,8 @@ mm_filter_port (MMFilter        *self,
              !g_strcmp0 (physdev_subsystem, "pci") ||
              !g_strcmp0 (physdev_subsystem, "pnp") ||
              !g_strcmp0 (physdev_subsystem, "sdio"))) {
-            if (!mm_kernel_device_get_global_property_as_boolean (port, ID_MM_PLATFORM_DRIVER_PROBE)) {
-                mm_dbg ("[filter] (%s/%s): port filtered: port's parent platform driver is not whitelisted", subsystem, name);
-                return FALSE;
-            }
-            mm_dbg ("[filter] (%s/%s): port allowed: port's parent platform driver is whitelisted", subsystem, name);
-            return TRUE;
+            mm_dbg ("[filter] (%s/%s): port filtered: tty platform driver", subsystem, name);
+            return FALSE;
         }
 
         /* Default allowed? */
