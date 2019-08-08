@@ -45,6 +45,7 @@ static GCancellable *cancellable;
 
 /* Context */
 static gboolean output_keyvalue_flag;
+static gboolean output_json_flag;
 static gboolean verbose_flag;
 static gboolean version_flag;
 static gboolean async_flag;
@@ -53,6 +54,10 @@ static gint timeout = 30; /* by default, use 30s for all operations */
 static GOptionEntry main_entries[] = {
     { "output-keyvalue", 'K', 0, G_OPTION_ARG_NONE, &output_keyvalue_flag,
       "Run action with machine-friendly key-value output",
+      NULL
+    },
+    { "output-json", 'J', 0, G_OPTION_ARG_NONE, &output_json_flag,
+      "Run action with machine-friendly json output",
       NULL
     },
     { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose_flag,
@@ -237,14 +242,19 @@ main (gint argc, gchar **argv)
         g_log_set_handler (G_LOG_DOMAIN, G_LOG_LEVEL_MASK, log_handler, NULL);
 
     /* Setup output */
-    if (output_keyvalue_flag) {
+    if (output_keyvalue_flag && output_json_flag) {
+        g_printerr ("error: only one output type supported at the same time\n");
+        exit (EXIT_FAILURE);
+    }
+    if (output_keyvalue_flag || output_json_flag) {
         if (verbose_flag) {
             g_printerr ("error: cannot set verbose output in keyvalue output type\n");
             exit (EXIT_FAILURE);
         }
-        mmcli_output_set (MMC_OUTPUT_TYPE_KEYVALUE);
-    } else
+        mmcli_output_set (output_keyvalue_flag ? MMC_OUTPUT_TYPE_KEYVALUE : MMC_OUTPUT_TYPE_JSON);
+    } else {
         mmcli_output_set (MMC_OUTPUT_TYPE_HUMAN);
+    }
 
     /* Setup signals */
     signal (SIGINT, signals_handler);

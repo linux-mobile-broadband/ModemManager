@@ -285,6 +285,7 @@ typedef enum {
     MMC_OUTPUT_TYPE_NONE,
     MMC_OUTPUT_TYPE_HUMAN,
     MMC_OUTPUT_TYPE_KEYVALUE,
+    MMC_OUTPUT_TYPE_JSON
 } MmcOutputType;
 
 void          mmcli_output_set (MmcOutputType type);
