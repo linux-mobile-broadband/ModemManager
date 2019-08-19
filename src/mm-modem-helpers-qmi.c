@@ -567,7 +567,8 @@ mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
 
     *qmi_bands = 0;
     *qmi_lte_bands = 0;
-    memset (extended_qmi_lte_bands, 0, extended_qmi_lte_bands_size * sizeof (guint64));
+    if (extended_qmi_lte_bands)
+        memset (extended_qmi_lte_bands, 0, extended_qmi_lte_bands_size * sizeof (guint64));
 
     for (i = 0; i < mm_bands->len; i++) {
         MMModemBand band;
