@@ -4473,7 +4473,7 @@ process_ussd_message (MMBroadbandModemMbim *self,
 {
     GTask                       *task = NULL;
     MMModem3gppUssdSessionState  ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE;
-    GByteArray                  *bytearray = NULL;
+    GByteArray                  *bytearray;
     gchar                       *converted = NULL;
     GError                      *error = NULL;
 
@@ -4483,8 +4483,9 @@ process_ussd_message (MMBroadbandModemMbim *self,
         self->priv->pending_ussd_action = NULL;
     }
 
-    if (data_size)
-        bytearray = g_byte_array_append (g_byte_array_new (), data, data_size);
+    bytearray = g_byte_array_new ();
+    if (data && data_size)
+        bytearray = g_byte_array_append (bytearray, data, data_size);
 
     switch (ussd_response) {
     case MBIM_USSD_RESPONSE_NO_ACTION_REQUIRED:
@@ -4541,8 +4542,7 @@ process_ussd_message (MMBroadbandModemMbim *self,
 
     mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self), ussd_state);
 
-    if (bytearray)
-        g_byte_array_unref (bytearray);
+    g_byte_array_unref (bytearray);
 
     /* Complete the pending action */
     if (task) {
