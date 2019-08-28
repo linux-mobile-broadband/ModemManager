@@ -1072,104 +1072,115 @@ dump_output_list_keyvalue (MmcF field)
 }
 
 /******************************************************************************/
-/* Json-friendly output */
+/* JSON-friendly output */
 
 static gint
 list_sort_by_keys (const OutputItem *item_a,
-                const OutputItem *item_b)
+                   const OutputItem *item_b)
 {
-    return g_strcmp0(field_infos[item_a->field].key, field_infos[item_b->field].key);
+    return g_strcmp0 (field_infos[item_a->field].key, field_infos[item_b->field].key);
 }
 
 static void
 dump_output_json (void)
 {
-    GList *l;
-    MmcF current_field = MMC_F_UNKNOWN;
-    gchar **current_path = NULL;
-    guint cur_dlen = 0;
-    GRegex *escape_regex;
+    GList   *l;
+    MmcF     current_field = MMC_F_UNKNOWN;
+    gchar  **current_path = NULL;
+    guint    cur_dlen = 0;
+    GRegex  *escape_regex;
 
     output_items = g_list_sort (output_items, (GCompareFunc) list_sort_by_keys);
-    escape_regex = g_regex_new("'", G_REGEX_MULTILINE | G_REGEX_RAW, 0, NULL);
+    escape_regex = g_regex_new ("'", G_REGEX_MULTILINE | G_REGEX_RAW, 0, NULL);
 
     g_print("{");
     for (l = output_items; l; l = g_list_next (l)) {
         OutputItem *item_l = (OutputItem *)(l->data);
 
         if (current_field != item_l->field) {
-            guint new_dlen;
-            guint iter = 0;
+            guint   new_dlen;
+            guint   iter = 0;
             gchar **new_path;
 
-            new_path = g_strsplit(field_infos[item_l->field].key, ".", -1);
-            new_dlen = g_strv_length(new_path) - 1;
+            new_path = g_strsplit (field_infos[item_l->field].key, ".", -1);
+            new_dlen = g_strv_length (new_path) - 1;
             if (current_path) {
-                guint min_dlen = MIN (cur_dlen, new_dlen);
-                while(iter < min_dlen && g_strcmp0(current_path[iter], new_path[iter]) == 0)
+                guint min_dlen;
+
+                min_dlen = MIN (cur_dlen, new_dlen);
+                while (iter < min_dlen && g_strcmp0 (current_path[iter], new_path[iter]) == 0)
                     iter++;
 
-                g_strfreev(current_path);
+                g_strfreev (current_path);
 
                 if (iter < min_dlen || new_dlen < cur_dlen)
-                    for(min_dlen = iter; min_dlen < cur_dlen; min_dlen++)
-                        g_print("}");
+                    for (min_dlen = iter; min_dlen < cur_dlen; min_dlen++)
+                        g_print ("}");
 
-                g_print(",");
+                g_print (",");
             }
 
-            while(iter < new_dlen)
-                g_print("\"%s\":{", new_path[iter++]);
+            while (iter < new_dlen)
+                g_print ("\"%s\":{", new_path[iter++]);
 
             cur_dlen = new_dlen;
             current_path = new_path;
             current_field = item_l->field;
         } else {
-            g_print(",");
+            g_print (",");
         }
+
         if (item_l->type == VALUE_TYPE_SINGLE) {
             OutputItemSingle *single = (OutputItemSingle *) item_l;
-            gchar *escaped = NULL;
+            gchar            *escaped = NULL;
 
             if (single->value)
-                escaped = g_regex_replace_literal(escape_regex, single->value, -1, 0, "\"", 0, NULL);
+                escaped = g_regex_replace_literal (escape_regex, single->value, -1, 0, "\"", 0, NULL);
 
             g_print ("\"%s\":\"%s\"", current_path[cur_dlen], escaped ? escaped : "--");
             g_free (escaped);
         } else if (item_l->type == VALUE_TYPE_MULTIPLE) {
             OutputItemMultiple *multiple = (OutputItemMultiple *) item_l;
-            guint i, n = multiple->values ? g_strv_length (multiple->values) : 0;
+            guint               i, n;
+
+            n = multiple->values ? g_strv_length (multiple->values) : 0;
 
             g_print ("\"%s\":[", current_path[cur_dlen]);
-            for(i = 0; i < n; i++) {
-                gchar *escaped = g_regex_replace_literal(escape_regex, multiple->values[i], -1, 0, "\"", 0, NULL);
+            for (i = 0; i < n; i++) {
+                gchar *escaped;
+
+                escaped = g_regex_replace_literal (escape_regex, multiple->values[i], -1, 0, "\"", 0, NULL);
                 g_print("\"%s\"", escaped);
                 if (i < n - 1)
                     g_print(",");
                 g_free (escaped);
             }
             g_print("]");
-        } else {
+        } else
             g_assert_not_reached ();
-        }
     }
-    while(cur_dlen--)
-        g_print("}");
+
+    while (cur_dlen--)
+        g_print ("}");
     g_print("}\n");
-    if (current_path)
-        g_strfreev(current_path);
-    g_regex_unref(escape_regex);
+
+    g_strfreev (current_path);
+    g_regex_unref (escape_regex);
 }
 
 static void
 dump_output_list_json (MmcF field)
 {
     GList *l;
+
     g_assert (field != MMC_F_UNKNOWN);
+
     g_print("{\"%s\":[", field_infos[field].key);
+
     for (l = output_items; l; l = g_list_next (l)) {
         OutputItem         *item_l;
         OutputItemListitem *listitem;
+
         item_l = (OutputItem *)(l->data);
         g_assert (item_l->type == VALUE_TYPE_LISTITEM);
         listitem = (OutputItemListitem *)item_l;
@@ -1178,9 +1189,11 @@ dump_output_list_json (MmcF field)
         /* All items must be of same type */
         g_assert_cmpint (item_l->field, ==, field);
         g_print("\"%s\"", listitem->value);
-        if (g_list_next(l))
+
+        if (g_list_next (l))
             g_print(",");
     }
+
     g_print("]}\n");
 }
 

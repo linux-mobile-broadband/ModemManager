@@ -246,12 +246,19 @@ main (gint argc, gchar **argv)
         g_printerr ("error: only one output type supported at the same time\n");
         exit (EXIT_FAILURE);
     }
-    if (output_keyvalue_flag || output_json_flag) {
+    if (output_keyvalue_flag) {
         if (verbose_flag) {
             g_printerr ("error: cannot set verbose output in keyvalue output type\n");
             exit (EXIT_FAILURE);
         }
-        mmcli_output_set (output_keyvalue_flag ? MMC_OUTPUT_TYPE_KEYVALUE : MMC_OUTPUT_TYPE_JSON);
+        mmcli_output_set (MMC_OUTPUT_TYPE_KEYVALUE);
+    }
+    else if (output_json_flag) {
+        if (verbose_flag) {
+            g_printerr ("error: cannot set verbose output in JSON output type\n");
+            exit (EXIT_FAILURE);
+        }
+        mmcli_output_set (MMC_OUTPUT_TYPE_JSON);
     } else {
         mmcli_output_set (MMC_OUTPUT_TYPE_HUMAN);
     }
