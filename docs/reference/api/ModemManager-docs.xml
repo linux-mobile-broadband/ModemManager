@@ -19,22 +19,22 @@
 
     <authorgroup>
       <author>
-	    <firstname>Dan</firstname>
-	    <surname>Williams</surname>
-	    <affiliation>
-	      <address>
-	        <email>dcbw@redhat.com</email>
-	      </address>
-	    </affiliation>
+        <firstname>Dan</firstname>
+        <surname>Williams</surname>
+        <affiliation>
+          <address>
+            <email>dcbw@redhat.com</email>
+          </address>
+        </affiliation>
       </author>
       <author>
-	    <firstname>Aleksander</firstname>
-	    <surname>Morgado</surname>
-	    <affiliation>
-	      <address>
-	        <email>aleksander@aleksander.es</email>
-	      </address>
-	    </affiliation>
+        <firstname>Aleksander</firstname>
+        <surname>Morgado</surname>
+        <affiliation>
+          <address>
+            <email>aleksander@aleksander.es</email>
+          </address>
+        </affiliation>
       </author>
     </authorgroup>
 
