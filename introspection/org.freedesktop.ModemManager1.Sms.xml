@@ -109,8 +109,8 @@
          <varlistentry><term><link linkend="MM-SMS-VALIDITY-TYPE-RELATIVE:CAPS">MM_SMS_VALIDITY_TYPE_RELATIVE</link></term>
           <listitem>
            <para>
-	        The value is the length of the validity period in minutes, given
-	        as an unsigned integer (D-Bus signature <literal>'u'</literal>).
+             The value is the length of the validity period in minutes, given
+             as an unsigned integer (D-Bus signature <literal>'u'</literal>).
             </para>
           </listitem>
          </varlistentry>

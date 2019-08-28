@@ -127,10 +127,10 @@
         CallWaitingSetup:
 
         Activates or deactivates the call waiting network service, as per
-	3GPP TS 22.083.
+        3GPP TS 22.083.
 
-	This operation requires communication with the network in order to
-	complete, so the modem must be successfully registered.
+        This operation requires communication with the network in order to
+        complete, so the modem must be successfully registered.
     -->
     <method name="CallWaitingSetup">
       <arg name="enable" type="b" direction="in" />
@@ -140,10 +140,10 @@
         CallWaitingQuery:
 
         Queries the status of the call waiting network service, as per
-	3GPP TS 22.083.
+        3GPP TS 22.083.
 
-	This operation requires communication with the network in order to
-	complete, so the modem must be successfully registered.
+        This operation requires communication with the network in order to
+        complete, so the modem must be successfully registered.
     -->
     <method name="CallWaitingQuery">
       <arg name="status" type="b" direction="out" />

@@ -132,11 +132,11 @@
 
     <!--
         SetPowerState:
-	@state: A <link linkend="MMModemPowerState">MMModemPowerState</link> value, to specify the desired power state.
+        @state: A <link linkend="MMModemPowerState">MMModemPowerState</link> value, to specify the desired power state.
 
         Set the power state of the modem. This action can only be run when the
-	modem is in <link linkend="MM-MODEM-STATE-DISABLED:CAPS"><constant>MM_MODEM_STATE_DISABLED</constant></link>
-	state.
+        modem is in <link linkend="MM-MODEM-STATE-DISABLED:CAPS"><constant>MM_MODEM_STATE_DISABLED</constant></link>
+        state.
     -->
     <method name="SetPowerState">
       <arg name="state" type="u" direction="in" />
@@ -424,9 +424,9 @@
         StateFailedReason:
 
         Error specifying why the modem is in
-	<link linkend="MM-MODEM-STATE-FAILED:CAPS"><constant>MM_MODEM_STATE_FAILED</constant></link>
-	state, given as a
-	<link linkend="MMModemStateFailedReason">MMModemStateFailedReason</link> value.
+        <link linkend="MM-MODEM-STATE-FAILED:CAPS"><constant>MM_MODEM_STATE_FAILED</constant></link>
+        state, given as a
+        <link linkend="MMModemStateFailedReason">MMModemStateFailedReason</link> value.
     -->
     <property name="StateFailedReason" type="u" access="read" />
 
@@ -466,8 +466,8 @@
     <!--
         PowerState:
 
-	A <link linkend="MMModemPowerState">MMModemPowerState</link> value
-	specifying the current power state of the modem.
+        A <link linkend="MMModemPowerState">MMModemPowerState</link> value
+        specifying the current power state of the modem.
     -->
     <property name="PowerState" type="u" access="read" />
 
