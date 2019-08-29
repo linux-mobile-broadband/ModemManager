@@ -10224,7 +10224,6 @@ typedef enum {
     DISABLING_STEP_IFACE_MESSAGING,
     DISABLING_STEP_IFACE_VOICE,
     DISABLING_STEP_IFACE_LOCATION,
-    DISABLING_STEP_IFACE_CONTACTS,
     DISABLING_STEP_IFACE_CDMA,
     DISABLING_STEP_IFACE_3GPP_USSD,
     DISABLING_STEP_IFACE_3GPP,
@@ -10495,10 +10494,6 @@ disabling_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
-    case DISABLING_STEP_IFACE_CONTACTS:
-        /* Fall down to next step */
-        ctx->step++;
-
     case DISABLING_STEP_IFACE_CDMA:
         if (ctx->self->priv->modem_cdma_dbus_skeleton) {
             mm_dbg ("Modem has CDMA capabilities, disabling the Modem CDMA interface...");
@@ -10588,7 +10583,6 @@ typedef enum {
     ENABLING_STEP_IFACE_3GPP,
     ENABLING_STEP_IFACE_3GPP_USSD,
     ENABLING_STEP_IFACE_CDMA,
-    ENABLING_STEP_IFACE_CONTACTS,
     ENABLING_STEP_IFACE_LOCATION,
     ENABLING_STEP_IFACE_MESSAGING,
     ENABLING_STEP_IFACE_VOICE,
@@ -10812,10 +10806,6 @@ enabling_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_IFACE_CONTACTS:
-        /* Fall down to next step */
-        ctx->step++;
-
     case ENABLING_STEP_IFACE_LOCATION:
         if (ctx->self->priv->modem_location_dbus_skeleton) {
             mm_dbg ("Modem has location capabilities, enabling the Location interface...");
@@ -10998,7 +10988,6 @@ typedef enum {
     INITIALIZE_STEP_IFACE_3GPP,
     INITIALIZE_STEP_IFACE_3GPP_USSD,
     INITIALIZE_STEP_IFACE_CDMA,
-    INITIALIZE_STEP_IFACE_CONTACTS,
     INITIALIZE_STEP_IFACE_LOCATION,
     INITIALIZE_STEP_IFACE_MESSAGING,
     INITIALIZE_STEP_IFACE_VOICE,
@@ -11277,10 +11266,6 @@ initialize_step (GTask *task)
                                             task);
             return;
         }
-        /* Fall down to next step */
-        ctx->step++;
-
-    case INITIALIZE_STEP_IFACE_CONTACTS:
         /* Fall down to next step */
         ctx->step++;
 
