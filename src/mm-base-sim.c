@@ -122,7 +122,7 @@ change_pin (MMBaseSim *self,
     command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"",
                                old_pin,
                                new_pin);
-    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+    mm_base_modem_at_command (self->priv->modem,
                               command,
                               3,
                               FALSE,
@@ -291,7 +291,7 @@ enable_pin (MMBaseSim *self,
     command = g_strdup_printf ("+CLCK=\"SC\",%d,\"%s\"",
                                enabled ? 1 : 0,
                                pin);
-    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+    mm_base_modem_at_command (self->priv->modem,
                               command,
                               3,
                               FALSE,
@@ -461,7 +461,7 @@ common_send_pin_puk (MMBaseSim *self,
                g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin) :
                g_strdup_printf ("+CPIN=\"%s\"", pin));
 
-    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+    mm_base_modem_at_command (self->priv->modem,
                               command,
                               3,
                               FALSE,
@@ -1041,7 +1041,7 @@ load_sim_identifier (MMBaseSim *self,
 
     /* READ BINARY of EFiccid (ICC Identification) ETSI TS 102.221 section 13.2 */
     mm_base_modem_at_command (
-        MM_BASE_MODEM (self->priv->modem),
+        self->priv->modem,
         "+CRSM=176,12258,0,0,10",
         20,
         FALSE,
@@ -1108,7 +1108,7 @@ load_imsi (MMBaseSim *self,
     mm_dbg ("loading IMSI...");
 
     mm_base_modem_at_command (
-        MM_BASE_MODEM (self->priv->modem),
+        self->priv->modem,
         "+CIMI",
         3,
         FALSE,
@@ -1227,7 +1227,7 @@ load_operator_identifier (MMBaseSim *self,
 
     /* READ BINARY of EFad (Administrative Data) ETSI 51.011 section 10.3.18 */
     mm_base_modem_at_command (
-        MM_BASE_MODEM (self->priv->modem),
+        self->priv->modem,
         "+CRSM=176,28589,0,0,4",
         10,
         FALSE,
@@ -1322,7 +1322,7 @@ load_operator_name (MMBaseSim *self,
 
     /* READ BINARY of EFspn (Service Provider Name) ETSI 51.011 section 10.3.11 */
     mm_base_modem_at_command (
-        MM_BASE_MODEM (self->priv->modem),
+        self->priv->modem,
         "+CRSM=176,28486,0,0,17",
         10,
         FALSE,
