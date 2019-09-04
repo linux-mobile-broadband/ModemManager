@@ -109,7 +109,7 @@ class Packet:
     def add_line(self, line):
         line = line.strip()
         if not len(line):
-        	return
+            return
         self.lines.append(line)
 
         if line[0] == '[':
