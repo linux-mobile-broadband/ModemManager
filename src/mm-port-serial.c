@@ -1387,7 +1387,10 @@ _close_internal (MMPortSerial *self, gboolean force)
         return;
 
     if (self->priv->connected_id) {
-        g_signal_handler_disconnect (self, self->priv->connected_id);
+        /* Don't assume it's always connected, because it may be automatically connected during
+         * object disposal, and this method is also called in finalize() */
+        if (g_signal_handler_is_connected (self, self->priv->connected_id))
+            g_signal_handler_disconnect (self, self->priv->connected_id);
         self->priv->connected_id = 0;
     }
 
