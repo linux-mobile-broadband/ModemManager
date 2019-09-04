@@ -79,7 +79,7 @@
  * ignore all ports exposed by the device.
  *
  * This tag was originally applicable to TTY ports and only when running
- * in DEFAULT or PARANOID filter policy types. Since 1.12, this tag
+ * in DEFAULT or PARANOID filter policy types. Since 1.10.6, this tag
  * applies to all filter types (including STRICT), and to all port types
  * (not only TTYs), and is associated to the
  * MM_FILTER_RULE_EXPLICIT_BLACKLIST rule.
