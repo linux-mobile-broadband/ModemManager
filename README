@@ -15,7 +15,7 @@ Implementation.
 ModemManager is a DBus system bus activated service (meaning it's started
 automatically when a request arrives). It is written in C, using glib and gio.
 Several GInterfaces specify different features that the modems support,
-including the generic MMIfaceModem3gpp and MMIfaceModemCdma which provice basic
+including the generic MMIfaceModem3gpp and MMIfaceModemCdma which provide basic
 operations for 3GPP (GSM, UMTS, LTE) or CDMA (CDMA1x, EV-DO) modems. If a given
 feature is not available in the modem, the specific interface will not be
 exported in DBus.
