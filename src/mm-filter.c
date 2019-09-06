@@ -34,8 +34,21 @@ enum {
 };
 
 struct _MMFilterPrivate {
-    MMFilterRule enabled_rules;
+    MMFilterRule  enabled_rules;
+    GList        *plugin_whitelist_tags;
 };
+
+/*****************************************************************************/
+
+void
+mm_filter_register_plugin_whitelist_tag (MMFilter    *self,
+                                         const gchar *tag)
+{
+    if (!g_list_find_custom (self->priv->plugin_whitelist_tags, tag, (GCompareFunc) g_strcmp0)) {
+        mm_dbg ("[filter] registered plugin whitelist tag: %s", tag);
+        self->priv->plugin_whitelist_tags = g_list_prepend (self->priv->plugin_whitelist_tags, g_strdup (tag));
+    }
+}
 
 /*****************************************************************************/
 
@@ -65,6 +78,19 @@ mm_filter_port (MMFilter        *self,
         (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_DEVICE_IGNORE))) {
         mm_dbg ("[filter] (%s/%s): port filtered: device is blacklisted", subsystem, name);
         return FALSE;
+    }
+
+    /* If the device is whitelisted by a plugin, we allow it. */
+    if (self->priv->enabled_rules & MM_FILTER_RULE_PLUGIN_WHITELIST) {
+        GList *l;
+
+        for (l = self->priv->plugin_whitelist_tags; l; l = g_list_next (l)) {
+            if (mm_kernel_device_get_global_property_as_boolean (port, (const gchar *)(l->data)) ||
+                mm_kernel_device_get_property_as_boolean (port, (const gchar *)(l->data))) {
+                mm_dbg ("[filter] (%s/%s) port allowed: device is whitelisted by plugin", subsystem, name);
+                return TRUE;
+            }
+        }
     }
 
     /* If this is a virtual device, don't allow it */
@@ -258,6 +284,15 @@ filter_rule_env_process (MMFilterRule enabled_rules)
 
 /*****************************************************************************/
 
+gboolean
+mm_filter_check_rule_enabled (MMFilter     *self,
+                              MMFilterRule  rule)
+{
+    return !!(self->priv->enabled_rules & rule);
+}
+
+/*****************************************************************************/
+
 /* If TTY rule enabled, either DEFAULT_ALLOWED or DEFAULT_FORBIDDEN must be set. */
 #define VALIDATE_RULE_TTY(rules) (!(rules & MM_FILTER_RULE_TTY) || \
                                   ((rules & (MM_FILTER_RULE_TTY_DEFAULT_ALLOWED | MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)) && \
@@ -289,6 +324,7 @@ mm_filter_new (MMFilterRule   enabled_rules,
     mm_dbg ("[filter] created");
     mm_dbg ("[filter]   explicit whitelist:         %s", RULE_ENABLED_STR (MM_FILTER_RULE_EXPLICIT_WHITELIST));
     mm_dbg ("[filter]   explicit blacklist:         %s", RULE_ENABLED_STR (MM_FILTER_RULE_EXPLICIT_BLACKLIST));
+    mm_dbg ("[filter]   plugin whitelist:           %s", RULE_ENABLED_STR (MM_FILTER_RULE_PLUGIN_WHITELIST));
     mm_dbg ("[filter]   virtual devices forbidden:  %s", RULE_ENABLED_STR (MM_FILTER_RULE_VIRTUAL));
     mm_dbg ("[filter]   net devices allowed:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_NET));
     mm_dbg ("[filter]   cdc-wdm devices allowed:    %s", RULE_ENABLED_STR (MM_FILTER_RULE_CDC_WDM));
@@ -357,6 +393,16 @@ mm_filter_init (MMFilter *self)
 }
 
 static void
+finalize (GObject *object)
+{
+    MMFilter *self = MM_FILTER (object);
+
+    g_list_free_full (self->priv->plugin_whitelist_tags, g_free);
+
+    G_OBJECT_CLASS (mm_filter_parent_class)->finalize (object);
+}
+
+static void
 mm_filter_class_init (MMFilterClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -366,6 +412,7 @@ mm_filter_class_init (MMFilterClass *klass)
     /* Virtual methods */
     object_class->set_property = set_property;
     object_class->get_property = get_property;
+    object_class->finalize     = finalize;
 
     g_object_class_install_property (
         object_class, PROP_ENABLED_RULES,

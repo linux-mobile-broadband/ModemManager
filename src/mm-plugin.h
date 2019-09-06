@@ -124,7 +124,8 @@ struct _MMPluginClass {
 
 GType mm_plugin_get_type (void);
 
-const gchar *mm_plugin_get_name (MMPlugin *self);
+const gchar  *mm_plugin_get_name              (MMPlugin *self);
+const gchar **mm_plugin_get_allowed_udev_tags (MMPlugin *self);
 
 /* This method will run all pre-probing filters, to see if we can discard this
  * plugin from the probing logic as soon as possible. */
