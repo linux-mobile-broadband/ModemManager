@@ -106,7 +106,7 @@ struct _MMPluginClass {
 
     /* Plugins need to provide a method to create a modem object given
      * a list of port probes (Mandatory) */
-    MMBaseModem *(*create_modem) (MMPlugin *plugin,
+    MMBaseModem *(*create_modem) (MMPlugin *self,
                                   const gchar *uid,
                                   const gchar **drivers,
                                   guint16 vendor,
@@ -116,7 +116,7 @@ struct _MMPluginClass {
 
     /* Plugins need to provide a method to grab independent ports
      * identified by port probes (Optional) */
-    gboolean (*grab_port) (MMPlugin *plugin,
+    gboolean (*grab_port) (MMPlugin *self,
                            MMBaseModem *modem,
                            MMPortProbe *probe,
                            GError **error);
@@ -124,25 +124,25 @@ struct _MMPluginClass {
 
 GType mm_plugin_get_type (void);
 
-const gchar *mm_plugin_get_name (MMPlugin *plugin);
+const gchar *mm_plugin_get_name (MMPlugin *self);
 
 /* This method will run all pre-probing filters, to see if we can discard this
  * plugin from the probing logic as soon as possible. */
-MMPluginSupportsHint mm_plugin_discard_port_early (MMPlugin       *plugin,
+MMPluginSupportsHint mm_plugin_discard_port_early (MMPlugin       *self,
                                                    MMDevice       *device,
                                                    MMKernelDevice *port);
 
-void                   mm_plugin_supports_port        (MMPlugin             *plugin,
+void                   mm_plugin_supports_port        (MMPlugin             *self,
                                                        MMDevice             *device,
                                                        MMKernelDevice       *port,
                                                        GCancellable         *cancellable,
                                                        GAsyncReadyCallback   callback,
                                                        gpointer              user_data);
-MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin             *plugin,
+MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin             *self,
                                                        GAsyncResult         *result,
                                                        GError              **error);
 
-MMBaseModem *mm_plugin_create_modem (MMPlugin *plugin,
+MMBaseModem *mm_plugin_create_modem (MMPlugin *self,
                                      MMDevice *device,
                                      GError **error);
 
