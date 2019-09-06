@@ -48,23 +48,25 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
     MM_FILTER_RULE_NONE                  = 0,
     MM_FILTER_RULE_EXPLICIT_WHITELIST    = 1 << 0,
     MM_FILTER_RULE_EXPLICIT_BLACKLIST    = 1 << 1,
-    MM_FILTER_RULE_VIRTUAL               = 1 << 2,
-    MM_FILTER_RULE_NET                   = 1 << 3,
-    MM_FILTER_RULE_CDC_WDM               = 1 << 4,
-    MM_FILTER_RULE_TTY                   = 1 << 5,
-    MM_FILTER_RULE_TTY_BLACKLIST         = 1 << 6,
-    MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  = 1 << 7,
-    MM_FILTER_RULE_TTY_PLATFORM_DRIVER   = 1 << 8,
-    MM_FILTER_RULE_TTY_DEFAULT_ALLOWED   = 1 << 9,
-    MM_FILTER_RULE_TTY_DRIVER            = 1 << 10,
-    MM_FILTER_RULE_TTY_ACM_INTERFACE     = 1 << 11,
-    MM_FILTER_RULE_TTY_WITH_NET          = 1 << 12,
-    MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN = 1 << 13,
+    MM_FILTER_RULE_PLUGIN_WHITELIST      = 1 << 2,
+    MM_FILTER_RULE_VIRTUAL               = 1 << 3,
+    MM_FILTER_RULE_NET                   = 1 << 4,
+    MM_FILTER_RULE_CDC_WDM               = 1 << 5,
+    MM_FILTER_RULE_TTY                   = 1 << 6,
+    MM_FILTER_RULE_TTY_BLACKLIST         = 1 << 7,
+    MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  = 1 << 8,
+    MM_FILTER_RULE_TTY_PLATFORM_DRIVER   = 1 << 9,
+    MM_FILTER_RULE_TTY_DEFAULT_ALLOWED   = 1 << 10,
+    MM_FILTER_RULE_TTY_DRIVER            = 1 << 11,
+    MM_FILTER_RULE_TTY_ACM_INTERFACE     = 1 << 12,
+    MM_FILTER_RULE_TTY_WITH_NET          = 1 << 13,
+    MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN = 1 << 14,
 } MMFilterRule;
 
 #define MM_FILTER_RULE_ALL                  \
     (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
      MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
+     MM_FILTER_RULE_PLUGIN_WHITELIST      | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
      MM_FILTER_RULE_CDC_WDM               | \
@@ -97,6 +99,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
 #define MM_FILTER_POLICY_STRICT             \
     (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
      MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
+     MM_FILTER_RULE_PLUGIN_WHITELIST      | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
      MM_FILTER_RULE_CDC_WDM               | \
@@ -112,6 +115,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
 #define MM_FILTER_POLICY_PARANOID           \
     (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
      MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
+     MM_FILTER_RULE_PLUGIN_WHITELIST      | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
      MM_FILTER_RULE_CDC_WDM               | \
@@ -138,5 +142,11 @@ gboolean mm_filter_port (MMFilter        *self,
 gboolean mm_filter_device_and_port (MMFilter       *self,
                                     MMDevice       *device,
                                     MMKernelDevice *port);
+
+void     mm_filter_register_plugin_whitelist_tag (MMFilter    *self,
+                                                  const gchar *tag);
+
+gboolean mm_filter_check_rule_enabled (MMFilter     *self,
+                                       MMFilterRule  rule);
 
 #endif /* MM_FILTER_H */
