@@ -176,7 +176,13 @@ mm_filter_port (MMFilter        *self,
         }
 
         /*
-         * If the TTY kernel driver is cdc-acm and the interface is class=2/subclass=2/protocol=[1-6], allow it.
+         * If the TTY kernel driver is cdc-acm and the interface is not
+         * class=2/subclass=2/protocol=[1-6], forbidden.
+         *
+         * Otherwise, we'll require the modem to have more ports other
+         * than the ttyACM one (see mm_filter_device_and_port()), because
+         * there are lots of Arduino devices out there exposing a single
+         * ttyACM port and wrongly claiming AT protocol support...
          *
          * Class definitions for Communication Devices 1.2
          * Communications Interface Class Control Protocol Codes:
@@ -194,11 +200,12 @@ mm_filter_port (MMFilter        *self,
          */
         if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_ACM_INTERFACE) &&
             (!g_strcmp0 (driver, "cdc_acm")) &&
-            (mm_kernel_device_get_interface_class (port) == 2) &&
-            (mm_kernel_device_get_interface_subclass (port) == 2) &&
-            (mm_kernel_device_get_interface_protocol (port) >= 1) && (mm_kernel_device_get_interface_protocol (port) <= 6)) {
-            mm_dbg ("[filter] (%s/%s): port allowed: cdc-acm interface reported AT-capable", subsystem, name);
-            return TRUE;
+            ((mm_kernel_device_get_interface_class (port) != 2)    ||
+             (mm_kernel_device_get_interface_subclass (port) != 2) ||
+             (mm_kernel_device_get_interface_protocol (port) < 1)  ||
+             (mm_kernel_device_get_interface_protocol (port) > 6))) {
+            mm_dbg ("[filter] (%s/%s): port filtered: cdc-acm interface is not AT-capable", subsystem, name);
+            return FALSE;
         }
 
         /* Default forbidden? flag the port as maybe-forbidden, and go on */
@@ -217,6 +224,24 @@ mm_filter_port (MMFilter        *self,
 
 /*****************************************************************************/
 
+static gboolean
+device_has_net_port (MMDevice *device)
+{
+    GList *l;
+
+    for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
+        if (!g_strcmp0 (mm_port_probe_get_port_subsys (MM_PORT_PROBE (l->data)), "net"))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean
+device_has_multiple_ports (MMDevice *device)
+{
+    return (g_list_length (mm_device_peek_port_probe_list (device)) > 1);
+}
+
 gboolean
 mm_filter_device_and_port (MMFilter       *self,
                            MMDevice       *device,
@@ -224,6 +249,7 @@ mm_filter_device_and_port (MMFilter       *self,
 {
     const gchar *subsystem;
     const gchar *name;
+    const gchar *driver;
 
     /* If it wasn't flagged as maybe forbidden, there's nothing to do */
     if (!GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (port), FILTER_PORT_MAYBE_FORBIDDEN)))
@@ -233,16 +259,19 @@ mm_filter_device_and_port (MMFilter       *self,
     name      = mm_kernel_device_get_name      (port);
 
     /* Check whether this device holds a NET port in addition to this TTY */
-    if (self->priv->enabled_rules & MM_FILTER_RULE_TTY_WITH_NET) {
-        GList *l;
+    if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_WITH_NET) &&
+        device_has_net_port (device)) {
+        mm_dbg ("[filter] (%s/%s): port allowed: device also exports a net interface", subsystem, name);
+        return TRUE;
+    }
 
-        for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
-            if (!g_strcmp0 (mm_port_probe_get_port_subsys (MM_PORT_PROBE (l->data)), "net")) {
-                mm_dbg ("[filter] (%s/%s): port allowed: device also exports a net interface (%s)",
-                        subsystem, name, mm_port_probe_get_port_name (MM_PORT_PROBE (l->data)));
-                return TRUE;
-            }
-        }
+    /* Check whether this device holds any other port in addition to the ttyACM port */
+    driver = mm_kernel_device_get_driver (port);
+    if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_ACM_INTERFACE) &&
+        (!g_strcmp0 (driver, "cdc_acm")) &&
+        device_has_multiple_ports (device)) {
+        mm_dbg ("[filter] (%s/%s): port allowed: device exports multiple interfaces", subsystem, name);
+        return TRUE;
     }
 
     mm_dbg ("[filter] (%s/%s) port filtered: forbidden", subsystem, name);
