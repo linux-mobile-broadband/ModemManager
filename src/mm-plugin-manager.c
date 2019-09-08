@@ -1511,6 +1511,21 @@ register_plugin_whitelist_tags (MMPluginManager *self,
         mm_filter_register_plugin_whitelist_tag (self->priv->filter, tags[i]);
 }
 
+static void
+register_plugin_whitelist_product_ids (MMPluginManager *self,
+                                       MMPlugin        *plugin)
+{
+    const mm_uint16_pair *product_ids;
+    guint                 i;
+
+    if (!mm_filter_check_rule_enabled (self->priv->filter, MM_FILTER_RULE_PLUGIN_WHITELIST))
+        return;
+
+    product_ids = mm_plugin_get_allowed_product_ids (plugin);
+    for (i = 0; product_ids && product_ids[i].l; i++)
+        mm_filter_register_plugin_whitelist_product_id (self->priv->filter, product_ids[i].l, product_ids[i].r);
+}
+
 static MMPlugin *
 load_plugin (const gchar *path)
 {
@@ -1625,8 +1640,9 @@ load_plugins (MMPluginManager *self,
             /* Vendor specific plugin */
             self->priv->plugins = g_list_append (self->priv->plugins, plugin);
 
-        /* Register plugin whitelist tags in filter, if any */
+        /* Register plugin whitelist rules in filter, if any */
         register_plugin_whitelist_tags (self, plugin);
+        register_plugin_whitelist_product_ids (self, plugin);
     }
 
     /* Check the generic plugin once all looped */

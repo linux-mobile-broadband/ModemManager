@@ -140,6 +140,12 @@ mm_plugin_get_allowed_udev_tags (MMPlugin *self)
     return (const gchar **) self->priv->udev_tags;
 }
 
+const mm_uint16_pair *
+mm_plugin_get_allowed_product_ids (MMPlugin *self)
+{
+    return self->priv->product_ids;
+}
+
 /*****************************************************************************/
 
 static gboolean
