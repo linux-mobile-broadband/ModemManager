@@ -1133,6 +1133,22 @@ dist_udevrules_DATA += fibocom/77-mm-fibocom-port-types.rules
 AM_CFLAGS += -DTESTUDEVRULESDIR_FIBOCOM=\"${srcdir}/fibocom\"
 
 ################################################################################
+# plugin: dlink
+################################################################################
+
+pkglib_LTLIBRARIES += libmm-plugin-dlink.la
+libmm_plugin_dlink_la_SOURCES = \
+	dlink/mm-plugin-dlink.c \
+	dlink/mm-plugin-dlink.h \
+	$(NULL)
+libmm_plugin_dlink_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_dlink_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+dist_udevrules_DATA += dlink/77-mm-dlink-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_DLINK=\"${srcdir}/dlink\"
+
+################################################################################
 # udev rules tester
 ################################################################################
 
