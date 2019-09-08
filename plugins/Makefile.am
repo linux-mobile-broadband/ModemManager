@@ -1149,6 +1149,22 @@ dist_udevrules_DATA += dlink/77-mm-dlink-port-types.rules
 AM_CFLAGS += -DTESTUDEVRULESDIR_DLINK=\"${srcdir}/dlink\"
 
 ################################################################################
+# plugin: tplink
+################################################################################
+
+pkglib_LTLIBRARIES += libmm-plugin-tplink.la
+libmm_plugin_tplink_la_SOURCES = \
+	tplink/mm-plugin-tplink.c \
+	tplink/mm-plugin-tplink.h \
+	$(NULL)
+libmm_plugin_tplink_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_tplink_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+dist_udevrules_DATA += tplink/77-mm-tplink-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_TPLINK=\"${srcdir}/tplink\"
+
+################################################################################
 # udev rules tester
 ################################################################################
 
