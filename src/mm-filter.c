@@ -36,6 +36,7 @@ enum {
 struct _MMFilterPrivate {
     MMFilterRule  enabled_rules;
     GList        *plugin_whitelist_tags;
+    GArray       *plugin_whitelist_product_ids;
 };
 
 /*****************************************************************************/
@@ -48,6 +49,31 @@ mm_filter_register_plugin_whitelist_tag (MMFilter    *self,
         mm_dbg ("[filter] registered plugin whitelist tag: %s", tag);
         self->priv->plugin_whitelist_tags = g_list_prepend (self->priv->plugin_whitelist_tags, g_strdup (tag));
     }
+}
+
+void
+mm_filter_register_plugin_whitelist_product_id (MMFilter *self,
+                                                guint16   vid,
+                                                guint16   pid)
+{
+    mm_uint16_pair new_item;
+    guint          i;
+
+    if (!self->priv->plugin_whitelist_product_ids)
+        self->priv->plugin_whitelist_product_ids = g_array_sized_new (FALSE, FALSE, sizeof (mm_uint16_pair), 10);
+
+    for (i = 0; i < self->priv->plugin_whitelist_product_ids->len; i++) {
+        mm_uint16_pair *item;
+
+        item = &g_array_index (self->priv->plugin_whitelist_product_ids, mm_uint16_pair, i);
+        if (item->l == vid && item->r == pid)
+            return;
+    }
+
+    new_item.l = vid;
+    new_item.r = pid;
+    g_array_append_val (self->priv->plugin_whitelist_product_ids, new_item);
+    mm_dbg ("[filter] registered plugin whitelist product id: %04x:%04x", vid, pid);
 }
 
 /*****************************************************************************/
@@ -82,13 +108,33 @@ mm_filter_port (MMFilter        *self,
 
     /* If the device is whitelisted by a plugin, we allow it. */
     if (self->priv->enabled_rules & MM_FILTER_RULE_PLUGIN_WHITELIST) {
-        GList *l;
+        GList   *l;
+        guint16  vid = 0;
+        guint16  pid = 0;
 
         for (l = self->priv->plugin_whitelist_tags; l; l = g_list_next (l)) {
             if (mm_kernel_device_get_global_property_as_boolean (port, (const gchar *)(l->data)) ||
                 mm_kernel_device_get_property_as_boolean (port, (const gchar *)(l->data))) {
-                mm_dbg ("[filter] (%s/%s) port allowed: device is whitelisted by plugin", subsystem, name);
+                mm_dbg ("[filter] (%s/%s) port allowed: device is whitelisted by plugin (tag)", subsystem, name);
                 return TRUE;
+            }
+        }
+
+        vid = mm_kernel_device_get_physdev_vid (port);
+        if (vid)
+            pid = mm_kernel_device_get_physdev_pid (port);
+
+        if (vid && pid && self->priv->plugin_whitelist_product_ids) {
+            guint i;
+
+            for (i = 0; i < self->priv->plugin_whitelist_product_ids->len; i++) {
+                mm_uint16_pair *item;
+
+                item = &g_array_index (self->priv->plugin_whitelist_product_ids, mm_uint16_pair, i);
+                if (item->l == vid && item->r == pid) {
+                    mm_dbg ("[filter] (%s/%s) port allowed: device is whitelisted by plugin (vid/pid)", subsystem, name);
+                    return TRUE;
+                }
             }
         }
     }
@@ -426,6 +472,7 @@ finalize (GObject *object)
 {
     MMFilter *self = MM_FILTER (object);
 
+    g_clear_pointer (&self->priv->plugin_whitelist_product_ids, g_array_unref);
     g_list_free_full (self->priv->plugin_whitelist_tags, g_free);
 
     G_OBJECT_CLASS (mm_filter_parent_class)->finalize (object);
