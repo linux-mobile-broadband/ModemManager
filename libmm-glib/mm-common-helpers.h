@@ -103,8 +103,9 @@ GVariant    *mm_common_bands_garray_to_variant (GArray *array);
 GVariant    *mm_common_build_bands_any     (void);
 GVariant    *mm_common_build_bands_unknown (void);
 
-gboolean     mm_common_bands_garray_cmp  (GArray *a, GArray *b);
-void         mm_common_bands_garray_sort (GArray *array);
+gboolean     mm_common_bands_garray_cmp    (GArray *a, GArray *b);
+void         mm_common_bands_garray_sort   (GArray *array);
+gboolean     mm_common_bands_garray_lookup (GArray *array, MMModemBand value);
 
 gboolean mm_common_band_is_gsm    (MMModemBand band);
 gboolean mm_common_band_is_utran  (MMModemBand band);

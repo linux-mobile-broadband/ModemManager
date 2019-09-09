@@ -159,9 +159,9 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_current_bands = mm_shared_telit_modem_set_current_bands;
     iface->set_current_bands_finish = mm_shared_telit_modem_set_current_bands_finish;
     iface->load_current_bands = mm_shared_telit_modem_load_current_bands;
-    iface->load_current_bands_finish = mm_shared_telit_modem_load_bands_finish;
+    iface->load_current_bands_finish = mm_shared_telit_modem_load_current_bands_finish;
     iface->load_supported_bands = mm_shared_telit_modem_load_supported_bands;
-    iface->load_supported_bands_finish = mm_shared_telit_modem_load_bands_finish;
+    iface->load_supported_bands_finish = mm_shared_telit_modem_load_supported_bands_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_current_modes = mm_shared_telit_load_current_modes;

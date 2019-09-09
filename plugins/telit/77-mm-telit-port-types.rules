@@ -45,4 +45,10 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1101", ENV{.MM_USBIFNUM}=="00", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1101", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1101", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
+# LM940/960 use alternate settings for 3G band management
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1040", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1041", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1042", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1043", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+
 LABEL="mm_telit_port_types_end"

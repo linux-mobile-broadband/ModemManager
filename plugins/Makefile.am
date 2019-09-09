@@ -901,8 +901,12 @@ noinst_PROGRAMS += test-modem-helpers-telit
 test_modem_helpers_telit_SOURCES = \
 	telit/tests/test-mm-modem-helpers-telit.c \
 	$(NULL)
-test_modem_helpers_telit_CPPFLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
+test_modem_helpers_telit_CPPFLAGS = \
+	$(PLUGIN_TELIT_COMPILER_FLAGS) \
+	$(TEST_COMMON_COMPILER_FLAGS) \
+	$(NULL)
 test_modem_helpers_telit_LDADD = \
+	$(TEST_COMMON_LIBADD_FLAGS) \
 	$(builddir)/libhelpers-telit.la \
 	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la \

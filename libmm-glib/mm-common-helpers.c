@@ -722,6 +722,20 @@ mm_common_bands_garray_cmp (GArray *a, GArray *b)
     return !different;
 }
 
+gboolean
+mm_common_bands_garray_lookup (GArray      *array,
+                               MMModemBand  value)
+{
+    guint i;
+
+    for (i = 0; i < array->len; i++) {
+        if (value == g_array_index (array, MMModemBand, i))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 void
 mm_common_bands_garray_sort (GArray *array)
 {

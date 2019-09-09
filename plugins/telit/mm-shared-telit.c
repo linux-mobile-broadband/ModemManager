@@ -32,6 +32,59 @@
 #include "mm-shared-telit.h"
 
 /*****************************************************************************/
+/* Private data context */
+
+#define PRIVATE_TAG "shared-telit-private-tag"
+static GQuark private_quark;
+
+typedef struct {
+    gboolean  alternate_3g_bands;
+    GArray   *supported_bands;
+} Private;
+
+static void
+private_free (Private *priv)
+{
+    if (priv->supported_bands)
+        g_array_unref (priv->supported_bands);
+    g_slice_free (Private, priv);
+}
+
+static void
+initialize_alternate_3g_band (MMSharedTelit *self,
+                              Private       *priv)
+{
+    MMPort         *primary;
+    MMKernelDevice *port;
+
+    primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
+    port = mm_port_peek_kernel_device (primary);
+
+    /* Lookup for the tag specifying that we're using the alternate 3G band mapping */
+    priv->alternate_3g_bands = mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_TELIT_BND_ALTERNATE");
+    if (priv->alternate_3g_bands)
+        mm_dbg ("Telit modem using alternate 3G band mask setup");
+}
+
+static Private *
+get_private (MMSharedTelit *self)
+{
+    Private *priv;
+
+    if (G_UNLIKELY (!private_quark))
+        private_quark = g_quark_from_static_string (PRIVATE_TAG);
+
+    priv = g_object_get_qdata (G_OBJECT (self), private_quark);
+    if (!priv) {
+        priv = g_slice_new0 (Private);
+        initialize_alternate_3g_band (self, priv);
+        g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
+    }
+
+    return priv;
+}
+
+/*****************************************************************************/
 /* Load current mode (Modem interface) */
 
 gboolean
@@ -114,126 +167,133 @@ mm_shared_telit_load_current_modes (MMIfaceModem *self,
 /*****************************************************************************/
 /* Load supported bands (Modem interface) */
 
-typedef struct {
-    gboolean mm_modem_is_2g;
-    gboolean mm_modem_is_3g;
-    gboolean mm_modem_is_4g;
-    MMTelitLoadBandsType band_type;
-} LoadBandsContext;
-
-static void
-mm_shared_telit_load_bands_context_free (LoadBandsContext *ctx)
+GArray *
+mm_shared_telit_modem_load_supported_bands_finish (MMIfaceModem  *self,
+                                                   GAsyncResult  *res,
+                                                   GError       **error)
 {
-    g_slice_free (LoadBandsContext, ctx);
+    return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-mm_shared_telit_load_bands_ready (MMBaseModem *self,
-                                  GAsyncResult *res,
-                                  GTask *task)
+mm_shared_telit_load_supported_bands_ready (MMBaseModem  *self,
+                                            GAsyncResult *res,
+                                            GTask        *task)
 {
     const gchar *response;
-    GError *error = NULL;
-    GArray *bands = NULL;
-    LoadBandsContext *ctx;
+    GError      *error = NULL;
+    Private     *priv;
 
-    ctx = g_task_get_task_data (task);
+    priv = get_private (MM_SHARED_TELIT (self));
+
     response = mm_base_modem_at_command_finish (self, res, &error);
-
     if (!response)
         g_task_return_error (task, error);
-    else if (!mm_telit_parse_bnd_response (response,
-                                           ctx->mm_modem_is_2g,
-                                           ctx->mm_modem_is_3g,
-                                           ctx->mm_modem_is_4g,
-                                           ctx->band_type,
-                                           &bands,
-                                           &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+    else {
+        GArray *bands;
+
+        bands = mm_telit_parse_bnd_test_response (response,
+                                                  mm_iface_modem_is_2g (MM_IFACE_MODEM (self)),
+                                                  mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
+                                                  mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
+                                                  priv->alternate_3g_bands,
+                                                  &error);
+        if (!bands)
+            g_task_return_error (task, error);
+        else {
+            /* Store supported bands to be able to build ANY when setting */
+            priv->supported_bands = g_array_ref (bands);
+            g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+        }
+    }
 
     g_object_unref (task);
 }
 
 void
-mm_shared_telit_modem_load_supported_bands (MMIfaceModem *self,
-                                            GAsyncReadyCallback callback,
-                                            gpointer user_data)
+mm_shared_telit_modem_load_supported_bands (MMIfaceModem        *self,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data)
 {
-    GTask *task;
-    LoadBandsContext *ctx;
-
-    ctx = g_slice_new0 (LoadBandsContext);
-
-    ctx->mm_modem_is_2g = mm_iface_modem_is_2g (self);
-    ctx->mm_modem_is_3g = mm_iface_modem_is_3g (self);
-    ctx->mm_modem_is_4g = mm_iface_modem_is_4g (self);
-    ctx->band_type = LOAD_SUPPORTED_BANDS;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)mm_shared_telit_load_bands_context_free);
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "#BND=?",
                               3,
-                              FALSE,
-                              (GAsyncReadyCallback) mm_shared_telit_load_bands_ready,
-                              task);
+                              TRUE,
+                              (GAsyncReadyCallback) mm_shared_telit_load_supported_bands_ready,
+                              g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
 /* Load current bands (Modem interface) */
 
 GArray *
-mm_shared_telit_modem_load_bands_finish (MMIfaceModem *self,
-                                         GAsyncResult *res,
-                                         GError **error)
+mm_shared_telit_modem_load_current_bands_finish (MMIfaceModem  *self,
+                                                 GAsyncResult  *res,
+                                                 GError       **error)
 {
-    return (GArray *) g_task_propagate_pointer (G_TASK (res), error);
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+mm_shared_telit_load_current_bands_ready (MMBaseModem  *self,
+                                          GAsyncResult *res,
+                                          GTask        *task)
+{
+    const gchar *response;
+    GError      *error = NULL;
+    Private     *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        g_task_return_error (task, error);
+    else {
+        GArray *bands;
+
+        bands = mm_telit_parse_bnd_query_response (response,
+                                                   mm_iface_modem_is_2g (MM_IFACE_MODEM (self)),
+                                                   mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
+                                                   mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
+                                                   priv->alternate_3g_bands,
+                                                   &error);
+        if (!bands)
+            g_task_return_error (task, error);
+        else
+            g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+    }
+
+    g_object_unref (task);
 }
 
 void
-mm_shared_telit_modem_load_current_bands (MMIfaceModem *self,
-                                          GAsyncReadyCallback callback,
-                                          gpointer user_data)
+mm_shared_telit_modem_load_current_bands (MMIfaceModem        *self,
+                                          GAsyncReadyCallback  callback,
+                                          gpointer             user_data)
 {
-    GTask *task;
-    LoadBandsContext *ctx;
-
-    ctx = g_slice_new0 (LoadBandsContext);
-
-    ctx->mm_modem_is_2g = mm_iface_modem_is_2g (self);
-    ctx->mm_modem_is_3g = mm_iface_modem_is_3g (self);
-    ctx->mm_modem_is_4g = mm_iface_modem_is_4g (self);
-    ctx->band_type = LOAD_CURRENT_BANDS;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)mm_shared_telit_load_bands_context_free);
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "#BND?",
                               3,
                               FALSE,
-                              (GAsyncReadyCallback) mm_shared_telit_load_bands_ready,
-                              task);
+                              (GAsyncReadyCallback) mm_shared_telit_load_current_bands_ready,
+                              g_task_new (self, NULL, callback, user_data));
 }
 
 /*****************************************************************************/
 /* Set current bands (Modem interface) */
 
 gboolean
-mm_shared_telit_modem_set_current_bands_finish (MMIfaceModem *self,
-                                                GAsyncResult *res,
-                                                GError **error)
+mm_shared_telit_modem_set_current_bands_finish (MMIfaceModem  *self,
+                                                GAsyncResult  *res,
+                                                GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-mm_shared_telit_modem_set_current_bands_ready (MMBaseModem *self,
-                                               GAsyncResult *res,
-                                               GTask *task)
+set_current_bands_ready (MMBaseModem  *self,
+                         GAsyncResult *res,
+                         GTask        *task)
 {
     GError *error = NULL;
 
@@ -247,88 +307,47 @@ mm_shared_telit_modem_set_current_bands_ready (MMBaseModem *self,
 }
 
 void
-mm_shared_telit_modem_set_current_bands (MMIfaceModem *self,
-                                         GArray *bands_array,
-                                         GAsyncReadyCallback callback,
-                                         gpointer user_data)
+mm_shared_telit_modem_set_current_bands (MMIfaceModem        *self,
+                                         GArray              *bands_array,
+                                         GAsyncReadyCallback  callback,
+                                         gpointer             user_data)
 {
-    gchar *cmd;
-    gint flag2g;
-    gint flag3g;
-    gint flag4g;
-    gboolean is_2g;
-    gboolean is_3g;
-    gboolean is_4g;
-    GTask *task;
+    GTask   *task;
+    GError  *error = NULL;
+    gchar   *cmd;
+    Private *priv;
 
-    mm_telit_get_band_flag (bands_array, &flag2g, &flag3g, &flag4g);
+    priv = get_private (MM_SHARED_TELIT (self));
 
-    is_2g = mm_iface_modem_is_2g (self);
-    is_3g = mm_iface_modem_is_3g (self);
-    is_4g = mm_iface_modem_is_4g (self);
-
-    if (is_2g && flag2g == -1) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_shared_telit_modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_NOT_FOUND,
-                                 "None or invalid 2G bands combination in the provided list");
-        return;
-    }
-
-    if (is_3g && flag3g == -1) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_shared_telit_modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_NOT_FOUND,
-                                 "None or invalid 3G bands combination in the provided list");
-        return;
-    }
-
-    if (is_4g && flag4g == -1) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_shared_telit_modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_NOT_FOUND,
-                                 "None or invalid 4G bands combination in the provided list");
-        return;
-    }
-
-    cmd = NULL;
-    if (is_2g && !is_3g && !is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d", flag2g);
-    else if (is_2g && is_3g && !is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d,%d", flag2g, flag3g);
-    else if (is_2g && is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d,%d,%d", flag2g, flag3g, flag4g);
-    else if (!is_2g && !is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=0,0,%d", flag4g);
-    else if (!is_2g && is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=0,%d,%d", flag3g, flag4g);
-    else if (is_2g && !is_3g && is_4g)
-        cmd = g_strdup_printf ("AT#BND=%d,0,%d", flag2g, flag4g);
-    else {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_shared_telit_modem_set_current_bands,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Unexpected error: could not compose AT#BND command");
-        return;
-    }
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (bands_array->len == 1 && g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        if (!priv->supported_bands) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Couldn't build ANY band settings: unknown supported bands");
+            g_object_unref (task);
+            return;
+        }
+        bands_array = priv->supported_bands;
+    }
+
+    cmd = mm_telit_build_bnd_request (bands_array,
+                                      mm_iface_modem_is_2g (self),
+                                      mm_iface_modem_is_3g (self),
+                                      mm_iface_modem_is_4g (self),
+                                      priv->alternate_3g_bands,
+                                      &error);
+    if (!cmd) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               20,
                               FALSE,
-                              (GAsyncReadyCallback)mm_shared_telit_modem_set_current_bands_ready,
+                              (GAsyncReadyCallback)set_current_bands_ready,
                               task);
     g_free (cmd);
 }
