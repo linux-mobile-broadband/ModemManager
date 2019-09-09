@@ -30,9 +30,7 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="01", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
-# CE910-DUAL/ME910
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+# CE910-DUAL
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 LABEL="mm_telit_port_types_end"
