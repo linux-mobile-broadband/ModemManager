@@ -1728,23 +1728,30 @@ mm_port_serial_flash_finish (MMPortSerial *port,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static gboolean
+flash_cancel_cb (GTask *task)
+{
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Flash cancelled");
+    g_object_unref (task);
+    return G_SOURCE_REMOVE;
+}
+
 void
 mm_port_serial_flash_cancel (MMPortSerial *self)
 {
     GTask *task;
 
+    /* Do nothing if there is no flash task */
     if (!self->priv->flash_task)
         return;
 
-    /* Recover task */
+    /* Recover task and schedule it to be cancelled in an idle.
+     * We do NOT want this cancellation to happen right away,
+     * because the object reference in the flashing task may
+     * be the last one valid. */
     task = self->priv->flash_task;
     self->priv->flash_task = NULL;
-
-    g_task_return_new_error (task,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_CANCELLED,
-                             "Flash cancelled");
-    g_object_unref (task);
+    g_idle_add ((GSourceFunc)flash_cancel_cb, task);
 }
 
 static gboolean
