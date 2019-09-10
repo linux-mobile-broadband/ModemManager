@@ -957,7 +957,7 @@ disconnect_ready (MMBaseBearer *self,
     GError *error = NULL;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
-        mm_dbg ("Couldn't disconnect bearer '%s'", self->priv->path);
+        mm_dbg ("Couldn't disconnect bearer '%s': %s", self->priv->path, error->message);
         bearer_update_status (self, MM_BEARER_STATUS_CONNECTED);
         g_task_return_error (task, error);
     }
