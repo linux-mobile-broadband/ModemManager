@@ -1596,9 +1596,18 @@ reopen_do (MMPortSerial *self)
         }
     }
 
-    if (error)
+    if (error) {
+        /* An error during port reopening may mean that the device is
+         * already gone. Note that we won't get a HUP in the TTY when
+         * the port is gone during the reopen wait time, because there's
+         * no channel I/O monitoring in place.
+         *
+         * If we ever see this, we'll flag the port as forced close right
+         * away, because the open count would anyway be broken afterwards.
+         */
+        port_serial_close_force (self);
         g_task_return_error (task, error);
-    else
+    } else
         g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 
