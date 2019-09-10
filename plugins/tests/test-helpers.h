@@ -20,7 +20,7 @@
 #include <libmm-glib.h>
 
 void mm_test_helpers_compare_bands (GArray            *bands,
-				    const MMModemBand *expected_bands,
-				    guint              n_expected_bands);
+                                    const MMModemBand *expected_bands,
+                                    guint              n_expected_bands);
 
 #endif /* TEST_HELPERS_H */
