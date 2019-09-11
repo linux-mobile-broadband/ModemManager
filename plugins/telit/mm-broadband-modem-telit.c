@@ -710,7 +710,7 @@ modem_reset (MMIfaceModem *self,
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "AT#REBOOT",
-                              3,
+                              8,
                               FALSE,
                               callback,
                               user_data);
