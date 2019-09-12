@@ -1,4 +1,68 @@
 
+ModemManager 1.10.6
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * Bearer: if connecting a bearer with PPP method, require upper layers to
+   disconnect the bearer explicitly and completely ignore the connectivity
+   checks performed by the modem itself. This makes sure that the TTY is not
+   reused by ModemManager before pppd has finished using it.
+
+ * Serial port:
+   ** Fix serial port flash cancellation logic to avoid assertion if the device
+      gets unplugged during the flash operation.
+   ** Fix serial port reopen logic to flag the port as forced-closed if the
+      reopening fails, to avoid assertion if the device gets unplugged during
+      the reopen operation.
+   ** Avoid warning when signals are disconnected automatically during last
+      object unref.
+
+ * SMS:
+   ** Initialize common fields early for multipart messages, without waiting for
+      the last part to arrive.
+
+ * 3GPP:
+   ** Report consolidated registration state as DENIED if all the other ones are
+      either idle or unknown.
+
+ * udev:
+   ** Updated ID_MM_DEVICE_IGNORE to make it really a user-usable tag,
+      applicable not only to TTY devices but to any kind of device (e.g. to
+      blacklist MBIM modems); and also applicable under any kind of filter mode
+      (including 'strict' mode).
+
+ * Filter:
+   ** Added new 'explicit blacklist' filter rule, by default enabled for all
+      filter modes and controlled with the MM_FILTER_RULE_EXPLICIT_BLACKLIST
+      envvar.
+   ** Added new 'plugin whitelist' filter rule, enabled exclusively in 'strict'
+      filter mode, which allows us to automatically flag for probing those
+      devices that are flagged with specific plugin-selected udev tags or which
+      have vid:pid pairs registered as allowed in the plugins.
+   ** Updated the 'AT-capable ttyACM' filter rule, so that we only process and
+      probe the serial port if the device also exposes other ports (serial,
+      cdc-wdm, net) that ModemManager may process. This fix should allow us to
+      automatically ignore Arduino devices that wrongly report themselves as
+      speaking AT protocol in the ttyACM port.
+
+ * QMI:
+   ** Fix segfault while updating bands and the device doesn't support the
+      'extended LTE band preference' TLV.
+
+ * MBIM:
+   ** Fix segfault while processing empty USSD responses.
+
+ * libmm-glib:
+   ** Properly handle NULL pointer on MMFirmwareUpdateSettings.
+
+ * Plugins:
+   ** sierra: added port type hints for the MC74xx family.
+   ** telit: added port type hints for the ME910 and the EG91.
+   ** cinterion: added port type hints for the PLS8.
+
+
 ModemManager 1.10.4
 -------------------------------------------
 This is a new bugfix release of ModemManager.
