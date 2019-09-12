@@ -607,6 +607,7 @@ typedef struct {
     GCancellable      *cancellable;
     guint              cid;
     guint              max_cid;
+    guint              blank_cid;
     gboolean           use_existing_cid;
     MMBearerIpFamily   ip_family;
 } CidSelection3gppContext;
@@ -724,7 +725,7 @@ parse_cid_range (MMBaseModem              *modem,
 {
     GError *inner_error = NULL;
     GList  *formats, *l;
-    guint   cid;
+    guint   unused_cid;
 
     /* If cancelled, set result error */
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
@@ -735,21 +736,20 @@ parse_cid_range (MMBaseModem              *modem,
 
     if (error) {
         mm_dbg ("Unexpected +CGDCONT error: '%s'", error->message);
-        mm_dbg ("Defaulting to CID=1");
-        ctx->cid = 1;
-        return TRUE;
+        goto out;
     }
 
     formats = mm_3gpp_parse_cgdcont_test_response (response, &inner_error);
     if (inner_error) {
         mm_dbg ("Error parsing +CGDCONT test response: '%s'", inner_error->message);
-        mm_dbg ("Defaulting to CID=1");
         g_error_free (inner_error);
-        ctx->cid = 1;
-        return TRUE;
+        goto out;
     }
 
-    cid = 0;
+    /* We need to look for the max allowed cid in the IP family we need, to see if
+     * we can use the next available CID */
+    unused_cid = 0;
+
     for (l = formats; l; l = g_list_next (l)) {
         MM3gppPdpContextFormat *format = l->data;
 
@@ -758,12 +758,11 @@ parse_cid_range (MMBaseModem              *modem,
             gchar *ip_family_str;
 
             ip_family_str = mm_bearer_ip_family_build_string_from_mask (format->pdp_type);
-            if (ctx->max_cid < format->max_cid) {
-                cid = ctx->max_cid + 1;
-                mm_dbg ("Using empty CID %u with PDP type '%s'", cid, ip_family_str);
-            } else {
-                cid = ctx->max_cid;
-                mm_dbg ("Re-using CID %u (max) with PDP type '%s'", cid, ip_family_str);
+            /* If the max existing CID found during CGDCONT? is below the max allowed
+             * CID, then we can use the next available CID because it's an unused one. */
+            if (ctx->max_cid && (ctx->max_cid < format->max_cid)) {
+                unused_cid = ctx->max_cid + 1;
+                mm_dbg ("Found an unused PDP context at CID %u", unused_cid);
             }
             g_free (ip_family_str);
             break;
@@ -772,12 +771,31 @@ parse_cid_range (MMBaseModem              *modem,
 
     mm_3gpp_pdp_context_format_list_free (formats);
 
-    if (cid == 0) {
-        mm_dbg ("Defaulting to CID=1");
-        cid = 1;
+    /* If an unused CID is found available after the last existing one, use it */
+    if (unused_cid) {
+        ctx->cid = unused_cid;
+        return TRUE;
     }
 
-    ctx->cid = cid;
+out:
+
+    /* Otherwise, rewrite a context defined with no APN, if any */
+    if (ctx->blank_cid) {
+        mm_dbg ("Rewriting first found context without APN set at CID %u", ctx->max_cid);
+        ctx->cid = ctx->blank_cid;
+        return TRUE;
+    }
+
+    /* Otherwise, rewrite the last existing one found */
+    if (ctx->max_cid) {
+        mm_dbg ("Rewriting last found context at CID %u", ctx->max_cid);
+        ctx->cid = ctx->max_cid;
+        return TRUE;
+    }
+
+    /* Otherwise, just fallback to CID=1 */
+    mm_dbg ("Defaulting to CID=1");
+    ctx->cid = 1;
     return TRUE;
 }
 
@@ -794,7 +812,8 @@ parse_pdp_list (MMBaseModem             *modem,
     GError *inner_error = NULL;
     GList *pdp_list;
     GList *l;
-    guint cid;
+    guint exact_cid;
+    guint unused_cid;
     guint prev_cid;
 
     /* If cancelled, set result error */
@@ -832,9 +851,6 @@ parse_pdp_list (MMBaseModem             *modem,
         return FALSE;
     }
 
-    cid = 0;
-    prev_cid = 0;
-
     /* Show all found PDP contexts in debug log */
     mm_dbg ("Found '%u' PDP contexts", g_list_length (pdp_list));
     for (l = pdp_list; l; l = g_list_next (l)) {
@@ -850,6 +866,10 @@ parse_pdp_list (MMBaseModem             *modem,
     }
 
     /* Look for the exact PDP context we want */
+    exact_cid = 0;
+    unused_cid = 0;
+    prev_cid  = 0;
+
     for (l = pdp_list; l; l = g_list_next (l)) {
         MM3gppPdpContext *pdp = l->data;
 
@@ -866,38 +886,32 @@ parse_pdp_list (MMBaseModem             *modem,
                 ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
                 mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
                         pdp->cid, ip_family_str, apn ? apn : "");
-                cid = pdp->cid;
-                ctx->use_existing_cid = TRUE;
+                exact_cid = pdp->cid;
                 g_free (ip_family_str);
                 /* In this case, stop searching */
                 break;
             }
 
-            /* If an open CID was not found yet and the previous CID is not (CID - 1),
-             * this means that (previous CID + 1) is a blank CID that can be used.
+            /* If an unused CID was not found yet and the previous CID is not (CID - 1),
+             * this means that (previous CID + 1) is an unused CID that can be used.
+             * This logic will allow us using unused CIDs that are available in the gaps
+             * between already defined contexts.
              */
-            if (prev_cid != G_MAXUINT && (prev_cid + 1) < pdp->cid) {
-                mm_dbg ("Found the first unused PDP context with CID %u", (prev_cid + 1));
-                cid = prev_cid + 1;
-
-                /* Set prev_cid to G_MAXUINT to show an open CID was found and only an
-                 * exact APN match would change the CID after
-                 */
-                prev_cid = G_MAXUINT;
-            } else {
-                /* PDP with no APN set? we may use that one if not exact match found */
-                if (!pdp->apn || !pdp->apn[0]) {
-                    mm_dbg ("Found PDP context with CID %u and no APN",
-                            pdp->cid);
-                    cid = pdp->cid;
-                }
+            if (!unused_cid && prev_cid && ((prev_cid + 1) < pdp->cid)) {
+                unused_cid = prev_cid + 1;
+                mm_dbg ("Found the first unused PDP context with CID %u", unused_cid);
+            }
+            /* PDP with no APN set? we may use that one if no exact match found */
+            else if ((!pdp->apn || !pdp->apn[0]) && !ctx->blank_cid) {
+                ctx->blank_cid = pdp->cid;
+                mm_dbg ("Found the first PDP context with no APN with CID %u", ctx->blank_cid);
             }
         }
 
         /* Update previous CID value to the current CID for use in the next loop,
-         * unless an unused CID was found
+         * unless an unused CID was already found.
          */
-        if (prev_cid != G_MAXUINT)
+        if (!unused_cid)
             prev_cid = pdp->cid;
 
         if (ctx->max_cid < pdp->cid)
@@ -905,11 +919,23 @@ parse_pdp_list (MMBaseModem             *modem,
     }
     mm_3gpp_pdp_context_list_free (pdp_list);
 
-    if (cid > 0) {
-        ctx->cid = cid;
+    /* Always prefer an exact match */
+    if (exact_cid) {
+        ctx->use_existing_cid = TRUE;
+        ctx->cid = exact_cid;
         return TRUE;
     }
 
+    /* Otherwise, try to use an empty CID detected in between the already
+     * defined contexts */
+    if (unused_cid) {
+        ctx->cid = unused_cid;
+        return TRUE;
+    }
+
+    /* And otherwise, fallback to running CGDCONT=? to look for the max
+     * range of CIDs and try to use the next one available after the last
+     * existing one. */
     return FALSE;
 }
 
