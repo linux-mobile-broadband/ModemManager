@@ -892,20 +892,21 @@ parse_pdp_list (MMBaseModem             *modem,
                 break;
             }
 
-            /* If an unused CID was not found yet and the previous CID is not (CID - 1),
-             * this means that (previous CID + 1) is an unused CID that can be used.
-             * This logic will allow us using unused CIDs that are available in the gaps
-             * between already defined contexts.
-             */
-            if (!unused_cid && prev_cid && ((prev_cid + 1) < pdp->cid)) {
-                unused_cid = prev_cid + 1;
-                mm_dbg ("Found the first unused PDP context with CID %u", unused_cid);
-            }
             /* PDP with no APN set? we may use that one if no exact match found */
-            else if ((!pdp->apn || !pdp->apn[0]) && !ctx->blank_cid) {
+            if ((!pdp->apn || !pdp->apn[0]) && !ctx->blank_cid) {
                 ctx->blank_cid = pdp->cid;
                 mm_dbg ("Found the first PDP context with no APN with CID %u", ctx->blank_cid);
             }
+        }
+
+        /* If an unused CID was not found yet and the previous CID is not (CID - 1),
+         * this means that (previous CID + 1) is an unused CID that can be used.
+         * This logic will allow us using unused CIDs that are available in the gaps
+         * between already defined contexts.
+         */
+        if (!unused_cid && prev_cid && ((prev_cid + 1) < pdp->cid)) {
+            unused_cid = prev_cid + 1;
+            mm_dbg ("Found the first unused PDP context with CID %u", unused_cid);
         }
 
         /* Update previous CID value to the current CID for use in the next loop,
