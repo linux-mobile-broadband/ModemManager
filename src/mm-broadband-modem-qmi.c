@@ -648,6 +648,7 @@ typedef struct {
     LoadUnlockRequiredStep step;
     QmiClient *dms;
     QmiClient *uim;
+    gboolean last_attempt;
 } LoadUnlockRequiredContext;
 
 static MMModemLock
@@ -903,9 +904,12 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            GAsyncResult *res,
                                            GTask *task)
 {
+    LoadUnlockRequiredContext *ctx;
     QmiMessageUimGetCardStatusOutput *output;
     GError *error = NULL;
     MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
+
+    ctx = g_task_get_task_data (task);
 
     output = qmi_client_uim_get_card_status_finish (client, res, &error);
     if (!output) {
@@ -919,6 +923,15 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            &lock,
                                            NULL, NULL, NULL, NULL,
                                            &error)) {
+        /* The device may report a SIM NOT INSERTED error if we're querying the
+         * card status soon after power on. We'll let the Modem interface generic
+         * logic retry loading the info a bit later if that's the case. This will
+         * make device detection slower when there's really no SIM card, but there's
+         * no clear better way to handle it :/ */
+        if (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) && !ctx->last_attempt) {
+            g_clear_error (&error);
+            g_set_error (&error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY, "No card found (retry)");
+        }
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else
@@ -1110,6 +1123,7 @@ modem_load_unlock_required (MMIfaceModem *self,
 
     ctx = g_new0 (LoadUnlockRequiredContext, 1);
     ctx->step = LOAD_UNLOCK_REQUIRED_STEP_FIRST;
+    ctx->last_attempt = last_attempt;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, g_free);
