@@ -884,8 +884,8 @@ modem_load_supported_ip_families (MMIfaceModem *self,
 /* Unlock required loading (Modem interface) */
 
 typedef struct {
-    guint n_ready_status_checks;
     MbimDevice *device;
+    gboolean    last_attempt;
 } LoadUnlockRequiredContext;
 
 static void
@@ -1008,29 +1008,28 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
+        goto out;
     }
+
     /* Need to retry? */
-    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED ||
-             ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) {
-        if (--ctx->n_ready_status_checks == 0) {
-            /* All retries consumed, issue error */
+    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED ||
+        ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) {
+        /* All retries consumed? issue error */
+        if (ctx->last_attempt) {
             if (ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)
-                g_task_return_error (
-                    task,
-                    mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED));
+                g_task_return_error (task, mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED));
             else
-                g_task_return_new_error (task,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
+                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                          "Error waiting for SIM to get initialized");
-            g_object_unref (task);
-        } else {
-            /* Retry */
-            g_timeout_add_seconds (1, (GSourceFunc)wait_for_sim_ready, task);
-        }
+        } else
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
+                                     "SIM not ready yet (retry)");
+        g_object_unref (task);
+        goto out;
     }
+
     /* Initialized but locked? */
-    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED) {
+    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED) {
         MbimMessage *message;
 
         /* Query which lock is to unlock */
@@ -1042,14 +1041,19 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
                              (GAsyncReadyCallback)pin_query_ready,
                              task);
         mbim_message_unref (message);
+        goto out;
     }
-    /* Initialized but locked? */
-    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED) {
+
+    /* Initialized! */
+    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
-    } else
-        g_assert_not_reached ();
+        goto out;
+    }
 
+    g_assert_not_reached ();
+
+out:
     if (response)
         mbim_message_unref (response);
 }
@@ -1087,7 +1091,7 @@ modem_load_unlock_required (MMIfaceModem *self,
 
     ctx = g_slice_new (LoadUnlockRequiredContext);
     ctx->device = g_object_ref (device);
-    ctx->n_ready_status_checks = 10;
+    ctx->last_attempt = last_attempt;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_unlock_required_context_free);
