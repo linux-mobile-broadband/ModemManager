@@ -1338,7 +1338,7 @@ modem_load_unlock_required (MMIfaceModem *self,
     mm_dbg ("checking if unlock required...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CPIN?",
-                              3,
+                              10,
                               FALSE,
                               (GAsyncReadyCallback)cpin_query_ready,
                               task);
