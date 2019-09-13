@@ -192,6 +192,14 @@ void mm_3gpp_pdp_context_list_free (GList *pdp_list);
 GList *mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
                                             GError **error);
 
+/* Select best CID to use during connection */
+guint mm_3gpp_select_best_cid (const gchar      *apn,
+                               MMBearerIpFamily  ip_family,
+                               GList            *context_list,
+                               GList            *context_format_list,
+                               gboolean         *cid_reused,
+                               gboolean         *cid_overwritten);
+
 /* AT+CGACT? (active PDP context query) response parser */
 typedef struct {
     guint cid;

@@ -2682,6 +2682,171 @@ test_cgact_read_response_multiple (void)
 }
 
 /*****************************************************************************/
+/* CID selection logic */
+
+typedef struct {
+    const gchar      *apn;
+    MMBearerIpFamily  ip_family;
+    const gchar      *cgdcont_test;
+    const gchar      *cgdcont_query;
+    guint             expected_cid;
+    gboolean          expected_cid_reused;
+    gboolean          expected_cid_overwritten;
+} CidSelectionTest;
+
+static const CidSelectionTest cid_selection_tests[] = {
+    /* Test: exact APN match */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 2,\"IP\",\"ac.vodafone.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 2,
+        .expected_cid_reused      = TRUE,
+        .expected_cid_overwritten = FALSE
+    },
+    /* Test: exact APN match reported as activated */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 2,\"IP\",\"ac.vodafone.es.MNC001.MCC214.GPRS\",\"\",0,0\r\n"
+                         "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 2,
+        .expected_cid_reused      = TRUE,
+        .expected_cid_overwritten = FALSE
+    },
+    /* Test: first empty slot in between defined contexts */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 10,\"IP\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 2,
+        .expected_cid_reused      = FALSE,
+        .expected_cid_overwritten = FALSE
+    },
+    /* Test: first empty slot in between defined contexts, different PDP types */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IPV6\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 10,\"IP\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 2,
+        .expected_cid_reused      = FALSE,
+        .expected_cid_overwritten = FALSE
+    },
+    /* Test: first empty slot after last context found */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 2,\"IP\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 3,
+        .expected_cid_reused      = FALSE,
+        .expected_cid_overwritten = FALSE
+    },
+    /* Test: first empty slot after last context found, different PDP types */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-10),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 2,\"IPV6\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 3,
+        .expected_cid_reused      = FALSE,
+        .expected_cid_overwritten = FALSE
+    },
+    /* Test: no empty slot, rewrite context with empty APN */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-3),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-3),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-3),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 2,\"IP\",\"\",\"\",0,0\r\n"
+                         "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 2,
+        .expected_cid_reused      = FALSE,
+        .expected_cid_overwritten = TRUE
+    },
+    /* Test: no empty slot, rewrite last context found */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = "+CGDCONT: (1-3),\"IP\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-3),\"IPV6\",,,(0,1),(0,1)\r\n"
+                         "+CGDCONT: (1-3),\"IPV4V6\",,,(0,1),(0,1)\r\n",
+        .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
+                         "+CGDCONT: 2,\"IP\",\"vzwinternet\",\"\",0,0\r\n"
+                         "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
+        .expected_cid             = 3,
+        .expected_cid_reused      = FALSE,
+        .expected_cid_overwritten = TRUE
+    },
+    /* Test: CGDCONT? and CGDCONT=? failures, fallback to CID=1 (a.g. some Android phones) */
+    {
+        .apn           = "ac.vodafone.es",
+        .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
+        .cgdcont_test  = NULL,
+        .cgdcont_query = NULL,
+        .expected_cid             = 1,
+        .expected_cid_reused      = FALSE,
+        .expected_cid_overwritten = TRUE
+    },
+};
+
+static void
+test_cid_selection (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (cid_selection_tests); i++) {
+        const CidSelectionTest *test;
+        GList                  *context_list;
+        GList                  *context_format_list;
+        guint                   cid;
+        gboolean                cid_reused;
+        gboolean                cid_overwritten;
+
+        test = &cid_selection_tests[i];
+
+        context_format_list = test->cgdcont_test ? mm_3gpp_parse_cgdcont_test_response (test->cgdcont_test, NULL) : NULL;
+        context_list = test->cgdcont_query ? mm_3gpp_parse_cgdcont_read_response (test->cgdcont_query, NULL) : NULL;
+
+        cid = mm_3gpp_select_best_cid (test->apn, test->ip_family,
+                                       context_list, context_format_list,
+                                       &cid_reused, &cid_overwritten);
+
+        g_assert_cmpuint (cid, ==, test->expected_cid);
+        g_assert_cmpuint (cid_reused, ==, test->expected_cid_reused);
+        g_assert_cmpuint (cid_overwritten, ==, test->expected_cid_overwritten);
+
+        mm_3gpp_pdp_context_format_list_free (context_format_list);
+        mm_3gpp_pdp_context_list_free (context_list);
+    }
+}
+
+/*****************************************************************************/
 /* Test CPMS responses */
 
 static gboolean
@@ -4446,6 +4611,8 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_nokia, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_samsung, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cid_selection, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cgact_read_response_none, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgact_read_response_single_inactive, NULL));

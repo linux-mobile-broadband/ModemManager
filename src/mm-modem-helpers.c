@@ -1540,6 +1540,131 @@ mm_3gpp_cmp_apn_name (const gchar *requested,
 
 /*************************************************************************/
 
+static guint
+find_max_allowed_cid (GList            *context_format_list,
+                      MMBearerIpFamily  ip_family)
+{
+    GList *l;
+
+    for (l = context_format_list; l; l = g_list_next (l)) {
+        MM3gppPdpContextFormat *format = l->data;
+
+        /* Found exact PDP type? */
+        if (format->pdp_type == ip_family)
+            return format->max_cid;
+    }
+    return 0;
+}
+
+guint
+mm_3gpp_select_best_cid (const gchar      *apn,
+                         MMBearerIpFamily  ip_family,
+                         GList            *context_list,
+                         GList            *context_format_list,
+                         gboolean         *cid_reused,
+                         gboolean         *cid_overwritten)
+{
+    GList *l;
+    guint  prev_cid = 0;
+    guint  exact_cid = 0;
+    guint  unused_cid = 0;
+    guint  max_cid = 0;
+    guint  max_allowed_cid = 0;
+    guint  blank_cid = 0;
+    gchar *ip_family_str;
+
+    ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+    mm_dbg ("Looking for best CID matching APN '%s' and PDP type '%s'...",
+            apn, ip_family_str);
+    g_free (ip_family_str);
+
+    /* Look for the exact PDP context we want */
+    for (l = context_list; l; l = g_list_next (l)) {
+        MM3gppPdpContext *pdp = l->data;
+
+        /* Match PDP type */
+        if (pdp->pdp_type == ip_family) {
+            /* Try to match exact APN and PDP type */
+            if (mm_3gpp_cmp_apn_name (apn, pdp->apn)) {
+                exact_cid = pdp->cid;
+                break;
+            }
+
+            /* Same PDP type but with no APN set? we may use that one if no exact match found */
+            if ((!pdp->apn || !pdp->apn[0]) && !blank_cid)
+                blank_cid = pdp->cid;
+        }
+
+        /* If an unused CID was not found yet and the previous CID is not (CID - 1),
+         * this means that (previous CID + 1) is an unused CID that can be used.
+         * This logic will allow us using unused CIDs that are available in the gaps
+         * between already defined contexts.
+         */
+        if (!unused_cid && prev_cid && ((prev_cid + 1) < pdp->cid))
+            unused_cid = prev_cid + 1;
+
+        /* Update previous CID value to the current CID for use in the next loop,
+         * unless an unused CID was already found.
+         */
+        if (!unused_cid)
+            prev_cid = pdp->cid;
+
+        /* Update max CID if we found a bigger one */
+        if (max_cid < pdp->cid)
+            max_cid = pdp->cid;
+    }
+
+    /* Always prefer an exact match */
+    if (exact_cid) {
+        mm_dbg ("Found exact context at CID %u", exact_cid);
+        *cid_reused = TRUE;
+        *cid_overwritten = FALSE;
+        return exact_cid;
+    }
+
+    /* Try to use an unused CID detected in between the already defined contexts */
+    if (unused_cid) {
+        mm_dbg ("Found unused context at CID %u", unused_cid);
+        *cid_reused = FALSE;
+        *cid_overwritten = FALSE;
+        return unused_cid;
+    }
+
+    /* If the max existing CID found during CGDCONT? is below the max allowed
+     * CID, then we can use the next available CID because it's an unused one. */
+    max_allowed_cid = find_max_allowed_cid (context_format_list, ip_family);
+    if (max_cid && (max_cid < max_allowed_cid)) {
+        mm_dbg ("Found unused context at CID %u (<%u)", max_cid + 1, max_allowed_cid);
+        *cid_reused = FALSE;
+        *cid_overwritten = FALSE;
+        return (max_cid + 1);
+    }
+
+    /* Rewrite a context defined with no APN, if any */
+    if (blank_cid) {
+        mm_dbg ("Rewriting context with empty APN at CID %u", blank_cid);
+        *cid_reused = FALSE;
+        *cid_overwritten = TRUE;
+        return blank_cid;
+    }
+
+    /* Rewrite the last existing one found */
+    if (max_cid) {
+        mm_dbg ("Rewriting last context detected at CID %u", max_cid);
+        *cid_reused = FALSE;
+        *cid_overwritten = TRUE;
+        return max_cid;
+    }
+
+    /* Otherwise, just fallback to CID=1 */
+    mm_dbg ("Falling back to CID 1");
+    *cid_reused = FALSE;
+    *cid_overwritten = TRUE;
+    return 1;
+}
+
+/*************************************************************************/
+
 static void
 mm_3gpp_pdp_context_format_free (MM3gppPdpContextFormat *format)
 {
