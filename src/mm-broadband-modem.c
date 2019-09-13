@@ -1320,6 +1320,7 @@ cpin_query_ready (MMIfaceModem *self,
 
 static void
 modem_load_unlock_required (MMIfaceModem *self,
+                            gboolean last_attempt,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {

@@ -1101,6 +1101,7 @@ load_unlock_required_context_step (GTask *task)
 
 static void
 modem_load_unlock_required (MMIfaceModem *self,
+                            gboolean last_attempt,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {

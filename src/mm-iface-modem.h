@@ -120,6 +120,7 @@ struct _MMIfaceModem {
 
     /* Loading of the UnlockRequired property */
     void (*load_unlock_required) (MMIfaceModem *self,
+                                  gboolean last_attempt,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);
     MMModemLock (*load_unlock_required_finish) (MMIfaceModem *self,

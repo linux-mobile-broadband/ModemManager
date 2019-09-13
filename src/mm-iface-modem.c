@@ -372,6 +372,7 @@ internal_load_unlock_required_context_step (GTask *task)
     g_assert (ctx->pin_check_timeout_id == 0);
     MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required (
         self,
+        (ctx->retries == MAX_RETRIES), /* last_attempt? */
         (GAsyncReadyCallback)load_unlock_required_ready,
         task);
 }
