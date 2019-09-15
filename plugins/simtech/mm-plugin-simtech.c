@@ -26,7 +26,7 @@
 #include "mm-broadband-modem-simtech.h"
 
 #if defined WITH_QMI
-#include "mm-broadband-modem-qmi.h"
+#include "mm-broadband-modem-qmi-simtech.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginSimtech, mm_plugin_simtech, MM_TYPE_PLUGIN)
@@ -48,11 +48,11 @@ create_modem (MMPlugin *self,
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
         mm_dbg ("QMI-powered SimTech modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
-                                                          drivers,
-                                                          mm_plugin_get_name (self),
-                                                          vendor,
-                                                          product));
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_simtech_new (uid,
+                                                                  drivers,
+                                                                  mm_plugin_get_name (self),
+                                                                  vendor,
+                                                                  product));
     }
 #endif
 

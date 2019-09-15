@@ -594,9 +594,17 @@ pkglib_LTLIBRARIES += libmm-plugin-simtech.la
 libmm_plugin_simtech_la_SOURCES = \
 	simtech/mm-plugin-simtech.c \
 	simtech/mm-plugin-simtech.h \
+	simtech/mm-shared-simtech.c \
+	simtech/mm-shared-simtech.h \
 	simtech/mm-broadband-modem-simtech.h \
 	simtech/mm-broadband-modem-simtech.c \
 	$(NULL)
+if WITH_QMI
+libmm_plugin_simtech_la_SOURCES += \
+	simtech/mm-broadband-modem-qmi-simtech.c \
+	simtech/mm-broadband-modem-qmi-simtech.h \
+	$(NULL)
+endif
 libmm_plugin_simtech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_simtech_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 

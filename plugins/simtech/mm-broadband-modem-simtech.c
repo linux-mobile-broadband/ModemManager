@@ -32,17 +32,24 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-location.h"
+#include "mm-shared-simtech.h"
 #include "mm-broadband-modem-simtech.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_init          (MMIfaceModem         *iface);
+static void iface_modem_3gpp_init     (MMIfaceModem3gpp     *iface);
+static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void shared_simtech_init       (MMSharedSimtech      *iface);
 
-static MMIfaceModem *iface_modem_parent;
-static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModem         *iface_modem_parent;
+static MMIfaceModem3gpp     *iface_modem_3gpp_parent;
+static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSimtech, mm_broadband_modem_simtech, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_SIMTECH, shared_simtech_init))
 
 /*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
@@ -828,6 +835,21 @@ mm_broadband_modem_simtech_init (MMBroadbandModemSimtech *self)
 }
 
 static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
+    iface->load_current_modes = load_current_modes;
+    iface->load_current_modes_finish = load_current_modes_finish;
+    iface->set_current_modes = set_current_modes;
+    iface->set_current_modes_finish = set_current_modes_finish;
+}
+
+static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
@@ -844,18 +866,28 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 }
 
 static void
-iface_modem_init (MMIfaceModem *iface)
+iface_modem_location_init (MMIfaceModemLocation *iface)
 {
-    iface_modem_parent = g_type_interface_peek_parent (iface);
+    iface_modem_location_parent = g_type_interface_peek_parent (iface);
 
-    iface->load_access_technologies = load_access_technologies;
-    iface->load_access_technologies_finish = load_access_technologies_finish;
-    iface->load_supported_modes = load_supported_modes;
-    iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_current_modes = load_current_modes;
-    iface->load_current_modes_finish = load_current_modes_finish;
-    iface->set_current_modes = set_current_modes;
-    iface->set_current_modes_finish = set_current_modes_finish;
+    iface->load_capabilities                 = mm_shared_simtech_location_load_capabilities;
+    iface->load_capabilities_finish          = mm_shared_simtech_location_load_capabilities_finish;
+    iface->enable_location_gathering         = mm_shared_simtech_enable_location_gathering;
+    iface->enable_location_gathering_finish  = mm_shared_simtech_enable_location_gathering_finish;
+    iface->disable_location_gathering        = mm_shared_simtech_disable_location_gathering;
+    iface->disable_location_gathering_finish = mm_shared_simtech_disable_location_gathering_finish;
+}
+
+static MMIfaceModemLocation *
+peek_parent_location_interface (MMSharedSimtech *self)
+{
+    return iface_modem_location_parent;
+}
+
+static void
+shared_simtech_init (MMSharedSimtech *iface)
+{
+    iface->peek_parent_location_interface = peek_parent_location_interface;
 }
 
 static void
