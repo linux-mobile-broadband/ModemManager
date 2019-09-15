@@ -209,7 +209,7 @@ own_enable_unsolicited_events_ready (MMBaseModem  *self,
 
 static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
     /* Autoreport access technology changes */
-    { "+CNSMOD=1",    5, FALSE, NULL },
+    { "+CNSMOD=1", 20, FALSE, NULL },
     /* Autoreport CSQ (first arg), and only report when it changes (second arg) */
     { "+AUTOCSQ=1,1", 5, FALSE, NULL },
     { NULL }
