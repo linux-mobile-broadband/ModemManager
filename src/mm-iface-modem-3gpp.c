@@ -123,9 +123,10 @@ get_registration_state_context (MMIfaceModem3gpp *self)
      state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED || \
      state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED)
 
-#define REG_STATE_IS_UNKNOWN_OR_IDLE(state)                               \
+#define REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED(state)                     \
     (state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN ||                 \
-     state == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE)
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||                    \
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
 
 static MMModem3gppRegistrationState
 get_consolidated_reg_state (RegistrationStateContext *ctx)
@@ -161,23 +162,14 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
          goto out;
     }
 
-    /* If one state is DENIED and the others are UNKNOWN or IDLE, use DENIED */
-    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED &&
-        REG_STATE_IS_UNKNOWN_OR_IDLE (ctx->ps) &&
-        REG_STATE_IS_UNKNOWN_OR_IDLE (ctx->eps)) {
-        consolidated = ctx->cs;
-        goto out;
-    }
-    if (REG_STATE_IS_UNKNOWN_OR_IDLE (ctx->cs) &&
-        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED &&
-        REG_STATE_IS_UNKNOWN_OR_IDLE (ctx->eps)) {
-        consolidated = ctx->ps;
-        goto out;
-    }
-    if (REG_STATE_IS_UNKNOWN_OR_IDLE (ctx->cs) &&
-        REG_STATE_IS_UNKNOWN_OR_IDLE (ctx->ps) &&
-        ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) {
-        consolidated = ctx->eps;
+    /* If at least one state is DENIED and the others are UNKNOWN or IDLE, use DENIED */
+    if ((ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
+         ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
+         ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) &&
+        REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED (ctx->cs) &&
+        REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED (ctx->ps) &&
+        REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED (ctx->eps)) {
+        consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_DENIED;
         goto out;
     }
 
@@ -218,7 +210,6 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
          consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
          goto out;
     }
-
 
  out:
     mm_dbg ("building consolidated registration state: cs '%s', ps '%s', eps '%s' --> '%s'",
