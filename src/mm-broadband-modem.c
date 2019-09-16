@@ -2207,7 +2207,8 @@ modem_load_signal_quality (MMIfaceModem *_self,
     /* Check whether we can get a non-connected AT port */
     ctx->at_port = (MMPortSerial *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
     if (ctx->at_port) {
-        if (self->priv->modem_cind_supported &&
+        if (!self->priv->modem_cind_disabled &&
+            self->priv->modem_cind_supported &&
             CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_signal_quality))
             signal_quality_cind (task);
         else
@@ -3189,7 +3190,7 @@ check_and_setup_3gpp_urc_support (GTask *task)
     self = g_task_get_source_object (task);
 
     /* Check support for +CIEV indications, managed with +CIND/+CMER */
-    if (!self->priv->modem_cind_support_checked) {
+    if (!self->priv->modem_cind_disabled && !self->priv->modem_cind_support_checked) {
         mm_dbg ("Checking indicator support...");
         self->priv->modem_cind_support_checked = TRUE;
         mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -3238,7 +3239,7 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp    *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (self->priv->modem_cind_support_checked && self->priv->modem_cind_supported)
+    if (!self->priv->modem_cind_disabled && self->priv->modem_cind_support_checked && self->priv->modem_cind_supported)
         set_ciev_unsolicited_events_handlers (self, FALSE);
 
     if (self->priv->modem_cgerep_supported)

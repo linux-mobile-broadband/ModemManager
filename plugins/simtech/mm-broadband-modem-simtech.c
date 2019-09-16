@@ -826,6 +826,7 @@ mm_broadband_modem_simtech_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_BROADBAND_MODEM_INDICATORS_DISABLED, TRUE,
                          NULL);
 }
 
