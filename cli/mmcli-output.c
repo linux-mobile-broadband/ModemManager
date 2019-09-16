@@ -622,21 +622,21 @@ build_firmware_info_human (GPtrArray            *array,
                            gboolean              selected)
 {
     g_ptr_array_add (array, g_strdup (mm_firmware_properties_get_unique_id (props)));
-    g_ptr_array_add (array, g_strdup_printf ("\tcurrent: %s", selected ? "yes" : "no"));
+    g_ptr_array_add (array, g_strdup_printf ("    current: %s", selected ? "yes" : "no"));
 
     if (mm_firmware_properties_get_image_type (props) == MM_FIRMWARE_IMAGE_TYPE_GOBI) {
         const gchar *aux;
 
         if ((aux = mm_firmware_properties_get_gobi_pri_version (props)) != NULL)
-            g_ptr_array_add (array, g_strdup_printf ("\tgobi pri version: %s", aux));
+            g_ptr_array_add (array, g_strdup_printf ("    gobi pri version: %s", aux));
         if ((aux = mm_firmware_properties_get_gobi_pri_info (props)) != NULL)
-            g_ptr_array_add (array, g_strdup_printf ("\tgobi pri info: %s", aux));
+            g_ptr_array_add (array, g_strdup_printf ("    gobi pri info: %s", aux));
         if ((aux = mm_firmware_properties_get_gobi_boot_version (props)) != NULL)
-            g_ptr_array_add (array, g_strdup_printf ("\tgobi boot version: %s", aux));
+            g_ptr_array_add (array, g_strdup_printf ("    gobi boot version: %s", aux));
         if ((aux = mm_firmware_properties_get_gobi_pri_unique_id (props)) != NULL)
-            g_ptr_array_add (array, g_strdup_printf ("\tgobi pri unique id: %s", aux));
+            g_ptr_array_add (array, g_strdup_printf ("    gobi pri unique id: %s", aux));
         if ((aux = mm_firmware_properties_get_gobi_modem_unique_id (props)) != NULL)
-            g_ptr_array_add (array, g_strdup_printf ("\tgobi modem unique id: %s", aux));
+            g_ptr_array_add (array, g_strdup_printf ("    gobi modem unique id: %s", aux));
     }
 }
 
