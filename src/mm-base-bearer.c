@@ -1301,7 +1301,7 @@ mm_base_bearer_report_connection_status (MMBaseBearer             *self,
                                          MMBearerConnectionStatus  status)
 {
     if ((status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) && self->priv->ignore_disconnection_reports) {
-        mm_info ("ignoring disconnection report for bearer '%s'", self->priv->path);
+        mm_dbg ("ignoring disconnection report for bearer '%s'", self->priv->path);
         return;
     }
 
