@@ -7183,6 +7183,7 @@ create_firmware_properties_from_pair (FirmwarePair  *pair,
 {
     gchar                *pri_unique_id_str = NULL;
     gchar                *modem_unique_id_str = NULL;
+    gchar                *firmware_unique_id_str = NULL;
     MMFirmwareProperties *firmware = NULL;
 
     /* If the string is ASCII, use it without converting to HEX */
@@ -7195,11 +7196,22 @@ create_firmware_properties_from_pair (FirmwarePair  *pair,
     if (!modem_unique_id_str)
         goto out;
 
-    firmware = mm_firmware_properties_new (MM_FIRMWARE_IMAGE_TYPE_GOBI, pair->build_id);
+    /* We will always append the PRI unique ID to the build id to form the unique id
+     * used by the API, because it may happen that a device holds multiple PRI images
+     * for the same build ID.
+     *
+     * E.g. we could have a single modem image (e.g. 02.14.03.00) and then two or more
+     * different PRI images with the same build ID (e.g. 02.14.03.00_VODAFONE) but
+     * different unique IDs (e.g. 000.008_000 and 000.016_000).
+     */
+    firmware_unique_id_str = g_strdup_printf ("%s_%s", pair->build_id, pri_unique_id_str);
+
+    firmware = mm_firmware_properties_new (MM_FIRMWARE_IMAGE_TYPE_GOBI, firmware_unique_id_str);
     mm_firmware_properties_set_gobi_pri_unique_id (firmware, pri_unique_id_str);
     mm_firmware_properties_set_gobi_modem_unique_id (firmware, modem_unique_id_str);
 
 out:
+    g_free (firmware_unique_id_str);
     g_free (pri_unique_id_str);
     g_free (modem_unique_id_str);
 
