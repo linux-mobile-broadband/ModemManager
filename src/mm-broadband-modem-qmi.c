@@ -7242,6 +7242,59 @@ match_images (const gchar *pri_id, const gchar *modem_id)
     return strncmp (pri_id, modem_id, modem_id_len - 1) == 0;
 }
 
+static GList *
+find_image_pairs (QmiMessageDmsListStoredImagesOutputListImage  *image_pri,
+                  QmiMessageDmsListStoredImagesOutputListImage  *image_modem,
+                  GError                                       **error)
+{
+    guint  i, j;
+    GList *pairs = NULL;
+
+    /* Loop PRI images and try to find a pairing MODEM image with same build ID */
+    for (i = 0; i < image_pri->sublist->len; i++) {
+        QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement *subimage_pri;
+
+        subimage_pri = &g_array_index (image_pri->sublist,
+                                       QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement,
+                                       i);
+        for (j = 0; j < image_modem->sublist->len; j++) {
+            QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement *subimage_modem;
+
+            subimage_modem = &g_array_index (image_modem->sublist,
+                                             QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement,
+                                             j);
+
+            if (match_images (subimage_pri->build_id, subimage_modem->build_id)) {
+                FirmwarePair *pair;
+
+                mm_dbg ("Found pairing PRI+MODEM images with build ID '%s'", subimage_pri->build_id);
+                pair = g_slice_new (FirmwarePair);
+                pair->build_id = g_strdup (subimage_pri->build_id);
+                pair->modem_unique_id = g_array_ref (subimage_modem->unique_id);
+                pair->pri_unique_id = g_array_ref (subimage_pri->unique_id);
+
+                /* We're using the PRI 'index_of_running_image' only as source to select
+                 * which is the current running firmware. This avoids issues with the wrong
+                 * 'index_of_running_image' reported for the MODEM images, see:
+                 *   https://forum.sierrawireless.com/t/mc74xx-wrong-running-image-in-qmi-get-stored-images/8998
+                 */
+                pair->current = (image_pri->index_of_running_image == i ? TRUE : FALSE);
+
+                pairs = g_list_append (pairs, pair);
+                break;
+            }
+        }
+
+        if (j == image_modem->sublist->len)
+            mm_dbg ("Pairing for PRI image with build ID '%s' not found", subimage_pri->build_id);
+    }
+
+    if (!pairs)
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND, "No valid PRI+MODEM pairs found");
+
+    return pairs;
+}
+
 static gboolean
 find_image_type_indices (GArray                                        *array,
                          QmiMessageDmsListStoredImagesOutputListImage **image_pri,
@@ -7299,15 +7352,16 @@ list_stored_images_ready (QmiClientDms *client,
                           GAsyncResult *res,
                           GTask        *task)
 {
-    FirmwareListPreloadContext *ctx;
-    GArray *array;
-    guint i;
-    guint j;
-    QmiMessageDmsListStoredImagesOutputListImage *image_pri = NULL;
-    QmiMessageDmsListStoredImagesOutputListImage *image_modem = NULL;
+    FirmwareListPreloadContext                   *ctx;
+    GArray                                       *array;
+    QmiMessageDmsListStoredImagesOutputListImage *image_pri;
+    QmiMessageDmsListStoredImagesOutputListImage *image_modem;
     QmiMessageDmsListStoredImagesOutput          *output;
-    GError *error = NULL;
+    GError                                       *error = NULL;
 
+    ctx = g_task_get_task_data (task);
+
+    /* Read array from output */
     output = qmi_client_dms_list_stored_images_finish (client, res, &error);
     if (!output ||
         !qmi_message_dms_list_stored_images_output_get_result (output, &error) ||
@@ -7324,50 +7378,10 @@ list_stored_images_ready (QmiClientDms *client,
         goto out;
     }
 
-    ctx = g_task_get_task_data (task);
-
-    /* Loop PRI images and try to find a pairing MODEM image with same build ID */
-    for (i = 0; i < image_pri->sublist->len; i++) {
-        QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement *subimage_pri;
-
-        subimage_pri = &g_array_index (image_pri->sublist,
-                                       QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement,
-                                       i);
-        for (j = 0; j < image_modem->sublist->len; j++) {
-            QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement *subimage_modem;
-
-            subimage_modem = &g_array_index (image_modem->sublist,
-                                             QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement,
-                                             j);
-
-            if (match_images (subimage_pri->build_id, subimage_modem->build_id)) {
-                FirmwarePair *pair;
-
-                mm_dbg ("Found pairing PRI+MODEM images with build ID '%s'", subimage_pri->build_id);
-                pair = g_slice_new (FirmwarePair);
-                pair->build_id = g_strdup (subimage_pri->build_id);
-                pair->modem_unique_id = g_array_ref (subimage_modem->unique_id);
-                pair->pri_unique_id = g_array_ref (subimage_pri->unique_id);
-
-                /* We're using the PRI 'index_of_running_image' only as source to select
-                 * which is the current running firmware. This avoids issues with the wrong
-                 * 'index_of_running_image' reported for the MODEM images, see:
-                 *   https://forum.sierrawireless.com/t/mc74xx-wrong-running-image-in-qmi-get-stored-images/8998
-                 */
-                pair->current = (image_pri->index_of_running_image == i ? TRUE : FALSE);
-
-                ctx->pairs = g_list_append (ctx->pairs, pair);
-                break;
-            }
-        }
-
-        if (j == image_modem->sublist->len)
-            mm_dbg ("Pairing for PRI image with build ID '%s' not found", subimage_pri->build_id);
-    }
-
+    /* Build firmware PRI+MODEM pair list */
+    ctx->pairs = find_image_pairs (image_pri, image_modem, &error);
     if (!ctx->pairs) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
-                                 "No valid PRI+MODEM pairs found");
+        g_task_return_error (task, error);
         g_object_unref (task);
         goto out;
     }
