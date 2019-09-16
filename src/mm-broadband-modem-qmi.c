@@ -7342,7 +7342,14 @@ list_stored_images_ready (QmiClientDms *client,
                 pair->build_id = g_strdup (subimage_pri->build_id);
                 pair->modem_unique_id = g_array_ref (subimage_modem->unique_id);
                 pair->pri_unique_id = g_array_ref (subimage_pri->unique_id);
+
+                /* We're using the PRI 'index_of_running_image' only as source to select
+                 * which is the current running firmware. This avoids issues with the wrong
+                 * 'index_of_running_image' reported for the MODEM images, see:
+                 *   https://forum.sierrawireless.com/t/mc74xx-wrong-running-image-in-qmi-get-stored-images/8998
+                 */
                 pair->current = (image_pri->index_of_running_image == i ? TRUE : FALSE);
+
                 ctx->pairs = g_list_append (ctx->pairs, pair);
                 break;
             }
