@@ -7242,85 +7242,91 @@ match_images (const gchar *pri_id, const gchar *modem_id)
     return strncmp (pri_id, modem_id, modem_id_len - 1) == 0;
 }
 
-static void
-list_stored_images_ready (QmiClientDms *client,
-                          GAsyncResult *res,
-                          GTask *task)
+static gboolean
+find_image_type_indices (GArray                                        *array,
+                         QmiMessageDmsListStoredImagesOutputListImage **image_pri,
+                         QmiMessageDmsListStoredImagesOutputListImage **image_modem,
+                         GError                                       **error)
 {
-    FirmwareListPreloadContext *ctx;
-    GArray *array;
-    gint pri_id;
-    gint modem_id;
     guint i;
-    guint j;
-    QmiMessageDmsListStoredImagesOutputListImage *image_pri;
-    QmiMessageDmsListStoredImagesOutputListImage *image_modem;
-    QmiMessageDmsListStoredImagesOutput *output;
 
-    output = qmi_client_dms_list_stored_images_finish (client, res, NULL);
-    if (!output ||
-        !qmi_message_dms_list_stored_images_output_get_result (output, NULL)) {
-        /* Assume firmware unsupported */
-        g_task_return_boolean (task, FALSE);
-        g_object_unref (task);
-        if (output)
-            qmi_message_dms_list_stored_images_output_unref (output);
-        return;
-    }
+    g_assert (array);
+    g_assert (image_pri);
+    g_assert (image_modem);
 
-    qmi_message_dms_list_stored_images_output_get_list (
-        output,
-        &array,
-        NULL);
+    *image_pri = NULL;
+    *image_modem = NULL;
 
-    /* Find which index corresponds to each image type */
-    pri_id = -1;
-    modem_id = -1;
+    /* The MODEM image list is usually given before the PRI image list, but
+     * let's not assume that. Try to find both lists and report at which index
+     * we can find each. */
+
     for (i = 0; i < array->len; i++) {
         QmiMessageDmsListStoredImagesOutputListImage *image;
 
-        image = &g_array_index (array,
-                                QmiMessageDmsListStoredImagesOutputListImage,
-                                i);
-
+        image = &g_array_index (array, QmiMessageDmsListStoredImagesOutputListImage, i);
         switch (image->type) {
         case QMI_DMS_FIRMWARE_IMAGE_TYPE_PRI:
-            if (pri_id != -1)
-                mm_warn ("Multiple array elements found with PRI type");
+            if (*image_pri != NULL)
+                mm_dbg ("Multiple array elements found with PRI type: ignoring additional list at index %u", i);
             else
-                pri_id = (gint)i;
+                *image_pri = image;
             break;
         case QMI_DMS_FIRMWARE_IMAGE_TYPE_MODEM:
-            if (modem_id != -1)
-                mm_warn ("Multiple array elements found with MODEM type");
+            if (*image_modem != NULL)
+                mm_dbg ("Multiple array elements found with MODEM type: ignoring additional list at index %u", i);
             else
-                modem_id = (gint)i;
+                *image_modem = image;
             break;
         default:
             break;
         }
     }
 
-    if (pri_id < 0 || modem_id < 0) {
-        mm_dbg ("We need both PRI (%s) and MODEM (%s) images",
-                pri_id < 0 ? "not found" : "found",
-                modem_id < 0 ? "not found" : "found");
-        g_task_return_boolean (task, FALSE);
+    if (!(*image_pri) || !(*image_modem)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                     "Missing image list: pri list %s, modem list %s",
+                     !(*image_pri) ? "not found" : "found",
+                     !(*image_modem) ? "not found" : "found");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+list_stored_images_ready (QmiClientDms *client,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    FirmwareListPreloadContext *ctx;
+    GArray *array;
+    guint i;
+    guint j;
+    QmiMessageDmsListStoredImagesOutputListImage *image_pri = NULL;
+    QmiMessageDmsListStoredImagesOutputListImage *image_modem = NULL;
+    QmiMessageDmsListStoredImagesOutput          *output;
+    GError *error = NULL;
+
+    output = qmi_client_dms_list_stored_images_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_dms_list_stored_images_output_get_result (output, &error) ||
+        !qmi_message_dms_list_stored_images_output_get_list (output, &array, &error)) {
+        g_task_return_error (task, error);
         g_object_unref (task);
-        qmi_message_dms_list_stored_images_output_unref (output);
-        return;
+        goto out;
+    }
+
+    /* Find which index corresponds to each image type */
+    if (!find_image_type_indices (array, &image_pri, &image_modem, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
     }
 
     ctx = g_task_get_task_data (task);
 
     /* Loop PRI images and try to find a pairing MODEM image with same build ID */
-    image_pri = &g_array_index (array,
-                                QmiMessageDmsListStoredImagesOutputListImage,
-                                pri_id);
-    image_modem = &g_array_index (array,
-                                  QmiMessageDmsListStoredImagesOutputListImage,
-                                  modem_id);
-
     for (i = 0; i < image_pri->sublist->len; i++) {
         QmiMessageDmsListStoredImagesOutputListImageSublistSublistElement *subimage_pri;
 
@@ -7360,18 +7366,20 @@ list_stored_images_ready (QmiClientDms *client,
     }
 
     if (!ctx->pairs) {
-        mm_dbg ("No valid PRI+MODEM pairs found");
-        g_task_return_boolean (task, FALSE);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                 "No valid PRI+MODEM pairs found");
         g_object_unref (task);
-        qmi_message_dms_list_stored_images_output_unref (output);
-        return;
+        goto out;
     }
 
-    /* Firmware is supported; now keep on loading info for each image and cache it */
-    qmi_message_dms_list_stored_images_output_unref (output);
-
+    /* Now keep on loading info for each image and cache it */
     ctx->l = ctx->pairs;
     get_next_image_info (task);
+
+out:
+
+    if (output)
+        qmi_message_dms_list_stored_images_output_unref (output);
 }
 
 static void
