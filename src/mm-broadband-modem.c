@@ -124,6 +124,7 @@ enum {
     PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED,
     PROP_MODEM_CARRIER_CONFIG_MAPPING,
     PROP_FLOW_CONTROL,
+    PROP_INDICATORS_DISABLED,
     PROP_LAST
 };
 
@@ -153,6 +154,7 @@ struct _MMBroadbandModemPrivate {
     gchar *carrier_config_mapping;
     /* Implementation helpers */
     MMModemCharset modem_current_charset;
+    gboolean modem_cind_disabled;
     gboolean modem_cind_support_checked;
     gboolean modem_cind_supported;
     guint modem_cind_indicator_signal_quality;
@@ -3316,14 +3318,14 @@ run_unsolicited_events_setup (GTask *task)
     ctx = g_task_get_task_data (task);
 
     /* CMER on primary port */
-    if (!ctx->cmer_primary_done && ctx->cmer_command && ctx->primary) {
+    if (!ctx->cmer_primary_done && ctx->cmer_command && ctx->primary && !self->priv->modem_cind_disabled) {
         mm_dbg ("%s +CIND event reporting in primary port...", ctx->enable ? "Enabling" : "Disabling");
         ctx->cmer_primary_done = TRUE;
         command = ctx->cmer_command;
         port = ctx->primary;
     }
     /* CMER on secondary port */
-    else if (!ctx->cmer_secondary_done && ctx->cmer_command && ctx->secondary) {
+    else if (!ctx->cmer_secondary_done && ctx->cmer_command && ctx->secondary && !self->priv->modem_cind_disabled) {
         mm_dbg ("%s +CIND event reporting in secondary port...", ctx->enable ? "Enabling" : "Disabling");
         ctx->cmer_secondary_done = TRUE;
         command = ctx->cmer_command;
@@ -11769,6 +11771,9 @@ set_property (GObject *object,
     case PROP_FLOW_CONTROL:
         self->priv->flow_control = g_value_get_flags (value);
         break;
+    case PROP_INDICATORS_DISABLED:
+        self->priv->modem_cind_disabled = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -11894,6 +11899,9 @@ get_property (GObject *object,
         break;
     case PROP_FLOW_CONTROL:
         g_value_set_flags (value, self->priv->flow_control);
+        break;
+    case PROP_INDICATORS_DISABLED:
+        g_value_set_boolean (value, self->priv->modem_cind_disabled);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -12474,4 +12482,12 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
                             MM_FLOW_CONTROL_NONE,
                             G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_FLOW_CONTROL, properties[PROP_FLOW_CONTROL]);
+
+    properties[PROP_INDICATORS_DISABLED] =
+        g_param_spec_boolean (MM_BROADBAND_MODEM_INDICATORS_DISABLED,
+                              "Disable indicators",
+                              "Avoid explicitly setting up +CIND URCs",
+                              FALSE,
+                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_INDICATORS_DISABLED, properties[PROP_INDICATORS_DISABLED]);
 }

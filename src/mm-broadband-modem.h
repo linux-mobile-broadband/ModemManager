@@ -39,7 +39,8 @@ typedef struct _MMBroadbandModem MMBroadbandModem;
 typedef struct _MMBroadbandModemClass MMBroadbandModemClass;
 typedef struct _MMBroadbandModemPrivate MMBroadbandModemPrivate;
 
-#define MM_BROADBAND_MODEM_FLOW_CONTROL "broadband-modem-flow-control"
+#define MM_BROADBAND_MODEM_FLOW_CONTROL        "broadband-modem-flow-control"
+#define MM_BROADBAND_MODEM_INDICATORS_DISABLED "broadband-modem-indicators-disabled"
 
 struct _MMBroadbandModem {
     MMBaseModem parent;
