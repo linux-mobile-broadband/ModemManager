@@ -123,7 +123,7 @@ get_registration_state_context (MMIfaceModem3gpp *self)
      state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED || \
      state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED)
 
-#define REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED(state)                     \
+#define REG_STATE_IS_UNKNOWN_IDLE_DENIED(state)                           \
     (state == MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN ||                 \
      state == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||                    \
      state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
@@ -166,9 +166,9 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
     if ((ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
          ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
          ctx->eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) &&
-        REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED (ctx->cs) &&
-        REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED (ctx->ps) &&
-        REG_STATE_IS_UNKNOWN_OR_IDLE_OR_DENIED (ctx->eps)) {
+        REG_STATE_IS_UNKNOWN_IDLE_DENIED (ctx->cs) &&
+        REG_STATE_IS_UNKNOWN_IDLE_DENIED (ctx->ps) &&
+        REG_STATE_IS_UNKNOWN_IDLE_DENIED (ctx->eps)) {
         consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_DENIED;
         goto out;
     }
