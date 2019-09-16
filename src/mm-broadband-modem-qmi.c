@@ -7313,7 +7313,7 @@ list_stored_images_ready (QmiClientDms *client,
 
     ctx = g_task_get_task_data (task);
 
-    /* Loop PRI images and try to find a pairing MODEM image with same boot ID */
+    /* Loop PRI images and try to find a pairing MODEM image with same build ID */
     image_pri = &g_array_index (array,
                                 QmiMessageDmsListStoredImagesOutputListImage,
                                 pri_id);
