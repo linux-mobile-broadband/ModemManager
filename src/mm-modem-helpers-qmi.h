@@ -138,4 +138,12 @@ typedef struct {
 
 MMModemCapability mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx);
 
+/*****************************************************************************/
+/* QMI unique id manipulation */
+
+gchar  *mm_qmi_unique_id_to_firmware_unique_id (GArray       *qmi_unique_id,
+                                                GError      **error);
+GArray *mm_firmware_unique_id_to_qmi_unique_id (const gchar  *unique_id,
+                                                GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_QMI_H */

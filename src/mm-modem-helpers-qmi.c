@@ -20,6 +20,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-modem-helpers-qmi.h"
+#include "mm-modem-helpers.h"
 #include "mm-enums-types.h"
 #include "mm-log.h"
 
@@ -1588,6 +1589,8 @@ mm_oma_session_state_failed_reason_from_qmi_oma_session_failed_reason (QmiOmaSes
     }
 }
 
+/*****************************************************************************/
+
 gboolean
 mm_error_from_qmi_loc_indication_status (QmiLocIndicationStatus   status,
                                          GError                 **error)
@@ -1617,4 +1620,122 @@ mm_error_from_qmi_loc_indication_status (QmiLocIndicationStatus   status,
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "LOC service: unknown failure");
         return FALSE;
     }
+}
+
+/*****************************************************************************/
+/* Convert between firmware unique ID (string) and QMI unique ID (16 bytes)
+ *
+ * The unique ID coming in the QMI message is a fixed-size 16 byte array, and its
+ * format really depends on the manufacturer. But, if the manufacturer is nice enough
+ * to use ASCII for this field, just use it ourselves as well, no need to obfuscate
+ * the information we expose in our interfaces.
+ *
+ * We also need to do the conversion in the other way around, because when
+ * selecting a new image to run we need to provide the QMI unique ID.
+ */
+
+#define EXPECTED_QMI_UNIQUE_ID_LENGTH 16
+
+gchar *
+mm_qmi_unique_id_to_firmware_unique_id (GArray  *qmi_unique_id,
+                                        GError **error)
+{
+    gint     i;
+    gboolean expect_nul_byte = FALSE;
+
+    if (qmi_unique_id->len != EXPECTED_QMI_UNIQUE_ID_LENGTH) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "unexpected QMI unique ID length: %u (expected: %u)",
+                     qmi_unique_id->len, EXPECTED_QMI_UNIQUE_ID_LENGTH);
+        return NULL;
+    }
+
+    for (i = 0; i < qmi_unique_id->len; i++) {
+        guint8 val;
+
+        val = g_array_index (qmi_unique_id, guint8, i);
+
+        /* Check for ASCII chars */
+        if (g_ascii_isprint ((gchar) val)) {
+            /* Halt iteration if we found an ASCII char after a NUL byte */
+            if (expect_nul_byte)
+                break;
+
+            /* good char */
+            continue;
+        }
+
+        /* Allow NUL bytes at the end of the array */
+        if (val == '\0' && i > 0) {
+            if (!expect_nul_byte)
+                expect_nul_byte = TRUE;
+            continue;
+        }
+
+        /* Halt iteration, not something we can build as ASCII */
+        break;
+    }
+
+    if (i != qmi_unique_id->len)
+        return mm_utils_bin2hexstr ((const guint8 *)qmi_unique_id->data, qmi_unique_id->len);
+
+    return g_strndup ((const gchar *)qmi_unique_id->data, qmi_unique_id->len);
+}
+
+GArray *
+mm_firmware_unique_id_to_qmi_unique_id (const gchar  *unique_id,
+                                        GError      **error)
+{
+    guint   len;
+    GArray *qmi_unique_id;
+
+    len = strlen (unique_id);
+
+    /* The length will be exactly EXPECTED_QMI_UNIQUE_ID_LENGTH*2 if given in HEX */
+    if (len == (2 * EXPECTED_QMI_UNIQUE_ID_LENGTH)) {
+        guint8 *tmp;
+        gsize   tmp_len;
+        guint   i;
+
+        for (i = 0; i < len; i++) {
+            if (!g_ascii_isxdigit (unique_id[i])) {
+                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Unexpected character found in unique id (not HEX): %c", unique_id[i]);
+                return NULL;
+            }
+        }
+
+        tmp_len = 0;
+        tmp = (guint8 *) mm_utils_hexstr2bin (unique_id, &tmp_len);
+        g_assert (tmp_len == EXPECTED_QMI_UNIQUE_ID_LENGTH);
+
+        qmi_unique_id = g_array_sized_new (FALSE, FALSE, sizeof (guint8), tmp_len);
+        g_array_insert_vals (qmi_unique_id, 0, tmp, tmp_len);
+        g_free (tmp);
+        return qmi_unique_id;
+    }
+
+    /* The length will be EXPECTED_QMI_UNIQUE_ID_LENGTH or less if given in ASCII */
+    if (len > 0 && len <= EXPECTED_QMI_UNIQUE_ID_LENGTH) {
+        guint i;
+
+        for (i = 0; i < len; i++) {
+            if (!g_ascii_isprint (unique_id[i])) {
+                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Unexpected character found in unique id (not ASCII): %c", unique_id[i]);
+                return NULL;
+            }
+        }
+
+        qmi_unique_id = g_array_sized_new (FALSE, FALSE, sizeof (guint8), EXPECTED_QMI_UNIQUE_ID_LENGTH);
+        g_array_set_size (qmi_unique_id, EXPECTED_QMI_UNIQUE_ID_LENGTH);
+        memcpy (&qmi_unique_id->data[0], unique_id, len);
+        if (len < EXPECTED_QMI_UNIQUE_ID_LENGTH)
+            memset (&qmi_unique_id->data[len], 0, EXPECTED_QMI_UNIQUE_ID_LENGTH - len);
+        return qmi_unique_id;
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "Unexpected unique id length: %u", len);
+    return NULL;
 }

@@ -7178,20 +7178,30 @@ out:
 }
 
 static MMFirmwareProperties *
-create_firmware_properties_from_pair (FirmwarePair *pair)
+create_firmware_properties_from_pair (FirmwarePair  *pair,
+                                      GError       **error)
 {
-    gchar                *unique_id_str;
-    MMFirmwareProperties *firmware;
+    gchar                *pri_unique_id_str = NULL;
+    gchar                *modem_unique_id_str = NULL;
+    MMFirmwareProperties *firmware = NULL;
+
+    /* If the string is ASCII, use it without converting to HEX */
+
+    pri_unique_id_str = mm_qmi_unique_id_to_firmware_unique_id (pair->pri_unique_id, error);
+    if (!pri_unique_id_str)
+        goto out;
+
+    modem_unique_id_str = mm_qmi_unique_id_to_firmware_unique_id (pair->modem_unique_id, error);
+    if (!modem_unique_id_str)
+        goto out;
 
     firmware = mm_firmware_properties_new (MM_FIRMWARE_IMAGE_TYPE_GOBI, pair->build_id);
+    mm_firmware_properties_set_gobi_pri_unique_id (firmware, pri_unique_id_str);
+    mm_firmware_properties_set_gobi_modem_unique_id (firmware, modem_unique_id_str);
 
-    unique_id_str = mm_utils_bin2hexstr ((const guint8 *)pair->pri_unique_id->data, pair->pri_unique_id->len);
-    mm_firmware_properties_set_gobi_pri_unique_id (firmware, unique_id_str);
-    g_free (unique_id_str);
-
-    unique_id_str = mm_utils_bin2hexstr ((const guint8 *)pair->modem_unique_id->data, pair->modem_unique_id->len);
-    mm_firmware_properties_set_gobi_modem_unique_id (firmware, unique_id_str);
-    g_free (unique_id_str);
+out:
+    g_free (pri_unique_id_str);
+    g_free (modem_unique_id_str);
 
     return firmware;
 }
@@ -7201,6 +7211,7 @@ get_next_image_info (GTask *task)
 {
     MMBroadbandModemQmi        *self;
     FirmwareListPreloadContext *ctx;
+    GError                     *error = NULL;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
@@ -7216,7 +7227,12 @@ get_next_image_info (GTask *task)
     ctx->pairs = g_list_delete_link (ctx->pairs, ctx->pairs);
 
     /* Build firmware properties */
-    ctx->current_firmware = create_firmware_properties_from_pair (ctx->current_pair);
+    ctx->current_firmware = create_firmware_properties_from_pair (ctx->current_pair, &error);
+    if (!ctx->current_firmware) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
     /* Now, load additional optional information for the PRI image */
     if (!ctx->skip_image_info) {
@@ -7667,21 +7683,21 @@ find_firmware_properties_by_gobi_pri_info_substring (MMBroadbandModemQmi *self,
 
 static void
 firmware_change_current (MMIfaceModemFirmware *_self,
-                         const gchar *unique_id,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
+                         const gchar          *unique_id,
+                         GAsyncReadyCallback   callback,
+                         gpointer              user_data)
 {
-    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    QmiMessageDmsSetFirmwarePreferenceInput *input;
-    FirmwareChangeCurrentContext *ctx;
-    GTask *task;
-    QmiClient *client = NULL;
-    GArray *array;
-    QmiMessageDmsSetFirmwarePreferenceInputListImage modem_image_id;
-    QmiMessageDmsSetFirmwarePreferenceInputListImage pri_image_id;
-    guint8 *tmp;
-    gsize tmp_len;
+    MMBroadbandModemQmi                              *self;
+    GTask                                            *task;
+    FirmwareChangeCurrentContext                     *ctx;
+    GError                                           *error = NULL;
+    QmiClient                                        *client = NULL;
+    GArray                                           *array;
+    QmiMessageDmsSetFirmwarePreferenceInput          *input = NULL;
+    QmiMessageDmsSetFirmwarePreferenceInputListImage  modem_image_id = { 0 };
+    QmiMessageDmsSetFirmwarePreferenceInputListImage  pri_image_id   = { 0 };
 
+    self = MM_BROADBAND_MODEM_QMI (_self);
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
                                       QMI_SERVICE_DMS, &client,
                                       callback, user_data))
@@ -7734,22 +7750,26 @@ firmware_change_current (MMIfaceModemFirmware *_self,
     }
 
     /* Modem image ID */
-    tmp_len = 0;
-    tmp = (guint8 *)mm_utils_hexstr2bin (mm_firmware_properties_get_gobi_modem_unique_id (ctx->firmware), &tmp_len);
     modem_image_id.type = QMI_DMS_FIRMWARE_IMAGE_TYPE_MODEM;
     modem_image_id.build_id = (gchar *)mm_firmware_properties_get_unique_id (ctx->firmware);
-    modem_image_id.unique_id = g_array_sized_new (FALSE, FALSE, sizeof (guint8), tmp_len);
-    g_array_insert_vals (modem_image_id.unique_id, 0, tmp, tmp_len);
-    g_free (tmp);
+    modem_image_id.unique_id = mm_firmware_unique_id_to_qmi_unique_id (mm_firmware_properties_get_gobi_modem_unique_id (ctx->firmware), &error);
+    if (!modem_image_id.unique_id) {
+        g_prefix_error (&error, "Couldn't build modem image unique id: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
 
     /* PRI image ID */
-    tmp_len = 0;
-    tmp = (guint8 *)mm_utils_hexstr2bin (mm_firmware_properties_get_gobi_pri_unique_id (ctx->firmware), &tmp_len);
     pri_image_id.type = QMI_DMS_FIRMWARE_IMAGE_TYPE_PRI;
     pri_image_id.build_id = (gchar *)mm_firmware_properties_get_unique_id (ctx->firmware);
-    pri_image_id.unique_id = g_array_sized_new (FALSE, FALSE, sizeof (guint8), tmp_len);
-    g_array_insert_vals (pri_image_id.unique_id, 0, tmp, tmp_len);
-    g_free (tmp);
+    pri_image_id.unique_id = mm_firmware_unique_id_to_qmi_unique_id (mm_firmware_properties_get_gobi_pri_unique_id (ctx->firmware), &error);
+    if (!pri_image_id.unique_id) {
+        g_prefix_error (&error, "Couldn't build PRI image unique id: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        goto out;
+    }
 
     mm_dbg ("Changing Gobi firmware to MODEM '%s' and PRI '%s' with Build ID '%s'...",
             mm_firmware_properties_get_gobi_modem_unique_id (ctx->firmware),
@@ -7770,9 +7790,14 @@ firmware_change_current (MMIfaceModemFirmware *_self,
         NULL,
         (GAsyncReadyCallback)firmware_select_stored_image_ready,
         task);
-    g_array_unref (modem_image_id.unique_id);
-    g_array_unref (pri_image_id.unique_id);
-    qmi_message_dms_set_firmware_preference_input_unref (input);
+
+out:
+    if (modem_image_id.unique_id)
+        g_array_unref (modem_image_id.unique_id);
+    if (pri_image_id.unique_id)
+        g_array_unref (pri_image_id.unique_id);
+    if (input)
+        qmi_message_dms_set_firmware_preference_input_unref (input);
 }
 
 /*****************************************************************************/
