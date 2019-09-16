@@ -1962,8 +1962,8 @@ signal_quality_csq_ready (MMBroadbandModem *self,
  * try the other command if the first one fails.
  */
 static const MMBaseModemAtCommand signal_quality_csq_sequence[] = {
-    { "+CSQ",  3, TRUE, response_processor_string_ignore_at_errors },
-    { "+CSQ?", 3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CSQ",  3, FALSE, response_processor_string_ignore_at_errors },
+    { "+CSQ?", 3, FALSE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
