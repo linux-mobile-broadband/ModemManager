@@ -1088,10 +1088,8 @@ dump_output_json (void)
     MmcF     current_field = MMC_F_UNKNOWN;
     gchar  **current_path = NULL;
     guint    cur_dlen = 0;
-    GRegex  *escape_regex;
 
     output_items = g_list_sort (output_items, (GCompareFunc) list_sort_by_keys);
-    escape_regex = g_regex_new ("'", G_REGEX_MULTILINE | G_REGEX_RAW, 0, NULL);
 
     g_print("{");
     for (l = output_items; l; l = g_list_next (l)) {
@@ -1135,7 +1133,7 @@ dump_output_json (void)
             gchar            *escaped = NULL;
 
             if (single->value)
-                escaped = g_regex_replace_literal (escape_regex, single->value, -1, 0, "\"", 0, NULL);
+                escaped = g_strescape (single->value, "\v");
 
             g_print ("\"%s\":\"%s\"", current_path[cur_dlen], escaped ? escaped : "--");
             g_free (escaped);
@@ -1149,7 +1147,7 @@ dump_output_json (void)
             for (i = 0; i < n; i++) {
                 gchar *escaped;
 
-                escaped = g_regex_replace_literal (escape_regex, multiple->values[i], -1, 0, "\"", 0, NULL);
+                escaped = g_strescape (multiple->values[i], "\v");
                 g_print("\"%s\"", escaped);
                 if (i < n - 1)
                     g_print(",");
@@ -1165,7 +1163,6 @@ dump_output_json (void)
     g_print("}\n");
 
     g_strfreev (current_path);
-    g_regex_unref (escape_regex);
 }
 
 static void
