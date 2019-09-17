@@ -70,22 +70,18 @@ struct _MMBroadbandModemSimtechPrivate {
 static MMModemAccessTechnology
 simtech_act_to_mm_act (int nsmod)
 {
-    if (nsmod == 1)
-        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
-    else if (nsmod == 2)
-        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
-    else if (nsmod == 3)
-        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
-    else if (nsmod == 4)
-        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-    else if (nsmod == 5)
-        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
-    else if (nsmod == 6)
-        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
-    else if (nsmod == 7)
-        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+    static const MMModemAccessTechnology simtech_act_to_mm_act_map[] = {
+        [0] = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+        [1] = MM_MODEM_ACCESS_TECHNOLOGY_GSM,
+        [2] = MM_MODEM_ACCESS_TECHNOLOGY_GPRS,
+        [3] = MM_MODEM_ACCESS_TECHNOLOGY_EDGE,
+        [4] = MM_MODEM_ACCESS_TECHNOLOGY_UMTS,
+        [5] = MM_MODEM_ACCESS_TECHNOLOGY_HSDPA,
+        [6] = MM_MODEM_ACCESS_TECHNOLOGY_HSUPA,
+        [7] = MM_MODEM_ACCESS_TECHNOLOGY_HSPA,
+    };
 
-    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    return (nsmod < G_N_ELEMENTS (simtech_act_to_mm_act_map) ? simtech_act_to_mm_act_map[nsmod] : MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
 }
 
 static void
