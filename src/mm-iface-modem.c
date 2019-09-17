@@ -5698,7 +5698,7 @@ iface_modem_init (gpointer g_iface)
                                "Periodic signal check disabled",
                                "Whether periodic signal check is disabled.",
                                FALSE,
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+                               G_PARAM_READWRITE));
 
     g_object_interface_install_property
         (g_iface,
