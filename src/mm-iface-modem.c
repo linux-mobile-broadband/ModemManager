@@ -1142,18 +1142,24 @@ typedef enum {
 
 typedef struct {
     gboolean enabled;
-    guint    interval;
-    guint    initial_retries;
     guint    timeout_source;
+
+    /* We first attempt an initial loading, and once it's done we
+     * setup polling */
+    guint    initial_retries;
+    gboolean initial_check_done;
 
     /* Values polled in this iteration */
     guint                   signal_quality;
     MMModemAccessTechnology access_technologies;
     guint                   access_technologies_mask;
 
-    /* If both these are unset we'll automatically stop polling */
+    /* If both signal and access tech polling are either unsupported
+     * or disabled, we'll automatically stop polling */
     gboolean signal_quality_polling_supported;
+    gboolean signal_quality_polling_disabled;
     gboolean access_technology_polling_supported;
+    gboolean access_technology_polling_disabled;
 
     /* Steps triggered when polling active */
     SignalCheckStep running_step;
@@ -1193,6 +1199,12 @@ get_signal_check_context (MMIfaceModem *self)
          * this flag and no longer poll. */
         ctx->signal_quality_polling_supported = (MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality &&
                                                  MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish);
+
+        /* Get plugin-specific setup for the polling logic */
+        g_object_get (self,
+                      MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      &ctx->signal_quality_polling_disabled,
+                      MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, &ctx->access_technology_polling_disabled,
+                      NULL);
 
         g_object_set_qdata_full (G_OBJECT (self), signal_check_context_quark,
                                  ctx, (GDestroyNotify) signal_check_context_free);
@@ -1274,7 +1286,6 @@ signal_quality_check_ready (MMIfaceModem *self,
 static void
 peridic_signal_check_step (MMIfaceModem *self)
 {
-    gboolean periodic_signal_check_disabled = FALSE;
     SignalCheckContext *ctx;
 
     ctx = get_signal_check_context (self);
@@ -1288,7 +1299,8 @@ peridic_signal_check_step (MMIfaceModem *self)
         ctx->running_step++;
 
     case SIGNAL_CHECK_STEP_SIGNAL_QUALITY:
-        if (ctx->enabled && ctx->signal_quality_polling_supported) {
+        if (ctx->enabled && ctx->signal_quality_polling_supported &&
+            (!ctx->initial_check_done || !ctx->signal_quality_polling_disabled)) {
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
                 self, (GAsyncReadyCallback)signal_quality_check_ready, NULL);
             return;
@@ -1297,7 +1309,8 @@ peridic_signal_check_step (MMIfaceModem *self)
         ctx->running_step++;
 
     case SIGNAL_CHECK_STEP_ACCESS_TECHNOLOGIES:
-        if (ctx->enabled && ctx->access_technology_polling_supported) {
+        if (ctx->enabled && ctx->access_technology_polling_supported &&
+            (!ctx->initial_check_done || !ctx->access_technology_polling_disabled)) {
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies (
                 self, (GAsyncReadyCallback)access_technologies_check_ready, NULL);
             return;
@@ -1312,7 +1325,7 @@ peridic_signal_check_step (MMIfaceModem *self)
         /* If we have been disabled while we were running the steps, we don't
          * do anything else. */
         if (!ctx->enabled) {
-            mm_dbg ("Periodic signal checks not rescheduled: disabled");
+            mm_dbg ("Periodic signal quality and access technology checks not rescheduled: disabled");
             return;
         }
 
@@ -1321,45 +1334,38 @@ peridic_signal_check_step (MMIfaceModem *self)
          * quality and access technology values. As soon as we get them, OR if
          * we made too many retries at a high frequency, we fallback to the
          * slower polling. */
-        if (ctx->interval == SIGNAL_CHECK_INITIAL_TIMEOUT_SEC) {
+        if (!ctx->initial_check_done) {
             gboolean signal_quality_ready;
             gboolean access_technology_ready;
-            gboolean initial_check_done;
 
             /* Signal quality is ready if unsupported or if we got a valid
              * value reported */
             signal_quality_ready = (!ctx->signal_quality_polling_supported || (ctx->signal_quality != 0));
+
             /* Access technology is ready if unsupported or if we got a valid
              * value reported */
             access_technology_ready = (!ctx->access_technology_polling_supported ||
                                        ((ctx->access_technologies & ctx->access_technologies_mask) != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN));
 
-            initial_check_done = ((signal_quality_ready && access_technology_ready) ||
-                                  (--ctx->initial_retries == 0));
-            if (initial_check_done) {
-                /* After the initial check is done, check if periodic signal
-                 * check is disabled. */
-                g_object_get (self,
-                              MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
-                              &periodic_signal_check_disabled,
-                              NULL);
-                ctx->interval = SIGNAL_CHECK_TIMEOUT_SEC;
-            }
+            ctx->initial_check_done = ((signal_quality_ready && access_technology_ready) || (--ctx->initial_retries == 0));
         }
 
-        /* If both tasks are unsupported, implicitly disable. Do NOT clear the
-         * values, because if we're told they are unsupported it may be that
-         * they're really updated via unsolicited messages. */
-        if (!ctx->access_technology_polling_supported &&
-            (!ctx->signal_quality_polling_supported || periodic_signal_check_disabled)) {
-            mm_dbg ("Periodic signal and access technologies checks not supported");
+        /* After running the initial check, if both signal quality and access tech
+         * loading are either disabled or unsupported, we'll stop polling completely,
+         * because they may be loaded asynchronously by unsolicited messages */
+        if (ctx->initial_check_done &&
+            (!ctx->signal_quality_polling_supported    || ctx->signal_quality_polling_disabled) &&
+            (!ctx->access_technology_polling_supported || ctx->access_technology_polling_disabled)) {
+            mm_dbg ("Periodic signal quality and access technology checks not rescheduled: unneeded or unsupported");
             periodic_signal_check_disable (self, FALSE);
             return;
         }
 
-        mm_dbg ("Periodic signal quality checks scheduled in %ds", ctx->interval);
+        mm_dbg ("Periodic signal quality and access technology checks scheduled");
         g_assert (!ctx->timeout_source);
-        ctx->timeout_source = g_timeout_add_seconds (ctx->interval, (GSourceFunc) periodic_signal_check_cb, self);
+        ctx->timeout_source = g_timeout_add_seconds (ctx->initial_check_done ? SIGNAL_CHECK_TIMEOUT_SEC : SIGNAL_CHECK_INITIAL_TIMEOUT_SEC,
+                                                     (GSourceFunc) periodic_signal_check_cb,
+                                                     self);
         return;
     }
 }
@@ -1414,8 +1420,8 @@ mm_iface_modem_refresh_signal (MMIfaceModem *self)
 
     /* Reset refresh rate and initial retries when we're asked to refresh signal
      * so that we poll at a higher frequency */
-    ctx->interval        = SIGNAL_CHECK_INITIAL_TIMEOUT_SEC;
-    ctx->initial_retries = SIGNAL_CHECK_INITIAL_RETRIES;
+    ctx->initial_retries    = SIGNAL_CHECK_INITIAL_RETRIES;
+    ctx->initial_check_done = FALSE;
 
     /* Start sequence */
     periodic_signal_check_cb (self);
@@ -1469,7 +1475,7 @@ periodic_signal_check_enable (MMIfaceModem *self)
         ctx->enabled = TRUE;
     }
 
-    /* And refresh, which will trigger the first check at high frequency*/
+    /* And refresh, which will trigger the first check at high frequency */
     mm_iface_modem_refresh_signal (self);
 }
 
@@ -5695,8 +5701,16 @@ iface_modem_init (gpointer g_iface)
     g_object_interface_install_property
         (g_iface,
          g_param_spec_boolean (MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
-                               "Periodic signal check disabled",
-                               "Whether periodic signal check is disabled.",
+                               "Periodic signal quality check disabled",
+                               "Whether periodic signal quality check is disabled.",
+                               FALSE,
+                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED,
+                               "Periodic access technology check disabled",
+                               "Whether periodic access technology check is disabled.",
                                FALSE,
                                G_PARAM_READWRITE));
 
