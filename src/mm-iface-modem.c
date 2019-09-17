@@ -1226,7 +1226,9 @@ access_technologies_check_ready (MMIfaceModem *self,
         if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
             mm_dbg ("Polling to refresh access technologies is unsupported");
             ctx->access_technology_polling_supported = FALSE;
-        } else
+        }
+        /* Ignore logging any message if the error is in 'in-progress' */
+        else if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS))
             mm_dbg ("Couldn't refresh access technologies: '%s'", error->message);
         g_error_free (error);
     }
@@ -1254,7 +1256,9 @@ signal_quality_check_ready (MMIfaceModem *self,
         if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
             mm_dbg ("Polling to refresh signal quality is unsupported");
             ctx->signal_quality_polling_supported = FALSE;
-        } else
+        }
+        /* Ignore logging any message if the error is in 'in-progress' */
+        else if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS))
             mm_dbg ("Couldn't refresh signal quality: '%s'", error->message);
         g_error_free (error);
     }
