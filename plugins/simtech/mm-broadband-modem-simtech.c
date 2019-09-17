@@ -53,6 +53,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSimtech, mm_broadband_modem_simtech, MM_
 
 struct _MMBroadbandModemSimtechPrivate {
     GRegex *cnsmod_regex;
+    GRegex *csq_regex;
 };
 
 /*****************************************************************************/
@@ -96,6 +97,24 @@ simtech_tech_changed (MMPortSerialAt *port,
 }
 
 static void
+simtech_signal_changed (MMPortSerialAt *port,
+                        GMatchInfo *match_info,
+                        MMBroadbandModemSimtech *self)
+{
+    guint quality = 0;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &quality))
+        return;
+
+    if (quality != 99)
+        quality = CLAMP (quality, 0, 31) * 100 / 31;
+    else
+        quality = 0;
+
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+}
+
+static void
 set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
                                  gboolean enable)
 {
@@ -115,6 +134,14 @@ set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
             ports[i],
             self->priv->cnsmod_regex,
             enable ? (MMPortSerialAtUnsolicitedMsgFn)simtech_tech_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+
+        /* Signal quality related */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->csq_regex,
+            enable ? (MMPortSerialAtUnsolicitedMsgFn)simtech_signal_changed : NULL,
             enable ? self : NULL,
             NULL);
     }
@@ -403,6 +430,85 @@ load_access_technologies (MMIfaceModem        *self,
         3,
         FALSE,
         (GAsyncReadyCallback)cnsmod_query_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Load signal quality (Modem interface) */
+
+static guint
+load_signal_quality_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), error);
+    return value < 0 ? 0 : value;
+}
+
+static void
+csq_query_ready (MMBaseModem  *self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    const gchar *response, *p;
+    GError      *error = NULL;
+    gint         quality;
+    gint         ber;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Given that we may have enabled AUTOCSQ support, it is totally possible
+     * to get an empty string at this point, because the +CSQ reply may have
+     * been processed as an URC already. If we ever see this, we should not return
+     * an error, because that would reset the reported signal quality to 0 :/
+     * So, in this case, return the last cached signal quality value. */
+    if (!response[0]) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
+                                 "already refreshed via URCs");
+        g_object_unref (task);
+        return;
+    }
+
+    p = mm_strip_tag (response, "+CSQ:");
+    if (sscanf (p, "%d, %d", &quality, &ber)) {
+        if (quality != 99)
+            quality = CLAMP (quality, 0, 31) * 100 / 31;
+        else
+            quality = 0;
+        g_task_return_int (task, quality);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Could not parse signal quality results");
+    g_object_unref (task);
+}
+
+static void
+load_signal_quality (MMIfaceModem        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+CSQ",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)csq_query_ready,
         task);
 }
 
@@ -838,6 +944,8 @@ mm_broadband_modem_simtech_init (MMBroadbandModemSimtech *self)
 
     self->priv->cnsmod_regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d)\\r\\n",
                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->csq_regex    = g_regex_new ("\\r\\n\\+CSQ:\\s*(\\d+),(\\d+)\\r\\n",
+                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -846,6 +954,7 @@ finalize (GObject *object)
     MMBroadbandModemSimtech *self = MM_BROADBAND_MODEM_SIMTECH (object);
 
     g_regex_unref (self->priv->cnsmod_regex);
+    g_regex_unref (self->priv->csq_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_simtech_parent_class)->finalize (object);
 }
@@ -855,6 +964,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface_modem_parent = g_type_interface_peek_parent (iface);
 
+    iface->load_signal_quality = load_signal_quality;
+    iface->load_signal_quality_finish = load_signal_quality_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_supported_modes = load_supported_modes;
