@@ -51,6 +51,10 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSimtech, mm_broadband_modem_simtech, MM_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_SIMTECH, shared_simtech_init))
 
+struct _MMBroadbandModemSimtechPrivate {
+    GRegex *cnsmod_regex;
+};
+
 /*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
@@ -97,13 +101,9 @@ set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
 {
     MMPortSerialAt *ports[2];
     guint i;
-    GRegex *regex;
 
     ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-
-    regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d)\\r\\n",
-                         G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     /* Enable unsolicited events in given port */
     for (i = 0; i < G_N_ELEMENTS (ports); i++) {
@@ -113,13 +113,11 @@ set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
         /* Access technology related */
         mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
-            regex,
+            self->priv->cnsmod_regex,
             enable ? (MMPortSerialAtUnsolicitedMsgFn)simtech_tech_changed : NULL,
             enable ? self : NULL,
             NULL);
     }
-
-    g_regex_unref (regex);
 }
 
 static gboolean
@@ -833,6 +831,23 @@ mm_broadband_modem_simtech_new (const gchar *device,
 static void
 mm_broadband_modem_simtech_init (MMBroadbandModemSimtech *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_BROADBAND_MODEM_SIMTECH,
+                                              MMBroadbandModemSimtechPrivate);
+
+    self->priv->cnsmod_regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d)\\r\\n",
+                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBroadbandModemSimtech *self = MM_BROADBAND_MODEM_SIMTECH (object);
+
+    g_regex_unref (self->priv->cnsmod_regex);
+
+    G_OBJECT_CLASS (mm_broadband_modem_simtech_parent_class)->finalize (object);
 }
 
 static void
@@ -894,7 +909,12 @@ shared_simtech_init (MMSharedSimtech *iface)
 static void
 mm_broadband_modem_simtech_class_init (MMBroadbandModemSimtechClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemSimtechPrivate));
+
+    object_class->finalize = finalize;
 
     broadband_modem_class->setup_ports = setup_ports;
 }

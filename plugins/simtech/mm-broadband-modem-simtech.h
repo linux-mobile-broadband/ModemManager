@@ -29,9 +29,11 @@
 
 typedef struct _MMBroadbandModemSimtech MMBroadbandModemSimtech;
 typedef struct _MMBroadbandModemSimtechClass MMBroadbandModemSimtechClass;
+typedef struct _MMBroadbandModemSimtechPrivate MMBroadbandModemSimtechPrivate;
 
 struct _MMBroadbandModemSimtech {
     MMBroadbandModem parent;
+    MMBroadbandModemSimtechPrivate *priv;
 };
 
 struct _MMBroadbandModemSimtechClass{
