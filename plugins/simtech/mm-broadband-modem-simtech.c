@@ -79,6 +79,7 @@ simtech_act_to_mm_act (int nsmod)
         [5] = MM_MODEM_ACCESS_TECHNOLOGY_HSDPA,
         [6] = MM_MODEM_ACCESS_TECHNOLOGY_HSUPA,
         [7] = MM_MODEM_ACCESS_TECHNOLOGY_HSPA,
+        [8] = MM_MODEM_ACCESS_TECHNOLOGY_LTE,
     };
 
     return (nsmod < G_N_ELEMENTS (simtech_act_to_mm_act_map) ? simtech_act_to_mm_act_map[nsmod] : MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
