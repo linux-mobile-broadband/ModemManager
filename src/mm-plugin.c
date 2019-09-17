@@ -997,7 +997,7 @@ mm_plugin_create_modem (MMPlugin  *self,
             }
 #else
             if (port_type == MM_PORT_TYPE_NET &&
-                g_strcmp0 (driver, "qmi_wwan") != 0) {
+                g_strcmp0 (driver, "qmi_wwan") == 0) {
                 /* QMI net ports are ignored if QMI support not built */
                 mm_dbg ("(%s/%s): ignoring QMI net port as QMI support isn't available", subsys, name);
                 force_ignored = TRUE;
