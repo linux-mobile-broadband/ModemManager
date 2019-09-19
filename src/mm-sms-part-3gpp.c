@@ -156,25 +156,26 @@ sms_decode_address (const guint8 *address, int len)
     return utf8;
 }
 
-static char *
+static gchar *
 sms_decode_timestamp (const guint8 *timestamp)
 {
-    /* YYMMDDHHMMSS+ZZ */
-    char *timestr;
-    int quarters, hours;
+    /* ISO8601 format: YYYY-MM-DDTHH:MM:SS+HHMM */
+    guint year, month, day, hour, minute, second;
+    gint quarters, offset_minutes;
 
-    timestr = g_malloc0 (16);
-    sms_semi_octets_to_bcd_string (timestr, timestamp, 6);
+    year = 2000 + ((timestamp[0] & 0xf) * 10) + ((timestamp[0] >> 4) & 0xf);
+    month = ((timestamp[1] & 0xf) * 10) + ((timestamp[1] >> 4) & 0xf);
+    day = ((timestamp[2] & 0xf) * 10) + ((timestamp[2] >> 4) & 0xf);
+    hour = ((timestamp[3] & 0xf) * 10) + ((timestamp[3] >> 4) & 0xf);
+    minute = ((timestamp[4] & 0xf) * 10) + ((timestamp[4] >> 4) & 0xf);
+    second = ((timestamp[5] & 0xf) * 10) + ((timestamp[5] >> 4) & 0xf);
     quarters = ((timestamp[6] & 0x7) * 10) + ((timestamp[6] >> 4) & 0xf);
-    hours = quarters / 4;
+    offset_minutes = quarters * 15;
     if (timestamp[6] & 0x08)
-        timestr[12] = '-';
-    else
-        timestr[12] = '+';
-    timestr[13] = (hours / 10) + '0';
-    timestr[14] = (hours % 10) + '0';
-    /* TODO(njw): Change timestamp rep to something that includes quarter-hours */
-    return timestr;
+        offset_minutes = -1 * offset_minutes;
+
+    return mm_new_iso8601_time (year, month, day, hour,
+                                minute, second, TRUE, offset_minutes);
 }
 
 static MMSmsEncoding
