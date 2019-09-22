@@ -11000,6 +11000,7 @@ typedef enum {
     INITIALIZE_STEP_IFACE_TIME,
     INITIALIZE_STEP_IFACE_SIGNAL,
     INITIALIZE_STEP_IFACE_OMA,
+    INITIALIZE_STEP_FALLBACK_LIMITED,
     INITIALIZE_STEP_IFACE_FIRMWARE,
     INITIALIZE_STEP_SIM_HOT_SWAP,
     INITIALIZE_STEP_IFACE_SIMPLE,
@@ -11106,9 +11107,9 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
 
         mm_iface_modem_update_failed_state (MM_IFACE_MODEM (self), failed_reason);
 
-        /* Jump to the firmware step. We allow firmware switching even in failed
-         * state */
-        ctx->step = INITIALIZE_STEP_IFACE_FIRMWARE;
+        /* Jump to the fallback step when on failure, we will allow some additional
+         * interfaces even in failed state. */
+        ctx->step = INITIALIZE_STEP_FALLBACK_LIMITED;
         initialize_step (task);
         return;
     }
@@ -11121,9 +11122,9 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
      * the initialization sequence. Instead, we will re-initialize once
      * we are unlocked. */
     if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
-        /* Jump to the Firmware interface. We do allow modems to export
-         * both the Firmware and Simple interfaces when locked. */
-        ctx->step = INITIALIZE_STEP_IFACE_FIRMWARE;
+        /* Jump to the fallback step when locked, we will allow some additional
+         * interfaces even in locked state. */
+        ctx->step = INITIALIZE_STEP_FALLBACK_LIMITED;
         initialize_step (task);
         return;
     }
@@ -11322,6 +11323,12 @@ initialize_step (GTask *task)
                                        (GAsyncReadyCallback)iface_modem_oma_initialize_ready,
                                        task);
         return;
+
+    case INITIALIZE_STEP_FALLBACK_LIMITED:
+        /* All the initialization steps after this one will be run both on
+         * successful and locked/failed initializations.
+         * Fall down to next step */
+        ctx->step++;
 
     case INITIALIZE_STEP_IFACE_FIRMWARE:
         /* Initialize the Firmware interface */
