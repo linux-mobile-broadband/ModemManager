@@ -10224,11 +10224,11 @@ typedef enum {
     DISABLING_STEP_DISCONNECT_BEARERS,
     DISABLING_STEP_IFACE_SIMPLE,
     DISABLING_STEP_IFACE_FIRMWARE,
+    DISABLING_STEP_IFACE_VOICE,
     DISABLING_STEP_IFACE_SIGNAL,
     DISABLING_STEP_IFACE_OMA,
     DISABLING_STEP_IFACE_TIME,
     DISABLING_STEP_IFACE_MESSAGING,
-    DISABLING_STEP_IFACE_VOICE,
     DISABLING_STEP_IFACE_LOCATION,
     DISABLING_STEP_IFACE_CDMA,
     DISABLING_STEP_IFACE_3GPP_USSD,
@@ -10428,6 +10428,18 @@ disabling_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_IFACE_VOICE:
+        if (ctx->self->priv->modem_voice_dbus_skeleton) {
+            mm_dbg ("Modem has voice capabilities, disabling the Voice interface...");
+            /* Disabling the Modem Voice interface */
+            mm_iface_modem_voice_disable (MM_IFACE_MODEM_VOICE (ctx->self),
+                                          (GAsyncReadyCallback)iface_modem_voice_disable_ready,
+                                          task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case DISABLING_STEP_IFACE_SIGNAL:
         if (ctx->self->priv->modem_signal_dbus_skeleton) {
             mm_dbg ("Modem has extended signal reporting capabilities, disabling the Signal interface...");
@@ -10471,18 +10483,6 @@ disabling_step (GTask *task)
             mm_iface_modem_messaging_disable (MM_IFACE_MODEM_MESSAGING (ctx->self),
                                               (GAsyncReadyCallback)iface_modem_messaging_disable_ready,
                                               task);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
-    case DISABLING_STEP_IFACE_VOICE:
-        if (ctx->self->priv->modem_voice_dbus_skeleton) {
-            mm_dbg ("Modem has voice capabilities, disabling the Voice interface...");
-            /* Disabling the Modem Voice interface */
-            mm_iface_modem_voice_disable (MM_IFACE_MODEM_VOICE (ctx->self),
-                                          (GAsyncReadyCallback)iface_modem_voice_disable_ready,
-                                          task);
             return;
         }
         /* Fall down to next step */
@@ -10591,10 +10591,10 @@ typedef enum {
     ENABLING_STEP_IFACE_CDMA,
     ENABLING_STEP_IFACE_LOCATION,
     ENABLING_STEP_IFACE_MESSAGING,
-    ENABLING_STEP_IFACE_VOICE,
     ENABLING_STEP_IFACE_TIME,
     ENABLING_STEP_IFACE_SIGNAL,
     ENABLING_STEP_IFACE_OMA,
+    ENABLING_STEP_IFACE_VOICE,
     ENABLING_STEP_IFACE_FIRMWARE,
     ENABLING_STEP_IFACE_SIMPLE,
     ENABLING_STEP_LAST,
@@ -10838,19 +10838,6 @@ enabling_step (GTask *task)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_IFACE_VOICE:
-        if (ctx->self->priv->modem_voice_dbus_skeleton) {
-            mm_dbg ("Modem has voice capabilities, enabling the Voice interface...");
-            /* Enabling the Modem Voice interface */
-            mm_iface_modem_voice_enable (MM_IFACE_MODEM_VOICE (ctx->self),
-                                         g_task_get_cancellable (task),
-                                         (GAsyncReadyCallback)iface_modem_voice_enable_ready,
-                                         task);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
     case ENABLING_STEP_IFACE_TIME:
         if (ctx->self->priv->modem_time_dbus_skeleton) {
             mm_dbg ("Modem has time capabilities, enabling the Time interface...");
@@ -10885,6 +10872,19 @@ enabling_step (GTask *task)
                                        g_task_get_cancellable (task),
                                        (GAsyncReadyCallback)iface_modem_oma_enable_ready,
                                        task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_VOICE:
+        if (ctx->self->priv->modem_voice_dbus_skeleton) {
+            mm_dbg ("Modem has voice capabilities, enabling the Voice interface...");
+            /* Enabling the Modem Voice interface */
+            mm_iface_modem_voice_enable (MM_IFACE_MODEM_VOICE (ctx->self),
+                                         g_task_get_cancellable (task),
+                                         (GAsyncReadyCallback)iface_modem_voice_enable_ready,
+                                         task);
             return;
         }
         /* Fall down to next step */
@@ -10996,11 +10996,11 @@ typedef enum {
     INITIALIZE_STEP_IFACE_CDMA,
     INITIALIZE_STEP_IFACE_LOCATION,
     INITIALIZE_STEP_IFACE_MESSAGING,
-    INITIALIZE_STEP_IFACE_VOICE,
     INITIALIZE_STEP_IFACE_TIME,
     INITIALIZE_STEP_IFACE_SIGNAL,
     INITIALIZE_STEP_IFACE_OMA,
     INITIALIZE_STEP_FALLBACK_LIMITED,
+    INITIALIZE_STEP_IFACE_VOICE,
     INITIALIZE_STEP_IFACE_FIRMWARE,
     INITIALIZE_STEP_SIM_HOT_SWAP,
     INITIALIZE_STEP_IFACE_SIMPLE,
@@ -11292,14 +11292,6 @@ initialize_step (GTask *task)
                                              task);
         return;
 
-    case INITIALIZE_STEP_IFACE_VOICE:
-        /* Initialize the Voice interface */
-        mm_iface_modem_voice_initialize (MM_IFACE_MODEM_VOICE (ctx->self),
-                                         g_task_get_cancellable (task),
-                                         (GAsyncReadyCallback)iface_modem_voice_initialize_ready,
-                                         task);
-        return;
-
     case INITIALIZE_STEP_IFACE_TIME:
         /* Initialize the Time interface */
         mm_iface_modem_time_initialize (MM_IFACE_MODEM_TIME (ctx->self),
@@ -11329,6 +11321,14 @@ initialize_step (GTask *task)
          * successful and locked/failed initializations.
          * Fall down to next step */
         ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_VOICE:
+        /* Initialize the Voice interface */
+        mm_iface_modem_voice_initialize (MM_IFACE_MODEM_VOICE (ctx->self),
+                                         g_task_get_cancellable (task),
+                                         (GAsyncReadyCallback)iface_modem_voice_initialize_ready,
+                                         task);
+        return;
 
     case INITIALIZE_STEP_IFACE_FIRMWARE:
         /* Initialize the Firmware interface */
@@ -11432,9 +11432,11 @@ initialize_step (GTask *task)
                                      "Modem is unusable, "
                                      "cannot fully initialize");
 sim_hot_swap_enabled:
-                /* Ensure we only leave the Modem, OMA, and Firmware interfaces
+                /* Ensure we only leave the Modem and Firmware interfaces
                  * around.  A failure could be caused by firmware issues, which
-                 * a firmware update, switch, or provisioning could fix.
+                 * a firmware update, switch, or provisioning could fix. We also
+                 * leave the Voice interface around so that we can attempt
+                 * emergency voice calls.
                  */
                 mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (ctx->self));
                 mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
@@ -11442,7 +11444,6 @@ sim_hot_swap_enabled:
                 mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (ctx->self));
                 mm_iface_modem_signal_shutdown (MM_IFACE_MODEM_SIGNAL (ctx->self));
                 mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (ctx->self));
-                mm_iface_modem_voice_shutdown (MM_IFACE_MODEM_VOICE (ctx->self));
                 mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
                 mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
             }
