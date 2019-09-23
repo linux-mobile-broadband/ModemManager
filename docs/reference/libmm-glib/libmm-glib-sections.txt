@@ -1001,6 +1001,7 @@ MMModemVoice
 <SUBSECTION Getters>
 mm_modem_voice_get_path
 mm_modem_voice_dup_path
+mm_modem_voice_get_emergency_only
 
 <SUBSECTION Methods>
 mm_modem_voice_create_call
@@ -2853,6 +2854,7 @@ MmGdbusModemVoiceIface
 <SUBSECTION Getters>
 mm_gdbus_modem_voice_get_calls
 mm_gdbus_modem_voice_dup_calls
+mm_gdbus_modem_voice_get_emergency_only
 <SUBSECTION Methods>
 mm_gdbus_modem_voice_call_create_call
 mm_gdbus_modem_voice_call_create_call_finish
@@ -2883,6 +2885,7 @@ mm_gdbus_modem_voice_call_call_waiting_setup_finish
 mm_gdbus_modem_voice_call_call_waiting_setup_sync
 <SUBSECTION Private>
 mm_gdbus_modem_voice_set_calls
+mm_gdbus_modem_voice_set_emergency_only
 mm_gdbus_modem_voice_emit_call_added
 mm_gdbus_modem_voice_emit_call_deleted
 mm_gdbus_modem_voice_complete_create_call

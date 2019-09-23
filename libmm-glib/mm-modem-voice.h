@@ -70,8 +70,9 @@ GType mm_modem_voice_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemVoice, g_object_unref)
 #endif
 
-const gchar *mm_modem_voice_get_path (MMModemVoice *self);
-gchar       *mm_modem_voice_dup_path (MMModemVoice *self);
+const gchar *mm_modem_voice_get_path           (MMModemVoice *self);
+gchar       *mm_modem_voice_dup_path           (MMModemVoice *self);
+gboolean     mm_modem_voice_get_emergency_only (MMModemVoice *self);
 
 void    mm_modem_voice_create_call          (MMModemVoice *self,
                                              MMCallProperties *properties,

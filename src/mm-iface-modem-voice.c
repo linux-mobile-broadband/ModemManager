@@ -2879,6 +2879,20 @@ mm_iface_modem_voice_initialize_finish (MMIfaceModemVoice *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static gboolean
+modem_state_to_emergency_only (GBinding     *binding,
+                               const GValue *from_value,
+                               GValue       *to_value)
+{
+    MMModemState state;
+
+    /* If the modem is REGISTERED, we allow any kind of call, otherwise
+     * only emergency calls */
+    state = g_value_get_enum (from_value);
+    g_value_set_boolean (to_value, (state < MM_MODEM_STATE_REGISTERED));
+    return TRUE;
+}
+
 void
 mm_iface_modem_voice_initialize (MMIfaceModemVoice *self,
                                  GCancellable *cancellable,
@@ -2899,6 +2913,12 @@ mm_iface_modem_voice_initialize (MMIfaceModemVoice *self,
         g_object_set (self,
                       MM_IFACE_MODEM_VOICE_DBUS_SKELETON, skeleton,
                       NULL);
+
+        g_object_bind_property_full (self, MM_IFACE_MODEM_STATE,
+                                     skeleton, "emergency-only",
+                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE,
+                                     (GBindingTransformFunc) modem_state_to_emergency_only,
+                                     NULL, NULL, NULL);
     }
 
     /* Perform async initialization here */

@@ -47,6 +47,7 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
+static gboolean status_flag;
 static gboolean list_flag;
 static gchar *create_str;
 static gchar *delete_str;
@@ -59,6 +60,10 @@ static gboolean call_waiting_disable_flag;
 static gboolean call_waiting_query_flag;
 
 static GOptionEntry entries[] = {
+    { "voice-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
+      "Show status of voice support.",
+      NULL
+    },
     { "voice-list-calls", 0, 0, G_OPTION_ARG_NONE, &list_flag,
       "List calls available in a given modem",
       NULL
@@ -126,7 +131,8 @@ mmcli_modem_voice_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (list_flag +
+    n_actions = (status_flag +
+                 list_flag +
                  !!create_str +
                  !!delete_str +
                  hold_and_accept_flag +
@@ -141,6 +147,9 @@ mmcli_modem_voice_options_enabled (void)
         g_printerr ("error: too many Voice actions requested\n");
         exit (EXIT_FAILURE);
     }
+
+    if (status_flag)
+        mmcli_force_sync_operation ();
 
     checked = TRUE;
     return !!n_actions;
@@ -195,6 +204,13 @@ build_call_properties_from_input (const gchar *properties_string)
     }
 
     return properties;
+}
+
+static void
+print_voice_status (void)
+{
+    mmcli_output_string (MMC_F_VOICE_EMERGENCY_ONLY, mm_modem_voice_get_emergency_only (ctx->modem_voice) ? "yes" : "no");
+    mmcli_output_dump ();
 }
 
 static void
@@ -488,6 +504,9 @@ get_modem_ready (GObject      *source,
 
     ensure_modem_voice ();
 
+    if (status_flag)
+        g_assert_not_reached ();
+
     /* Request to list call? */
     if (list_flag) {
         g_debug ("Asynchronously listing calls in modem...");
@@ -633,6 +652,13 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
         mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_voice));
 
     ensure_modem_voice ();
+
+    /* Request to get voice status? */
+    if (status_flag) {
+        g_debug ("Printing voice status...");
+        print_voice_status ();
+        return;
+    }
 
     /* Request to list the call? */
     if (list_flag) {

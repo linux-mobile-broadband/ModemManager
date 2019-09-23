@@ -81,6 +81,20 @@ mm_modem_voice_dup_path (MMModemVoice *self)
     RETURN_NON_EMPTY_STRING (value);
 }
 
+/**
+ * mm_modem_voice_get_emergency_only:
+ * @self: A #MMModemVoice.
+ *
+ * Checks whether emergency calls only are allowed.
+ *
+ * Returns: %TRUE if only emergency calls are allowed, %FALSE otherwise..
+ */
+gboolean
+mm_modem_voice_get_emergency_only (MMModemVoice *self)
+{
+    return mm_gdbus_modem_voice_get_emergency_only (MM_GDBUS_MODEM_VOICE (self));
+}
+
 /*****************************************************************************/
 
 typedef struct {
