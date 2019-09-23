@@ -252,6 +252,119 @@ struct _MMBroadbandModemPrivate {
 };
 
 /*****************************************************************************/
+/* Generic ports open/close context */
+
+struct _PortsContext {
+    volatile gint     ref_count;
+    MMPortSerialAt   *primary;
+    gboolean          primary_open;
+    MMPortSerialAt   *secondary;
+    gboolean          secondary_open;
+    MMPortSerialQcdm *qcdm;
+    gboolean          qcdm_open;
+};
+
+static PortsContext *
+ports_context_ref (PortsContext *ctx)
+{
+    g_atomic_int_inc (&ctx->ref_count);
+    return ctx;
+}
+
+static void
+ports_context_unref (PortsContext *ctx)
+{
+    if (g_atomic_int_dec_and_test (&ctx->ref_count)) {
+        if (ctx->primary) {
+            if (ctx->primary_open)
+                mm_port_serial_close (MM_PORT_SERIAL (ctx->primary));
+            g_object_unref (ctx->primary);
+        }
+        if (ctx->secondary) {
+            if (ctx->secondary_open)
+                mm_port_serial_close (MM_PORT_SERIAL (ctx->secondary));
+            g_object_unref (ctx->secondary);
+        }
+        if (ctx->qcdm) {
+            if (ctx->qcdm_open)
+                mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
+            g_object_unref (ctx->qcdm);
+        }
+        g_free (ctx);
+    }
+}
+
+static gboolean
+ports_context_open (MMBroadbandModem  *self,
+                    PortsContext      *ctx,
+                    gboolean           disable_at_init_sequence,
+                    gboolean           with_at_secondary,
+                    gboolean           with_qcdm,
+                    GError           **error)
+{
+    /* Open primary */
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    if (!ctx->primary) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't get primary port");
+        return FALSE;
+    }
+    /* If we'll need to run modem initialization, disable port init sequence */
+    if (disable_at_init_sequence)
+        g_object_set (ctx->primary,
+                      MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
+                      NULL);
+    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), error)) {
+        g_prefix_error (error, "Couldn't open primary port: ");
+        return FALSE;
+    }
+    ctx->primary_open = TRUE;
+
+    /* Open secondary (optional) */
+    if (with_at_secondary) {
+        ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+        if (ctx->secondary) {
+            /* If we'll need to run modem initialization, disable port init sequence */
+            if (disable_at_init_sequence)
+                g_object_set (ctx->secondary,
+                              MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
+                              NULL);
+            if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->secondary), error)) {
+                g_prefix_error (error, "Couldn't open secondary port: ");
+                return FALSE;
+            }
+            ctx->secondary_open = TRUE;
+        }
+    }
+
+    /* Open qcdm (optional) */
+    if (with_qcdm) {
+        ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+        if (ctx->qcdm) {
+            if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), error)) {
+                g_prefix_error (error, "Couldn't open QCDM port: ");
+                return FALSE;
+            }
+            ctx->qcdm_open = TRUE;
+        }
+    }
+
+    return TRUE;
+}
+
+static PortsContext *
+ports_context_new (void)
+{
+    PortsContext *ctx;
+
+    ctx = g_new0 (PortsContext, 1);
+    ctx->ref_count = 1;
+    return ctx;
+}
+
+/*****************************************************************************/
 
 static gboolean
 response_processor_string_ignore_at_errors (MMBaseModem *self,
@@ -9775,120 +9888,6 @@ setup_ports (MMBroadbandModem *self)
                                                        NULL);
     }
     g_regex_unref (regex);
-}
-
-/*****************************************************************************/
-/* Generic ports open/close context */
-
-struct _PortsContext {
-    volatile gint ref_count;
-
-    MMPortSerialAt *primary;
-    gboolean primary_open;
-    MMPortSerialAt *secondary;
-    gboolean secondary_open;
-    MMPortSerialQcdm *qcdm;
-    gboolean qcdm_open;
-};
-
-static PortsContext *
-ports_context_ref (PortsContext *ctx)
-{
-    g_atomic_int_inc (&ctx->ref_count);
-    return ctx;
-}
-
-static void
-ports_context_unref (PortsContext *ctx)
-{
-    if (g_atomic_int_dec_and_test (&ctx->ref_count)) {
-        if (ctx->primary) {
-            if (ctx->primary_open)
-                mm_port_serial_close (MM_PORT_SERIAL (ctx->primary));
-            g_object_unref (ctx->primary);
-        }
-        if (ctx->secondary) {
-            if (ctx->secondary_open)
-                mm_port_serial_close (MM_PORT_SERIAL (ctx->secondary));
-            g_object_unref (ctx->secondary);
-        }
-        if (ctx->qcdm) {
-            if (ctx->qcdm_open)
-                mm_port_serial_close (MM_PORT_SERIAL (ctx->qcdm));
-            g_object_unref (ctx->qcdm);
-        }
-        g_free (ctx);
-    }
-}
-
-static gboolean
-ports_context_open (MMBroadbandModem  *self,
-                    PortsContext      *ctx,
-                    gboolean           disable_at_init_sequence,
-                    gboolean           with_at_secondary,
-                    gboolean           with_qcdm,
-                    GError           **error)
-{
-    /* Open primary */
-    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    if (!ctx->primary) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Couldn't get primary port");
-        return FALSE;
-    }
-    /* If we'll need to run modem initialization, disable port init sequence */
-    if (disable_at_init_sequence)
-        g_object_set (ctx->primary,
-                      MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
-                      NULL);
-    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), error)) {
-        g_prefix_error (error, "Couldn't open primary port: ");
-        return FALSE;
-    }
-    ctx->primary_open = TRUE;
-
-    /* Open secondary (optional) */
-    if (with_at_secondary) {
-        ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-        if (ctx->secondary) {
-            /* If we'll need to run modem initialization, disable port init sequence */
-            if (disable_at_init_sequence)
-                g_object_set (ctx->secondary,
-                              MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
-                              NULL);
-            if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->secondary), error)) {
-                g_prefix_error (error, "Couldn't open secondary port: ");
-                return FALSE;
-            }
-            ctx->secondary_open = TRUE;
-        }
-    }
-
-    /* Open qcdm (optional) */
-    if (with_qcdm) {
-        ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
-        if (ctx->qcdm) {
-            if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), error)) {
-                g_prefix_error (error, "Couldn't open QCDM port: ");
-                return FALSE;
-            }
-            ctx->qcdm_open = TRUE;
-        }
-    }
-
-    return TRUE;
-}
-
-static PortsContext *
-ports_context_new (void)
-{
-    PortsContext *ctx;
-
-    ctx = g_new0 (PortsContext, 1);
-    ctx->ref_count = 1;
-    return ctx;
 }
 
 /*****************************************************************************/
