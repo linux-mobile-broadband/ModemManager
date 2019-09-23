@@ -9869,17 +9869,6 @@ open_ports_initialization (MMBroadbandModem *self,
 
     ctx->primary_open = TRUE;
 
-    /* Try to disable echo */
-    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   ctx->primary,
-                                   "E0", 3,
-                                   FALSE, FALSE, NULL, NULL, NULL);
-    /* Try to get extended errors */
-    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   ctx->primary,
-                                   "+CMEE=1", 3,
-                                   FALSE, FALSE, NULL, NULL, NULL);
-
     return TRUE;
 }
 
