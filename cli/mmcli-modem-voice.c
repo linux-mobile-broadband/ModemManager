@@ -168,11 +168,6 @@ context_free (Context *ctx)
 static void
 ensure_modem_voice (void)
 {
-    if (mm_modem_get_state (mm_object_peek_modem (ctx->object)) < MM_MODEM_STATE_ENABLED) {
-        g_printerr ("error: modem not enabled yet\n");
-        exit (EXIT_FAILURE);
-    }
-
     if (!ctx->modem_voice) {
         g_printerr ("error: modem has no voice capabilities\n");
         exit (EXIT_FAILURE);

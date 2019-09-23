@@ -469,25 +469,11 @@ handle_delete_auth_ready (MMBaseModem *self,
                           GAsyncResult *res,
                           HandleDeleteContext *ctx)
 {
-    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
     MMCallList *list = NULL;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_delete_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot delete call: device not yet enabled");
         handle_delete_context_free (ctx);
         return;
     }
@@ -559,7 +545,6 @@ handle_create_auth_ready (MMBaseModem *self,
                           GAsyncResult *res,
                           HandleCreateContext *ctx)
 {
-    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
     MMCallList *list = NULL;
     GError *error = NULL;
     MMCallProperties *properties;
@@ -567,19 +552,6 @@ handle_create_auth_ready (MMBaseModem *self,
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_create_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot create CALL: device not yet enabled");
         handle_create_context_free (ctx);
         return;
     }
@@ -661,21 +633,6 @@ handle_list (MmGdbusModemVoice *skeleton,
 {
     GStrv paths;
     MMCallList *list = NULL;
-    MMModemState modem_state;
-
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot list CALL messages: "
-                                               "device not yet enabled");
-        return TRUE;
-    }
 
     g_object_get (self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
@@ -767,25 +724,11 @@ handle_hold_and_accept_auth_ready (MMBaseModem                *self,
                                    GAsyncResult               *res,
                                    HandleHoldAndAcceptContext *ctx)
 {
-    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
-    GError       *error = NULL;
-    MMCallList   *list = NULL;
+    GError     *error = NULL;
+    MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_hold_and_accept_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot hold and accept: device not yet enabled");
         handle_hold_and_accept_context_free (ctx);
         return;
     }
@@ -909,25 +852,11 @@ handle_hangup_and_accept_auth_ready (MMBaseModem                  *self,
                                      GAsyncResult                 *res,
                                      HandleHangupAndAcceptContext *ctx)
 {
-    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
-    GError       *error = NULL;
-    MMCallList   *list = NULL;
+    GError     *error = NULL;
+    MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_hangup_and_accept_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot hangup and accept: device not yet enabled");
         handle_hangup_and_accept_context_free (ctx);
         return;
     }
@@ -1064,25 +993,11 @@ handle_hangup_all_auth_ready (MMBaseModem            *self,
                               GAsyncResult           *res,
                               HandleHangupAllContext *ctx)
 {
-    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
-    GError       *error = NULL;
-    MMCallList   *list = NULL;
+    GError     *error = NULL;
+    MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_hangup_all_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot hangup all: device not yet enabled");
         handle_hangup_all_context_free (ctx);
         return;
     }
@@ -1195,25 +1110,11 @@ handle_transfer_auth_ready (MMBaseModem           *self,
                             GAsyncResult          *res,
                             HandleTransferContext *ctx)
 {
-    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
-    GError       *error = NULL;
-    MMCallList   *list = NULL;
+    GError     *error = NULL;
+    MMCallList *list = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_transfer_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot transfer: device not yet enabled");
         handle_transfer_context_free (ctx);
         return;
     }
@@ -1307,24 +1208,10 @@ handle_call_waiting_setup_auth_ready (MMBaseModem                   *self,
                                       GAsyncResult                  *res,
                                       HandleCallWaitingSetupContext *ctx)
 {
-    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
-    GError       *error = NULL;
+    GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_call_waiting_setup_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot setup call waiting: device not yet enabled");
         handle_call_waiting_setup_context_free (ctx);
         return;
     }
@@ -1408,24 +1295,10 @@ handle_call_waiting_query_auth_ready (MMBaseModem                   *self,
                                       GAsyncResult                  *res,
                                       HandleCallWaitingQueryContext *ctx)
 {
-    MMModemState  modem_state = MM_MODEM_STATE_UNKNOWN;
-    GError       *error = NULL;
+    GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_call_waiting_query_context_free (ctx);
-        return;
-    }
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (ctx->invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot query call waiting: device not yet enabled");
         handle_call_waiting_query_context_free (ctx);
         return;
     }
