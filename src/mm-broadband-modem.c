@@ -12006,6 +12006,11 @@ dispose (GObject *object)
         g_clear_object (&self->priv->modem_simple_dbus_skeleton);
     }
 
+    if (self->priv->modem_firmware_dbus_skeleton) {
+        mm_iface_modem_firmware_shutdown (MM_IFACE_MODEM_FIRMWARE (object));
+        g_clear_object (&self->priv->modem_firmware_dbus_skeleton);
+    }
+
     g_clear_object (&self->priv->modem_3gpp_initial_eps_bearer);
     g_clear_object (&self->priv->modem_sim);
     g_clear_object (&self->priv->modem_bearer_list);
