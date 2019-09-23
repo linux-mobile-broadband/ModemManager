@@ -2605,11 +2605,6 @@ interface_disabling_step (GTask *task)
         ctx->step++;
 
     case DISABLING_STEP_LAST:
-        /* Clear CALL list */
-        g_object_set (self,
-                      MM_IFACE_MODEM_VOICE_CALL_LIST, NULL,
-                      NULL);
-
         /* We are done without errors! */
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -2739,55 +2734,12 @@ interface_enabling_step (GTask *task)
     ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
-    case ENABLING_STEP_FIRST: {
-        MMCallList *list;
-
-        list = mm_call_list_new (MM_BASE_MODEM (self));
-        g_object_set (self,
-                      MM_IFACE_MODEM_VOICE_CALL_LIST, list,
-                      NULL);
-
-        /* Connect to list's signals */
-        g_signal_connect (list,
-                          MM_CALL_ADDED,
-                          G_CALLBACK (call_added),
-                          ctx->skeleton);
-        g_signal_connect (list,
-                          MM_CALL_DELETED,
-                          G_CALLBACK (call_deleted),
-                          ctx->skeleton);
-
-        /* Setup monitoring for in-call event handling */
-        g_signal_connect (list,
-                          MM_CALL_ADDED,
-                          G_CALLBACK (setup_in_call_event_handling),
-                          self);
-
-        /* Unless we're told not to, setup call list polling logic */
-        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list &&
-            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish) {
-            gboolean periodic_call_list_check_disabled = FALSE;
-
-            g_object_get (self,
-                          MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, &periodic_call_list_check_disabled,
-                          NULL);
-            if (!periodic_call_list_check_disabled) {
-                mm_dbg ("periodic call list polling will be used if supported");
-                g_signal_connect (list,
-                                  MM_CALL_ADDED,
-                                  G_CALLBACK (setup_call_list_polling),
-                                  self);
-            }
-        }
-
-        g_object_unref (list);
-
+    case ENABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
-    }
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
-        /* Allow setting up unsolicited events */
+        /* Allow setting up unsolicited events to get notified of incoming calls */
         if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_unsolicited_events &&
             MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_unsolicited_events_finish) {
             MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_unsolicited_events (
@@ -2800,7 +2752,7 @@ interface_enabling_step (GTask *task)
         ctx->step++;
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
-        /* Allow setting up unsolicited events */
+        /* Allow setting up unsolicited events to get notified of incoming calls */
         if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events &&
             MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events_finish) {
             MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events (
@@ -2861,6 +2813,7 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CHECK_SUPPORT,
     INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED,
+    INITIALIZATION_STEP_SETUP_CALL_LIST,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -2972,6 +2925,52 @@ interface_initialization_step (GTask *task)
         }
         /* Fall down to next step */
         ctx->step++;
+
+    case INITIALIZATION_STEP_SETUP_CALL_LIST: {
+        MMCallList *list;
+
+        list = mm_call_list_new (MM_BASE_MODEM (self));
+        g_object_set (self,
+                      MM_IFACE_MODEM_VOICE_CALL_LIST, list,
+                      NULL);
+
+        /* Connect to list's signals */
+        g_signal_connect (list,
+                          MM_CALL_ADDED,
+                          G_CALLBACK (call_added),
+                          ctx->skeleton);
+        g_signal_connect (list,
+                          MM_CALL_DELETED,
+                          G_CALLBACK (call_deleted),
+                          ctx->skeleton);
+
+        /* Setup monitoring for in-call event handling */
+        g_signal_connect (list,
+                          MM_CALL_ADDED,
+                          G_CALLBACK (setup_in_call_event_handling),
+                          self);
+
+        /* Unless we're told not to, setup call list polling logic */
+        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list &&
+            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish) {
+            gboolean periodic_call_list_check_disabled = FALSE;
+
+            g_object_get (self,
+                          MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, &periodic_call_list_check_disabled,
+                          NULL);
+            if (!periodic_call_list_check_disabled) {
+                mm_dbg ("periodic call list polling will be used if supported");
+                g_signal_connect (list,
+                                  MM_CALL_ADDED,
+                                  G_CALLBACK (setup_call_list_polling),
+                                  self);
+            }
+        }
+        g_object_unref (list);
+
+        /* Fall down to next step */
+        ctx->step++;
+    }
 
     case INITIALIZATION_STEP_LAST:
         /* Setup all method handlers */
