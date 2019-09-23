@@ -9821,6 +9821,76 @@ ports_context_unref (PortsContext *ctx)
     }
 }
 
+static gboolean
+ports_context_open (MMBroadbandModem  *self,
+                    PortsContext      *ctx,
+                    gboolean           disable_at_init_sequence,
+                    gboolean           with_at_secondary,
+                    gboolean           with_qcdm,
+                    GError           **error)
+{
+    /* Open primary */
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    if (!ctx->primary) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't get primary port");
+        return FALSE;
+    }
+    /* If we'll need to run modem initialization, disable port init sequence */
+    if (disable_at_init_sequence)
+        g_object_set (ctx->primary,
+                      MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
+                      NULL);
+    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), error)) {
+        g_prefix_error (error, "Couldn't open primary port: ");
+        return FALSE;
+    }
+    ctx->primary_open = TRUE;
+
+    /* Open secondary (optional) */
+    if (with_at_secondary) {
+        ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+        if (ctx->secondary) {
+            /* If we'll need to run modem initialization, disable port init sequence */
+            if (disable_at_init_sequence)
+                g_object_set (ctx->secondary,
+                              MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
+                              NULL);
+            if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->secondary), error)) {
+                g_prefix_error (error, "Couldn't open secondary port: ");
+                return FALSE;
+            }
+            ctx->secondary_open = TRUE;
+        }
+    }
+
+    /* Open qcdm (optional) */
+    if (with_qcdm) {
+        ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+        if (ctx->qcdm) {
+            if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), error)) {
+                g_prefix_error (error, "Couldn't open QCDM port: ");
+                return FALSE;
+            }
+            ctx->qcdm_open = TRUE;
+        }
+    }
+
+    return TRUE;
+}
+
+static PortsContext *
+ports_context_new (void)
+{
+    PortsContext *ctx;
+
+    ctx = g_new0 (PortsContext, 1);
+    ctx->ref_count = 1;
+    return ctx;
+}
+
 /*****************************************************************************/
 /* Initialization started/stopped */
 
@@ -9883,10 +9953,9 @@ initialization_started (MMBroadbandModem *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    ctx = g_new0 (PortsContext, 1);
-    ctx->ref_count = 1;
-
-    if (!open_ports_initialization (self, ctx, &error)) {
+    /* Open ports for initialization, just the primary AT port */
+    ctx = ports_context_new ();
+    if (!ports_context_open (self, ctx, FALSE, FALSE, FALSE, &error)) {
         ports_context_unref (ctx);
         g_prefix_error (&error, "Couldn't open ports during modem initialization: ");
         g_task_return_error (task, error);
@@ -9975,6 +10044,7 @@ enabling_after_modem_init_timeout (GTask *task)
     ctx = g_task_get_task_data (task);
 
     /* Reset init sequence enabled flags and run them explicitly */
+    g_assert (ctx->modem_init_required);
     g_object_set (ctx->ports->primary,
                   MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, TRUE,
                   NULL);
@@ -10047,64 +10117,6 @@ enabling_flash_done (MMPortSerial *port,
     g_object_unref (task);
 }
 
-static gboolean
-open_ports_enabling (MMBroadbandModem *self,
-                     PortsContext *ctx,
-                     gboolean modem_init_required,
-                     GError **error)
-{
-    /* Open primary */
-    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    if (!ctx->primary) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Couldn't get primary port");
-        return FALSE;
-    }
-
-    /* If we'll need to run modem initialization, disable port init sequence */
-    if (modem_init_required)
-        g_object_set (ctx->primary,
-                      MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
-                      NULL);
-
-
-    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), error)) {
-        g_prefix_error (error, "Couldn't open primary port: ");
-        return FALSE;
-    }
-
-    ctx->primary_open = TRUE;
-
-    /* Open secondary (optional) */
-    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (ctx->secondary) {
-        /* If we'll need to run modem initialization, disable port init sequence */
-        if (modem_init_required)
-            g_object_set (ctx->secondary,
-                          MM_PORT_SERIAL_AT_INIT_SEQUENCE_ENABLED, FALSE,
-                          NULL);
-        if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->secondary), error)) {
-            g_prefix_error (error, "Couldn't open secondary port: ");
-            return FALSE;
-        }
-        ctx->secondary_open = TRUE;
-    }
-
-    /* Open qcdm (optional) */
-    ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
-    if (ctx->qcdm) {
-        if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->qcdm), error)) {
-            g_prefix_error (error, "Couldn't open QCDM port: ");
-            return FALSE;
-        }
-        ctx->qcdm_open = TRUE;
-    }
-
-    return TRUE;
-}
-
 static void
 enabling_started (MMBroadbandModem *self,
                   GAsyncReadyCallback callback,
@@ -10115,8 +10127,7 @@ enabling_started (MMBroadbandModem *self,
     GTask *task;
 
     ctx = g_slice_new0 (EnablingStartedContext);
-    ctx->ports = g_new0 (PortsContext, 1);
-    ctx->ports->ref_count = 1;
+    ctx->ports = ports_context_new ();
 
     /* Skip modem initialization if the device was hotplugged OR if we already
      * did it (i.e. don't reinitialize if the modem got disabled and enabled
@@ -10135,8 +10146,8 @@ enabling_started (MMBroadbandModem *self,
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_started_context_free);
 
-    /* Enabling */
-    if (!open_ports_enabling (self, ctx->ports, ctx->modem_init_required, &error)) {
+    /* Open ports for enabling, including secondary AT port and QCDM if available */
+    if (!ports_context_open (self, ctx->ports, ctx->modem_init_required, TRUE, TRUE, &error)) {
         g_prefix_error (&error, "Couldn't open ports during modem enabling: ");
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -11348,11 +11359,8 @@ initialize_step (GTask *task)
                     GError *error = NULL;
 
                     mm_dbg ("Creating ports context for SIM hot swap");
-
-                    ports = g_new0 (PortsContext, 1);
-                    ports->ref_count = 1;
-
-                    if (!open_ports_enabling (ctx->self, ports, FALSE, &error)) {
+                    ports = ports_context_new ();
+                    if (!ports_context_open (ctx->self, ports, FALSE, FALSE, FALSE, &error)) {
                         mm_warn ("Couldn't open ports during Modem SIM hot swap enabling: %s", error? error->message : "unknown reason");
                         g_error_free (error);
                     } else {
