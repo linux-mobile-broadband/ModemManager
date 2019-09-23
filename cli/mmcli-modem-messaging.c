@@ -437,7 +437,7 @@ mmcli_modem_messaging_run_synchronous (GDBusConnection *connection)
 
     ensure_modem_messaging ();
 
-    /* Request to get location status? */
+    /* Request to get messaging status? */
     if (status_flag) {
         g_debug ("Printing messaging status...");
         print_messaging_status ();
