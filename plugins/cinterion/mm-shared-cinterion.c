@@ -1228,8 +1228,8 @@ parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
 
     priv = get_private (MM_SHARED_CINTERION (self));
 
-    if (!priv->iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't cleanup parent voice unsolicited events: %s", error->message);
+    if (!priv->iface_modem_voice_parent->setup_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't setup parent voice unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
