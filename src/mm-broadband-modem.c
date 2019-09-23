@@ -141,6 +141,7 @@ struct _MMBroadbandModemPrivate {
     /* Broadband modem specific implementation */
     PortsContext *enabled_ports_ctx;
     PortsContext *sim_hot_swap_ports_ctx;
+    PortsContext *in_call_ports_ctx;
     gboolean modem_init_run;
     gboolean sim_hot_swap_supported;
     gboolean sim_hot_swap_configured;
@@ -7471,21 +7472,19 @@ in_call_event_received (MMPortSerialAt   *port,
 }
 
 static void
-set_voice_in_call_unsolicited_events_handlers (MMIfaceModemVoice   *self,
-                                               gboolean             enable,
-                                               GAsyncReadyCallback  callback,
-                                               gpointer             user_data)
+set_voice_in_call_unsolicited_events_handlers (MMBroadbandModem *self,
+                                               PortsContext     *ports_ctx,
+                                               gboolean          enable)
 {
     MMPortSerialAt *ports[2];
     GRegex         *in_call_event_regex;
     guint           i;
-    GTask          *task;
 
     in_call_event_regex = g_regex_new ("\\r\\n(NO CARRIER|BUSY|NO ANSWER|NO DIALTONE)\\r\\n$",
-                                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+                                       G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
-    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = MM_PORT_SERIAL_AT (ports_ctx->primary);
+    ports[1] = MM_PORT_SERIAL_AT (ports_ctx->secondary);
 
     /* Enable unsolicited events in given port */
     for (i = 0; i < 2; i++) {
@@ -7504,26 +7503,60 @@ set_voice_in_call_unsolicited_events_handlers (MMIfaceModemVoice   *self,
     }
 
     g_regex_unref (in_call_event_regex);
+}
+
+static void
+modem_voice_setup_in_call_unsolicited_events (MMIfaceModemVoice   *_self,
+                                              GAsyncReadyCallback  callback,
+                                              gpointer             user_data)
+{
+    MMBroadbandModem *self;
+    GTask            *task;
+    GError           *error = NULL;
+
+    self = MM_BROADBAND_MODEM (_self);
+    if (!self->priv->in_call_ports_ctx)  {
+        PortsContext *ctx;
+
+        mm_dbg ("Setting up in-call ports context");
+        ctx = ports_context_new ();
+        if (!ports_context_open (self, ctx, FALSE, FALSE, FALSE, &error)) {
+            ports_context_unref (ctx);
+            g_prefix_error (&error, "Couldn't open ports in-call: ");
+        } else {
+            set_voice_in_call_unsolicited_events_handlers (self, ctx, TRUE);
+            self->priv->in_call_ports_ctx = ctx;
+        }
+    } else
+        mm_dbg ("In-call ports context already set up");
 
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_return_boolean (task, TRUE);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
 static void
-modem_voice_setup_in_call_unsolicited_events (MMIfaceModemVoice   *self,
-                                              GAsyncReadyCallback  callback,
-                                              gpointer             user_data)
-{
-    set_voice_in_call_unsolicited_events_handlers (self, TRUE, callback, user_data);
-}
-
-static void
-modem_voice_cleanup_in_call_unsolicited_events (MMIfaceModemVoice   *self,
+modem_voice_cleanup_in_call_unsolicited_events (MMIfaceModemVoice   *_self,
                                                 GAsyncReadyCallback  callback,
                                                 gpointer             user_data)
 {
-    set_voice_in_call_unsolicited_events_handlers (self, FALSE, callback, user_data);
+    MMBroadbandModem *self;
+    GTask            *task;
+
+    self = MM_BROADBAND_MODEM (_self);
+    if (self->priv->in_call_ports_ctx)  {
+        mm_dbg ("Cleaning up in-call ports context");
+        set_voice_in_call_unsolicited_events_handlers (self, self->priv->in_call_ports_ctx, FALSE);
+        g_clear_pointer (&self->priv->in_call_ports_ctx, (GDestroyNotify) ports_context_unref);
+    } else
+        mm_dbg ("In-call ports context already cleaned up");
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -11964,6 +11997,9 @@ finalize (GObject *object)
 
     if (self->priv->sim_hot_swap_ports_ctx)
         ports_context_unref (self->priv->sim_hot_swap_ports_ctx);
+
+    if (self->priv->in_call_ports_ctx)
+        ports_context_unref (self->priv->in_call_ports_ctx);
 
     if (self->priv->modem_3gpp_registration_regex)
         mm_3gpp_creg_regex_destroy (self->priv->modem_3gpp_registration_regex);
