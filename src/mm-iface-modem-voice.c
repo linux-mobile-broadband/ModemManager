@@ -23,13 +23,9 @@
 #include "mm-call-list.h"
 #include "mm-log.h"
 
-#define SUPPORT_CHECKED_TAG           "voice-support-checked-tag"
-#define SUPPORTED_TAG                 "voice-supported-tag"
 #define CALL_LIST_POLLING_CONTEXT_TAG "voice-call-list-polling-context-tag"
 #define IN_CALL_EVENT_CONTEXT_TAG     "voice-in-call-event-context-tag"
 
-static GQuark support_checked_quark;
-static GQuark supported_quark;
 static GQuark call_list_polling_context_quark;
 static GQuark in_call_event_context_quark;
 
@@ -2685,7 +2681,6 @@ static void interface_initialization_step (GTask *task);
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CHECK_SUPPORT,
-    INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED,
     INITIALIZATION_STEP_SETUP_CALL_LIST,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
@@ -2710,19 +2705,12 @@ check_support_ready (MMIfaceModemVoice *self,
     InitializationContext *ctx;
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish (self,
-                                                                          res,
-                                                                          &error)) {
-        if (error) {
-            /* This error shouldn't be treated as critical */
-            mm_dbg ("Voice support check failed: '%s'", error->message);
-            g_error_free (error);
-        }
-    } else {
-        /* Voice is supported! */
-        g_object_set_qdata (G_OBJECT (self),
-                            supported_quark,
-                            GUINT_TO_POINTER (TRUE));
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
+        mm_dbg ("Voice support check failed: '%s'", error->message);
+        g_error_free (error);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "Voice not supported");
+        g_object_unref (task);
+        return;
     }
 
     /* Go on to next step */
@@ -2748,85 +2736,66 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
-        /* Setup quarks if we didn't do it before */
-        if (G_UNLIKELY (!support_checked_quark))
-            support_checked_quark = (g_quark_from_static_string (
-                                         SUPPORT_CHECKED_TAG));
-        if (G_UNLIKELY (!supported_quark))
-            supported_quark = (g_quark_from_static_string (
-                                   SUPPORTED_TAG));
-
         /* Fall down to next step */
         ctx->step++;
 
     case INITIALIZATION_STEP_CHECK_SUPPORT:
-        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
-                                                   support_checked_quark))) {
-            /* Set the checked flag so that we don't run it again */
-            g_object_set_qdata (G_OBJECT (self),
-                                support_checked_quark,
-                                GUINT_TO_POINTER (TRUE));
-            /* Initially, assume we don't support it */
-            g_object_set_qdata (G_OBJECT (self),
-                                supported_quark,
-                                GUINT_TO_POINTER (FALSE));
-
-            if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support &&
-                MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish) {
-                MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support (
-                    self,
-                    (GAsyncReadyCallback)check_support_ready,
-                    task);
-                return;
-            }
-
-            /* If there is no implementation to check support, assume we DON'T
-             * support it. */
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
-    case INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED:
-        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
-                                                   supported_quark))) {
-            g_task_return_new_error (task,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNSUPPORTED,
-                                     "Voice not supported");
-            g_object_unref (task);
+        /* Always check voice support when we run initialization, because
+         * the support may be different before and after SIM-PIN unlock. */
+        if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support &&
+            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish) {
+            MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support (
+                self,
+                (GAsyncReadyCallback)check_support_ready,
+                task);
             return;
         }
-        /* Fall down to next step */
-        ctx->step++;
+
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "Voice not supported");
+        g_object_unref (task);
+        return;
 
     case INITIALIZATION_STEP_SETUP_CALL_LIST: {
-        MMCallList *list;
+        MMCallList *list = NULL;
 
-        list = mm_call_list_new (MM_BASE_MODEM (self));
-        g_object_set (self,
-                      MM_IFACE_MODEM_VOICE_CALL_LIST, list,
+        g_object_get (self,
+                      MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                       NULL);
 
-        /* Connect to list's signals */
-        g_signal_connect (list,
-                          MM_CALL_ADDED,
-                          G_CALLBACK (call_added),
-                          ctx->skeleton);
-        g_signal_connect (list,
-                          MM_CALL_DELETED,
-                          G_CALLBACK (call_deleted),
-                          ctx->skeleton);
+        /* Create a new call list if not already available (this initialization
+         * may be called multiple times) */
+        if (!list) {
+            list = mm_call_list_new (MM_BASE_MODEM (self));
+            g_object_set (self,
+                          MM_IFACE_MODEM_VOICE_CALL_LIST, list,
+                          NULL);
 
-        /* Setup monitoring for in-call event handling */
-        g_signal_connect (list,
-                          MM_CALL_ADDED,
-                          G_CALLBACK (setup_in_call_event_handling),
-                          self);
+            /* Connect to list's signals */
+            g_signal_connect (list,
+                              MM_CALL_ADDED,
+                              G_CALLBACK (call_added),
+                              ctx->skeleton);
+            g_signal_connect (list,
+                              MM_CALL_DELETED,
+                              G_CALLBACK (call_deleted),
+                              ctx->skeleton);
+
+            /* Setup monitoring for in-call event handling */
+            g_signal_connect (list,
+                              MM_CALL_ADDED,
+                              G_CALLBACK (setup_in_call_event_handling),
+                              self);
+        }
 
         /* Unless we're told not to, setup call list polling logic */
         if (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list &&
             MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish) {
             gboolean periodic_call_list_check_disabled = FALSE;
+
+            /* Cleanup any previously configured handler, before checking if we need to
+             * add a new one, because the PERIODIC_CALL_LIST_CHECK_DISABLED flag may
+             * change before and after SIM-PIN unlock */
+            g_signal_handlers_disconnect_by_func (list, G_CALLBACK (setup_call_list_polling), self);
 
             g_object_get (self,
                           MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, &periodic_call_list_check_disabled,
