@@ -7379,7 +7379,10 @@ ath_format_check_ready (MMBroadbandModem *self,
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CLCC=?",
                               3,
-                              TRUE,
+                              /* Do NOT cache as the reply may be different if PIN locked
+                               * or unlocked. E.g. we may not support +CLCC for emergency
+                               * voice calls. */
+                              FALSE,
                               (GAsyncReadyCallback)clcc_format_check_ready,
                               task);
 }
@@ -7399,7 +7402,7 @@ modem_voice_check_support (MMIfaceModemVoice *self,
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "H",
                               3,
-                              TRUE,
+                              FALSE,
                               (GAsyncReadyCallback)ath_format_check_ready,
                               task);
 }
