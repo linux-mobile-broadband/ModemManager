@@ -7324,6 +7324,20 @@ modem_voice_check_support_finish (MMIfaceModemVoice *self,
 }
 
 static void
+ignore_sim_related_errors (GError **error)
+{
+    g_assert (error && *error);
+    if (g_error_matches (*error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
+        g_error_matches (*error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN)          ||
+        g_error_matches (*error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK)          ||
+        g_error_matches (*error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE)      ||
+        g_error_matches (*error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_BUSY)         ||
+        g_error_matches (*error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
+        g_clear_error (error);
+    }
+}
+
+static void
 clcc_format_check_ready (MMBroadbandModem *self,
                          GAsyncResult     *res,
                          GTask            *task)
@@ -7350,9 +7364,15 @@ ath_format_check_ready (MMBroadbandModem *self,
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
+        /* Ignore some errors that the module may return when there is no SIM inserted or
+         * if the SIM is PIN-locked. We do need the voice interface exposed even in those
+         * cases, in order to support emergency calls */
+        ignore_sim_related_errors (&error);
+        if (error) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
     }
 
     /* Also check if +CLCC is supported */
