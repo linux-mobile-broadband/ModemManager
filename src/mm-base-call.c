@@ -34,6 +34,7 @@
 #include "mm-base-modem.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 
 G_DEFINE_TYPE (MMBaseCall, mm_base_call, MM_GDBUS_TYPE_CALL_SKELETON)
 
@@ -69,6 +70,11 @@ struct _MMBaseCallPrivate {
 
     /* Ongoing call index */
     guint index;
+
+    /* Start cancellable, used when the call state transition to
+     * 'terminated' is coming asynchronously (e.g. via in-call state
+     * update notifications) */
+    GCancellable *start_cancellable;
 };
 
 /*****************************************************************************/
@@ -148,8 +154,19 @@ handle_start_ready (MMBaseCall         *self,
 {
     GError *error = NULL;
 
+    g_clear_object (&ctx->self->priv->start_cancellable);
+
     if (!MM_BASE_CALL_GET_CLASS (self)->start_finish (self, res, &error)) {
         mm_warn ("Couldn't start call : '%s'", error->message);
+
+        /* When cancelled via the start cancellable, it's because we got an early in-call error
+         * before the call attempt was reported as started. */
+        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED) ||
+            g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED)) {
+            g_clear_error (&error);
+            error = mm_connection_error_for_code (MM_CONNECTION_ERROR_NO_DIALTONE);
+        }
+
         /* Convert errors into call state updates */
         if (g_error_matches (error, MM_CONNECTION_ERROR, MM_CONNECTION_ERROR_NO_DIALTONE))
             mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_ERROR);
@@ -159,6 +176,7 @@ handle_start_ready (MMBaseCall         *self,
             mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
         else
             mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
+
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_context_free (ctx);
         return;
@@ -220,7 +238,12 @@ handle_start_auth_ready (MMBaseModem *modem,
 
     mm_base_call_change_state (ctx->self, MM_CALL_STATE_DIALING, MM_CALL_STATE_REASON_OUTGOING_STARTED);
 
+    /* Setup start cancellable to get notified of termination asynchronously */
+    g_assert (!ctx->self->priv->start_cancellable);
+    ctx->self->priv->start_cancellable = g_cancellable_new ();
+
     MM_BASE_CALL_GET_CLASS (ctx->self)->start (ctx->self,
+                                               ctx->self->priv->start_cancellable,
                                                (GAsyncReadyCallback)handle_start_ready,
                                                ctx);
 }
@@ -970,6 +993,8 @@ mm_base_call_change_state (MMBaseCall        *self,
             g_source_remove (self->priv->incoming_timeout);
             self->priv->incoming_timeout = 0;
         }
+        /* cancel start if ongoing */
+        g_cancellable_cancel (self->priv->start_cancellable);
     }
 
     mm_gdbus_call_set_state (MM_GDBUS_CALL (self), new_state);
@@ -1021,6 +1046,7 @@ call_start_ready (MMBaseModem *modem,
 
 static void
 call_start (MMBaseCall *self,
+            GCancellable *cancellable,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
@@ -1030,12 +1056,15 @@ call_start (MMBaseCall *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)));
-    mm_base_modem_at_command (self->priv->modem,
-                              cmd,
-                              90,
-                              FALSE,
-                              (GAsyncReadyCallback)call_start_ready,
-                              task);
+    mm_base_modem_at_command_full (self->priv->modem,
+                                   mm_base_modem_peek_port_primary (self->priv->modem),
+                                   cmd,
+                                   90,
+                                   FALSE, /* no cached */
+                                   FALSE, /* no raw */
+                                   cancellable,
+                                   (GAsyncReadyCallback)call_start_ready,
+                                   task);
     g_free (cmd);
 }
 
@@ -1400,6 +1429,7 @@ finalize (GObject *object)
 {
     MMBaseCall *self = MM_BASE_CALL (object);
 
+    g_assert (!self->priv->start_cancellable);
     g_free (self->priv->path);
 
     G_OBJECT_CLASS (mm_base_call_parent_class)->finalize (object);

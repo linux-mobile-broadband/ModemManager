@@ -54,6 +54,7 @@ struct _MMBaseCallClass {
 
     /* Start the call */
     void     (* start)        (MMBaseCall *self,
+                               GCancellable *cancellable,
                                GAsyncReadyCallback callback,
                                gpointer user_data);
     gboolean (* start_finish) (MMBaseCall *self,
