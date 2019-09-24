@@ -258,6 +258,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_SIM_PROPERTIES_ICCID]              = { "sim.properties.iccid",                            "iccid",                    MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_OPERATOR_ID]        = { "sim.properties.operator-code",                    "operator id",              MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_OPERATOR_NAME]      = { "sim.properties.operator-name",                    "operator name",            MMC_S_SIM_PROPERTIES,          },
+    [MMC_F_SIM_PROPERTIES_EMERGENCY_NUMBERS]  = { "sim.properties.emergency-numbers",                "emergency numbers",        MMC_S_SIM_PROPERTIES,          },
     [MMC_F_MODEM_LIST_DBUS_PATH]              = { "modem-list",                                      "modems",                   MMC_S_UNKNOWN,                 },
     [MMC_F_SMS_LIST_DBUS_PATH]                = { "modem.messaging.sms",                             "sms messages",             MMC_S_UNKNOWN,                 },
     [MMC_F_CALL_LIST_DBUS_PATH]               = { "modem.voice.call",                                "calls",                    MMC_S_UNKNOWN,                 },

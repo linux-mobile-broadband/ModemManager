@@ -82,6 +82,9 @@ gchar       *mm_sim_dup_operator_identifier (MMSim *self);
 const gchar *mm_sim_get_operator_name       (MMSim *self);
 gchar       *mm_sim_dup_operator_name       (MMSim *self);
 
+const gchar * const  *mm_sim_get_emergency_numbers (MMSim *self);
+gchar               **mm_sim_dup_emergency_numbers (MMSim *self);
+
 void     mm_sim_send_pin        (MMSim *self,
                                  const gchar *pin,
                                  GCancellable *cancellable,

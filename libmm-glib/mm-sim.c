@@ -246,6 +246,45 @@ mm_sim_dup_operator_name (MMSim *self)
 /*****************************************************************************/
 
 /**
+ * mm_sim_get_emergency_numbers:
+ * @self: A #MMSim.
+ *
+ * Gets the list of emergency call numbers programmed in the SIM card.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_sim_dup_emergency_numbers() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): The emergency numbers, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ */
+const gchar * const *
+mm_sim_get_emergency_numbers (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+
+    return mm_gdbus_sim_get_emergency_numbers (MM_GDBUS_SIM (self));
+}
+
+/**
+ * mm_sim_dup_emergency_numbers:
+ * @self: A #MMSim.
+ *
+ * Gets a copy of the list of emergency call numbers programmed in the SIM card.
+ *
+ * Returns: (transfer full): The emergency numbers, or %NULL if none available. The returned value should be freed with g_strfreev().
+ */
+gchar **
+mm_sim_dup_emergency_numbers (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+
+    return mm_gdbus_sim_dup_emergency_numbers (MM_GDBUS_SIM (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_sim_send_pin_finish:
  * @self: A #MMSim.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sim_send_pin().

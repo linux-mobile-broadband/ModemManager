@@ -1341,6 +1341,7 @@ typedef enum {
     INITIALIZATION_STEP_IMSI,
     INITIALIZATION_STEP_OPERATOR_ID,
     INITIALIZATION_STEP_OPERATOR_NAME,
+    INITIALIZATION_STEP_EMERGENCY_NUMBERS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1410,6 +1411,32 @@ init_load_sim_identifier_ready (MMBaseSim *self,
     g_free (simid);
 
     /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
+}
+
+static void
+init_load_emergency_numbers_ready (MMBaseSim    *self,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    InitAsyncContext *ctx;
+    GError           *error = NULL;
+    GStrv             str_list;
+
+    str_list = MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers_finish (self, res, &error);
+    if (error) {
+        mm_warn ("couldn't load list of Emergency Numbers: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    if (str_list) {
+        mm_gdbus_sim_set_emergency_numbers (MM_GDBUS_SIM (self), (const gchar *const *) str_list);
+        g_strfreev (str_list);
+    }
+
+    /* Go on to next step */
+    ctx = g_task_get_task_data (task);
     ctx->step++;
     interface_initialization_step (task);
 }
@@ -1521,6 +1548,22 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_operator_name (
                 self,
                 (GAsyncReadyCallback)init_load_operator_name_ready,
+                task);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_EMERGENCY_NUMBERS:
+        /* Emergency Numbers are meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_sim_get_emergency_numbers (MM_GDBUS_SIM (self)) == NULL &&
+            MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers &&
+            MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers (
+                self,
+                (GAsyncReadyCallback)init_load_emergency_numbers_ready,
                 task);
             return;
         }
