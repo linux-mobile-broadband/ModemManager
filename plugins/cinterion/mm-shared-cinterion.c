@@ -1315,7 +1315,10 @@ parent_voice_check_support_ready (MMIfaceModemVoice *self,
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SLCC=?",
                               3,
-                              TRUE,
+                              /* Do NOT cache as the reply may be different if PIN locked
+                               * or unlocked. E.g. we may not support ^SLCC for emergency
+                               * voice calls. */
+                              FALSE,
                               (GAsyncReadyCallback) slcc_format_check_ready,
                               task);
 }
