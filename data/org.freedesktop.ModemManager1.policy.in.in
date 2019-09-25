@@ -68,7 +68,7 @@
     <message>System policy prevents querying or utilizing network information and services.</message>
     <defaults>
       <allow_inactive>no</allow_inactive>
-      <allow_active>yes</allow_active>
+      <allow_active>@MM_DEFAULT_USER_POLICY@</allow_active>
     </defaults>
   </action>
 
