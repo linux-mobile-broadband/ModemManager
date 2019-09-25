@@ -5,7 +5,8 @@ edit = @sed \
        -e 's|@sbindir[@]|$(sbindir)|g' \
        -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
        -e 's|@localstatedir[@]|$(localstatedir)|g' \
-       -e 's|@libexecdir[@]|$(libexecdir)|g'
+       -e 's|@libexecdir[@]|$(libexecdir)|g' \
+       -e 's|@MM_POLKIT_SERVICE[@]|$(MM_POLKIT_SERVICE)|g'
 
 
 # DBus Service file

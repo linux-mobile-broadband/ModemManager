@@ -288,6 +288,7 @@ elif test "x$with_polkit" = "xyes"; then
     with_polkit=strict
 fi
 
+MM_POLKIT_SERVICE=""
 if test "x$with_polkit" != "xno"; then
 	if test "x$have_polkit" = "xno"; then
 		AC_MSG_ERROR(PolicyKit development headers are required)
@@ -296,9 +297,11 @@ if test "x$with_polkit" != "xno"; then
     case "x$with_polkit" in
         "xpermissive")
             MM_DEFAULT_USER_POLICY="yes"
+            MM_POLKIT_SERVICE="polkit.service"
             ;;
         "xstrict")
             MM_DEFAULT_USER_POLICY="auth_self_keep"
+            MM_POLKIT_SERVICE="polkit.service"
             ;;
         *)
             AC_MSG_ERROR([Wrong value for --with-polkit: $with_polkit])
@@ -311,6 +314,7 @@ if test "x$with_polkit" != "xno"; then
     AC_SUBST(MM_DEFAULT_USER_POLICY)
 fi
 
+AC_SUBST(MM_POLKIT_SERVICE)
 AM_CONDITIONAL(WITH_POLKIT, [test "x$with_polkit" != "xno"])
 
 dnl-----------------------------------------------------------------------------
