@@ -1485,7 +1485,7 @@ mmcli_get_call_sync (GDBusConnection  *connection,
     manager = mmcli_get_manager_sync (connection);
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
     if (!modems) {
-        g_printerr ("error: couldn't find sms at '%s': 'no modems found'\n",
+        g_printerr ("error: couldn't find call at '%s': 'no modems found'\n",
                     call_path);
         exit (EXIT_FAILURE);
     }
