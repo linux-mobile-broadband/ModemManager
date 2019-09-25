@@ -183,6 +183,10 @@
 
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Modem.Location"
+           send_member="InjectAssistanceData"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Location"
            send_member="SetGpsRefreshRate"/>
 
     <!-- Protected by the Location policy rule -->
