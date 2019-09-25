@@ -125,6 +125,25 @@
            send_interface="org.freedesktop.ModemManager1.Modem.ModemCdma"
            send_member="ActivateManual"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Oma.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Oma"
+           send_member="Setup"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Oma"
+           send_member="StartClientInitiatedSession"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Oma"
+           send_member="AcceptNetworkInitiatedSession"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Oma"
+           send_member="CancelSession"/>
+
     <!-- org.freedesktop.ModemManager1.Sim.xml -->
 
     <!-- Protected by the Device.Control policy rule -->
