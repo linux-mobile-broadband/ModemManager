@@ -34,6 +34,7 @@
 #define MM_AUTHORIZATION_VOICE           "org.freedesktop.ModemManager1.Voice"
 #define MM_AUTHORIZATION_USSD            "org.freedesktop.ModemManager1.USSD"
 #define MM_AUTHORIZATION_LOCATION        "org.freedesktop.ModemManager1.Location"
+#define MM_AUTHORIZATION_TIME            "org.freedesktop.ModemManager1.Time"
 #define MM_AUTHORIZATION_FIRMWARE        "org.freedesktop.ModemManager1.Firmware"
 
 typedef struct _MMAuthProvider MMAuthProvider;

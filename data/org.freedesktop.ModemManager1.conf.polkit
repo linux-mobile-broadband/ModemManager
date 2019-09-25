@@ -299,6 +299,13 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Signal"
            send_member="Setup"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Time.xml -->
+
+    <!-- Protected by the Time policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Time"
+           send_member="GetNetworkTime"/>
+
   </policy>
 
   <policy user="root">

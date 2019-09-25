@@ -55,42 +55,34 @@ handle_get_network_time_context_free (HandleGetNetworkTimeContext *ctx)
 }
 
 static void
-load_network_time_ready (MMIfaceModemTime *self,
-                         GAsyncResult *res,
+load_network_time_ready (MMIfaceModemTime            *self,
+                         GAsyncResult                *res,
                          HandleGetNetworkTimeContext *ctx)
 {
     gchar *time_str;
     GError *error = NULL;
 
-    time_str = MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish (self,
-                                                                                   res,
-                                                                                   &error);
+    time_str = MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish (self, res, &error);
     if (error)
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_modem_time_complete_get_network_time (ctx->skeleton,
-                                                       ctx->invocation,
-                                                       time_str);
+        mm_gdbus_modem_time_complete_get_network_time (ctx->skeleton, ctx->invocation, time_str);
     g_free (time_str);
     handle_get_network_time_context_free (ctx);
 }
 
-static gboolean
-handle_get_network_time (MmGdbusModemTime *skeleton,
-                         GDBusMethodInvocation *invocation,
-                         MMIfaceModemTime *self)
+static void
+handle_get_network_time_auth_ready (MMBaseModem                 *self,
+                                    GAsyncResult                *res,
+                                    HandleGetNetworkTimeContext *ctx)
 {
-    HandleGetNetworkTimeContext *ctx;
-    MMModemState state;
+    MMModemState  state;
+    GError       *error = NULL;
 
-    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time ||
-        !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot load network time: "
-                                               "operation not supported");
-        return TRUE;
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_get_network_time_context_free (ctx);
+        return;
     }
 
     state = MM_MODEM_STATE_UNKNOWN;
@@ -99,23 +91,49 @@ handle_get_network_time (MmGdbusModemTime *skeleton,
                   NULL);
     /* If we're not yet registered, we cannot get the network time */
     if (state < MM_MODEM_STATE_REGISTERED) {
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot load network time: "
                                                "not registered yet");
-        return TRUE;
+        handle_get_network_time_context_free (ctx);
+        return;
     }
+
+    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time ||
+        !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot load network time: "
+                                               "operation not supported");
+        handle_get_network_time_context_free (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time (
+        ctx->self,
+        (GAsyncReadyCallback)load_network_time_ready,
+        ctx);
+}
+
+static gboolean
+handle_get_network_time (MmGdbusModemTime      *skeleton,
+                         GDBusMethodInvocation *invocation,
+                         MMIfaceModemTime      *self)
+{
+    HandleGetNetworkTimeContext *ctx;
 
     ctx = g_new (HandleGetNetworkTimeContext, 1);
     ctx->invocation = g_object_ref (invocation);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->self = g_object_ref (self);
 
-    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time (
-        self,
-        (GAsyncReadyCallback)load_network_time_ready,
-        ctx);
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_TIME,
+                             (GAsyncReadyCallback)handle_get_network_time_auth_ready,
+                             ctx);
     return TRUE;
 }
 
