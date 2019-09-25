@@ -53,6 +53,10 @@
 
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Modem"
+           send_member="SetPowerState"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem"
            send_member="Reset"/>
 
     <allow send_destination="org.freedesktop.ModemManager1"
