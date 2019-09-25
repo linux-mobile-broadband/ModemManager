@@ -79,6 +79,16 @@
            send_interface="org.freedesktop.ModemManager1.Modem"
            send_member="Command"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Firmware.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Firmware"
+           send_member="List"/>
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Firmware"
+           send_member="Select"/>
+
     <!-- org.freedesktop.ModemManager1.Modem.Simple.xml -->
 
     <!-- Allowed for everyone -->
