@@ -323,7 +323,7 @@
 
     <!-- org.freedesktop.ModemManager1.Modem.Signal.xml -->
 
-    <!-- Allowed for everyone -->
+    <!-- Protected by the Device.Control policy rule -->
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Modem.Signal"
            send_member="Setup"/>
