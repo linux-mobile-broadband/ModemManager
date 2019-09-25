@@ -157,7 +157,7 @@ handle_list (MmGdbusModemFirmware *skeleton,
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             MM_AUTHORIZATION_FIRMWARE,
                              (GAsyncReadyCallback)list_auth_ready,
                              ctx);
 
@@ -244,7 +244,7 @@ handle_select (MmGdbusModemFirmware *skeleton,
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
-                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             MM_AUTHORIZATION_FIRMWARE,
                              (GAsyncReadyCallback)select_auth_ready,
                              ctx);
 
