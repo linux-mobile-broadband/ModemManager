@@ -973,7 +973,84 @@ mm_base_sim_get_path (MMBaseSim *self)
     }
 
 /*****************************************************************************/
-/* SIM IDENTIFIER */
+/* Emergency numbers */
+
+static GStrv
+parse_emergency_numbers (const gchar  *response,
+                         GError      **error)
+{
+    guint  sw1 = 0;
+    guint  sw2 = 0;
+    gchar *hex = 0;
+    GStrv  ret;
+
+    if (!mm_3gpp_parse_crsm_response (response, &sw1, &sw2, &hex, error))
+        return NULL;
+
+    if ((sw1 == 0x90 && sw2 == 0x00) ||
+        (sw1 == 0x91) ||
+        (sw1 == 0x92) ||
+        (sw1 == 0x9f)) {
+        ret = mm_3gpp_parse_emergency_numbers (hex, error);
+        g_free (hex);
+        return ret;
+    }
+
+    g_free (hex);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                 sw1, sw2);
+    return NULL;
+}
+
+static GStrv
+load_emergency_numbers_finish (MMBaseSim     *self,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    gchar *result;
+    GStrv  emergency_numbers;
+    guint  i;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return NULL;
+
+    emergency_numbers = parse_emergency_numbers (result, error);
+    g_free (result);
+
+    if (!emergency_numbers)
+        return NULL;
+
+    for (i = 0; emergency_numbers[i]; i++)
+        mm_dbg ("loaded emergency number: %s", emergency_numbers[i]);
+
+    return emergency_numbers;
+}
+
+STR_REPLY_READY_FN (load_emergency_numbers)
+
+static void
+load_emergency_numbers (MMBaseSim           *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    mm_dbg ("loading emergency numbers...");
+
+    /* READ BINARY of EF_ECC (Emergency Call Codes) ETSI TS 51.011 section 10.3.27 */
+    mm_base_modem_at_command (
+        self->priv->modem,
+        "+CRSM=176,28599,0,0,15",
+        20,
+        FALSE,
+        (GAsyncReadyCallback)load_emergency_numbers_command_ready,
+        g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
+/* ICCID */
 
 static gchar *
 parse_iccid (const gchar *response,
@@ -1784,6 +1861,8 @@ mm_base_sim_class_init (MMBaseSimClass *klass)
     klass->load_operator_identifier_finish = load_operator_identifier_finish;
     klass->load_operator_name = load_operator_name;
     klass->load_operator_name_finish = load_operator_name_finish;
+    klass->load_emergency_numbers = load_emergency_numbers;
+    klass->load_emergency_numbers_finish = load_emergency_numbers_finish;
     klass->send_pin = send_pin;
     klass->send_pin_finish = common_send_pin_puk_finish;
     klass->send_puk = send_puk;

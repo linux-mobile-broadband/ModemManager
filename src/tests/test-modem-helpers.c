@@ -4338,6 +4338,55 @@ test_clcc_response_multiple (void)
 }
 
 /*****************************************************************************/
+/* Test +CRSM EF_ECC read data parsing */
+
+#define MAX_EMERGENCY_NUMBERS 5
+typedef struct {
+    const gchar *raw;
+    guint        n_numbers;
+    gchar       *numbers[MAX_EMERGENCY_NUMBERS];
+} EmergencyNumbersTest;
+
+static const EmergencyNumbersTest emergency_numbers_tests[] = {
+   { "",                                           0                                          },
+   { "FFF",                                        0                                          },
+   { "FFFFFF" "FFFFFF" "FFFFFF" "FFFFFF" "FFFFFF", 0                                          },
+   { "00F0FF" "11F2FF" "88F8FF",                   3, { "000", "112", "888" }                 },
+   { "00F0FF" "11F2FF" "88F8FF" "FFFFFF" "FFFFFF", 3, { "000", "112", "888" }                 },
+   { "00F0FF" "11F2FF" "88F8FF" "214365" "08FFFF", 5, { "000", "112", "888", "123456", "80" } },
+};
+
+static void
+test_emergency_numbers (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (emergency_numbers_tests); i++) {
+        GStrv   numbers;
+        GError *error = NULL;
+        guint   j;
+
+        g_debug ("  testing %s...", emergency_numbers_tests[i].raw);
+
+        numbers = mm_3gpp_parse_emergency_numbers (emergency_numbers_tests[i].raw, &error);
+        if (!emergency_numbers_tests[i].n_numbers) {
+            g_assert (error);
+            g_assert (!numbers);
+            continue;
+        }
+
+        g_assert_no_error (error);
+        g_assert (numbers);
+
+        g_assert_cmpuint (emergency_numbers_tests[i].n_numbers, ==, g_strv_length (numbers));
+        for (j = 0; j < emergency_numbers_tests[i].n_numbers; j++)
+            g_assert_cmpstr (emergency_numbers_tests[i].numbers[j], ==, numbers[j]);
+
+        g_strfreev (numbers);
+    }
+}
+
+/*****************************************************************************/
 
 typedef struct {
     gchar *str;
@@ -4658,6 +4707,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_clcc_response_single, NULL));
     g_test_suite_add (suite, TESTCASE (test_clcc_response_single_long, NULL));
     g_test_suite_add (suite, TESTCASE (test_clcc_response_multiple, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_emergency_numbers, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_parse_uint_list, NULL));
 

@@ -445,6 +445,8 @@ gboolean mm_3gpp_rsrp_level_to_rsrp   (guint    rsrp_level,
 gboolean mm_3gpp_rssnr_level_to_rssnr (gint     rssnr_level,
                                        gdouble *out_rssnr);
 
+GStrv mm_3gpp_parse_emergency_numbers (const char *raw, GError **error);
+
 /*****************************************************************************/
 /* CDMA specific helpers and utilities */
 /*****************************************************************************/
