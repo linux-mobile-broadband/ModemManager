@@ -243,6 +243,11 @@ void mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
                                          guint              index,
                                          const gchar       *dtmf);
 
+/* Authorize outgoing call based on modem status and ECC list */
+gboolean mm_iface_modem_voice_authorize_outgoing_call (MMIfaceModemVoice  *self,
+                                                       MMBaseCall         *call,
+                                                       GError            **error);
+
 /* Join/Leave multiparty calls
  *
  * These actions are provided in the Call API, but implemented in the

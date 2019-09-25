@@ -180,4 +180,7 @@ gchar       *mm_base_sim_load_sim_identifier_finish (MMBaseSim *self,
                                                      GAsyncResult *res,
                                                      GError **error);
 
+gboolean     mm_base_sim_is_emergency_number (MMBaseSim   *self,
+                                              const gchar *number);
+
 #endif /* MM_BASE_SIM_H */

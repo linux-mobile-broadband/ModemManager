@@ -225,6 +225,13 @@ handle_start_auth_ready (MMBaseModem *modem,
 
     mm_info ("user request to start call");
 
+    /* Disallow non-emergency calls when in emergency-only state */
+    if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (modem), ctx->self, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_start_context_free (ctx);
+        return;
+    }
+
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->start ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->start_finish) {

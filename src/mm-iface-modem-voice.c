@@ -39,6 +39,109 @@ mm_iface_modem_voice_bind_simple_status (MMIfaceModemVoice *self,
 
 /*****************************************************************************/
 
+gboolean
+mm_iface_modem_voice_authorize_outgoing_call (MMIfaceModemVoice  *self,
+                                              MMBaseCall         *call,
+                                              GError            **error)
+{
+    MmGdbusModemVoice *skeleton = NULL;
+    MMBaseSim         *sim = NULL;
+    gboolean           emergency_only = FALSE;
+    gboolean           call_allowed = FALSE;
+    GError            *inner_error = NULL;
+    guint              i;
+    const gchar       *number;
+
+    static const gchar *always_valid_emergency_numbers[] = { "112", "911" };
+    static const gchar *no_sim_valid_emergency_numbers[] = { "000", "08", "110", "999", "118", "119" };
+
+    g_assert (mm_base_call_get_direction (call) == MM_CALL_DIRECTION_OUTGOING);
+    number = mm_base_call_get_number (call);
+    g_assert (number);
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (!skeleton) {
+        g_set_error (&inner_error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "voice operations unsupported");
+        goto out;
+    }
+
+    g_object_get (skeleton,
+                  "emergency-only", &emergency_only,
+                  NULL);
+
+    /* Identification of emergency numbers. 3GPP TS 22.101
+     *
+     *   a) 112 and 911 shall always be available.
+     *   b) Any emergency call number stored on a SIM/USIM when the SIM/USIM is
+     *      present.
+     *   c) 000, 08, 110, 999, 118 and 119 when a SIM/USIM is not present.
+     *   d) Additional emergency call numbers that may have been downloaded by
+     *      the serving network when the SIM/USIM is present.
+     *
+     * In ModemManager we're not flagging any call as being "emergency" or
+     * "normal", but we can right away limit non-emergency calls if we're in
+     * "emergency-only" mode.
+     */
+
+    /* If we're not in emergency mode, the call (emergency or normal) is always allowed */
+    if (!emergency_only) {
+        mm_dbg ("voice call to %s allowed", number);
+        call_allowed = TRUE;
+        goto out;
+    }
+
+    for (i = 0; i < G_N_ELEMENTS (always_valid_emergency_numbers); i++) {
+        if (g_strcmp0 (number, always_valid_emergency_numbers[i]) == 0) {
+            mm_dbg ("voice call to %s allowed: emergency call number always valid", number);
+            call_allowed = TRUE;
+            goto out;
+        }
+    }
+
+    /* Check if we have a SIM */
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM, &sim,
+                  NULL);
+    if (!sim) {
+        /* If no SIM available, some additional numbers may be valid emergency numbers */
+        for (i = 0; i < G_N_ELEMENTS (no_sim_valid_emergency_numbers); i++) {
+            if (g_strcmp0 (number, no_sim_valid_emergency_numbers[i]) == 0) {
+                mm_dbg ("voice call to %s allowed: emergency call number valid when no SIM", number);
+                call_allowed = TRUE;
+                goto out;
+            }
+        }
+
+        mm_dbg ("voice call to %s NOT allowed: not a valid emergency call number when no SIM", number);
+        goto out;
+    }
+
+    /* Check if the number is programmed in EF_ECC */
+    if (mm_base_sim_is_emergency_number (sim, number)) {
+        mm_dbg ("voice call to %s allowed: emergency call number programmed in the SIM", number);
+        call_allowed = TRUE;
+    } else
+        mm_dbg ("voice call to %s NOT allowed: not a valid emergency call number programmed in the SIM", number);
+
+ out:
+
+    if (inner_error)
+        g_propagate_error (error, inner_error);
+    else if (!call_allowed)
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNAUTHORIZED,
+                     "only emergency calls allowed");
+
+    g_clear_object (&skeleton);
+    g_clear_object (&sim);
+    return call_allowed;
+}
+
+/*****************************************************************************/
+
 /* new calls will inherit audio settings if the modem is already in-call state */
 static void update_audio_settings_in_call (MMIfaceModemVoice *self,
                                            MMBaseCall        *call);

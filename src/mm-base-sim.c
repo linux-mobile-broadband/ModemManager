@@ -953,6 +953,28 @@ mm_base_sim_get_path (MMBaseSim *self)
 
 /*****************************************************************************/
 
+gboolean
+mm_base_sim_is_emergency_number (MMBaseSim   *self,
+                                 const gchar *number)
+{
+    const gchar *const *emergency_numbers;
+    guint               i;
+
+    emergency_numbers = mm_gdbus_sim_get_emergency_numbers (MM_GDBUS_SIM (self));
+
+    if (!emergency_numbers)
+        return FALSE;
+
+    for (i = 0; emergency_numbers[i]; i++) {
+        if (g_strcmp0 (number, emergency_numbers[i]) == 0)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+/*****************************************************************************/
+
 #undef STR_REPLY_READY_FN
 #define STR_REPLY_READY_FN(NAME)                                        \
     static void                                                         \
