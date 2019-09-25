@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2018-09-13 09:33+0200\n"
+"POT-Creation-Date: 2019-09-25 12:48+0200\n"
 "PO-Revision-Date: 2018-08-18 16:17+0200\n"
 "Last-Translator: Claude Paroz <claude@2xlibre.net>\n"
 "Language-Team: French <gnomefr@traduc.org>\n"
@@ -68,21 +68,32 @@ msgid "System policy prevents voice calls."
 msgstr "La politique système empêche les appels vocaux."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr ""
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#, fuzzy
+msgid "System policy prevents querying network time information."
+msgstr ""
+"La politique système empêche l’interrogation et l’utilisation des "
+"informations et des services du réseau."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
 msgstr "Activer et voir les informations de position géographique"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "La politique système empêche d’activer ou de voir les informations de "
 "position géographique."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query and utilize network information and services"
 msgstr "Interroger et utiliser les informations et services du réseau"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -90,11 +101,11 @@ msgstr ""
 "La politique système empêche l’interrogation et l’utilisation des "
 "informations et des services du réseau."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr "Interroger et gérer le matériel d’un périphérique mobile à large bande"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "La politique système empêche l’interrogation et la gestion du matériel de ce "

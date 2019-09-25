@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-04-25 10:07+0200\n"
+"POT-Creation-Date: 2019-09-25 12:48+0200\n"
 "PO-Revision-Date: 2019-04-13 22:08+0300\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -72,20 +72,31 @@ msgid "System policy prevents voice calls."
 msgstr "Sistemos politika neleidžia balso skambučių."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr ""
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#, fuzzy
+msgid "System policy prevents querying network time information."
+msgstr ""
+"Sistemos politika neleidžia užklausti ar panaudoti tinklo informacija ir "
+"paslaugas."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
 msgstr "Įjungti ir rodyti geografinės vietos bei pozicionavimo informaciją"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "Sistemos politika neleidžia įjungti ar rodyti geografinės vietos informaciją."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query and utilize network information and services"
 msgstr "Užklausti ir panaudoti tinklo informacija bei paslaugas"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -93,13 +104,13 @@ msgstr ""
 "Sistemos politika neleidžia užklausti ar panaudoti tinklo informacija ir "
 "paslaugas."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr ""
 "Užklausti ir tvarkyti programinę aparatinę įrangą mobiliojo plačiajuosčio "
 "ryšio įrenginyje"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "Sistemos politika neleidžia užklausti ar tvarkyti šio įrenginio programinę "

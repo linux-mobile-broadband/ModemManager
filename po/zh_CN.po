@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-07-02 09:46+0200\n"
+"POT-Creation-Date: 2019-09-25 12:48+0200\n"
 "PO-Revision-Date: 2019-05-03 00:10+0800\n"
 "Last-Translator: 王滋涵 <i@wi24rd.ml>\n"
 "Language-Team: Chinese (China) <i18n-zh@googlegroups.com>\n"
@@ -62,29 +62,38 @@ msgid "System policy prevents voice calls."
 msgstr "系统策略禁止语音呼叫。"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr ""
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#, fuzzy
+msgid "System policy prevents querying network time information."
+msgstr "系统策略禁止查询和利用网络信息和服务。"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
 msgstr "启用和查看地理位置和定位信息"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr "系统策略禁止启用和查看地理位置和定位信息。"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query and utilize network information and services"
 msgstr "查询和利用网络信息和服务"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
 msgstr "系统策略禁止查询和利用网络信息和服务。"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr "在移动宽带设备上查询和管理固件"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr "系统策略禁止在移动宽带设备上查询和管理固件。"
 

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2018-08-14 11:06+0200\n"
+"POT-Creation-Date: 2019-09-25 12:48+0200\n"
 "PO-Revision-Date: 2018-06-23 18:53+0300\n"
 "Last-Translator: Emin Tufan Çetin <etcetin@gmail.com>\n"
 "Language-Team: Türkçe <gnome-turk@gnome.org>\n"
@@ -68,21 +68,32 @@ msgid "System policy prevents voice calls."
 msgstr "Sistem ilkesi sesli çağrıları engelliyor."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr ""
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#, fuzzy
+msgid "System policy prevents querying network time information."
+msgstr ""
+"Sistem ilkesi ağ bilgisini ve hizmetleri sorgulamayı veya yararlanmayı "
+"engelliyor."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
 msgstr "Coğrafi konum ve konumlandırma bilgisini etkinleştir ve gör"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "Sistem ilkesi coğrafi konum bilgisini etkinleştirmeyi ve göstermeyi "
 "engelliyor."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query and utilize network information and services"
 msgstr "Ağ bilgisi ve hizmetleri sorgula ve yararlan"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -90,11 +101,11 @@ msgstr ""
 "Sistem ilkesi ağ bilgisini ve hizmetleri sorgulamayı veya yararlanmayı "
 "engelliyor."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr "Mobil geniş bant aygıtındaki donanım yazılımını sorgula ve yönet"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "Sistem ilkesi bu aygıtın donanım yazılımını sorgulamayı veya yönetmeyi "

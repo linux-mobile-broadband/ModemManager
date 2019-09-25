@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2017-08-29 09:24+0200\n"
+"POT-Creation-Date: 2019-09-25 12:48+0200\n"
 "PO-Revision-Date: 2014-01-06 21:23+0100\n"
 "Last-Translator: Mario Blättermann <mario.blaettermann@gmail.com>\n"
 "Language-Team: German <debian-l10n-german@lists.debian.org>\n"
@@ -70,23 +70,34 @@ msgid "System policy prevents voice calls."
 msgstr "Die Systemrichtlinien verhindern die Steuerung von ModemManager."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr ""
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#, fuzzy
+msgid "System policy prevents querying network time information."
+msgstr ""
+"Die Systemrichtlinien verhindern die Abfrage der Netzwerkinformationen und -"
+"dienste."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
 msgstr ""
 "Informationen zum geografischen Standort und Positionierung aktivieren und "
 "anzeigen"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:59
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
 msgstr ""
 "Die Systemrichtlinien verhindern das Aktivieren oder Ändern der "
 "Informationen zum geografischen Standort."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:67
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query and utilize network information and services"
 msgstr "Netzwerkinformationen und -dienste abfragen und nutzen"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:68
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
@@ -94,11 +105,11 @@ msgstr ""
 "Die Systemrichtlinien verhindern die Abfrage der Netzwerkinformationen und -"
 "dienste."
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:76
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and manage firmware on a mobile broadband device"
 msgstr "Firmware auf mobilen Breitbandgeräten abfragen und verwalten"
 
-#: data/org.freedesktop.ModemManager1.policy.in.in:77
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "Die Systemrichtlinien verhindern die Abfrage oder Verwaltung der Firmware "
