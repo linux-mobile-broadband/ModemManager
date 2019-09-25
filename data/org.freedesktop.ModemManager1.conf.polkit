@@ -237,6 +237,30 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Voice"
            send_member="DeleteCall"/>
 
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="HoldAndAccept"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="HangupAndAccept"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="HangupAll"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="Transfer"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="CallWaitingSetup"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Voice"
+           send_member="CallWaitingQuery"/>
+
     <!-- org.freedesktop.ModemManager1.Call.xml -->
 
     <!-- Protected by the Voice policy rule -->
@@ -247,6 +271,18 @@
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Call"
            send_member="Accept"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Call"
+           send_member="Deflect"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Call"
+           send_member="JoinMultiparty"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Call"
+           send_member="LeaveMultiparty"/>
 
     <allow send_destination="org.freedesktop.ModemManager1"
            send_interface="org.freedesktop.ModemManager1.Call"
