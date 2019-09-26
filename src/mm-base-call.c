@@ -206,6 +206,7 @@ handle_start_auth_ready (MMBaseModem *modem,
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_context_free (ctx);
         return;
@@ -227,6 +228,7 @@ handle_start_auth_ready (MMBaseModem *modem,
 
     /* Disallow non-emergency calls when in emergency-only state */
     if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (modem), ctx->self, &error)) {
+        mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_start_context_free (ctx);
         return;
@@ -235,6 +237,7 @@ handle_start_auth_ready (MMBaseModem *modem,
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->start ||
         !MM_BASE_CALL_GET_CLASS (ctx->self)->start_finish) {
+        mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
