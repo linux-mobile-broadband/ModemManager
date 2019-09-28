@@ -1,15 +1,15 @@
 # Polish translation for ModemManager.
-# Copyright © 2017 the ModemManager authors.
+# Copyright © 2017-2019 the ModemManager authors.
 # This file is distributed under the same license as the ModemManager package.
-# Piotr Drąg <piotrdrag@gmail.com>, 2017.
-# Aviary.pl <community-poland@mozilla.org>, 2017.
+# Piotr Drąg <piotrdrag@gmail.com>, 2017-2019.
+# Aviary.pl <community-poland@mozilla.org>, 2017-2019.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
-"PO-Revision-Date: 2017-09-06 19:15+0200\n"
+"POT-Creation-Date: 2019-09-26 03:26+0000\n"
+"PO-Revision-Date: 2019-09-28 15:02+0200\n"
 "Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
 "Language-Team: Polish <community-poland@mozilla.org>\n"
 "Language: pl\n"
@@ -70,14 +70,12 @@ msgstr "Ustawienia systemu uniemożliwiają dzwonienie."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Odpytywanie informacji o czasie sieciowym i strefie czasowej"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
 msgstr ""
-"Ustawienia systemu uniemożliwiają odpytywanie lub używanie informacji "
-"i usług sieciowych."
+"Ustawienia systemu uniemożliwiają odpytywanie informacji o czasie sieciowym."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
