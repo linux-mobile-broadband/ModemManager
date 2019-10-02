@@ -113,7 +113,7 @@ mm_modem_oma_setup_finish (MMModemOma *self,
 /**
  * mm_modem_oma_setup:
  * @self: A #MMModemOma.
- * @features: Mask of #MMOmaFeatures to enable.
+ * @features: Mask of #MMOmaFeature values to enable.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
@@ -140,7 +140,7 @@ mm_modem_oma_setup (MMModemOma *self,
 /**
  * mm_modem_oma_setup_sync:
  * @self: A #MMModemOma.
- * @features: Mask of #MMOmaFeatures to enable.
+ * @features: Mask of #MMOmaFeature values to enable.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
