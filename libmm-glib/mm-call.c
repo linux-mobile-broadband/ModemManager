@@ -644,7 +644,7 @@ mm_call_join_multiparty (MMCall              *self,
 
 /**
  * mm_call_join_multiparty_sync:
- * @self: A #MMCall.g
+ * @self: A #MMCall.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
