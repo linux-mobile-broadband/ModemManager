@@ -736,6 +736,8 @@ handle_connect (MmGdbusModemSimple *skeleton,
     ctx->self = g_object_ref (self);
     ctx->dictionary = g_variant_ref (dictionary);
 
+    mm_dbg ("User request to connect modem");
+
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
@@ -885,8 +887,11 @@ handle_disconnect (MmGdbusModemSimple *skeleton,
      *
      * We will detect the '/' string and set the bearer path as NULL in the
      * context if so, and otherwise use the given input string as path */
-    if (g_strcmp0 (bearer_path, "/") != 0)
+    if (g_strcmp0 (bearer_path, "/") != 0) {
+        mm_dbg ("User request to disconnect modem (bearer '%s')", bearer_path);
         ctx->bearer_path = g_strdup (bearer_path);
+    } else
+        mm_dbg ("User request to disconnect modem (all bearers)");
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,

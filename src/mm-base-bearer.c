@@ -931,6 +931,8 @@ handle_connect (MMBaseBearer *self,
                   MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
 
+    mm_dbg ("User request to connect bearer '%s'", self->priv->path);
+
     mm_base_modem_authorize (ctx->modem,
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
@@ -1121,6 +1123,8 @@ handle_disconnect (MMBaseBearer *self,
     g_object_get (self,
                   MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
+
+    mm_dbg ("User request to disconnect bearer '%s'", self->priv->path);
 
     mm_base_modem_authorize (ctx->modem,
                              invocation,
