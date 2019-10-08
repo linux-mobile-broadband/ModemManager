@@ -130,6 +130,28 @@ name_lost_cb (GDBusConnection *connection,
     g_main_loop_quit (loop);
 }
 
+static void
+register_dbus_errors (void)
+{
+  static volatile guint32 aux = 0;
+
+  if (aux)
+      return;
+
+  /* Register all known own errors */
+  aux |= MM_CORE_ERROR;
+  aux |= MM_MOBILE_EQUIPMENT_ERROR;
+  aux |= MM_CONNECTION_ERROR;
+  aux |= MM_SERIAL_ERROR;
+  aux |= MM_MESSAGE_ERROR;
+  aux |= MM_CDMA_ACTIVATION_ERROR;
+
+  /* We no longer use MM_CORE_ERROR_CANCELLED in the daemon, we rely on
+   * G_IO_ERROR_CANCELLED internally */
+  g_dbus_error_unregister_error (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, MM_CORE_ERROR_DBUS_PREFIX ".Cancelled");
+  g_dbus_error_register_error   (G_IO_ERROR,    G_IO_ERROR_CANCELLED,    MM_CORE_ERROR_DBUS_PREFIX ".Cancelled");
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -153,6 +175,9 @@ main (int argc, char *argv[])
 
     g_unix_signal_add (SIGTERM, quit_cb, NULL);
     g_unix_signal_add (SIGINT, quit_cb, NULL);
+
+    /* Early register all known errors */
+    register_dbus_errors ();
 
     mm_info ("ModemManager (version " MM_DIST_VERSION ") starting in %s bus...",
              mm_context_get_test_session () ? "session" : "system");
