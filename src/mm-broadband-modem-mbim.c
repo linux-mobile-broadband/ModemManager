@@ -4521,23 +4521,23 @@ process_ussd_message (MMBroadbandModemMbim *self,
         break;
 
     case MBIM_USSD_RESPONSE_TERMINATED_BY_NETWORK:
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "USSD terminated by network");
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_ABORTED, "USSD terminated by network");
         break;
 
     case MBIM_USSD_RESPONSE_OTHER_LOCAL_CLIENT:
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Another ongoing USSD operation is in progress");
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_RETRY, "Another ongoing USSD operation is in progress");
         break;
 
     case MBIM_USSD_RESPONSE_OPERATION_NOT_SUPPORTED:
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Operation not supported");
+        error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED, "Operation not supported");
         break;
 
     case MBIM_USSD_RESPONSE_NETWORK_TIMEOUT:
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Network timeout");
+        error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT, "Network timeout");
         break;
 
     default:
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Unknown USSD response (%u)", ussd_response);
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Unknown USSD response (%u)", ussd_response);
         break;
     }
 
@@ -4851,7 +4851,7 @@ ussd_cancel_ready (MbimDevice   *device,
         task = self->priv->pending_ussd_action;
         self->priv->pending_ussd_action = NULL;
 
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
                                  "USSD session was cancelled");
         g_object_unref (task);
     }
