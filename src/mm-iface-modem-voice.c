@@ -2165,7 +2165,7 @@ in_call_cleanup_ready (MMIfaceModemVoice *self,
 
     if (!in_call_cleanup_finish (self, res, &error)) {
         /* ignore cancelled operations */
-        if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED) && !g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED))
+        if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
             mm_warn ("Cannot cleanup in-call modem state: %s", error->message);
         g_clear_error (&error);
     } else {
@@ -2189,7 +2189,7 @@ in_call_setup_ready (MMIfaceModemVoice *self,
 
     if (!in_call_setup_finish (self, res, &ctx->audio_port, &ctx->audio_format, &error)) {
         /* ignore cancelled operations */
-        if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED) && !g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED))
+        if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
             mm_warn ("Cannot setup in-call modem state: %s", error->message);
         g_clear_error (&error);
     } else {
