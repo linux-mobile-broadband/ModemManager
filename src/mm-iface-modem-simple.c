@@ -878,11 +878,15 @@ handle_disconnect (MmGdbusModemSimple *skeleton,
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
 
-    if (bearer_path &&
-        bearer_path[0] == '/' &&
-        bearer_path[1]) {
-        ctx->bearer_path = g_strdup (ctx->bearer_path);
-    }
+    /* The Disconnect() method expects a valid object path given in bearer path,
+     * it cannot be NULL, so we assume we get '/' when we're asked to disconnect
+     * all connected bearers, as that is what mm_modem_simple_disconnect() does
+     * when a NULL bearer path is given to that method.
+     *
+     * We will detect the '/' string and set the bearer path as NULL in the
+     * context if so, and otherwise use the given input string as path */
+    if (g_strcmp0 (bearer_path, "/") != 0)
+        ctx->bearer_path = g_strdup (bearer_path);
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
