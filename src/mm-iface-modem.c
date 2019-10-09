@@ -315,8 +315,8 @@ load_unlock_required_ready (MMIfaceModem *self,
         /* For several kinds of errors, just return them directly */
         if (error->domain == MM_SERIAL_ERROR ||
             g_error_matches (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_CANCELLED) ||
+                             G_IO_ERROR,
+                             G_IO_ERROR_CANCELLED) ||
             g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
@@ -3316,8 +3316,8 @@ internal_load_unlock_required_ready (MMIfaceModem *self,
          * state. */
         if (error->domain == MM_SERIAL_ERROR ||
             g_error_matches (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_CANCELLED)) {
+                             G_IO_ERROR,
+                             G_IO_ERROR_CANCELLED)) {
             ctx->saved_error = error;
             ctx->step = UPDATE_LOCK_INFO_CONTEXT_STEP_LAST;
             update_lock_info_context_step (task);
