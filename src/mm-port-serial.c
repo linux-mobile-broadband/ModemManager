@@ -815,8 +815,7 @@ port_serial_response_wait_cancelled (GCancellable *cancellable,
     /* FIXME: This is not completely correct - if the response finally arrives and there's
      * some other command waiting for response right now, the other command will
      * get the output of the cancelled command. Not sure what to do here. */
-    error = g_error_new_literal (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_CANCELLED,
+    error = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_CANCELLED,
                                  "Waiting for the reply cancelled");
     /* Note: may complete last operation and unref the MMPortSerial */
     port_serial_got_response (self, NULL, error);
@@ -1566,10 +1565,7 @@ port_serial_reopen_cancel (MMPortSerial *self)
     task = self->priv->reopen_task;
     self->priv->reopen_task = NULL;
 
-    g_task_return_new_error (task,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_CANCELLED,
-                             "Reopen cancelled");
+    g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_CANCELLED, "Reopen cancelled");
     g_object_unref (task);
 }
 
@@ -1740,7 +1736,7 @@ mm_port_serial_flash_finish (MMPortSerial *port,
 static gboolean
 flash_cancel_cb (GTask *task)
 {
-    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Flash cancelled");
+    g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_CANCELLED, "Flash cancelled");
     g_object_unref (task);
     return G_SOURCE_REMOVE;
 }
