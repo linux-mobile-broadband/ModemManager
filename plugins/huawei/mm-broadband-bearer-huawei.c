@@ -333,9 +333,7 @@ connect_3gpp_context_step (GTask *task)
                                            NULL, /* Do not care the AT response */
                                            NULL);
 
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_CANCELLED,
+        g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_CANCELLED,
                                  "Huawei connection operation has been cancelled");
         g_object_unref (task);
         return;
