@@ -5294,7 +5294,7 @@ cancel_command_ready (MMBroadbandModem *self,
         task = self->priv->pending_ussd_action;
         self->priv->pending_ussd_action = NULL;
 
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED,
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
                                  "USSD session was cancelled");
         g_object_unref (task);
     }
@@ -5701,13 +5701,13 @@ cusd_process_string (MMBroadbandModem *self,
     case 2:
         /* Response to the user's request? */
         if (task)
-            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "USSD terminated by network");
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_ABORTED, "USSD terminated by network");
         break;
 
     case 4:
         /* Response to the user's request? */
         if (task)
-            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED, "Operation not supported");
+            error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED, "Operation not supported");
         break;
 
     default:
