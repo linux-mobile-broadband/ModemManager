@@ -3309,7 +3309,7 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE ? "yes" : "no",
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PCO ? "yes" : "no",
             self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
-            self->priv->setup_flags & MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_STATUS ? "yes" : "no");
+            self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS ? "yes" : "no");
 
     if (setup) {
         /* Don't re-enable it if already there */
