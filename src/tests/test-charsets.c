@@ -20,12 +20,6 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-#if defined ENABLE_TEST_MESSAGE_TRACES
-#define trace(message, ...) g_print (message, ##__VA_ARGS__)
-#else
-#define trace(...)
-#endif
-
 static void
 test_gsm7_default_chars (void)
 {
@@ -400,7 +394,7 @@ test_charset_can_covert_to (void)
     guint i;
 
     for (i = 0; i < G_N_ELEMENTS (charset_can_convert_to_test); i++) {
-        trace ("testing charset conversion: '%s'\n", charset_can_convert_to_test[i].utf8);
+        g_debug ("testing charset conversion: '%s'", charset_can_convert_to_test[i].utf8);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_GSM)     == charset_can_convert_to_test[i].to_gsm);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_IRA)     == charset_can_convert_to_test[i].to_ira);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_8859_1)  == charset_can_convert_to_test[i].to_8859_1);

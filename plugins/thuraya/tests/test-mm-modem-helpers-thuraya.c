@@ -26,12 +26,6 @@
 #include "mm-modem-helpers-thuraya.h"
 #include "mm-log.h"
 
-#if defined ENABLE_TEST_MESSAGE_TRACES
-#define trace(message, ...) g_print (message, ##__VA_ARGS__)
-#else
-#define trace(...)
-#endif
-
 /*****************************************************************************/
 /* Test CPMS response */
 
@@ -62,7 +56,7 @@ test_cpms_response_thuraya (void *f, gpointer d)
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
 
-    trace ("\nTesting thuraya +CPMS=? response...\n");
+    g_debug ("Testing thuraya +CPMS=? response...");
 
     g_assert (mm_thuraya_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert_cmpuint (mem1->len, ==, 5);

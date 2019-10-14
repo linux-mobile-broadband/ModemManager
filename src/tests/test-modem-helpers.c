@@ -24,12 +24,6 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-#if defined ENABLE_TEST_MESSAGE_TRACES
-#define trace(message, ...) g_print (message, ##__VA_ARGS__)
-#else
-#define trace(...)
-#endif
-
 #define g_assert_cmpfloat_tolerance(val1, val2, tolerance)  \
     g_assert_cmpfloat (fabs (val1 - val2), <, tolerance)
 
@@ -489,7 +483,7 @@ test_cops_results (const gchar *desc,
     GError *error = NULL;
     GList *results;
 
-    trace ("\nTesting %s +COPS response...\n", desc);
+    g_debug ("Testing %s +COPS response...", desc);
 
     results = mm_3gpp_parse_cops_test_response (reply, &error);
     g_assert (results);
@@ -1091,17 +1085,17 @@ test_creg_match (const char *test,
     g_assert (data);
     g_assert (result);
 
-    trace ("\nTesting '%s' +C%sREG %s response...\n",
-           test,
-           result->cgreg ? "G" : "",
-           solicited ? "solicited" : "unsolicited");
+    g_debug ("Testing '%s' +C%sREG %s response...",
+             test,
+             result->cgreg ? "G" : "",
+             solicited ? "solicited" : "unsolicited");
 
     array = solicited ? data->solicited_creg : data->unsolicited_creg;
     for (i = 0; i < array->len; i++) {
         GRegex *r = g_ptr_array_index (array, i);
 
         if (g_regex_match (r, reply, 0, &info)) {
-            trace ("  matched with %d\n", i);
+            g_debug ("  matched with %d", i);
             regex_num = i + 1;
             break;
         }
@@ -1109,9 +1103,9 @@ test_creg_match (const char *test,
         info = NULL;
     }
 
-    trace ("  regex_num (%u) == result->regex_num (%u)\n",
-           regex_num,
-           result->regex_num);
+    g_debug ("  regex_num (%u) == result->regex_num (%u)",
+             regex_num,
+             result->regex_num);
 
     g_assert (info != NULL);
     g_assert_cmpuint (regex_num, ==, result->regex_num);
@@ -1124,8 +1118,8 @@ test_creg_match (const char *test,
     g_assert (lac == result->lac);
     g_assert (ci == result->ci);
 
-    trace ("  access_tech (%d) == result->act (%d)\n",
-           access_tech, result->act);
+    g_debug ("  access_tech (%d) == result->act (%d)",
+             access_tech, result->act);
     g_assert_cmpuint (access_tech, ==, result->act);
     g_assert_cmpuint (cgreg, ==, result->cgreg);
     g_assert_cmpuint (cereg, ==, result->cereg);
@@ -1881,7 +1875,7 @@ test_devid_item (void *f, gpointer d)
     DevidItem *item = (DevidItem *) d;
     char *devid;
 
-    trace ("%s... ", item->desc);
+    g_debug ("%s... ", item->desc);
     devid = mm_create_device_identifier (item->vid,
                                          item->pid,
                                          item->ati,
@@ -1990,7 +1984,7 @@ test_cind_results (const char *desc,
     GError *error = NULL;
     GHashTable *results;
 
-    trace ("\nTesting %s +CIND response...\n", desc);
+    g_debug ("Testing %s +CIND response...", desc);
 
     results = mm_3gpp_parse_cind_test_response (reply, &error);
     g_assert (results);
@@ -2133,7 +2127,7 @@ test_cgev_indication (const CgevIndicationTest *t)
         type = mm_3gpp_parse_cgev_indication_action (test->str);
         g_assert_cmpuint (type, ==, test->expected_type);
 
-        g_print ("[%u] type: %u\n", i, type);
+        g_debug ("[%u] type: %u", i, type);
 
         switch (type) {
         case MM_3GPP_CGEV_NW_DETACH:
@@ -2145,7 +2139,7 @@ test_cgev_indication (const CgevIndicationTest *t)
         case MM_3GPP_CGEV_ME_DEACT_PRIMARY: {
             guint cid;
 
-            g_print ("[%u] parsing as primary\n", i);
+            g_debug ("[%u] parsing as primary", i);
             ret = mm_3gpp_parse_cgev_indication_primary (test->str, type, &cid, &error);
             g_assert_no_error (error);
             g_assert (ret);
@@ -2160,7 +2154,7 @@ test_cgev_indication (const CgevIndicationTest *t)
             guint cid;
             guint event_type;
 
-            g_print ("[%u] parsing as secondary\n", i);
+            g_debug ("[%u] parsing as secondary", i);
             ret = mm_3gpp_parse_cgev_indication_secondary (test->str, type, &p_cid, &cid, &event_type, &error);
             g_assert_no_error (error);
             g_assert (ret);
@@ -2177,7 +2171,7 @@ test_cgev_indication (const CgevIndicationTest *t)
             gchar *pdp_addr;
             guint  cid;
 
-            g_print ("[%u] parsing as pdp\n", i);
+            g_debug ("[%u] parsing as pdp", i);
             ret = mm_3gpp_parse_cgev_indication_pdp (test->str, type, &pdp_type, &pdp_addr, &cid, &error);
             g_assert_no_error (error);
             g_assert (ret);
@@ -2409,7 +2403,7 @@ test_cgdcont_test_results (const gchar *desc,
     GError *error = NULL;
     GList *results;
 
-    trace ("\nTesting %s +CGDCONT test response...\n", desc);
+    g_debug ("Testing %s +CGDCONT test response...", desc);
 
     results = mm_3gpp_parse_cgdcont_test_response (reply, &error);
     g_assert (results);
@@ -2537,7 +2531,7 @@ test_cgdcont_read_results (const gchar *desc,
     GError *error = NULL;
     GList *results;
 
-    trace ("\nTesting %s +CGDCONT response...\n", desc);
+    g_debug ("Testing %s +CGDCONT response...", desc);
 
     results = mm_3gpp_parse_cgdcont_read_response (reply, &error);
     g_assert (results);
@@ -2607,7 +2601,7 @@ test_cgact_read_results (const gchar *desc,
     GError *error = NULL;
     GList *results;
 
-    trace ("\nTesting %s +CGACT response...\n", desc);
+    g_debug ("Testing %s +CGACT response...", desc);
 
     results = mm_3gpp_parse_cgact_read_response (reply, &error);
     g_assert_no_error (error);
@@ -2872,7 +2866,7 @@ test_cpms_response_cinterion (void *f, gpointer d)
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
 
-    trace ("\nTesting Cinterion +CPMS=? response...\n");
+    g_debug ("Testing Cinterion +CPMS=? response...");
 
     g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert_cmpuint (mem1->len, ==, 2);
@@ -2900,7 +2894,7 @@ test_cpms_response_huawei_mu609 (void *f, gpointer d)
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
 
-    trace ("\nTesting Huawei MU609 +CPMS=? response...\n");
+    g_debug ("Testing Huawei MU609 +CPMS=? response...");
 
     g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert_cmpuint (mem1->len, ==, 1);
@@ -2924,7 +2918,7 @@ test_cpms_response_nokia_c6 (void *f, gpointer d)
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
 
-    trace ("\nTesting Nokia C6 response...\n");
+    g_debug ("Testing Nokia C6 response...");
 
     g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert_cmpuint (mem1->len, ==, 0);
@@ -2949,7 +2943,7 @@ test_cpms_response_mixed (void *f, gpointer d)
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
 
-    trace ("\nTesting mixed +CPMS=? response...\n");
+    g_debug ("Testing mixed +CPMS=? response...");
 
     g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert_cmpuint (mem1->len, ==, 2);
@@ -2974,7 +2968,7 @@ test_cpms_response_mixed_spaces (void *f, gpointer d)
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
 
-    trace ("\nTesting mixed +CPMS=? response with spaces...\n");
+    g_debug ("Testing mixed +CPMS=? response with spaces...");
 
     g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert_cmpuint (mem1->len, ==, 2);
@@ -3003,7 +2997,7 @@ test_cpms_response_empty_fields (void *f, gpointer d)
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
 
-    trace ("\nTesting mixed +CPMS=? response...\n");
+    g_debug ("Testing mixed +CPMS=? response...");
 
     g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert_cmpuint (mem1->len, ==, 0);
@@ -3060,7 +3054,7 @@ test_cnum_results (const gchar *desc,
     GStrv results;
     guint i;
 
-    trace ("\nTesting +CNUM response (%s)...\n", desc);
+    g_debug ("Testing +CNUM response (%s)...", desc);
 
     results = mm_3gpp_parse_cnum_exec_response (reply);
     g_assert (results);
@@ -3161,19 +3155,19 @@ common_parse_operator_id (const gchar *operator_id,
     GError *error = NULL;
 
     if (expected_mcc) {
-        trace ("\nParsing Operator ID '%s' "
-               "(%" G_GUINT16_FORMAT ", %" G_GUINT16_FORMAT  ")...\n",
-               operator_id, expected_mcc, expected_mnc);
+        g_debug ("Parsing Operator ID '%s' "
+                 "(%" G_GUINT16_FORMAT ", %" G_GUINT16_FORMAT  ")...",
+                 operator_id, expected_mcc, expected_mnc);
         result = mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error);
     } else {
-        trace ("\nValidating Operator ID '%s'...\n", operator_id);
+        g_debug ("Validating Operator ID '%s'...", operator_id);
         result = mm_3gpp_parse_operator_id (operator_id, NULL, NULL, &error);
     }
 
     if (error)
-        trace ("\tGot %s error: %s...\n",
-               expected_success ? "unexpected" : "expected",
-               error->message);
+        g_debug ("Got %s error: %s...",
+                 expected_success ? "unexpected" : "expected",
+                 error->message);
 
     g_assert (result == expected_success);
 
@@ -3193,7 +3187,6 @@ common_parse_operator_id (const gchar *operator_id,
 static void
 test_parse_operator_id (void *f, gpointer d)
 {
-    trace ("\n");
     /* Valid MCC+MNC(2) */
     common_parse_operator_id ("41201",  TRUE, 412, 1);
     common_parse_operator_id ("41201",  TRUE, 0, 0);
@@ -4257,7 +4250,7 @@ common_test_clcc_response (const gchar      *str,
     g_assert_no_error (error);
     g_assert (result);
 
-    g_print ("found %u calls\n", g_list_length (call_info_list));
+    g_debug ("found %u calls", g_list_length (call_info_list));
 
     if (expected_call_info_list) {
         g_assert (call_info_list);
@@ -4270,7 +4263,7 @@ common_test_clcc_response (const gchar      *str,
         gboolean                   found = FALSE;
         guint                      i;
 
-        g_print ("call at index %u: direction %s, state %s, number %s\n",
+        g_debug ("call at index %u: direction %s, state %s, number %s",
                  call_info->index,
                  mm_call_direction_get_string (call_info->direction),
                  mm_call_state_get_string (call_info->state),

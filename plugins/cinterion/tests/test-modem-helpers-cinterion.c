@@ -699,7 +699,7 @@ common_test_slcc_urc (const gchar               *urc,
     g_assert_no_error (error);
     g_assert (result);
 
-    g_print ("found %u calls\n", g_list_length (call_info_list));
+    g_debug ("found %u calls", g_list_length (call_info_list));
 
     if (expected_call_info_list) {
         g_assert (call_info_list);
@@ -712,7 +712,7 @@ common_test_slcc_urc (const gchar               *urc,
         gboolean                   found = FALSE;
         guint                      i;
 
-        g_print ("call at index %u: direction %s, state %s, number %s\n",
+        g_debug ("call at index %u: direction %s, state %s, number %s",
                  call_info->index,
                  mm_call_direction_get_string (call_info->direction),
                  mm_call_state_get_string (call_info->state),
