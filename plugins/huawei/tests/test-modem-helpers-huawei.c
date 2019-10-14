@@ -391,7 +391,6 @@ test_prefmode (void)
         g_assert (combinations != NULL);
         g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
 
-#if defined ENABLE_TEST_MESSAGE_TRACES
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiPrefmodeCombination *single;
             gchar *allowed_str;
@@ -409,7 +408,6 @@ test_prefmode (void)
             g_free (allowed_str);
             g_free (preferred_str);
         }
-#endif
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiPrefmodeCombination *single;
@@ -629,7 +627,6 @@ test_syscfg (void)
         g_assert (combinations != NULL);
         g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
 
-#if defined ENABLE_TEST_MESSAGE_TRACES
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgCombination *single;
             gchar *allowed_str;
@@ -648,7 +645,6 @@ test_syscfg (void)
             g_free (allowed_str);
             g_free (preferred_str);
         }
-#endif
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgCombination *single;
@@ -898,7 +894,6 @@ test_syscfgex (void)
         g_assert (combinations != NULL);
         g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
 
-#if defined ENABLE_TEST_MESSAGE_TRACES
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgexCombination *single;
             gchar *allowed_str;
@@ -916,7 +911,6 @@ test_syscfgex (void)
             g_free (allowed_str);
             g_free (preferred_str);
         }
-#endif
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgexCombination *single;
@@ -1280,17 +1274,17 @@ _mm_log (const char *loc,
          const char *fmt,
          ...)
 {
-#if defined ENABLE_TEST_MESSAGE_TRACES
-    /* Dummy log function */
     va_list args;
     gchar *msg;
+
+    if (!g_test_verbose ())
+        return;
 
     va_start (args, fmt);
     msg = g_strdup_vprintf (fmt, args);
     va_end (args);
     g_print ("%s\n", msg);
     g_free (msg);
-#endif
 }
 
 int main (int argc, char **argv)

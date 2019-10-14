@@ -22,9 +22,6 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-/* Define symbol to enable test message traces */
-#undef ENABLE_TEST_MESSAGE_TRACES
-
 #include "mm-kernel-device-generic-rules.h"
 #include "mm-log.h"
 
@@ -133,17 +130,17 @@ _mm_log (const char *loc,
          const char *fmt,
          ...)
 {
-#if defined ENABLE_TEST_MESSAGE_TRACES
-    /* Dummy log function */
     va_list args;
     gchar *msg;
+
+    if (!g_test_verbose ())
+        return;
 
     va_start (args, fmt);
     msg = g_strdup_vprintf (fmt, args);
     va_end (args);
     g_print ("%s\n", msg);
     g_free (msg);
-#endif
 }
 
 int main (int argc, char **argv)
