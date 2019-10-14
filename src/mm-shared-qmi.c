@@ -850,7 +850,7 @@ mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
      * switching only when switching GSM/UMTS+CDMA/EVDO multimode devices, and only if
      * we have support for the commands doing it.
      */
-    if (priv->feature_nas_technology_preference == FEATURE_SUPPORTED || priv->feature_nas_system_selection_preference == FEATURE_UNKNOWN) {
+    if (priv->feature_nas_technology_preference == FEATURE_SUPPORTED || priv->feature_nas_system_selection_preference == FEATURE_SUPPORTED) {
         if (mask == (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)) {
             /* Multimode GSM/UMTS+CDMA/EVDO device switched to GSM/UMTS only */
             single = MM_MODEM_CAPABILITY_GSM_UMTS;
