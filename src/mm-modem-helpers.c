@@ -606,6 +606,15 @@ mm_3gpp_parse_clcc_response (const gchar  *str,
         [3] = MM_CALL_STATE_RINGING_OUT, /* Alerting (MOC) */
         [4] = MM_CALL_STATE_RINGING_IN,  /* Incoming (MTC) */
         [5] = MM_CALL_STATE_WAITING,     /* Waiting  (MTC) */
+
+        /* This next call state number isn't defined by 3GPP, because it
+         * doesn't make sense to have it when reporting a full list of calls
+         * via +CLCC (i.e. the absence of the call would mean it's terminated).
+         * But, this value may be used by other implementations (e.g. SimTech
+         * plugin) to report that a call is terminated even when the full
+         * call list isn't being reported. So, let's support it in the generic,
+         * parser, even if not strictly standard. */
+        [6] = MM_CALL_STATE_TERMINATED,
     };
 
     g_assert (out_list);
