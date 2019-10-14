@@ -355,6 +355,11 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
     for (l = ctx.call_info_list; l; l = g_list_next (l)) {
         MMCallInfo *call_info = (MMCallInfo *)(l->data);
 
+        /* Ignore unknown terminated calls, because these be due to an already
+         * processed event. */
+        if (call_info->state == MM_CALL_STATE_TERMINATED)
+            continue;
+
         if (call_info->direction == MM_CALL_DIRECTION_OUTGOING) {
             mm_warn ("unexpected outgoing call to number '%s' reported in call list: state %s",
                      call_info->number ? call_info->number : "n/a",
