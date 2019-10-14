@@ -25,23 +25,6 @@
 #include "mm-sms-part-cdma.h"
 #include "mm-log.h"
 
-/* If defined will print debugging traces */
-#ifdef TEST_SMS_PART_ENABLE_TRACE
-#define trace_pdu(pdu, pdu_len) do {      \
-        guint i;                          \
-                                          \
-        g_print ("\n        ");           \
-        for (i = 0; i < len; i++) {       \
-            g_print ("  0x%02X", pdu[i]); \
-            if (((i + 1) % 12) == 0)      \
-                g_print ("\n        ");   \
-        }                                 \
-        g_print ("\n");                   \
-    } while (0)
-#else
-#define trace_pdu(...)
-#endif
-
 /********************* PDU PARSER TESTS *********************/
 
 static void
@@ -370,6 +353,21 @@ test_unicode_encoding (void)
 /********************* PDU CREATOR TESTS *********************/
 
 static void
+trace_pdu (const guint8 *pdu,
+           guint         len)
+{
+    guint i;
+
+    g_print ("n        ");
+    for (i = 0; i < len; i++) {
+        g_print ("  0x%02X", pdu[i]);
+        if (((i + 1) % 12) == 0)
+            g_print ("n        ");
+    }
+    g_print ("n");
+}
+
+static void
 common_test_create_pdu (MMSmsCdmaTeleserviceId teleservice_id,
                         const gchar *number,
                         const gchar *text,
@@ -401,7 +399,8 @@ common_test_create_pdu (MMSmsCdmaTeleserviceId teleservice_id,
     pdu = mm_sms_part_cdma_get_submit_pdu (part, &len, &error);
     mm_sms_part_free (part);
 
-    trace_pdu (pdu, len);
+    if (g_test_verbose ())
+        trace_pdu (pdu, len);
 
     g_assert_no_error (error);
     g_assert (pdu != NULL);
