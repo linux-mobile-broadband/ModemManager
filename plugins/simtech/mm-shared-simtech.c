@@ -23,10 +23,12 @@
 
 #include "mm-log.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-voice.h"
 #include "mm-iface-modem-location.h"
 #include "mm-base-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-shared-simtech.h"
+#include "mm-modem-helpers-simtech.h"
 
 /*****************************************************************************/
 /* Private data context */
@@ -46,7 +48,18 @@ typedef struct {
     MMModemLocationSource  supported_sources;
     MMModemLocationSource  enabled_sources;
     FeatureSupport         cgps_support;
+    /* voice */
+    MMIfaceModemVoice     *iface_modem_voice_parent;
+    FeatureSupport         clcc_urc_support;
+    GRegex                *clcc_urc_regex;
 } Private;
+
+static void
+private_free (Private *ctx)
+{
+    g_regex_unref (ctx->clcc_urc_regex);
+    g_slice_free (Private, ctx);
+}
 
 static Private *
 get_private (MMSharedSimtech *self)
@@ -58,16 +71,22 @@ get_private (MMSharedSimtech *self)
 
     priv = g_object_get_qdata (G_OBJECT (self), private_quark);
     if (!priv) {
-        priv = g_new0 (Private, 1);
+        priv = g_slice_new0 (Private);
         priv->supported_sources = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->enabled_sources = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->cgps_support = FEATURE_SUPPORT_UNKNOWN;
+        priv->clcc_urc_support = FEATURE_SUPPORT_UNKNOWN;
+        priv->clcc_urc_regex = mm_simtech_get_clcc_urc_regex ();
 
-        /* Setup parent class' MMIfaceModemLocation */
+        /* Setup parent class' MMIfaceModemLocation and MMIfaceModemVoice */
+
         g_assert (MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_location_interface (self);
 
-        g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, g_free);
+        g_assert (MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_voice_interface);
+        priv->iface_modem_voice_parent = MM_SHARED_SIMTECH_GET_INTERFACE (self)->peek_parent_voice_interface (self);
+
+        g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
 
     return priv;
@@ -486,6 +505,523 @@ mm_shared_simtech_enable_location_gathering (MMIfaceModemLocation  *self,
                               FALSE,
                               (GAsyncReadyCallback) enable_cgps_ready,
                               task);
+}
+
+/*****************************************************************************/
+/* Common enable/disable voice unsolicited events */
+
+typedef struct {
+    gboolean        enable;
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+    gchar          *clcc_command;
+    gboolean        clcc_primary_done;
+    gboolean        clcc_secondary_done;
+} VoiceUnsolicitedEventsContext;
+
+static void
+voice_unsolicited_events_context_free (VoiceUnsolicitedEventsContext *ctx)
+{
+    g_clear_object (&ctx->secondary);
+    g_clear_object (&ctx->primary);
+    g_free (ctx->clcc_command);
+    g_slice_free (VoiceUnsolicitedEventsContext, ctx);
+}
+
+static gboolean
+common_voice_enable_disable_unsolicited_events_finish (MMSharedSimtech  *self,
+                                                       GAsyncResult       *res,
+                                                       GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void run_voice_enable_disable_unsolicited_events (GTask *task);
+
+static void
+clcc_command_ready (MMBaseModem  *self,
+                    GAsyncResult *res,
+                    GTask        *task)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GError                        *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        mm_dbg ("Couldn't %s +CLCC reporting: '%s'",
+                ctx->enable ? "enable" : "disable",
+                error->message);
+        g_error_free (error);
+    }
+
+    /* Continue on next port */
+    run_voice_enable_disable_unsolicited_events (task);
+}
+
+static void
+run_voice_enable_disable_unsolicited_events (GTask *task)
+{
+    MMSharedSimtech               *self;
+    Private                       *priv;
+    VoiceUnsolicitedEventsContext *ctx;
+    MMPortSerialAt                *port = NULL;
+
+    self = MM_SHARED_SIMTECH (g_task_get_source_object (task));
+    priv = get_private (self);
+    ctx  = g_task_get_task_data (task);
+
+    /* If +CLCC URCs not supported, we're done */
+    if (priv->clcc_urc_support == FEATURE_NOT_SUPPORTED) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!ctx->clcc_primary_done && ctx->primary) {
+        mm_dbg ("%s +CLCC extended list of current calls reporting in primary port...",
+                ctx->enable ? "Enabling" : "Disabling");
+        ctx->clcc_primary_done = TRUE;
+        port = ctx->primary;
+    } else if (!ctx->clcc_secondary_done && ctx->secondary) {
+        mm_dbg ("%s +CLCC extended list of current calls reporting in secondary port...",
+                ctx->enable ? "Enabling" : "Disabling");
+        ctx->clcc_secondary_done = TRUE;
+        port = ctx->secondary;
+    }
+
+    if (port) {
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                       port,
+                                       ctx->clcc_command,
+                                       3,
+                                       FALSE,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback)clcc_command_ready,
+                                       task);
+        return;
+    }
+
+    /* Fully done now */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_voice_enable_disable_unsolicited_events (MMSharedSimtech     *self,
+                                                gboolean             enable,
+                                                GAsyncReadyCallback  callback,
+                                                gpointer             user_data)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GTask                         *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (VoiceUnsolicitedEventsContext);
+    ctx->enable = enable;
+    if (enable)
+        ctx->clcc_command = g_strdup ("+CLCC=1");
+    else
+        ctx->clcc_command = g_strdup ("+CLCC=0");
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    g_task_set_task_data (task, ctx, (GDestroyNotify) voice_unsolicited_events_context_free);
+
+    run_voice_enable_disable_unsolicited_events (task);
+}
+
+/*****************************************************************************/
+/* Disable unsolicited events (Voice interface) */
+
+gboolean
+mm_shared_simtech_voice_disable_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                                           GAsyncResult       *res,
+                                                           GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                               GAsyncResult      *res,
+                                               GTask             *task)
+{
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    if (!priv->iface_modem_voice_parent->disable_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't disable parent voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+voice_disable_unsolicited_events_ready (MMSharedSimtech *self,
+                                        GAsyncResult      *res,
+                                        GTask             *task)
+{
+    Private *priv;
+    GError  *error = NULL;
+
+    if (!common_voice_enable_disable_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't disable Simtech-specific voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+    g_assert (priv->iface_modem_voice_parent);
+    g_assert (priv->iface_modem_voice_parent->disable_unsolicited_events);
+    g_assert (priv->iface_modem_voice_parent->disable_unsolicited_events_finish);
+
+    /* Chain up parent's disable */
+    priv->iface_modem_voice_parent->disable_unsolicited_events (
+        MM_IFACE_MODEM_VOICE (self),
+        (GAsyncReadyCallback)parent_voice_disable_unsolicited_events_ready,
+        task);
+}
+
+void
+mm_shared_simtech_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
+                                                    GAsyncReadyCallback  callback,
+                                                    gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* our own disabling first */
+    common_voice_enable_disable_unsolicited_events (MM_SHARED_SIMTECH (self),
+                                                    FALSE,
+                                                    (GAsyncReadyCallback) voice_disable_unsolicited_events_ready,
+                                                    task);
+}
+
+/*****************************************************************************/
+/* Enable unsolicited events (Voice interface) */
+
+gboolean
+mm_shared_simtech_voice_enable_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                                          GAsyncResult       *res,
+                                                          GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+voice_enable_unsolicited_events_ready (MMSharedSimtech *self,
+                                       GAsyncResult      *res,
+                                       GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!common_voice_enable_disable_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't enable Simtech-specific voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                              GAsyncResult      *res,
+                                              GTask             *task)
+{
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    if (!priv->iface_modem_voice_parent->enable_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't enable parent voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    /* our own enabling next */
+    common_voice_enable_disable_unsolicited_events (MM_SHARED_SIMTECH (self),
+                                                    TRUE,
+                                                    (GAsyncReadyCallback) voice_enable_unsolicited_events_ready,
+                                                    task);
+}
+
+void
+mm_shared_simtech_voice_enable_unsolicited_events (MMIfaceModemVoice   *self,
+                                                   GAsyncReadyCallback  callback,
+                                                   gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+    g_assert (priv->iface_modem_voice_parent);
+    g_assert (priv->iface_modem_voice_parent->enable_unsolicited_events);
+    g_assert (priv->iface_modem_voice_parent->enable_unsolicited_events_finish);
+
+    /* chain up parent's enable first */
+    priv->iface_modem_voice_parent->enable_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_enable_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Common setup/cleanup voice unsolicited events */
+
+static void
+clcc_urc_received (MMPortSerialAt  *port,
+                   GMatchInfo      *match_info,
+                   MMSharedSimtech *self)
+{
+    gchar  *full;
+    GError *error = NULL;
+    GList  *call_info_list = NULL;
+
+    full = g_match_info_fetch (match_info, 0);
+
+    if (!mm_simtech_parse_clcc_list (full, &call_info_list, &error)) {
+        mm_warn ("couldn't parse +CLCC list in URC: %s", error->message);
+        g_error_free (error);
+    } else
+        mm_iface_modem_voice_report_all_calls (MM_IFACE_MODEM_VOICE (self), call_info_list);
+
+    mm_simtech_call_info_list_free (call_info_list);
+    g_free (full);
+}
+
+static void
+common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
+                                               gboolean         enable)
+{
+    Private        *priv;
+    MMPortSerialAt *ports[2];
+    guint           i;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    /* If +CLCC URCs not supported, we're done */
+    if (priv->clcc_urc_support == FEATURE_NOT_SUPPORTED)
+        return;
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       priv->clcc_urc_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)clcc_urc_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+    }
+}
+
+/*****************************************************************************/
+/* Cleanup unsolicited events (Voice interface) */
+
+gboolean
+mm_shared_simtech_voice_cleanup_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                                           GAsyncResult       *res,
+                                                           GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                               GAsyncResult      *res,
+                                               GTask             *task)
+{
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    if (!priv->iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't cleanup parent voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_shared_simtech_voice_cleanup_unsolicited_events (MMIfaceModemVoice   *self,
+                                                    GAsyncReadyCallback  callback,
+                                                    gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+    g_assert (priv->iface_modem_voice_parent);
+    g_assert (priv->iface_modem_voice_parent->cleanup_unsolicited_events);
+    g_assert (priv->iface_modem_voice_parent->cleanup_unsolicited_events_finish);
+
+    /* our own cleanup first */
+    common_voice_setup_cleanup_unsolicited_events (MM_SHARED_SIMTECH (self), FALSE);
+
+    /* Chain up parent's cleanup */
+    priv->iface_modem_voice_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_cleanup_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Setup unsolicited events (Voice interface) */
+
+gboolean
+mm_shared_simtech_voice_setup_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                                         GAsyncResult       *res,
+                                                         GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                             GAsyncResult      *res,
+                                             GTask             *task)
+{
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    if (!priv->iface_modem_voice_parent->setup_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't setup parent voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    /* our own setup next */
+    common_voice_setup_cleanup_unsolicited_events (MM_SHARED_SIMTECH (self), TRUE);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_shared_simtech_voice_setup_unsolicited_events (MMIfaceModemVoice   *self,
+                                                  GAsyncReadyCallback  callback,
+                                                  gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+    g_assert (priv->iface_modem_voice_parent);
+    g_assert (priv->iface_modem_voice_parent->setup_unsolicited_events);
+    g_assert (priv->iface_modem_voice_parent->setup_unsolicited_events_finish);
+
+    /* chain up parent's setup first */
+    priv->iface_modem_voice_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_voice_setup_unsolicited_events_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Check if Voice supported (Voice interface) */
+
+gboolean
+mm_shared_simtech_voice_check_support_finish (MMIfaceModemVoice  *self,
+                                              GAsyncResult       *res,
+                                              GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+clcc_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult     *res,
+                         GTask            *task)
+{
+    Private     *priv;
+    GError      *error = NULL;
+    const gchar *response;
+    gboolean     clcc_urc_supported = FALSE;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    if (response && !mm_simtech_parse_clcc_test (response, &clcc_urc_supported, &error)) {
+        mm_dbg ("failed checking CLCC URC support: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    priv->clcc_urc_support = (clcc_urc_supported ? FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
+    mm_dbg ("modem %s +CLCC URCs", (priv->clcc_urc_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
+
+    /* If +CLCC URC supported we won't need polling in the parent */
+    g_object_set (self,
+                  MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, (priv->clcc_urc_support == FEATURE_SUPPORTED),
+                  NULL);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_voice_check_support_ready (MMIfaceModemVoice *self,
+                                  GAsyncResult      *res,
+                                  GTask             *task)
+{
+    Private *priv;
+    GError  *error = NULL;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+    if (!priv->iface_modem_voice_parent->check_support_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* voice is supported, check if +CLCC URCs are available */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CLCC=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback) clcc_format_check_ready,
+                              task);
+}
+
+void
+mm_shared_simtech_voice_check_support (MMIfaceModemVoice   *self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    Private *priv;
+    GTask   *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+    g_assert (priv->iface_modem_voice_parent);
+    g_assert (priv->iface_modem_voice_parent->check_support);
+    g_assert (priv->iface_modem_voice_parent->check_support_finish);
+
+    /* chain up parent's setup first */
+    priv->iface_modem_voice_parent->check_support (
+        self,
+        (GAsyncReadyCallback)parent_voice_check_support_ready,
+        task);
 }
 
 /*****************************************************************************/

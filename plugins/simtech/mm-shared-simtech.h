@@ -26,7 +26,6 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-voice.h"
-#include "mm-iface-modem-time.h"
 
 #define MM_TYPE_SHARED_SIMTECH               (mm_shared_simtech_get_type ())
 #define MM_SHARED_SIMTECH(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_SIMTECH, MMSharedSimtech))
@@ -40,6 +39,9 @@ struct _MMSharedSimtech {
 
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedSimtech *self);
+
+    /* Peek voice interface of the parent class of the object */
+    MMIfaceModemVoice *  (* peek_parent_voice_interface) (MMSharedSimtech *self);
 };
 
 GType mm_shared_simtech_get_type (void);
@@ -69,5 +71,44 @@ void                  mm_shared_simtech_disable_location_gathering        (MMIfa
 gboolean              mm_shared_simtech_disable_location_gathering_finish (MMIfaceModemLocation   *self,
                                                                            GAsyncResult           *res,
                                                                            GError                **error);
+
+
+/*****************************************************************************/
+/* Voice interface */
+
+void     mm_shared_simtech_voice_check_support                     (MMIfaceModemVoice   *self,
+                                                                    GAsyncReadyCallback  callback,
+                                                                    gpointer             user_data);
+gboolean mm_shared_simtech_voice_check_support_finish              (MMIfaceModemVoice    *self,
+                                                                    GAsyncResult         *res,
+                                                                    GError              **error);
+
+void     mm_shared_simtech_voice_setup_unsolicited_events          (MMIfaceModemVoice    *self,
+                                                                    GAsyncReadyCallback   callback,
+                                                                    gpointer              user_data);
+gboolean mm_shared_simtech_voice_setup_unsolicited_events_finish   (MMIfaceModemVoice    *self,
+                                                                    GAsyncResult         *res,
+                                                                    GError              **error);
+
+void     mm_shared_simtech_voice_cleanup_unsolicited_events        (MMIfaceModemVoice    *self,
+                                                                    GAsyncReadyCallback   callback,
+                                                                    gpointer              user_data);
+gboolean mm_shared_simtech_voice_cleanup_unsolicited_events_finish (MMIfaceModemVoice    *self,
+                                                                    GAsyncResult         *res,
+                                                                    GError              **error);
+
+void     mm_shared_simtech_voice_enable_unsolicited_events         (MMIfaceModemVoice    *self,
+                                                                    GAsyncReadyCallback   callback,
+                                                                    gpointer              user_data);
+gboolean mm_shared_simtech_voice_enable_unsolicited_events_finish  (MMIfaceModemVoice    *self,
+                                                                    GAsyncResult         *res,
+                                                                    GError              **error);
+
+void     mm_shared_simtech_voice_disable_unsolicited_events        (MMIfaceModemVoice    *self,
+                                                                    GAsyncReadyCallback   callback,
+                                                                    gpointer              user_data);
+gboolean mm_shared_simtech_voice_disable_unsolicited_events_finish (MMIfaceModemVoice    *self,
+                                                                    GAsyncResult         *res,
+                                                                    GError              **error);
 
 #endif  /* MM_SHARED_SIMTECH_H */

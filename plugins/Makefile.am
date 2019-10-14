@@ -590,6 +590,25 @@ libmm_plugin_linktop_la_LIBADD   = $(builddir)/libhelpers-linktop.la
 # plugin: simtech
 ################################################################################
 
+noinst_LTLIBRARIES += libhelpers-simtech.la
+libhelpers_simtech_la_SOURCES = \
+	simtech/mm-modem-helpers-simtech.c \
+	simtech/mm-modem-helpers-simtech.h \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-simtech
+test_modem_helpers_simtech_SOURCES = \
+	simtech/tests/test-modem-helpers-simtech.c \
+	$(NULL)
+test_modem_helpers_simtech_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/simtech \
+	$(NULL)
+test_modem_helpers_simtech_LDADD = \
+	$(builddir)/libhelpers-simtech.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 pkglib_LTLIBRARIES += libmm-plugin-simtech.la
 libmm_plugin_simtech_la_SOURCES = \
 	simtech/mm-plugin-simtech.c \
@@ -607,6 +626,7 @@ libmm_plugin_simtech_la_SOURCES += \
 endif
 libmm_plugin_simtech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_simtech_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_simtech_la_LIBADD   = $(builddir)/libhelpers-simtech.la
 
 dist_udevrules_DATA += simtech/77-mm-simtech-port-types.rules
 
