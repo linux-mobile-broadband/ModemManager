@@ -24,8 +24,8 @@
 
 void
 mm_test_helpers_compare_bands (GArray            *bands,
-			       const MMModemBand *expected_bands,
-			       guint              n_expected_bands)
+                               const MMModemBand *expected_bands,
+                               guint              n_expected_bands)
 {
     gchar  *bands_str;
     GArray *expected_bands_array;
