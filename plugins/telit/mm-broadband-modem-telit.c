@@ -30,6 +30,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-location.h"
 #include "mm-broadband-modem-telit.h"
 #include "mm-modem-helpers-telit.h"
 #include "mm-telit-enums-types.h"
@@ -38,14 +39,17 @@
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void shared_telit_init (MMSharedTelit *iface);
+static void iface_modem_location_init (MMIfaceModemLocation *iface);
 
 static MMIfaceModem *iface_modem_parent;
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemTelit, mm_broadband_modem_telit, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_TELIT, shared_telit_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_TELIT, shared_telit_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init));
 
 #define CSIM_UNLOCK_MAX_TIMEOUT 3
 
@@ -62,7 +66,328 @@ struct _MMBroadbandModemTelitPrivate {
     GTask *csim_lock_task;
     guint csim_lock_timeout_id;
     gboolean parse_qss;
+    MMModemLocationSource enabled_sources;
 };
+
+
+typedef struct {
+    MMModemLocationSource source;
+    gint gps_enable_step;
+} LocationGatheringContext;
+
+static const gchar *gps_enable[] = {
+    "$GPSP=1",
+    "$GPSNMUN=2,1,1,1,1,1,1"
+};
+
+static gboolean
+disable_location_gathering_finish (MMIfaceModemLocation *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+gps_disabled_ready (MMBaseModem *self,
+                    GAsyncResult *res,
+                    GTask *task)
+{
+    LocationGatheringContext *ctx;
+    MMPortSerialGps *gps_port;
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (self, res, &error);
+    ctx = g_task_get_task_data (task);
+    /* Only use the GPS port in NMEA/RAW setups */
+    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        /* Even if we get an error here, we try to close the GPS port */
+        gps_port = mm_base_modem_peek_port_gps (self);
+        if (gps_port)
+            mm_port_serial_close (MM_PORT_SERIAL (gps_port));
+    }
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
+}
+
+static void
+disable_location_gathering (MMIfaceModemLocation *self,
+                            MMModemLocationSource source,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    MMBroadbandModemTelit *telit = MM_BROADBAND_MODEM_TELIT (self);
+    gboolean stop_gps = FALSE;
+    LocationGatheringContext *ctx;
+    GTask *task;
+
+    ctx = g_new (LocationGatheringContext, 1);
+    ctx->source = source;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    /* Only stop GPS engine if no GPS-related sources enabled */
+    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                  MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                  MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
+        telit->priv->enabled_sources &= ~source;
+
+        if (!(telit->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                            MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                            MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)))
+            stop_gps = TRUE;
+    }
+
+    if (stop_gps) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "$GPSP=0",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)gps_disabled_ready,
+                                  task);
+        return;
+    }
+    /* For any other location (e.g. 3GPP), or if still some GPS needed, just return */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+gps_enabled_ready (MMBaseModem *self,
+                   GAsyncResult *res,
+                   GTask *task)
+{
+    LocationGatheringContext *ctx;
+    GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        mm_warn ("telit: couldn't power up GNSS controller: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+    /* After Receiver was powered up we still have to enable unsolicited NMEA events */
+    if (ctx->gps_enable_step < G_N_ELEMENTS (gps_enable)) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  gps_enable[ctx->gps_enable_step++],
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)gps_enabled_ready,
+                                  task);
+        return;
+    }
+    mm_info("telit: GNSS controller is powered up");
+    /* Only use the GPS port in NMEA/RAW setups */
+    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                       MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        MMPortSerialGps *gps_port;
+
+        gps_port = mm_base_modem_peek_port_gps (self);
+        if (!gps_port ||
+            !mm_port_serial_open (MM_PORT_SERIAL (gps_port), &error)) {
+            if (error)
+                g_task_return_error (task, error);
+            else
+                g_task_return_new_error (task,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't open raw GPS serial port");
+        } else
+            g_task_return_boolean (task, TRUE);
+    }
+    else
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
+}
+
+static void
+parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
+                                        GAsyncResult *res,
+                                        GTask *task)
+{
+    MMBroadbandModemTelit *self = MM_BROADBAND_MODEM_TELIT (_self);
+    LocationGatheringContext *ctx;
+    gboolean start_gps = FALSE;
+    GError *error = NULL;
+
+    if (!iface_modem_location_parent->enable_location_gathering_finish (_self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+    /* Now our own enabling */
+    ctx = g_task_get_task_data (task);
+
+    /* NMEA, RAW and UNMANAGED are all enabled in the same way */
+    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                       MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                       MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
+        /* Only start GPS engine if not done already */
+        if (!(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                             MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)))
+            start_gps = TRUE;
+        self->priv->enabled_sources |= ctx->source;
+    }
+
+    if (start_gps && ctx->gps_enable_step < G_N_ELEMENTS (gps_enable)) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  gps_enable[ctx->gps_enable_step++],
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)gps_enabled_ready,
+                                  task);
+        return;
+    }
+    /* For any other location (e.g. 3GPP), or if GPS already running just return */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+enable_location_gathering (MMIfaceModemLocation *self,
+                           MMModemLocationSource source,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    LocationGatheringContext *ctx;
+    GTask *task;
+
+    ctx = g_new (LocationGatheringContext, 1);
+    ctx->source = source;
+    ctx->gps_enable_step = 0;
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, g_free);
+
+    /* Chain up parent's gathering enable */
+    iface_modem_location_parent->enable_location_gathering (
+        self,
+        source,
+        (GAsyncReadyCallback)parent_enable_location_gathering_ready,
+        task);
+}
+
+static void
+trace_received (MMPortSerialGps *port,
+                const gchar *trace,
+                MMIfaceModemLocation *self)
+{
+    mm_iface_modem_location_gps_update (self, trace);
+}
+
+static gboolean
+enable_location_gathering_finish (MMIfaceModemLocation *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    MMPortSerialGps *gps_data_port;
+
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_telit_parent_class)->setup_ports (self);
+
+    gps_data_port = mm_base_modem_peek_port_gps (MM_BASE_MODEM (self));
+    if (gps_data_port) {
+        /* It may happen that the modem was started with GPS already enabled,
+         * in this case GPSP AT command returns always error. Disable it for consistency
+         */
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "$GPSP=0", 3, FALSE, FALSE, NULL);
+
+        /* Add handler for the NMEA traces */
+        mm_port_serial_gps_add_trace_handler (gps_data_port,
+                                              (MMPortSerialGpsTraceFn)trace_received,
+                                              self,
+                                              NULL);
+    }
+}
+
+static MMModemLocationSource
+location_load_capabilities_finish (MMIfaceModemLocation *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    GError *inner_error = NULL;
+    gssize value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_LOCATION_SOURCE_NONE;
+    }
+    return (MMModemLocationSource)value;
+}
+
+static void
+gpsp_test_ready (MMIfaceModemLocation *self,
+                GAsyncResult *res,
+                GTask *task)
+{
+    GError *error = NULL;
+    MMModemLocationSource sources;
+
+    sources = GPOINTER_TO_UINT (g_task_get_task_data (task));
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!error && mm_base_modem_get_port_gps (MM_BASE_MODEM (self)))
+        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                    MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
+                    MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
+    else
+        mm_dbg ("telit: GPS controller not supported: %s", error->message);
+
+    g_clear_error(&error);
+    g_task_return_int (task, sources);
+    g_object_unref (task);
+}
+
+static void
+parent_load_capabilities_ready (MMIfaceModemLocation *self,
+                                GAsyncResult *res,
+                                GTask *task)
+{
+    MMModemLocationSource sources;
+    GError *error = NULL;
+
+    sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+    g_task_set_task_data (task, GUINT_TO_POINTER (sources), NULL);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "$GPSP=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback)gpsp_test_ready,
+                              task);
+}
+
+static void
+location_load_capabilities (MMIfaceModemLocation *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    /* Chain up parent's setup */
+    iface_modem_location_parent->load_capabilities (
+        self,
+        (GAsyncReadyCallback)parent_load_capabilities_ready,
+        g_task_new (self, NULL, callback, user_data));
+}
 
 /*****************************************************************************/
 /* After Sim Unlock (Modem interface) */
@@ -1071,9 +1396,24 @@ shared_telit_init (MMSharedTelit *iface)
 }
 
 static void
+iface_modem_location_init (MMIfaceModemLocation *iface)
+{
+    iface_modem_location_parent = g_type_interface_peek_parent (iface);
+
+    iface->load_capabilities = location_load_capabilities;
+    iface->load_capabilities_finish = location_load_capabilities_finish;
+    iface->enable_location_gathering = enable_location_gathering;
+    iface->enable_location_gathering_finish = enable_location_gathering_finish;
+    iface->disable_location_gathering = disable_location_gathering;
+    iface->disable_location_gathering_finish = disable_location_gathering_finish;
+}
+
+static void
 mm_broadband_modem_telit_class_init (MMBroadbandModemTelitClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemTelitPrivate));
+    broadband_modem_class->setup_ports = setup_ports;
 }
