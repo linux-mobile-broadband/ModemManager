@@ -111,4 +111,19 @@ gboolean mm_shared_simtech_voice_disable_unsolicited_events_finish (MMIfaceModem
                                                                     GAsyncResult         *res,
                                                                     GError              **error);
 
+void     mm_shared_simtech_voice_setup_in_call_audio_channel          (MMIfaceModemVoice    *self,
+                                                                       GAsyncReadyCallback   callback,
+                                                                       gpointer              user_data);
+gboolean mm_shared_simtech_voice_setup_in_call_audio_channel_finish   (MMIfaceModemVoice    *self,
+                                                                       GAsyncResult         *res,
+                                                                       MMPort              **audio_port,   /* optional */
+                                                                       MMCallAudioFormat   **audio_format, /* optional */
+                                                                       GError              **error);
+void     mm_shared_simtech_voice_cleanup_in_call_audio_channel        (MMIfaceModemVoice    *self,
+                                                                       GAsyncReadyCallback   callback,
+                                                                       gpointer              user_data);
+gboolean mm_shared_simtech_voice_cleanup_in_call_audio_channel_finish (MMIfaceModemVoice    *self,
+                                                                       GAsyncResult         *res,
+                                                                       GError              **error);
+
 #endif  /* MM_SHARED_SIMTECH_H */

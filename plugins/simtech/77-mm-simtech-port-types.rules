@@ -35,6 +35,6 @@ ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="00", ENV{
 ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
-ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_TYPE_AUDIO}="1"
 
 LABEL="mm_simtech_port_types_end"

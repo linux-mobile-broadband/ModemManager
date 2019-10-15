@@ -50,6 +50,7 @@ typedef struct {
     FeatureSupport         cgps_support;
     /* voice */
     MMIfaceModemVoice     *iface_modem_voice_parent;
+    FeatureSupport         cpcmreg_support;
     FeatureSupport         clcc_urc_support;
     GRegex                *clcc_urc_regex;
     GRegex                *voice_call_regex;
@@ -81,6 +82,7 @@ get_private (MMSharedSimtech *self)
         priv->supported_sources = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->enabled_sources = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->cgps_support = FEATURE_SUPPORT_UNKNOWN;
+        priv->cpcmreg_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_regex = mm_simtech_get_clcc_urc_regex ();
         priv->voice_call_regex = mm_simtech_get_voice_call_urc_regex ();
@@ -1025,6 +1027,102 @@ mm_shared_simtech_voice_setup_unsolicited_events (MMIfaceModemVoice   *self,
 }
 
 /*****************************************************************************/
+/* In-call audio channel setup/cleanup */
+
+gboolean
+mm_shared_simtech_voice_setup_in_call_audio_channel_finish (MMIfaceModemVoice  *self,
+                                                            GAsyncResult       *res,
+                                                            MMPort            **audio_port,   /* optional */
+                                                            MMCallAudioFormat **audio_format, /* optional */
+                                                            GError            **error)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    if (audio_format)
+        *audio_format = NULL;
+
+    if (audio_port) {
+        if (priv->cpcmreg_support == FEATURE_SUPPORTED)
+            *audio_port = MM_PORT (mm_base_modem_get_port_audio (MM_BASE_MODEM (self)));
+        else
+            *audio_port = NULL;
+    }
+
+    return TRUE;
+}
+
+gboolean
+mm_shared_simtech_voice_cleanup_in_call_audio_channel_finish (MMIfaceModemVoice  *self,
+                                                              GAsyncResult       *res,
+                                                              GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+cpcmreg_set_ready (MMBaseModem  *self,
+                   GAsyncResult *res,
+                   GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_setup_cleanup_in_call_audio_channel (MMSharedSimtech     *self,
+                                            gboolean             setup,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data)
+{
+    GTask   *task;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Do nothing if CPCMREG isn't supported */
+    if (priv->cpcmreg_support != FEATURE_SUPPORTED) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              setup ? "+CPCMREG=1" : "+CPCMREG=0",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) cpcmreg_set_ready,
+                              task);
+}
+
+void
+mm_shared_simtech_voice_setup_in_call_audio_channel (MMIfaceModemVoice   *self,
+                                                     GAsyncReadyCallback  callback,
+                                                     gpointer             user_data)
+{
+    common_setup_cleanup_in_call_audio_channel (MM_SHARED_SIMTECH (self), TRUE, callback, user_data);
+}
+
+void
+mm_shared_simtech_voice_cleanup_in_call_audio_channel (MMIfaceModemVoice   *self,
+                                                       GAsyncReadyCallback  callback,
+                                                       gpointer             user_data)
+{
+    common_setup_cleanup_in_call_audio_channel (MM_SHARED_SIMTECH (self), FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
 /* Check if Voice supported (Voice interface) */
 
 gboolean
@@ -1033,6 +1131,23 @@ mm_shared_simtech_voice_check_support_finish (MMIfaceModemVoice  *self,
                                               GError            **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+cpcmreg_format_check_ready (MMBroadbandModem *self,
+                            GAsyncResult     *res,
+                            GTask            *task)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_SIMTECH (self));
+
+    priv->cpcmreg_support = (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL) ?
+                             FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
+    mm_dbg ("modem %s USB audio control", (priv->cpcmreg_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -1061,8 +1176,12 @@ clcc_format_check_ready (MMBroadbandModem *self,
                   MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, (priv->clcc_urc_support == FEATURE_SUPPORTED),
                   NULL);
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CPCMREG=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback) cpcmreg_format_check_ready,
+                              task);
 }
 
 static void

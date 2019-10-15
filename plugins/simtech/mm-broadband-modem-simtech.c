@@ -1308,6 +1308,11 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->setup_unsolicited_events_finish   = mm_shared_simtech_voice_setup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events        = mm_shared_simtech_voice_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = mm_shared_simtech_voice_cleanup_unsolicited_events_finish;
+    iface->setup_in_call_audio_channel          = mm_shared_simtech_voice_setup_in_call_audio_channel;
+    iface->setup_in_call_audio_channel_finish   = mm_shared_simtech_voice_setup_in_call_audio_channel_finish;
+    iface->cleanup_in_call_audio_channel        = mm_shared_simtech_voice_cleanup_in_call_audio_channel;
+    iface->cleanup_in_call_audio_channel_finish = mm_shared_simtech_voice_cleanup_in_call_audio_channel_finish;
+
 }
 
 static MMIfaceModemVoice *
