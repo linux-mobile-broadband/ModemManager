@@ -148,3 +148,16 @@ out:
 
     return TRUE;
 }
+
+/*****************************************************************************/
+
+/*
+ * Using TWO <CR> instead of one...
+ * <CR><CR><LF>+CRING: VOICE<CR><CR><LF>
+ */
+GRegex *
+mm_simtech_get_cring_urc_regex (void)
+{
+    return g_regex_new ("(?:\\r)+\\n\\+CRING:\\s*(\\S+)(?:\\r)+\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}

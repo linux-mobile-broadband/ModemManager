@@ -193,6 +193,47 @@ test_voice_call_end_duration_urc (void)
 
 /*****************************************************************************/
 
+static void
+common_test_cring_urc (const gchar *urc,
+                       const gchar *expected_type)
+{
+    GError     *error = NULL;
+    GRegex     *cring_regex = NULL;
+    GMatchInfo *match_info = NULL;
+    gchar      *type;
+    gboolean    result;
+
+    cring_regex = mm_simtech_get_cring_urc_regex ();
+
+    /* Same matching logic as done in MMSerialPortAt when processing URCs! */
+    result = g_regex_match_full (cring_regex, urc, -1, 0, 0, &match_info, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    type = g_match_info_fetch (match_info, 1);
+    g_assert (type);
+
+    g_assert_cmpstr (type, ==, expected_type);
+
+    g_match_info_free (match_info);
+    g_regex_unref (cring_regex);
+    g_free (type);
+}
+
+static void
+test_cring_urc_two_crs (void)
+{
+    common_test_cring_urc ("\r\r\n+CRING: VOICE\r\r\n", "VOICE");
+}
+
+static void
+test_cring_urc_one_cr (void)
+{
+    common_test_cring_urc ("\r\n+CRING: VOICE\r\n", "VOICE");
+}
+
+/*****************************************************************************/
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -226,6 +267,9 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/simtech/voicecall/urc/begin",        test_voice_call_begin_urc);
     g_test_add_func ("/MM/simtech/voicecall/urc/end",          test_voice_call_end_urc);
     g_test_add_func ("/MM/simtech/voicecall/urc/end-duration", test_voice_call_end_duration_urc);
+
+    g_test_add_func ("/MM/simtech/cring/urc/two-crs", test_cring_urc_two_crs);
+    g_test_add_func ("/MM/simtech/cring/urc/one-cr", test_cring_urc_one_cr);
 
     return g_test_run ();
 }

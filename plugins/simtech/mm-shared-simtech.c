@@ -53,11 +53,13 @@ typedef struct {
     FeatureSupport         clcc_urc_support;
     GRegex                *clcc_urc_regex;
     GRegex                *voice_call_regex;
+    GRegex                *cring_regex;
 } Private;
 
 static void
 private_free (Private *ctx)
 {
+    g_regex_unref (ctx->cring_regex);
     g_regex_unref (ctx->voice_call_regex);
     g_regex_unref (ctx->clcc_urc_regex);
     g_slice_free (Private, ctx);
@@ -80,6 +82,7 @@ get_private (MMSharedSimtech *self)
         priv->clcc_urc_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_regex = mm_simtech_get_clcc_urc_regex ();
         priv->voice_call_regex = mm_simtech_get_voice_call_urc_regex ();
+        priv->cring_regex = mm_simtech_get_cring_urc_regex ();
 
         /* Setup parent class' MMIfaceModemLocation and MMIfaceModemVoice */
 
@@ -830,6 +833,27 @@ voice_call_urc_received (MMPortSerialAt  *port,
 }
 
 static void
+cring_urc_received (MMPortSerialAt  *port,
+                    GMatchInfo      *info,
+                    MMSharedSimtech *self)
+{
+    MMCallInfo  call_info;
+    gchar      *str;
+
+    /* We could have "VOICE" or "DATA". Now consider only "VOICE" */
+    str = mm_get_string_unquoted_from_match_info (info, 1);
+    mm_dbg ("Ringing (%s)", str);
+    g_free (str);
+
+    call_info.index     = 0;
+    call_info.direction = MM_CALL_DIRECTION_INCOMING;
+    call_info.state     = MM_CALL_STATE_RINGING_IN;
+    call_info.number    = NULL;
+
+    mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
+}
+
+static void
 common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
                                                gboolean         enable)
 {
@@ -856,6 +880,12 @@ common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
         mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
                                                        priv->voice_call_regex,
                                                        enable ? (MMPortSerialAtUnsolicitedMsgFn)voice_call_urc_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       priv->cring_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)cring_urc_received : NULL,
                                                        enable ? self : NULL,
                                                        NULL);
     }
