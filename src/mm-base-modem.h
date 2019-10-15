@@ -121,6 +121,7 @@ MMPortSerialAt   *mm_base_modem_peek_port_secondary    (MMBaseModem *self);
 MMPortSerialQcdm *mm_base_modem_peek_port_qcdm         (MMBaseModem *self);
 MMPortSerialAt   *mm_base_modem_peek_port_gps_control  (MMBaseModem *self);
 MMPortSerialGps  *mm_base_modem_peek_port_gps          (MMBaseModem *self);
+MMPortSerial     *mm_base_modem_peek_port_audio        (MMBaseModem *self);
 #if defined WITH_QMI
 MMPortQmi        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
 MMPortQmi        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
@@ -138,6 +139,7 @@ MMPortSerialAt   *mm_base_modem_get_port_secondary    (MMBaseModem *self);
 MMPortSerialQcdm *mm_base_modem_get_port_qcdm         (MMBaseModem *self);
 MMPortSerialAt   *mm_base_modem_get_port_gps_control  (MMBaseModem *self);
 MMPortSerialGps  *mm_base_modem_get_port_gps          (MMBaseModem *self);
+MMPortSerial     *mm_base_modem_get_port_audio        (MMBaseModem *self);
 #if defined WITH_QMI
 MMPortQmi        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
 MMPortQmi        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);

@@ -178,6 +178,16 @@
 #define ID_MM_PORT_TYPE_GPS "ID_MM_PORT_TYPE_GPS"
 
 /**
+ * ID_MM_PORT_TYPE_AUDIO:
+ *
+ * This is a port-specific tag applied to TTYs that we know in advance
+ * are audio ports.
+ *
+ * This tag also prevents AT and QCDM probing in the port.
+ */
+#define ID_MM_PORT_TYPE_AUDIO "ID_MM_PORT_TYPE_AUDIO"
+
+/**
  * ID_MM_TTY_BAUDRATE:
  *
  * This is a port-specific tag applied to TTYs that require a specific
