@@ -234,6 +234,53 @@ test_cring_urc_one_cr (void)
 
 /*****************************************************************************/
 
+static void
+common_test_rxdtmf_urc (const gchar *urc,
+                        const gchar *expected_str)
+{
+    GError     *error = NULL;
+    GRegex     *rxdtmf_regex = NULL;
+    GMatchInfo *match_info = NULL;
+    gchar      *type;
+    gboolean    result;
+
+    rxdtmf_regex = mm_simtech_get_rxdtmf_urc_regex ();
+
+    /* Same matching logic as done in MMSerialPortAt when processing URCs! */
+    result = g_regex_match_full (rxdtmf_regex, urc, -1, 0, 0, &match_info, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    type = g_match_info_fetch (match_info, 1);
+    g_assert (type);
+
+    g_assert_cmpstr (type, ==, expected_str);
+
+    g_match_info_free (match_info);
+    g_regex_unref (rxdtmf_regex);
+    g_free (type);
+}
+
+static void
+test_rxdtmf_urc_two_crs (void)
+{
+    common_test_rxdtmf_urc ("\r\r\n+RXDTMF: 8\r\r\n", "8");
+    common_test_rxdtmf_urc ("\r\r\n+RXDTMF: *\r\r\n", "*");
+    common_test_rxdtmf_urc ("\r\r\n+RXDTMF: #\r\r\n", "#");
+    common_test_rxdtmf_urc ("\r\r\n+RXDTMF: A\r\r\n", "A");
+}
+
+static void
+test_rxdtmf_urc_one_cr (void)
+{
+    common_test_rxdtmf_urc ("\r\n+RXDTMF: 8\r\n", "8");
+    common_test_rxdtmf_urc ("\r\n+RXDTMF: *\r\n", "*");
+    common_test_rxdtmf_urc ("\r\n+RXDTMF: #\r\n", "#");
+    common_test_rxdtmf_urc ("\r\n+RXDTMF: A\r\n", "A");
+}
+
+/*****************************************************************************/
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -270,6 +317,9 @@ int main (int argc, char **argv)
 
     g_test_add_func ("/MM/simtech/cring/urc/two-crs", test_cring_urc_two_crs);
     g_test_add_func ("/MM/simtech/cring/urc/one-cr", test_cring_urc_one_cr);
+
+    g_test_add_func ("/MM/simtech/rxdtmf/urc/two-crs", test_rxdtmf_urc_two_crs);
+    g_test_add_func ("/MM/simtech/rxdtmf/urc/one-cr", test_rxdtmf_urc_one_cr);
 
     return g_test_run ();
 }

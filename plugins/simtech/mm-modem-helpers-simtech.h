@@ -50,4 +50,9 @@ gboolean  mm_simtech_parse_voice_call_urc     (GMatchInfo  *match_info,
 
 GRegex *mm_simtech_get_cring_urc_regex (void);
 
+/*****************************************************************************/
+/* +RXDTMF URC helpers */
+
+GRegex *mm_simtech_get_rxdtmf_urc_regex (void);
+
 #endif  /* MM_MODEM_HELPERS_SIMTECH_H */

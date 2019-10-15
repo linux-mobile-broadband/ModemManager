@@ -161,3 +161,19 @@ mm_simtech_get_cring_urc_regex (void)
     return g_regex_new ("(?:\\r)+\\n\\+CRING:\\s*(\\S+)(?:\\r)+\\n",
                         G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
+
+/*****************************************************************************/
+
+/*
+ * <CR><CR><LF>+RXDTMF: 8<CR><CR><LF>
+ * <CR><CR><LF>+RXDTMF: *<CR><CR><LF>
+ * <CR><CR><LF>+RXDTMF: 7<CR><CR><LF>
+ *
+ * Note! using TWO <CR> instead of one...
+ */
+GRegex *
+mm_simtech_get_rxdtmf_urc_regex (void)
+{
+    return g_regex_new ("(?:\\r)+\\n\\+RXDTMF:\\s*([0-9A-D\\*\\#])(?:\\r)+\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}

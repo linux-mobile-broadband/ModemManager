@@ -54,11 +54,13 @@ typedef struct {
     GRegex                *clcc_urc_regex;
     GRegex                *voice_call_regex;
     GRegex                *cring_regex;
+    GRegex                *rxdtmf_regex;
 } Private;
 
 static void
 private_free (Private *ctx)
 {
+    g_regex_unref (ctx->rxdtmf_regex);
     g_regex_unref (ctx->cring_regex);
     g_regex_unref (ctx->voice_call_regex);
     g_regex_unref (ctx->clcc_urc_regex);
@@ -83,6 +85,7 @@ get_private (MMSharedSimtech *self)
         priv->clcc_urc_regex = mm_simtech_get_clcc_urc_regex ();
         priv->voice_call_regex = mm_simtech_get_voice_call_urc_regex ();
         priv->cring_regex = mm_simtech_get_cring_urc_regex ();
+        priv->rxdtmf_regex = mm_simtech_get_rxdtmf_urc_regex ();
 
         /* Setup parent class' MMIfaceModemLocation and MMIfaceModemVoice */
 
@@ -854,6 +857,20 @@ cring_urc_received (MMPortSerialAt  *port,
 }
 
 static void
+rxdtmf_urc_received (MMPortSerialAt  *port,
+                     GMatchInfo      *match_info,
+                     MMSharedSimtech *self)
+{
+    gchar *dtmf;
+
+    dtmf = g_match_info_fetch (match_info, 1);
+    mm_dbg ("Received DTMF: %s", dtmf);
+    /* call index unknown */
+    mm_iface_modem_voice_received_dtmf (MM_IFACE_MODEM_VOICE (self), 0, dtmf);
+    g_free (dtmf);
+}
+
+static void
 common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
                                                gboolean         enable)
 {
@@ -886,6 +903,12 @@ common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
         mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
                                                        priv->cring_regex,
                                                        enable ? (MMPortSerialAtUnsolicitedMsgFn)cring_urc_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       priv->rxdtmf_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)rxdtmf_urc_received : NULL,
                                                        enable ? self : NULL,
                                                        NULL);
     }
