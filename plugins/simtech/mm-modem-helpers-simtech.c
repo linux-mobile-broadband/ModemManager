@@ -93,3 +93,58 @@ mm_simtech_call_info_list_free (GList *call_info_list)
 {
     mm_3gpp_call_info_list_free (call_info_list);
 }
+
+/*****************************************************************************/
+
+/*
+ * <CR><LF>VOICE CALL: BEGIN<CR><LF>
+ * <CR><LF>VOICE CALL: END: 000041<CR><LF>
+ */
+GRegex *
+mm_simtech_get_voice_call_urc_regex (void)
+{
+    return g_regex_new ("\\r\\nVOICE CALL:\\s*([A-Z]+)(?::\\s*(\\d+))?\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+gboolean
+mm_simtech_parse_voice_call_urc (GMatchInfo  *match_info,
+                                 gboolean    *start_or_stop,
+                                 guint       *duration,
+                                 GError     **error)
+{
+    GError *inner_error = NULL;
+    gchar  *str;
+
+    str = mm_get_string_unquoted_from_match_info (match_info, 1);
+    if (!str) {
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                   "Couldn't read voice call URC action");
+        goto out;
+    }
+
+    if (g_strcmp0 (str, "BEGIN") == 0) {
+        *start_or_stop = TRUE;
+        *duration = 0;
+        goto out;
+    }
+
+    if (g_strcmp0 (str, "END") == 0) {
+        *start_or_stop = FALSE;
+        if (!mm_get_uint_from_match_info (match_info, 2, duration))
+            *duration = 0;
+        goto out;
+    }
+
+    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                               "Unknown voice call URC action: %s", str);
+
+out:
+    g_free (str);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    return TRUE;
+}

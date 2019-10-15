@@ -52,11 +52,13 @@ typedef struct {
     MMIfaceModemVoice     *iface_modem_voice_parent;
     FeatureSupport         clcc_urc_support;
     GRegex                *clcc_urc_regex;
+    GRegex                *voice_call_regex;
 } Private;
 
 static void
 private_free (Private *ctx)
 {
+    g_regex_unref (ctx->voice_call_regex);
     g_regex_unref (ctx->clcc_urc_regex);
     g_slice_free (Private, ctx);
 }
@@ -77,6 +79,7 @@ get_private (MMSharedSimtech *self)
         priv->cgps_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_regex = mm_simtech_get_clcc_urc_regex ();
+        priv->voice_call_regex = mm_simtech_get_voice_call_urc_regex ();
 
         /* Setup parent class' MMIfaceModemLocation and MMIfaceModemVoice */
 
@@ -799,6 +802,34 @@ clcc_urc_received (MMPortSerialAt  *port,
 }
 
 static void
+voice_call_urc_received (MMPortSerialAt  *port,
+                         GMatchInfo      *match_info,
+                         MMSharedSimtech *self)
+{
+    GError   *error = NULL;
+    gboolean  start_or_stop = FALSE; /* start = TRUE, stop = FALSE */
+    guint     duration = 0;
+
+    if (!mm_simtech_parse_voice_call_urc (match_info, &start_or_stop, &duration, &error)) {
+        mm_warn ("couldn't parse VOICE CALL URC: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+
+    if (start_or_stop) {
+        mm_dbg ("voice call started");
+        return;
+    }
+
+    if (duration) {
+        mm_dbg ("voice call finished (duration: %us)", duration);
+        return;
+    }
+
+    mm_dbg ("voice call finished");
+}
+
+static void
 common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
                                                gboolean         enable)
 {
@@ -808,10 +839,6 @@ common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
 
     priv = get_private (MM_SHARED_SIMTECH (self));
 
-    /* If +CLCC URCs not supported, we're done */
-    if (priv->clcc_urc_support == FEATURE_NOT_SUPPORTED)
-        return;
-
     ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
@@ -819,9 +846,16 @@ common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
         if (!ports[i])
             continue;
 
+        if (priv->clcc_urc_support == FEATURE_SUPPORTED)
+            mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                           priv->clcc_urc_regex,
+                                                           enable ? (MMPortSerialAtUnsolicitedMsgFn)clcc_urc_received : NULL,
+                                                           enable ? self : NULL,
+                                                           NULL);
+
         mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
-                                                       priv->clcc_urc_regex,
-                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)clcc_urc_received : NULL,
+                                                       priv->voice_call_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)voice_call_urc_received : NULL,
                                                        enable ? self : NULL,
                                                        NULL);
     }

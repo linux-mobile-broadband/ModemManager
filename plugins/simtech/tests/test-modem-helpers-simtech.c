@@ -143,6 +143,56 @@ test_clcc_urc_complex (void)
 
 /*****************************************************************************/
 
+static void
+common_test_voice_call_urc (const gchar *urc,
+                            gboolean     expected_start_or_stop,
+                            guint        expected_duration)
+{
+    GError     *error = NULL;
+    gboolean    start_or_stop = FALSE; /* start = TRUE, stop = FALSE */
+    guint       duration = 0;
+    GRegex     *voice_call_regex = NULL;
+    gboolean    result;
+    GMatchInfo *match_info = NULL;
+
+    voice_call_regex = mm_simtech_get_voice_call_urc_regex ();
+
+    /* Same matching logic as done in MMSerialPortAt when processing URCs! */
+    result = g_regex_match_full (voice_call_regex, urc, -1, 0, 0, &match_info, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    result = mm_simtech_parse_voice_call_urc (match_info, &start_or_stop, &duration, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    g_assert_cmpuint (expected_start_or_stop, ==, start_or_stop);
+    g_assert_cmpuint (expected_duration, ==, duration);
+
+    g_match_info_free (match_info);
+    g_regex_unref (voice_call_regex);
+}
+
+static void
+test_voice_call_begin_urc (void)
+{
+    common_test_voice_call_urc ("\r\nVOICE CALL: BEGIN\r\n", TRUE, 0);
+}
+
+static void
+test_voice_call_end_urc (void)
+{
+    common_test_voice_call_urc ("\r\nVOICE CALL: END\r\n", FALSE, 0);
+}
+
+static void
+test_voice_call_end_duration_urc (void)
+{
+    common_test_voice_call_urc ("\r\nVOICE CALL: END: 000041\r\n", FALSE, 41);
+}
+
+/*****************************************************************************/
+
 void
 _mm_log (const char *loc,
          const char *func,
@@ -172,6 +222,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/simtech/clcc/urc/single",   test_clcc_urc_single);
     g_test_add_func ("/MM/simtech/clcc/urc/multiple", test_clcc_urc_multiple);
     g_test_add_func ("/MM/simtech/clcc/urc/complex",  test_clcc_urc_complex);
+
+    g_test_add_func ("/MM/simtech/voicecall/urc/begin",        test_voice_call_begin_urc);
+    g_test_add_func ("/MM/simtech/voicecall/urc/end",          test_voice_call_end_urc);
+    g_test_add_func ("/MM/simtech/voicecall/urc/end-duration", test_voice_call_end_duration_urc);
 
     return g_test_run ();
 }

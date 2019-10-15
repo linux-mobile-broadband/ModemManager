@@ -36,4 +36,13 @@ gboolean  mm_simtech_parse_clcc_list     (const gchar *str,
                                           GError     **error);
 void      mm_simtech_call_info_list_free (GList       *call_info_list);
 
+/*****************************************************************************/
+/* VOICE CALL URC helpers */
+
+GRegex   *mm_simtech_get_voice_call_urc_regex (void);
+gboolean  mm_simtech_parse_voice_call_urc     (GMatchInfo  *match_info,
+                                               gboolean    *start_or_stop,
+                                               guint       *duration,
+                                               GError     **error);
+
 #endif  /* MM_MODEM_HELPERS_SIMTECH_H */
