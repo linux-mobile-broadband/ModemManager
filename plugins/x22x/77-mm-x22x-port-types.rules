@@ -40,6 +40,13 @@ ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{.MM_USBIFNUM}=="02", ENV{
 ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="00B7", ENV{ID_MM_X22X_TAGGED}="1"
 
+# Alcaltel X602D
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="022c", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="022c", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="022c", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="022c", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bbb", ATTRS{idProduct}=="022c", ENV{ID_MM_X22X_TAGGED}="1"
+
 GOTO="mm_x22x_port_types_end"
 
 # Olivetti devices ---------------------------
