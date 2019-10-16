@@ -38,6 +38,13 @@ static MMIfaceModem *iface_modem_parent;
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemX22x, mm_broadband_modem_x22x, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
 
+struct _MMBroadbandModemX22xPrivate {
+    GRegex *mode_regex;
+    GRegex *sysinfo_regex;
+    GRegex *specc_regex;
+    GRegex *sperror_regex;
+};
+
 /*****************************************************************************/
 /* Load supported modes (Modem interface) */
 
@@ -303,6 +310,52 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+set_ignored_unsolicited_events_handlers (MMBroadbandModemX22x *self)
+{
+    MMPortSerialAt *ports[2];
+    guint           i;
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable/disable unsolicited events in given port */
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->mode_regex,
+            NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->sysinfo_regex,
+            NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->specc_regex,
+            NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->sperror_regex,
+            NULL, NULL, NULL);
+    }
+}
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_x22x_parent_class)->setup_ports (self);
+
+    /* Unsolicited messages to always ignore */
+    set_ignored_unsolicited_events_handlers (MM_BROADBAND_MODEM_X22X (self));
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemX22x *
 mm_broadband_modem_x22x_new (const gchar *device,
@@ -323,6 +376,30 @@ mm_broadband_modem_x22x_new (const gchar *device,
 static void
 mm_broadband_modem_x22x_init (MMBroadbandModemX22x *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_BROADBAND_MODEM_X22X,
+                                              MMBroadbandModemX22xPrivate);
+
+    self->priv->mode_regex    = g_regex_new ("\\r\\n\\^MODE:.+\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->sysinfo_regex = g_regex_new ("\\r\\n\\^SYSINFO:.+\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->specc_regex   = g_regex_new ("\\r\\n\\+SPECC\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->sperror_regex = g_regex_new ("\\r\\n\\+SPERROR:.+\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBroadbandModemX22x *self = MM_BROADBAND_MODEM_X22X (object);
+
+    g_regex_unref (self->priv->mode_regex);
+    g_regex_unref (self->priv->sysinfo_regex);
+    g_regex_unref (self->priv->specc_regex);
+    g_regex_unref (self->priv->sperror_regex);
+    G_OBJECT_CLASS (mm_broadband_modem_x22x_parent_class)->finalize (object);
 }
 
 static void
@@ -343,4 +420,12 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 mm_broadband_modem_x22x_class_init (MMBroadbandModemX22xClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemX22xPrivate));
+
+    object_class->finalize = finalize;
+
+    broadband_modem_class->setup_ports = setup_ports;
 }
