@@ -152,6 +152,36 @@ out:
 /*****************************************************************************/
 
 /*
+ * <CR><LF>MISSED_CALL: 11:01AM 07712345678<CR><LF>
+ */
+GRegex *
+mm_simtech_get_missed_call_urc_regex (void)
+{
+    return g_regex_new ("\\r\\nMISSED_CALL:\\s*(.+)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+}
+
+gboolean
+mm_simtech_parse_missed_call_urc (GMatchInfo  *match_info,
+                                  gchar      **details,
+                                  GError     **error)
+{
+    gchar *str;
+
+    str = mm_get_string_unquoted_from_match_info (match_info, 1);
+    if (!str) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't read missed call URC details");
+        return FALSE;
+    }
+
+    *details = str;
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+/*
  * Using TWO <CR> instead of one...
  * <CR><CR><LF>+CRING: VOICE<CR><CR><LF>
  */

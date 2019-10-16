@@ -194,6 +194,42 @@ test_voice_call_end_duration_urc (void)
 /*****************************************************************************/
 
 static void
+common_test_missed_call_urc (const gchar *urc,
+                             const gchar *expected_details)
+{
+    GError     *error = NULL;
+    gchar      *details = NULL;
+    GRegex     *missed_call_regex = NULL;
+    gboolean    result;
+    GMatchInfo *match_info = NULL;
+
+    missed_call_regex = mm_simtech_get_missed_call_urc_regex ();
+
+    /* Same matching logic as done in MMSerialPortAt when processing URCs! */
+    result = g_regex_match_full (missed_call_regex, urc, -1, 0, 0, &match_info, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    result = mm_simtech_parse_missed_call_urc (match_info, &details, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    g_assert_cmpstr (expected_details, ==, details);
+    g_free (details);
+
+    g_match_info_free (match_info);
+    g_regex_unref (missed_call_regex);
+}
+
+static void
+test_missed_call_urc (void)
+{
+    common_test_missed_call_urc ("\r\nMISSED_CALL: 11:01AM 07712345678\r\n", "11:01AM 07712345678");
+}
+
+/*****************************************************************************/
+
+static void
 common_test_cring_urc (const gchar *urc,
                        const gchar *expected_type)
 {
@@ -314,6 +350,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/simtech/voicecall/urc/begin",        test_voice_call_begin_urc);
     g_test_add_func ("/MM/simtech/voicecall/urc/end",          test_voice_call_end_urc);
     g_test_add_func ("/MM/simtech/voicecall/urc/end-duration", test_voice_call_end_duration_urc);
+
+    g_test_add_func ("/MM/simtech/missedcall/urc", test_missed_call_urc);
 
     g_test_add_func ("/MM/simtech/cring/urc/two-crs", test_cring_urc_two_crs);
     g_test_add_func ("/MM/simtech/cring/urc/one-cr", test_cring_urc_one_cr);

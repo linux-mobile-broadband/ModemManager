@@ -46,6 +46,14 @@ gboolean  mm_simtech_parse_voice_call_urc     (GMatchInfo  *match_info,
                                                GError     **error);
 
 /*****************************************************************************/
+/* MISSED_CALL URC helpers */
+
+GRegex   *mm_simtech_get_missed_call_urc_regex (void);
+gboolean  mm_simtech_parse_missed_call_urc     (GMatchInfo  *match_info,
+                                                gchar      **details,
+                                                GError     **error);
+
+/*****************************************************************************/
 /* Non-standard CRING URC helpers */
 
 GRegex *mm_simtech_get_cring_urc_regex (void);

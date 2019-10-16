@@ -54,6 +54,7 @@ typedef struct {
     FeatureSupport         clcc_urc_support;
     GRegex                *clcc_urc_regex;
     GRegex                *voice_call_regex;
+    GRegex                *missed_call_regex;
     GRegex                *cring_regex;
     GRegex                *rxdtmf_regex;
 } Private;
@@ -63,6 +64,7 @@ private_free (Private *ctx)
 {
     g_regex_unref (ctx->rxdtmf_regex);
     g_regex_unref (ctx->cring_regex);
+    g_regex_unref (ctx->missed_call_regex);
     g_regex_unref (ctx->voice_call_regex);
     g_regex_unref (ctx->clcc_urc_regex);
     g_slice_free (Private, ctx);
@@ -86,6 +88,7 @@ get_private (MMSharedSimtech *self)
         priv->clcc_urc_support = FEATURE_SUPPORT_UNKNOWN;
         priv->clcc_urc_regex = mm_simtech_get_clcc_urc_regex ();
         priv->voice_call_regex = mm_simtech_get_voice_call_urc_regex ();
+        priv->missed_call_regex = mm_simtech_get_missed_call_urc_regex ();
         priv->cring_regex = mm_simtech_get_cring_urc_regex ();
         priv->rxdtmf_regex = mm_simtech_get_rxdtmf_urc_regex ();
 
@@ -810,6 +813,24 @@ clcc_urc_received (MMPortSerialAt  *port,
 }
 
 static void
+missed_call_urc_received (MMPortSerialAt  *port,
+                          GMatchInfo      *match_info,
+                          MMSharedSimtech *self)
+{
+    GError *error = NULL;
+    gchar  *details = NULL;
+
+    if (!mm_simtech_parse_missed_call_urc (match_info, &details, &error)) {
+        mm_warn ("couldn't parse missed call URC: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+
+    mm_dbg ("missed call reported: %s", details);
+    g_free (details);
+}
+
+static void
 voice_call_urc_received (MMPortSerialAt  *port,
                          GMatchInfo      *match_info,
                          MMSharedSimtech *self)
@@ -899,6 +920,12 @@ common_voice_setup_cleanup_unsolicited_events (MMSharedSimtech *self,
         mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
                                                        priv->voice_call_regex,
                                                        enable ? (MMPortSerialAtUnsolicitedMsgFn)voice_call_urc_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       priv->missed_call_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)missed_call_urc_received : NULL,
                                                        enable ? self : NULL,
                                                        NULL);
 
