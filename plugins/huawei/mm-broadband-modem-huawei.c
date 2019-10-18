@@ -2942,6 +2942,44 @@ modem_voice_check_support (MMIfaceModemVoice   *self,
 /* In-call audio channel setup/cleanup */
 
 static gboolean
+modem_voice_cleanup_in_call_audio_channel_finish (MMIfaceModemVoice  *self,
+                                                  GAsyncResult       *res,
+                                                  GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_voice_cleanup_in_call_audio_channel (MMIfaceModemVoice   *_self,
+                                           GAsyncReadyCallback  callback,
+                                           gpointer             user_data)
+{
+    MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
+    GTask                  *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* If there is no CVOICE support, no custom audio setup required
+     * (i.e. audio path is externally managed) */
+    if (self->priv->cvoice_support == FEATURE_SUPPORTED) {
+        MMPort *port;
+
+        /* The QCDM port, if present, switches back from voice to QCDM after
+         * the voice call is dropped. */
+        port = MM_PORT (mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self)));
+        if (port) {
+            /* During a voice call, we'll set the QCDM port as connected, and that
+             * will make us ignore all incoming data and avoid sending any outgoing
+             * data. */
+            mm_port_set_connected (port, FALSE);
+        }
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static gboolean
 modem_voice_setup_in_call_audio_channel_finish (MMIfaceModemVoice  *_self,
                                                 GAsyncResult       *res,
                                                 MMPort            **audio_port,
@@ -2954,6 +2992,8 @@ modem_voice_setup_in_call_audio_channel_finish (MMIfaceModemVoice  *_self,
         return FALSE;
 
     if (self->priv->cvoice_support == FEATURE_SUPPORTED) {
+        MMPort *port;
+
         /* Setup audio format */
         if (audio_format) {
             gchar *resolution_str;
@@ -2968,8 +3008,16 @@ modem_voice_setup_in_call_audio_channel_finish (MMIfaceModemVoice  *_self,
 
         /* The QCDM port, if present, switches from QCDM to voice while
          * a voice call is active. */
+        port = MM_PORT (mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self)));
+        if (port) {
+            /* During a voice call, we'll set the QCDM port as connected, and that
+             * will make us ignore all incoming data and avoid sending any outgoing
+             * data. */
+            mm_port_set_connected (port, TRUE);
+        }
+
         if (audio_port)
-            *audio_port = MM_PORT (mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self)));
+            *audio_port = (port ? g_object_ref (port) : NULL);;
     } else {
         if (audio_format)
             *audio_format =  NULL;
@@ -4701,6 +4749,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->disable_unsolicited_events_finish = modem_voice_disable_unsolicited_events_finish;
     iface->setup_in_call_audio_channel = modem_voice_setup_in_call_audio_channel;
     iface->setup_in_call_audio_channel_finish = modem_voice_setup_in_call_audio_channel_finish;
+    iface->cleanup_in_call_audio_channel = modem_voice_cleanup_in_call_audio_channel;
+    iface->cleanup_in_call_audio_channel_finish = modem_voice_cleanup_in_call_audio_channel_finish;
 
     iface->create_call = create_call;
 }
