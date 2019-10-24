@@ -182,7 +182,7 @@
         A flag indicating whether emergency calls are the only allowed ones.
 
         If this flag is set, users should only attempt voice calls to
-	emergency numbers, as standard voice calls will likely fail.
+        emergency numbers, as standard voice calls will likely fail.
     -->
     <property name="EmergencyOnly" type="b" access="read" />
 
