@@ -36,16 +36,10 @@
 
 G_DEFINE_TYPE (MMCallProperties, mm_call_properties, G_TYPE_OBJECT)
 
-#define PROPERTY_NUMBER       "number"
-#define PROPERTY_DIRECTION    "direction"
-#define PROPERTY_STATE_REASON "state-reason"
-#define PROPERTY_STATE        "state"
+#define PROPERTY_NUMBER "number"
 
 struct _MMCallPropertiesPrivate {
     gchar *number;
-    MMCallDirection direction;
-    MMCallState state;
-    MMCallStateReason state_reason;
 };
 
 /*****************************************************************************/
@@ -90,6 +84,8 @@ mm_call_properties_get_number (MMCallProperties *self)
 
 /*****************************************************************************/
 
+#ifndef MM_DISABLE_DEPRECATED
+
 /**
  * mm_call_properties_set_direction:
  * @self: A #MMCallProperties.
@@ -98,14 +94,15 @@ mm_call_properties_get_number (MMCallProperties *self)
  * Sets the call direction.
  *
  * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the direction of the call, as
+ * it is implicit (outgoing always). Anyway, this parameter has always been
+ * ignored during the new call creation processing.
  */
 void
 mm_call_properties_set_direction (MMCallProperties *self,
                                   MMCallDirection direction)
 {
-    g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
-
-    self->priv->direction = direction;
+    /* NO-OP */
 }
 
 /**
@@ -117,13 +114,15 @@ mm_call_properties_set_direction (MMCallProperties *self,
  * Returns: the call direction.
  *
  * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the direction of the call, as
+ * it is implicit (outgoing always). This parameter has always been ignored
+ * during the new call creation processing.
  */
 MMCallDirection
 mm_call_properties_get_direction (MMCallProperties *self)
 {
-    g_return_val_if_fail (MM_IS_CALL_PROPERTIES (self), MM_CALL_DIRECTION_UNKNOWN);
-
-    return self->priv->direction;
+    /* NO-OP */
+    return MM_CALL_DIRECTION_UNKNOWN;
 }
 
 /*****************************************************************************/
@@ -136,14 +135,15 @@ mm_call_properties_get_direction (MMCallProperties *self)
  * Sets the call state
  *
  * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state of the call before
+ * the call is created. This parameter has always been ignored during the new
+ * call creation processing.
  */
 void
 mm_call_properties_set_state (MMCallProperties *self,
                               MMCallState state)
 {
-    g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
-
-    self->priv->state = state;
+    /* NO-OP */
 }
 
 /**
@@ -155,13 +155,15 @@ mm_call_properties_set_state (MMCallProperties *self,
  * Returns: the call state.
  *
  * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state of the call before
+ * the call is created. This parameter has always been ignored during the new
+ * call creation processing.
  */
 MMCallState
 mm_call_properties_get_state (MMCallProperties *self)
 {
-    g_return_val_if_fail (MM_IS_CALL_PROPERTIES (self), MM_CALL_STATE_UNKNOWN);
-
-    return self->priv->state;
+    /* NO-OP */
+    return MM_CALL_STATE_UNKNOWN;
 }
 
 /*****************************************************************************/
@@ -174,14 +176,15 @@ mm_call_properties_get_state (MMCallProperties *self)
  * Sets the call state reason.
  *
  * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state reason of the call
+ * before the call is created. This parameter has always been ignored during the
+ * new call creation processing.
  */
 void
 mm_call_properties_set_state_reason (MMCallProperties *self,
                                      MMCallStateReason state_reason)
 {
-    g_return_if_fail (MM_IS_CALL_PROPERTIES (self));
-
-    self->priv->state_reason = state_reason;
+    /* NO-OP */
 }
 
 /**
@@ -193,14 +196,18 @@ mm_call_properties_set_state_reason (MMCallProperties *self,
  * Returns: the call state reason.
  *
  * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state reason of the call
+ * before the call is created. This parameter has always been ignored during the
+ * new call creation processing.
  */
 MMCallStateReason
 mm_call_properties_get_state_reason (MMCallProperties *self)
 {
-    g_return_val_if_fail (MM_IS_CALL_PROPERTIES (self), MM_CALL_STATE_REASON_UNKNOWN);
-
-    return self->priv->state_reason;
+    /* NO-OP */
+    return MM_CALL_STATE_REASON_UNKNOWN;
 }
+
+#endif /* MM_DISABLE_DEPRECATED */
 
 /*****************************************************************************/
 
@@ -223,23 +230,6 @@ mm_call_properties_get_dictionary (MMCallProperties *self)
                                PROPERTY_NUMBER,
                                g_variant_new_string (self->priv->number));
 
-    if (self->priv->state_reason != MM_CALL_STATE_REASON_UNKNOWN)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_STATE_REASON,
-                               g_variant_new_uint32 (self->priv->state_reason));
-
-    if (self->priv->state != MM_CALL_STATE_UNKNOWN)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_STATE,
-                               g_variant_new_uint32 (self->priv->state));
-
-    g_variant_builder_add (&builder,
-                           "{sv}",
-                           PROPERTY_DIRECTION,
-                           g_variant_new_uint32 (self->priv->direction));
-
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -252,39 +242,6 @@ consume_string (MMCallProperties *self,
 {
     if (g_str_equal (key, PROPERTY_NUMBER)) {
         mm_call_properties_set_number (self, value);
-    } else if (g_str_equal (key, PROPERTY_DIRECTION)) {
-        MMCallDirection direction;
-        GError *inner_error = NULL;
-
-        direction = mm_common_get_call_direction_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-
-        mm_call_properties_set_direction(self, direction);
-    } else if (g_str_equal (key, PROPERTY_STATE)) {
-        MMCallState state;
-        GError *inner_error = NULL;
-
-        state = mm_common_get_call_state_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-
-        mm_call_properties_set_state(self, state);
-    } else if (g_str_equal (key, PROPERTY_STATE_REASON)) {
-        MMCallStateReason state_reason;
-        GError *inner_error = NULL;
-
-        state_reason = mm_common_get_call_state_reason_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-
-        mm_call_properties_set_state_reason (self, state_reason);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -315,7 +272,7 @@ key_value_foreach (const gchar *key,
 
 MMCallProperties *
 mm_call_properties_new_from_string (const gchar *str,
-                                   GError **error)
+                                    GError **error)
 {
     ParseKeyValueContext ctx;
 
@@ -349,18 +306,6 @@ consume_variant (MMCallProperties *properties,
         mm_call_properties_set_number (
             properties,
             g_variant_get_string (value, NULL));
-    else if (g_str_equal (key, PROPERTY_DIRECTION))
-        mm_call_properties_set_direction (
-            properties,
-            g_variant_get_uint32 (value));
-    else if (g_str_equal (key, PROPERTY_STATE))
-        mm_call_properties_set_state (
-            properties,
-            g_variant_get_uint32 (value));
-    else if (g_str_equal (key, PROPERTY_STATE_REASON))
-        mm_call_properties_set_state_reason (
-            properties,
-            g_variant_get_uint32 (value));
     else {
         /* Set error */
         g_set_error (error,
@@ -375,8 +320,8 @@ consume_variant (MMCallProperties *properties,
 }
 
 MMCallProperties *
-mm_call_properties_new_from_dictionary (GVariant *dictionary,
-                                       GError **error)
+mm_call_properties_new_from_dictionary (GVariant  *dictionary,
+                                        GError   **error)
 {
     GError *inner_error = NULL;
     GVariantIter iter;
@@ -459,14 +404,9 @@ mm_call_properties_new (void)
 static void
 mm_call_properties_init (MMCallProperties *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_CALL_PROPERTIES,
                                               MMCallPropertiesPrivate);
-
-    self->priv->number       = NULL;
-    self->priv->direction    = MM_CALL_DIRECTION_UNKNOWN;
-    self->priv->state        = MM_CALL_STATE_UNKNOWN;
-    self->priv->state_reason = MM_CALL_STATE_REASON_UNKNOWN;
 }
 
 static void
