@@ -103,7 +103,7 @@
         List of emergency numbers programmed in the SIM card.
 
         These numbers should be treated as numbers for emergency calls in
-	addition to 112 and 911.
+        addition to 112 and 911.
     -->
     <property name="EmergencyNumbers" type="as" access="read" />
 
