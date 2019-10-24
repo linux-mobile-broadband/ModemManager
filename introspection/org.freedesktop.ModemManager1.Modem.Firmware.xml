@@ -134,7 +134,7 @@
             <listitem>
               <para>
                 The following settings are mandatory as long as the reported update method is not
-                <term><link linkend="MM-MODEM-FIRMWARE-UPDATE-METHOD-NONE:CAPS">MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE</link></term>.
+                <link linkend="MM-MODEM-FIRMWARE-UPDATE-METHOD-NONE:CAPS">MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE</link>.
               </para>
               <variablelist>
                 <varlistentry><term><literal>"device-ids"</literal></term>
