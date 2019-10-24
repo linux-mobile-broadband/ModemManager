@@ -36,6 +36,8 @@
  *
  * This is a port-specific tag added automatically when all other
  * ModemManager related tags have already been set.
+ *
+ * Since: 1.10
  */
 #define ID_MM_CANDIDATE "ID_MM_CANDIDATE"
 
@@ -56,6 +58,8 @@
  * property and can then be used in mmcli calls to refer unequivocally
  * to a specific device, regardless of its modem index, e.g.:
  *  $ mmcli --modem=UID ...
+ *
+ * Since: 1.10
  */
 #define ID_MM_PHYSDEV_UID "ID_MM_PHYSDEV_UID"
 
@@ -69,6 +73,8 @@
  *
  * This tag may also be specified in specific ports, e.g. when the modem
  * exposes a single platform port without any parent device.
+ *
+ * Since: 1.10
  */
 #define ID_MM_DEVICE_PROCESS "ID_MM_DEVICE_PROCESS"
 
@@ -83,6 +89,8 @@
  * applies to all filter types (including STRICT), and to all port types
  * (not only TTYs), and is associated to the
  * MM_FILTER_RULE_EXPLICIT_BLACKLIST rule.
+ *
+ * Since: 1.10
  */
 #define ID_MM_DEVICE_IGNORE "ID_MM_DEVICE_IGNORE"
 
@@ -93,6 +101,8 @@
  * in a device.
  *
  * This tag applies to all types of ports.
+ *
+ * Since: 1.10
  */
 #define ID_MM_PORT_IGNORE "ID_MM_PORT_IGNORE"
 
@@ -107,6 +117,8 @@
  * rule.
  *
  * This tag is ignored when the STRICT filter policy is used.
+ *
+ * Since: 1.12
  */
 #define ID_MM_TTY_BLACKLIST "ID_MM_TTY_BLACKLIST"
 
@@ -124,6 +136,8 @@
  * rule.
  *
  * This tag is ignored when the STRICT filter policy is used.
+ *
+ * Since: 1.12
  */
 #define ID_MM_TTY_MANUAL_SCAN_ONLY "ID_MM_TTY_MANUAL_SCAN_ONLY"
 
@@ -134,6 +148,8 @@
  * are AT ports to be used as primary control ports.
  *
  * This tag will also prevent QCDM probing on the port.
+ *
+ * Since: 1.10
  */
 #define ID_MM_PORT_TYPE_AT_PRIMARY "ID_MM_PORT_TYPE_AT_PRIMARY"
 
@@ -144,6 +160,8 @@
  * are AT ports to be used as secondary control ports.
  *
  * This tag will also prevent QCDM probing on the port.
+ *
+ * Since: 1.10
  */
 #define ID_MM_PORT_TYPE_AT_SECONDARY "ID_MM_PORT_TYPE_AT_SECONDARY"
 
@@ -154,6 +172,8 @@
  * are AT ports to be used as data ports exclusively.
  *
  * This tag will also prevent QCDM probing on the port.
+ *
+ * Since: 1.10
  */
 #define ID_MM_PORT_TYPE_AT_PPP "ID_MM_PORT_TYPE_AT_PPP"
 
@@ -164,6 +184,8 @@
  * are QCDM ports.
  *
  * The only purpose of this tag is to prevent AT probing in the port.
+ *
+ * Since: 1.10
  */
 #define ID_MM_PORT_TYPE_QCDM "ID_MM_PORT_TYPE_QCDM"
 
@@ -174,6 +196,8 @@
  * are GPS data ports where we expect to receive NMEA traces.
  *
  * This tag also prevents AT and QCDM probing in the port.
+ *
+ * Since: 1.10
  */
 #define ID_MM_PORT_TYPE_GPS "ID_MM_PORT_TYPE_GPS"
 
@@ -184,6 +208,8 @@
  * are audio ports.
  *
  * This tag also prevents AT and QCDM probing in the port.
+ *
+ * Since: 1.12
  */
 #define ID_MM_PORT_TYPE_AUDIO "ID_MM_PORT_TYPE_AUDIO"
 
@@ -198,6 +224,8 @@
  * The value of the tag should be the number of bauds per second to
  * use when talking to the port, e.g. "115200". If not given, the
  * default of 57600bps is assumed.
+ *
+ * Since: 1.10
  */
 #define ID_MM_TTY_BAUDRATE "ID_MM_TTY_BAUDRATE"
 
@@ -212,6 +240,8 @@
  * 'rts-cts', and must be a flow control value supported by the device
  * where it's configured. If not given, it is assumed that the TTYs
  * don't require any specific flow control setting in command mode.
+ *
+ * Since: 1.10
  */
 #define ID_MM_TTY_FLOW_CONTROL "ID_MM_TTY_FLOW_CONTROL"
 

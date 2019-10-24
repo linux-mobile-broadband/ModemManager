@@ -56,6 +56,8 @@
  * @MM_CORE_ERROR_EXISTS: Item already exists.
  *
  * Common errors that may be reported by ModemManager.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_core_error >*/
     MM_CORE_ERROR_FAILED       = 0,  /*< nick=Failed       >*/
@@ -129,10 +131,10 @@ typedef enum { /*< underscore_name=mm_core_error >*/
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE: Network failure.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION: Congestion.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NOT_AUTHORIZED_FOR_CSG: GPRS not authorized for CSG. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_INSUFFICIENT_RESOURCES: Insufficient resources.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN: Missing or unknown APN.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_INSUFFICIENT_RESOURCES: Insufficient resources. Since 1.4.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN: Missing or unknown APN. Since 1.4.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_ADDRESS_OR_TYPE: Unknown PDP address or type. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED: User authentication failed.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED: User authentication failed. Since 1.4.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_BY_GGSN_OR_GW: Activation rejected by GGSN or gateway. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_UNSPECIFIED: Activation rejected (reason unspecified). Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED: Service option not supported.
@@ -160,6 +162,8 @@ typedef enum { /*< underscore_name=mm_core_error >*/
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION: Request rejected (BCM violation). Since: 1.8.
  *
  * Enumeration of Mobile Equipment errors, as defined in 3GPP TS 07.07 version 7.8.0.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
     /* General errors */
@@ -257,6 +261,8 @@ typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
  * @MM_CONNECTION_ERROR_NO_ANSWER: No answer.
  *
  * Connection errors that may be reported by ModemManager.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_connection_error >*/
     MM_CONNECTION_ERROR_UNKNOWN     = 0, /*< nick=Unknown    >*/
@@ -276,9 +282,11 @@ typedef enum { /*< underscore_name=mm_connection_error >*/
  * @MM_SERIAL_ERROR_FLASH_FAILED: Could not flash the device.
  * @MM_SERIAL_ERROR_NOT_OPEN: The serial port is not open.
  * @MM_SERIAL_ERROR_PARSE_FAILED: The serial port specific parsing failed.
- * @MM_SERIAL_ERROR_FRAME_NOT_FOUND: The serial port reported that the frame marker wasn't found (e.g. for QCDM).
+ * @MM_SERIAL_ERROR_FRAME_NOT_FOUND: The serial port reported that the frame marker wasn't found (e.g. for QCDM). Since 1.6.
  *
  * Serial errors that may be reported by ModemManager.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_serial_error >*/
     MM_SERIAL_ERROR_UNKNOWN               = 0, /*< nick=Unknown            >*/
@@ -319,6 +327,8 @@ typedef enum { /*< underscore_name=mm_serial_error >*/
  * @MM_MESSAGE_ERROR_UNKNOWN: Unknown error.
  *
  * Enumeration of message errors, as defined in 3GPP TS 27.005 version 10 section 3.2.5.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_message_error >*/
     /* 0 -> 127 per 3GPP TS 24.011 [6] clause E.2 */
@@ -362,6 +372,8 @@ typedef enum { /*< underscore_name=mm_message_error >*/
  * @MM_CDMA_ACTIVATION_ERROR_START_FAILED: API call for initial activation failed.
  *
  * CDMA Activation errors.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_cdma_activation_error >*/
     MM_CDMA_ACTIVATION_ERROR_NONE                           = 0, /*< nick=None                         >*/

@@ -42,6 +42,8 @@
  *
  * Flags describing one or more of the general access technology families that a
  * modem supports.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_capability >*/
     MM_MODEM_CAPABILITY_NONE         = 0,
@@ -75,6 +77,8 @@ typedef enum { /*< underscore_name=mm_modem_capability >*/
  * @MM_MODEM_LOCK_PH_NETSUB_PUK: Modem requires the network subset PUK code.
  *
  * Enumeration of possible lock reasons.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_lock >*/
     MM_MODEM_LOCK_UNKNOWN        = 0,
@@ -113,6 +117,8 @@ typedef enum { /*< underscore_name=mm_modem_lock >*/
  * @MM_MODEM_STATE_CONNECTED: One or more packet data bearers is active and connected.
  *
  * Enumeration of possible modem states.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_state >*/
     MM_MODEM_STATE_FAILED        = -1,
@@ -138,6 +144,8 @@ typedef enum { /*< underscore_name=mm_modem_state >*/
  * @MM_MODEM_STATE_FAILED_REASON_SIM_ERROR: SIM is available, but unusable (e.g. permanently locked).
  *
  * Enumeration of possible errors when the modem is in @MM_MODEM_STATE_FAILED.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_state_failed_reason >*/
     MM_MODEM_STATE_FAILED_REASON_NONE        = 0,
@@ -154,6 +162,8 @@ typedef enum { /*< underscore_name=mm_modem_state_failed_reason >*/
  * @MM_MODEM_POWER_STATE_ON: Full power mode.
  *
  * Power state of the modem.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_power_state >*/
     MM_MODEM_POWER_STATE_UNKNOWN = 0,
@@ -170,6 +180,8 @@ typedef enum { /*< underscore_name=mm_modem_power_state >*/
  * @MM_MODEM_STATE_CHANGE_REASON_FAILURE: State change was caused by an unrecoverable error.
  *
  * Enumeration of possible reasons to have changed the modem state.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_state_change_reason >*/
     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN        = 0,
@@ -200,6 +212,8 @@ typedef enum { /*< underscore_name=mm_modem_state_change_reason >*/
  *
  * Describes various access technologies that a device uses when registered with
  * or connected to a network.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_access_technology >*/
     MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN     = 0,
@@ -232,6 +246,8 @@ typedef enum { /*< underscore_name=mm_modem_access_technology >*/
  *
  * Bitfield to indicate which access modes are supported, allowed or
  * preferred in a given device.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_mode >*/
     MM_MODEM_MODE_NONE = 0,
@@ -256,119 +272,121 @@ typedef enum { /*< underscore_name=mm_modem_mode >*/
  * @MM_MODEM_BAND_G410: GSM/GPRS/EDGE 410 MHz.
  * @MM_MODEM_BAND_G710: GSM/GPRS/EDGE 710 MHz.
  * @MM_MODEM_BAND_G810: GSM/GPRS/EDGE 810 MHz.
- * @MM_MODEM_BAND_UTRAN_1: UMTS 2100 MHz (IMT, UTRAN band 1).
- * @MM_MODEM_BAND_UTRAN_2: UMTS 1900 MHz (PCS A-F, UTRAN band 2).
- * @MM_MODEM_BAND_UTRAN_3: UMTS 1800 MHz (DCS, UTRAN band 3).
- * @MM_MODEM_BAND_UTRAN_4: UMTS 1700 MHz (AWS A-F, UTRAN band 4).
- * @MM_MODEM_BAND_UTRAN_5: UMTS 850 MHz (CLR, UTRAN band 5).
- * @MM_MODEM_BAND_UTRAN_6: UMTS 800 MHz (UTRAN band 6).
- * @MM_MODEM_BAND_UTRAN_7: UMTS 2600 MHz (IMT-E, UTRAN band 7).
- * @MM_MODEM_BAND_UTRAN_8: UMTS 900 MHz (E-GSM, UTRAN band 8).
- * @MM_MODEM_BAND_UTRAN_9: UMTS 1700 MHz (UTRAN band 9).
- * @MM_MODEM_BAND_UTRAN_10: UMTS 1700 MHz (EAWS A-G, UTRAN band 10).
- * @MM_MODEM_BAND_UTRAN_11: UMTS 1500 MHz (LPDC, UTRAN band 11).
- * @MM_MODEM_BAND_UTRAN_12: UMTS 700 MHz (LSMH A/B/C, UTRAN band 12).
- * @MM_MODEM_BAND_UTRAN_13: UMTS 700 MHz (USMH C, UTRAN band 13).
- * @MM_MODEM_BAND_UTRAN_14: UMTS 700 MHz (USMH D, UTRAN band 14).
- * @MM_MODEM_BAND_UTRAN_19: UMTS 800 MHz (UTRAN band 19).
- * @MM_MODEM_BAND_UTRAN_20: UMTS 800 MHz (EUDD, UTRAN band 20).
- * @MM_MODEM_BAND_UTRAN_21: UMTS 1500 MHz (UPDC, UTRAN band 21).
- * @MM_MODEM_BAND_UTRAN_22: UMTS 3500 MHz (UTRAN band 22).
- * @MM_MODEM_BAND_UTRAN_25: UMTS 1900 MHz (EPCS A-G, UTRAN band 25).
- * @MM_MODEM_BAND_UTRAN_26: UMTS 850 MHz (ECLR, UTRAN band 26).
- * @MM_MODEM_BAND_UTRAN_32: UMTS 1500 MHz (L-band, UTRAN band 32).
- * @MM_MODEM_BAND_EUTRAN_1: E-UTRAN band 1.
- * @MM_MODEM_BAND_EUTRAN_2: E-UTRAN band 2.
- * @MM_MODEM_BAND_EUTRAN_3: E-UTRAN band 3.
- * @MM_MODEM_BAND_EUTRAN_4: E-UTRAN band 4.
- * @MM_MODEM_BAND_EUTRAN_5: E-UTRAN band 5.
- * @MM_MODEM_BAND_EUTRAN_6: E-UTRAN band 6.
- * @MM_MODEM_BAND_EUTRAN_7: E-UTRAN band 7.
- * @MM_MODEM_BAND_EUTRAN_8: E-UTRAN band 8.
- * @MM_MODEM_BAND_EUTRAN_9: E-UTRAN band 9.
- * @MM_MODEM_BAND_EUTRAN_10: E-UTRAN band 10.
- * @MM_MODEM_BAND_EUTRAN_11: E-UTRAN band 11.
- * @MM_MODEM_BAND_EUTRAN_12: E-UTRAN band 12.
- * @MM_MODEM_BAND_EUTRAN_13: E-UTRAN band 13.
- * @MM_MODEM_BAND_EUTRAN_14: E-UTRAN band 14.
- * @MM_MODEM_BAND_EUTRAN_17: E-UTRAN band 17.
- * @MM_MODEM_BAND_EUTRAN_18: E-UTRAN band 18.
- * @MM_MODEM_BAND_EUTRAN_19: E-UTRAN band 19.
- * @MM_MODEM_BAND_EUTRAN_20: E-UTRAN band 20.
- * @MM_MODEM_BAND_EUTRAN_21: E-UTRAN band 21.
- * @MM_MODEM_BAND_EUTRAN_22: E-UTRAN band 22.
- * @MM_MODEM_BAND_EUTRAN_23: E-UTRAN band 23.
- * @MM_MODEM_BAND_EUTRAN_24: E-UTRAN band 24.
- * @MM_MODEM_BAND_EUTRAN_25: E-UTRAN band 25.
- * @MM_MODEM_BAND_EUTRAN_26: E-UTRAN band 26.
- * @MM_MODEM_BAND_EUTRAN_27: E-UTRAN band 27.
- * @MM_MODEM_BAND_EUTRAN_28: E-UTRAN band 28.
- * @MM_MODEM_BAND_EUTRAN_29: E-UTRAN band 29.
- * @MM_MODEM_BAND_EUTRAN_30: E-UTRAN band 30.
- * @MM_MODEM_BAND_EUTRAN_31: E-UTRAN band 31.
- * @MM_MODEM_BAND_EUTRAN_32: E-UTRAN band 32.
- * @MM_MODEM_BAND_EUTRAN_33: E-UTRAN band 33.
- * @MM_MODEM_BAND_EUTRAN_34: E-UTRAN band 34.
- * @MM_MODEM_BAND_EUTRAN_35: E-UTRAN band 35.
- * @MM_MODEM_BAND_EUTRAN_36: E-UTRAN band 36.
- * @MM_MODEM_BAND_EUTRAN_37: E-UTRAN band 37.
- * @MM_MODEM_BAND_EUTRAN_38: E-UTRAN band 38.
- * @MM_MODEM_BAND_EUTRAN_39: E-UTRAN band 39.
- * @MM_MODEM_BAND_EUTRAN_40: E-UTRAN band 40.
- * @MM_MODEM_BAND_EUTRAN_41: E-UTRAN band 41.
- * @MM_MODEM_BAND_EUTRAN_42: E-UTRAN band 42.
- * @MM_MODEM_BAND_EUTRAN_43: E-UTRAN band 43.
- * @MM_MODEM_BAND_EUTRAN_44: E-UTRAN band 44.
- * @MM_MODEM_BAND_EUTRAN_45: E-UTRAN band 45.
- * @MM_MODEM_BAND_EUTRAN_46: E-UTRAN band 46.
- * @MM_MODEM_BAND_EUTRAN_47: E-UTRAN band 47.
- * @MM_MODEM_BAND_EUTRAN_48: E-UTRAN band 48.
- * @MM_MODEM_BAND_EUTRAN_49: E-UTRAN band 49.
- * @MM_MODEM_BAND_EUTRAN_50: E-UTRAN band 50.
- * @MM_MODEM_BAND_EUTRAN_51: E-UTRAN band 51.
- * @MM_MODEM_BAND_EUTRAN_52: E-UTRAN band 52.
- * @MM_MODEM_BAND_EUTRAN_53: E-UTRAN band 53.
- * @MM_MODEM_BAND_EUTRAN_54: E-UTRAN band 54.
- * @MM_MODEM_BAND_EUTRAN_55: E-UTRAN band 55.
- * @MM_MODEM_BAND_EUTRAN_56: E-UTRAN band 56.
- * @MM_MODEM_BAND_EUTRAN_57: E-UTRAN band 57.
- * @MM_MODEM_BAND_EUTRAN_58: E-UTRAN band 58.
- * @MM_MODEM_BAND_EUTRAN_59: E-UTRAN band 59.
- * @MM_MODEM_BAND_EUTRAN_60: E-UTRAN band 60.
- * @MM_MODEM_BAND_EUTRAN_61: E-UTRAN band 61.
- * @MM_MODEM_BAND_EUTRAN_62: E-UTRAN band 62.
- * @MM_MODEM_BAND_EUTRAN_63: E-UTRAN band 63.
- * @MM_MODEM_BAND_EUTRAN_64: E-UTRAN band 64.
- * @MM_MODEM_BAND_EUTRAN_65: E-UTRAN band 65.
- * @MM_MODEM_BAND_EUTRAN_66: E-UTRAN band 66.
- * @MM_MODEM_BAND_EUTRAN_67: E-UTRAN band 67.
- * @MM_MODEM_BAND_EUTRAN_68: E-UTRAN band 68.
- * @MM_MODEM_BAND_EUTRAN_69: E-UTRAN band 69.
- * @MM_MODEM_BAND_EUTRAN_70: E-UTRAN band 70.
- * @MM_MODEM_BAND_EUTRAN_71: E-UTRAN band 71.
- * @MM_MODEM_BAND_CDMA_BC0: CDMA Band Class 0 (US Cellular 850MHz).
- * @MM_MODEM_BAND_CDMA_BC1: CDMA Band Class 1 (US PCS 1900MHz).
- * @MM_MODEM_BAND_CDMA_BC2: CDMA Band Class 2 (UK TACS 900MHz).
- * @MM_MODEM_BAND_CDMA_BC3: CDMA Band Class 3 (Japanese TACS).
- * @MM_MODEM_BAND_CDMA_BC4: CDMA Band Class 4 (Korean PCS).
- * @MM_MODEM_BAND_CDMA_BC5: CDMA Band Class 5 (NMT 450MHz).
- * @MM_MODEM_BAND_CDMA_BC6: CDMA Band Class 6 (IMT2000 2100MHz).
- * @MM_MODEM_BAND_CDMA_BC7: CDMA Band Class 7 (Cellular 700MHz).
- * @MM_MODEM_BAND_CDMA_BC8: CDMA Band Class 8 (1800MHz).
- * @MM_MODEM_BAND_CDMA_BC9: CDMA Band Class 9 (900MHz).
- * @MM_MODEM_BAND_CDMA_BC10: CDMA Band Class 10 (US Secondary 800).
- * @MM_MODEM_BAND_CDMA_BC11: CDMA Band Class 11 (European PAMR 400MHz).
- * @MM_MODEM_BAND_CDMA_BC12: CDMA Band Class 12 (PAMR 800MHz).
- * @MM_MODEM_BAND_CDMA_BC13: CDMA Band Class 13 (IMT2000 2500MHz Expansion).
- * @MM_MODEM_BAND_CDMA_BC14: CDMA Band Class 14 (More US PCS 1900MHz).
- * @MM_MODEM_BAND_CDMA_BC15: CDMA Band Class 15 (AWS 1700MHz).
- * @MM_MODEM_BAND_CDMA_BC16: CDMA Band Class 16 (US 2500MHz).
- * @MM_MODEM_BAND_CDMA_BC17: CDMA Band Class 17 (US 2500MHz Forward Link Only).
- * @MM_MODEM_BAND_CDMA_BC18: CDMA Band Class 18 (US 700MHz Public Safety).
- * @MM_MODEM_BAND_CDMA_BC19: CDMA Band Class 19 (US Lower 700MHz).
+ * @MM_MODEM_BAND_UTRAN_1: UMTS 2100 MHz (IMT, UTRAN band 1). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_2: UMTS 1900 MHz (PCS A-F, UTRAN band 2). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_3: UMTS 1800 MHz (DCS, UTRAN band 3). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_4: UMTS 1700 MHz (AWS A-F, UTRAN band 4). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_5: UMTS 850 MHz (CLR, UTRAN band 5). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_6: UMTS 800 MHz (UTRAN band 6). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_7: UMTS 2600 MHz (IMT-E, UTRAN band 7). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_8: UMTS 900 MHz (E-GSM, UTRAN band 8). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_9: UMTS 1700 MHz (UTRAN band 9). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_10: UMTS 1700 MHz (EAWS A-G, UTRAN band 10). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_11: UMTS 1500 MHz (LPDC, UTRAN band 11). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_12: UMTS 700 MHz (LSMH A/B/C, UTRAN band 12). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_13: UMTS 700 MHz (USMH C, UTRAN band 13). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_14: UMTS 700 MHz (USMH D, UTRAN band 14). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_19: UMTS 800 MHz (UTRAN band 19). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_20: UMTS 800 MHz (EUDD, UTRAN band 20). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_21: UMTS 1500 MHz (UPDC, UTRAN band 21). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_22: UMTS 3500 MHz (UTRAN band 22). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_25: UMTS 1900 MHz (EPCS A-G, UTRAN band 25). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_26: UMTS 850 MHz (ECLR, UTRAN band 26). Since 1.8.
+ * @MM_MODEM_BAND_UTRAN_32: UMTS 1500 MHz (L-band, UTRAN band 32). Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_1: E-UTRAN band 1. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_2: E-UTRAN band 2. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_3: E-UTRAN band 3. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_4: E-UTRAN band 4. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_5: E-UTRAN band 5. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_6: E-UTRAN band 6. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_7: E-UTRAN band 7. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_8: E-UTRAN band 8. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_9: E-UTRAN band 9. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_10: E-UTRAN band 10. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_11: E-UTRAN band 11. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_12: E-UTRAN band 12. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_13: E-UTRAN band 13. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_14: E-UTRAN band 14. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_17: E-UTRAN band 17. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_18: E-UTRAN band 18. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_19: E-UTRAN band 19. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_20: E-UTRAN band 20. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_21: E-UTRAN band 21. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_22: E-UTRAN band 22. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_23: E-UTRAN band 23. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_24: E-UTRAN band 24. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_25: E-UTRAN band 25. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_26: E-UTRAN band 26. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_27: E-UTRAN band 27. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_28: E-UTRAN band 28. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_29: E-UTRAN band 29. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_30: E-UTRAN band 30. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_31: E-UTRAN band 31. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_32: E-UTRAN band 32. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_33: E-UTRAN band 33. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_34: E-UTRAN band 34. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_35: E-UTRAN band 35. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_36: E-UTRAN band 36. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_37: E-UTRAN band 37. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_38: E-UTRAN band 38. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_39: E-UTRAN band 39. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_40: E-UTRAN band 40. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_41: E-UTRAN band 41. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_42: E-UTRAN band 42. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_43: E-UTRAN band 43. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_44: E-UTRAN band 44. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_45: E-UTRAN band 45. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_46: E-UTRAN band 46. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_47: E-UTRAN band 47. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_48: E-UTRAN band 48. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_49: E-UTRAN band 49. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_50: E-UTRAN band 50. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_51: E-UTRAN band 51. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_52: E-UTRAN band 52. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_53: E-UTRAN band 53. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_54: E-UTRAN band 54. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_55: E-UTRAN band 55. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_56: E-UTRAN band 56. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_57: E-UTRAN band 57. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_58: E-UTRAN band 58. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_59: E-UTRAN band 59. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_60: E-UTRAN band 60. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_61: E-UTRAN band 61. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_62: E-UTRAN band 62. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_63: E-UTRAN band 63. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_64: E-UTRAN band 64. Since 1.10.
+ * @MM_MODEM_BAND_EUTRAN_65: E-UTRAN band 65. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_66: E-UTRAN band 66. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_67: E-UTRAN band 67. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_68: E-UTRAN band 68. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_69: E-UTRAN band 69. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_70: E-UTRAN band 70. Since 1.8.
+ * @MM_MODEM_BAND_EUTRAN_71: E-UTRAN band 71. Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC0: CDMA Band Class 0 (US Cellular 850MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC1: CDMA Band Class 1 (US PCS 1900MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC2: CDMA Band Class 2 (UK TACS 900MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC3: CDMA Band Class 3 (Japanese TACS). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC4: CDMA Band Class 4 (Korean PCS). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC5: CDMA Band Class 5 (NMT 450MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC6: CDMA Band Class 6 (IMT2000 2100MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC7: CDMA Band Class 7 (Cellular 700MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC8: CDMA Band Class 8 (1800MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC9: CDMA Band Class 9 (900MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC10: CDMA Band Class 10 (US Secondary 800). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC11: CDMA Band Class 11 (European PAMR 400MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC12: CDMA Band Class 12 (PAMR 800MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC13: CDMA Band Class 13 (IMT2000 2500MHz Expansion). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC14: CDMA Band Class 14 (More US PCS 1900MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC15: CDMA Band Class 15 (AWS 1700MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC16: CDMA Band Class 16 (US 2500MHz). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC17: CDMA Band Class 17 (US 2500MHz Forward Link Only). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC18: CDMA Band Class 18 (US 700MHz Public Safety). Since 1.8.
+ * @MM_MODEM_BAND_CDMA_BC19: CDMA Band Class 19 (US Lower 700MHz). Since 1.8.
  * @MM_MODEM_BAND_ANY: For certain operations, allow the modem to select a band automatically.
  *
  * Radio bands supported by the device when connecting to a mobile network.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_band >*/
     MM_MODEM_BAND_UNKNOWN = 0,
@@ -514,9 +532,11 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
  * @MM_MODEM_PORT_TYPE_GPS: GPS port.
  * @MM_MODEM_PORT_TYPE_QMI: QMI port.
  * @MM_MODEM_PORT_TYPE_MBIM: MBIM port.
- * @MM_MODEM_PORT_TYPE_AUDIO: Audio port.
+ * @MM_MODEM_PORT_TYPE_AUDIO: Audio port. Since 1.12.
  *
  * Type of modem port.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_port_type >*/
     MM_MODEM_PORT_TYPE_UNKNOWN = 1,
@@ -535,14 +555,16 @@ typedef enum { /*< underscore_name=mm_modem_port_type >*/
  * @MM_SMS_PDU_TYPE_DELIVER: 3GPP Mobile-Terminated (MT) message.
  * @MM_SMS_PDU_TYPE_SUBMIT: 3GPP Mobile-Originated (MO) message.
  * @MM_SMS_PDU_TYPE_STATUS_REPORT: 3GPP status report (MT).
- * @MM_SMS_PDU_TYPE_CDMA_DELIVER: 3GPP2 Mobile-Terminated (MT) message.
- * @MM_SMS_PDU_TYPE_CDMA_SUBMIT: 3GPP2 Mobile-Originated (MO) message.
- * @MM_SMS_PDU_TYPE_CDMA_CANCELLATION: 3GPP2 Cancellation (MO) message.
- * @MM_SMS_PDU_TYPE_CDMA_DELIVERY_ACKNOWLEDGEMENT: 3GPP2 Delivery Acknowledgement (MT) message.
- * @MM_SMS_PDU_TYPE_CDMA_USER_ACKNOWLEDGEMENT: 3GPP2 User Acknowledgement (MT or MO) message.
- * @MM_SMS_PDU_TYPE_CDMA_READ_ACKNOWLEDGEMENT: 3GPP2 Read Acknowledgement (MT or MO) message.
+ * @MM_SMS_PDU_TYPE_CDMA_DELIVER: 3GPP2 Mobile-Terminated (MT) message. Since 1.2.
+ * @MM_SMS_PDU_TYPE_CDMA_SUBMIT: 3GPP2 Mobile-Originated (MO) message. Since 1.2.
+ * @MM_SMS_PDU_TYPE_CDMA_CANCELLATION: 3GPP2 Cancellation (MO) message. Since 1.2.
+ * @MM_SMS_PDU_TYPE_CDMA_DELIVERY_ACKNOWLEDGEMENT: 3GPP2 Delivery Acknowledgement (MT) message. Since 1.2.
+ * @MM_SMS_PDU_TYPE_CDMA_USER_ACKNOWLEDGEMENT: 3GPP2 User Acknowledgement (MT or MO) message. Since 1.2.
+ * @MM_SMS_PDU_TYPE_CDMA_READ_ACKNOWLEDGEMENT: 3GPP2 Read Acknowledgement (MT or MO) message. Since 1.2.
  *
  * Type of PDUs used in the SMS.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_sms_pdu_type >*/
     MM_SMS_PDU_TYPE_UNKNOWN = 0,
@@ -567,6 +589,8 @@ typedef enum { /*< underscore_name=mm_sms_pdu_type >*/
  * @MM_SMS_STATE_SENT: The message was successfully sent.
  *
  * State of a given SMS.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_sms_state >*/
     MM_SMS_STATE_UNKNOWN   = 0,
@@ -605,67 +629,69 @@ typedef enum { /*< underscore_name=mm_sms_state >*/
  * @MM_SMS_DELIVERY_STATE_TEMPORARY_FATAL_ERROR_QOS_NOT_AVAILABLE: Permanent error, QoS not available.
  * @MM_SMS_DELIVERY_STATE_TEMPORARY_FATAL_ERROR_IN_SME: Permanent error in SME.
  * @MM_SMS_DELIVERY_STATE_UNKNOWN: Unknown state.
- * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_ADDRESS_VACANT: Permanent error in network, address vacant.
- * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_ADDRESS_TRANSLATION_FAILURE: Permanent error in network, address translation failure.
- * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_NETWORK_RESOURCE_OUTAGE: Permanent error in network, network resource outage.
- * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_NETWORK_FAILURE: Permanent error in network, network failure.
- * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_INVALID_TELESERVICE_ID: Permanent error in network, invalid teleservice id.
- * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_OTHER: Permanent error, other network problem.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_NO_PAGE_RESPONSE: Permanent error in terminal, no page response.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_BUSY: Permanent error in terminal, destination busy.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_NO_ACKNOWLEDGMENT: Permanent error in terminal, no acknowledgement.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_RESOURCE_SHORTAGE: Permanent error in terminal, destination resource shortage.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_SMS_DELIVERY_POSTPONED: Permanent error in terminal, SMS delivery postponed.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_OUT_OF_SERVICE: Permanent error in terminal, destination out of service.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_NO_LONGER_AT_THIS_ADDRESS: Permanent error in terminal, destination no longer at this address.
- * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_OTHER: Permanent error, other terminal problem.
- * @MM_SMS_DELIVERY_STATE_RADIO_INTERFACE_PROBLEM_RESOURCE_SHORTAGE: Permanent error in radio interface, resource shortage.
- * @MM_SMS_DELIVERY_STATE_RADIO_INTERFACE_PROBLEM_INCOMPATIBILITY: Permanent error in radio interface, problem incompatibility.
- * @MM_SMS_DELIVERY_STATE_RADIO_INTERFACE_PROBLEM_OTHER: Permanent error, other radio interface problem.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_ENCODING: Permanent error, encoding.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SMS_ORIGINATION_DENIED: Permanent error, SMS origination denied.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SMS_TERMINATION_DENIED: Permanent error, SMS termination denied.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SUPPLEMENTARY_SERVICE_NOT_SUPPORTED: Permanent error, supplementary service not supported.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SMS_NOT_SUPPORTED: Permanent error, SMS not supported.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_MISSING_EXPECTED_PARAMETER: Permanent error, missing expected parameter.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_MISSING_MANDATORY_PARAMETER: Permanent error, missing mandatory parameter.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_UNRECOGNIZED_PARAMETER_VALUE: Permanent error, unrecognized parameter value.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_UNEXPECTED_PARAMETER_VALUE: Permanent error, unexpected parameter value.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_USER_DATA_SIZE_ERROR: Permanent error, user data size error.
- * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_OTHER: Permanent error, other general problem.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_ADDRESS_VACANT: Temporary error in network, address vacant.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_ADDRESS_TRANSLATION_FAILURE: Temporary error in network, address translation failure.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_NETWORK_RESOURCE_OUTAGE: Temporary error in network, network resource outage.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_NETWORK_FAILURE: Temporary error in network, network failure.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_INVALID_TELESERVICE_ID: Temporary error in network, invalid teleservice id.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_OTHER: Temporary error, other network problem.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_NO_PAGE_RESPONSE: Temporary error in terminal, no page response.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_BUSY: Temporary error in terminal, destination busy.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_NO_ACKNOWLEDGMENT: Temporary error in terminal, no acknowledgement.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_RESOURCE_SHORTAGE: Temporary error in terminal, destination resource shortage.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_SMS_DELIVERY_POSTPONED: Temporary error in terminal, SMS delivery postponed.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_OUT_OF_SERVICE: Temporary error in terminal, destination out of service.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_NO_LONGER_AT_THIS_ADDRESS: Temporary error in terminal, destination no longer at this address.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_OTHER: Temporary error, other terminal problem.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_RADIO_INTERFACE_PROBLEM_RESOURCE_SHORTAGE: Temporary error in radio interface, resource shortage.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_RADIO_INTERFACE_PROBLEM_INCOMPATIBILITY: Temporary error in radio interface, problem incompatibility.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_RADIO_INTERFACE_PROBLEM_OTHER: Temporary error, other radio interface problem.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_ENCODING: Temporary error, encoding.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SMS_ORIGINATION_DENIED: Temporary error, SMS origination denied.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SMS_TERMINATION_DENIED: Temporary error, SMS termination denied.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SUPPLEMENTARY_SERVICE_NOT_SUPPORTED: Temporary error, supplementary service not supported.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SMS_NOT_SUPPORTED: Temporary error, SMS not supported.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_MISSING_EXPECTED_PARAMETER: Temporary error, missing expected parameter.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_MISSING_MANDATORY_PARAMETER: Temporary error, missing mandatory parameter.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_UNRECOGNIZED_PARAMETER_VALUE: Temporary error, unrecognized parameter value.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_UNEXPECTED_PARAMETER_VALUE: Temporary error, unexpected parameter value.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_USER_DATA_SIZE_ERROR: Temporary error, user data size error.
- * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_OTHER: Temporary error, other general problem.
+ * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_ADDRESS_VACANT: Permanent error in network, address vacant. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_ADDRESS_TRANSLATION_FAILURE: Permanent error in network, address translation failure. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_NETWORK_RESOURCE_OUTAGE: Permanent error in network, network resource outage. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_NETWORK_FAILURE: Permanent error in network, network failure. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_INVALID_TELESERVICE_ID: Permanent error in network, invalid teleservice id. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_NETWORK_PROBLEM_OTHER: Permanent error, other network problem. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_NO_PAGE_RESPONSE: Permanent error in terminal, no page response. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_BUSY: Permanent error in terminal, destination busy. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_NO_ACKNOWLEDGMENT: Permanent error in terminal, no acknowledgement. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_RESOURCE_SHORTAGE: Permanent error in terminal, destination resource shortage. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_SMS_DELIVERY_POSTPONED: Permanent error in terminal, SMS delivery postponed. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_OUT_OF_SERVICE: Permanent error in terminal, destination out of service. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_DESTINATION_NO_LONGER_AT_THIS_ADDRESS: Permanent error in terminal, destination no longer at this address. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TERMINAL_PROBLEM_OTHER: Permanent error, other terminal problem. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_RADIO_INTERFACE_PROBLEM_RESOURCE_SHORTAGE: Permanent error in radio interface, resource shortage. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_RADIO_INTERFACE_PROBLEM_INCOMPATIBILITY: Permanent error in radio interface, problem incompatibility. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_RADIO_INTERFACE_PROBLEM_OTHER: Permanent error, other radio interface problem. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_ENCODING: Permanent error, encoding. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SMS_ORIGINATION_DENIED: Permanent error, SMS origination denied. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SMS_TERMINATION_DENIED: Permanent error, SMS termination denied. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SUPPLEMENTARY_SERVICE_NOT_SUPPORTED: Permanent error, supplementary service not supported. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_SMS_NOT_SUPPORTED: Permanent error, SMS not supported. Since 1.22.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_MISSING_EXPECTED_PARAMETER: Permanent error, missing expected parameter. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_MISSING_MANDATORY_PARAMETER: Permanent error, missing mandatory parameter. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_UNRECOGNIZED_PARAMETER_VALUE: Permanent error, unrecognized parameter value. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_UNEXPECTED_PARAMETER_VALUE: Permanent error, unexpected parameter value. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_USER_DATA_SIZE_ERROR: Permanent error, user data size error. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_GENERAL_PROBLEM_OTHER: Permanent error, other general problem. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_ADDRESS_VACANT: Temporary error in network, address vacant. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_ADDRESS_TRANSLATION_FAILURE: Temporary error in network, address translation failure. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_NETWORK_RESOURCE_OUTAGE: Temporary error in network, network resource outage. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_NETWORK_FAILURE: Temporary error in network, network failure. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_INVALID_TELESERVICE_ID: Temporary error in network, invalid teleservice id. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_NETWORK_PROBLEM_OTHER: Temporary error, other network problem. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_NO_PAGE_RESPONSE: Temporary error in terminal, no page response. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_BUSY: Temporary error in terminal, destination busy. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_NO_ACKNOWLEDGMENT: Temporary error in terminal, no acknowledgement. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_RESOURCE_SHORTAGE: Temporary error in terminal, destination resource shortage. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_SMS_DELIVERY_POSTPONED: Temporary error in terminal, SMS delivery postponed. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_OUT_OF_SERVICE: Temporary error in terminal, destination out of service. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_DESTINATION_NO_LONGER_AT_THIS_ADDRESS: Temporary error in terminal, destination no longer at this address. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_TERMINAL_PROBLEM_OTHER: Temporary error, other terminal problem. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_RADIO_INTERFACE_PROBLEM_RESOURCE_SHORTAGE: Temporary error in radio interface, resource shortage. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_RADIO_INTERFACE_PROBLEM_INCOMPATIBILITY: Temporary error in radio interface, problem incompatibility. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_RADIO_INTERFACE_PROBLEM_OTHER: Temporary error, other radio interface problem. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_ENCODING: Temporary error, encoding. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SMS_ORIGINATION_DENIED: Temporary error, SMS origination denied. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SMS_TERMINATION_DENIED: Temporary error, SMS termination denied. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SUPPLEMENTARY_SERVICE_NOT_SUPPORTED: Temporary error, supplementary service not supported. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_SMS_NOT_SUPPORTED: Temporary error, SMS not supported. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_MISSING_EXPECTED_PARAMETER: Temporary error, missing expected parameter. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_MISSING_MANDATORY_PARAMETER: Temporary error, missing mandatory parameter. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_UNRECOGNIZED_PARAMETER_VALUE: Temporary error, unrecognized parameter value. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_UNEXPECTED_PARAMETER_VALUE: Temporary error, unexpected parameter value. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_USER_DATA_SIZE_ERROR: Temporary error, user data size error. Since 1.2.
+ * @MM_SMS_DELIVERY_STATE_TEMPORARY_GENERAL_PROBLEM_OTHER: Temporary error, other general problem. Since 1.2.
  *
  * Enumeration of known SMS delivery states as defined in 3GPP TS 03.40 and
  * 3GPP2 N.S0005-O, section 6.5.2.125.
  *
  * States out of the known ranges may also be valid (either reserved or SC-specific).
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_sms_delivery_state >*/
     /* --------------- 3GPP specific errors ---------------------- */
@@ -786,6 +812,8 @@ typedef enum { /*< underscore_name=mm_sms_delivery_state >*/
  * @MM_SMS_STORAGE_TA: Terminal adaptor message storage area.
  *
  * Storage for SMS messages.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_sms_storage >*/
     MM_SMS_STORAGE_UNKNOWN = 0,
@@ -805,6 +833,8 @@ typedef enum { /*< underscore_name=mm_sms_storage >*/
  * @MM_SMS_VALIDITY_TYPE_ENHANCED: Enhanced validity.
  *
  * Type of SMS validity value.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_sms_validity_type >*/
     MM_SMS_VALIDITY_TYPE_UNKNOWN  = 0,
@@ -827,6 +857,8 @@ typedef enum { /*< underscore_name=mm_sms_validity_type >*/
  *
  * Teleservice IDs supported for CDMA SMS, as defined in 3GPP2 X.S0004-550-E
  * (section 2.256) and 3GPP2 C.S0015-B (section 3.4.3.1).
+ *
+ * Since: 1.2
  */
 typedef enum { /*< underscore_name=mm_sms_cdma_teleservice_id >*/
     MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN = 0x0000,
@@ -881,6 +913,8 @@ typedef enum { /*< underscore_name=mm_sms_cdma_teleservice_id >*/
  * @MM_SMS_CDMA_SERVICE_CATEGORY_CMAS_TEST: CMAS test.
  *
  * Service category for CDMA SMS, as defined in 3GPP2 C.R1001-D (section 9.3).
+ *
+ * Since: 1.2
  */
 typedef enum { /*< underscore_name=mm_sms_cdma_service_category >*/
     MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN                          = 0x0000,
@@ -929,11 +963,13 @@ typedef enum { /*< underscore_name=mm_sms_cdma_service_category >*/
  * @MM_MODEM_LOCATION_SOURCE_GPS_RAW: GPS location given by predefined keys.
  * @MM_MODEM_LOCATION_SOURCE_GPS_NMEA: GPS location given as NMEA traces.
  * @MM_MODEM_LOCATION_SOURCE_CDMA_BS: CDMA base station position.
- * @MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED: No location given, just GPS module setup.
+ * @MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED: No location given, just GPS module setup. Since 1.4.
  * @MM_MODEM_LOCATION_SOURCE_AGPS_MSA: Mobile Station Assisted A-GPS location requested. Since 1.12.
  * @MM_MODEM_LOCATION_SOURCE_AGPS_MSB: Mobile Station Based A-GPS location requested. Since 1.12.
  *
  * Sources of location information supported by the modem.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_location_source >*/
     MM_MODEM_LOCATION_SOURCE_NONE          = 0,
@@ -956,6 +992,8 @@ typedef enum { /*< underscore_name=mm_modem_location_source >*/
  * @MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_XTRA: Qualcomm gpsOneXTRA.
  *
  * Type of assistance data that may be injected to the GNSS module.
+ *
+ * Since: 1.10
  */
 typedef enum { /*< underscore_name=mm_modem_location_assistance_data_type >*/
     MM_MODEM_LOCATION_ASSISTANCE_DATA_TYPE_NONE = 0,
@@ -970,6 +1008,8 @@ typedef enum { /*< underscore_name=mm_modem_location_assistance_data_type >*/
  * @MM_MODEM_CONTACTS_STORAGE_MT: Combined device/ME and SIM/SM phonebook.
  *
  * Specifies different storage locations for contact information.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_contacts_storage >*/
     MM_MODEM_CONTACTS_STORAGE_UNKNOWN = 0,
@@ -992,6 +1032,8 @@ typedef enum { /*< underscore_name=mm_modem_contacts_storage >*/
  * specific traffic with different QoS settings.
  *
  * Type of context (2G/3G) or bearer (4G).
+ *
+ * Since: 1.10
  */
 typedef enum { /*< underscore_name=mm_bearer_type >*/
     MM_BEARER_TYPE_UNKNOWN        = 0,
@@ -1018,6 +1060,8 @@ typedef enum { /*< underscore_name=mm_bearer_type >*/
  * is started to obtain the rest of the configuration.
  *
  * Type of IP method configuration to be used in a given Bearer.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_bearer_ip_method >*/
     MM_BEARER_IP_METHOD_UNKNOWN = 0,
@@ -1035,6 +1079,8 @@ typedef enum { /*< underscore_name=mm_bearer_ip_method >*/
  * @MM_BEARER_IP_FAMILY_ANY: Mask specifying all IP families.
  *
  * Type of IP family to be used in a given Bearer.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_bearer_ip_family >*/
     MM_BEARER_IP_FAMILY_NONE    = 0,
@@ -1055,6 +1101,8 @@ typedef enum { /*< underscore_name=mm_bearer_ip_family >*/
  * @MM_BEARER_ALLOWED_AUTH_EAP: EAP.
  *
  * Allowed authentication methods when authenticating with the network.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_bearer_allowed_auth >*/
     MM_BEARER_ALLOWED_AUTH_UNKNOWN  = 0,
@@ -1075,6 +1123,8 @@ typedef enum { /*< underscore_name=mm_bearer_allowed_auth >*/
  * @MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING: Currently registered on a roaming network.
  *
  * Registration state of a CDMA modem.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_cdma_registration_state >*/
     MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN    = 0,
@@ -1092,6 +1142,8 @@ typedef enum { /*< underscore_name=mm_modem_cdma_registration_state >*/
  * @MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED: Device is ready for use.
  *
  * Activation state of a CDMA modem.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_cdma_activation_state >*/
     MM_MODEM_CDMA_ACTIVATION_STATE_UNKNOWN             = 0,
@@ -1111,6 +1163,8 @@ typedef enum { /*< underscore_name=mm_modem_cdma_activation_state >*/
  * @MM_MODEM_CDMA_RM_PROTOCOL_STU_III: STU-III service.
  *
  * Protocol of the Rm interface in modems with CDMA capabilities.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_cdma_rm_protocol >*/
     MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN             = 0,
@@ -1129,13 +1183,15 @@ typedef enum { /*< underscore_name=mm_modem_cdma_rm_protocol >*/
  * @MM_MODEM_3GPP_REGISTRATION_STATE_DENIED: Registration denied.
  * @MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN: Unknown registration status.
  * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING: Registered on a roaming network.
- * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY: Registered for "SMS only", home network (applicable only when on LTE).
- * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY: Registered for "SMS only", roaming network (applicable only when on LTE).
- * @MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY: Emergency services only.
- * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", home network (applicable only when on LTE).
- * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", roaming network (applicable only when on LTE).
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY: Registered for "SMS only", home network (applicable only when on LTE). Since 1.8.
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY: Registered for "SMS only", roaming network (applicable only when on LTE). Since 1.8.
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY: Emergency services only. Since 1.8.
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", home network (applicable only when on LTE). Since 1.8.
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", roaming network (applicable only when on LTE). Since 1.8.
  *
  * GSM registration code as defined in 3GPP TS 27.007.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_registration_state >*/
     MM_MODEM_3GPP_REGISTRATION_STATE_IDLE                       = 0,
@@ -1167,6 +1223,8 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_registration_state >*/
  * requires a pin or unlock code. The facilities include the
  * personalizations (device locks) described in 3GPP spec TS 22.022,
  * and the PIN and PIN2 locks, which are SIM locks.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_facility >*/
     MM_MODEM_3GPP_FACILITY_NONE          = 0,
@@ -1187,7 +1245,9 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_facility >*/
  * @MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT: Network is the current one.
  * @MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN: Network is forbidden.
  *
- * Network availability status as defined in 3GPP TS 27.007 section 7.3
+ * Network availability status as defined in 3GPP TS 27.007 section 7.3.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_network_availability >*/
     MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN   = 0,
@@ -1205,6 +1265,8 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_network_availability >*/
  *
  * Describes the current subscription status of the SIM.  This value is only available after the
  * modem attempts to register with the network.
+ *
+ * Since: 1.2
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_subscription_state >*/
     MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN       = 0,
@@ -1221,6 +1283,8 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_subscription_state >*/
  * @MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE: The network is waiting for the client's response.
  *
  * State of a USSD session.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_ussd_session_state >*/
     MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN       = 0,
@@ -1238,6 +1302,8 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_ussd_session_state >*/
  * @MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_CSPS_2: CS/PS mode 2 of operation: EPS and non-EPS, data-centric.
  *
  * UE mode of operation for EPS, as per 3GPP TS 24.301.
+ *
+ * Since: 1.8
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_eps_ue_mode_operation >*/
     MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN = 0,
@@ -1254,6 +1320,8 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_eps_ue_mode_operation >*/
  * @MM_FIRMWARE_IMAGE_TYPE_GOBI: Firmware image of Gobi devices.
  *
  * Type of firmware image.
+ *
+ * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_firmware_image_type >*/
     MM_FIRMWARE_IMAGE_TYPE_UNKNOWN = 0,
@@ -1269,6 +1337,8 @@ typedef enum { /*< underscore_name=mm_firmware_image_type >*/
  * @MM_OMA_FEATURE_HANDS_FREE_ACTIVATION: Hands free activation service.
  *
  * Features that can be enabled or disabled in the OMA device management support.
+ *
+ * Since: 1.2
  */
 typedef enum { /*< underscore_name=mm_oma_feature >*/
     MM_OMA_FEATURE_NONE                  = 0,
@@ -1289,6 +1359,8 @@ typedef enum { /*< underscore_name=mm_oma_feature >*/
  * @MM_OMA_SESSION_TYPE_DEVICE_INITIATED_HANDS_FREE_ACTIVATION: Device-initiated hands free activation.
  *
  * Type of OMA device management session.
+ *
+ * Since: 1.2
  */
 typedef enum { /*< underscore_name=mm_oma_session_type >*/
     MM_OMA_SESSION_TYPE_UNKNOWN                                = 0,
@@ -1317,6 +1389,8 @@ typedef enum { /*< underscore_name=mm_oma_session_type >*/
  * @MM_OMA_SESSION_STATE_COMPLETED: Session completed.
  *
  * State of the OMA device management session.
+ *
+ * Since: 1.2
  */
 typedef enum { /*< underscore_name=mm_oma_session_state >*/
     MM_OMA_SESSION_STATE_FAILED                 = -1,
@@ -1343,6 +1417,8 @@ typedef enum { /*< underscore_name=mm_oma_session_state >*/
  * @MM_OMA_SESSION_STATE_FAILED_REASON_SESSION_CANCELLED: Session cancelled.
  *
  * Reason of failure in the OMA device management session.
+ *
+ * Since: 1.2
  */
 typedef enum { /*< underscore_name=mm_oma_session_state_failed_reason >*/
     MM_OMA_SESSION_STATE_FAILED_REASON_UNKNOWN               = 0,
@@ -1364,7 +1440,9 @@ typedef enum { /*< underscore_name=mm_oma_session_state_failed_reason >*/
  * @MM_CALL_STATE_WAITING: waiting call (by +CCWA AT command).
  * @MM_CALL_STATE_TERMINATED: call is terminated.
  *
- * State of Call
+ * State of Call.
+ *
+ * Since: 1.6
  */
 typedef enum { /*< underscore_name=mm_call_state >*/
     MM_CALL_STATE_UNKNOWN       = 0,
@@ -1386,11 +1464,13 @@ typedef enum { /*< underscore_name=mm_call_state >*/
  * @MM_CALL_STATE_REASON_TERMINATED: Call is correctly terminated.
  * @MM_CALL_STATE_REASON_REFUSED_OR_BUSY: Remote peer is busy or refused call.
  * @MM_CALL_STATE_REASON_ERROR: Wrong number or generic network error.
- * @MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED: Error setting up audio channel.
+ * @MM_CALL_STATE_REASON_AUDIO_SETUP_FAILED: Error setting up audio channel. Since 1.10.
  * @MM_CALL_STATE_REASON_TRANSFERRED: Call has been transferred. Since 1.12.
  * @MM_CALL_STATE_REASON_DEFLECTED: Call has been deflected to a new number. Since 1.12.
  *
  * Reason for the state change in the call.
+ *
+ * Since: 1.6
  */
 typedef enum { /*< underscore_name=mm_call_state_reason >*/
     MM_CALL_STATE_REASON_UNKNOWN            = 0,
@@ -1412,6 +1492,8 @@ typedef enum { /*< underscore_name=mm_call_state_reason >*/
  * @MM_CALL_DIRECTION_OUTGOING: call to network.
  *
  * Direction of the call.
+ *
+ * Since: 1.6
  */
 typedef enum { /*< underscore_name=mm_call_direction >*/
     MM_CALL_DIRECTION_UNKNOWN   = 0,
@@ -1426,6 +1508,8 @@ typedef enum { /*< underscore_name=mm_call_direction >*/
  * @MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC: Device supports QMI PDC based update.
  *
  * Type of firmware update method supported by the module.
+ *
+ * Since: 1.10
  */
 typedef enum { /*< underscore_name=mm_modem_firmware_update_method >*/
     MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE     = 0,
