@@ -51,7 +51,10 @@ struct _MMCallAudioFormatPrivate {
  * Gets the encoding of the audio format.  For example, "pcm" for PCM-encoded
  * audio.
  *
- * Returns: a string with the encoding, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ * Returns: a string with the encoding, or #NULL if unknown. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.10
  */
 const gchar *
 mm_call_audio_format_get_encoding (MMCallAudioFormat *self)
@@ -80,7 +83,10 @@ mm_call_audio_format_set_encoding (MMCallAudioFormat *self,
  * Gets the resolution of the audio format.  For example, "s16le" for signed
  * 16-bit little-endian audio sampling resolution.
  *
- * Returns: a string with the resolution, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ * Returns: a string with the resolution, or #NULL if unknown. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.10
  */
 const gchar *
 mm_call_audio_format_get_resolution (MMCallAudioFormat *self)
@@ -110,6 +116,8 @@ mm_call_audio_format_set_resolution (MMCallAudioFormat *self,
  * sampling rate.
  *
  * Returns: the sampling rate, or 0 if unknown.
+ *
+ * Since: 1.10
  */
 guint
 mm_call_audio_format_get_rate (MMCallAudioFormat *self)
@@ -212,14 +220,6 @@ mm_call_audio_format_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-/**
- * mm_call_audio_format_dup:
- * @orig: a #MMCallAudioFormat
- *
- * Creates a copy of @orig.
- *
- * Returns: (transfer full): a newly created #MMCallAudioFormat
- */
 MMCallAudioFormat *
 mm_call_audio_format_dup (MMCallAudioFormat *orig)
 {

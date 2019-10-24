@@ -56,6 +56,8 @@ struct _MMModemTimePrivate {
  * Gets the DBus path of the #MMObject which implements this interface.
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_time_get_path (MMModemTime *self)
@@ -70,9 +72,13 @@ mm_modem_time_get_path (MMModemTime *self)
  * mm_modem_time_dup_path:
  * @self: A #MMModemTime.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_time_dup_path (MMModemTime *self)
@@ -92,12 +98,16 @@ mm_modem_time_dup_path (MMModemTime *self)
 /**
  * mm_modem_time_get_network_time_finish:
  * @self: A #MMModemTime.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_enable().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_enable().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_time_get_network_time().
  *
- * Returns: (transfer full): A string containing the network time, or %NULL if @error is set. The returned value should be freed with g_free().
+ * Returns: (transfer full): A string containing the network time, or %NULL if
+ * @error is set. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_time_get_network_time_finish (MMModemTime *self,
@@ -118,15 +128,21 @@ mm_modem_time_get_network_time_finish (MMModemTime *self,
  * mm_modem_time_get_network_time:
  * @self: A #MMModemTime.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests the current network time.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_time_get_network_time_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_time_get_network_time_finish() to get the result of the operation.
  *
- * See mm_modem_time_get_network_time_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_time_get_network_time_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_time_get_network_time (MMModemTime *self,
@@ -150,10 +166,13 @@ mm_modem_time_get_network_time (MMModemTime *self,
  *
  * Synchronously requests the current network time.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_time_get_network_time()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_time_get_network_time() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A string containing the network time, or %NULL if @error is set. The returned value should be freed with g_free().
+ * Returns: (transfer full): A string containing the network time, or %NULL if
+ * @error is set. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_time_get_network_time_sync (MMModemTime *self,
@@ -228,10 +247,13 @@ ensure_internal_timezone (MMModemTime *self,
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_time_get_network_timezone() again to get a new #MMNetworkTimezone with the
- * new values.</warning>
+ * mm_modem_time_get_network_timezone() again to get a new #MMNetworkTimezone
+ * with the new values.</warning>
  *
- * Returns: (transfer full): A #MMNetworkTimezone that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMNetworkTimezone that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.0
  */
 MMNetworkTimezone *
 mm_modem_time_get_network_timezone (MMModemTime *self)
@@ -250,12 +272,14 @@ mm_modem_time_get_network_timezone (MMModemTime *self)
  *
  * Gets the network timezone information.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_time_get_network_timezone() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_time_get_network_timezone() if on another thread.</warning>
  *
- * Returns: (transfer none): A #MMNetworkTimezone. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMNetworkTimezone. Do not free the returned
+ * value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 MMNetworkTimezone *
 mm_modem_time_peek_network_timezone (MMModemTime *self)

@@ -83,7 +83,10 @@ struct _MMModemPrivate {
  *
  * Gets the DBus path of the #MMObject which implements this interface.
  *
- * Returns: (transfer none): The DBus path of the #MMObject object. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The DBus path of the #MMObject object. Do not free
+ * the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_path (MMModem *self)
@@ -98,9 +101,13 @@ mm_modem_get_path (MMModem *self)
  * mm_modem_dup_path:
  * @self: A #MMModem.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_path (MMModem *self)
@@ -124,12 +131,15 @@ mm_modem_dup_path (MMModem *self)
  *
  * Gets the DBus path of the #MMSim handled in this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_sim_path() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_sim_path() if on another thread.</warning>
  *
- * Returns: (transfer none): The DBus path of the #MMSim handled in this #MMModem, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The DBus path of the #MMSim handled in this
+ * #MMModem, or %NULL if none available. Do not free the returned value, it
+ * belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_sim_path (MMModem *self)
@@ -145,7 +155,11 @@ mm_modem_get_sim_path (MMModem *self)
  *
  * Gets a copy of the DBus path of the #MMSim handled in this #MMModem.
  *
- * Returns: (transfer full): The DBus path of the #MMSim handled in this #MMModem, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMSim handled in this
+ * #MMModem, or %NULL if none available. The returned value should be freed
+ * with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_sim_path (MMModem *self)
@@ -228,12 +242,19 @@ ensure_internal_supported_capabilities (MMModem *self,
 /**
  * mm_modem_get_supported_capabilities:
  * @self: A #MMModem.
- * @capabilities: (out) (array length=n_capabilities): Return location for the array of #MMModemCapability values. The returned array should be freed with g_free() when no longer needed.
- * @n_capabilities: (out): Return location for the number of values in @capabilities.
+ * @capabilities: (out) (array length=n_capabilities): Return location for the
+ *  array of #MMModemCapability values. The returned array should be freed with
+ *  g_free() when no longer needed.
+ * @n_capabilities: (out): Return location for the number of values in
+ *  @capabilities.
  *
- * Gets the list of combinations of generic families of access technologies supported by this #MMModem.
+ * Gets the list of combinations of generic families of access technologies
+ * supported by this #MMModem.
  *
- * Returns: %TRUE if @capabilities and @n_capabilities are set, %FALSE otherwise.
+ * Returns: %TRUE if @capabilities and @n_capabilities are set, %FALSE
+ * otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_get_supported_capabilities (MMModem *self,
@@ -248,12 +269,19 @@ mm_modem_get_supported_capabilities (MMModem *self,
 /**
  * mm_modem_peek_supported_capabilities:
  * @self: A #MMModem.
- * @capabilities: (out) (array length=n_capabilities): Return location for the array of #MMModemCapability values. Do not free the returned array, it is owned by @self.
- * @n_capabilities: (out): Return location for the number of values in @capabilities.
+ * @capabilities: (out) (array length=n_capabilities): Return location for the
+ *  array of #MMModemCapability values. Do not free the returned array, it is
+ *  owned by @self.
+ * @n_capabilities: (out): Return location for the number of values in
+ * @capabilities.
  *
- * Gets the list of combinations of generic families of access technologies supported by this #MMModem.
+ * Gets the list of combinations of generic families of access technologies
+ * supported by this #MMModem.
  *
- * Returns: %TRUE if @capabilities and @n_capabilities are set, %FALSE otherwise.
+ * Returns: %TRUE if @capabilities and @n_capabilities are set, %FALSE
+ * otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_peek_supported_capabilities (MMModem *self,
@@ -278,10 +306,12 @@ mm_modem_peek_supported_capabilities (MMModem *self,
  * mm_modem_get_current_capabilities:
  * @self: A #MMModem.
  *
- * Gets the list of generic families of access technologies supported by this #MMModem
- * without a firmware reload or reinitialization.
+ * Gets the list of generic families of access technologies supported by this
+ * #MMModem without a firmware reload or reinitialization.
  *
  * Returns: A bitmask of #MMModemCapability flags.
+ *
+ * Since: 1.0
  */
 MMModemCapability
 mm_modem_get_current_capabilities (MMModem *self)
@@ -297,7 +327,8 @@ mm_modem_get_current_capabilities (MMModem *self)
  * mm_modem_get_max_bearers:
  * @self: a #MMModem.
  *
- * Gets the maximum number of defined packet data bearers this #MMModem supports.
+ * Gets the maximum number of defined packet data bearers this #MMModem
+ * supports.
  *
  * This is not the number of active/connected bearers the modem supports,
  * but simply the number of bearers that may be defined at any given time.
@@ -307,6 +338,8 @@ mm_modem_get_current_capabilities (MMModem *self)
  * CDMA2000-capable) also typically support three or more.
  *
  * Returns: the maximum number of defined packet data bearers.
+ *
+ * Since: 1.0
  */
 guint
 mm_modem_get_max_bearers (MMModem *self)
@@ -329,6 +362,8 @@ mm_modem_get_max_bearers (MMModem *self)
  * at least two active bearers.
  *
  * Returns: the maximum number of defined packet data bearers.
+ *
+ * Since: 1.0
  */
 guint
 mm_modem_get_max_active_bearers (MMModem *self)
@@ -346,12 +381,15 @@ mm_modem_get_max_active_bearers (MMModem *self)
  *
  * Gets the DBus paths of the #MMBearer handled in this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_bearer_paths() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_bearer_paths() if on another thread.</warning>
  *
- * Returns: (transfer none): The DBus paths of the #MMBearer handled in this #MMModem, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The DBus paths of the #MMBearer handled in this
+ * #MMModem, or %NULL if none available. Do not free the returned value, it
+ * belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar * const *
 mm_modem_get_bearer_paths (MMModem *self)
@@ -367,7 +405,11 @@ mm_modem_get_bearer_paths (MMModem *self)
  *
  * Gets a copy of the DBus paths of the #MMBearer handled in this #MMModem.
  *
- * Returns: (transfer full): The DBus paths of the #MMBearer handled in this #MMModem, or %NULL if none available. The returned value should be freed with g_strfreev().
+ * Returns: (transfer full): The DBus paths of the #MMBearer handled in this
+ * #MMModem, or %NULL if none available. The returned value should be freed
+ * with g_strfreev().
+ *
+ * Since: 1.0
  */
 gchar **
 mm_modem_dup_bearer_paths (MMModem *self)
@@ -385,12 +427,14 @@ mm_modem_dup_bearer_paths (MMModem *self)
  *
  * Gets the equipment manufacturer, as reported by this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_manufacturer() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_manufacturer() if on another thread.</warning>
  *
- * Returns: (transfer none): The equipment manufacturer, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The equipment manufacturer, or %NULL if none
+ * available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_manufacturer (MMModem *self)
@@ -407,7 +451,10 @@ mm_modem_get_manufacturer (MMModem *self)
  *
  * Gets a copy of the equipment manufacturer, as reported by this #MMModem.
  *
- * Returns: (transfer full): The equipment manufacturer, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The equipment manufacturer, or %NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_manufacturer (MMModem *self)
@@ -426,12 +473,14 @@ mm_modem_dup_manufacturer (MMModem *self)
  *
  * Gets the equipment model, as reported by this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_model() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_model() if on another thread.</warning>
  *
- * Returns: (transfer none): The equipment model, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The equipment model, or %NULL if none available.
+ * Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_model (MMModem *self)
@@ -448,7 +497,10 @@ mm_modem_get_model (MMModem *self)
  *
  * Gets a copy of the equipment model, as reported by this #MMModem.
  *
- * Returns: (transfer full): The equipment model, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The equipment model, or %NULL if none available.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_model (MMModem *self)
@@ -467,12 +519,14 @@ mm_modem_dup_model (MMModem *self)
  *
  * Gets the equipment revision, as reported by this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_revision() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_revision() if on another thread.</warning>
  *
- * Returns: (transfer none): The equipment revision, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The equipment revision, or %NULL if none available.
+ * Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_revision (MMModem *self)
@@ -489,7 +543,10 @@ mm_modem_get_revision (MMModem *self)
  *
  * Gets a copy of the equipment revision, as reported by this #MMModem.
  *
- * Returns: (transfer full): The equipment revision, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The equipment revision, or %NULL if none available.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_revision (MMModem *self)
@@ -506,14 +563,17 @@ mm_modem_dup_revision (MMModem *self)
  * mm_modem_get_carrier_configuration:
  * @self: A #MMModem.
  *
- * Gets the carrier-specific configuration (MCFG) in use, as reported by this #MMModem.
+ * Gets the carrier-specific configuration (MCFG) in use, as reported by this
+ * #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_carrier_configuration() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_carrier_configuration() if on another thread.</warning>
  *
- * Returns: (transfer none): The carrier configuration, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The carrier configuration, or %NULL if none
+ * available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.12
  */
 const gchar *
 mm_modem_get_carrier_configuration (MMModem *self)
@@ -528,9 +588,13 @@ mm_modem_get_carrier_configuration (MMModem *self)
  * mm_modem_dup_carrier_configuration:
  * @self: A #MMModem.
  *
- * Gets a copy of the carrier-specific configuration (MCFG) in use, as reported by this #MMModem.
+ * Gets a copy of the carrier-specific configuration (MCFG) in use, as reported
+ * by this #MMModem.
  *
- * Returns: (transfer full): The carrier configuration, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The carrier configuration, or %NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.12
  */
 gchar *
 mm_modem_dup_carrier_configuration (MMModem *self)
@@ -547,14 +611,17 @@ mm_modem_dup_carrier_configuration (MMModem *self)
  * mm_modem_get_carrier_configuration_revision:
  * @self: A #MMModem.
  *
- * Gets the carrier-specific configuration revision in use, as reported by this #MMModem.
+ * Gets the carrier-specific configuration revision in use, as reported by this
+ * #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_carrier_configuration() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_carrier_configuration() if on another thread.</warning>
  *
- * Returns: (transfer none): The carrier configuration revision, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The carrier configuration revision, or %NULL if
+ * none available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.12
  */
 const gchar *
 mm_modem_get_carrier_configuration_revision (MMModem *self)
@@ -569,9 +636,13 @@ mm_modem_get_carrier_configuration_revision (MMModem *self)
  * mm_modem_dup_carrier_configuration_revision:
  * @self: A #MMModem.
  *
- * Gets a copy of the carrier-specific configuration revision in use, as reported by this #MMModem.
+ * Gets a copy of the carrier-specific configuration revision in use, as
+ * reported by this #MMModem.
  *
- * Returns: (transfer full): The carrier configuration revision, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The carrier configuration revision, or %NULL if
+ * none available. The returned value should be freed with g_free().
+ *
+ * Since: 1.12
  */
 gchar *
 mm_modem_dup_carrier_configuration_revision (MMModem *self)
@@ -590,12 +661,14 @@ mm_modem_dup_carrier_configuration_revision (MMModem *self)
  *
  * Gets the equipment hardware revision, as reported by this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_hardware_revision() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_hardware_revision() if on another thread.</warning>
  *
- * Returns: (transfer none): The equipment hardware revision, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The equipment hardware revision, or %NULL if none
+ * available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.8
  */
 const gchar *
 mm_modem_get_hardware_revision (MMModem *self)
@@ -612,7 +685,10 @@ mm_modem_get_hardware_revision (MMModem *self)
  *
  * Gets a copy of the equipment hardware revision, as reported by this #MMModem.
  *
- * Returns: (transfer full): The equipment hardware revision, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The equipment hardware revision, or %NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.8
  */
 gchar *
 mm_modem_dup_hardware_revision (MMModem *self)
@@ -640,12 +716,14 @@ mm_modem_dup_hardware_revision (MMModem *self)
  * This is not the device's IMEI or ESN since those may not be available
  * before unlocking the device via a PIN.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_device_identifier() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_device_identifier() if on another thread.</warning>
  *
- * Returns: (transfer none): The device identifier, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The device identifier, or %NULL if none available.
+ * Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_device_identifier (MMModem *self)
@@ -660,8 +738,9 @@ mm_modem_get_device_identifier (MMModem *self)
  * mm_modem_dup_device_identifier:
  * @self: A #MMModem.
  *
- * Gets a copy of a best-effort device identifier based on various device information
- * like model name, firmware revision, USB/PCI/PCMCIA IDs, and other properties.
+ * Gets a copy of a best-effort device identifier based on various device
+ * information like model name, firmware revision, USB/PCI/PCMCIA IDs, and other
+ * properties.
  *
  * This ID is not guaranteed to be unique and may be shared between
  * identical devices with the same firmware, but is intended to be "unique
@@ -671,7 +750,10 @@ mm_modem_get_device_identifier (MMModem *self)
  * This is not the device's IMEI or ESN since those may not be available
  * before unlocking the device via a PIN.
  *
- * Returns: (transfer full): The device identifier, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The device identifier, or %NULL if none available.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_device_identifier (MMModem *self)
@@ -691,12 +773,14 @@ mm_modem_dup_device_identifier (MMModem *self)
  * Gets the physical modem device reference (ie, USB, PCI, PCMCIA device), which
  * may be dependent upon the operating system.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_device() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_device() if on another thread.</warning>
  *
- * Returns: (transfer none): The device, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The device, or %NULL if none available. Do not free
+ * the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_device (MMModem *self)
@@ -711,10 +795,13 @@ mm_modem_get_device (MMModem *self)
  * mm_modem_dup_device:
  * @self: A #MMModem.
  *
- * Gets a copy of the physical modem device reference (ie, USB, PCI, PCMCIA device), which
- * may be dependent upon the operating system.
+ * Gets a copy of the physical modem device reference (ie, USB, PCI, PCMCIA
+ * device), which may be dependent upon the operating system.
  *
- * Returns: (transfer full): The device, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The device, or %NULL if none available. The
+ * returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_device (MMModem *self)
@@ -731,15 +818,17 @@ mm_modem_dup_device (MMModem *self)
  * mm_modem_get_drivers:
  * @self: A #MMModem.
  *
- * Gets the Operating System device drivers handling communication with the modem
- * hardware.
+ * Gets the Operating System device drivers handling communication with the
+ * modem hardware.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_drivers() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_drivers() if on another thread.</warning>
  *
- * Returns: (transfer none): The drivers, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The drivers, or %NULL if none available. Do not
+ * free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar * const *
 mm_modem_get_drivers (MMModem *self)
@@ -753,10 +842,13 @@ mm_modem_get_drivers (MMModem *self)
  * mm_modem_dup_drivers:
  * @self: A #MMModem.
  *
- * Gets a copy of the Operating System device driver handling communication with the modem
- * hardware.
+ * Gets a copy of the Operating System device driver handling communication with
+ * the modem hardware.
  *
- * Returns: (transfer full): The drivers, or %NULL if none available. The returned value should be freed with g_strfreev().
+ * Returns: (transfer full): The drivers, or %NULL if none available. The
+ * returned value should be freed with g_strfreev().
+ *
+ * Since: 1.0
  */
 gchar **
 mm_modem_dup_drivers (MMModem *self)
@@ -774,12 +866,14 @@ mm_modem_dup_drivers (MMModem *self)
  *
  * Gets the name of the plugin handling this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_plugin() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_plugin() if on another thread.</warning>
  *
- * Returns: (transfer none): The name of the plugin, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The name of the plugin, or %NULL if none
+ *available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_plugin (MMModem *self)
@@ -796,7 +890,10 @@ mm_modem_get_plugin (MMModem *self)
  *
  * Gets a copy of the name of the plugin handling this #MMModem.
  *
- * Returns: (transfer full): The name of the plugin, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The name of the plugin, or %NULL if none available.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_plugin (MMModem *self)
@@ -815,12 +912,14 @@ mm_modem_dup_plugin (MMModem *self)
  *
  * Gets the name of the primary port controlling this #MMModem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_primary_port() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_primary_port() if on another thread.</warning>
  *
- * Returns: (transfer none): The name of the primary port. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The name of the primary port. Do not free the
+ * returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_primary_port (MMModem *self)
@@ -837,7 +936,10 @@ mm_modem_get_primary_port (MMModem *self)
  *
  * Gets a copy of the name of the primary port controlling this #MMModem.
  *
- * Returns: (transfer full): The name of the primary port. The returned value should be freed with g_free().
+ * Returns: (transfer full): The name of the primary port. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_primary_port (MMModem *self)
@@ -929,12 +1031,16 @@ ensure_internal_ports (MMModem *self,
 /**
  * mm_modem_peek_ports:
  * @self: A #MMModem.
- * @ports: (out) (array length=n_ports) (transfer none): Return location for the array of #MMModemPortInfo values. Do not free the returned value, it is owned by @self.
+ * @ports: (out) (array length=n_ports) (transfer none): Return location for the
+ *  array of #MMModemPortInfo values. Do not free the returned value, it is
+ *  owned by @self.
  * @n_ports: (out): Return location for the number of values in @ports.
  *
  * Gets the list of ports in the modem.
  *
  * Returns: %TRUE if @ports and @n_ports are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_peek_ports (MMModem *self,
@@ -956,12 +1062,16 @@ mm_modem_peek_ports (MMModem *self,
 /**
  * mm_modem_get_ports:
  * @self: A #MMModem.
- * @ports: (out) (array length=n_ports): Return location for the array of #MMModemPortInfo values. The returned array should be freed with mm_modem_port_info_array_free() when no longer needed.
+ * @ports: (out) (array length=n_ports): Return location for the array of
+ *  #MMModemPortInfo values. The returned array should be freed with
+ *  mm_modem_port_info_array_free() when no longer needed.
  * @n_ports: (out): Return location for the number of values in @ports.
  *
  * Gets the list of ports in the modem.
  *
  * Returns: %TRUE if @ports and @n_ports are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_get_ports (MMModem *self,
@@ -986,12 +1096,14 @@ mm_modem_get_ports (MMModem *self,
  * This will be the IMEI number for GSM devices and the hex-format ESN/MEID
  * for CDMA devices.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_equipment_identifier() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_equipment_identifier() if on another thread.</warning>
  *
- * Returns: (transfer none): The equipment identifier, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The equipment identifier, or %NULL if none
+ * available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_get_equipment_identifier (MMModem *self)
@@ -1011,7 +1123,10 @@ mm_modem_get_equipment_identifier (MMModem *self)
  * This will be the IMEI number for GSM devices and the hex-format ESN/MEID
  * for CDMA devices.
  *
- * Returns: (transfer full): The equipment identifier, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The equipment identifier, or %NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_dup_equipment_identifier (MMModem *self)
@@ -1031,12 +1146,14 @@ mm_modem_dup_equipment_identifier (MMModem *self)
  * Gets the list of numbers (e.g. MSISDN in 3GPP) being currently handled by
  * this modem.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_dup_own_numbers() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_own_numbers() if on another thread.</warning>
  *
- * Returns: (transfer none): The list of own numbers or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The list of own numbers or %NULL if none available.
+ * Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *const *
 mm_modem_get_own_numbers (MMModem *self)
@@ -1057,7 +1174,10 @@ mm_modem_get_own_numbers (MMModem *self)
  * Gets a copy of the list of numbers (e.g. MSISDN in 3GPP) being currently
  * handled by this modem.
  *
- * Returns: (transfer full): The list of own numbers or %NULL if none is available. The returned value should be freed with g_strfreev().
+ * Returns: (transfer full): The list of own numbers or %NULL if none is
+ * available. The returned value should be freed with g_strfreev().
+ *
+ * Since: 1.0
  */
 gchar **
 mm_modem_dup_own_numbers (MMModem *self)
@@ -1083,6 +1203,8 @@ mm_modem_dup_own_numbers (MMModem *self)
  * Gets current lock state of the #MMModem.
  *
  * Returns: A #MMModemLock value, specifying the current lock state.
+ *
+ * Since: 1.0
  */
 MMModemLock
 mm_modem_get_unlock_required (MMModem *self)
@@ -1149,15 +1271,18 @@ ensure_internal_unlock_retries (MMModem *self,
  *
  * Gets a #MMUnlockRetries object, which provides, for each
  * <link linkend="MMModemLock">MMModemLock</link> handled by the modem, the
- * number of PIN tries remaining before the code becomes blocked (requiring a PUK)
- * or permanently blocked.
+ * number of PIN tries remaining before the code becomes blocked (requiring a
+ * PUK) or permanently blocked.
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
  * mm_modem_get_unlock_retries() again to get a new #MMUnlockRetries with the
  * new values.</warning>
  *
- * Returns: (transfer full): A #MMUnlockRetries that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMUnlockRetries that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.0
  */
 MMUnlockRetries *
 mm_modem_get_unlock_retries (MMModem *self)
@@ -1176,15 +1301,17 @@ mm_modem_get_unlock_retries (MMModem *self)
  *
  * Gets a #MMUnlockRetries object, which provides, for each
  * <link linkend="MMModemLock">MMModemLock</link> handled by the modem, the
- * number of PIN tries remaining before the code becomes blocked (requiring a PUK)
- * or permanently blocked.
+ * number of PIN tries remaining before the code becomes blocked (requiring a
+ * PUK) or permanently blocked.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_get_unlock_retries() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_get_unlock_retries() if on another thread.</warning>
  *
- * Returns: (transfer none): A #MMUnlockRetries. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMUnlockRetries. Do not free the returned value,
+ * it belongs to @self.
+ *
+ * Since: 1.0
  */
 MMUnlockRetries *
 mm_modem_peek_unlock_retries (MMModem *self)
@@ -1204,6 +1331,8 @@ mm_modem_peek_unlock_retries (MMModem *self)
  * Gets the overall state of the #MMModem.
  *
  * Returns: A #MMModemState value.
+ *
+ * Since: 1.0
  */
 MMModemState
 mm_modem_get_state (MMModem *self)
@@ -1222,6 +1351,8 @@ mm_modem_get_state (MMModem *self)
  * Gets the reason specifying why the modem is in #MM_MODEM_STATE_FAILED state.
  *
  * Returns: A #MMModemStateFailedReason value.
+ *
+ * Since: 1.0
  */
 MMModemStateFailedReason
 mm_modem_get_state_failed_reason (MMModem *self)
@@ -1240,6 +1371,8 @@ mm_modem_get_state_failed_reason (MMModem *self)
  * Gets the power state of the #MMModem.
  *
  * Returns: A #MMModemPowerState value.
+ *
+ * Since: 1.0
  */
 MMModemPowerState
 mm_modem_get_power_state (MMModem *self)
@@ -1255,10 +1388,12 @@ mm_modem_get_power_state (MMModem *self)
  * mm_modem_get_access_technologies:
  * @self: A #MMModem.
  *
- * Gets the current network access technology used by the #MMModem to communicate
- * with the network.
+ * Gets the current network access technology used by the #MMModem to
+ * communicate with the network.
  *
  * Returns: A ##MMModemAccessTechnology value.
+ *
+ * Since: 1.0
  */
 MMModemAccessTechnology
 mm_modem_get_access_technologies (MMModem *self)
@@ -1273,14 +1408,17 @@ mm_modem_get_access_technologies (MMModem *self)
 /**
  * mm_modem_get_signal_quality:
  * @self: A #MMModem.
- * @recent: (out): Return location for the flag specifying if the signal quality value was recent or not.
+ * @recent: (out): Return location for the flag specifying if the signal quality
+ *  value was recent or not.
  *
- * Gets the signal quality value in percent (0 - 100) of the dominant access technology
- * the #MMModem is using to communicate with the network.
+ * Gets the signal quality value in percent (0 - 100) of the dominant access
+ * technology the #MMModem is using to communicate with the network.
  *
  * Always 0 for POTS devices.
  *
  * Returns: The signal quality.
+ *
+ * Since: 1.0
  */
 guint
 mm_modem_get_signal_quality (MMModem *self,
@@ -1378,12 +1516,16 @@ ensure_internal_supported_modes (MMModem *self,
 /**
  * mm_modem_get_supported_modes:
  * @self: A #MMModem.
- * @modes: (out) (array length=n_modes): Return location for the array of #MMModemModeCombination structs. The returned array should be freed with g_free() when no longer needed.
+ * @modes: (out) (array length=n_modes): Return location for the array of
+ *  #MMModemModeCombination structs. The returned array should be freed with
+ *  g_free() when no longer needed.
  * @n_modes: (out): Return location for the number of values in @modes.
  *
  * Gets the list of supported mode combinations.
  *
  * Returns: %TRUE if @modes and @n_modes are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_get_supported_modes (MMModem *self,
@@ -1400,12 +1542,16 @@ mm_modem_get_supported_modes (MMModem *self,
 /**
  * mm_modem_peek_supported_modes:
  * @self: A #MMModem.
- * @modes: (out) (array length=n_modes): Return location for the array of #MMModemModeCombination values. Do not free the returned array, it is owned by @self.
+ * @modes: (out) (array length=n_modes): Return location for the array of
+ *  #MMModemModeCombination values. Do not free the returned array, it is owned
+ *  by @self.
  * @n_modes: (out): Return location for the number of values in @modes.
  *
  * Gets the list of supported mode combinations.
  *
  * Returns: %TRUE if @modes and @n_modes are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_peek_supported_modes (MMModem *self,
@@ -1437,6 +1583,8 @@ mm_modem_peek_supported_modes (MMModem *self,
  * well as the preferred one, if any.
  *
  * Returns: %TRUE if @allowed and @preferred are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_get_current_modes (MMModem *self,
@@ -1534,14 +1682,19 @@ ensure_internal_supported_bands (MMModem *self,
 /**
  * mm_modem_get_supported_bands:
  * @self: A #MMModem.
- * @bands: (out) (array length=n_bands): Return location for the array of #MMModemBand values. The returned array should be freed with g_free() when no longer needed.
+ * @bands: (out) (array length=n_bands): Return location for the array of
+ *  #MMModemBand values. The returned array should be freed with g_free() when
+ *  no longer needed.
  * @n_bands: (out): Return location for the number of values in @bands.
  *
- * Gets the list of radio frequency and technology bands supported by the #MMModem.
+ * Gets the list of radio frequency and technology bands supported by the
+ * #MMModem.
  *
  * For POTS devices, only #MM_MODEM_BAND_ANY will be returned in @bands.
  *
  * Returns: %TRUE if @bands and @n_bands are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_get_supported_bands (MMModem *self,
@@ -1558,14 +1711,18 @@ mm_modem_get_supported_bands (MMModem *self,
 /**
  * mm_modem_peek_supported_bands:
  * @self: A #MMModem.
- * @bands: (out) (array length=n_bands): Return location for the array of #MMModemBand values. Do not free the returned array, it is owned by @self.
+ * @bands: (out) (array length=n_bands): Return location for the array of
+ *  #MMModemBand values. Do not free the returned array, it is owned by @self.
  * @n_bands: (out): Return location for the number of values in @bands.
  *
- * Gets the list of radio frequency and technology bands supported by the #MMModem.
+ * Gets the list of radio frequency and technology bands supported by the
+ * #MMModem.
  *
  * For POTS devices, only #MM_MODEM_BAND_ANY will be returned in @bands.
  *
  * Returns: %TRUE if @bands and @n_bands are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_peek_supported_bands (MMModem *self,
@@ -1656,15 +1813,19 @@ ensure_internal_current_bands (MMModem *self,
 /**
  * mm_modem_get_current_bands:
  * @self: A #MMModem.
- * @bands: (out) (array length=n_bands): Return location for the array of #MMModemBand values. The returned array should be freed with g_free() when no longer needed.
+ * @bands: (out) (array length=n_bands): Return location for the array of
+ *  #MMModemBand values. The returned array should be freed with g_free() when
+ *  no longer needed.
  * @n_bands: (out): Return location for the number of values in @bands.
  *
- * Gets the list of radio frequency and technology bands the #MMModem is currently
- * using when connecting to a network.
+ * Gets the list of radio frequency and technology bands the #MMModem is
+ * currently using when connecting to a network.
  *
  * For POTS devices, only the #MM_MODEM_BAND_ANY band is supported.
  *
  * Returns: %TRUE if @bands and @n_bands are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_get_current_bands (MMModem *self,
@@ -1681,15 +1842,18 @@ mm_modem_get_current_bands (MMModem *self,
 /**
  * mm_modem_peek_current_bands:
  * @self: A #MMModem.
- * @bands: (out) (array length=n_bands): Return location for the array of #MMModemBand values. Do not free the returned value, it is owned by @self.
+ * @bands: (out) (array length=n_bands): Return location for the array of
+ *  #MMModemBand values. Do not free the returned value, it is owned by @self.
  * @n_bands: (out): Return location for the number of values in @bands.
  *
- * Gets the list of radio frequency and technology bands the #MMModem is currently
- * using when connecting to a network.
+ * Gets the list of radio frequency and technology bands the #MMModem is
+ * currently using when connecting to a network.
  *
  * For POTS devices, only the #MM_MODEM_BAND_ANY band is supported.
  *
  * Returns: %TRUE if @bands and @n_bands are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_peek_current_bands (MMModem *self,
@@ -1717,6 +1881,8 @@ mm_modem_peek_current_bands (MMModem *self,
  * Gets the list of supported IP families.
  *
  * Returns: A bitmask of #MMBearerIpFamily values.
+ *
+ * Since: 1.0
  */
 MMBearerIpFamily
 mm_modem_get_supported_ip_families (MMModem *self)
@@ -1731,12 +1897,15 @@ mm_modem_get_supported_ip_families (MMModem *self)
 /**
  * mm_modem_enable_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_enable().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_enable().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_enable().
  *
  * Returns: %TRUE if the modem was properly enabled, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_enable_finish (MMModem *self,
@@ -1752,17 +1921,23 @@ mm_modem_enable_finish (MMModem *self,
  * mm_modem_enable:
  * @self: A #MMModem.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously tries to enable the #MMModem. When enabled, the modem's radio is
- * powered on and data sessions, voice calls, location services, and Short Message
- * Service may be available.
+ * Asynchronously tries to enable the #MMModem. When enabled, the modem's radio
+ * is powered on and data sessions, voice calls, location services, and Short
+ * Message Service may be available.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_enable_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_enable_finish() to get the result of the operation.
  *
- * See mm_modem_enable_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_enable_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_enable (MMModem *self,
@@ -1781,14 +1956,16 @@ mm_modem_enable (MMModem *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously tries to enable the #MMModem. When enabled, the modem's radio is
- * powered on and data sessions, voice calls, location services, and Short Message
- * Service may be available.
+ * Synchronously tries to enable the #MMModem. When enabled, the modem's radio
+ * is powered on and data sessions, voice calls, location services, and Short
+ * Message Service may be available.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_enable()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_enable() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the modem was properly enabled, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_enable_sync (MMModem *self,
@@ -1805,12 +1982,15 @@ mm_modem_enable_sync (MMModem *self,
 /**
  * mm_modem_disable_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_disable().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_disable().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_disable().
  *
  * Returns: %TRUE if the modem was properly disabled, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_disable_finish (MMModem *self,
@@ -1826,16 +2006,22 @@ mm_modem_disable_finish (MMModem *self,
  * mm_modem_disable:
  * @self: A #MMModem.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously tries to disable the #MMModem. When disabled, the modem enters
  * low-power state and no network-related operations are available.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_disable_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_disable_finish() to get the result of the operation.
  *
- * See mm_modem_disable_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_disable_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_disable (MMModem *self,
@@ -1857,10 +2043,12 @@ mm_modem_disable (MMModem *self,
  * Synchronously tries to disable the #MMModem. When disabled, the modem enters
  * low-power state and no network-related operations are available.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_disable()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_disable() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the modem was properly disabled, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_disable_sync (MMModem *self,
@@ -1897,12 +2085,16 @@ list_bearers_context_free (ListBearersContext *ctx)
 /**
  * mm_modem_list_bearers_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_list_bearers().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_list_bearers().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_list_bearers().
  *
- * Returns: (transfer full) (element-type ModemManager.Bearer): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
+ * Returns: (transfer full) (element-type ModemManager.Bearer): The list of
+ * #MMBearer objects, or %NULL if either none found or if @error is set.
+ *
+ * Since: 1.0
  */
 GList *
 mm_modem_list_bearers_finish (MMModem *self,
@@ -1985,15 +2177,21 @@ create_next_bearer (GTask *task)
  * mm_modem_list_bearers:
  * @self: A #MMModem.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously lists the packet data bearers in the #MMModem.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_list_bearers_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_list_bearers_finish() to get the result of the operation.
  *
- * See mm_modem_list_bearers_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_list_bearers_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_list_bearers (MMModem *self,
@@ -2034,10 +2232,13 @@ mm_modem_list_bearers (MMModem *self,
  *
  * Synchronously lists the packet data bearers in the #MMModem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_list_bearers()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_list_bearers() for the asynchronous version of this method.
  *
- * Returns: (transfer full) (element-type ModemManager.Bearer): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
+ * Returns: (transfer full) (element-type ModemManager.Bearer): The list of
+ * #MMBearer objects, or %NULL if either none found or if @error is set.
+ *
+ * Since: 1.0
  */
 GList *
 mm_modem_list_bearers_sync (MMModem *self,
@@ -2088,12 +2289,16 @@ mm_modem_list_bearers_sync (MMModem *self,
 /**
  * mm_modem_create_bearer_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_create_bearer().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_create_bearer().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_create_bearer().
  *
- * Returns: (transfer full): A newly created #MMBearer, or %NULL if @error is set.
+ * Returns: (transfer full): A newly created #MMBearer, or %NULL if @error is
+ * set.
+ *
+ * Since: 1.0
  */
 MMBearer *
 mm_modem_create_bearer_finish (MMModem *self,
@@ -2163,7 +2368,8 @@ modem_create_bearer_ready (MMModem *self,
  * @self: A #MMModem.
  * @properties: A #MMBearerProperties object with the properties to use.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously creates a new packet data bearer in the #MMModem.
@@ -2171,12 +2377,18 @@ modem_create_bearer_ready (MMModem *self,
  * This request may fail if the modem does not support additional bearers,
  * if too many bearers are already defined, or if @properties are invalid.
  *
- * See <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer</link> to check which properties may be passed.
+ * See <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer</link>
+ * to check which properties may be passed.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_create_bearer_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_create_bearer_finish() to get the result of the operation.
  *
- * See mm_modem_create_bearer_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_create_bearer_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_create_bearer (MMModem *self,
@@ -2216,12 +2428,16 @@ mm_modem_create_bearer (MMModem *self,
  * This request may fail if the modem does not support additional bearers,
  * if too many bearers are already defined, or if @properties are invalid.
  *
- * See <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer</link> to check which properties may be passed.
+ * See <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer</link>
+ * to check which properties may be passed.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_create_bearer()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_create_bearer() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A newly created #MMBearer, or %NULL if @error is set.
+ * Returns: (transfer full): A newly created #MMBearer, or %NULL if @error is
+ * set.
+ *
+ * Since: 1.0
  */
 MMBearer *
 mm_modem_create_bearer_sync (MMModem *self,
@@ -2264,12 +2480,15 @@ mm_modem_create_bearer_sync (MMModem *self,
 /**
  * mm_modem_delete_bearer_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_delete_bearer().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_delete_bearer().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_delete_bearer().
  *
  * Returns: %TRUE if the bearer was deleted, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_delete_bearer_finish (MMModem *self,
@@ -2286,15 +2505,21 @@ mm_modem_delete_bearer_finish (MMModem *self,
  * @self: A #MMModem.
  * @bearer: Path of the bearer to delete.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously deletes a given bearer from the #MMModem.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_delete_bearer_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_delete_bearer_finish() to get the result of the operation.
  *
- * See mm_modem_delete_bearer_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_delete_bearer_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_delete_bearer (MMModem *self,
@@ -2317,10 +2542,12 @@ mm_modem_delete_bearer (MMModem *self,
 
  * Synchronously deletes a given bearer from the #MMModem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_delete_bearer()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_delete_bearer() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the bearer was deleted, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_delete_bearer_sync (MMModem *self,
@@ -2338,12 +2565,15 @@ mm_modem_delete_bearer_sync (MMModem *self,
 /**
  * mm_modem_reset_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_reset().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_reset().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_reset().
  *
  * Returns: %TRUE if the reset was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_reset_finish (MMModem *self,
@@ -2359,16 +2589,22 @@ mm_modem_reset_finish (MMModem *self,
  * mm_modem_reset:
  * @self: A #MMModem.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously clears non-persistent configuration and state, and returns the device to
- * a newly-powered-on state.
+ * Asynchronously clears non-persistent configuration and state, and returns the
+ * device to a newly-powered-on state.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_reset_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_reset_finish() to get the result of the operation.
  *
- * See mm_modem_reset_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_reset_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_reset (MMModem *self,
@@ -2387,13 +2623,15 @@ mm_modem_reset (MMModem *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously clears non-persistent configuration and state, and returns the device to
- * a newly-powered-on state.
+ * Synchronously clears non-persistent configuration and state, and returns the
+ * device to a newly-powered-on state.
  *
  * The calling thread is blocked until a reply is received. See mm_modem_reset()
  * for the asynchronous version of this method.
  *
  * Returns: %TRUE if the reset was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_reset_sync (MMModem *self,
@@ -2410,12 +2648,15 @@ mm_modem_reset_sync (MMModem *self,
 /**
  * mm_modem_factory_reset_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_factory_reset().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_factory_reset().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_factory_reset().
  *
  * Returns: %TRUE if the factory_reset was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_factory_reset_finish (MMModem *self,
@@ -2432,16 +2673,22 @@ mm_modem_factory_reset_finish (MMModem *self,
  * @self: A #MMModem.
  * @code: Carrier-supplied code required to reset the modem.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously clears the modem's configuration (including persistent configuration and
- * state), and returns the device to a factory-default state.
+ * Asynchronously clears the modem's configuration (including persistent
+ * configuration and state), and returns the device to a factory-default state.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_factory_reset_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_factory_reset_finish() to get the result of the operation.
  *
- * See mm_modem_factory_reset_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_factory_reset_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_factory_reset (MMModem *self,
@@ -2462,13 +2709,15 @@ mm_modem_factory_reset (MMModem *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously clears the modem's configuration (including persistent configuration and
- * state), and returns the device to a factory-default state.
+ * Synchronously clears the modem's configuration (including persistent
+ * configuration and state), and returns the device to a factory-default state.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_factory_reset()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_factory_reset() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the factory reset was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_factory_reset_sync (MMModem *self,
@@ -2486,12 +2735,17 @@ mm_modem_factory_reset_sync (MMModem *self,
 /**
  * mm_modem_command_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_command().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_command().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_command().
  *
- * Returns: (transfer full): A newly allocated string with the reply to the command, or #NULL if @error is set. The returned value should be freed with g_free().
+ * Returns: (transfer full): A newly allocated string with the reply to the
+ * command, or #NULL if @error is set. The returned value should be freed with
+ * g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_command_finish (MMModem *self,
@@ -2514,15 +2768,21 @@ mm_modem_command_finish (MMModem *self,
  * @cmd: AT command to run.
  * @timeout: Maximum time to wait for the response, in seconds.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously runs an AT command in the modem.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_command_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_command_finish() to get the result of the operation.
  *
- * See mm_modem_command_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_command_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_command (MMModem *self,
@@ -2550,10 +2810,14 @@ mm_modem_command (MMModem *self,
  *
  * Synchronously runs an AT command in the modem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_command()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_command() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A newly allocated string with the reply to the command, or #NULL if @error is set. The returned value should be freed with g_free().
+ * Returns: (transfer full): A newly allocated string with the reply to the
+ * command, or #NULL if @error is set. The returned value should be freed
+ * with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_command_sync (MMModem *self,
@@ -2580,12 +2844,16 @@ mm_modem_command_sync (MMModem *self,
 /**
  * mm_modem_set_power_state_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_power_state().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_set_power_state().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_set_power_state().
  *
- * Returns: %TRUE if the power state was successfully set, %FALSE if @error is set.
+ * Returns: %TRUE if the power state was successfully set, %FALSE if @error is
+ * set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_power_state_finish (MMModem *self,
@@ -2600,18 +2868,25 @@ mm_modem_set_power_state_finish (MMModem *self,
 /**
  * mm_modem_set_power_state:
  * @self: A #MMModem.
- * @state: Either %MM_MODEM_POWER_STATE_LOW or %MM_MODEM_POWER_STATE_ON. Every other #MMModemPowerState value is not allowed.
+ * @state: Either %MM_MODEM_POWER_STATE_LOW or %MM_MODEM_POWER_STATE_ON. Every
+ *  other #MMModemPowerState value is not allowed.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously sets the power state of the device. This method can only be
  * used while the modem is in %MM_MODEM_STATE_DISABLED state.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_set_power_state_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_set_power_state_finish() to get the result of the operation.
  *
- * See mm_modem_set_power_state_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_set_power_state_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_set_power_state (MMModem *self,
@@ -2628,17 +2903,21 @@ mm_modem_set_power_state (MMModem *self,
 /**
  * mm_modem_set_power_state_sync:
  * @self: A #MMModem.
- * @state: Either %MM_MODEM_POWER_STATE_LOW or %MM_MODEM_POWER_STATE_ON. Every other #MMModemPowerState value is not allowed.
+ * @state: Either %MM_MODEM_POWER_STATE_LOW or %MM_MODEM_POWER_STATE_ON. Every
+ *  other #MMModemPowerState value is not allowed.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
  * Synchronously sets the power state of the device. This method can only be
  * used while the modem is in %MM_MODEM_STATE_DISABLED state.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_set_power_state()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_set_power_state() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the power state was successfully set, %FALSE if @error is set.
+ * Returns: %TRUE if the power state was successfully set, %FALSE if @error is
+ * set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_power_state_sync (MMModem *self,
@@ -2656,12 +2935,16 @@ mm_modem_set_power_state_sync (MMModem *self,
 /**
  * mm_modem_set_current_capabilities_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_current_capabilities().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_set_current_capabilities().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_set_current_capabilities().
  *
- * Returns: %TRUE if the capabilities were successfully set, %FALSE if @error is set.
+ * Returns: %TRUE if the capabilities were successfully set, %FALSE if @error is
+ * set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_current_capabilities_finish (MMModem *self,
@@ -2678,15 +2961,23 @@ mm_modem_set_current_capabilities_finish (MMModem *self,
  * @self: A #MMModem.
  * @capabilities: A #MMModemCapability mask.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously sets the capabilities of the device. A restart of the modem may be required.
+ * Asynchronously sets the capabilities of the device. A restart of the modem
+ * may be required.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_set_current_capabilities_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_set_current_capabilities_finish() to get the result of the
+ * operation.
  *
- * See mm_modem_set_current_capabilities_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_set_current_capabilities_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_set_current_capabilities (MMModem *self,
@@ -2711,12 +3002,17 @@ mm_modem_set_current_capabilities (MMModem *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously sets the capabilities of the device. A restart of the modem may be required.
+ * Synchronously sets the capabilities of the device. A restart of the modem may
+ * be required.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_set_current_capabilities()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_set_current_capabilities() for the asynchronous version of this
+ * method.
  *
- * Returns: %TRUE if the capabilities were successfully set, %FALSE if @error is set.
+ * Returns: %TRUE if the capabilities were successfully set, %FALSE if @error is
+ * set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_current_capabilities_sync (MMModem *self,
@@ -2738,12 +3034,16 @@ mm_modem_set_current_capabilities_sync (MMModem *self,
 /**
  * mm_modem_set_current_modes_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_current_modes().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_set_current_modes().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_set_current_modes().
  *
- * Returns: %TRUE if the allowed modes were successfully set, %FALSE if @error is set.
+ * Returns: %TRUE if the allowed modes were successfully set, %FALSE if @error
+ * is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_current_modes_finish (MMModem *self,
@@ -2759,18 +3059,25 @@ mm_modem_set_current_modes_finish (MMModem *self,
  * mm_modem_set_current_modes:
  * @self: A #MMModem.
  * @modes: Mask of #MMModemMode values specifying which modes are allowed.
- * @preferred: A #MMModemMode value specifying which of the modes given in @modes is the preferred one, or #MM_MODEM_MODE_NONE if none.
+ * @preferred: A #MMModemMode value specifying which of the modes given in
+ *  @modes is the preferred one, or #MM_MODEM_MODE_NONE if none.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously sets the access technologies (e.g. 2G/3G/4G preference) the device is
- * currently allowed to use when connecting to a network.
+ * Asynchronously sets the access technologies (e.g. 2G/3G/4G preference) the
+ * device is currently allowed to use when connecting to a network.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_set_current_modes_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_set_current_modes_finish() to get the result of the operation.
  *
- * See mm_modem_set_current_modes_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_set_current_modes_sync() for the synchronous, blocking version
+ * of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_set_current_modes (MMModem *self,
@@ -2793,17 +3100,21 @@ mm_modem_set_current_modes (MMModem *self,
  * mm_modem_set_current_modes_sync:
  * @self: A #MMModem.
  * @modes: Mask of #MMModemMode values specifying which modes are allowed.
- * @preferred: A #MMModemMode value specifying which of the modes given in @modes is the preferred one, or #MM_MODEM_MODE_NONE if none.
+ * @preferred: A #MMModemMode value specifying which of the modes given in
+ *  @modes is the preferred one, or #MM_MODEM_MODE_NONE if none.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously sets the access technologies (e.g. 2G/3G/4G preference) the device is
- * currently allowed to use when connecting to a network.
+ * Synchronously sets the access technologies (e.g. 2G/3G/4G preference) the
+ * device is currently allowed to use when connecting to a network.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_set_current_modes()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_set_current_modes() for the asynchronous version of this method.
  *
- * Returns: %TRUE if the allowed modes were successfully set, %FALSE if @error is set.
+ * Returns: %TRUE if the allowed modes were successfully set, %FALSE if @error
+ * is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_current_modes_sync (MMModem *self,
@@ -2825,12 +3136,15 @@ mm_modem_set_current_modes_sync (MMModem *self,
 /**
  * mm_modem_set_current_bands_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_set_current_bands().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_set_current_bands().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_set_current_bands().
  *
  * Returns: %TRUE if the bands were successfully set, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_current_bands_finish (MMModem *self,
@@ -2848,16 +3162,22 @@ mm_modem_set_current_bands_finish (MMModem *self,
  * @bands: An array of #MMModemBand values specifying which bands are allowed.
  * @n_bands: Number of elements in @bands.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously sets the radio frequency and technology bands the device is currently
- * allowed to use when connecting to a network.
+ * Asynchronously sets the radio frequency and technology bands the device is
+ * currently allowed to use when connecting to a network.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_set_current_bands_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_set_current_bands_finish() to get the result of the operation.
  *
- * See mm_modem_set_current_bands_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_set_current_bands_sync() for the synchronous, blocking version
+ * of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_set_current_bands (MMModem *self,
@@ -2884,13 +3204,15 @@ mm_modem_set_current_bands (MMModem *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously sets the radio frequency and technology bands the device is currently
- * allowed to use when connecting to a network.
+ * Synchronously sets the radio frequency and technology bands the device is
+ * currently allowed to use when connecting to a network.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_set_current_bands()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_set_current_bands() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the bands were successfully set, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_set_current_bands_sync (MMModem *self,
@@ -2913,12 +3235,16 @@ mm_modem_set_current_bands_sync (MMModem *self,
 /**
  * mm_modem_get_sim_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_get_sim().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_get_sim().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_get_sim().
  *
- * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned
+ * value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMSim *
 mm_modem_get_sim_finish (MMModem *self,
@@ -2955,15 +3281,21 @@ modem_get_sim_ready (GDBusConnection *connection,
  * mm_modem_get_sim:
  * @self: A #MMModem.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously gets the #MMSim object managed by this #MMModem.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_get_sim_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_get_sim_finish() to get the result of the operation.
  *
- * See mm_modem_get_sim_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_get_sim_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_get_sim (MMModem *self,
@@ -3009,10 +3341,13 @@ mm_modem_get_sim (MMModem *self,
  *
  * Synchronously gets the #MMSim object managed by this #MMModem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_get_sim()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_get_sim() for the asynchronous version of this method.
  *
- * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned
+ * value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMSim *
 mm_modem_get_sim_sync (MMModem *self,

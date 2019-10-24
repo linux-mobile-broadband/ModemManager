@@ -58,7 +58,10 @@ struct _MMCdmaManualActivationPropertiesPrivate {
  *
  * Gets the Service Programming Code.
  *
- * Returns: (transfer none): The SPC. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The SPC. Do not free the returned value, it is
+ * owned by @self.
+ *
+ * Since: 1.2
  */
 const gchar *
 mm_cdma_manual_activation_properties_get_spc (MMCdmaManualActivationProperties *self)
@@ -105,6 +108,8 @@ validate_spc (const gchar *spc,
  * Sets the Service Programming Code.
  *
  * Returns: %TRUE if the SPC was successfully set, or %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_cdma_manual_activation_properties_set_spc (MMCdmaManualActivationProperties *self,
@@ -130,6 +135,8 @@ mm_cdma_manual_activation_properties_set_spc (MMCdmaManualActivationProperties *
  * Gets the System Identification Number.
  *
  * Returns: The SID.
+ *
+ * Since: 1.2
  */
 guint16
 mm_cdma_manual_activation_properties_get_sid (MMCdmaManualActivationProperties *self)
@@ -145,6 +152,8 @@ mm_cdma_manual_activation_properties_get_sid (MMCdmaManualActivationProperties *
  * @sid: The SID.
  *
  * Sets the Service Identification Number.
+ *
+ * Since: 1.2
  */
 void
 mm_cdma_manual_activation_properties_set_sid (MMCdmaManualActivationProperties *self,
@@ -163,7 +172,10 @@ mm_cdma_manual_activation_properties_set_sid (MMCdmaManualActivationProperties *
  *
  * Gets the Mobile Directory Number.
  *
- * Returns: (transfer none): The MDN. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The MDN. Do not free the returned value, it is
+ * owned by @self.
+ *
+ * Since: 1.2
  */
 const gchar *
 mm_cdma_manual_activation_properties_get_mdn (MMCdmaManualActivationProperties *self)
@@ -198,6 +210,8 @@ validate_mdn (const gchar *mdn,
  * Sets the Mobile Directory Number.
  *
  * Returns: %TRUE if the MDN was successfully set, or %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_cdma_manual_activation_properties_set_mdn (MMCdmaManualActivationProperties *self,
@@ -222,7 +236,10 @@ mm_cdma_manual_activation_properties_set_mdn (MMCdmaManualActivationProperties *
  *
  * Gets the Mobile Indentification Number.
  *
- * Returns: (transfer none): The MIN. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The MIN. Do not free the returned value, it is
+ * owned by @self.
+ *
+ * Since: 1.2
  */
 const gchar *
 mm_cdma_manual_activation_properties_get_min (MMCdmaManualActivationProperties *self)
@@ -257,6 +274,8 @@ validate_min (const gchar *min,
  * Sets the Mobile Identification Number.
  *
  * Returns: %TRUE if the MIN was successfully set, or %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_cdma_manual_activation_properties_set_min (MMCdmaManualActivationProperties *self,
@@ -281,7 +300,10 @@ mm_cdma_manual_activation_properties_set_min (MMCdmaManualActivationProperties *
  *
  * Gets the MN-HA key.
  *
- * Returns: (transfer none): The MN-HA key. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The MN-HA key. Do not free the returned value, it
+ * is owned by @self.
+ *
+ * Since: 1.2
  */
 const gchar *
 mm_cdma_manual_activation_properties_get_mn_ha_key (MMCdmaManualActivationProperties *self)
@@ -315,7 +337,10 @@ validate_mn_ha_key (const gchar *mn_ha_key,
  *
  * Sets the Mobile Identification Number.
  *
- * Returns: %TRUE if the MN-HA key was successfully set, or %FALSE if @error is set.
+ * Returns: %TRUE if the MN-HA key was successfully set, or %FALSE if @error
+ * is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_cdma_manual_activation_properties_set_mn_ha_key (MMCdmaManualActivationProperties *self,
@@ -340,7 +365,10 @@ mm_cdma_manual_activation_properties_set_mn_ha_key (MMCdmaManualActivationProper
  *
  * Gets the MN-AAA key.
  *
- * Returns: (transfer none): The MN-AAA key. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The MN-AAA key. Do not free the returned value, it
+ * is owned by @self.
+ *
+ * Since: 1.2
  */
 const gchar *
 mm_cdma_manual_activation_properties_get_mn_aaa_key (MMCdmaManualActivationProperties *self)
@@ -374,7 +402,10 @@ validate_mn_aaa_key (const gchar *mn_aaa_key,
  *
  * Sets the Mobile Identification Number.
  *
- * Returns: %TRUE if the MN-AAA key was successfully set, or %FALSE if @error is set.
+ * Returns: %TRUE if the MN-AAA key was successfully set, or %FALSE if @error is
+ * set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_cdma_manual_activation_properties_set_mn_aaa_key (MMCdmaManualActivationProperties *self,
@@ -400,7 +431,10 @@ mm_cdma_manual_activation_properties_set_mn_aaa_key (MMCdmaManualActivationPrope
  *
  * Gets the Preferred Roaming List.
  *
- * Returns: (transfer none): The PRL. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The PRL. Do not free the returned value, it is
+ * owned by @self.
+ *
+ * Since: 1.2
  */
 const guint8 *
 mm_cdma_manual_activation_properties_get_prl (MMCdmaManualActivationProperties *self,
@@ -420,7 +454,10 @@ mm_cdma_manual_activation_properties_get_prl (MMCdmaManualActivationProperties *
  *
  * Gets the Preferred Roaming List.
  *
- * Returns: (transfer none): A #GByteArray with the PRL, or %NULL if it doesn't contain any. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): A #GByteArray with the PRL, or %NULL if it doesn't
+ * contain any. Do not free the returned value, it is owned by @self.
+ *
+ * Since: 1.2
  */
 GByteArray *
 mm_cdma_manual_activation_properties_peek_prl_bytearray (MMCdmaManualActivationProperties *self)
@@ -436,7 +473,10 @@ mm_cdma_manual_activation_properties_peek_prl_bytearray (MMCdmaManualActivationP
  *
  * Gets the Preferred Roaming List.
  *
- * Returns: (transfer full): A #GByteArray with the PRL, or %NULL if it doesn't contain any. The returned value should be freed with g_byte_array_unref().
+ * Returns: (transfer full): A #GByteArray with the PRL, or %NULL if it doesn't
+ * contain any. The returned value should be freed with g_byte_array_unref().
+ *
+ * Since: 1.2
  */
 GByteArray *
 mm_cdma_manual_activation_properties_get_prl_bytearray (MMCdmaManualActivationProperties *self)
@@ -472,6 +512,8 @@ validate_prl (const guint8 *prl,
  * Sets the Preferred Roaming List.
  *
  * Returns: %TRUE if the PRL was successfully set, or %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_cdma_manual_activation_properties_set_prl (MMCdmaManualActivationProperties *self,
@@ -499,12 +541,15 @@ mm_cdma_manual_activation_properties_set_prl (MMCdmaManualActivationProperties *
 /**
  * mm_cdma_manual_activation_properties_set_prl_bytearray:
  * @self: A #MMCdmaManualActivationProperties.
- * @prl: A #GByteArray with the PRL to set. This method takes a new reference of @prl.
+ * @prl: A #GByteArray with the PRL to set. This method takes a new reference
+ *  of @prl.
  * @error: Return location for error or %NULL.
  *
  * Sets the Preferred Roaming List.
  *
  * Returns: %TRUE if the PRL was successfully set, or %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_cdma_manual_activation_properties_set_prl_bytearray (MMCdmaManualActivationProperties *self,
@@ -525,14 +570,6 @@ mm_cdma_manual_activation_properties_set_prl_bytearray (MMCdmaManualActivationPr
 
 /*****************************************************************************/
 
-/**
- * mm_cdma_manual_activation_properties_get_dictionary:
- * @self: A #MMCdmaManualActivationProperties.
- *
- * Gets a variant dictionary with the contents of @self.
- *
- * Returns: (transfer full): A dictionary with the properties. The returned value should be freed with g_variant_unref().
- */
 GVariant *
 mm_cdma_manual_activation_properties_get_dictionary (MMCdmaManualActivationProperties *self)
 {
@@ -659,16 +696,6 @@ consume_variant (MMCdmaManualActivationProperties *self,
     return FALSE;
 }
 
-/**
- * mm_cdma_manual_activation_properties_new_from_dictionary:
- * @dictionary: A variant dictionary with the properties of the image.
- * @error: Return location for error or %NULL.
- *
- * Creates a new #MMCdmaManualActivationProperties object with the properties exposed in
- * the dictionary.
- *
- * Returns: (transfer full): A #MMCdmaManualActivationProperties or %NULL if @error is set. The returned value should be freed with g_object_unref().
- */
 MMCdmaManualActivationProperties *
 mm_cdma_manual_activation_properties_new_from_dictionary (GVariant *dictionary,
                                                           GError **error)
@@ -837,7 +864,10 @@ mm_cdma_manual_activation_properties_new_from_string (const gchar *str,
  *
  * Creates a new #MMCdmaManualActivationProperties object.
  *
- * Returns: (transfer full): A #MMCdmaManualActivationProperties. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMCdmaManualActivationProperties. The returned
+ * value should be freed with g_object_unref().
+ *
+ * Since: 1.2
  */
 MMCdmaManualActivationProperties *
 mm_cdma_manual_activation_properties_new (void)

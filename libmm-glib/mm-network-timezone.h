@@ -36,13 +36,17 @@ G_BEGIN_DECLS
  * MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN:
  *
  * Identifier for an unknown timezone offset.
+ *
+ * Since: 1.0
  */
-#define MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN       G_MAXINT32
+#define MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN G_MAXINT32
 
 /**
  * MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN:
  *
  * Identifier for an unknown leap seconds value.
+ *
+ * Since: 1.0
  */
 #define MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN G_MAXINT32
 

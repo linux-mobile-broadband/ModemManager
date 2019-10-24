@@ -70,6 +70,8 @@ struct _MMBearerPropertiesPrivate {
  * @apn: Name of the access point.
  *
  * Sets the name of the access point to use when connecting.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_properties_set_apn (MMBearerProperties *self,
@@ -87,7 +89,10 @@ mm_bearer_properties_set_apn (MMBearerProperties *self,
  *
  * Gets the name of the access point to use when connecting.
  *
- * Returns: (transfer none): the access point, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the access point, or #NULL if not set. Do not free
+ * the returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_bearer_properties_get_apn (MMBearerProperties *self)
@@ -102,9 +107,13 @@ mm_bearer_properties_get_apn (MMBearerProperties *self)
 /**
  * mm_bearer_properties_set_allowed_auth:
  * @self: a #MMBearerProperties.
- * @allowed_auth: a bitmask of #MMBearerAllowedAuth values. %MM_BEARER_ALLOWED_AUTH_UNKNOWN may be given to request the modem-default method.
+ * @allowed_auth: a bitmask of #MMBearerAllowedAuth values.
+ *  %MM_BEARER_ALLOWED_AUTH_UNKNOWN may be given to request the modem-default
+ *  method.
  *
  * Sets the authentication method to use.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_properties_set_allowed_auth (MMBearerProperties *self,
@@ -121,7 +130,10 @@ mm_bearer_properties_set_allowed_auth (MMBearerProperties *self,
  *
  * Gets the authentication methods allowed in the connection.
  *
- * Returns: a bitmask of #MMBearerAllowedAuth values, or %MM_BEARER_ALLOWED_AUTH_UNKNOWN to request the modem-default method.
+ * Returns: a bitmask of #MMBearerAllowedAuth values, or
+ * %MM_BEARER_ALLOWED_AUTH_UNKNOWN to request the modem-default method.
+ *
+ * Since: 1.0
  */
 MMBearerAllowedAuth
 mm_bearer_properties_get_allowed_auth (MMBearerProperties *self)
@@ -139,6 +151,8 @@ mm_bearer_properties_get_allowed_auth (MMBearerProperties *self)
  * @user: the username
  *
  * Sets the username used to authenticate with the access point.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_properties_set_user (MMBearerProperties *self,
@@ -156,7 +170,10 @@ mm_bearer_properties_set_user (MMBearerProperties *self,
  *
  * Gets the username used to authenticate with the access point.
  *
- * Returns: (transfer none): the username, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the username, or #NULL if not set. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_bearer_properties_get_user (MMBearerProperties *self)
@@ -174,6 +191,8 @@ mm_bearer_properties_get_user (MMBearerProperties *self)
  * @password: the password
  *
  * Sets the password used to authenticate with the access point.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_properties_set_password (MMBearerProperties *self,
@@ -191,7 +210,10 @@ mm_bearer_properties_set_password (MMBearerProperties *self,
  *
  * Gets the password used to authenticate with the access point.
  *
- * Returns: (transfer none): the password, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the password, or #NULL if not set. Do not free
+ * the returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_bearer_properties_get_password (MMBearerProperties *self)
@@ -209,6 +231,8 @@ mm_bearer_properties_get_password (MMBearerProperties *self)
  * @ip_type: a #MMBearerIpFamily.
  *
  * Sets the IP type to use.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_properties_set_ip_type (MMBearerProperties *self,
@@ -226,6 +250,8 @@ mm_bearer_properties_set_ip_type (MMBearerProperties *self,
  * Sets the IP type to use.
  *
  * Returns: a #MMBearerIpFamily.
+ *
+ * Since: 1.0
  */
 MMBearerIpFamily
 mm_bearer_properties_get_ip_type (MMBearerProperties *self)
@@ -244,6 +270,8 @@ mm_bearer_properties_get_ip_type (MMBearerProperties *self)
  *
  * Sets the flag to indicate whether roaming is allowed or not in the
  * connection.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
@@ -262,6 +290,8 @@ mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
  * Checks whether roaming is allowed in the connection.
  *
  * Returns: %TRUE if roaming is allowed, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_bearer_properties_get_allow_roaming (MMBearerProperties *self)
@@ -282,6 +312,7 @@ mm_bearer_properties_get_allow_roaming (MMBearerProperties *self)
  *
  * Sets the number to use when performing the connection.
  *
+ * Since: 1.0
  * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
  * it doesn't make sense to expose it in the ModemManager interface.
  */
@@ -300,8 +331,10 @@ mm_bearer_properties_set_number (MMBearerProperties *self,
  *
  * Gets the number to use when performing the connection.
  *
- * Returns: (transfer none): the number, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the number, or #NULL if not set. Do not free the
+ * returned value, it is owned by @self.
  *
+ * Since: 1.0
  * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
  * it doesn't make sense to expose it in the ModemManager interface.
  */
@@ -324,6 +357,8 @@ mm_bearer_properties_get_number (MMBearerProperties *self)
  * @protocol: a #MMModemCdmaRmProtocol.
  *
  * Sets the RM protocol to use in the CDMA connection.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_properties_set_rm_protocol (MMBearerProperties *self,
@@ -341,6 +376,8 @@ mm_bearer_properties_set_rm_protocol (MMBearerProperties *self,
  * Gets the RM protocol requested to use in the CDMA connection.
  *
  * Returns: a #MMModemCdmaRmProtocol.
+ *
+ * Since: 1.0
  */
 MMModemCdmaRmProtocol
 mm_bearer_properties_get_rm_protocol (MMBearerProperties *self)
@@ -615,14 +652,6 @@ mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-/**
- * mm_bearer_properties_dup:
- * @orig: a #MMBearerProperties
- *
- * Creates a copy of @orig.
- *
- * Returns: (transfer full): a newly created #MMBearerProperties
- */
 MMBearerProperties *
 mm_bearer_properties_dup (MMBearerProperties *orig)
 {
@@ -664,6 +693,8 @@ mm_bearer_properties_cmp (MMBearerProperties *a,
  * Creates a new empty #MMBearerProperties.
  *
  * Returns: (transfer full): a #MMBearerProperties. The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMBearerProperties *
 mm_bearer_properties_new (void)

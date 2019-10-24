@@ -34,7 +34,7 @@
  * mm_modem_location_get_full_sync().
  */
 
-G_DEFINE_TYPE (MMLocationGpsNmea, mm_location_gps_nmea, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMLocationGpsNmea, mm_location_gps_nmea, G_TYPE_OBJECT)
 
 struct _MMLocationGpsNmeaPrivate {
     GHashTable *traces;
@@ -135,7 +135,10 @@ mm_location_gps_nmea_add_trace (MMLocationGpsNmea *self,
  *
  * Gets the last cached value of the specific @trace_type given.
  *
- * Returns: the NMEA trace, or %NULL if not available. Do not free the returned value, it is owned by @self.
+ * Returns: the NMEA trace, or %NULL if not available. Do not free the returned
+ * value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_location_gps_nmea_get_trace (MMLocationGpsNmea *self,
@@ -163,7 +166,10 @@ build_full_foreach (const gchar *trace_type,
  *
  * Gets a compilation of all cached traces.
  *
- * Returns: (transfer full): a string containing all traces, or #NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): a string containing all traces, or #NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
@@ -249,7 +255,7 @@ mm_location_gps_nmea_new (void)
 static void
 mm_location_gps_nmea_init (MMLocationGpsNmea *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_LOCATION_GPS_NMEA,
                                               MMLocationGpsNmeaPrivate);
 

@@ -35,7 +35,10 @@
  * @allowed: Mask of #MMModemMode values specifying allowed modes.
  * @preferred: A single #MMModemMode value specifying the preferred mode.
  *
- * #MMModemModeCombination is a simple struct holding a pair of #MMModemMode values.
+ * #MMModemModeCombination is a simple struct holding a pair of #MMModemMode
+ * values.
+ *
+ * Since: 1.0
  */
 typedef struct _MMModemModeCombination MMModemModeCombination;
 struct _MMModemModeCombination {
@@ -49,6 +52,8 @@ struct _MMModemModeCombination {
  * @type: A #MMModemPortType value.
  *
  * Information of a given port.
+ *
+ * Since: 1.0
  */
 typedef struct _MMModemPortInfo MMModemPortInfo;
 struct _MMModemPortInfo {
@@ -66,6 +71,8 @@ void mm_modem_port_info_array_free (MMModemPortInfo *array,
  *
  * #MMOmaPendingNetworkInitiatedSession is a simple struct specifying the
  * information available for a pending network-initiated OMA session.
+ *
+ * Since: 1.2
  */
 typedef struct _MMOmaPendingNetworkInitiatedSession MMOmaPendingNetworkInitiatedSession;
 struct _MMOmaPendingNetworkInitiatedSession {

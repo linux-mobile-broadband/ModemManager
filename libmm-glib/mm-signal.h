@@ -29,6 +29,8 @@ G_BEGIN_DECLS
  * MM_SIGNAL_UNKNOWN:
  *
  * Identifier for an unknown signal value.
+ *
+ * Since: 1.2
  */
 #define MM_SIGNAL_UNKNOWN -G_MAXDOUBLE
 

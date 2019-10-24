@@ -50,6 +50,8 @@ G_DEFINE_TYPE (MMModemCdma, mm_modem_cdma, MM_GDBUS_TYPE_MODEM_CDMA_PROXY)
  * Gets the DBus path of the #MMObject which implements this interface.
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_cdma_get_path (MMModemCdma *self)
@@ -64,9 +66,13 @@ mm_modem_cdma_get_path (MMModemCdma *self)
  * mm_modem_cdma_dup_path:
  * @self: A #MMModemCdma.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_cdma_dup_path (MMModemCdma *self)
@@ -87,15 +93,17 @@ mm_modem_cdma_dup_path (MMModemCdma *self)
  * mm_modem_cdma_get_meid:
  * @self: A #MMModemCdma.
  *
- * Gets the <ulink url="http://en.wikipedia.org/wiki/MEID">Mobile Equipment Identifier</ulink>,
+ * Gets the
+ * <ulink url="http://en.wikipedia.org/wiki/MEID">Mobile Equipment Identifier</ulink>,
  * as reported by this #MMModemCdma.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_cdma_dup_meid() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_cdma_dup_meid() if on another thread.</warning>
  *
  * Returns: (transfer none): The MEID, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_cdma_get_meid (MMModemCdma *self)
@@ -110,10 +118,14 @@ mm_modem_cdma_get_meid (MMModemCdma *self)
  * mm_modem_cdma_dup_meid:
  * @self: A #MMModemCdma.
  *
- * Gets a copy of the <ulink url="http://en.wikipedia.org/wiki/MEID">Mobile Equipment Identifier</ulink>,
+ * Gets a copy of the
+ * <ulink url="http://en.wikipedia.org/wiki/MEID">Mobile Equipment Identifier</ulink>,
  * as reported by this #MMModemCdma.
  *
- * Returns: (transfer full): The MEID, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The MEID, or %NULL if none available. The returned
+ * value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_cdma_dup_meid (MMModemCdma *self)
@@ -130,17 +142,19 @@ mm_modem_cdma_dup_meid (MMModemCdma *self)
  * mm_modem_cdma_get_esn:
  * @self: A #MMModemCdma.
  *
- * Gets the <ulink url="http://en.wikipedia.org/wiki/Electronic_serial_number">Electronic Serial Number</ulink>,
+ * Gets the
+ * <ulink url="http://en.wikipedia.org/wiki/Electronic_serial_number">Electronic Serial Number</ulink>,
  * as reported by this #MMModemCdma.
  *
  * The ESN is superceded by MEID, but still used in older devices.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_cdma_dup_esn() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_cdma_dup_esn() if on another thread.</warning>
  *
  * Returns: (transfer none): The ESN, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_cdma_get_esn (MMModemCdma *self)
@@ -155,12 +169,16 @@ mm_modem_cdma_get_esn (MMModemCdma *self)
  * mm_modem_cdma_dup_esn:
  * @self: A #MMModemCdma.
  *
- * Gets a copy of the <ulink url="http://en.wikipedia.org/wiki/Electronic_serial_number">Electronic Serial Number</ulink>,
+ * Gets a copy of the
+ * <ulink url="http://en.wikipedia.org/wiki/Electronic_serial_number">Electronic Serial Number</ulink>,
  * as reported by this #MMModemCdma.
  *
  * The ESN is superceded by MEID, but still used in older devices.
  *
- * Returns: (transfer full): The ESN, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The ESN, or %NULL if none available. The returned
+ * value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_cdma_dup_esn (MMModemCdma *self)
@@ -177,11 +195,14 @@ mm_modem_cdma_dup_esn (MMModemCdma *self)
  * mm_modem_cdma_get_sid:
  * @self: A #MMModemCdma.
  *
- * Gets the <ulink url="http://en.wikipedia.org/wiki/System_Identification_Number">System Identifier</ulink>
+ * Gets the
+ * <ulink url="http://en.wikipedia.org/wiki/System_Identification_Number">System Identifier</ulink>
  * of the serving CDMA 1x network, if known, and if the modem is registered with
  * a CDMA 1x network.
  *
  * Returns: The SID, or %MM_MODEM_CDMA_SID_UNKNOWN.
+ *
+ * Since: 1.0
  */
 guint
 mm_modem_cdma_get_sid (MMModemCdma *self)
@@ -197,11 +218,14 @@ mm_modem_cdma_get_sid (MMModemCdma *self)
  * mm_modem_cdma_get_nid:
  * @self: A #MMModemCdma.
  *
- * Gets the <ulink url="http://en.wikipedia.org/wiki/Network_Identification_Number">Network Identifier</ulink>
+ * Gets the
+ * <ulink url="http://en.wikipedia.org/wiki/Network_Identification_Number">Network Identifier</ulink>
  * of the serving CDMA 1x network, if known, and if the modem is registered with
  * a CDMA 1x network.
  *
  * Returns: The NID, or %MM_MODEM_CDMA_NID_UNKNOWN.
+ *
+ * Since: 1.0
  */
 guint
 mm_modem_cdma_get_nid (MMModemCdma *self)
@@ -220,6 +244,8 @@ mm_modem_cdma_get_nid (MMModemCdma *self)
  * Gets the state of the registration in the CDMA 1x network.
  *
  * Returns: a #MMModemCdmaRegistrationState.
+ *
+ * Since: 1.0
  */
 MMModemCdmaRegistrationState
 mm_modem_cdma_get_cdma1x_registration_state (MMModemCdma *self)
@@ -236,6 +262,8 @@ mm_modem_cdma_get_cdma1x_registration_state (MMModemCdma *self)
  * Gets the state of the registration in the EV-DO network.
  *
  * Returns: a #MMModemCdmaRegistrationState.
+ *
+ * Since: 1.0
  */
 MMModemCdmaRegistrationState
 mm_modem_cdma_get_evdo_registration_state (MMModemCdma *self)
@@ -254,6 +282,8 @@ mm_modem_cdma_get_evdo_registration_state (MMModemCdma *self)
  * Gets the state of the activation in the 3GPP2 network.
  *
  * Returns: a #MMModemCdmaActivationState.
+ *
+ * Since: 1.0
  */
 MMModemCdmaActivationState
 mm_modem_cdma_get_activation_state (MMModemCdma *self)
@@ -268,12 +298,15 @@ mm_modem_cdma_get_activation_state (MMModemCdma *self)
 /**
  * mm_modem_cdma_activate_finish:
  * @self: A #MMModemCdma.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_cdma_activate().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_cdma_activate().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_cdma_activate().
  *
  * Returns: %TRUE if the activation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_cdma_activate_finish (MMModemCdma *self,
@@ -290,16 +323,22 @@ mm_modem_cdma_activate_finish (MMModemCdma *self,
  * @self: A #MMModemCdma.
  * @carrier: Name of the carrier.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests to provision the modem for use with a given carrier
  * using the modem's OTA activation functionality, if any.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_cdma_activate_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_cdma_activate_finish() to get the result of the operation.
  *
- * See mm_modem_cdma_activate_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_cdma_activate_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_cdma_activate (MMModemCdma *self,
@@ -323,10 +362,12 @@ mm_modem_cdma_activate (MMModemCdma *self,
  * Synchronously requests to provision the modem for use with a given carrier
  * using the modem's OTA activation functionality, if any.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_cdma_activate()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_cdma_activate() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the activation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_cdma_activate_sync (MMModemCdma *self,
@@ -344,12 +385,15 @@ mm_modem_cdma_activate_sync (MMModemCdma *self,
 /**
  * mm_modem_cdma_activate_manual_finish:
  * @self: A #MMModemCdma.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_cdma_activate_manual().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_cdma_activate_manual().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_cdma_activate_manual().
  *
  * Returns: %TRUE if the activation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_cdma_activate_manual_finish (MMModemCdma *self,
@@ -366,15 +410,22 @@ mm_modem_cdma_activate_manual_finish (MMModemCdma *self,
  * @self: A #MMModemCdma.
  * @properties: A #MMCdmaManualActivationProperties.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests to provision the modem with the given properties.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_cdma_activate_manual_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from.
+ * You can then call mm_modem_cdma_activate_manual_finish() to get the result of
+ * the operation.
  *
- * See mm_modem_cdma_activate_manual_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_cdma_activate_manual_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_cdma_activate_manual (MMModemCdma *self,
@@ -405,10 +456,12 @@ mm_modem_cdma_activate_manual (MMModemCdma *self,
  *
  * Synchronously requests to provision the modem with the given properties.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_cdma_activate_manual()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_cdma_activate_manual() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the activation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_cdma_activate_manual_sync (MMModemCdma *self,

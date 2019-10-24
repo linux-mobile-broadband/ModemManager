@@ -33,7 +33,7 @@
  * mm_modem_simple_get_status_sync().
  */
 
-G_DEFINE_TYPE (MMSimpleStatus, mm_simple_status, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMSimpleStatus, mm_simple_status, G_TYPE_OBJECT)
 
 enum {
     PROP_0,
@@ -96,6 +96,8 @@ struct _MMSimpleStatusPrivate {
  * Gets the state of the modem.
  *
  * Returns: a #MMModemState.
+ *
+ * Since: 1.0
  */
 MMModemState
 mm_simple_status_get_state (MMSimpleStatus *self)
@@ -110,11 +112,14 @@ mm_simple_status_get_state (MMSimpleStatus *self)
 /**
  * mm_simple_status_get_signal_quality:
  * @self: a #MMSimpleStatus.
- * @recent: (out) (allow-none): indication of whether the given signal quality is considered recent.
+ * @recent: (out) (allow-none): indication of whether the given signal quality
+ *  is considered recent.
  *
  * Gets the signal quality.
  *
  * Returns: the signal quality.
+ *
+ * Since: 1.0
  */
 guint32
 mm_simple_status_get_signal_quality (MMSimpleStatus *self,
@@ -142,10 +147,13 @@ mm_simple_status_get_signal_quality (MMSimpleStatus *self,
 /**
  * mm_simple_status_get_current_bands:
  * @self: a #MMSimpleStatus.
- * @bands: (out): location for an array of #MMModemBand values. Do not free the returned value, it is owned by @self.
+ * @bands: (out): location for an array of #MMModemBand values. Do not free the
+ *  returned value, it is owned by @self.
  * @n_bands: (out): number of elements in @bands.
  *
  * Gets the currently used frequency bands.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_status_get_current_bands (MMSimpleStatus *self,
@@ -170,6 +178,8 @@ mm_simple_status_get_current_bands (MMSimpleStatus *self,
  * Gets the currently used access technologies.
  *
  * Returns: a bitmask of #MMModemAccessTechnology values.
+ *
+ * Since: 1.0
  */
 MMModemAccessTechnology
 mm_simple_status_get_access_technologies (MMSimpleStatus *self)
@@ -188,6 +198,8 @@ mm_simple_status_get_access_technologies (MMSimpleStatus *self)
  * Gets the current state of the registration in the 3GPP network.
  *
  * Returns: a #MMModem3gppRegistrationState.
+ *
+ * Since: 1.0
  */
 MMModem3gppRegistrationState
 mm_simple_status_get_3gpp_registration_state (MMSimpleStatus *self)
@@ -203,9 +215,13 @@ mm_simple_status_get_3gpp_registration_state (MMSimpleStatus *self)
  * mm_simple_status_get_3gpp_operator_code:
  * @self: a #MMSimpleStatus.
  *
- * Gets the MCC/MNC of the operator of the 3GPP network where the modem is registered.
+ * Gets the MCC/MNC of the operator of the 3GPP network where the modem is
+ * registered.
  *
- * Returns: the operator code, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ * Returns: the operator code, or %NULL if unknown. Do not free the returned
+ * value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_simple_status_get_3gpp_operator_code (MMSimpleStatus *self)
@@ -221,9 +237,13 @@ mm_simple_status_get_3gpp_operator_code (MMSimpleStatus *self)
  * mm_simple_status_get_3gpp_operator_name:
  * @self: a #MMSimpleStatus.
  *
- * Gets the name of the operator of the 3GPP network where the modem is registered.
+ * Gets the name of the operator of the 3GPP network where the modem is
+ * registered.
  *
- * Returns: the operator name, or %NULL if unknown. Do not free the returned value, it is owned by @self.
+ * Returns: the operator name, or %NULL if unknown. Do not free the returned
+ * value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_simple_status_get_3gpp_operator_name (MMSimpleStatus *self)
@@ -242,6 +262,8 @@ mm_simple_status_get_3gpp_operator_name (MMSimpleStatus *self)
  * Gets the current subscription status of the account.
  *
  * Returns: a #MMModem3gppSubscriptionState.
+ *
+ * Since: 1.0
  */
 MMModem3gppSubscriptionState
 mm_simple_status_get_3gpp_subscription_state (MMSimpleStatus *self)
@@ -261,6 +283,8 @@ mm_simple_status_get_3gpp_subscription_state (MMSimpleStatus *self)
  * Gets the current state of the registration in the CDMA-1x network.
  *
  * Returns: a #MMModemCdmaRegistrationState.
+ *
+ * Since: 1.0
  */
 MMModemCdmaRegistrationState
 mm_simple_status_get_cdma_cdma1x_registration_state (MMSimpleStatus *self)
@@ -279,6 +303,8 @@ mm_simple_status_get_cdma_cdma1x_registration_state (MMSimpleStatus *self)
  * Gets the current state of the registration in the EV-DO network.
  *
  * Returns: a #MMModemCdmaRegistrationState.
+ *
+ * Since: 1.0
  */
 MMModemCdmaRegistrationState
 mm_simple_status_get_cdma_evdo_registration_state (MMSimpleStatus *self)
@@ -297,6 +323,8 @@ mm_simple_status_get_cdma_evdo_registration_state (MMSimpleStatus *self)
  * Gets the System Identification number of the CDMA network.
  *
  * Returns: the SID, or %MM_MODEM_CDMA_SID_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 guint
 mm_simple_status_get_cdma_sid (MMSimpleStatus *self)
@@ -315,6 +343,8 @@ mm_simple_status_get_cdma_sid (MMSimpleStatus *self)
  * Gets the Network Identification number of the CDMA network.
  *
  * Returns: the NID, or %MM_MODEM_CDMA_NID_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 guint
 mm_simple_status_get_cdma_nid (MMSimpleStatus *self)

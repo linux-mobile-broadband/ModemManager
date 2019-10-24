@@ -55,6 +55,8 @@ struct _MMModemFirmwarePrivate {
  * Gets the DBus path of the #MMObject which implements this interface.
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_firmware_get_path (MMModemFirmware *self)
@@ -69,9 +71,13 @@ mm_modem_firmware_get_path (MMModemFirmware *self)
  * mm_modem_firmware_dup_path:
  * @self: A #MMModemFirmware.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_firmware_dup_path (MMModemFirmware *self)
@@ -157,10 +163,13 @@ ensure_internal_update_settings (MMModemFirmware           *self,
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_firmware_get_update_settings() again to get a new #MMFirmwareUpdateSettings
- * with the new values.</warning>
+ * mm_modem_firmware_get_update_settings() again to get a new
+ * #MMFirmwareUpdateSettings with the new values.</warning>
  *
- * Returns: (transfer full): A #MMFirmwareUpdateSettings that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMFirmwareUpdateSettings that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.10
  */
 MMFirmwareUpdateSettings *
 mm_modem_firmware_get_update_settings (MMModemFirmware *self)
@@ -185,7 +194,10 @@ mm_modem_firmware_get_update_settings (MMModemFirmware *self)
  * @self was constructed. Use mm_modem_firmware_get_update_settings() if on
  * another thread.</warning>
  *
- * Returns: (transfer none): A #MMFirmwareUpdateSettings. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMFirmwareUpdateSettings. Do not free the
+ * returned value, it belongs to @self.
+ *
+ * Since: 1.10
  */
 MMFirmwareUpdateSettings *
 mm_modem_firmware_peek_update_settings (MMModemFirmware *self)
@@ -201,12 +213,15 @@ mm_modem_firmware_peek_update_settings (MMModemFirmware *self)
 /**
  * mm_modem_firmware_select_finish:
  * @self: A #MMModemFirmware.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_firmware_select().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_firmware_select().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_firmware_select().
  *
  * Returns: %TRUE if the selection was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_firmware_select_finish (MMModemFirmware *self,
@@ -223,7 +238,8 @@ mm_modem_firmware_select_finish (MMModemFirmware *self,
  * @self: A #MMModemFirmware.
  * @unique_id: Unique ID of the firmware image to select.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously selects a firmware image to boot.
@@ -231,10 +247,15 @@ mm_modem_firmware_select_finish (MMModemFirmware *self,
  * <warning>The modem will possibly disappear once this action is run, as it
  * needs to reboot in order to select the new image.</warning>
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_firmware_select_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_firmware_select_finish() to get the result of the operation.
  *
- * See mm_modem_firmware_select_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_firmware_select_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_firmware_select (MMModemFirmware *self,
@@ -261,10 +282,12 @@ mm_modem_firmware_select (MMModemFirmware *self,
  * <warning>The modem will possibly disappear once this action is run, as it
  * needs to reboot in order to select the new image.</warning>
  *
- * The calling thread is blocked until a reply is received. See mm_modem_firmware_select()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_firmware_select() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the selection was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_firmware_select_sync (MMModemFirmware *self,
@@ -360,14 +383,22 @@ build_results (const gchar *str_selected,
 /**
  * mm_modem_firmware_list_finish:
  * @self: A #MMModemFirmware.
- * @selected: (out) (allow-none) (transfer full): The selected firmware slot, or NULL if no slot is selected (such as if all slots are empty, or no slots exist). The returned value should be freed with g_object_unref().
- * @installed: (out) (allow-none) (transfer full) (element-type ModemManager.FirmwareProperties): A list of #MMFirmwareProperties objects specifying the installed images. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_firmware_list().
+ * @selected: (out) (allow-none) (transfer full): The selected firmware slot, or
+ *  %NULL if no slot is selected (such as if all slots are empty, or no slots
+ *  exist). The returned value should be freed with g_object_unref().
+ * @installed: (out) (allow-none) (transfer full) (element-type ModemManager.FirmwareProperties):
+ *  A list of #MMFirmwareProperties objects specifying the installed images. The
+ *  returned value should be freed with g_list_free_full() using
+ *  g_object_unref() as #GDestroyNotify.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_firmware_list().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_firmware_list().
  *
  * Returns: %TRUE if the list was correctly retrieved, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_firmware_list_finish (MMModemFirmware *self,
@@ -409,15 +440,21 @@ mm_modem_firmware_list_finish (MMModemFirmware *self,
  * mm_modem_firmware_list:
  * @self: A #MMModemFirmware.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously gets the list of available firmware images.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_firmware_list_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_firmware_list_finish() to get the result of the operation.
  *
- * See mm_modem_firmware_list_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_firmware_list_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_firmware_list (MMModemFirmware *self,
@@ -436,17 +473,24 @@ mm_modem_firmware_list (MMModemFirmware *self,
 /**
  * mm_modem_firmware_list_sync:
  * @self: A #MMModemFirmware.
- * @selected: (out) (allow-none) (transfer full): The selected firmware slot, or NULL if no slot is selected (such as if all slots are empty, or no slots exist). The returned value should be freed with g_object_unref().
- * @installed: (out) (allow-none) (transfer full) (element-type ModemManager.FirmwareProperties): A list of #MMFirmwareProperties objects specifying the installed images. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify.
+ * @selected: (out) (allow-none) (transfer full): The selected firmware slot,
+ *  or NULL if no slot is selected (such as if all slots are empty, or no slots
+ *  exist). The returned value should be freed with g_object_unref().
+ * @installed: (out) (allow-none) (transfer full) (element-type ModemManager.FirmwareProperties):
+ *  A list of #MMFirmwareProperties objects specifying the installed images. The
+ *  returned value should be freed with g_list_free_full() using
+ *  g_object_unref() as #GDestroyNotify.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return firmware for error or %NULL.
  *
  * Synchronously gets the list of available firmware images.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_firmware_list()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_firmware_list() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the list was correctly retrieved, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_firmware_list_sync (MMModemFirmware *self,

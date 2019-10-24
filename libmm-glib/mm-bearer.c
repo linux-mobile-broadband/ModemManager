@@ -69,6 +69,8 @@ struct _MMBearerPrivate {
  * Gets the DBus path of the #MMBearer object.
  *
  * Returns: (transfer none): The DBus path of the #MMBearer object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_bearer_get_path (MMBearer *self)
@@ -85,7 +87,10 @@ mm_bearer_get_path (MMBearer *self)
  *
  * Gets a copy of the DBus path of the #MMBearer object.
  *
- * Returns: (transfer full): The DBus path of the #MMBearer object. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMBearer object. The returned
+ * value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_bearer_dup_path (MMBearer *self)
@@ -116,7 +121,10 @@ mm_bearer_dup_path (MMBearer *self)
  * @self was constructed. Use mm_bearer_dup_interface() if on another
  * thread.</warning>
  *
- * Returns: (transfer none): The name of the interface, or %NULL if it couldn't be retrieved.
+ * Returns: (transfer none): The name of the interface, or %NULL if it couldn't
+ * be retrieved.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_bearer_get_interface (MMBearer *self)
@@ -131,11 +139,14 @@ mm_bearer_get_interface (MMBearer *self)
  * mm_bearer_dup_interface:
  * @self: A #MMBearer.
  *
- * Gets a copy of the operating system name for the network data interface that provides
- * packet data using this #MMBearer. This will only be available once the #MMBearer
- * is in connected state.
+ * Gets a copy of the operating system name for the network data interface that
+ * provides packet data using this #MMBearer. This will only be available once
+ * the #MMBearer is in connected state.
  *
- * Returns: (transfer full): The name of the interface, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The name of the interface, or %NULL if it couldn't
+ * be retrieved. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_bearer_dup_interface (MMBearer *self)
@@ -156,6 +167,8 @@ mm_bearer_dup_interface (MMBearer *self)
  * communication is possible.
  *
  * Returns: %TRUE if the #MMBearer is connected, #FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_bearer_get_connected (MMBearer *self)
@@ -171,10 +184,13 @@ mm_bearer_get_connected (MMBearer *self)
  * mm_bearer_get_suspended:
  * @self: A #MMBearer.
  *
- * Checks whether or not the #MMBearer is suspended (but not deactivated) while the
- * device is handling other communications, like a voice call.
+ * Checks whether or not the #MMBearer is suspended (but not deactivated) while
+ * the device is handling other communications, like a voice call.
  *
- * Returns: %TRUE if packet data service is suspended in the #MMBearer, #FALSE otherwise.
+ * Returns: %TRUE if packet data service is suspended in the #MMBearer, #FALSE
+ * otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_bearer_get_suspended (MMBearer *self)
@@ -193,6 +209,8 @@ mm_bearer_get_suspended (MMBearer *self)
  * Gets the maximum time to wait for the bearer to retrieve a valid IP address.
  *
  * Returns: The IP timeout, or 0 if no specific one given.
+ *
+ * Since: 1.0
  */
 guint
 mm_bearer_get_ip_timeout (MMBearer *self)
@@ -211,6 +229,8 @@ mm_bearer_get_ip_timeout (MMBearer *self)
  * Gets the type of bearer.
  *
  * Returns: a #MMBearerType.
+ *
+ * Since: 1.0
  */
 MMBearerType
 mm_bearer_get_bearer_type (MMBearer *self)
@@ -296,7 +316,10 @@ ensure_internal_ipv4_config (MMBearer *self,
  * mm_bearer_get_ipv4_config() again to get a new #MMBearerIpConfig with the
  * new values.</warning>
  *
- * Returns: (transfer full): A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerIpConfig that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.0
  */
 MMBearerIpConfig *
 mm_bearer_get_ipv4_config (MMBearer *self)
@@ -321,7 +344,10 @@ mm_bearer_get_ipv4_config (MMBearer *self)
  * @self was constructed. Use mm_bearer_get_ipv4_config() if on another
  * thread.</warning>
  *
- * Returns: (transfer none): A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerIpConfig. Do not free the returned
+ * value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 MMBearerIpConfig *
 mm_bearer_peek_ipv4_config (MMBearer *self)
@@ -408,7 +434,10 @@ ensure_internal_ipv6_config (MMBearer *self,
  * mm_bearer_get_ipv6_config() again to get a new #MMBearerIpConfig with the
  * new values.</warning>
  *
- * Returns: (transfer full): A #MMBearerIpConfig that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerIpConfig that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.0
  */
 MMBearerIpConfig *
 mm_bearer_get_ipv6_config (MMBearer *self)
@@ -433,7 +462,10 @@ mm_bearer_get_ipv6_config (MMBearer *self)
  * @self was constructed. Use mm_bearer_get_ipv6_config() if on another
  * thread.</warning>
  *
- * Returns: (transfer none): A #MMBearerIpConfig. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerIpConfig. Do not free the returned
+ * value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 MMBearerIpConfig *
 mm_bearer_peek_ipv6_config (MMBearer *self)
@@ -520,7 +552,10 @@ ensure_internal_properties (MMBearer *self,
  * mm_bearer_get_properties() again to get a new #MMBearerProperties with the
  * new values.</warning>
  *
- * Returns: (transfer full): A #MMBearerProperties that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerProperties that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.0
  */
 MMBearerProperties *
 mm_bearer_get_properties (MMBearer *self)
@@ -545,7 +580,10 @@ mm_bearer_get_properties (MMBearer *self)
  * @self was constructed. Use mm_bearer_get_properties() if on another
  * thread.</warning>
  *
- * Returns: (transfer none): A #MMBearerProperties. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerProperties. Do not free the returned
+ * value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 MMBearerProperties *
 mm_bearer_peek_properties (MMBearer *self)
@@ -631,7 +669,10 @@ ensure_internal_stats (MMBearer *self,
  * mm_bearer_get_stats() again to get a new #MMBearerStats with the
  * new values.</warning>
  *
- * Returns: (transfer full): A #MMBearerStats that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerStats that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.6
  */
 MMBearerStats *
 mm_bearer_get_stats (MMBearer *self)
@@ -656,7 +697,10 @@ mm_bearer_get_stats (MMBearer *self)
  * @self was constructed. Use mm_bearer_get_stats() if on another
  * thread.</warning>
  *
- * Returns: (transfer none): A #MMBearerStats. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerStats. Do not free the returned value,
+ * it belongs to @self.
+ *
+ * Since: 1.6
  */
 MMBearerStats *
 mm_bearer_peek_stats (MMBearer *self)
@@ -672,12 +716,15 @@ mm_bearer_peek_stats (MMBearer *self)
 /**
  * mm_bearer_connect_finish:
  * @self: A #MMBearer.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_bearer_connect().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_bearer_connect().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_bearer_connect().
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_bearer_connect_finish (MMBearer *self,
@@ -699,10 +746,14 @@ mm_bearer_connect_finish (MMBearer *self,
  * Asynchronously requests activation of a packet data connection with the
  * network using this #MMBearer properties.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_bearer_connect_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_bearer_connect_finish() to get the result of the operation.
  *
  * See mm_bearer_connect_sync() for the synchronous, blocking version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_connect (MMBearer *self,
@@ -728,6 +779,8 @@ mm_bearer_connect (MMBearer *self,
  * See mm_bearer_connect() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_bearer_connect_sync (MMBearer *self,
@@ -745,15 +798,22 @@ mm_bearer_connect_sync (MMBearer *self,
  * mm_bearer_disconnect:
  * @self: A #MMBearer.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Synchronously requests disconnection and deactivation of the packet data connection.
+ * Synchronously requests disconnection and deactivation of the packet data
+ * connection.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_bearer_disconnect_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_bearer_disconnect_finish() to get the result of the operation.
  *
- * See mm_bearer_disconnect_sync() for the synchronous, blocking version of this method.
+ * See mm_bearer_disconnect_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.0
  */
 void
 mm_bearer_disconnect (MMBearer *self,
@@ -769,12 +829,15 @@ mm_bearer_disconnect (MMBearer *self,
 /**
  * mm_bearer_disconnect_finish:
  * @self: A #MMBearer.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_bearer_disconnect().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_bearer_disconnect().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_bearer_disconnect().
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_bearer_disconnect_finish (MMBearer *self,
@@ -792,12 +855,15 @@ mm_bearer_disconnect_finish (MMBearer *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously requests disconnection and deactivation of the packet data connection.
+ * Synchronously requests disconnection and deactivation of the packet data
+ * connection.
  *
  * The calling thread is blocked until a reply is received.
  * See mm_bearer_disconnect() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_bearer_disconnect_sync (MMBearer *self,

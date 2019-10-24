@@ -32,7 +32,7 @@
  * This object is retrieved with mm_modem_3gpp_get_pco().
  */
 
-G_DEFINE_TYPE (MMPco, mm_pco, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMPco, mm_pco, G_TYPE_OBJECT)
 
 struct _MMPcoPrivate {
     /* Session ID, signature 'u' */
@@ -77,6 +77,8 @@ _g_variant_get_bytes (GVariant *variant)
  * Gets the session ID associated with the PCO.
  *
  * Returns: the session ID.
+ *
+ * Since: 1.10
  */
 guint32
 mm_pco_get_session_id (MMPco *self)
@@ -104,7 +106,10 @@ mm_pco_set_session_id (MMPco *self,
  * Gets the complete flag that indicates whether the PCO data contains the
  * complete PCO structure received from the network.
  *
- * Returns: %TRUE if the PCO data contains the complete PCO structure, %FALSE otherwise.
+ * Returns: %TRUE if the PCO data contains the complete PCO structure, %FALSE
+ * otherwise.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_pco_is_complete (MMPco *self)
@@ -133,6 +138,8 @@ mm_pco_set_complete (MMPco *self,
  * Gets the PCO data in raw bytes.
  *
  * Returns: (transfer none): the PCO data, or %NULL if it doesn't contain any.
+ *
+ * Since: 1.10
  */
 const guint8 *
 mm_pco_get_data (MMPco *self,
@@ -158,16 +165,6 @@ mm_pco_set_data (MMPco *self,
 
 /*****************************************************************************/
 
-/**
- * mm_pco_from_variant:
- * @variant: A variant with the PCO information.
- * @error: Return location for error or %NULL.
- *
- * Creates a new #MMPco object with the values exposed in
- * the variant.
- *
- * Returns: (transfer full): A #MMPco or %NULL if @error is set. The returned value should be freed with g_object_unref().
- */
 MMPco *
 mm_pco_from_variant (GVariant *variant,
                      GError **error)
@@ -203,14 +200,6 @@ mm_pco_from_variant (GVariant *variant,
 
 /*****************************************************************************/
 
-/**
- * mm_pco_to_variant:
- * @self: a #MMPco.
- *
- * Gets a GVariant representation with signature "(ubay)" of @self.
- *
- * Returns: (transfer full): A #GVariant representation of the #MMPco object. The returned value should be freed with g_variant_unref().
- */
 GVariant *
 mm_pco_to_variant (MMPco *self)
 {
@@ -244,9 +233,12 @@ mm_pco_to_variant (MMPco *self)
 
 /**
  * mm_pco_list_free:
- * @pco_list: (transfer full)(element-type ModemManager.Pco): a #GList of #MMPco.
+ * @pco_list: (transfer full)(element-type ModemManager.Pco): a #GList of
+ *  #MMPco.
  *
  * Frees all of the memory used by a #GList of #MMPco.
+ *
+ * Since: 1.10
  */
 void
 mm_pco_list_free (GList *pco_list)

@@ -36,6 +36,8 @@ G_BEGIN_DECLS
  * MM_UNLOCK_RETRIES_UNKNOWN:
  *
  * Identifier for reporting unknown unlock retries.
+ *
+ * Since: 1.0
  */
 #define MM_UNLOCK_RETRIES_UNKNOWN 999
 
@@ -76,6 +78,8 @@ guint mm_unlock_retries_get (MMUnlockRetries *self,
  * @user_data: data passed to the function.
  *
  * Specifies the type of function passed to mm_unlock_retries_foreach().
+ *
+ * Since: 1.0
  */
 typedef void (* MMUnlockRetriesForeachCb) (MMModemLock lock,
                                            guint count,

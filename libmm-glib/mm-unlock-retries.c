@@ -32,7 +32,7 @@
  * mm_modem_get_unlock_retries() or mm_modem_peek_unlock_retries().
  */
 
-G_DEFINE_TYPE (MMUnlockRetries, mm_unlock_retries, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMUnlockRetries, mm_unlock_retries, G_TYPE_OBJECT)
 
 struct _MMUnlockRetriesPrivate {
     GHashTable *ht;
@@ -68,6 +68,8 @@ mm_unlock_retries_unset (MMUnlockRetries *self,
  * Gets the unlock retries for the given @lock.
  *
  * Returns: the unlock retries or %MM_UNLOCK_RETRIES_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 guint
 mm_unlock_retries_get (MMUnlockRetries *self,
@@ -116,6 +118,8 @@ mm_unlock_retries_cmp (MMUnlockRetries *a,
  * @user_data: (closure): data to pass to @callback.
  *
  * Executes @callback for each lock information found in @self.
+ *
+ * Since: 1.0
  */
 void
 mm_unlock_retries_foreach (MMUnlockRetries *self,
@@ -221,7 +225,7 @@ mm_unlock_retries_new (void)
 static void
 mm_unlock_retries_init (MMUnlockRetries *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_UNLOCK_RETRIES,
                                               MMUnlockRetriesPrivate);
     self->priv->ht = g_hash_table_new (g_direct_hash,

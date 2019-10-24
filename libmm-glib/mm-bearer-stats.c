@@ -53,6 +53,8 @@ struct _MMBearerStatsPrivate {
  * Gets the duration of the current connection, in seconds.
  *
  * Returns: a #guint.
+ *
+ * Since: 1.6
  */
 guint
 mm_bearer_stats_get_duration (MMBearerStats *self)
@@ -80,6 +82,8 @@ mm_bearer_stats_set_duration (MMBearerStats *self,
  * Gets the number of bytes received without error in the connection.
  *
  * Returns: a #guint64.
+ *
+ * Since: 1.6
  */
 guint64
 mm_bearer_stats_get_rx_bytes (MMBearerStats *self)
@@ -107,6 +111,8 @@ mm_bearer_stats_set_rx_bytes (MMBearerStats *self,
  * Gets the number of bytes transmitted without error in the connection.
  *
  * Returns: a #guint64.
+ *
+ * Since: 1.6
  */
 guint64
 mm_bearer_stats_get_tx_bytes (MMBearerStats *self)

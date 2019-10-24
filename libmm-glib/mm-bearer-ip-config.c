@@ -60,6 +60,8 @@ struct _MMBearerIpConfigPrivate {
  * Gets the IP method to be used with this bearer.
  *
  * Returns: a #MMBearerIpMethod.
+ *
+ * Since: 1.0
  */
 MMBearerIpMethod
 mm_bearer_ip_config_get_method (MMBearerIpConfig *self)
@@ -86,7 +88,10 @@ mm_bearer_ip_config_set_method (MMBearerIpConfig *self,
  *
  * Gets the IP address to be used with this bearer.
  *
- * Returns: a string with the IP address, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ * Returns: a string with the IP address, or #NULL if unknown. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_bearer_ip_config_get_address (MMBearerIpConfig *self)
@@ -115,6 +120,8 @@ mm_bearer_ip_config_set_address (MMBearerIpConfig *self,
  * Gets the network prefix to be used with this bearer.
  *
  * Returns: the network prefix.
+ *
+ * Since: 1.0
  */
 guint
 mm_bearer_ip_config_get_prefix (MMBearerIpConfig *self)
@@ -141,7 +148,10 @@ mm_bearer_ip_config_set_prefix (MMBearerIpConfig *self,
  *
  * Gets the list of IP addresses of DNS servers to be used with this bearer.
  *
- * Returns: (transfer none) (array zero-terminated=1): a NULL-terminated array of strings. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none) (array zero-terminated=1): a %NULL-terminated array
+ * of strings. Do not free the returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar **
 mm_bearer_ip_config_get_dns (MMBearerIpConfig *self)
@@ -169,7 +179,10 @@ mm_bearer_ip_config_set_dns (MMBearerIpConfig *self,
  *
  * Gets the IP address of the gateway to be used with this bearer.
  *
- * Returns: a string with the IP address, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ * Returns: a string with the IP address, or #NULL if unknown. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_bearer_ip_config_get_gateway (MMBearerIpConfig *self)
@@ -198,6 +211,8 @@ mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
  * Gets the MTU to be used with this bearer.
  *
  * Returns: the MTU.
+ *
+ * Since: 1.4
  */
 guint
 mm_bearer_ip_config_get_mtu (MMBearerIpConfig *self)
@@ -367,14 +382,6 @@ mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-/**
- * mm_bearer_ip_config_dup:
- * @orig: a #MMBearerIpConfig
- *
- * Creates a copy of @orig.
- *
- * Returns: (transfer full): a newly created #MMBearerIpConfig
- */
 MMBearerIpConfig *
 mm_bearer_ip_config_dup (MMBearerIpConfig *orig)
 {

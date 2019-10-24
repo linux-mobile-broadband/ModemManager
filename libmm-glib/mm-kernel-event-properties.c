@@ -56,6 +56,8 @@ struct _MMKernelEventPropertiesPrivate {
  * @action: The action to set.
  *
  * Sets the action.
+ *
+ * Since: 1.8
  */
 void
 mm_kernel_event_properties_set_action (MMKernelEventProperties *self,
@@ -73,7 +75,10 @@ mm_kernel_event_properties_set_action (MMKernelEventProperties *self,
  *
  * Gets the action.
  *
- * Returns: (transfer none): The action. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The action. Do not free the returned value, it is
+ * owned by @self.
+ *
+ * Since: 1.8
  */
 const gchar *
 mm_kernel_event_properties_get_action (MMKernelEventProperties *self)
@@ -91,6 +96,8 @@ mm_kernel_event_properties_get_action (MMKernelEventProperties *self)
  * @subsystem: The subsystem to set.
  *
  * Sets the subsystem.
+ *
+ * Since: 1.8
  */
 void
 mm_kernel_event_properties_set_subsystem (MMKernelEventProperties *self,
@@ -108,7 +115,10 @@ mm_kernel_event_properties_set_subsystem (MMKernelEventProperties *self,
  *
  * Gets the subsystem.
  *
- * Returns: (transfer none): The subsystem. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The subsystem. Do not free the returned value, it
+ * is owned by @self.
+ *
+ * Since: 1.8
  */
 const gchar *
 mm_kernel_event_properties_get_subsystem (MMKernelEventProperties *self)
@@ -126,6 +136,8 @@ mm_kernel_event_properties_get_subsystem (MMKernelEventProperties *self)
  * @name: The name to set.
  *
  * Sets the name.
+ *
+ * Since: 1.8
  */
 void
 mm_kernel_event_properties_set_name (MMKernelEventProperties *self,
@@ -143,7 +155,10 @@ mm_kernel_event_properties_set_name (MMKernelEventProperties *self,
  *
  * Gets the name.
  *
- * Returns: (transfer none): The name. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The name. Do not free the returned value, it is
+ * owned by @self.
+ *
+ * Since: 1.8
  */
 const gchar *
 mm_kernel_event_properties_get_name (MMKernelEventProperties *self)
@@ -161,6 +176,8 @@ mm_kernel_event_properties_get_name (MMKernelEventProperties *self)
  * @uid: The uid to set.
  *
  * Sets the unique ID of the physical device.
+ *
+ * Since: 1.8
  */
 void
 mm_kernel_event_properties_set_uid (MMKernelEventProperties *self,
@@ -178,7 +195,10 @@ mm_kernel_event_properties_set_uid (MMKernelEventProperties *self,
  *
  * Gets the unique ID of the physical device.
  *
- * Returns: (transfer none): The uid. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): The uid. Do not free the returned value, it is
+ * owned by @self.
+ *
+ * Since: 1.8
  */
 const gchar *
 mm_kernel_event_properties_get_uid (MMKernelEventProperties *self)
@@ -382,14 +402,6 @@ mm_kernel_event_properties_new_from_dictionary (GVariant  *dictionary,
 
 /*****************************************************************************/
 
-/**
- * mm_kernel_event_properties_dup:
- * @orig: a #MMKernelEventProperties
- *
- * Returns a copy of @orig.
- *
- * Returns: (transfer full): a #MMKernelEventProperties
- */
 MMKernelEventProperties *
 mm_kernel_event_properties_dup (MMKernelEventProperties *orig)
 {
@@ -414,7 +426,10 @@ mm_kernel_event_properties_dup (MMKernelEventProperties *orig)
  *
  * Creates a new empty #MMKernelEventProperties.
  *
- * Returns: (transfer full): a #MMKernelEventProperties. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMKernelEventProperties. The returned value
+ * should be freed with g_object_unref().
+ *
+ * Since: 1.8
  */
 MMKernelEventProperties *
 mm_kernel_event_properties_new (void)

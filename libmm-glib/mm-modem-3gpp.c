@@ -59,6 +59,8 @@ struct _MMModem3gppPrivate {
  * Gets the DBus path of the #MMObject which implements this interface.
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_3gpp_get_path (MMModem3gpp *self)
@@ -73,9 +75,13 @@ mm_modem_3gpp_get_path (MMModem3gpp *self)
  * mm_modem_3gpp_dup_path:
  * @self: A #MMModem3gpp.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_3gpp_dup_path (MMModem3gpp *self)
@@ -105,6 +111,8 @@ mm_modem_3gpp_dup_path (MMModem3gpp *self)
  * thread.</warning>
  *
  * Returns: (transfer none): The IMEI, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_3gpp_get_imei (MMModem3gpp *self)
@@ -122,7 +130,10 @@ mm_modem_3gpp_get_imei (MMModem3gpp *self)
  * Gets a copy of the <ulink url="http://en.wikipedia.org/wiki/Imei">IMEI</ulink>,
  * as reported by this #MMModem3gpp.
  *
- * Returns: (transfer full): The IMEI, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The IMEI, or %NULL if none available. The returned
+ * value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_3gpp_dup_imei (MMModem3gpp *self)
@@ -139,8 +150,7 @@ mm_modem_3gpp_dup_imei (MMModem3gpp *self)
  * mm_modem_3gpp_get_operator_code:
  * @self: A #MMModem3gpp.
  *
- * Gets the code of the operator to which the mobile is
- * currently registered.
+ * Gets the code of the operator to which the mobile is currently registered.
  *
  * Returned in the format <literal>"MCCMNC"</literal>, where
  * <literal>MCC</literal> is the three-digit ITU E.212 Mobile Country Code
@@ -157,6 +167,8 @@ mm_modem_3gpp_dup_imei (MMModem3gpp *self)
  * thread.</warning>
  *
  * Returns: (transfer none): The operator code, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_3gpp_get_operator_code (MMModem3gpp *self)
@@ -171,15 +183,18 @@ mm_modem_3gpp_get_operator_code (MMModem3gpp *self)
  * mm_modem_3gpp_dup_operator_code:
  * @self: A #MMModem3gpp.
  *
- * Gets a copy of the code of the operator to which the mobile is
- * currently registered.
+ * Gets a copy of the code of the operator to which the mobile is currently
+ * registered.
  *
  * Returned in the format <literal>"MCCMNC"</literal>, where
  * <literal>MCC</literal> is the three-digit ITU E.212 Mobile Country Code
  * and <literal>MNC</literal> is the two- or three-digit GSM Mobile Network
  * Code. e.g. e<literal>"31026"</literal> or <literal>"310260"</literal>.
  *
- * Returns: (transfer full): The operator code, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The operator code, or %NULL if none available.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_3gpp_dup_operator_code (MMModem3gpp *self)
@@ -205,6 +220,8 @@ mm_modem_3gpp_dup_operator_code (MMModem3gpp *self)
  * thread.</warning>
  *
  * Returns: (transfer none): The operator name, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_3gpp_get_operator_name (MMModem3gpp *self)
@@ -222,7 +239,10 @@ mm_modem_3gpp_get_operator_name (MMModem3gpp *self)
  * Gets a copy of the name of the operator to which the mobile is
  * currently registered.
  *
- * Returns: (transfer full): The operator name, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The operator name, or %NULL if none available.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_3gpp_dup_operator_name (MMModem3gpp *self)
@@ -242,7 +262,10 @@ mm_modem_3gpp_dup_operator_name (MMModem3gpp *self)
  * Get the the mobile registration status as defined in 3GPP TS 27.007
  * section 10.1.19.
  *
- * Returns: A #MMModem3gppRegistrationState value, specifying the current registration state.
+ * Returns: A #MMModem3gppRegistrationState value, specifying the current
+ * registration state.
+ *
+ * Since: 1.0
  */
 MMModem3gppRegistrationState
 mm_modem_3gpp_get_registration_state (MMModem3gpp *self)
@@ -263,15 +286,17 @@ mm_modem_3gpp_get_registration_state (MMModem3gpp *self)
  * Get the current subscription status of the account. This value is only
  * available after the modem attempts to register with the network.
  *
- * The value of this property can only be obtained with operator specific logic (e.g.
- * processing specific PCO info), and therefore it doesn't make sense to expose it in
- * the ModemManager interface.
+ * The value of this property can only be obtained with operator specific logic
+ * (e.g. processing specific PCO info), and therefore it doesn't make sense to
+ * expose it in the ModemManager interface.
  *
- * Returns: A #MMModem3gppSubscriptionState value, specifying the current subscription state.
+ * Returns: A #MMModem3gppSubscriptionState value, specifying the current
+ * subscription state.
  *
- * Deprecated: 1.10.0. The value of this property can only be obtained with operator
- * specific logic (e.g. processing specific PCO info), and therefore it doesn't make sense
- * to expose it in the ModemManager interface.
+ * Since: 1.0
+ * Deprecated: 1.10.0. The value of this property can only be obtained with
+ * operator specific logic (e.g. processing specific PCO info), and therefore
+ * it doesn't make sense to expose it in the ModemManager interface.
  */
 MMModem3gppSubscriptionState
 mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
@@ -289,7 +314,10 @@ mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
  *
  * Get the list of facilities for which PIN locking is enabled.
  *
- * Returns: A bitmask of #MMModem3gppFacility flags, specifying which facilities have locks enabled.
+ * Returns: A bitmask of #MMModem3gppFacility flags, specifying which facilities
+ * have locks enabled.
+ *
+ * Since: 1.0
  */
 MMModem3gppFacility
 mm_modem_3gpp_get_enabled_facility_locks (MMModem3gpp *self)
@@ -306,6 +334,8 @@ mm_modem_3gpp_get_enabled_facility_locks (MMModem3gpp *self)
  * Get the UE mode of operation for EPS.
  *
  * Returns: A #MMModem3gppEpsUeModeOperation.
+ *
+ * Since: 1.8
  */
 MMModem3gppEpsUeModeOperation
 mm_modem_3gpp_get_eps_ue_mode_operation (MMModem3gpp *self)
@@ -327,6 +357,8 @@ mm_modem_3gpp_get_eps_ue_mode_operation (MMModem3gpp *self)
  * mm_pco_list_free().
  *
  * Returns: (element-type ModemManager.Pco) (transfer full): A list of #MMPco.
+ *
+ * Since: 1.10
  */
 GList *
 mm_modem_3gpp_get_pco (MMModem3gpp *self)
@@ -364,10 +396,13 @@ mm_modem_3gpp_get_pco (MMModem3gpp *self)
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_3gpp_dup_initial_eps_bearer_path() if on another
- * thread.</warning>
+ * @self was constructed. Use mm_modem_3gpp_dup_initial_eps_bearer_path() if on
+ * another thread.</warning>
  *
- * Returns: (transfer none): The DBus path of the #MMBearer, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The DBus path of the #MMBearer, or %NULL if none
+ * available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.10
  */
 const gchar *
 mm_modem_3gpp_get_initial_eps_bearer_path (MMModem3gpp *self)
@@ -381,9 +416,13 @@ mm_modem_3gpp_get_initial_eps_bearer_path (MMModem3gpp *self)
  * mm_modem_3gpp_dup_initial_eps_bearer_path:
  * @self: A #MMModem3gpp.
  *
- * Gets a copy of the DBus path of the initial EPS #MMBearer exposed in this #MMModem3gpp.
+ * Gets a copy of the DBus path of the initial EPS #MMBearer exposed in this
+ * #MMModem3gpp.
  *
- * Returns: (transfer full): The DBus path of the #MMBearer, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMBearer, or %NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.10
  */
 gchar *
 mm_modem_3gpp_dup_initial_eps_bearer_path (MMModem3gpp *self)
@@ -399,12 +438,15 @@ mm_modem_3gpp_dup_initial_eps_bearer_path (MMModem3gpp *self)
 /**
  * mm_modem_3gpp_register_finish:
  * @self: A #MMModem3gpp.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_register().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_register().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_3gpp_register().
  *
  * Returns: %TRUE if the modem was registered, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_3gpp_register_finish (MMModem3gpp *self,
@@ -419,17 +461,24 @@ mm_modem_3gpp_register_finish (MMModem3gpp *self,
 /**
  * mm_modem_3gpp_register:
  * @self: A #MMModem3gpp.
- * @network_id: The operator ID to register. An empty string can be used to register to the home network.
+ * @network_id: The operator ID to register. An empty string can be used to
+ *  register to the home network.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests registration with a given mobile network.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_3gpp_register_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_3gpp_register_finish() to get the result of the operation.
  *
- * See mm_modem_3gpp_register_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_3gpp_register_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_3gpp_register (MMModem3gpp *self,
@@ -446,16 +495,19 @@ mm_modem_3gpp_register (MMModem3gpp *self,
 /**
  * mm_modem_3gpp_register_sync:
  * @self: A #MMModem3gpp.
- * @network_id: The operator ID to register. An empty string can be used to register to the home network.
+ * @network_id: The operator ID to register. An empty string can be used to
+ *  register to the home network.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
  * Synchronously requests registration with a given mobile network.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_3gpp_register()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_3gpp_register() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the modem was registered, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_3gpp_register_sync (MMModem3gpp *self,
@@ -483,6 +535,8 @@ struct _MMModem3gppNetwork {
  * @network: A #MMModem3gppNetwork.
  *
  * Frees a #MMModem3gppNetwork.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_3gpp_network_free (MMModem3gppNetwork *network)
@@ -503,6 +557,8 @@ mm_modem_3gpp_network_free (MMModem3gppNetwork *network)
  * Get availability of the 3GPP network.
  *
  * Returns: A #MMModem3gppNetworkAvailability.
+ *
+ * Since: 1.0
  */
 MMModem3gppNetworkAvailability
 mm_modem_3gpp_network_get_availability (const MMModem3gppNetwork *network)
@@ -519,6 +575,8 @@ mm_modem_3gpp_network_get_availability (const MMModem3gppNetwork *network)
  * Get the long operator name of the 3GPP network.
  *
  * Returns: (transfer none): The long operator name, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_3gpp_network_get_operator_long (const MMModem3gppNetwork *network)
@@ -535,6 +593,8 @@ mm_modem_3gpp_network_get_operator_long (const MMModem3gppNetwork *network)
  * Get the short operator name of the 3GPP network.
  *
  * Returns: (transfer none): The long operator name, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_3gpp_network_get_operator_short (const MMModem3gppNetwork *network)
@@ -551,6 +611,8 @@ mm_modem_3gpp_network_get_operator_short (const MMModem3gppNetwork *network)
  * Get the operator code (MCCMNC) of the 3GPP network.
  *
  * Returns: (transfer none): The operator code, or %NULL if none available.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_3gpp_network_get_operator_code (const MMModem3gppNetwork *network)
@@ -567,6 +629,8 @@ mm_modem_3gpp_network_get_operator_code (const MMModem3gppNetwork *network)
  * Get the technology used to access the 3GPP network.
  *
  * Returns: A #MMModemAccessTechnology.
+ *
+ * Since: 1.0
  */
 MMModemAccessTechnology
 mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network)
@@ -648,10 +712,13 @@ ensure_internal_initial_eps_bearer_settings (MMModem3gpp         *self,
  *
  * <warning>The values reported by @self are not updated when the values in the
  * interface change. Instead, the client is expected to call
- * mm_modem_3gpp_get_initial_eps_bearer_settings() again to get a new #MMBearerProperties with the
- * new values.</warning>
+ * mm_modem_3gpp_get_initial_eps_bearer_settings() again to get a new
+ * #MMBearerProperties with the new values.</warning>
  *
- * Returns: (transfer full): A #MMBearerProperties that must be freed with g_object_unref() or %NULL if unknown.
+ * Returns: (transfer full): A #MMBearerProperties that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.10
  */
 MMBearerProperties *
 mm_modem_3gpp_get_initial_eps_bearer_settings (MMModem3gpp *self)
@@ -673,10 +740,13 @@ mm_modem_3gpp_get_initial_eps_bearer_settings (MMModem3gpp *self)
  *
  * <warning>The returned value is only valid until the property changes so
  * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_3gpp_get_initial_eps_bearer_settings() if on another
- * thread.</warning>
+ * @self was constructed. Use mm_modem_3gpp_get_initial_eps_bearer_settings()
+ * if on another thread.</warning>
  *
- * Returns: (transfer none): A #MMBearerProperties. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): A #MMBearerProperties. Do not free the returned
+ * value, it belongs to @self.
+ *
+ * Since: 1.10
  */
 MMBearerProperties *
 mm_modem_3gpp_peek_initial_eps_bearer_settings (MMModem3gpp *self)
@@ -738,12 +808,18 @@ create_networks_list (GVariant *variant)
 /**
  * mm_modem_3gpp_scan_finish:
  * @self: A #MMModem3gpp.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_scan().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_scan().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_3gpp_scan().
  *
- * Returns: (transfer full) (element-type ModemManager.Modem3gppNetwork): a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
+ * Returns: (transfer full) (element-type ModemManager.Modem3gppNetwork): a list
+ * of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value
+ * should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as
+ * #GDestroyNotify function.
+ *
+ * Since: 1.0
  */
 GList *
 mm_modem_3gpp_scan_finish (MMModem3gpp *self,
@@ -764,15 +840,21 @@ mm_modem_3gpp_scan_finish (MMModem3gpp *self,
  * mm_modem_3gpp_scan:
  * @self: A #MMModem3gpp.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests to scan available 3GPP networks.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_3gpp_scan_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_3gpp_scan_finish() to get the result of the operation.
  *
- * See mm_modem_3gpp_scan_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_3gpp_scan_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_3gpp_scan (MMModem3gpp *self,
@@ -793,10 +875,15 @@ mm_modem_3gpp_scan (MMModem3gpp *self,
  *
  * Synchronously requests to scan available 3GPP networks.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_3gpp_scan()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_3gpp_scan() for the asynchronous version of this method.
  *
- * Returns:  (transfer full) (element-type ModemManager.Modem3gppNetwork):  a list of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as #GDestroyNotify function.
+ * Returns: (transfer full) (element-type ModemManager.Modem3gppNetwork): a list
+ * of #MMModem3gppNetwork structs, or #NULL if @error is set. The returned value
+ * should be freed with g_list_free_full() using mm_modem_3gpp_network_free() as
+ * #GDestroyNotify function.
+ *
+ * Since: 1.0
  */
 GList *
 mm_modem_3gpp_scan_sync (MMModem3gpp *self,
@@ -818,12 +905,15 @@ mm_modem_3gpp_scan_sync (MMModem3gpp *self,
 /**
  * mm_modem_3gpp_set_eps_ue_mode_operation_finish:
  * @self: A #MMModem3gpp.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_set_eps_ue_mode_operation().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_set_eps_ue_mode_operation().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_3gpp_set_eps_ue_mode_operation().
  *
  * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.8
  */
 gboolean
 mm_modem_3gpp_set_eps_ue_mode_operation_finish (MMModem3gpp   *self,
@@ -840,7 +930,8 @@ mm_modem_3gpp_set_eps_ue_mode_operation_finish (MMModem3gpp   *self,
  * @self: A #MMModem3gpp.
  * @mode: A #MMModem3gppEpsUeModeOperation.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests to update the EPS UE mode of operation.
@@ -848,10 +939,14 @@ mm_modem_3gpp_set_eps_ue_mode_operation_finish (MMModem3gpp   *self,
  * When the operation is finished, @callback will be invoked in the
  * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
  * of the thread you are calling this method from. You can then call
- * mm_modem_3gpp_set_eps_ue_mode_operation_finish() to get the result of the operation.
+ * mm_modem_3gpp_set_eps_ue_mode_operation_finish() to get the result of the
+ * operation.
  *
- * See mm_modem_3gpp_set_eps_ue_mode_operation_sync() for the synchronous, blocking
- * version of this method. The calling thread is blocked until a reply is received.
+ * See mm_modem_3gpp_set_eps_ue_mode_operation_sync() for the synchronous,
+ * blocking version of this method. The calling thread is blocked until a reply
+ * is received.
+ *
+ * Since: 1.8
  */
 void
 mm_modem_3gpp_set_eps_ue_mode_operation (MMModem3gpp                    *self,
@@ -880,6 +975,8 @@ mm_modem_3gpp_set_eps_ue_mode_operation (MMModem3gpp                    *self,
  * of this method.
  *
  * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.8
  */
 gboolean
 mm_modem_3gpp_set_eps_ue_mode_operation_sync (MMModem3gpp                    *self,
@@ -898,12 +995,16 @@ mm_modem_3gpp_set_eps_ue_mode_operation_sync (MMModem3gpp                    *se
 /**
  * mm_modem_3gpp_get_initial_eps_bearer_finish:
  * @self: A #MMModem3gpp.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_get_initial_eps_bearer().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_get_initial_eps_bearer().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_3gpp_get_initial_eps_bearer().
  *
- * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMSim or #NULL if @error is set. The returned
+ * value should be freed with g_object_unref().
+ *
+ * Since: 1.10
  */
 MMBearer *
 mm_modem_3gpp_get_initial_eps_bearer_finish (MMModem3gpp   *self,
@@ -940,15 +1041,23 @@ modem_3gpp_get_initial_eps_bearer_ready (GDBusConnection *connection,
  * mm_modem_3gpp_get_initial_eps_bearer:
  * @self: A #MMModem3gpp.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously gets the initial EPS #MMBearer object exposed by this #MMModem3gpp.
+ * Asynchronously gets the initial EPS #MMBearer object exposed by this
+ * #MMModem3gpp.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_3gpp_get_initial_eps_bearer_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_3gpp_get_initial_eps_bearer_finish() to get the result of the
+ * operation.
  *
- * See mm_modem_3gpp_get_initial_eps_bearer_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_3gpp_get_initial_eps_bearer_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.10
  */
 void
 mm_modem_3gpp_get_initial_eps_bearer (MMModem3gpp         *self,
@@ -992,12 +1101,17 @@ mm_modem_3gpp_get_initial_eps_bearer (MMModem3gpp         *self,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously gets the initial EPS #MMBearer object exposed by this #MMModem3gpp.
+ * Synchronously gets the initial EPS #MMBearer object exposed by this
+ * #MMModem3gpp.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_3gpp_get_initial_eps_bearer()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_3gpp_get_initial_eps_bearer() for the asynchronous version of this
+ * method.
  *
- * Returns: (transfer full): a #MMBearer or #NULL if @error is set. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMBearer or #NULL if @error is set. The returned
+ * value should be freed with g_object_unref().
+ *
+ * Since: 1.10
  */
 MMBearer *
 mm_modem_3gpp_get_initial_eps_bearer_sync (MMModem3gpp   *self,
@@ -1036,12 +1150,16 @@ mm_modem_3gpp_get_initial_eps_bearer_sync (MMModem3gpp   *self,
 /**
  * mm_modem_3gpp_set_initial_eps_bearer_settings_finish:
  * @self: A #MMModem3gpp.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_3gpp_set_initial_eps_bearer_settings().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_set_initial_eps_bearer_settings().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation started with mm_modem_3gpp_set_initial_eps_bearer_settings().
+ * Finishes an operation started with
+ * mm_modem_3gpp_set_initial_eps_bearer_settings().
  *
  * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_modem_3gpp_set_initial_eps_bearer_settings_finish (MMModem3gpp   *self,
@@ -1056,7 +1174,8 @@ mm_modem_3gpp_set_initial_eps_bearer_settings_finish (MMModem3gpp   *self,
  * @self: A #MMModem3gpp.
  * @config: A #MMBearerProperties object with the properties to use.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously configures the settings for the initial LTE default bearer.
@@ -1064,7 +1183,10 @@ mm_modem_3gpp_set_initial_eps_bearer_settings_finish (MMModem3gpp   *self,
  * When the operation is finished, @callback will be invoked in the
  * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
  * of the thread you are calling this method from. You can then call
- * mm_modem_3gpp_set_initial_eps_bearer_settings_finish() to get the result of the operation.
+ * mm_modem_3gpp_set_initial_eps_bearer_settings_finish() to get the result of
+ * the operation.
+ *
+ * Since: 1.10
  */
 void
 mm_modem_3gpp_set_initial_eps_bearer_settings (MMModem3gpp         *self,
@@ -1098,6 +1220,8 @@ mm_modem_3gpp_set_initial_eps_bearer_settings (MMModem3gpp         *self,
  * version of this method.
  *
  * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_modem_3gpp_set_initial_eps_bearer_settings_sync (MMModem3gpp         *self,

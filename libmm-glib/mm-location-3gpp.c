@@ -58,6 +58,8 @@ struct _MMLocation3gppPrivate {
  * Gets the Mobile Country Code of the 3GPP network.
  *
  * Returns: the MCC, or 0 if unknown.
+ *
+ * Since: 1.0
  */
 guint
 mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self)
@@ -94,6 +96,8 @@ mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
  * be 0.
  *
  * Returns: the MNC, or 0 if unknown.
+ *
+ * Since: 1.0
  */
 guint
 mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
@@ -127,6 +131,8 @@ mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
  * Gets the location area code of the 3GPP network.
  *
  * Returns: the location area code, or 0 if unknown.
+ *
+ * Since: 1.0
  */
 gulong
 mm_location_3gpp_get_location_area_code (MMLocation3gpp *self)
@@ -159,6 +165,8 @@ mm_location_3gpp_set_location_area_code (MMLocation3gpp *self,
  * Gets the cell ID of the 3GPP network.
  *
  * Returns: the cell ID, or 0 if unknown.
+ *
+ * Since: 1.0
  */
 gulong
 mm_location_3gpp_get_cell_id (MMLocation3gpp *self)
@@ -191,6 +199,8 @@ mm_location_3gpp_set_cell_id (MMLocation3gpp *self,
  * Gets the location area code of the 3GPP network.
  *
  * Returns: the location area code, or 0 if unknown.
+ *
+ * Since: 1.10
  */
 gulong
 mm_location_3gpp_get_tracking_area_code (MMLocation3gpp *self)

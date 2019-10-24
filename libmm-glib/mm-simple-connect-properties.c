@@ -31,10 +31,10 @@
  * mm_modem_simple_connect() or mm_modem_simple_connect_sync().
  */
 
-G_DEFINE_TYPE (MMSimpleConnectProperties, mm_simple_connect_properties, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMSimpleConnectProperties, mm_simple_connect_properties, G_TYPE_OBJECT)
 
-#define PROPERTY_PIN             "pin"
-#define PROPERTY_OPERATOR_ID     "operator-id"
+#define PROPERTY_PIN         "pin"
+#define PROPERTY_OPERATOR_ID "operator-id"
 
 struct _MMSimpleConnectPropertiesPrivate {
     /* PIN */
@@ -53,6 +53,8 @@ struct _MMSimpleConnectPropertiesPrivate {
  * @pin: PIN code.
  *
  * Sets the PIN code to use when unlocking the modem.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_pin (MMSimpleConnectProperties *self,
@@ -70,7 +72,10 @@ mm_simple_connect_properties_set_pin (MMSimpleConnectProperties *self,
  *
  * Gets the PIN code to use when unlocking the modem.
  *
- * Returns: (transfer none): the PIN, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the PIN, or #NULL if not set. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_simple_connect_properties_get_pin (MMSimpleConnectProperties *self)
@@ -88,6 +93,8 @@ mm_simple_connect_properties_get_pin (MMSimpleConnectProperties *self)
  * @operator_id: operator ID, given as MCC/MNC.
  *
  * Sets the ID of the network to which register before connecting.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_operator_id (MMSimpleConnectProperties *self,
@@ -105,7 +112,10 @@ mm_simple_connect_properties_set_operator_id (MMSimpleConnectProperties *self,
  *
  * Gets the ID of the network to which register before connecting.
  *
- * Returns: (transfer none): the operator ID, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the operator ID, or #NULL if not set. Do not free
+ * the returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_simple_connect_properties_get_operator_id (MMSimpleConnectProperties *self)
@@ -123,6 +133,8 @@ mm_simple_connect_properties_get_operator_id (MMSimpleConnectProperties *self)
  * @apn: Name of the access point.
  *
  * Sets the name of the access point to use when connecting.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_apn (MMSimpleConnectProperties *self,
@@ -140,7 +152,10 @@ mm_simple_connect_properties_set_apn (MMSimpleConnectProperties *self,
  *
  * Gets the name of the access point to use when connecting.
  *
- * Returns: (transfer none): the access point, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the access point, or #NULL if not set. Do not free
+ * the returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_simple_connect_properties_get_apn (MMSimpleConnectProperties *self)
@@ -155,9 +170,12 @@ mm_simple_connect_properties_get_apn (MMSimpleConnectProperties *self)
 /**
  * mm_simple_connect_properties_set_allowed_auth:
  * @self: a #MMSimpleConnectProperties.
- * @allowed_auth: a bitmask of #MMBearerAllowedAuth values. %MM_BEARER_ALLOWED_AUTH_UNKNOWN may be given to request the modem-default method.
+ * @allowed_auth: a bitmask of #MMBearerAllowedAuth values.
+ *  %MM_BEARER_ALLOWED_AUTH_UNKNOWN may be given to request the modem-default method.
  *
  * Sets the authentication method to use.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_allowed_auth (MMSimpleConnectProperties *self,
@@ -174,7 +192,10 @@ mm_simple_connect_properties_set_allowed_auth (MMSimpleConnectProperties *self,
  *
  * Gets the authentication methods allowed in the connection.
  *
- * Returns: a bitmask of #MMBearerAllowedAuth values, or %MM_BEARER_ALLOWED_AUTH_UNKNOWN to request the modem-default method.
+ * Returns: a bitmask of #MMBearerAllowedAuth values, or
+ * %MM_BEARER_ALLOWED_AUTH_UNKNOWN to request the modem-default method.
+ *
+ * Since: 1.0
  */
 MMBearerAllowedAuth
 mm_simple_connect_properties_get_allowed_auth (MMSimpleConnectProperties *self)
@@ -192,6 +213,8 @@ mm_simple_connect_properties_get_allowed_auth (MMSimpleConnectProperties *self)
  * @user: the username
  *
  * Sets the username used to authenticate with the access point.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_user (MMSimpleConnectProperties *self,
@@ -209,7 +232,10 @@ mm_simple_connect_properties_set_user (MMSimpleConnectProperties *self,
  *
  * Gets the username used to authenticate with the access point.
  *
- * Returns: (transfer none): the username, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the username, or #NULL if not set. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_simple_connect_properties_get_user (MMSimpleConnectProperties *self)
@@ -227,6 +253,8 @@ mm_simple_connect_properties_get_user (MMSimpleConnectProperties *self)
  * @password: the password
  *
  * Sets the password used to authenticate with the access point.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_password (MMSimpleConnectProperties *self,
@@ -244,7 +272,10 @@ mm_simple_connect_properties_set_password (MMSimpleConnectProperties *self,
  *
  * Gets the password used to authenticate with the access point.
  *
- * Returns: (transfer none): the password, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the password, or #NULL if not set. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_simple_connect_properties_get_password (MMSimpleConnectProperties *self)
@@ -262,6 +293,8 @@ mm_simple_connect_properties_get_password (MMSimpleConnectProperties *self)
  * @ip_type: a #MMBearerIpFamily.
  *
  * Sets the IP type to use.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_ip_type (MMSimpleConnectProperties *self,
@@ -280,6 +313,8 @@ mm_simple_connect_properties_set_ip_type (MMSimpleConnectProperties *self,
  * Sets the IP type to use.
  *
  * Returns: a #MMBearerIpFamily.
+ *
+ * Since: 1.0
  */
 MMBearerIpFamily
 mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
@@ -298,6 +333,8 @@ mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
  *
  * Sets the flag to indicate whether roaming is allowed or not in the
  * connection.
+ *
+ * Since: 1.0
  */
 void
 mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
@@ -315,7 +352,9 @@ mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
  *
  * Checks whether roaming is allowed in the connection.
  *
- * Returns: %TRUE if roaming is allowed, %FALSE otherwise..
+ * Returns: %TRUE if roaming is allowed, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self)
@@ -337,6 +376,7 @@ mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self)
  *
  * Sets the number to use when performing the connection.
  *
+ * Since: 1.0
  * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
  * it doesn't make sense to expose it in the ModemManager interface.
  */
@@ -355,8 +395,10 @@ mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
  *
  * Gets the number to use when performing the connection.
  *
- * Returns: (transfer none): the number, or #NULL if not set. Do not free the returned value, it is owned by @self.
+ * Returns: (transfer none): the number, or #NULL if not set. Do not free the
+ * returned value, it is owned by @self.
  *
+ * Since: 1.0
  * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
  * it doesn't make sense to expose it in the ModemManager interface.
  */
@@ -373,14 +415,6 @@ mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
 
 /*****************************************************************************/
 
-/**
- * mm_simple_connect_properties_get_bearer_properties:
- * @self: a #MMSimpleConnectProperties:
- *
- * Returns the bearer properties of @self.
- *
- * Returns: (transfer full): a #MMBearerProperties
- */
 MMBearerProperties *
 mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self)
 {
@@ -567,6 +601,8 @@ mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
  * Creates a new empty #MMSimpleConnectProperties.
  *
  * Returns: (transfer full): a #MMSimpleConnectProperties. The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMSimpleConnectProperties *
 mm_simple_connect_properties_new (void)

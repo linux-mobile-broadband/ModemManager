@@ -34,7 +34,7 @@
  * mm_modem_location_get_full_sync().
  */
 
-G_DEFINE_TYPE (MMLocationGpsRaw, mm_location_gps_raw, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMLocationGpsRaw, mm_location_gps_raw, G_TYPE_OBJECT)
 
 #define PROPERTY_UTC_TIME  "utc-time"
 #define PROPERTY_LATITUDE  "latitude"
@@ -59,7 +59,10 @@ struct _MMLocationGpsRawPrivate {
  *
  * Gets the UTC time of the location being reported.
  *
- * Returns: a string with the UTC time, or #NULL if unknown. Do not free the returned value, it is owned by @self.
+ * Returns: a string with the UTC time, or #NULL if unknown. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_location_gps_raw_get_utc_time (MMLocationGpsRaw *self)
@@ -78,6 +81,8 @@ mm_location_gps_raw_get_utc_time (MMLocationGpsRaw *self)
  * Gets the longitude, in the [-180,180] range.
  *
  * Returns: the longitude, or %MM_LOCATION_LONGITUDE_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gdouble
 mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self)
@@ -97,6 +102,8 @@ mm_location_gps_raw_get_longitude (MMLocationGpsRaw *self)
  * Gets the latitude, in the [-90,90] range.
  *
  * Returns: the latitude, or %MM_LOCATION_LATITUDE_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gdouble
 mm_location_gps_raw_get_latitude (MMLocationGpsRaw *self)
@@ -116,6 +123,8 @@ mm_location_gps_raw_get_latitude (MMLocationGpsRaw *self)
  * Gets the altitude, in the [-90,90] range.
  *
  * Returns: the altitude, or %MM_LOCATION_ALTITUDE_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gdouble
 mm_location_gps_raw_get_altitude (MMLocationGpsRaw *self)
@@ -369,7 +378,7 @@ mm_location_gps_raw_new (void)
 static void
 mm_location_gps_raw_init (MMLocationGpsRaw *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_LOCATION_GPS_RAW,
                                               MMLocationGpsRawPrivate);
 

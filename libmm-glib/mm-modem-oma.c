@@ -36,7 +36,8 @@
  * The #MMModemOma is an object providing access to the methods, signals and
  * properties of the OMA interface.
  *
- * The OMA interface is exposed whenever a modem has OMA device management capabilities.
+ * The OMA interface is exposed whenever a modem has OMA device management
+ * capabilities.
  */
 
 G_DEFINE_TYPE (MMModemOma, mm_modem_oma, MM_GDBUS_TYPE_MODEM_OMA_PROXY)
@@ -57,6 +58,8 @@ struct _MMModemOmaPrivate {
  * Gets the DBus path of the #MMObject which implements this interface.
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
+ *
+ * Since: 1.2
  */
 const gchar *
 mm_modem_oma_get_path (MMModemOma *self)
@@ -71,9 +74,13 @@ mm_modem_oma_get_path (MMModemOma *self)
  * mm_modem_oma_dup_path:
  * @self: A #MMModemOma.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.2
  */
 gchar *
 mm_modem_oma_dup_path (MMModemOma *self)
@@ -93,12 +100,15 @@ mm_modem_oma_dup_path (MMModemOma *self)
 /**
  * mm_modem_oma_setup_finish:
  * @self: A #MMModemOma.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_oma_setup().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_oma_setup().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_oma_setup().
  *
  * Returns: %TRUE if the setup was successful, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_setup_finish (MMModemOma *self,
@@ -115,15 +125,21 @@ mm_modem_oma_setup_finish (MMModemOma *self,
  * @self: A #MMModemOma.
  * @features: Mask of #MMOmaFeature values to enable.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously sets up the OMA device management service.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_oma_setup_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_oma_setup_finish() to get the result of the operation.
  *
- * See mm_modem_oma_setup_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_oma_setup_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.2
  */
 void
 mm_modem_oma_setup (MMModemOma *self,
@@ -146,10 +162,12 @@ mm_modem_oma_setup (MMModemOma *self,
  *
  * Synchronously sets up the OMA device management service.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_oma_setup()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_oma_setup() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the setup was successful, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_setup_sync (MMModemOma *self,
@@ -167,12 +185,16 @@ mm_modem_oma_setup_sync (MMModemOma *self,
 /**
  * mm_modem_oma_start_client_initiated_session_finish:
  * @self: A #MMModemOma.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_oma_start_client_initiated_session().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_oma_start_client_initiated_session().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation started with mm_modem_oma_start_client_initiated_session().
+ * Finishes an operation started with
+ * mm_modem_oma_start_client_initiated_session().
  *
  * Returns: %TRUE if the session was started, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_start_client_initiated_session_finish (MMModemOma *self,
@@ -189,15 +211,22 @@ mm_modem_oma_start_client_initiated_session_finish (MMModemOma *self,
  * @self: A #MMModemOma.
  * @session_type: A #MMOmaSessionType.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously starts a client-initiated OMA device management session.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_oma_start_client_initiated_session_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_oma_start_client_initiated_session_finish() to get the result of the
+ * operation.
  *
- * See mm_modem_oma_start_client_initiated_session_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_oma_start_client_initiated_session_sync() for the synchronous,
+ * blocking version of this method.
+ *
+ * Since: 1.2
  */
 void
 mm_modem_oma_start_client_initiated_session (MMModemOma *self,
@@ -220,10 +249,13 @@ mm_modem_oma_start_client_initiated_session (MMModemOma *self,
  *
  * Synchronously starts a client-initiated OMA device management session.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_oma_start_client_initiated_session()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_oma_start_client_initiated_session() for the asynchronous version
+ * of this method.
  *
  * Returns: %TRUE if the session was started, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_start_client_initiated_session_sync (MMModemOma *self,
@@ -241,12 +273,16 @@ mm_modem_oma_start_client_initiated_session_sync (MMModemOma *self,
 /**
  * mm_modem_oma_accept_network_initiated_session_finish:
  * @self: A #MMModemOma.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_oma_accept_network_initiated_session().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_oma_accept_network_initiated_session().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation started with mm_modem_oma_accept_network_initiated_session().
+ * Finishes an operation started with
+ * mm_modem_oma_accept_network_initiated_session().
  *
  * Returns: %TRUE if the session was started, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_accept_network_initiated_session_finish (MMModemOma *self,
@@ -264,15 +300,22 @@ mm_modem_oma_accept_network_initiated_session_finish (MMModemOma *self,
  * @session_id: The unique ID of the network-initiated session.
  * @accept: %TRUE if the session is to be accepted, %FALSE otherwise.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously accepts a nework-initiated OMA device management session.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_oma_accept_network_initiated_session_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_oma_accept_network_initiated_session_finish() to get the result of
+ * the operation.
  *
- * See mm_modem_oma_accept_network_initiated_session_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_oma_accept_network_initiated_session_sync() for the synchronous,
+ * blocking version of this method.
+ *
+ * Since: 1.2
  */
 void
 mm_modem_oma_accept_network_initiated_session (MMModemOma *self,
@@ -297,10 +340,13 @@ mm_modem_oma_accept_network_initiated_session (MMModemOma *self,
  *
  * Synchronously accepts a nework-initiated OMA device management session.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_oma_accept_network_initiated_session()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_oma_accept_network_initiated_session() for the asynchronous version
+ * of this method.
  *
  * Returns: %TRUE if the session was started, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_accept_network_initiated_session_sync (MMModemOma *self,
@@ -319,12 +365,15 @@ mm_modem_oma_accept_network_initiated_session_sync (MMModemOma *self,
 /**
  * mm_modem_oma_cancel_session_finish:
  * @self: A #MMModemOma.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_oma_cancel_session().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_oma_cancel_session().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_oma_cancel_session().
  *
  * Returns: %TRUE if the session was started, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_cancel_session_finish (MMModemOma *self,
@@ -340,15 +389,21 @@ mm_modem_oma_cancel_session_finish (MMModemOma *self,
  * mm_modem_oma_cancel_session:
  * @self: A #MMModemOma.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously cancels the current OMA device management session.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_oma_cancel_session_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_oma_cancel_session_finish() to get the result of the operation.
  *
- * See mm_modem_oma_cancel_session_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_oma_cancel_session_sync() for the synchronous, blocking version
+ * of this method.
+ *
+ * Since: 1.2
  */
 void
 mm_modem_oma_cancel_session (MMModemOma *self,
@@ -369,10 +424,12 @@ mm_modem_oma_cancel_session (MMModemOma *self,
  *
  * Synchronously cancels the current OMA device management session.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_oma_cancel_session()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_oma_cancel_session() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the session was started, %FALSE if @error is set.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_oma_cancel_session_sync (MMModemOma *self,
@@ -393,6 +450,8 @@ mm_modem_oma_cancel_session_sync (MMModemOma *self,
  * Gets the currently enabled OMA features.
  *
  * Returns: a bitmask of #MMOmaFeature values.
+ *
+ * Since: 1.2
  */
 MMOmaFeature
 mm_modem_oma_get_features  (MMModemOma *self)
@@ -411,6 +470,8 @@ mm_modem_oma_get_features  (MMModemOma *self)
  * Gets the type of the current OMA device management session.
  *
  * Returns: a #MMOmaSessionType.
+ *
+ * Since: 1.2
  */
 MMOmaSessionType
 mm_modem_oma_get_session_type  (MMModemOma *self)
@@ -429,6 +490,8 @@ mm_modem_oma_get_session_type  (MMModemOma *self)
  * Gets the state of the current OMA device management session.
  *
  * Returns: a #MMOmaSessionState.
+ *
+ * Since: 1.2
  */
 MMOmaSessionState
 mm_modem_oma_get_session_state (MMModemOma *self)
@@ -510,12 +573,16 @@ ensure_internal_pending_network_initiated_sessions (MMModemOma *self,
 /**
  * mm_modem_get_pending_network_initiated_sessions:
  * @self: A #MMModem.
- * @sessions: (out) (array length=n_sessions): Return location for the array of #MMOmaPendingNetworkInitiatedSession structs. The returned array should be freed with g_free() when no longer needed.
+ * @sessions: (out) (array length=n_sessions): Return location for the array of
+ *  #MMOmaPendingNetworkInitiatedSession structs. The returned array should be
+ *  freed with g_free() when no longer needed.
  * @n_sessions: (out): Return location for the number of values in @sessions.
  *
  * Gets the list of pending network-initiated OMA sessions.
  *
  * Returns: %TRUE if @sessions and @n_sessions are set, %FALSE otherwise.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_get_pending_network_initiated_sessions (MMModemOma *self,
@@ -532,12 +599,16 @@ mm_modem_get_pending_network_initiated_sessions (MMModemOma *self,
 /**
  * mm_modem_peek_pending_network_initiated_sessions:
  * @self: A #MMModem.
- * @sessions: (out) (array length=n_sessions): Return location for the array of #MMOmaPendingNetworkInitiatedSession values. Do not free the returned array, it is owned by @self.
+ * @sessions: (out) (array length=n_sessions): Return location for the array of
+ *  #MMOmaPendingNetworkInitiatedSession values. Do not free the returned array,
+ *  it is owned by @self.
  * @n_sessions: (out): Return location for the number of values in @sessions.
  *
  * Gets the list of pending network-initiated OMA sessions.
  *
  * Returns: %TRUE if @sessions and @n_sessions are set, %FALSE otherwise.
+ *
+ * Since: 1.2
  */
 gboolean
 mm_modem_peek_pending_network_initiated_sessions (MMModemOma *self,

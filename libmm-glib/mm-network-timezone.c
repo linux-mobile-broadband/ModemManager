@@ -47,6 +47,8 @@ struct _MMNetworkTimezonePrivate {
  * Gets the timezone offset (in minutes) reported by the network.
  *
  * Returns: the offset, or %MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gint
 mm_network_timezone_get_offset (MMNetworkTimezone *self)
@@ -76,6 +78,8 @@ mm_network_timezone_set_offset (MMNetworkTimezone *self,
  * the network.
  *
  * Returns: the offset, or %MM_NETWORK_TIMEZONE_OFFSET_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gint
 mm_network_timezone_get_dst_offset (MMNetworkTimezone *self)
@@ -103,7 +107,10 @@ mm_network_timezone_set_dst_offset (MMNetworkTimezone *self,
  *
  * Gets the number of leap seconds (TAI-UTC), as reported by the network.
  *
- * Returns: the number of leap seconds, or %MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN if unknown.
+ * Returns: the number of leap seconds, or
+ * %MM_NETWORK_TIMEZONE_LEAP_SECONDS_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gint
 mm_network_timezone_get_leap_seconds (MMNetworkTimezone *self)
@@ -236,7 +243,7 @@ mm_network_timezone_new (void)
 static void
 mm_network_timezone_init (MMNetworkTimezone *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_NETWORK_TIMEZONE,
                                               MMNetworkTimezonePrivate);
 

@@ -53,6 +53,8 @@ struct _MMLocationCdmaBsPrivate {
  * Gets the longitude, in the [-180,180] range.
  *
  * Returns: the longitude, or %MM_LOCATION_LONGITUDE_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gdouble
 mm_location_cdma_bs_get_longitude (MMLocationCdmaBs *self)
@@ -72,6 +74,8 @@ mm_location_cdma_bs_get_longitude (MMLocationCdmaBs *self)
  * Gets the latitude, in the [-90,90] range.
  *
  * Returns: the latitude, or %MM_LOCATION_LATITUDE_UNKNOWN if unknown.
+ *
+ * Since: 1.0
  */
 gdouble
 mm_location_cdma_bs_get_latitude (MMLocationCdmaBs *self)

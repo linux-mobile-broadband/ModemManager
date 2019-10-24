@@ -146,12 +146,16 @@ ensure_modem_manager1_proxy (MMManager  *self,
 
 /**
  * mm_manager_new_finish:
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_new().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_manager_new().
  * @error: Return location for error or %NULL
  *
  * Finishes an operation started with mm_manager_new().
  *
- * Returns: (transfer full) (type MMManager): The constructed object manager client or %NULL if @error is set.
+ * Returns: (transfer full) (type MMManager): The constructed object manager
+ * client or %NULL if @error is set.
+ *
+ * Since: 1.0
  */
 MMManager *
 mm_manager_new_finish (GAsyncResult  *res,
@@ -182,7 +186,10 @@ mm_manager_new_finish (GAsyncResult  *res,
  *
  * You can then call mm_manager_new_finish() to get the result of the operation.
  *
- * See mm_manager_new_sync() for the synchronous, blocking version of this constructor.
+ * See mm_manager_new_sync() for the synchronous, blocking version of this
+ * constructor.
+ *
+ * Since: 1.0
  */
 void
 mm_manager_new (GDBusConnection               *connection,
@@ -217,7 +224,10 @@ mm_manager_new (GDBusConnection               *connection,
  *
  * See mm_manager_new() for the asynchronous version of this constructor.
  *
- * Returns: (transfer full) (type MMManager): The constructed object manager client or %NULL if @error is set.
+ * Returns: (transfer full) (type MMManager): The constructed object manager
+ * client or %NULL if @error is set.
+ *
+ * Since: 1.0
  */
 MMManager *
 mm_manager_new_sync (GDBusConnection                *connection,
@@ -244,7 +254,10 @@ mm_manager_new_sync (GDBusConnection                *connection,
  *
  * Gets the #GDBusProxy interface of the @manager.
  *
- * Returns: (transfer none): The #GDBusProxy interface of @manager, or #NULL if none. Do not free the returned object, it is owned by @manager.
+ * Returns: (transfer none): The #GDBusProxy interface of @manager, or #NULL if
+ * none. Do not free the returned object, it is owned by @manager.
+ *
+ * Since: 1.0
  */
 GDBusProxy *
 mm_manager_peek_proxy (MMManager *manager)
@@ -263,7 +276,10 @@ mm_manager_peek_proxy (MMManager *manager)
  *
  * Gets the #GDBusProxy interface of the @manager.
  *
- * Returns: (transfer full): The #GDBusProxy interface of @manager, or #NULL if none. The returned object must be freed with g_object_unref().
+ * Returns: (transfer full): The #GDBusProxy interface of @manager, or #NULL if
+ * none. The returned object must be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 GDBusProxy *
 mm_manager_get_proxy (MMManager *manager)
@@ -286,7 +302,10 @@ mm_manager_get_proxy (MMManager *manager)
  *
  * It is safe to assume this value never changes during runtime.
  *
- * Returns: (transfer none): The version, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The version, or %NULL if none available. Do not
+ * free the returned value, it belongs to @self.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_manager_get_version (MMManager *manager)
@@ -305,12 +324,15 @@ mm_manager_get_version (MMManager *manager)
 /**
  * mm_manager_set_logging_finish:
  * @manager: A #MMManager.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_set_logging().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_manager_set_logging().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_manager_set_logging().
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_manager_set_logging_finish (MMManager     *manager,
@@ -343,7 +365,8 @@ set_logging_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
  * @manager: A #MMManager.
  * @level: the login level to set.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests to set the specified logging level in the daemon.
@@ -353,7 +376,10 @@ set_logging_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
  * of the thread you are calling this method from. You can then call
  * mm_manager_set_logging_finish() to get the result of the operation.
  *
- * See mm_manager_set_logging_sync() for the synchronous, blocking version of this method.
+ * See mm_manager_set_logging_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_manager_set_logging (MMManager           *manager,
@@ -390,13 +416,15 @@ mm_manager_set_logging (MMManager           *manager,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously requests to set the specified logging level in the daemon..
+ * Synchronously requests to set the specified logging level in the daemon.
  *
  * The calling thread is blocked until a reply is received.
  *
  * See mm_manager_set_logging() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_manager_set_logging_sync (MMManager     *manager,
@@ -421,12 +449,15 @@ mm_manager_set_logging_sync (MMManager     *manager,
 /**
  * mm_manager_scan_devices_finish:
  * @manager: A #MMManager.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_scan_devices().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_manager_scan_devices().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_manager_scan_devices().
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_manager_scan_devices_finish (MMManager     *manager,
@@ -458,7 +489,8 @@ scan_devices_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
  * mm_manager_scan_devices:
  * @manager: A #MMManager.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests to scan looking for devices.
@@ -468,7 +500,10 @@ scan_devices_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_proxy,
  * of the thread you are calling this method from. You can then call
  * mm_manager_scan_devices_finish() to get the result of the operation.
  *
- * See mm_manager_scan_devices_sync() for the synchronous, blocking version of this method.
+ * See mm_manager_scan_devices_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_manager_scan_devices (MMManager           *manager,
@@ -509,6 +544,8 @@ mm_manager_scan_devices (MMManager           *manager,
  * See mm_manager_scan_devices() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_manager_scan_devices_sync (MMManager     *manager,
@@ -531,12 +568,15 @@ mm_manager_scan_devices_sync (MMManager     *manager,
 /**
  * mm_manager_report_kernel_event_finish:
  * @manager: A #MMManager.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_report_kernel_event().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_manager_report_kernel_event().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_manager_report_kernel_event().
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.8
  */
 gboolean
 mm_manager_report_kernel_event_finish (MMManager     *manager,
@@ -568,7 +608,8 @@ report_kernel_event_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_pro
  * @manager: A #MMManager.
  * @properties: the properties of the kernel event.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously report kernel event.
@@ -578,7 +619,10 @@ report_kernel_event_ready (MmGdbusOrgFreedesktopModemManager1 *manager_iface_pro
  * of the thread you are calling this method from. You can then call
  * mm_manager_report_kernel_event_finish() to get the result of the operation.
  *
- * See mm_manager_report_kernel_event_sync() for the synchronous, blocking version of this method.
+ * See mm_manager_report_kernel_event_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.8
  */
 void
 mm_manager_report_kernel_event (MMManager                *manager,
@@ -622,9 +666,12 @@ mm_manager_report_kernel_event (MMManager                *manager,
  *
  * The calling thread is blocked until a reply is received.
  *
- * See mm_manager_report_kernel_event() for the asynchronous version of this method.
+ * See mm_manager_report_kernel_event() for the asynchronous version of this
+ * method.
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.8
  */
 gboolean
 mm_manager_report_kernel_event_sync (MMManager                *manager,
@@ -723,12 +770,15 @@ common_inhibit_device_sync (MMManager     *manager,
 /**
  * mm_manager_inhibit_device_finish:
  * @manager: A #MMManager.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_inhibit_device().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_manager_inhibit_device().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_manager_inhibit_device().
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_manager_inhibit_device_finish (MMManager     *manager,
@@ -744,14 +794,17 @@ mm_manager_inhibit_device_finish (MMManager     *manager,
  * @manager: A #MMManager.
  * @uid: the unique ID of the physical device.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously requests to add an inhibition on the device identified by @uid.
+ * Asynchronously requests to add an inhibition on the device identified by
+ * @uid.
  *
  * The @uid must be the unique ID retrieved from an existing #MMModem using
  * mm_modem_get_device(). The caller should keep track of this @uid and use it
- * in the mm_manager_uninhibit_device() call when the inhibition is no longer required.
+ * in the mm_manager_uninhibit_device() call when the inhibition is no longer
+ * required.
  *
  * The inhibition added with this method may also be automatically removed when
  * the caller program disappears from the bus (e.g. if the program ends before
@@ -762,7 +815,10 @@ mm_manager_inhibit_device_finish (MMManager     *manager,
  * of the thread you are calling this method from. You can then call
  * mm_manager_inhibit_device_finish() to get the result of the operation.
  *
- * See mm_manager_inhibit_device_sync() for the synchronous, blocking version of this method.
+ * See mm_manager_inhibit_device_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.10
  */
 void
 mm_manager_inhibit_device (MMManager           *manager,
@@ -786,7 +842,8 @@ mm_manager_inhibit_device (MMManager           *manager,
  *
  * The @uid must be the unique ID retrieved from an existing #MMModem using
  * mm_modem_get_device(). The caller should keep track of this @uid and use it
- * in the mm_manager_uninhibit_device_sync() call when the inhibition is no longer required.
+ * in the mm_manager_uninhibit_device_sync() call when the inhibition is no
+ * longer required.
  *
  * The inhibition added with this method may also be automatically removed when
  * the caller program disappears from the bus (e.g. if the program ends before
@@ -795,6 +852,8 @@ mm_manager_inhibit_device (MMManager           *manager,
  * See mm_manager_inhibit_device() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_manager_inhibit_device_sync (MMManager     *manager,
@@ -809,12 +868,15 @@ mm_manager_inhibit_device_sync (MMManager     *manager,
 /**
  * mm_manager_uninhibit_device_finish:
  * @manager: A #MMManager.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_manager_uninhibit_device().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_manager_uninhibit_device().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_manager_uninhibit_device().
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_manager_uninhibit_device_finish (MMManager     *manager,
@@ -830,22 +892,27 @@ mm_manager_uninhibit_device_finish (MMManager     *manager,
  * @manager: A #MMManager.
  * @uid: the unique ID of the physical device.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
- * Asynchronously requests to remove an inhibition on the device identified by @uid.
+ * Asynchronously requests to remove an inhibition on the device identified by
+ * @uid.
  *
  * The @uid must be the same unique ID that was sent in the inhibition request.
  *
- * Only the same program that placed an inhibition on a given device is able to remove
- * the inhibition.
+ * Only the same program that placed an inhibition on a given device is able to
+ * remove the inhibition.
  *
  * When the operation is finished, @callback will be invoked in the
  * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
  * of the thread you are calling this method from. You can then call
  * mm_manager_uninhibit_device_finish() to get the result of the operation.
  *
- * See mm_manager_uninhibit_device_sync() for the synchronous, blocking version of this method.
+ * See mm_manager_uninhibit_device_sync() for the synchronous, blocking version
+ * of this method.
+ *
+ * Since: 1.10
  */
 void
 mm_manager_uninhibit_device (MMManager           *manager,
@@ -865,16 +932,20 @@ mm_manager_uninhibit_device (MMManager           *manager,
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronously requests to remove an inhibition on the device identified by @uid.
+ * Synchronously requests to remove an inhibition on the device identified by
+ * @uid.
  *
  * The @uid must be the same unique ID that was sent in the inhibition request.
  *
- * Only the same program that placed an inhibition on a given device is able to remove
- * the inhibition.
+ * Only the same program that placed an inhibition on a given device is able to
+ * remove the inhibition.
  *
- * See mm_manager_uninhibit_device() for the asynchronous version of this method.
+ * See mm_manager_uninhibit_device() for the asynchronous version of this
+ * method.
  *
  * Returns: %TRUE if the call succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_manager_uninhibit_device_sync (MMManager     *manager,
@@ -911,7 +982,7 @@ mm_manager_init (MMManager *manager)
     register_dbus_errors ();
 
     /* Setup private data */
-    manager->priv = G_TYPE_INSTANCE_GET_PRIVATE ((manager),
+    manager->priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
                                                  MM_TYPE_MANAGER,
                                                  MMManagerPrivate);
 }

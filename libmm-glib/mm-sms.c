@@ -49,6 +49,8 @@ G_DEFINE_TYPE (MMSms, mm_sms, MM_GDBUS_TYPE_SMS_PROXY)
  * Gets the DBus path of the #MMSms object.
  *
  * Returns: (transfer none): The DBus path of the #MMSms object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_sms_get_path (MMSms *self)
@@ -65,7 +67,10 @@ mm_sms_get_path (MMSms *self)
  *
  * Gets a copy of the DBus path of the #MMSms object.
  *
- * Returns: (transfer full): The DBus path of the #MMSms object. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMSms object. The returned
+ * value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_sms_dup_path (MMSms *self)
@@ -89,12 +94,14 @@ mm_sms_dup_path (MMSms *self)
  *
  * Gets the message text, in UTF-8.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_sms_dup_text() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_sms_dup_text() if on another thread.</warning>
  *
- * Returns: (transfer none): The message text, or %NULL if it doesn't contain any (e.g. contains data instead).
+ * Returns: (transfer none): The message text, or %NULL if it doesn't contain
+ * any (e.g. contains data instead).
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_sms_get_text (MMSms *self)
@@ -111,7 +118,11 @@ mm_sms_get_text (MMSms *self)
  *
  * Gets the message text, in UTF-8.
  *
- * Returns: (transfer full): The message text, or %NULL if it doesn't contain any (e.g. contains data instead). The returned value should be freed with g_free().
+ * Returns: (transfer full): The message text, or %NULL if it doesn't contain
+ * any (e.g. contains data instead). The returned value should be freed with
+ * g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_sms_dup_text (MMSms *self)
@@ -131,7 +142,11 @@ mm_sms_dup_text (MMSms *self)
  *
  * Gets the message data.
  *
- * Returns: (transfer none) (array length=data_len) (element-type guint8): The message data, or %NULL if it doesn't contain any (e.g. contains text instead).
+ * Returns: (transfer none) (array length=data_len) (element-type guint8): The
+ * message data, or %NULL if it doesn't contain any (e.g. contains text
+ * instead).
+ *
+ * Since: 1.0
  */
 const guint8 *
 mm_sms_get_data (MMSms *self,
@@ -158,7 +173,11 @@ mm_sms_get_data (MMSms *self,
  *
  * Gets the message data.
  *
- * Returns: (transfer full) (array length=data_len) (element-type guint8): The message data, or %NULL if it doesn't contain any (e.g. contains text instead). The returned value should be freed with g_free().
+ * Returns: (transfer full) (array length=data_len) (element-type guint8): The
+ * message data, or %NULL if it doesn't contain any (e.g. contains text
+ * instead). The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 guint8 *
 mm_sms_dup_data (MMSms *self,
@@ -198,12 +217,13 @@ mm_sms_dup_data (MMSms *self,
  *
  * Gets the number to which the message is addressed.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_sms_dup_number() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_sms_dup_number() if on another thread.</warning>
  *
  * Returns: (transfer none): The number, or %NULL if it couldn't be retrieved.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_sms_get_number (MMSms *self)
@@ -220,7 +240,10 @@ mm_sms_get_number (MMSms *self)
  *
  * Gets the number to which the message is addressed.
  *
- * Returns: (transfer full): The number, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The number, or %NULL if it couldn't be retrieved.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_sms_dup_number (MMSms *self)
@@ -239,12 +262,14 @@ mm_sms_dup_number (MMSms *self)
  *
  * Gets the SMS service center number.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_sms_dup_smsc() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_sms_dup_smsc() if on another thread.</warning>
  *
- * Returns: (transfer none): The number of the SMSC, or %NULL if it couldn't be retrieved.
+ * Returns: (transfer none): The number of the SMSC, or %NULL if it couldn't be
+ * retrieved.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_sms_get_smsc (MMSms *self)
@@ -261,7 +286,10 @@ mm_sms_get_smsc (MMSms *self)
  *
  * Gets the SMS service center number.
  *
- * Returns: (transfer full): The number of the SMSC, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The number of the SMSC, or %NULL if it couldn't be
+ * retrieved. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_sms_dup_smsc (MMSms *self)
@@ -285,12 +313,14 @@ mm_sms_dup_smsc (MMSms *self)
  * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_DELIVER or
  * %MM_SMS_PDU_TYPE_STATUS_REPORT.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_sms_dup_timestamp() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_sms_dup_timestamp() if on another thread.</warning>
  *
- * Returns: (transfer none): The timestamp, or %NULL if it couldn't be retrieved.
+ * Returns: (transfer none): The timestamp, or %NULL if it couldn't be
+ * retrieved.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_sms_get_timestamp (MMSms *self)
@@ -312,7 +342,10 @@ mm_sms_get_timestamp (MMSms *self)
  * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_DELIVER or
  * %MM_SMS_PDU_TYPE_STATUS_REPORT.
  *
- * Returns: (transfer full): The timestamp, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The timestamp, or %NULL if it couldn't be
+ * retrieved. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_sms_dup_timestamp (MMSms *self)
@@ -333,14 +366,17 @@ mm_sms_dup_timestamp (MMSms *self)
  * <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
  * format.
  *
- * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_STATUS_REPORT.
+ * This field is only applicable if the PDU type is
+ * %MM_SMS_PDU_TYPE_STATUS_REPORT.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_sms_dup_discharge_timestamp() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_sms_dup_discharge_timestamp() if on another thread.</warning>
  *
- * Returns: (transfer none): The timestamp, or %NULL if it couldn't be retrieved.
+ * Returns: (transfer none): The timestamp, or %NULL if it couldn't be
+ * retrieved.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_sms_get_discharge_timestamp (MMSms *self)
@@ -359,9 +395,13 @@ mm_sms_get_discharge_timestamp (MMSms *self)
  * <ulink url="http://en.wikipedia.org/wiki/ISO_8601">ISO8601</ulink>
  * format.
  *
- * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_STATUS_REPORT.
+ * This field is only applicable if the PDU type is
+ * %MM_SMS_PDU_TYPE_STATUS_REPORT.
  *
- * Returns: (transfer full): The timestamp, or %NULL if it couldn't be retrieved. The returned value should be freed with g_free().
+ * Returns: (transfer full): The timestamp, or %NULL if it couldn't be
+ * retrieved. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_sms_dup_discharge_timestamp (MMSms *self)
@@ -381,6 +421,8 @@ mm_sms_dup_discharge_timestamp (MMSms *self)
  * Gets the type of validity information in the SMS.
  *
  * Returns: the validity type or #MM_SMS_VALIDITY_TYPE_UNKNOWN.
+ *
+ * Since: 1.0
  */
 MMSmsValidityType
 mm_sms_get_validity_type (MMSms *self)
@@ -411,6 +453,8 @@ mm_sms_get_validity_type (MMSms *self)
  * Only applicable if the type of validity is #MM_SMS_VALIDITY_TYPE_RELATIVE.
  *
  * Returns: the length of the validity period, or 0 if unknown.
+ *
+ * Since: 1.0
  */
 guint
 mm_sms_get_validity_relative (MMSms *self)
@@ -446,6 +490,8 @@ mm_sms_get_validity_relative (MMSms *self)
  * Gets the 3GPP message class of the SMS.
  *
  * Returns: the message class, or -1 for invalid/unset class.
+ *
+ * Since: 1.0
  */
 gint
 mm_sms_get_class (MMSms *self)
@@ -467,6 +513,8 @@ mm_sms_get_class (MMSms *self)
  * message reference of the PDU associated to the status report.
  *
  * Returns: The message reference.
+ *
+ * Since: 1.0
  */
 guint
 mm_sms_get_message_reference (MMSms *self)
@@ -485,6 +533,8 @@ mm_sms_get_message_reference (MMSms *self)
  * Checks whether delivery report is requested for this SMS.
  *
  * Returns: %TRUE if delivery report is requested, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_sms_get_delivery_report_request (MMSms *self)
@@ -502,9 +552,12 @@ mm_sms_get_delivery_report_request (MMSms *self)
  *
  * Gets the delivery state of this SMS.
  *
- * This field is only applicable if the PDU type is %MM_SMS_PDU_TYPE_STATUS_REPORT.
+ * This field is only applicable if the PDU type is
+ * %MM_SMS_PDU_TYPE_STATUS_REPORT.
  *
  * Returns: A #MMSmsDeliveryState specifying the delivery state.
+ *
+ * Since: 1.0
  */
 guint
 mm_sms_get_delivery_state (MMSms *self)
@@ -523,6 +576,8 @@ mm_sms_get_delivery_state (MMSms *self)
  * Gets the state of this SMS.
  *
  * Returns: A #MMSmsState specifying the state.
+ *
+ * Since: 1.0
  */
 MMSmsState
 mm_sms_get_state (MMSms *self)
@@ -541,6 +596,8 @@ mm_sms_get_state (MMSms *self)
  * Gets the storage in which this SMS is kept.
  *
  * Returns: A #MMSmsStorage specifying the storage.
+ *
+ * Since: 1.0
  */
 MMSmsStorage
 mm_sms_get_storage (MMSms *self)
@@ -559,6 +616,8 @@ mm_sms_get_storage (MMSms *self)
  * Gets the PDU type on which this SMS is based.
  *
  * Returns: A #MMSmsPduType specifying the PDU type.
+ *
+ * Since: 1.0
  */
 MMSmsPduType
 mm_sms_get_pdu_type (MMSms *self)
@@ -577,6 +636,8 @@ mm_sms_get_pdu_type (MMSms *self)
  * Gets the 3GPP2 Teleservice ID.
  *
  * Returns: a #MMSmsCdmaTeleserviceId.
+ *
+ * Since: 1.2
  */
 MMSmsCdmaTeleserviceId
 mm_sms_get_teleservice_id (MMSms *self)
@@ -595,6 +656,8 @@ mm_sms_get_teleservice_id (MMSms *self)
  * Gets the 3GPP2 Service Category.
  *
  * Returns: a #MMSmsCdmaServiceCategory.
+ *
+ * Since: 1.2
  */
 MMSmsCdmaServiceCategory
 mm_sms_get_service_category (MMSms *self)
@@ -609,12 +672,15 @@ mm_sms_get_service_category (MMSms *self)
 /**
  * mm_sms_send_finish:
  * @self: A #MMSms.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_send().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_sms_send().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_sms_send().
  *
- * Returns:  %TRUE if the operation succeeded, %FALSE if @error is set.
+ * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_sms_send_finish (MMSms *self,
@@ -630,17 +696,22 @@ mm_sms_send_finish (MMSms *self,
  * mm_sms_send:
  * @self: A #MMSms.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests to queue the message for delivery.
  *
  * SMS objects can only be sent once.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_sms_send_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_sms_send_finish() to get the result of the operation.
  *
  * See mm_sms_send_sync() for the synchronous, blocking version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_sms_send (MMSms *self,
@@ -666,10 +737,12 @@ mm_sms_send (MMSms *self,
  *
  * SMS objects can only be sent once.
  *
- * The calling thread is blocked until a reply is received.
- * See mm_sms_send() for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See mm_sms_send()
+ * for the asynchronous version of this method.
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_sms_send_sync (MMSms *self,
@@ -688,12 +761,15 @@ mm_sms_send_sync (MMSms *self,
 /**
  * mm_sms_store_finish:
  * @self: A #MMSms.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_store().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_sms_store().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_sms_store().
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_sms_store_finish (MMSms *self,
@@ -708,19 +784,25 @@ mm_sms_store_finish (MMSms *self,
 /**
  * mm_sms_store:
  * @self: A #MMSms.
- * @storage: A #MMSmsStorage specifying where to store the SMS, or #MM_SMS_STORAGE_UNKNOWN to use the default.
+ * @storage: A #MMSmsStorage specifying where to store the SMS, or
+ *  %MM_SMS_STORAGE_UNKNOWN to use the default.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronoulsy requests to store the message in the device if not already done.
  *
  * SMS objects can only be stored once.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_sms_store_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_sms_store_finish() to get the result of the operation.
  *
  * See mm_sms_store_sync() for the synchronous, blocking version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_sms_store (MMSms *self,
@@ -741,18 +823,22 @@ mm_sms_store (MMSms *self,
 /**
  * mm_sms_store_sync:
  * @self: A #MMSms.
- * @storage: A #MMSmsStorage specifying where to store the SMS, or #MM_SMS_STORAGE_UNKNOWN to use the default.
+ * @storage: A #MMSmsStorage specifying where to store the SMS, or
+ *  %MM_SMS_STORAGE_UNKNOWN to use the default.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
- * Synchronoulsy requests to store the message in the device if not already done.
+ * Synchronoulsy requests to store the message in the device if not already
+ * done.
  *
  * SMS objects can only be stored once.
  *
- * The calling thread is blocked until a reply is received.
- * See mm_sms_store() for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See mm_sms_store()
+ * for the asynchronous version of this method.
  *
  * Returns: %TRUE if the operation succeeded, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_sms_store_sync (MMSms *self,

@@ -28,6 +28,8 @@
  * @array_size: length of @array.
  *
  * Frees an array of #MMModemPortInfo values.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_port_info_array_free (MMModemPortInfo *array,

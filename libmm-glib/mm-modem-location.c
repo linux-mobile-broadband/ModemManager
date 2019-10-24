@@ -49,6 +49,8 @@ G_DEFINE_TYPE (MMModemLocation, mm_modem_location, MM_GDBUS_TYPE_MODEM_LOCATION_
  * Gets the DBus path of the #MMObject which implements this interface.
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_location_get_path (MMModemLocation *self)
@@ -63,9 +65,13 @@ mm_modem_location_get_path (MMModemLocation *self)
  * mm_modem_location_dup_path:
  * @self: A #MMModemLocation.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_location_dup_path (MMModemLocation *self)
@@ -86,9 +92,12 @@ mm_modem_location_dup_path (MMModemLocation *self)
  * mm_modem_location_get_capabilities:
  * @self: A #MMModemLocation.
  *
- * Gets a bitmask of the location capabilities supported by this #MMModemLocation.
+ * Gets a bitmask of the location capabilities supported by this
+ * #MMModemLocation.
  *
  * Returns: A #MMModemLocationSource.
+ *
+ * Since: 1.0
  */
 MMModemLocationSource
 mm_modem_location_get_capabilities (MMModemLocation *self)
@@ -107,6 +116,8 @@ mm_modem_location_get_capabilities (MMModemLocation *self)
  * Gets a bitmask of the supported assistance data types.
  *
  * Returns: A #MMModemLocationAssistanceDataType.
+ *
+ * Since: 1.10
  */
 MMModemLocationAssistanceDataType
 mm_modem_location_get_supported_assistance_data (MMModemLocation *self)
@@ -125,6 +136,8 @@ mm_modem_location_get_supported_assistance_data (MMModemLocation *self)
  * Gets a bitmask of the location capabilities which are enabled in this #MMModemLocation.
  *
  * Returns: A #MMModemLocationSource.
+ *
+ * Since: 1.0
  */
 MMModemLocationSource
 mm_modem_location_get_enabled (MMModemLocation *self)
@@ -142,7 +155,9 @@ mm_modem_location_get_enabled (MMModemLocation *self)
  *
  * Gets the status of the location signaling in the #MMModemLocation.
  *
- * Returns: %TRUE if location changes are signaled, %FALSE otherwise..
+ * Returns: %TRUE if location changes are signaled, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_location_signals_location (MMModemLocation *self)
@@ -163,6 +178,8 @@ mm_modem_location_signals_location (MMModemLocation *self)
  * Finishes an operation started with mm_modem_location_setup().
  *
  * Returns: %TRUE if the setup was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_location_setup_finish (MMModemLocation *self,
@@ -177,19 +194,26 @@ mm_modem_location_setup_finish (MMModemLocation *self,
 /**
  * mm_modem_location_setup:
  * @self: A #MMModemLocation.
- * @sources: Bitmask of #MMModemLocationSource values specifying which locations should get enabled.
+ * @sources: Bitmask of #MMModemLocationSource values specifying which locations
+ *  should get enabled.
  * @signal_location: Flag to enable or disable location signaling.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously configures the location sources to use when gathering location
  * information. Also enable or disable location information gathering.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_setup_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_setup_finish() to get the result of the operation.
  *
- * See mm_modem_location_setup_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_setup_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_location_setup (MMModemLocation *self,
@@ -212,7 +236,8 @@ mm_modem_location_setup (MMModemLocation *self,
 /**
  * mm_modem_location_setup_sync:
  * @self: A #MMModemLocation.
- * @sources: Bitmask of #MMModemLocationSource values specifying which locations should get enabled.
+ * @sources: Bitmask of #MMModemLocationSource values specifying which locations
+ *  should get enabled.
  * @signal_location: Flag to enable or disable location signaling.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
@@ -220,10 +245,12 @@ mm_modem_location_setup (MMModemLocation *self,
  * Synchronously configures the location sources to use when gathering location
  * information. Also enable or disable location information gathering.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_setup()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_setup() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the setup was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_location_setup_sync (MMModemLocation *self,
@@ -246,12 +273,16 @@ mm_modem_location_setup_sync (MMModemLocation *self,
 /**
  * mm_modem_location_set_supl_server_finish:
  * @self: A #MMModemLocation.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_set_supl_server().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_set_supl_server().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_location_set_supl_server().
  *
- * Returns: %TRUE if setting the SUPL server was successful, %FALSE if @error is set.
+ * Returns: %TRUE if setting the SUPL server was successful, %FALSE if @error is
+ * set.
+ *
+ * Since: 1.6
  */
 gboolean
 mm_modem_location_set_supl_server_finish (MMModemLocation *self,
@@ -268,15 +299,21 @@ mm_modem_location_set_supl_server_finish (MMModemLocation *self,
  * @self: A #MMModemLocation.
  * @supl: The SUPL server address, given as IP:PORT or with a full URL.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously configures the address of the SUPL server for A-GPS operation.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_set_supl_server_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_set_supl_server_finish() to get the result of the operation.
  *
- * See mm_modem_location_set_supl_server_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_set_supl_server_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.6
  */
 void
 mm_modem_location_set_supl_server (MMModemLocation *self,
@@ -303,10 +340,14 @@ mm_modem_location_set_supl_server (MMModemLocation *self,
  *
  * Synchronously configures the address of the SUPL server for A-GPS operation.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_set_supl_server()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_set_supl_server() for the asynchronous version of this
+ * method.
  *
- * Returns: %TRUE if setting the SUPL server was successful, %FALSE if @error is set.
+ * Returns: %TRUE if setting the SUPL server was successful, %FALSE if @error is
+ * set.
+ *
+ * Since: 1.6
  */
 gboolean
 mm_modem_location_set_supl_server_sync (MMModemLocation *self,
@@ -327,12 +368,16 @@ mm_modem_location_set_supl_server_sync (MMModemLocation *self,
 /**
  * mm_modem_location_inject_assistance_data_finish:
  * @self: A #MMModemLocation.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_inject_assistance_data().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_inject_assistance_data().
  * @error: Return location for error or %NULL.
  *
- * Finishes an operation started with mm_modem_location_inject_assistance_data().
+ * Finishes an operation started with
+ * mm_modem_location_inject_assistance_data().
  *
  * Returns: %TRUE if the injection was successful, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_modem_location_inject_assistance_data_finish (MMModemLocation  *self,
@@ -350,15 +395,22 @@ mm_modem_location_inject_assistance_data_finish (MMModemLocation  *self,
  * @data: (array length=data_size): Data to inject.
  * @data_size: size of @data.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Aynchronously injects assistance data to the GNSS module.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_inject_assistance_data_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_inject_assistance_data_finish() to get the result of the
+ * operation.
  *
- * See mm_modem_location_inject_assistance_data_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_inject_assistance_data_sync() for the synchronous,
+ * blocking version of this method.
+ *
+ * Since: 1.10
  */
 void
 mm_modem_location_inject_assistance_data (MMModemLocation     *self,
@@ -387,10 +439,13 @@ mm_modem_location_inject_assistance_data (MMModemLocation     *self,
  *
  * Synchronously injects assistance data to the GNSS module.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_inject_assistance_data()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_inject_assistance_data() for the asynchronous version of
+ * this method.
  *
  * Returns: %TRUE if the injection was successful, %FALSE if @error is set.
+ *
+ * Since: 1.10
  */
 gboolean
 mm_modem_location_inject_assistance_data_sync (MMModemLocation  *self,
@@ -412,12 +467,16 @@ mm_modem_location_inject_assistance_data_sync (MMModemLocation  *self,
 /**
  * mm_modem_location_set_gps_refresh_rate_finish:
  * @self: A #MMModemLocation.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_set_gps_refresh_rate().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_set_gps_refresh_rate().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_location_set_gps_refresh_rate().
  *
- * Returns: %TRUE if setting the GPS refresh rate was successful, %FALSE if @error is set.
+ * Returns: %TRUE if setting the GPS refresh rate was successful, %FALSE if
+ * @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_location_set_gps_refresh_rate_finish (MMModemLocation *self,
@@ -439,12 +498,19 @@ mm_modem_location_set_gps_refresh_rate_finish (MMModemLocation *self,
  *
  * Asynchronously configures the GPS refresh rate.
 
- * If a 0 rate is used, the GPS location updates will be immediately propagated to the interface.
+ * If a 0 rate is used, the GPS location updates will be immediately propagated
+ * to the interface.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_set_gps_refresh_rate_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_set_gps_refresh_rate_finish() to get the result of the
+ * operation.
  *
- * See mm_modem_location_set_gps_refresh_rate_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_set_gps_refresh_rate_sync() for the synchronous,
+ * blocking version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_location_set_gps_refresh_rate (MMModemLocation *self,
@@ -471,12 +537,17 @@ mm_modem_location_set_gps_refresh_rate (MMModemLocation *self,
  *
  * Synchronously configures the GPS refresh rate.
  *
- * If a 0 rate is used, the GPS location updates will be immediately propagated to the interface.
+ * If a 0 rate is used, the GPS location updates will be immediately propagated
+ * to the interface.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_set_gps_refresh_rate()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_set_gps_refresh_rate() for the asynchronous version of this
+ * method.
  *
- * Returns: %TRUE if setting the refresh rate was successful, %FALSE if @error is set.
+ * Returns: %TRUE if setting the refresh rate was successful, %FALSE if @error
+ * is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_location_set_gps_refresh_rate_sync (MMModemLocation *self,
@@ -554,16 +625,27 @@ build_locations (GVariant *dictionary,
 /**
  * mm_modem_location_get_full_finish:
  * @self: A #MMModemLocation.
- * @location_3gpp: (out) (allow-none) (transfer full): Return location for a #MMLocation3gpp if 3GPP location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
- * @location_gps_nmea: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsNmea if GPS NMEA location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
- * @location_gps_raw: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsRaw if GPS raw location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
- * @location_cdma_bs: (out) (allow-none) (transfer full): Return location for a #MMLocationCdmaBs if CDMA Base Station location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_get_full().
+ * @location_3gpp: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocation3gpp if 3GPP location is requested, or #NULL if not required. The
+ *  returned value should be freed with g_object_unref().
+ * @location_gps_nmea: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocationGpsNmea if GPS NMEA location is requested, or #NULL if not
+ *  required. The returned value should be freed with g_object_unref().
+ * @location_gps_raw: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocationGpsRaw if GPS raw location is requested, or #NULL if not required.
+ *  The returned value should be freed with g_object_unref().
+ * @location_cdma_bs: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocationCdmaBs if CDMA Base Station location is requested, or #NULL if
+ *  not required. The returned value should be freed with g_object_unref().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_get_full().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_location_get_full().
  *
  * Returns: %TRUE if the retrieval was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_location_get_full_finish (MMModemLocation *self,
@@ -588,15 +670,21 @@ mm_modem_location_get_full_finish (MMModemLocation *self,
  * mm_modem_location_get_full:
  * @self: A #MMModemLocation.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously gets the current location information.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_get_full_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_get_full_finish() to get the result of the operation.
  *
- * See mm_modem_location_get_full_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_get_full_sync() for the synchronous, blocking version
+ * of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_location_get_full (MMModemLocation *self,
@@ -615,19 +703,29 @@ mm_modem_location_get_full (MMModemLocation *self,
 /**
  * mm_modem_location_get_full_sync:
  * @self: A #MMModemLocation.
- * @location_3gpp: (out) (allow-none) (transfer full): Return location for a #MMLocation3gpp if 3GPP location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
- * @location_gps_nmea: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsNmea if GPS NMEA location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
- * @location_gps_raw: (out) (allow-none) (transfer full): Return location for a #MMLocationGpsRaw if GPS raw location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
- * @location_cdma_bs: (out) (allow-none) (transfer full): Return location for a #MMLocationCdmaBs if CDMA Base Station location is requested, or #NULL if not required. The returned value should be freed with g_object_unref().
+ * @location_3gpp: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocation3gpp if 3GPP location is requested, or #NULL if not required. The
+ *  returned value should be freed with g_object_unref().
+ * @location_gps_nmea: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocationGpsNmea if GPS NMEA location is requested, or #NULL if not
+ *  required. The returned value should be freed with g_object_unref().
+ * @location_gps_raw: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocationGpsRaw if GPS raw location is requested, or #NULL if not required.
+ *  The returned value should be freed with g_object_unref().
+ * @location_cdma_bs: (out) (allow-none) (transfer full): Return location for a
+ *  #MMLocationCdmaBs if CDMA Base Station location is requested, or #NULL if
+ *  not required. The returned value should be freed with g_object_unref().
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
  * Synchronously gets the current location information.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_get_full()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_get_full() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the setup was successful, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_location_get_full_sync (MMModemLocation *self,
@@ -653,12 +751,16 @@ mm_modem_location_get_full_sync (MMModemLocation *self,
 /**
  * mm_modem_location_get_3gpp_finish:
  * @self: A #MMModemLocation.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_get_3gpp().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_get_3gpp().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_location_get_3gpp().
  *
- * Returns: (transfer full): A #MMLocation3gpp, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocation3gpp, or #NULL if not available. The
+ *  returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocation3gpp *
 mm_modem_location_get_3gpp_finish (MMModemLocation *self,
@@ -676,15 +778,21 @@ mm_modem_location_get_3gpp_finish (MMModemLocation *self,
  * mm_modem_location_get_3gpp:
  * @self: A #MMModemLocation.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously gets the current 3GPP location information.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_get_3gpp_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_get_3gpp_finish() to get the result of the operation.
  *
- * See mm_modem_location_get_3gpp_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_get_3gpp_sync() for the synchronous, blocking version
+ * of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_location_get_3gpp (MMModemLocation *self,
@@ -703,10 +811,13 @@ mm_modem_location_get_3gpp (MMModemLocation *self,
  *
  * Synchronously gets the current 3GPP location information.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_get_3gpp()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_get_3gpp() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A #MMLocation3gpp, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocation3gpp, or #NULL if not available. The
+ * returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocation3gpp *
 mm_modem_location_get_3gpp_sync (MMModemLocation *self,
@@ -725,12 +836,16 @@ mm_modem_location_get_3gpp_sync (MMModemLocation *self,
 /**
  * mm_modem_location_get_gps_nmea_finish:
  * @self: A #MMModemLocation.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_get_gps_nmea().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_get_gps_nmea().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_location_get_gps_nmea().
  *
- * Returns: (transfer full): A #MMLocationGpsNmea, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsNmea, or #NULL if not available.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocationGpsNmea *
 mm_modem_location_get_gps_nmea_finish (MMModemLocation *self,
@@ -748,15 +863,21 @@ mm_modem_location_get_gps_nmea_finish (MMModemLocation *self,
  * mm_modem_location_get_gps_nmea:
  * @self: A #MMModemLocation.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously gets the current GPS NMEA location information.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_get_gps_nmea_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_get_gps_nmea_finish() to get the result of the operation.
  *
- * See mm_modem_location_get_gps_nmea_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_get_gps_nmea_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_location_get_gps_nmea (MMModemLocation *self,
@@ -775,10 +896,13 @@ mm_modem_location_get_gps_nmea (MMModemLocation *self,
  *
  * Synchronously gets the current GPS NMEA location information.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_get_gps_nmea()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_get_gps_nmea() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A #MMLocationGpsNmea, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsNmea, or #NULL if not available.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocationGpsNmea *
 mm_modem_location_get_gps_nmea_sync (MMModemLocation *self,
@@ -797,12 +921,16 @@ mm_modem_location_get_gps_nmea_sync (MMModemLocation *self,
 /**
  * mm_modem_location_get_gps_raw_finish:
  * @self: A #MMModemLocation.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_get_gps_raw().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_get_gps_raw().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_location_get_gps_raw().
  *
- * Returns: (transfer full): A #MMLocationGpsRaw, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsRaw, or #NULL if not available.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocationGpsRaw *
 mm_modem_location_get_gps_raw_finish (MMModemLocation *self,
@@ -820,15 +948,21 @@ mm_modem_location_get_gps_raw_finish (MMModemLocation *self,
  * mm_modem_location_get_gps_raw:
  * @self: A #MMModemLocation.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously gets the current GPS raw location information.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_get_gps_raw_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_get_gps_raw_finish() to get the result of the operation.
  *
- * See mm_modem_location_get_gps_raw_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_get_gps_raw_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_location_get_gps_raw (MMModemLocation *self,
@@ -847,10 +981,13 @@ mm_modem_location_get_gps_raw (MMModemLocation *self,
  *
  * Synchronously gets the current GPS raw location information.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_get_gps_raw()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_get_gps_raw() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A #MMLocationGpsRaw, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationGpsRaw, or #NULL if not available.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocationGpsRaw *
 mm_modem_location_get_gps_raw_sync (MMModemLocation *self,
@@ -869,12 +1006,16 @@ mm_modem_location_get_gps_raw_sync (MMModemLocation *self,
 /**
  * mm_modem_location_get_cdma_bs_finish:
  * @self: A #MMModemLocation.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_location_get_cdma_bs().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_location_get_cdma_bs().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_location_get_cdma_bs().
  *
- * Returns: (transfer full): A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationCdmaBs, or #NULL if not available.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocationCdmaBs *
 mm_modem_location_get_cdma_bs_finish (MMModemLocation *self,
@@ -892,15 +1033,21 @@ mm_modem_location_get_cdma_bs_finish (MMModemLocation *self,
  * mm_modem_location_get_cdma_bs:
  * @self: A #MMModemLocation.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously gets the current CDMA base station location information.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_location_get_cdma_bs_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_location_get_cdma_bs_finish() to get the result of the operation.
  *
- * See mm_modem_location_get_cdma_bs_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_location_get_cdma_bs_sync() for the synchronous, blocking
+ * version of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_location_get_cdma_bs (MMModemLocation *self,
@@ -919,10 +1066,13 @@ mm_modem_location_get_cdma_bs (MMModemLocation *self,
  *
  * Synchronously gets the current CDMA base station location information.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_location_get_cdma_bs()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_location_get_cdma_bs() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A #MMLocationCdmaBs, or #NULL if not available. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A #MMLocationCdmaBs, or #NULL if not available.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMLocationCdmaBs *
 mm_modem_location_get_cdma_bs_sync (MMModemLocation *self,
@@ -944,12 +1094,14 @@ mm_modem_location_get_cdma_bs_sync (MMModemLocation *self,
  *
  * Gets the address of the SUPL server.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_location_dup_supl_server() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_location_dup_supl_server() if on another thread.</warning>
  *
- * Returns: (transfer none): The SUPL server address, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): The SUPL server address, or %NULL if none
+ * available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.6
  */
 const gchar *
 mm_modem_location_get_supl_server (MMModemLocation *self)
@@ -966,7 +1118,10 @@ mm_modem_location_get_supl_server (MMModemLocation *self)
  *
  * Gets the address of the SUPL server.
  *
- * Returns: (transfer full): The SUPL server address, or %NULL if none available. The returned value should be freed with g_free().
+ * Returns: (transfer full): The SUPL server address, or %NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.6
  */
 gchar *
 mm_modem_location_dup_supl_server (MMModemLocation *self)
@@ -985,12 +1140,15 @@ mm_modem_location_dup_supl_server (MMModemLocation *self)
  *
  * Gets the list of assistance data servers.
  *
- * <warning>The returned value is only valid until the property changes so
- * it is only safe to use this function on the thread where
- * @self was constructed. Use mm_modem_location_dup_assistance_data_servers() if on another
- * thread.</warning>
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_location_dup_assistance_data_servers() if on another thread.
+ * </warning>
  *
- * Returns: (transfer none): a %NULL-terminated array of server addresses, or %NULL if none available. Do not free the returned value, it belongs to @self.
+ * Returns: (transfer none): a %NULL-terminated array of server addresses, or
+ * %NULL if none available. Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.10
  */
 const gchar **
 mm_modem_location_get_assistance_data_servers (MMModemLocation *self)
@@ -1010,7 +1168,11 @@ mm_modem_location_get_assistance_data_servers (MMModemLocation *self)
  *
  * Gets the list of assistance data servers.
  *
- * Returns: (transfer full): a %NULL-terminated array of server addresses, or %NULL if none available. The returned value should be freed with g_strfreev().
+ * Returns: (transfer full): a %NULL-terminated array of server addresses, or
+ * %NULL if none available. The returned value should be freed with
+ * g_strfreev().
+ *
+ * Since: 1.10
  */
 gchar **
 mm_modem_location_dup_assistance_data_servers (MMModemLocation *self)
@@ -1036,6 +1198,8 @@ mm_modem_location_dup_assistance_data_servers (MMModemLocation *self)
  * Gets the GPS refresh rate, in seconds.
  *
  * Returns: The GPS refresh rate, or 0 if no fixed rate is used.
+ *
+ * Since: 1.0
  */
 guint
 mm_modem_location_get_gps_refresh_rate (MMModemLocation *self)

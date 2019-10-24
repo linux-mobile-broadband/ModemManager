@@ -57,6 +57,8 @@ struct _MMModemMessagingPrivate {
  * Gets the DBus path of the #MMObject which implements this interface.
  *
  * Returns: (transfer none): The DBus path of the #MMObject object.
+ *
+ * Since: 1.0
  */
 const gchar *
 mm_modem_messaging_get_path (MMModemMessaging *self)
@@ -71,9 +73,13 @@ mm_modem_messaging_get_path (MMModemMessaging *self)
  * mm_modem_messaging_dup_path:
  * @self: A #MMModemMessaging.
  *
- * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ * Gets a copy of the DBus path of the #MMObject object which implements this
+ * interface.
  *
- * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value
+ * should be freed with g_free().
+ *
+ * Since: 1.0
  */
 gchar *
 mm_modem_messaging_dup_path (MMModemMessaging *self)
@@ -143,12 +149,16 @@ ensure_internal_supported_storages (MMModemMessaging *self,
 /**
  * mm_modem_messaging_get_supported_storages:
  * @self: A #MMModem.
- * @storages: (out) (array length=n_storages): Return location for the array of #MMSmsStorage values. The returned array should be freed with g_free() when no longer needed.
+ * @storages: (out) (array length=n_storages): Return location for the array of
+ *  #MMSmsStorage values. The returned array should be freed with g_free() when
+ *  no longer needed.
  * @n_storages: (out): Return location for the number of values in @storages.
  *
  * Gets the list of SMS storages supported by the #MMModem.
  *
  * Returns: %TRUE if @storages and @n_storages are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_messaging_get_supported_storages (MMModemMessaging *self,
@@ -173,12 +183,15 @@ mm_modem_messaging_get_supported_storages (MMModemMessaging *self,
 /**
  * mm_modem_messaging_peek_supported_storages:
  * @self: A #MMModem.
- * @storages: (out): Return location for the array of #MMSmsStorage values. Do not free the returned array, it is owned by @self.
+ * @storages: (out): Return location for the array of #MMSmsStorage values. Do
+ *  not free the returned array, it is owned by @self.
  * @n_storages: (out): Return location for the number of values in @storages.
  *
  * Gets the list of SMS storages supported by the #MMModem.
  *
  * Returns: %TRUE if @storages and @n_storages are set, %FALSE otherwise.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_messaging_peek_supported_storages (MMModemMessaging *self,
@@ -207,6 +220,8 @@ mm_modem_messaging_peek_supported_storages (MMModemMessaging *self,
  * Gets the default SMS storage used when storing or receiving SMS messages.
  *
  * Returns: the default #MMSmsStorage.
+ *
+ * Since: 1.0
  */
 MMSmsStorage
 mm_modem_messaging_get_default_storage (MMModemMessaging *self)
@@ -241,12 +256,18 @@ list_sms_context_free (ListSmsContext *ctx)
 /**
  * mm_modem_messaging_list_finish:
  * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_messaging_list().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_messaging_list().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_messaging_list().
  *
- * Returns: (element-type ModemManager.Sms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
+ * Returns: (element-type ModemManager.Sms) (transfer full): A list of #MMSms
+ * objects, or #NULL if either not found or @error is set. The returned value
+ * should be freed with g_list_free_full() using g_object_unref() as
+ * #GDestroyNotify function.
+ *
+ * Since: 1.0
  */
 GList *
 mm_modem_messaging_list_finish (MMModemMessaging *self,
@@ -325,15 +346,21 @@ create_next_sms (GTask *task)
  * mm_modem_messaging_list:
  * @self: A #MMModemMessaging.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously lists the #MMSms objects in the modem.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_messaging_list_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_messaging_list_finish() to get the result of the operation.
  *
- * See mm_modem_messaging_list_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_messaging_list_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_messaging_list (MMModemMessaging *self,
@@ -372,10 +399,15 @@ mm_modem_messaging_list (MMModemMessaging *self,
  *
  * Synchronously lists the #MMSms objects in the modem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_messaging_list()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_messaging_list() for the asynchronous version of this method.
  *
- * Returns: (element-type ModemManager.Sms) (transfer full): A list of #MMSms objects, or #NULL if either not found or @error is set. The returned value should be freed with g_list_free_full() using g_object_unref() as #GDestroyNotify function.
+ * Returns: (element-type ModemManager.Sms) (transfer full): A list of #MMSms
+ * objects, or #NULL if either not found or @error is set. The returned value
+ * should be freed with g_list_free_full() using g_object_unref() as
+ * #GDestroyNotify function.
+ *
+ * Since: 1.0
  */
 GList *
 mm_modem_messaging_list_sync (MMModemMessaging *self,
@@ -425,12 +457,16 @@ mm_modem_messaging_list_sync (MMModemMessaging *self,
 /**
  * mm_modem_messaging_create_finish:
  * @self: A #MMModemMessaging.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_messaging_create().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_messaging_create().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_messaging_create().
  *
- * Returns: (transfer full): A newly created #MMSms, or %NULL if @error is set. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A newly created #MMSms, or %NULL if @error is set.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMSms *
 mm_modem_messaging_create_finish (MMModemMessaging *self,
@@ -500,15 +536,21 @@ create_sms_ready (MMModemMessaging *self,
  * @self: A #MMModemMessaging.
  * @properties: A ##MMSmsProperties object with the properties to use.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously creates a new #MMSms in the modem.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_messaging_create_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_messaging_create_finish() to get the result of the operation.
  *
- * See mm_modem_messaging_create_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_messaging_create_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_messaging_create (MMModemMessaging *self,
@@ -543,10 +585,13 @@ mm_modem_messaging_create (MMModemMessaging *self,
  *
  * Synchronously creates a new #MMSms in the modem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_messaging_create()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_messaging_create() for the asynchronous version of this method.
  *
- * Returns: (transfer full): A newly created #MMSms, or %NULL if @error is set. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): A newly created #MMSms, or %NULL if @error is set.
+ * The returned value should be freed with g_object_unref().
+ *
+ * Since: 1.0
  */
 MMSms *
 mm_modem_messaging_create_sync (MMModemMessaging *self,
@@ -589,12 +634,15 @@ mm_modem_messaging_create_sync (MMModemMessaging *self,
 /**
  * mm_modem_messaging_delete_finish:
  * @self: A #MMModemMessaging.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_messaging_delete().
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_messaging_delete().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_messaging_delete().
  *
  * Returns: %TRUE if the sms was deleted, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_messaging_delete_finish (MMModemMessaging *self,
@@ -611,15 +659,21 @@ mm_modem_messaging_delete_finish (MMModemMessaging *self,
  * @self: A #MMModemMessaging.
  * @sms: Path of the #MMSms to delete.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
- * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously deletes a given #MMSms from the modem.
  *
- * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
- * You can then call mm_modem_messaging_delete_finish() to get the result of the operation.
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_messaging_delete_finish() to get the result of the operation.
  *
- * See mm_modem_messaging_delete_sync() for the synchronous, blocking version of this method.
+ * See mm_modem_messaging_delete_sync() for the synchronous, blocking version
+ * of this method.
+ *
+ * Since: 1.0
  */
 void
 mm_modem_messaging_delete (MMModemMessaging *self,
@@ -646,10 +700,12 @@ mm_modem_messaging_delete (MMModemMessaging *self,
 
  * Synchronously deletes a given #MMSms from the modem.
  *
- * The calling thread is blocked until a reply is received. See mm_modem_messaging_delete()
- * for the asynchronous version of this method.
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_messaging_delete() for the asynchronous version of this method.
  *
  * Returns: %TRUE if the SMS was deleted, %FALSE if @error is set.
+ *
+ * Since: 1.0
  */
 gboolean
 mm_modem_messaging_delete_sync (MMModemMessaging *self,

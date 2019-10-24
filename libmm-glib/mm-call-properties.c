@@ -56,6 +56,8 @@ struct _MMCallPropertiesPrivate {
  * @text: The number to set, in UTF-8.
  *
  * Sets the call number.
+ *
+ * Since: 1.6
  */
 void
 mm_call_properties_set_number (MMCallProperties *self,
@@ -73,7 +75,10 @@ mm_call_properties_set_number (MMCallProperties *self,
  *
  * Gets the number, in UTF-8.
  *
- * Returns: the call number, or %NULL if it doesn't contain any (anonymous caller). Do not free the returned value, it is owned by @self.
+ * Returns: the call number, or %NULL if it doesn't contain any (anonymous
+ * caller). Do not free the returned value, it is owned by @self.
+ *
+ * Since: 1.6
  */
 const gchar *
 mm_call_properties_get_number (MMCallProperties *self)
@@ -90,7 +95,9 @@ mm_call_properties_get_number (MMCallProperties *self)
  * @self: A #MMCallProperties.
  * @direction: the call direction
  *
- * Sets the call direction
+ * Sets the call direction.
+ *
+ * Since: 1.6
  */
 void
 mm_call_properties_set_direction (MMCallProperties *self,
@@ -108,6 +115,8 @@ mm_call_properties_set_direction (MMCallProperties *self,
  * Gets the call direction.
  *
  * Returns: the call direction.
+ *
+ * Since: 1.6
  */
 MMCallDirection
 mm_call_properties_get_direction (MMCallProperties *self)
@@ -125,6 +134,8 @@ mm_call_properties_get_direction (MMCallProperties *self)
  * @state: the call state
  *
  * Sets the call state
+ *
+ * Since: 1.6
  */
 void
 mm_call_properties_set_state (MMCallProperties *self,
@@ -142,6 +153,8 @@ mm_call_properties_set_state (MMCallProperties *self,
  * Gets the call state.
  *
  * Returns: the call state.
+ *
+ * Since: 1.6
  */
 MMCallState
 mm_call_properties_get_state (MMCallProperties *self)
@@ -156,9 +169,11 @@ mm_call_properties_get_state (MMCallProperties *self)
 /**
  * mm_call_properties_set_state_reason:
  * @self: A #MMCallProperties.
- * @state_reason: the call state_reason
+ * @state_reason: the call state reason.
  *
- * Sets the call state reason
+ * Sets the call state reason.
+ *
+ * Since: 1.6
  */
 void
 mm_call_properties_set_state_reason (MMCallProperties *self,
@@ -176,6 +191,8 @@ mm_call_properties_set_state_reason (MMCallProperties *self,
  * Gets the call state reason.
  *
  * Returns: the call state reason.
+ *
+ * Since: 1.6
  */
 MMCallStateReason
 mm_call_properties_get_state_reason (MMCallProperties *self)
@@ -404,14 +421,6 @@ mm_call_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-/**
- * mm_call_properties_dup:
- * @orig: a #MMCallProperties
- *
- * Returns a copy of @orig.
- *
- * Returns: (transfer full): a #MMCallProperties
- */
 MMCallProperties *
 mm_call_properties_dup (MMCallProperties *orig)
 {
@@ -436,7 +445,10 @@ mm_call_properties_dup (MMCallProperties *orig)
  *
  * Creates a new empty #MMCallProperties.
  *
- * Returns: (transfer full): a #MMCallProperties. The returned value should be freed with g_object_unref().
+ * Returns: (transfer full): a #MMCallProperties. The returned value should be
+ * freed with g_object_unref().
+ *
+ * Since: 1.6
  */
 MMCallProperties *
 mm_call_properties_new (void)
