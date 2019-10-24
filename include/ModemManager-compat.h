@@ -22,8 +22,6 @@
 
 #include <ModemManager-enums.h>
 
-#ifndef MM_DISABLE_DEPRECATED
-
 /**
  * SECTION:mm-compat
  * @title: API break replacements
@@ -40,6 +38,8 @@
 #else
 # define MM_DEPRECATED
 #endif
+
+#ifndef MM_DISABLE_DEPRECATED
 
 /* The following type exists just so that we can get deprecation warnings */
 MM_DEPRECATED
