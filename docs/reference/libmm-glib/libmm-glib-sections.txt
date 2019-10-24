@@ -1202,6 +1202,8 @@ mm_sim_get_operator_identifier
 mm_sim_dup_operator_identifier
 mm_sim_get_operator_name
 mm_sim_dup_operator_name
+mm_sim_get_emergency_numbers
+mm_sim_dup_emergency_numbers
 <SUBSECTION Methods>
 mm_sim_send_pin
 mm_sim_send_pin_finish
@@ -3076,6 +3078,8 @@ mm_gdbus_sim_get_operator_identifier
 mm_gdbus_sim_dup_operator_identifier
 mm_gdbus_sim_get_operator_name
 mm_gdbus_sim_dup_operator_name
+mm_gdbus_sim_get_emergency_numbers
+mm_gdbus_sim_dup_emergency_numbers
 <SUBSECTION Methods>
 mm_gdbus_sim_call_send_pin
 mm_gdbus_sim_call_send_pin_finish
@@ -3094,6 +3098,7 @@ mm_gdbus_sim_set_imsi
 mm_gdbus_sim_set_operator_identifier
 mm_gdbus_sim_set_operator_name
 mm_gdbus_sim_set_sim_identifier
+mm_gdbus_sim_set_emergency_numbers
 mm_gdbus_sim_complete_change_pin
 mm_gdbus_sim_complete_enable_pin
 mm_gdbus_sim_complete_send_pin
