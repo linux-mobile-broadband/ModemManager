@@ -104,8 +104,6 @@ MMBearerProperties *mm_bearer_properties_new_from_string (const gchar *str,
 MMBearerProperties *mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
                                                               GError **error);
 
-MMBearerProperties *mm_bearer_properties_dup (MMBearerProperties *orig);
-
 gboolean mm_bearer_properties_consume_string (MMBearerProperties *self,
                                               const gchar *key,
                                               const gchar *value,

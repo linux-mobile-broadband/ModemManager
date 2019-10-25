@@ -109,8 +109,6 @@ MMSmsProperties *mm_sms_properties_new_from_string (const gchar *str,
 MMSmsProperties *mm_sms_properties_new_from_dictionary (GVariant *dictionary,
                                                         GError **error);
 
-MMSmsProperties *mm_sms_properties_dup (MMSmsProperties *orig);
-
 GVariant *mm_sms_properties_get_dictionary (MMSmsProperties *self);
 
 #endif

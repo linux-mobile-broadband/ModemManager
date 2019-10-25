@@ -90,8 +90,6 @@ MMKernelEventProperties *mm_kernel_event_properties_new_from_string     (const g
 MMKernelEventProperties *mm_kernel_event_properties_new_from_dictionary (GVariant  *dictionary,
                                                                          GError   **error);
 
-MMKernelEventProperties *mm_kernel_event_properties_dup                 (MMKernelEventProperties *orig);
-
 GVariant                *mm_kernel_event_properties_get_dictionary      (MMKernelEventProperties *self);
 
 #endif

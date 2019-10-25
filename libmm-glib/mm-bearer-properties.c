@@ -652,25 +652,6 @@ mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-MMBearerProperties *
-mm_bearer_properties_dup (MMBearerProperties *orig)
-{
-    GVariant *dict;
-    MMBearerProperties *copy;
-    GError *error = NULL;
-
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (orig), NULL);
-
-    dict = mm_bearer_properties_get_dictionary (orig);
-    copy = mm_bearer_properties_new_from_dictionary (dict, &error);
-    g_assert_no_error (error);
-    g_variant_unref (dict);
-
-    return copy;
-}
-
-/*****************************************************************************/
-
 gboolean
 mm_bearer_properties_cmp (MMBearerProperties *a,
                           MMBearerProperties *b)

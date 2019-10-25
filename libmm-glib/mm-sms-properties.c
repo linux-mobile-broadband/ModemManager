@@ -876,25 +876,6 @@ mm_sms_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-MMSmsProperties *
-mm_sms_properties_dup (MMSmsProperties *orig)
-{
-    GVariant *dict;
-    MMSmsProperties *copy;
-    GError *error = NULL;
-
-    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (orig), NULL);
-
-    dict = mm_sms_properties_get_dictionary (orig);
-    copy = mm_sms_properties_new_from_dictionary (dict, &error);
-    g_assert_no_error (error);
-    g_variant_unref (dict);
-
-    return copy;
-}
-
-/*****************************************************************************/
-
 /**
  * mm_sms_properties_new:
  *

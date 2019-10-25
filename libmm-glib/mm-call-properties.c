@@ -366,25 +366,6 @@ mm_call_properties_new_from_dictionary (GVariant  *dictionary,
 
 /*****************************************************************************/
 
-MMCallProperties *
-mm_call_properties_dup (MMCallProperties *orig)
-{
-    GVariant *dict;
-    MMCallProperties *copy;
-    GError *error = NULL;
-
-    g_return_val_if_fail (MM_IS_CALL_PROPERTIES (orig), NULL);
-
-    dict = mm_call_properties_get_dictionary (orig);
-    copy = mm_call_properties_new_from_dictionary (dict, &error);
-    g_assert_no_error (error);
-    g_variant_unref (dict);
-
-    return copy;
-}
-
-/*****************************************************************************/
-
 /**
  * mm_call_properties_new:
  *

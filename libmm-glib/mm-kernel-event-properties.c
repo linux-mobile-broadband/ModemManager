@@ -402,25 +402,6 @@ mm_kernel_event_properties_new_from_dictionary (GVariant  *dictionary,
 
 /*****************************************************************************/
 
-MMKernelEventProperties *
-mm_kernel_event_properties_dup (MMKernelEventProperties *orig)
-{
-    GVariant *dict;
-    MMKernelEventProperties *copy;
-    GError *error = NULL;
-
-    g_return_val_if_fail (MM_IS_KERNEL_EVENT_PROPERTIES (orig), NULL);
-
-    dict = mm_kernel_event_properties_get_dictionary (orig);
-    copy = mm_kernel_event_properties_new_from_dictionary (dict, &error);
-    g_assert_no_error (error);
-    g_variant_unref (dict);
-
-    return copy;
-}
-
-/*****************************************************************************/
-
 /**
  * mm_kernel_event_properties_new:
  *

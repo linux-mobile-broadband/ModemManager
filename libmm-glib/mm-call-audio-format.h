@@ -74,8 +74,6 @@ MMCallAudioFormat *mm_call_audio_format_new (void);
 MMCallAudioFormat *mm_call_audio_format_new_from_dictionary (GVariant *dictionary,
                                                              GError **error);
 
-MMCallAudioFormat *mm_call_audio_format_dup (MMCallAudioFormat *orig);
-
 void mm_call_audio_format_set_encoding   (MMCallAudioFormat *self,
                                           const gchar *encoding);
 void mm_call_audio_format_set_resolution (MMCallAudioFormat *self,

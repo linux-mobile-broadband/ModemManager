@@ -77,8 +77,6 @@ MMBearerIpConfig *mm_bearer_ip_config_new (void);
 MMBearerIpConfig *mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
                                                            GError **error);
 
-MMBearerIpConfig *mm_bearer_ip_config_dup (MMBearerIpConfig *orig);
-
 void mm_bearer_ip_config_set_method  (MMBearerIpConfig *self,
                                       MMBearerIpMethod ip_method);
 void mm_bearer_ip_config_set_address (MMBearerIpConfig *self,

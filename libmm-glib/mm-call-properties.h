@@ -89,14 +89,11 @@ MMCallState       mm_call_properties_get_state        (MMCallProperties *self);
     defined (_LIBMM_INSIDE_MMCLI) || \
     defined (LIBMM_GLIB_COMPILATION)
 
-MMCallProperties *mm_call_properties_new_from_string (const gchar *str,
-                                                      GError **error);
+MMCallProperties *mm_call_properties_new_from_string     (const gchar *str,
+                                                          GError **error);
 MMCallProperties *mm_call_properties_new_from_dictionary (GVariant *dictionary,
                                                           GError **error);
-
-MMCallProperties *mm_call_properties_dup (MMCallProperties *orig);
-
-GVariant *mm_call_properties_get_dictionary (MMCallProperties *self);
+GVariant         *mm_call_properties_get_dictionary      (MMCallProperties *self);
 
 #endif
 

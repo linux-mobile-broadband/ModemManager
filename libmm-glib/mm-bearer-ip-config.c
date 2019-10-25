@@ -383,25 +383,6 @@ mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
 /*****************************************************************************/
 
 MMBearerIpConfig *
-mm_bearer_ip_config_dup (MMBearerIpConfig *orig)
-{
-    GVariant *dict;
-    MMBearerIpConfig *copy;
-    GError *error = NULL;
-
-    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (orig), NULL);
-
-    dict = mm_bearer_ip_config_get_dictionary (orig);
-    copy = mm_bearer_ip_config_new_from_dictionary (dict, &error);
-    g_assert_no_error (error);
-    g_variant_unref (dict);
-
-    return copy;
-}
-
-/*****************************************************************************/
-
-MMBearerIpConfig *
 mm_bearer_ip_config_new (void)
 {
     return (MM_BEARER_IP_CONFIG (
