@@ -59,6 +59,9 @@ mm_network_timezone_get_offset (MMNetworkTimezone *self)
     return self->priv->offset;
 }
 
+/**
+ * mm_network_timezone_set_offset: (skip)
+ */
 void
 mm_network_timezone_set_offset (MMNetworkTimezone *self,
                                 gint offset)
@@ -90,6 +93,9 @@ mm_network_timezone_get_dst_offset (MMNetworkTimezone *self)
     return self->priv->dst_offset;
 }
 
+/**
+ * mm_network_timezone_set_dst_offset: (skip)
+ */
 void
 mm_network_timezone_set_dst_offset (MMNetworkTimezone *self,
                                     gint dst_offset)
@@ -121,6 +127,9 @@ mm_network_timezone_get_leap_seconds (MMNetworkTimezone *self)
     return self->priv->leap_seconds;
 }
 
+/**
+ * mm_network_timezone_set_leap_seconds: (skip)
+ */
 void
 mm_network_timezone_set_leap_seconds (MMNetworkTimezone *self,
                                       gint leap_seconds)
@@ -132,6 +141,9 @@ mm_network_timezone_set_leap_seconds (MMNetworkTimezone *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_network_timezone_get_dictionary: (skip)
+ */
 GVariant *
 mm_network_timezone_get_dictionary (MMNetworkTimezone *self)
 {
@@ -168,6 +180,9 @@ mm_network_timezone_get_dictionary (MMNetworkTimezone *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_network_timezone_new_from_dictionary: (skip)
+ */
 MMNetworkTimezone *
 mm_network_timezone_new_from_dictionary (GVariant *dictionary,
                                          GError **error)
@@ -233,6 +248,9 @@ mm_network_timezone_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_network_timezone_new: (skip)
+ */
 MMNetworkTimezone *
 mm_network_timezone_new (void)
 {

@@ -71,6 +71,9 @@ mm_bearer_ip_config_get_method (MMBearerIpConfig *self)
     return self->priv->method;
 }
 
+/**
+ * mm_bearer_ip_config_set_method: (skip)
+ */
 void
 mm_bearer_ip_config_set_method (MMBearerIpConfig *self,
                                 MMBearerIpMethod method)
@@ -101,6 +104,9 @@ mm_bearer_ip_config_get_address (MMBearerIpConfig *self)
     return self->priv->address;
 }
 
+/**
+ * mm_bearer_ip_config_set_address: (skip)
+ */
 void
 mm_bearer_ip_config_set_address (MMBearerIpConfig *self,
                                  const gchar *address)
@@ -131,6 +137,9 @@ mm_bearer_ip_config_get_prefix (MMBearerIpConfig *self)
     return self->priv->prefix;
 }
 
+/**
+ * mm_bearer_ip_config_set_prefix: (skip)
+ */
 void
 mm_bearer_ip_config_set_prefix (MMBearerIpConfig *self,
                                 guint prefix)
@@ -161,6 +170,9 @@ mm_bearer_ip_config_get_dns (MMBearerIpConfig *self)
     return (const gchar **)self->priv->dns;
 }
 
+/**
+ * mm_bearer_ip_config_set_dns: (skip)
+ */
 void
 mm_bearer_ip_config_set_dns (MMBearerIpConfig *self,
                              const gchar **dns)
@@ -192,6 +204,9 @@ mm_bearer_ip_config_get_gateway (MMBearerIpConfig *self)
     return self->priv->gateway;
 }
 
+/**
+ * mm_bearer_ip_config_set_gateway: (skip)
+ */
 void
 mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
                                  const gchar *gateway)
@@ -222,6 +237,9 @@ mm_bearer_ip_config_get_mtu (MMBearerIpConfig *self)
     return self->priv->mtu;
 }
 
+/**
+ * mm_bearer_ip_config_set_mtu: (skip)
+ */
 void
 mm_bearer_ip_config_set_mtu (MMBearerIpConfig *self,
                              guint mtu)
@@ -233,6 +251,9 @@ mm_bearer_ip_config_set_mtu (MMBearerIpConfig *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_ip_config_get_dictionary: (skip)
+ */
 GVariant *
 mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self)
 {
@@ -300,6 +321,9 @@ mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_ip_config_new_from_dictionary: (skip)
+ */
 MMBearerIpConfig *
 mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
                                          GError **error)
@@ -382,6 +406,9 @@ mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_ip_config_new: (skip)
+ */
 MMBearerIpConfig *
 mm_bearer_ip_config_new (void)
 {

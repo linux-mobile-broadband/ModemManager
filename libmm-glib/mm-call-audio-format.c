@@ -64,6 +64,9 @@ mm_call_audio_format_get_encoding (MMCallAudioFormat *self)
     return self->priv->encoding;
 }
 
+/**
+ * mm_call_audio_format_set_encoding: (skip)
+ */
 void
 mm_call_audio_format_set_encoding (MMCallAudioFormat *self,
                                    const gchar *encoding)
@@ -96,6 +99,9 @@ mm_call_audio_format_get_resolution (MMCallAudioFormat *self)
     return self->priv->resolution;
 }
 
+/**
+ * mm_call_audio_format_set_resolution: (skip)
+ */
 void
 mm_call_audio_format_set_resolution (MMCallAudioFormat *self,
                                      const gchar *resolution)
@@ -127,6 +133,9 @@ mm_call_audio_format_get_rate (MMCallAudioFormat *self)
     return self->priv->rate;
 }
 
+/**
+ * mm_call_audio_format_set_rate: (skip)
+ */
 void
 mm_call_audio_format_set_rate (MMCallAudioFormat *self,
                                guint rate)
@@ -138,6 +147,9 @@ mm_call_audio_format_set_rate (MMCallAudioFormat *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_call_audio_format_get_dictionary: (skip)
+ */
 GVariant *
 mm_call_audio_format_get_dictionary (MMCallAudioFormat *self)
 {
@@ -173,6 +185,9 @@ mm_call_audio_format_get_dictionary (MMCallAudioFormat *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_call_audio_format_new_from_dictionary: (skip)
+ */
 MMCallAudioFormat *
 mm_call_audio_format_new_from_dictionary (GVariant *dictionary,
                                           GError **error)
@@ -220,6 +235,9 @@ mm_call_audio_format_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_call_audio_format_new: (skip)
+ */
 MMCallAudioFormat *
 mm_call_audio_format_new (void)
 {

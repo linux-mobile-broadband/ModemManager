@@ -511,6 +511,9 @@ mm_sms_properties_get_service_category (MMSmsProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_sms_properties_get_dictionary: (skip)
+ */
 GVariant *
 mm_sms_properties_get_dictionary (MMSmsProperties *self)
 {
@@ -734,6 +737,9 @@ key_value_foreach (const gchar *key,
                            &ctx->error);
 }
 
+/**
+ * mm_sms_properties_new_from_string: (skip)
+ */
 MMSmsProperties *
 mm_sms_properties_new_from_string (const gchar *str,
                                    GError **error)
@@ -829,6 +835,9 @@ consume_variant (MMSmsProperties *properties,
     return TRUE;
 }
 
+/**
+ * mm_sms_properties_new_from_dictionary: (skip)
+ */
 MMSmsProperties *
 mm_sms_properties_new_from_dictionary (GVariant *dictionary,
                                        GError **error)

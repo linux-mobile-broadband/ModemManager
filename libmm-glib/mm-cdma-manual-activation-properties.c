@@ -570,6 +570,9 @@ mm_cdma_manual_activation_properties_set_prl_bytearray (MMCdmaManualActivationPr
 
 /*****************************************************************************/
 
+/**
+ * mm_cdma_manual_activation_properties_get_dictionary: (skip)
+ */
 GVariant *
 mm_cdma_manual_activation_properties_get_dictionary (MMCdmaManualActivationProperties *self)
 {
@@ -696,6 +699,9 @@ consume_variant (MMCdmaManualActivationProperties *self,
     return FALSE;
 }
 
+/**
+ * mm_cdma_manual_activation_properties_new_from_dictionary: (skip)
+ */
 MMCdmaManualActivationProperties *
 mm_cdma_manual_activation_properties_new_from_dictionary (GVariant *dictionary,
                                                           GError **error)
@@ -833,6 +839,9 @@ key_value_foreach (const gchar *key,
                            &ctx->error);
 }
 
+/**
+ * mm_cdma_manual_activation_properties_new_from_string: (skip)
+ */
 MMCdmaManualActivationProperties *
 mm_cdma_manual_activation_properties_new_from_string (const gchar *str,
                                                       GError **error)

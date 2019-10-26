@@ -88,6 +88,9 @@ mm_pco_get_session_id (MMPco *self)
     return self->priv->session_id;
 }
 
+/**
+ * mm_pco_set_session_id: (skip)
+ */
 void
 mm_pco_set_session_id (MMPco *self,
                        guint32 session_id)
@@ -119,6 +122,9 @@ mm_pco_is_complete (MMPco *self)
     return self->priv->is_complete;
 }
 
+/**
+ * mm_pco_set_complete: (skip)
+ */
 void
 mm_pco_set_complete (MMPco *self,
                      gboolean is_complete)
@@ -150,6 +156,9 @@ mm_pco_get_data (MMPco *self,
     return g_bytes_get_data (self->priv->data, data_size);
 }
 
+/**
+ * mm_pco_set_data: (skip)
+ */
 void
 mm_pco_set_data (MMPco *self,
                  const guint8 *data,
@@ -165,6 +174,9 @@ mm_pco_set_data (MMPco *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_pco_from_variant: (skip)
+ */
 MMPco *
 mm_pco_from_variant (GVariant *variant,
                      GError **error)
@@ -200,6 +212,9 @@ mm_pco_from_variant (GVariant *variant,
 
 /*****************************************************************************/
 
+/**
+ * mm_pco_to_variant: (skip)
+ */
 GVariant *
 mm_pco_to_variant (MMPco *self)
 {
@@ -279,6 +294,9 @@ mm_pco_list_add (GList *pco_list,
 
 /*****************************************************************************/
 
+/**
+ * mm_pco_new: (skip)
+ */
 MMPco *
 mm_pco_new (void)
 {

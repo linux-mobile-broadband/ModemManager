@@ -69,6 +69,9 @@ mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self)
     return self->priv->mobile_country_code;
 }
 
+/**
+ * mm_location_3gpp_set_mobile_country_code: (skip)
+ */
 gboolean
 mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
                                           guint mobile_country_code)
@@ -107,6 +110,9 @@ mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
     return self->priv->mobile_network_code;
 }
 
+/**
+ * mm_location_3gpp_set_mobile_network_code: (skip)
+ */
 gboolean
 mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
                                           guint mobile_network_code)
@@ -142,6 +148,9 @@ mm_location_3gpp_get_location_area_code (MMLocation3gpp *self)
     return self->priv->location_area_code;
 }
 
+/**
+ * mm_location_3gpp_set_location_area_code: (skip)
+ */
 gboolean
 mm_location_3gpp_set_location_area_code (MMLocation3gpp *self,
                                          gulong location_area_code)
@@ -176,6 +185,9 @@ mm_location_3gpp_get_cell_id (MMLocation3gpp *self)
     return self->priv->cell_id;
 }
 
+/**
+ * mm_location_3gpp_set_cell_id: (skip)
+ */
 gboolean
 mm_location_3gpp_set_cell_id (MMLocation3gpp *self,
                               gulong cell_id)
@@ -210,6 +222,9 @@ mm_location_3gpp_get_tracking_area_code (MMLocation3gpp *self)
     return self->priv->tracking_area_code;
 }
 
+/**
+ * mm_location_3gpp_set_tracking_area_code: (skip)
+ */
 gboolean
 mm_location_3gpp_set_tracking_area_code (MMLocation3gpp *self,
                                          gulong tracking_area_code)
@@ -226,6 +241,9 @@ mm_location_3gpp_set_tracking_area_code (MMLocation3gpp *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_location_3gpp_reset: (skip)
+ */
 gboolean
 mm_location_3gpp_reset (MMLocation3gpp *self)
 {
@@ -250,6 +268,9 @@ mm_location_3gpp_reset (MMLocation3gpp *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_location_3gpp_get_string_variant: (skip)
+ */
 GVariant *
 mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
 {
@@ -335,6 +356,9 @@ validate_numeric_string_content (const gchar *display,
     return TRUE;
 }
 
+/**
+ * mm_location_3gpp_new_from_string_variant: (skip)
+ */
 MMLocation3gpp *
 mm_location_3gpp_new_from_string_variant (GVariant *string,
                                           GError **error)
@@ -387,6 +411,9 @@ mm_location_3gpp_new_from_string_variant (GVariant *string,
 
 /*****************************************************************************/
 
+/**
+ * mm_location_3gpp_new: (skip)
+ */
 MMLocation3gpp *
 mm_location_3gpp_new (void)
 {

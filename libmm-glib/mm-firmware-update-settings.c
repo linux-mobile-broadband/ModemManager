@@ -85,6 +85,9 @@ mm_firmware_update_settings_get_device_ids (MMFirmwareUpdateSettings *self)
     return (const gchar **) self->priv->device_ids;
 }
 
+/**
+ * mm_firmware_update_settings_set_device_ids: (skip)
+ */
 void
 mm_firmware_update_settings_set_device_ids (MMFirmwareUpdateSettings  *self,
                                             const gchar              **device_ids)
@@ -117,6 +120,9 @@ mm_firmware_update_settings_get_version (MMFirmwareUpdateSettings *self)
     return self->priv->version;
 }
 
+/**
+ * mm_firmware_update_settings_set_version: (skip)
+ */
 void
 mm_firmware_update_settings_set_version (MMFirmwareUpdateSettings *self,
                                          const gchar              *version)
@@ -153,6 +159,9 @@ mm_firmware_update_settings_get_fastboot_at (MMFirmwareUpdateSettings *self)
     return self->priv->fastboot_at;
 }
 
+/**
+ * mm_firmware_update_settings_set_fastboot_at: (skip)
+ */
 void
 mm_firmware_update_settings_set_fastboot_at (MMFirmwareUpdateSettings *self,
                                              const gchar              *fastboot_at)
@@ -166,6 +175,9 @@ mm_firmware_update_settings_set_fastboot_at (MMFirmwareUpdateSettings *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_firmware_update_settings_get_variant: (skip)
+ */
 GVariant *
 mm_firmware_update_settings_get_variant (MMFirmwareUpdateSettings *self)
 {
@@ -226,6 +238,9 @@ consume_variant (MMFirmwareUpdateSettings  *self,
     return TRUE;
 }
 
+/**
+ * mm_firmware_update_settings_new_from_variant: (skip)
+ */
 MMFirmwareUpdateSettings *
 mm_firmware_update_settings_new_from_variant (GVariant  *variant,
                                               GError   **error)
@@ -290,6 +305,9 @@ mm_firmware_update_settings_new_from_variant (GVariant  *variant,
 
 /*****************************************************************************/
 
+/**
+ * mm_firmware_update_settings_new: (skip)
+ */
 MMFirmwareUpdateSettings *
 mm_firmware_update_settings_new (MMModemFirmwareUpdateMethod method)
 {

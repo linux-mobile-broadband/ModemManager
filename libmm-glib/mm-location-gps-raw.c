@@ -176,6 +176,9 @@ out:
     return ret;
 }
 
+/**
+ * mm_location_gps_raw_add_trace: (skip)
+ */
 gboolean
 mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
                                const gchar *trace)
@@ -265,6 +268,9 @@ mm_location_gps_raw_add_trace (MMLocationGpsRaw *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_raw_get_dictionary: (skip)
+ */
 GVariant *
 mm_location_gps_raw_get_dictionary (MMLocationGpsRaw *self)
 {
@@ -308,6 +314,9 @@ mm_location_gps_raw_get_dictionary (MMLocationGpsRaw *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_raw_new_from_dictionary: (skip)
+ */
 MMLocationGpsRaw *
 mm_location_gps_raw_new_from_dictionary (GVariant *dictionary,
                                          GError **error)
@@ -368,6 +377,9 @@ mm_location_gps_raw_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_raw_new: (skip)
+ */
 MMLocationGpsRaw *
 mm_location_gps_raw_new (void)
 {

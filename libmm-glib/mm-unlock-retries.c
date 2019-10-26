@@ -40,6 +40,9 @@ struct _MMUnlockRetriesPrivate {
 
 /*****************************************************************************/
 
+/**
+ * mm_unlock_retries_set: (skip)
+ */
 void
 mm_unlock_retries_set (MMUnlockRetries *self,
                        MMModemLock lock,
@@ -50,6 +53,9 @@ mm_unlock_retries_set (MMUnlockRetries *self,
                           GUINT_TO_POINTER (retries));
 }
 
+/**
+ * mm_unlock_retries_unset: (skip)
+ */
 void
 mm_unlock_retries_unset (MMUnlockRetries *self,
                          MMModemLock lock)
@@ -87,6 +93,9 @@ mm_unlock_retries_get (MMUnlockRetries *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_unlock_retries_cmp: (skip)
+ */
 gboolean
 mm_unlock_retries_cmp (MMUnlockRetries *a,
                        MMUnlockRetries *b)
@@ -139,6 +148,9 @@ mm_unlock_retries_foreach (MMUnlockRetries *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_unlock_retries_get_dictionary: (skip)
+ */
 GVariant *
 mm_unlock_retries_get_dictionary (MMUnlockRetries *self)
 {
@@ -165,6 +177,9 @@ mm_unlock_retries_get_dictionary (MMUnlockRetries *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_unlock_retries_new_from_dictionary: (skip)
+ */
 MMUnlockRetries *
 mm_unlock_retries_new_from_dictionary (GVariant *dictionary)
 {
@@ -188,6 +203,9 @@ mm_unlock_retries_new_from_dictionary (GVariant *dictionary)
 
 /*****************************************************************************/
 
+/**
+ * mm_unlock_retries_build_string: (skip)
+ */
 gchar *
 mm_unlock_retries_build_string (MMUnlockRetries *self)
 {
@@ -215,6 +233,9 @@ mm_unlock_retries_build_string (MMUnlockRetries *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_unlock_retries_new: (skip)
+ */
 MMUnlockRetries *
 mm_unlock_retries_new (void)
 {

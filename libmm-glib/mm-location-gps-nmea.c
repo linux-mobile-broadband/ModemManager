@@ -119,6 +119,9 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
     return TRUE;
 }
 
+/**
+ * mm_location_gps_nmea_add_trace: (skip)
+ */
 gboolean
 mm_location_gps_nmea_add_trace (MMLocationGpsNmea *self,
                                 const gchar *trace)
@@ -185,6 +188,9 @@ mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_nmea_get_string_variant: (skip)
+ */
 GVariant *
 mm_location_gps_nmea_get_string_variant (MMLocationGpsNmea *self)
 {
@@ -202,6 +208,9 @@ mm_location_gps_nmea_get_string_variant (MMLocationGpsNmea *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_nmea_new_from_string_variant: (skip)
+ */
 MMLocationGpsNmea *
 mm_location_gps_nmea_new_from_string_variant (GVariant *string,
                                               GError **error)
@@ -245,6 +254,9 @@ mm_location_gps_nmea_new_from_string_variant (GVariant *string,
 
 /*****************************************************************************/
 
+/**
+ * mm_location_gps_nmea_new: (skip)
+ */
 MMLocationGpsNmea *
 mm_location_gps_nmea_new (void)
 {

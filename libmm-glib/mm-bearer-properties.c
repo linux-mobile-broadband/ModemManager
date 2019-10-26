@@ -389,6 +389,9 @@ mm_bearer_properties_get_rm_protocol (MMBearerProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_get_dictionary: (skip)
+ */
 GVariant *
 mm_bearer_properties_get_dictionary (MMBearerProperties *self)
 {
@@ -449,6 +452,9 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_consume_string: (skip)
+ */
 gboolean
 mm_bearer_properties_consume_string (MMBearerProperties *self,
                                      const gchar *key,
@@ -533,6 +539,9 @@ key_value_foreach (const gchar *key,
                                                 &ctx->error);
 }
 
+/**
+ * mm_bearer_properties_new_from_string: (skip)
+ */
 MMBearerProperties *
 mm_bearer_properties_new_from_string (const gchar *str,
                                       GError **error)
@@ -558,6 +567,9 @@ mm_bearer_properties_new_from_string (const gchar *str,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_consume_variant: (skip)
+ */
 gboolean
 mm_bearer_properties_consume_variant (MMBearerProperties *properties,
                                       const gchar *key,
@@ -605,6 +617,9 @@ mm_bearer_properties_consume_variant (MMBearerProperties *properties,
     return TRUE;
 }
 
+/**
+ * mm_bearer_properties_new_from_dictionary: (skip)
+ */
 MMBearerProperties *
 mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
                                           GError **error)
@@ -652,6 +667,9 @@ mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_properties_cmp: (skip)
+ */
 gboolean
 mm_bearer_properties_cmp (MMBearerProperties *a,
                           MMBearerProperties *b)

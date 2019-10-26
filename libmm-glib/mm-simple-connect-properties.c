@@ -415,6 +415,9 @@ mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_connect_properties_get_bearer_properties: (skip)
+ */
 MMBearerProperties *
 mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self)
 {
@@ -425,6 +428,9 @@ mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *s
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_connect_properties_get_dictionary: (skip)
+ */
 GVariant *
 mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self)
 {
@@ -504,6 +510,9 @@ key_value_foreach (const gchar *key,
     return !ctx->error;
 }
 
+/**
+ * mm_simple_connect_properties_new_from_string: (skip)
+ */
 MMSimpleConnectProperties *
 mm_simple_connect_properties_new_from_string (const gchar *str,
                                               GError **error)
@@ -530,6 +539,9 @@ mm_simple_connect_properties_new_from_string (const gchar *str,
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_connect_properties_new_from_dictionary: (skip)
+ */
 MMSimpleConnectProperties *
 mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
                                                   GError **error)

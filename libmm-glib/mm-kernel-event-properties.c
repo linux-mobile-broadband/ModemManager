@@ -210,6 +210,9 @@ mm_kernel_event_properties_get_uid (MMKernelEventProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_kernel_event_properties_get_dictionary: (skip)
+ */
 GVariant *
 mm_kernel_event_properties_get_dictionary (MMKernelEventProperties *self)
 {
@@ -294,6 +297,9 @@ key_value_foreach (const gchar          *key,
                            &ctx->error);
 }
 
+/**
+ * mm_kernel_event_properties_new_from_string: (skip)
+ */
 MMKernelEventProperties *
 mm_kernel_event_properties_new_from_string (const gchar  *str,
                                             GError      **error)
@@ -355,6 +361,9 @@ consume_variant (MMKernelEventProperties  *properties,
     return TRUE;
 }
 
+/**
+ * mm_kernel_event_properties_new_from_dictionary: (skip)
+ */
 MMKernelEventProperties *
 mm_kernel_event_properties_new_from_dictionary (GVariant  *dictionary,
                                                 GError   **error)

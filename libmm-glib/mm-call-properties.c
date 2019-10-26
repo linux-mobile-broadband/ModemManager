@@ -211,6 +211,9 @@ mm_call_properties_get_state_reason (MMCallProperties *self)
 
 /*****************************************************************************/
 
+/*
+ * mm_call_properties_get_dictionary: (skip)
+ */
 GVariant *
 mm_call_properties_get_dictionary (MMCallProperties *self)
 {
@@ -270,6 +273,9 @@ key_value_foreach (const gchar *key,
                            &ctx->error);
 }
 
+/*
+ * mm_call_properties_new_from_string: (skip)
+ */
 MMCallProperties *
 mm_call_properties_new_from_string (const gchar *str,
                                     GError **error)
@@ -319,6 +325,9 @@ consume_variant (MMCallProperties *properties,
     return TRUE;
 }
 
+/*
+ * mm_call_properties_new_from_dictionary: (skip)
+ */
 MMCallProperties *
 mm_call_properties_new_from_dictionary (GVariant  *dictionary,
                                         GError   **error)

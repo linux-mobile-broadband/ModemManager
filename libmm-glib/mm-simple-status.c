@@ -358,6 +358,9 @@ mm_simple_status_get_cdma_nid (MMSimpleStatus *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_status_get_dictionary: (skip)
+ */
 GVariant *
 mm_simple_status_get_dictionary (MMSimpleStatus *self)
 {
@@ -434,6 +437,9 @@ mm_simple_status_get_dictionary (MMSimpleStatus *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_status_new_from_dictionary: (skip)
+ */
 MMSimpleStatus *
 mm_simple_status_new_from_dictionary (GVariant *dictionary,
                                       GError **error)
@@ -512,6 +518,9 @@ mm_simple_status_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_status_new: (skip)
+ */
 MMSimpleStatus *
 mm_simple_status_new (void)
 {

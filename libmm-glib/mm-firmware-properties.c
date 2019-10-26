@@ -119,6 +119,9 @@ mm_firmware_properties_get_gobi_pri_version (MMFirmwareProperties *self)
     return self->priv->gobi_pri_version;
 }
 
+/*
+ * mm_firmware_properties_set_gobi_pri_version: (skip)
+ */
 void
 mm_firmware_properties_set_gobi_pri_version (MMFirmwareProperties *self,
                                              const gchar *version)
@@ -152,6 +155,9 @@ mm_firmware_properties_get_gobi_pri_info (MMFirmwareProperties *self)
     return self->priv->gobi_pri_info;
 }
 
+/*
+ * mm_firmware_properties_set_gobi_pri_info: (skip)
+ */
 void
 mm_firmware_properties_set_gobi_pri_info (MMFirmwareProperties *self,
                                           const gchar *info)
@@ -184,6 +190,9 @@ mm_firmware_properties_get_gobi_boot_version (MMFirmwareProperties *self)
     return self->priv->gobi_boot_version;
 }
 
+/*
+ * mm_firmware_properties_set_gobi_boot_version: (skip)
+ */
 void
 mm_firmware_properties_set_gobi_boot_version (MMFirmwareProperties *self,
                                               const gchar *version)
@@ -218,6 +227,9 @@ mm_firmware_properties_get_gobi_pri_unique_id (MMFirmwareProperties *self)
     return self->priv->gobi_pri_unique_id;
 }
 
+/*
+ * mm_firmware_properties_set_gobi_pri_unique_id: (skip)
+ */
 void
 mm_firmware_properties_set_gobi_pri_unique_id (MMFirmwareProperties *self,
                                                const gchar *unique_id)
@@ -252,6 +264,9 @@ mm_firmware_properties_get_gobi_modem_unique_id (MMFirmwareProperties *self)
     return self->priv->gobi_modem_unique_id;
 }
 
+/*
+ * mm_firmware_properties_set_gobi_modem_unique_id: (skip)
+ */
 void
 mm_firmware_properties_set_gobi_modem_unique_id (MMFirmwareProperties *self,
                                                  const gchar *unique_id)
@@ -265,6 +280,9 @@ mm_firmware_properties_set_gobi_modem_unique_id (MMFirmwareProperties *self,
 
 /*****************************************************************************/
 
+/*
+ * mm_firmware_properties_get_dictionary: (skip)
+ */
 GVariant *
 mm_firmware_properties_get_dictionary (MMFirmwareProperties *self)
 {
@@ -361,6 +379,9 @@ consume_variant (MMFirmwareProperties *self,
     return TRUE;
 }
 
+/*
+ * mm_firmware_properties_new_from_dictionary: (skip)
+ */
 MMFirmwareProperties *
 mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
                                             GError **error)
@@ -425,6 +446,9 @@ mm_firmware_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
+/*
+ * mm_firmware_properties_new: (skip)
+ */
 MMFirmwareProperties *
 mm_firmware_properties_new (MMFirmwareImageType image_type,
                             const gchar *unique_id)
