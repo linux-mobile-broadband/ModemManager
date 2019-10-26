@@ -255,15 +255,7 @@ mm_pco_list_free (GList *pco_list)
 }
 
 /**
- * mm_pco_list_add:
- * @pco_list: (transfer full)(element-type ModemManager.Pco): a #GList of #MMPco.
- * @pco: (transfer none): a #MMPco to add to the given list.
- *
- * Adds a #MMPco to a given PCO list. #MMPco objects stored in the order of
- * their session ID. An existing PCO with the same session ID is overwritten
- * with the new value.
- *
- * Returns: (transfer full)(element-type ModemManager.Pco): the new start of an updated or newly allocated #GList of #MMPco.
+ * mm_pco_list_add: (skip)
  */
 GList *
 mm_pco_list_add (GList *pco_list,

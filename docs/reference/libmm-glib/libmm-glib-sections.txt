@@ -1417,7 +1417,6 @@ mm_pco_get_session_id
 mm_pco_is_complete
 mm_pco_get_data
 <SUBSECTION List>
-mm_pco_list_add
 mm_pco_list_free
 <SUBSECTION Private>
 mm_pco_new
@@ -1426,6 +1425,7 @@ mm_pco_to_variant
 mm_pco_set_session_id
 mm_pco_set_complete
 mm_pco_set_data
+mm_pco_list_add
 <SUBSECTION Standard>
 MMPcoClass
 MMPcoPrivate
