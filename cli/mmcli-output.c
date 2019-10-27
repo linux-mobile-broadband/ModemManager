@@ -960,8 +960,10 @@ dump_output_keyvalue (void)
 
             n = multiple->values ? g_strv_length (multiple->values) : 0;
             if (n > 0) {
+                guint aux = n;
+
                 key_length += ((strlen (KEY_ARRAY_VALUE_SUFFIX)) + 3);
-                if (n > 10)
+                while ((aux /= 10) > 0)
                     key_length++;
             }
         }
