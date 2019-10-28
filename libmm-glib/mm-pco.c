@@ -246,6 +246,8 @@ mm_pco_to_variant (MMPco *self)
 
 /*****************************************************************************/
 
+#ifndef MM_DISABLE_DEPRECATED
+
 /**
  * mm_pco_list_free:
  * @pco_list: (transfer full)(element-type ModemManager.Pco): a #GList of
@@ -254,12 +256,16 @@ mm_pco_to_variant (MMPco *self)
  * Frees all of the memory used by a #GList of #MMPco.
  *
  * Since: 1.10
+ * Deprecated: 1.12.0: Use g_list_free_full() using g_object_unref() as
+ * #GDestroyNotify function instead.
  */
 void
 mm_pco_list_free (GList *pco_list)
 {
     g_list_free_full (pco_list, g_object_unref);
 }
+
+#endif /* MM_DISABLE_DEPRECATED */
 
 /**
  * mm_pco_list_add: (skip)

@@ -353,10 +353,9 @@ mm_modem_3gpp_get_eps_ue_mode_operation (MMModem3gpp *self)
  *
  * Get the list of #MMPco received from the network.
  *
- * The caller is responsible for freeing the returned #GList with
- * mm_pco_list_free().
- *
- * Returns: (element-type ModemManager.Pco) (transfer full): A list of #MMPco.
+ * Returns: (transfer full) (element-type ModemManager.Pco): a list of #MMPco
+ * objects, or #NULL if @error is set. The returned value should be freed with
+ * g_list_free_full() using g_object_unref() as #GDestroyNotify function.
  *
  * Since: 1.10
  */
