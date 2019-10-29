@@ -83,7 +83,7 @@ static const guint band_utran_index[] = {
 #define MM_MODEM_BAND_TELIT_3G_LAST  MM_MODEM_BAND_UTRAN_19
 
 #define B3G_NUM(band) band_utran_index[band]
-#define B3G_FLAG(band) ((B3G_NUM (band) > 0) ? (1 << (B3G_NUM (band) - B3G_NUM (MM_MODEM_BAND_TELIT_3G_FIRST))) : 0)
+#define B3G_FLAG(band) ((B3G_NUM (band) > 0) ? (1LL << (B3G_NUM (band) - B3G_NUM (MM_MODEM_BAND_TELIT_3G_FIRST))) : 0)
 
 /* Index of the arrays is the telit 3G band value.
  * The bitmask value here is built from the 3G MMModemBand values right away.
@@ -93,10 +93,10 @@ static const guint band_utran_index[] = {
  */
 
 #define TELIT_3G_TO_MM_BAND_MASK_DEFAULT_N_ELEMENTS 27
-static guint32 telit_3g_to_mm_band_mask_default[TELIT_3G_TO_MM_BAND_MASK_DEFAULT_N_ELEMENTS];
+static guint64 telit_3g_to_mm_band_mask_default[TELIT_3G_TO_MM_BAND_MASK_DEFAULT_N_ELEMENTS];
 
 #define TELIT_3G_TO_MM_BAND_MASK_ALTERNATE_N_ELEMENTS 20
-static guint32 telit_3g_to_mm_band_mask_alternate[TELIT_3G_TO_MM_BAND_MASK_ALTERNATE_N_ELEMENTS];
+static guint64 telit_3g_to_mm_band_mask_alternate[TELIT_3G_TO_MM_BAND_MASK_ALTERNATE_N_ELEMENTS];
 
 static void
 initialize_telit_3g_to_mm_band_masks (void)
@@ -198,14 +198,14 @@ mm_telit_build_bnd_request (GArray    *bands_array,
                             GError   **error)
 {
     guint32        mask2g = 0;
-    guint32        mask3g = 0;
+    guint64        mask3g = 0;
     guint64        mask4g = 0;
     guint          i;
     gint           flag2g = -1;
     gint           flag3g = -1;
     gint           flag4g = -1;
     gchar         *cmd;
-    const guint32 *telit_3g_to_mm_band_mask;
+    const guint64 *telit_3g_to_mm_band_mask;
     guint          telit_3g_to_mm_band_mask_n_elements;
 
     initialize_telit_3g_to_mm_band_masks ();
@@ -229,7 +229,8 @@ mm_telit_build_bnd_request (GArray    *bands_array,
             (band >= MM_MODEM_BAND_TELIT_2G_FIRST) && (band <= MM_MODEM_BAND_TELIT_2G_LAST))
             mask2g += B2G_FLAG (band);
 
-        /* Convert 3G bands into a bitmask, to match against telit_3g_to_mm_band_mask. */
+        /* Convert 3G bands into a bitmask, to match against telit_3g_to_mm_band_mask. We use
+         * a 64-bit explicit bitmask so that all values fit correctly. */
         if (flag3g && mm_common_band_is_utran (band) &&
             (B3G_NUM (band) >= B3G_NUM (MM_MODEM_BAND_TELIT_3G_FIRST)) && (B3G_NUM (band) <= B3G_NUM (MM_MODEM_BAND_TELIT_3G_LAST)))
             mask3g += B3G_FLAG (band);
@@ -429,7 +430,7 @@ telit_get_3g_mm_bands (GMatchInfo  *match_info,
     GArray        *values = NULL;
     gchar         *match_str = NULL;
     guint          i;
-    const guint32 *telit_3g_to_mm_band_mask;
+    const guint64 *telit_3g_to_mm_band_mask;
     guint          telit_3g_to_mm_band_mask_n_elements;
 
     initialize_telit_3g_to_mm_band_masks ();
