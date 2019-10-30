@@ -1,4 +1,42 @@
 
+ModemManager 1.10.8
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * Polkit policy:
+   ** Added several missing methods to the policy rules.
+   ** Use the explicit Firmware policy for all firmware operations.
+   ** Updated USSD policy to require user authentication in strict mode.
+
+ * systemd service:
+   ** Always start after polkit service when policy control is enabled.
+
+ * Broadband modem:
+   ** Fix signal quality reporting when +CSQ is used.
+
+ * 3GPP:
+   ** Fix reporting 'denied' registration state.
+
+ * QMI:
+   ** Fixed NAS SSP support check during supported capability loading.
+
+ * Simple interface:
+   ** Allow one single ongoing Connect() attempt.
+   ** Fixed Disconnect() when an explicit bearer path is given.
+
+ * mmcli:
+   ** Fixed key-value output when printing array with 10 elements.
+
+ * Plugins:
+   ** simtech: added port type hints for the SIM7000/SIM7600 family.
+   ** x22x: added support for the Alcatel X602D.
+   ** telit: increased timeout for AT#REBOOT.
+   ** quectel: fixed port type hints for the EG91.
+   ** quectel: added port type hints for the BG96.
+
+
 ModemManager 1.10.6
 -------------------------------------------
 This is a new bugfix release of ModemManager.
