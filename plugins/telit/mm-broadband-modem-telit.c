@@ -334,8 +334,8 @@ location_load_capabilities_finish (MMIfaceModemLocation *self,
 
 static void
 gpsp_test_ready (MMIfaceModemLocation *self,
-                GAsyncResult *res,
-                GTask *task)
+                 GAsyncResult *res,
+                 GTask *task)
 {
     GError *error = NULL;
     MMModemLocationSource sources;
@@ -349,7 +349,7 @@ gpsp_test_ready (MMIfaceModemLocation *self,
     else
         mm_dbg ("telit: GPS controller not supported: %s", error->message);
 
-    g_clear_error(&error);
+    g_clear_error (&error);
     g_task_return_int (task, sources);
     g_object_unref (task);
 }
