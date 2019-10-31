@@ -342,14 +342,14 @@ gpsp_test_ready (MMIfaceModemLocation *self,
 
     sources = GPOINTER_TO_UINT (g_task_get_task_data (task));
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!error && mm_base_modem_get_port_gps (MM_BASE_MODEM (self)))
+    if (error) {
+        mm_dbg ("telit: GPS controller not supported: %s", error->message);
+        g_clear_error (&error);
+    } else if (mm_base_modem_get_port_gps (MM_BASE_MODEM (self)))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
                     MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
-    else
-        mm_dbg ("telit: GPS controller not supported: %s", error->message);
 
-    g_clear_error (&error);
     g_task_return_int (task, sources);
     g_object_unref (task);
 }
