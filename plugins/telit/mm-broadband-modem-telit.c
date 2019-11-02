@@ -202,8 +202,7 @@ gps_enabled_ready (MMBaseModem *self,
                                          "Couldn't open raw GPS serial port");
         } else
             g_task_return_boolean (task, TRUE);
-    }
-    else
+    } else
         g_task_return_boolean (task, TRUE);
 
     g_object_unref (task);
