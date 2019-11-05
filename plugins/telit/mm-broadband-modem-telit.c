@@ -75,6 +75,19 @@ typedef struct {
     gint gps_enable_step;
 } LocationGatheringContext;
 
+/*
+ * AT$GPSNMUN
+ *    enable:  0 NMEA stream disabled (default)
+ *             1 NMEA stream enabled in the form $GPSNMUN: <nmea sentence><CR>
+ *             2 NMEA stream enabled in the form <nmea sentence><CR>
+ *             3 dedicated NMEA stream
+ *    GGA:     0 disable (default), 1 enable
+ *    GLL:     0 disable (default), 1 enable
+ *    GSA:     0 disable (default), 1 enable
+ *    GSV:     0 disable (default), 1 enable
+ *    RMC:     0 disable (default), 1 enable
+ *    VTG:     0 disable (default), 1 enable
+ */
 static const gchar *gps_enable[] = {
     "$GPSP=1",
     "$GPSNMUN=2,1,1,1,1,1,1"
