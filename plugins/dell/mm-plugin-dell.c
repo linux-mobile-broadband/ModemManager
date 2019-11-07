@@ -399,7 +399,7 @@ create_modem (MMPlugin *self,
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
         /* Specific implementation for the DW5821e */
-        if (vendor == 0x413c && product == 0x81d7) {
+        if (vendor == 0x413c && (product == 0x81d7 || product == 0x81e0)) {
             mm_dbg ("MBIM-powered DW5821e modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_dell_dw5821e_new (uid,
                                                                        drivers,
