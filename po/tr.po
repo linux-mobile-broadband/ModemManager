@@ -1,14 +1,14 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
-# Emin Tufan Çetin <etcetin@gmail.com>, 2018.
+# Turkish translation for ModemManager.
+# Copyright (C) 2017-2019 the ModemManager authors.
+# This file is distributed under the same license as the ModemManager package.
+# Emin Tufan Çetin <etcetin@gmail.com>, 2018, 2019.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
-"PO-Revision-Date: 2018-06-23 18:53+0300\n"
+"POT-Creation-Date: 2019-11-11 10:01+0100\n"
+"PO-Revision-Date: 2019-11-10 09:05+0300\n"
 "Last-Translator: Emin Tufan Çetin <etcetin@gmail.com>\n"
 "Language-Team: Türkçe <gnome-turk@gnome.org>\n"
 "Language: tr\n"
@@ -45,7 +45,7 @@ msgstr "Mobil geniş bant kişileri ekle, düzenle ve sil"
 msgid ""
 "System policy prevents adding, modifying, or deleting this device's contacts."
 msgstr ""
-"Sistem ilkesi bu aygıtın kişilerini eklemeyi, düzenlemeyi veya silmeyi "
+"Sistem ilkesi bu aygıtın kişi eklemesini, düzenlemesini veya silmesini "
 "engelliyor."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:40
@@ -56,7 +56,7 @@ msgstr "Metin ileti gönder, kaydet, düzenle ve sil"
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
 msgstr ""
-"Sistem ilkesi bu aygıtın metin iletilerini göndermeyi veya işlemeyi "
+"Sistem ilkesi bu aygıtın metin iletiler göndermesini veya işlemesini "
 "engelliyor."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:49
@@ -69,14 +69,11 @@ msgstr "Sistem ilkesi sesli çağrıları engelliyor."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Ağ zaman ve saat dilimi bilgisini sorgula"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
-msgstr ""
-"Sistem ilkesi ağ bilgisini ve hizmetleri sorgulamayı veya yararlanmayı "
-"engelliyor."
+msgstr "Sistem ilkesi ağ zaman bilgisini sorgulamayı engelliyor."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
