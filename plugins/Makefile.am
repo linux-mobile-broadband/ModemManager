@@ -299,6 +299,21 @@ XMM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/xmm
 XMM_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-xmm.la
 
 ################################################################################
+# common foxconn support
+################################################################################
+
+# Common Foxconn modem support library (MBIM only)
+if WITH_MBIM
+noinst_LTLIBRARIES += libmm-utils-foxconn.la
+libmm_utils_foxconn_la_SOURCES = \
+	foxconn/mm-broadband-modem-foxconn-t77w968.c \
+	foxconn/mm-broadband-modem-foxconn-t77w968.h \
+	$(NULL)
+FOXCONN_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/foxconn
+FOXCONN_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-foxconn.la
+endif
+
+################################################################################
 # plugin: generic
 ################################################################################
 
@@ -814,6 +829,28 @@ libmm_plugin_novatel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_novatel_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS)
 
 ################################################################################
+# plugin: foxconn
+################################################################################
+
+pkglib_LTLIBRARIES += libmm-plugin-foxconn.la
+libmm_plugin_foxconn_la_SOURCES = \
+	foxconn/mm-plugin-foxconn.c \
+	foxconn/mm-plugin-foxconn.h \
+	$(NULL)
+libmm_plugin_foxconn_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(FOXCONN_COMMON_COMPILER_FLAGS)
+libmm_plugin_foxconn_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_foxconn_la_LIBADD   = $(FOXCONN_COMMON_LIBADD_FLAGS)
+
+dist_udevrules_DATA += foxconn/77-mm-foxconn-port-types.rules
+
+dist_pkgdata_DATA += foxconn/mm-foxconn-t77w968-carrier-mapping.conf
+
+AM_CFLAGS += \
+	-DTESTUDEVRULESDIR_FOXCONN=\"${srcdir}/foxconn\" \
+	-DTESTKEYFILE_FOXCONN_T77W968=\"${srcdir}/foxconn/mm-foxconn-t77w968-carrier-mapping.conf\" \
+	$(NULL)
+
+################################################################################
 # plugin: altair lte
 ################################################################################
 
@@ -1081,7 +1118,7 @@ libmm_plugin_ublox_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_ublox_la_LIBADD   = $(builddir)/libhelpers-ublox.la
 
 ################################################################################
-# plugin: dell (novatel, sierra or telit)
+# plugin: dell (novatel, sierra, telit or foxconn)
 ################################################################################
 
 pkglib_LTLIBRARIES += libmm-plugin-dell.la
@@ -1090,13 +1127,6 @@ libmm_plugin_dell_la_SOURCES = \
 	dell/mm-plugin-dell.h \
 	$(NULL)
 
-if WITH_MBIM
-libmm_plugin_dell_la_SOURCES += \
-	dell/mm-broadband-modem-dell-dw5821e.h \
-	dell/mm-broadband-modem-dell-dw5821e.c \
-	$(NULL)
-endif
-
 libmm_plugin_dell_la_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS) \
 	$(NOVATEL_COMMON_COMPILER_FLAGS) \
@@ -1104,6 +1134,7 @@ libmm_plugin_dell_la_CPPFLAGS = \
 	$(TELIT_COMMON_COMPILER_FLAGS) \
 	$(XMM_COMMON_COMPILER_FLAGS) \
 	$(MBM_COMMON_COMPILER_FLAGS) \
+	$(FOXCONN_COMMON_COMPILER_FLAGS) \
 	$(NULL)
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_dell_la_LIBADD = \
@@ -1112,15 +1143,13 @@ libmm_plugin_dell_la_LIBADD = \
 	$(TELIT_COMMON_LIBADD_FLAGS) \
 	$(XMM_COMMON_LIBADD_FLAGS) \
 	$(MBM_COMMON_LIBADD_FLAGS) \
+	$(FOXCONN_COMMON_LIBADD_FLAGS) \
 	$(NULL)
 
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
 
-dist_pkgdata_DATA += dell/mm-dell-dw5821e-carrier-mapping.conf
-
 AM_CFLAGS += \
 	-DTESTUDEVRULESDIR_DELL=\"${srcdir}/dell\" \
-	-DTESTKEYFILE_DELL_DW5821E=\"${srcdir}/dell/mm-dell-dw5821e-carrier-mapping.conf\" \
 	$(NULL)
 
 ################################################################################

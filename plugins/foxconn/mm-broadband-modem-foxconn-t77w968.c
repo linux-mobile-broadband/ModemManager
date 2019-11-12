@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2018-2019 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -32,7 +32,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
-#include "mm-broadband-modem-dell-dw5821e.h"
+#include "mm-broadband-modem-foxconn-t77w968.h"
 
 #if defined WITH_QMI
 # include "mm-iface-modem-firmware.h"
@@ -47,7 +47,7 @@ static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 
 static MMIfaceModemLocation *iface_modem_location_parent;
 
-G_DEFINE_TYPE_EXTENDED (MMBroadbandModemDellDw5821e, mm_broadband_modem_dell_dw5821e, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemFoxconnT77w968, mm_broadband_modem_foxconn_t77w968, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
 #if defined WITH_QMI
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
 #endif
@@ -59,7 +59,7 @@ typedef enum {
     FEATURE_SUPPORTED
 } FeatureSupport;
 
-struct _MMBroadbandModemDellDw5821ePrivate {
+struct _MMBroadbandModemFoxconnT77w968Private {
     FeatureSupport unmanaged_gps_support;
 };
 
@@ -82,17 +82,17 @@ firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
 }
 
 static void
-dell_get_firmware_version_ready (QmiClientDms *client,
-                                 GAsyncResult *res,
-                                 GTask        *task)
+foxconn_get_firmware_version_ready (QmiClientDms *client,
+                                    GAsyncResult *res,
+                                    GTask        *task)
 {
-    QmiMessageDmsDellGetFirmwareVersionOutput *output;
-    GError                                    *error = NULL;
-    MMFirmwareUpdateSettings                  *update_settings = NULL;
-    const gchar                               *str;
+    QmiMessageDmsFoxconnGetFirmwareVersionOutput *output;
+    GError                                       *error = NULL;
+    MMFirmwareUpdateSettings                     *update_settings = NULL;
+    const gchar                                  *str;
 
-    output = qmi_client_dms_dell_get_firmware_version_finish (client, res, &error);
-    if (!output || !qmi_message_dms_dell_get_firmware_version_output_get_result (output, &error))
+    output = qmi_client_dms_foxconn_get_firmware_version_finish (client, res, &error);
+    if (!output || !qmi_message_dms_foxconn_get_firmware_version_output_get_result (output, &error))
         goto out;
 
     /* Create update settings now */
@@ -100,7 +100,7 @@ dell_get_firmware_version_ready (QmiClientDms *client,
                                                        MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC);
     mm_firmware_update_settings_set_fastboot_at (update_settings, "AT^FASTBOOT");
 
-    qmi_message_dms_dell_get_firmware_version_output_get_version (output, &str, NULL);
+    qmi_message_dms_foxconn_get_firmware_version_output_get_version (output, &str, NULL);
     mm_firmware_update_settings_set_version (update_settings, str);
 
  out:
@@ -112,7 +112,7 @@ dell_get_firmware_version_ready (QmiClientDms *client,
     }
     g_object_unref (task);
     if (output)
-        qmi_message_dms_dell_get_firmware_version_output_unref (output);
+        qmi_message_dms_foxconn_get_firmware_version_output_unref (output);
 }
 
 static void
@@ -120,9 +120,9 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
                                GAsyncReadyCallback   callback,
                                gpointer              user_data)
 {
-    GTask                                    *task;
-    QmiMessageDmsDellGetFirmwareVersionInput *input = NULL;
-    QmiClient                                *client = NULL;
+    GTask                                       *task;
+    QmiMessageDmsFoxconnGetFirmwareVersionInput *input = NULL;
+    QmiClient                                   *client = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -132,22 +132,24 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
                                         NULL);
     if (!client) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Unable to load DW5821e version info: no QMI DMS client available");
+                                 "Unable to load T77w968 version info: no QMI DMS client available");
         g_object_unref (task);
         return;
     }
 
-    input = qmi_message_dms_dell_get_firmware_version_input_new ();
-    qmi_message_dms_dell_get_firmware_version_input_set_version_type (input,
-                                                                      QMI_DMS_DELL_FIRMWARE_VERSION_TYPE_FIRMWARE_MCFG,
-                                                                      NULL);
-    qmi_client_dms_dell_get_firmware_version (QMI_CLIENT_DMS (client),
-                                              input,
-                                              10,
-                                              NULL,
-                                              (GAsyncReadyCallback)dell_get_firmware_version_ready,
-                                              task);
-    qmi_message_dms_dell_get_firmware_version_input_unref (input);
+    input = qmi_message_dms_foxconn_get_firmware_version_input_new ();
+    qmi_message_dms_foxconn_get_firmware_version_input_set_version_type (
+        input,
+        QMI_DMS_FOXCONN_FIRMWARE_VERSION_TYPE_FIRMWARE_MCFG,
+        NULL);
+    qmi_client_dms_foxconn_get_firmware_version (
+        QMI_CLIENT_DMS (client),
+        input,
+        10,
+        NULL,
+        (GAsyncReadyCallback)foxconn_get_firmware_version_ready,
+        task);
+    qmi_message_dms_foxconn_get_firmware_version_input_unref (input);
 }
 
 #endif
@@ -189,7 +191,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
     /* If we have a GPS port and an AT port, enable unmanaged GPS support */
     if (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)) &&
         mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
-        MM_BROADBAND_MODEM_DELL_DW5821E (self)->priv->unmanaged_gps_support = FEATURE_SUPPORTED;
+        MM_BROADBAND_MODEM_FOXCONN_T77W968 (self)->priv->unmanaged_gps_support = FEATURE_SUPPORTED;
         sources |= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
     }
 
@@ -248,9 +250,9 @@ parent_disable_location_gathering (GTask *task)
     source = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
     iface_modem_location_parent->disable_location_gathering (self,
-                                                            source,
-                                                            (GAsyncReadyCallback)parent_disable_location_gathering_ready,
-                                                            task);
+							     source,
+							     (GAsyncReadyCallback)parent_disable_location_gathering_ready,
+							     task);
 }
 
 static void
@@ -275,8 +277,8 @@ disable_location_gathering (MMIfaceModemLocation  *_self,
                             GAsyncReadyCallback    callback,
                             gpointer               user_data)
 {
-    MMBroadbandModemDellDw5821e *self = MM_BROADBAND_MODEM_DELL_DW5821E (_self);
-    GTask                       *task;
+    MMBroadbandModemFoxconnT77w968 *self = MM_BROADBAND_MODEM_FOXCONN_T77W968 (_self);
+    GTask                          *task;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, GUINT_TO_POINTER (source), NULL);
@@ -326,9 +328,9 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
                                         GAsyncResult         *res,
                                         GTask                *task)
 {
-    MMBroadbandModemDellDw5821e *self = MM_BROADBAND_MODEM_DELL_DW5821E (_self);
-    GError                      *error = NULL;
-    MMModemLocationSource        source;
+    MMBroadbandModemFoxconnT77w968 *self = MM_BROADBAND_MODEM_FOXCONN_T77W968 (_self);
+    GError                         *error = NULL;
+    MMModemLocationSource           source;
 
     if (!iface_modem_location_parent->enable_location_gathering_finish (_self, res, &error)) {
         g_task_return_error (task, error);
@@ -373,14 +375,14 @@ enable_location_gathering (MMIfaceModemLocation  *self,
 
 /*****************************************************************************/
 
-MMBroadbandModemDellDw5821e *
-mm_broadband_modem_dell_dw5821e_new (const gchar  *device,
-                                     const gchar **drivers,
-                                     const gchar  *plugin,
-                                     guint16       vendor_id,
-                                     guint16       product_id)
+MMBroadbandModemFoxconnT77w968 *
+mm_broadband_modem_foxconn_t77w968_new (const gchar  *device,
+                                        const gchar **drivers,
+                                        const gchar  *plugin,
+                                        guint16       vendor_id,
+                                        guint16       product_id)
 {
-    return g_object_new (MM_TYPE_BROADBAND_MODEM_DELL_DW5821E,
+    return g_object_new (MM_TYPE_BROADBAND_MODEM_FOXCONN_T77W968,
                          MM_BASE_MODEM_DEVICE,     device,
                          MM_BASE_MODEM_DRIVERS,    drivers,
                          MM_BASE_MODEM_PLUGIN,     plugin,
@@ -390,15 +392,15 @@ mm_broadband_modem_dell_dw5821e_new (const gchar  *device,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED,             FALSE,
                          MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      TRUE,
                          MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS, TRUE,
-                         MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,              PKGDATADIR "/mm-dell-dw5821e-carrier-mapping.conf",
+                         MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,              PKGDATADIR "/mm-foxconn-t77w968-carrier-mapping.conf",
                          NULL);
 }
 
 static void
-mm_broadband_modem_dell_dw5821e_init (MMBroadbandModemDellDw5821e *self)
+mm_broadband_modem_foxconn_t77w968_init (MMBroadbandModemFoxconnT77w968 *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BROADBAND_MODEM_DELL_DW5821E, MMBroadbandModemDellDw5821ePrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BROADBAND_MODEM_FOXCONN_T77W968, MMBroadbandModemFoxconnT77w968Private);
     self->priv->unmanaged_gps_support = FEATURE_SUPPORT_UNKNOWN;
 }
 
@@ -427,9 +429,9 @@ iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 #endif
 
 static void
-mm_broadband_modem_dell_dw5821e_class_init (MMBroadbandModemDellDw5821eClass *klass)
+mm_broadband_modem_foxconn_t77w968_class_init (MMBroadbandModemFoxconnT77w968Class *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMBroadbandModemDellDw5821ePrivate));
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemFoxconnT77w968Private));
 }

@@ -43,9 +43,9 @@ common_test (const gchar *keyfile_path)
 /************************************************************/
 
 static void
-test_dell_dw5821e (void)
+test_foxconn_t77w968 (void)
 {
-    common_test (TESTKEYFILE_DELL_DW5821E);
+    common_test (TESTKEYFILE_FOXCONN_T77W968);
 }
 
 /************************************************************/
@@ -76,7 +76,7 @@ int main (int argc, char **argv)
 
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/test-keyfiles/dell/dw5821e", test_dell_dw5821e);
+    g_test_add_func ("/MM/test-keyfiles/foxconn/t77w968", test_foxconn_t77w968);
 
     return g_test_run ();
 }

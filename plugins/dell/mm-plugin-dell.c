@@ -16,7 +16,7 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
- * Copyright (C) 2015 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2015-2019 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <string.h>
@@ -45,7 +45,7 @@
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
 #include "mm-broadband-modem-mbim-xmm.h"
-#include "mm-broadband-modem-dell-dw5821e.h"
+#include "mm-broadband-modem-foxconn-t77w968.h"
 #endif
 
 #define MAX_PORT_PROBE_TIMEOUTS 3
@@ -400,12 +400,12 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_has_mbim_port (probes)) {
         /* Specific implementation for the DW5821e */
         if (vendor == 0x413c && (product == 0x81d7 || product == 0x81e0)) {
-            mm_dbg ("MBIM-powered DW5821e modem found...");
-            return MM_BASE_MODEM (mm_broadband_modem_dell_dw5821e_new (uid,
-                                                                       drivers,
-                                                                       mm_plugin_get_name (self),
-                                                                       vendor,
-                                                                       product));
+            mm_dbg ("MBIM-powered DW5821e (T77W968) modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_foxconn_t77w968_new (uid,
+                                                                          drivers,
+                                                                          mm_plugin_get_name (self),
+                                                                          vendor,
+                                                                          product));
         }
 
         if (mm_port_probe_list_is_xmm (probes)) {
