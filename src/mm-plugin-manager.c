@@ -812,6 +812,15 @@ device_context_complete (DeviceContext *device_context)
 {
     GTask *task;
 
+    /* If the context is completed before the minimum probing time, we need to wait
+     * until that happens, so that we give enough time to udev/hotplug to report the
+     * new port additions. */
+    if (device_context->min_probing_time_id) {
+        mm_dbg ("[plugin manager] task %s: all port probings completed, but not reached min probing time yet",
+                device_context->name);
+        return;
+    }
+
     /* Steal the task from the context */
     g_assert (device_context->task);
     task = device_context->task;
@@ -831,15 +840,8 @@ device_context_complete (DeviceContext *device_context)
         device_context->released_id = 0;
     }
 
-    /* Remove timeouts, if still around */
-    if (device_context->min_wait_time_id) {
-        g_source_remove (device_context->min_wait_time_id);
-        device_context->min_wait_time_id = 0;
-    }
-    if (device_context->min_probing_time_id) {
-        g_source_remove (device_context->min_probing_time_id);
-        device_context->min_probing_time_id = 0;
-    }
+    /* On completion, the minimum wait time must have been already elapsed */
+    g_assert (!device_context->min_wait_time_id);
 
     /* Task completion */
     if (!device_context->best_plugin)
