@@ -681,6 +681,10 @@ port_context_new (MMPluginManager *self,
  * (needs to be > MIN_WAIT_TIME_MSECS!!) */
 #define MIN_PROBING_TIME_MSECS 2500
 
+/* Additional time to wait for other ports to appear after the last port is
+ * exposed in the system. */
+#define EXTRA_PROBING_TIME_MSECS 1500
+
 /* The wait time we define must always be less than the probing time */
 G_STATIC_ASSERT (MIN_WAIT_TIME_MSECS < MIN_PROBING_TIME_MSECS);
 
@@ -720,10 +724,17 @@ struct _DeviceContext {
     /* Port support check contexts waiting to be run after min wait time */
     GList *wait_port_contexts;
 
-    /* Minimum probing_time. The device support check task cannot be finished
-     * before this timeout expires. Once the timeout is expired, the id is reset
-     * to 0. */
+    /* Minimum probing time, which is a timeout initialized as soon as the first
+     * port is added to the device context. The device support check task cannot
+     * be finished before this timeout expires. Once the timeout is expired, the
+     * id is reset to 0. */
     guint min_probing_time_id;
+
+    /* Extra probing time, which is a timeout refreshed every time a new port
+     * is added to the device context. The device support check task cannot be
+     * finished before this timeout expires. Once the timeout is expired, the id
+     * is reset to 0. */
+    guint extra_probing_time_id;
 
     /* Signal connection ids for the grabbed/released signals from the device.
      * These are the signals that will give us notifications of what ports are
@@ -745,6 +756,7 @@ device_context_unref (DeviceContext *device_context)
         g_assert (!device_context->released_id);
         g_assert (!device_context->min_wait_time_id);
         g_assert (!device_context->min_probing_time_id);
+        g_assert (!device_context->extra_probing_time_id);
         g_assert (!device_context->port_contexts);
 
         /* The device support check task must have been completed previously */
@@ -816,11 +828,19 @@ device_context_complete (DeviceContext *device_context)
 {
     GTask *task;
 
-    /* If the context is completed before the minimum probing time, we need to wait
+    /* If the context is completed before the 2500ms minimum probing time, we need to wait
      * until that happens, so that we give enough time to udev/hotplug to report the
      * new port additions. */
     if (device_context->min_probing_time_id) {
         mm_dbg ("[plugin manager] task %s: all port probings completed, but not reached min probing time yet",
+                device_context->name);
+        return;
+    }
+
+    /* If the context is completed less than 1500ms before the last port was exposed,
+     * wait some more. */
+    if (device_context->extra_probing_time_id) {
+        mm_dbg ("[plugin manager] task %s: all port probings completed, but not reached extra probing time yet",
                 device_context->name);
         return;
     }
@@ -1077,6 +1097,18 @@ device_context_min_probing_time_elapsed (DeviceContext *device_context)
     return G_SOURCE_REMOVE;
 }
 
+static gboolean
+device_context_extra_probing_time_elapsed (DeviceContext *device_context)
+{
+    device_context->extra_probing_time_id = 0;
+
+    mm_dbg ("[plugin manager] task %s: extra probing time elapsed", device_context->name);
+
+    /* Wakeup the device context logic */
+    device_context_continue (device_context);
+    return G_SOURCE_REMOVE;
+}
+
 static void
 device_context_run_port_context (DeviceContext *device_context,
                                  PortContext   *port_context)
@@ -1208,6 +1240,13 @@ device_context_port_grabbed (DeviceContext  *device_context,
         return;
     }
 
+    /* Refresh the extra probing timeout. */
+    if (device_context->extra_probing_time_id)
+        g_source_remove (device_context->extra_probing_time_id);
+    device_context->extra_probing_time_id = g_timeout_add (EXTRA_PROBING_TIME_MSECS,
+                                                           (GSourceFunc) device_context_extra_probing_time_elapsed,
+                                                           device_context);
+
     /* Setup a new port context for the newly grabbed port */
     port_context = port_context_new (self,
                                      device_context->name,
@@ -1271,6 +1310,10 @@ device_context_cancel (DeviceContext *device_context)
         g_source_remove (device_context->min_probing_time_id);
         device_context->min_probing_time_id = 0;
     }
+    if (device_context->extra_probing_time_id) {
+        g_source_remove (device_context->extra_probing_time_id);
+        device_context->extra_probing_time_id = 0;
+    }
 
     /* Wakeup the device context logic. If we were still waiting for the
      * min probing time, this will complete the device context. */
@@ -1289,6 +1332,7 @@ device_context_run (MMPluginManager     *self,
     g_assert (!device_context->released_id);
     g_assert (!device_context->min_wait_time_id);
     g_assert (!device_context->min_probing_time_id);
+    g_assert (!device_context->extra_probing_time_id);
 
     /* Connect to device port grabbed/released notifications from the device */
     device_context->grabbed_id = g_signal_connect_swapped (device_context->device,
