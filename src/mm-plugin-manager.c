@@ -1258,6 +1258,16 @@ device_context_cancel (DeviceContext *device_context)
         g_list_foreach (device_context->port_contexts, (GFunc) port_context_cancel, NULL);
     }
 
+    /* Cancel all timeouts */
+    if (device_context->min_wait_time_id) {
+        g_source_remove (device_context->min_wait_time_id);
+        device_context->min_wait_time_id = 0;
+    }
+    if (device_context->min_probing_time_id) {
+        g_source_remove (device_context->min_probing_time_id);
+        device_context->min_probing_time_id = 0;
+    }
+
     /* Wakeup the device context logic. If we were still waiting for the
      * min probing time, this will complete the device context. */
     device_context_continue (device_context);
