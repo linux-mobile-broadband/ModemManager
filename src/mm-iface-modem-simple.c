@@ -41,7 +41,7 @@ typedef struct {
 static void
 private_free (Private *priv)
 {
-    g_assert (!priv->ongoing_connect);
+    g_clear_object (&priv->ongoing_connect);
     g_slice_free (Private, priv);
 }
 
