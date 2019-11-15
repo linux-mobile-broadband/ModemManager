@@ -434,7 +434,7 @@ print_modem_info (void)
         mmcli_output_pco_list    (pco_list);
 
         g_free (facility_locks);
-        mm_pco_list_free (pco_list);
+        g_list_free_full (pco_list, g_object_unref);
     }
 
     /* CDMA */
