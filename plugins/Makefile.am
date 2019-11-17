@@ -217,16 +217,18 @@ OPTION_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/option
 ################################################################################
 
 # Common Novatel modem support library
-noinst_LTLIBRARIES += libmm-utils-novatel.la
-libmm_utils_novatel_la_SOURCES = \
+pkglib_LTLIBRARIES += libmm-shared-novatel.la
+libmm_shared_novatel_la_SOURCES = \
+	novatel/mm-shared.c \
 	novatel/mm-common-novatel.c \
 	novatel/mm-common-novatel.h \
 	novatel/mm-broadband-modem-novatel.c \
 	novatel/mm-broadband-modem-novatel.h \
 	$(NULL)
+libmm_shared_novatel_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_novatel_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 
 NOVATEL_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/novatel
-NOVATEL_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-novatel.la
 
 ################################################################################
 # common xmm support
@@ -820,7 +822,6 @@ libmm_plugin_novatel_la_SOURCES = \
 	$(NULL)
 libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS)
 libmm_plugin_novatel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_novatel_la_LIBADD   = $(NOVATEL_COMMON_LIBADD_FLAGS)
 
 ################################################################################
 # plugin: foxconn
@@ -1131,7 +1132,6 @@ libmm_plugin_dell_la_CPPFLAGS = \
 	$(NULL)
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_dell_la_LIBADD = \
-	$(NOVATEL_COMMON_LIBADD_FLAGS) \
 	$(TELIT_COMMON_LIBADD_FLAGS) \
 	$(XMM_COMMON_LIBADD_FLAGS) \
 	$(FOXCONN_COMMON_LIBADD_FLAGS) \
