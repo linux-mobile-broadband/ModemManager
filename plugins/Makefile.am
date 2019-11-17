@@ -152,45 +152,6 @@ libmm_shared_icera_la_LIBADD = \
 ICERA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/icera
 
 ################################################################################
-# common ericsson mbm support
-################################################################################
-
-noinst_LTLIBRARIES += libhelpers-mbm.la
-libhelpers_mbm_la_SOURCES = \
-	mbm/mm-modem-helpers-mbm.c \
-	mbm/mm-modem-helpers-mbm.h \
-	$(NULL)
-
-noinst_PROGRAMS += test-modem-helpers-mbm
-test_modem_helpers_mbm_SOURCES = \
-	mbm/tests/test-modem-helpers-mbm.c \
-	$(NULL)
-test_modem_helpers_mbm_CPPFLAGS = \
-	-I$(top_srcdir)/plugins/mbm \
-	$(NULL)
-test_modem_helpers_mbm_LDADD = \
-	$(builddir)/libhelpers-mbm.la \
-	$(top_builddir)/src/libhelpers.la \
-	$(top_builddir)/libmm-glib/libmm-glib.la \
-	$(NULL)
-
-noinst_LTLIBRARIES += libmm-utils-mbm.la
-libmm_utils_mbm_la_SOURCES = \
-	mbm/mm-broadband-modem-mbm.c \
-	mbm/mm-broadband-modem-mbm.h \
-	mbm/mm-broadband-bearer-mbm.c \
-	mbm/mm-broadband-bearer-mbm.h \
-	mbm/mm-sim-mbm.c \
-	mbm/mm-sim-mbm.h \
-	$(NULL)
-libmm_utils_mbm_la_LIBADD = \
-	$(builddir)/libhelpers-mbm.la \
-	$(NULL)
-
-MBM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/mbm
-MBM_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-mbm.la
-
-################################################################################
 # common sierra support
 ################################################################################
 
@@ -384,14 +345,39 @@ AM_CFLAGS += -DTESTUDEVRULESDIR_HUAWEI=\"${srcdir}/huawei\"
 # plugin: ericsson mbm
 ################################################################################
 
+noinst_LTLIBRARIES += libhelpers-mbm.la
+libhelpers_mbm_la_SOURCES = \
+	mbm/mm-modem-helpers-mbm.c \
+	mbm/mm-modem-helpers-mbm.h \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-mbm
+test_modem_helpers_mbm_SOURCES = \
+	mbm/tests/test-modem-helpers-mbm.c \
+	$(NULL)
+test_modem_helpers_mbm_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/mbm \
+	$(NULL)
+test_modem_helpers_mbm_LDADD = \
+	$(builddir)/libhelpers-mbm.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 pkglib_LTLIBRARIES += libmm-plugin-ericsson-mbm.la
 libmm_plugin_ericsson_mbm_la_SOURCES = \
+	mbm/mm-broadband-modem-mbm.c \
+	mbm/mm-broadband-modem-mbm.h \
+	mbm/mm-broadband-bearer-mbm.c \
+	mbm/mm-broadband-bearer-mbm.h \
+	mbm/mm-sim-mbm.c \
+	mbm/mm-sim-mbm.h \
 	mbm/mm-plugin-mbm.c \
 	mbm/mm-plugin-mbm.h \
 	$(NULL)
-libmm_plugin_ericsson_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(MBM_COMMON_COMPILER_FLAGS)
+libmm_plugin_ericsson_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_ericsson_mbm_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_ericsson_mbm_la_LIBADD   = $(MBM_COMMON_LIBADD_FLAGS)
+libmm_plugin_ericsson_mbm_la_LIBADD   = $(builddir)/libhelpers-mbm.la
 
 dist_udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
 
@@ -1072,7 +1058,6 @@ libmm_plugin_dell_la_CPPFLAGS = \
 	$(SIERRA_COMMON_COMPILER_FLAGS) \
 	$(TELIT_COMMON_COMPILER_FLAGS) \
 	$(XMM_COMMON_COMPILER_FLAGS) \
-	$(MBM_COMMON_COMPILER_FLAGS) \
 	$(NULL)
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_dell_la_LIBADD = \
@@ -1080,7 +1065,6 @@ libmm_plugin_dell_la_LIBADD = \
 	$(SIERRA_COMMON_LIBADD_FLAGS) \
 	$(TELIT_COMMON_LIBADD_FLAGS) \
 	$(XMM_COMMON_LIBADD_FLAGS) \
-	$(MBM_COMMON_LIBADD_FLAGS) \
 	$(NULL)
 
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
