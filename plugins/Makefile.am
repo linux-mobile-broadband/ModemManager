@@ -37,6 +37,14 @@ AM_CFLAGS  += $(MBIM_CFLAGS)
 AM_LDFLAGS += $(MBIM_LIBS)
 endif
 
+# Common compiler/linker flags for shared utils
+SHARED_COMMON_COMPILER_FLAGS = \
+	$(NULL)
+SHARED_COMMON_LINKER_FLAGS = \
+	-module        \
+	-avoid-version \
+	$(NULL)
+
 # Common compiler/linker flags for plugins
 PLUGIN_COMMON_COMPILER_FLAGS = \
 	$(NULL)
