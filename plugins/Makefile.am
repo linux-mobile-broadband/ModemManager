@@ -250,8 +250,9 @@ test_modem_helpers_xmm_LDADD = \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)
 
-noinst_LTLIBRARIES += libmm-utils-xmm.la
-libmm_utils_xmm_la_SOURCES = \
+pkglib_LTLIBRARIES += libmm-shared-xmm.la
+libmm_shared_xmm_la_SOURCES = \
+	xmm/mm-shared.c \
 	xmm/mm-shared-xmm.h \
 	xmm/mm-shared-xmm.c \
 	xmm/mm-broadband-modem-xmm.h \
@@ -259,18 +260,19 @@ libmm_utils_xmm_la_SOURCES = \
 	$(NULL)
 
 if WITH_MBIM
-libmm_utils_xmm_la_SOURCES += \
+libmm_shared_xmm_la_SOURCES += \
 	xmm/mm-broadband-modem-mbim-xmm.h \
 	xmm/mm-broadband-modem-mbim-xmm.c \
 	$(NULL)
 endif
 
-libmm_utils_xmm_la_LIBADD = \
+libmm_shared_xmm_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_xmm_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
+libmm_shared_xmm_la_LIBADD = \
 	$(builddir)/libhelpers-xmm.la \
 	$(NULL)
 
 XMM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/xmm
-XMM_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-xmm.la
 
 ################################################################################
 # plugin: generic
@@ -1064,7 +1066,6 @@ libmm_plugin_dell_la_CPPFLAGS = \
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_dell_la_LIBADD = \
 	$(TELIT_COMMON_LIBADD_FLAGS) \
-	$(XMM_COMMON_LIBADD_FLAGS) \
 	$(NULL)
 
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
@@ -1111,7 +1112,6 @@ libmm_plugin_fibocom_la_SOURCES = \
 	$(NULL)
 libmm_plugin_fibocom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(XMM_COMMON_COMPILER_FLAGS)
 libmm_plugin_fibocom_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_fibocom_la_LIBADD   = $(XMM_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += fibocom/77-mm-fibocom-port-types.rules
 
