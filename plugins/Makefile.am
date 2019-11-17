@@ -283,13 +283,16 @@ XMM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/xmm
 
 # Common Foxconn modem support library (MBIM only)
 if WITH_MBIM
-noinst_LTLIBRARIES += libmm-utils-foxconn.la
-libmm_utils_foxconn_la_SOURCES = \
+pkglib_LTLIBRARIES += libmm-shared-foxconn.la
+libmm_shared_foxconn_la_SOURCES = \
+	foxconn/mm-shared.c \
 	foxconn/mm-broadband-modem-foxconn-t77w968.c \
 	foxconn/mm-broadband-modem-foxconn-t77w968.h \
 	$(NULL)
+libmm_shared_foxconn_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_foxconn_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
+
 FOXCONN_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/foxconn
-FOXCONN_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-foxconn.la
 endif
 
 ################################################################################
@@ -836,7 +839,6 @@ libmm_plugin_foxconn_la_SOURCES = \
 	$(NULL)
 libmm_plugin_foxconn_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(FOXCONN_COMMON_COMPILER_FLAGS)
 libmm_plugin_foxconn_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_foxconn_la_LIBADD   = $(FOXCONN_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += foxconn/77-mm-foxconn-port-types.rules
 
@@ -1135,7 +1137,6 @@ libmm_plugin_dell_la_CPPFLAGS = \
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_dell_la_LIBADD = \
 	$(TELIT_COMMON_LIBADD_FLAGS) \
-	$(FOXCONN_COMMON_LIBADD_FLAGS) \
 	$(NULL)
 
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
