@@ -350,6 +350,7 @@ ModemManager_SOURCES = \
 	mm-port-probe-at.c \
 	mm-plugin.c \
 	mm-plugin.h \
+	mm-shared.h \
 	$(NULL)
 
 nodist_ModemManager_SOURCES = $(DAEMON_ENUMS_GENERATED)
