@@ -12,8 +12,8 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
- * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2011 - 2019 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <string.h>
@@ -27,7 +27,11 @@
 
 #include "mm-plugin-manager.h"
 #include "mm-plugin.h"
+#include "mm-shared.h"
 #include "mm-log.h"
+
+#define SHARED_PREFIX "libmm-shared"
+#define PLUGIN_PREFIX "libmm-plugin"
 
 static void initable_iface_init (GInitableIface *iface);
 
@@ -1629,9 +1633,10 @@ load_plugin (const gchar *path)
     }
 
     plugin = (*plugin_create_func) ();
-    if (plugin)
+    if (plugin) {
+        mm_dbg ("[plugin manager] loaded plugin '%s' from '%s'", mm_plugin_get_name (plugin), path_display);
         g_object_weak_ref (G_OBJECT (plugin), (GWeakNotify) g_module_close, module);
-    else
+    } else
         mm_warn ("[plugin manager] could not load plugin '%s': initialization failed", path_display);
 
 out:
@@ -1643,6 +1648,60 @@ out:
     return plugin;
 }
 
+static void
+load_shared (const gchar *path)
+{
+    GModule      *module;
+    gchar        *path_display;
+    const gchar **shared_name = NULL;
+    gint         *major_shared_version;
+    gint         *minor_shared_version;
+
+    /* Get printable UTF-8 string of the path */
+    path_display = g_filename_display_name (path);
+
+    module = g_module_open (path, G_MODULE_BIND_LAZY);
+    if (!module) {
+        mm_warn ("[plugin manager] could not load shared '%s': %s", path_display, g_module_error ());
+        goto out;
+    }
+
+    if (!g_module_symbol (module, "mm_shared_major_version", (gpointer *) &major_shared_version)) {
+        mm_warn ("[plugin manager] could not load shared '%s': Missing major version info", path_display);
+        goto out;
+    }
+
+    if (*major_shared_version != MM_SHARED_MAJOR_VERSION) {
+        mm_warn ("[plugin manager] could not load shared '%s': Shared major version %d, %d is required",
+                 path_display, *major_shared_version, MM_SHARED_MAJOR_VERSION);
+        goto out;
+    }
+
+    if (!g_module_symbol (module, "mm_shared_minor_version", (gpointer *) &minor_shared_version)) {
+        mm_warn ("[plugin manager] could not load shared '%s': Missing minor version info", path_display);
+        goto out;
+    }
+
+    if (*minor_shared_version != MM_SHARED_MINOR_VERSION) {
+        mm_warn ("[plugin manager] could not load shared '%s': Shared minor version %d, %d is required",
+                   path_display, *minor_shared_version, MM_SHARED_MINOR_VERSION);
+        goto out;
+    }
+
+    if (!g_module_symbol (module, "mm_shared_name", (gpointer *) &shared_name)) {
+        mm_warn ("[plugin manager] could not load shared '%s': Missing name", path_display);
+        goto out;
+    }
+
+    mm_dbg ("[plugin manager] loaded shared '%s' utils from '%s'", *shared_name, path_display);
+
+out:
+    if (module && !(*shared_name))
+        g_module_close (module);
+
+    g_free (path_display);
+}
+
 static gboolean
 load_plugins (MMPluginManager *self,
               GError **error)
@@ -1650,6 +1709,9 @@ load_plugins (MMPluginManager *self,
     GDir *dir = NULL;
     const gchar *fname;
     gchar *plugindir_display = NULL;
+    GList *shared_paths = NULL;
+    GList *plugin_paths = NULL;
+    GList *l;
 
     if (!g_module_supported ()) {
         g_set_error (error,
@@ -1674,20 +1736,25 @@ load_plugins (MMPluginManager *self,
     }
 
     while ((fname = g_dir_read_name (dir)) != NULL) {
-        gchar *path;
-        MMPlugin *plugin;
-
         if (!g_str_has_suffix (fname, G_MODULE_SUFFIX))
             continue;
+        if (g_str_has_prefix (fname, SHARED_PREFIX))
+            shared_paths = g_list_prepend (shared_paths, g_module_build_path (self->priv->plugin_dir, fname));
+        else if (g_str_has_prefix (fname, PLUGIN_PREFIX))
+            plugin_paths = g_list_prepend (plugin_paths, g_module_build_path (self->priv->plugin_dir, fname));
+    }
 
-        path = g_module_build_path (self->priv->plugin_dir, fname);
-        plugin = load_plugin (path);
-        g_free (path);
+    /* Load all shared utils */
+    for (l = shared_paths; l; l = g_list_next (l))
+        load_shared ((const gchar *)(l->data));
 
+    /* Load all plugins */
+    for (l = plugin_paths; l; l = g_list_next (l)) {
+        MMPlugin *plugin;
+
+        plugin = load_plugin ((const gchar *)(l->data));
         if (!plugin)
             continue;
-
-        mm_dbg ("[plugin manager] loaded plugin '%s'", mm_plugin_get_name (plugin));
 
         if (g_str_equal (mm_plugin_get_name (plugin), MM_PLUGIN_GENERIC_NAME))
             /* Generic plugin */
@@ -1719,6 +1786,8 @@ load_plugins (MMPluginManager *self,
             g_list_length (self->priv->plugins) + !!self->priv->generic);
 
 out:
+    g_list_free_full (shared_paths, g_free);
+    g_list_free_full (plugin_paths, g_free);
     if (dir)
         g_dir_close (dir);
     g_free (plugindir_display);
