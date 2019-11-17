@@ -1555,7 +1555,7 @@ load_plugin (const gchar *path)
     /* Get printable UTF-8 string of the path */
     path_display = g_filename_display_name (path);
 
-    module = g_module_open (path, G_MODULE_BIND_LAZY);
+    module = g_module_open (path, 0);
     if (!module) {
         mm_warn ("[plugin manager] could not load plugin '%s': %s", path_display, g_module_error ());
         goto out;
@@ -1616,7 +1616,7 @@ load_shared (const gchar *path)
     /* Get printable UTF-8 string of the path */
     path_display = g_filename_display_name (path);
 
-    module = g_module_open (path, G_MODULE_BIND_LAZY);
+    module = g_module_open (path, 0);
     if (!module) {
         mm_warn ("[plugin manager] could not load shared '%s': %s", path_display, g_module_error ());
         goto out;
