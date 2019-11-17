@@ -198,14 +198,16 @@ SIERRA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/sierra
 # common option support
 ################################################################################
 
-noinst_LTLIBRARIES += libmm-utils-option.la
-libmm_utils_option_la_SOURCES = \
+pkglib_LTLIBRARIES += libmm-shared-option.la
+libmm_shared_option_la_SOURCES = \
+	option/mm-shared.c \
 	option/mm-broadband-modem-option.c \
 	option/mm-broadband-modem-option.h \
 	$(NULL)
+libmm_shared_option_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_option_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 
 OPTION_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/option
-OPTION_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-option.la
 
 ################################################################################
 # common novatel support
@@ -396,7 +398,6 @@ libmm_plugin_option_la_SOURCES = \
 	$(NULL)
 libmm_plugin_option_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(OPTION_COMMON_COMPILER_FLAGS)
 libmm_plugin_option_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_option_la_LIBADD   = $(OPTION_COMMON_LIBADD_FLAGS)
 
 ################################################################################
 # plugin: option hso
@@ -413,7 +414,6 @@ libmm_plugin_option_hso_la_SOURCES = \
 	$(NULL)
 libmm_plugin_option_hso_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(OPTION_COMMON_COMPILER_FLAGS)
 libmm_plugin_option_hso_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_option_hso_la_LIBADD   = $(OPTION_COMMON_LIBADD_FLAGS)
 
 ################################################################################
 # plugin: sierra (new QMI or MBIM modems)
