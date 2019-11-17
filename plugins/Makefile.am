@@ -278,6 +278,99 @@ libmm_shared_xmm_la_LIBADD = \
 XMM_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/xmm
 
 ################################################################################
+# common telit support
+################################################################################
+
+TELIT_ENUMS_INPUTS = \
+	$(top_srcdir)/plugins/telit/mm-modem-helpers-telit.h \
+	$(NULL)
+
+TELIT_ENUMS_GENERATED = \
+	telit/mm-telit-enums-types.h \
+	telit/mm-telit-enums-types.c \
+	$(NULL)
+
+BUILT_SOURCES += $(TELIT_ENUMS_GENERATED)
+CLEANFILES    += $(TELIT_ENUMS_GENERATED)
+
+telit/mm-telit-enums-types.h: Makefile.am $(TELIT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+	$(AM_V_GEN) \
+		$(MKDIR_P) telit; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-modem-helpers-telit.h\"\n#ifndef __MM_TELIT_ENUMS_TYPES_H__\n#define __MM_TELIT_ENUMS_TYPES_H__\n" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.h \
+			--ftail "#endif /* __MM_TELIT_ENUMS_TYPES_H__ */\n" \
+			$(TELIT_ENUMS_INPUTS) > $@
+
+telit/mm-telit-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c telit/mm-telit-enums-types.h
+	$(AM_V_GEN) \
+		$(MKDIR_P) telit; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-telit-enums-types.h\"" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.c \
+			$(TELIT_ENUMS_INPUTS) > $@
+
+noinst_LTLIBRARIES += libhelpers-telit.la
+libhelpers_telit_la_SOURCES = \
+	telit/mm-modem-helpers-telit.c \
+	telit/mm-modem-helpers-telit.h \
+	$(NULL)
+libhelpers_telit_la_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	-I$(top_builddir)/plugins/telit \
+	$(NULL)
+nodist_libhelpers_telit_la_SOURCES = $(TELIT_ENUMS_GENERATED)
+
+noinst_PROGRAMS += test-modem-helpers-telit
+test_modem_helpers_telit_SOURCES = \
+	telit/tests/test-mm-modem-helpers-telit.c \
+	$(NULL)
+test_modem_helpers_telit_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	-I$(top_builddir)/plugins/telit \
+	$(TEST_COMMON_COMPILER_FLAGS) \
+	$(NULL)
+test_modem_helpers_telit_LDADD = \
+	$(TEST_COMMON_LIBADD_FLAGS) \
+	$(builddir)/libhelpers-telit.la \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
+# Common telit modem support library
+pkglib_LTLIBRARIES += libmm-shared-telit.la
+libmm_shared_telit_la_SOURCES = \
+	telit/mm-shared.c \
+	telit/mm-common-telit.c \
+	telit/mm-common-telit.h \
+	telit/mm-shared-telit.c \
+	telit/mm-shared-telit.h \
+	telit/mm-broadband-modem-telit.c \
+	telit/mm-broadband-modem-telit.h \
+	$(NULL)
+if WITH_MBIM
+libmm_shared_telit_la_SOURCES += \
+	telit/mm-broadband-modem-mbim-telit.h \
+	telit/mm-broadband-modem-mbim-telit.c \
+	$(NULL)
+endif
+
+libmm_shared_telit_la_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	-I$(top_builddir)/plugins/telit \
+	$(SHARED_COMMON_COMPILER_FLAGS) \
+	$(NULL)
+libmm_shared_telit_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
+libmm_shared_telit_la_LIBADD = \
+	$(builddir)/libhelpers-telit.la \
+	$(NULL)
+
+TELIT_COMMON_COMPILER_FLAGS = \
+	-I$(top_srcdir)/plugins/telit \
+	-I$(top_builddir)/plugins/telit \
+	$(NULL)
+
+################################################################################
 # common foxconn support
 ################################################################################
 
@@ -903,103 +996,17 @@ libmm_plugin_via_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 # plugin: telit
 ################################################################################
 
-PLUGIN_TELIT_COMPILER_FLAGS = \
-	-I$(top_srcdir)/plugins/telit \
-	-I$(top_builddir)/plugins/telit \
-	$(NULL)
-
-noinst_LTLIBRARIES += libhelpers-telit.la
-
-TELIT_ENUMS_INPUTS = \
-	$(top_srcdir)/plugins/telit/mm-modem-helpers-telit.h \
-	$(NULL)
-
-TELIT_ENUMS_GENERATED = \
-	telit/mm-telit-enums-types.h \
-	telit/mm-telit-enums-types.c \
-	$(NULL)
-
-telit/mm-telit-enums-types.h: Makefile.am $(TELIT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
-	$(AM_V_GEN) \
-		$(MKDIR_P) telit; \
-		$(GLIB_MKENUMS) \
-			--fhead "#include \"mm-modem-helpers-telit.h\"\n#ifndef __MM_TELIT_ENUMS_TYPES_H__\n#define __MM_TELIT_ENUMS_TYPES_H__\n" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.h \
-			--ftail "#endif /* __MM_TELIT_ENUMS_TYPES_H__ */\n" \
-			$(TELIT_ENUMS_INPUTS) > $@
-
-telit/mm-telit-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c telit/mm-telit-enums-types.h
-	$(AM_V_GEN) \
-		$(MKDIR_P) telit; \
-		$(GLIB_MKENUMS) \
-			--fhead "#include \"mm-telit-enums-types.h\"" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.c \
-			$(TELIT_ENUMS_INPUTS) > $@
-
-libhelpers_telit_la_SOURCES = \
-	telit/mm-modem-helpers-telit.c \
-	telit/mm-modem-helpers-telit.h \
-	$(NULL)
-
-nodist_libhelpers_telit_la_SOURCES = $(TELIT_ENUMS_GENERATED)
-
-libhelpers_telit_la_CPPFLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
-
-BUILT_SOURCES += $(TELIT_ENUMS_GENERATED)
-CLEANFILES    += $(TELIT_ENUMS_GENERATED)
-
 pkglib_LTLIBRARIES += libmm-plugin-telit.la
 libmm_plugin_telit_la_SOURCES = \
 	telit/mm-plugin-telit.c \
 	telit/mm-plugin-telit.h \
 	$(NULL)
-libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(PLUGIN_TELIT_COMPILER_FLAGS)
+libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(TELIT_COMMON_COMPILER_FLAGS)
 libmm_plugin_telit_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_telit_la_LIBADD   = $(TELIT_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += telit/77-mm-telit-port-types.rules
 
 AM_CFLAGS += -DTESTUDEVRULESDIR_TELIT=\"${srcdir}/telit\"
-
-noinst_PROGRAMS += test-modem-helpers-telit
-test_modem_helpers_telit_SOURCES = \
-	telit/tests/test-mm-modem-helpers-telit.c \
-	$(NULL)
-test_modem_helpers_telit_CPPFLAGS = \
-	$(PLUGIN_TELIT_COMPILER_FLAGS) \
-	$(TEST_COMMON_COMPILER_FLAGS) \
-	$(NULL)
-test_modem_helpers_telit_LDADD = \
-	$(TEST_COMMON_LIBADD_FLAGS) \
-	$(builddir)/libhelpers-telit.la \
-	$(top_builddir)/src/libhelpers.la \
-	$(top_builddir)/libmm-glib/libmm-glib.la \
-	$(NULL)
-
-# Common telit modem support library
-noinst_LTLIBRARIES += libmm-utils-telit.la
-libmm_utils_telit_la_SOURCES = \
-	telit/mm-common-telit.c \
-	telit/mm-common-telit.h \
-	telit/mm-shared-telit.c \
-	telit/mm-shared-telit.h \
-	telit/mm-broadband-modem-telit.c \
-	telit/mm-broadband-modem-telit.h \
-	$(NULL)
-libmm_utils_telit_la_CPPFLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
-
-if WITH_MBIM
-libmm_utils_telit_la_SOURCES += \
-	telit/mm-broadband-modem-mbim-telit.h \
-	telit/mm-broadband-modem-mbim-telit.c \
-	$(NULL)
-endif
-
-TELIT_COMMON_COMPILER_FLAGS = $(PLUGIN_TELIT_COMPILER_FLAGS)
-TELIT_COMMON_LIBADD_FLAGS   = \
-	$(builddir)/libhelpers-telit.la \
-	$(builddir)/libmm-utils-telit.la \
-	$(NULL)
 
 ################################################################################
 # plugin: mtk
@@ -1135,9 +1142,6 @@ libmm_plugin_dell_la_CPPFLAGS = \
 	$(FOXCONN_COMMON_COMPILER_FLAGS) \
 	$(NULL)
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_dell_la_LIBADD = \
-	$(TELIT_COMMON_LIBADD_FLAGS) \
-	$(NULL)
 
 dist_udevrules_DATA += dell/77-mm-dell-port-types.rules
 
