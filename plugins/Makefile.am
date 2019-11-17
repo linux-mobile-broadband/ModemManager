@@ -174,8 +174,9 @@ test_modem_helpers_sierra_LDADD = \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)
 
-noinst_LTLIBRARIES += libmm-utils-sierra.la
-libmm_utils_sierra_la_SOURCES = \
+pkglib_LTLIBRARIES += libmm-shared-sierra.la
+libmm_shared_sierra_la_SOURCES = \
+	sierra/mm-shared.c \
 	sierra/mm-common-sierra.c \
 	sierra/mm-common-sierra.h \
 	sierra/mm-sim-sierra.c \
@@ -185,12 +186,13 @@ libmm_utils_sierra_la_SOURCES = \
 	sierra/mm-broadband-modem-sierra.c  \
 	sierra/mm-broadband-modem-sierra.h  \
 	$(NULL)
-libmm_utils_sierra_la_LIBADD = \
+libmm_shared_sierra_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_sierra_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
+libmm_shared_sierra_la_LIBADD = \
 	$(builddir)/libhelpers-sierra.la \
 	$(NULL)
 
 SIERRA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/sierra
-SIERRA_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-sierra.la
 
 ################################################################################
 # common option support
@@ -440,7 +442,6 @@ libmm_plugin_sierra_legacy_la_SOURCES = \
 	$(NULL)
 libmm_plugin_sierra_legacy_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS)
 libmm_plugin_sierra_legacy_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_sierra_legacy_la_LIBADD   = $(SIERRA_COMMON_LIBADD_FLAGS)
 
 ################################################################################
 # plugin: wavecom (now sierra airlink)
@@ -1062,7 +1063,6 @@ libmm_plugin_dell_la_CPPFLAGS = \
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_dell_la_LIBADD = \
 	$(NOVATEL_COMMON_LIBADD_FLAGS) \
-	$(SIERRA_COMMON_LIBADD_FLAGS) \
 	$(TELIT_COMMON_LIBADD_FLAGS) \
 	$(XMM_COMMON_LIBADD_FLAGS) \
 	$(NULL)
