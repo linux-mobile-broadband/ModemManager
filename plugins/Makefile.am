@@ -135,19 +135,21 @@ test_modem_helpers_icera_LDADD = \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)
 
-noinst_LTLIBRARIES += libmm-utils-icera.la
-libmm_utils_icera_la_SOURCES = \
+pkglib_LTLIBRARIES += libmm-shared-icera.la
+libmm_shared_icera_la_SOURCES = \
+	icera/mm-shared.c \
 	icera/mm-broadband-modem-icera.h \
 	icera/mm-broadband-modem-icera.c \
 	icera/mm-broadband-bearer-icera.h \
 	icera/mm-broadband-bearer-icera.c \
 	$(NULL)
-libmm_utils_icera_la_LIBADD = \
+libmm_shared_icera_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_icera_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
+libmm_shared_icera_la_LIBADD = \
 	$(builddir)/libhelpers-icera.la \
 	$(NULL)
 
 ICERA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/icera
-ICERA_COMMON_LIBADD_FLAGS   = $(builddir)/libmm-utils-icera.la
 
 ################################################################################
 # common ericsson mbm support
@@ -452,7 +454,7 @@ libmm_plugin_sierra_legacy_la_SOURCES = \
 	$(NULL)
 libmm_plugin_sierra_legacy_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS)
 libmm_plugin_sierra_legacy_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_sierra_legacy_la_LIBADD   = $(ICERA_COMMON_LIBADD_FLAGS) $(SIERRA_COMMON_LIBADD_FLAGS)
+libmm_plugin_sierra_legacy_la_LIBADD   = $(SIERRA_COMMON_LIBADD_FLAGS)
 
 ################################################################################
 # plugin: wavecom (now sierra airlink)
@@ -495,7 +497,6 @@ libmm_plugin_nokia_icera_la_SOURCES = \
 	$(NULL)
 libmm_plugin_nokia_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
 libmm_plugin_nokia_icera_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_nokia_icera_la_LIBADD   = $(ICERA_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 
@@ -518,7 +519,6 @@ libmm_plugin_zte_la_SOURCES = \
 	$(NULL)
 libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
 libmm_plugin_zte_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_zte_la_LIBADD   = $(ICERA_COMMON_LIBADD_FLAGS)
 
 dist_udevrules_DATA += zte/77-mm-zte-port-types.rules
 
@@ -655,7 +655,6 @@ libmm_plugin_samsung_la_SOURCES = \
 	$(NULL)
 libmm_plugin_samsung_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
 libmm_plugin_samsung_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_samsung_la_LIBADD   = $(ICERA_COMMON_LIBADD_FLAGS)
 
 ################################################################################
 # plugin: cinterion (previously siemens)
