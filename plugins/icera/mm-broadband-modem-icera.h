@@ -42,8 +42,10 @@ struct _MMBroadbandModemIceraClass{
     MMBroadbandModemClass parent;
 };
 
+G_MODULE_EXPORT
 GType mm_broadband_modem_icera_get_type (void);
 
+G_MODULE_EXPORT
 MMBroadbandModemIcera *mm_broadband_modem_icera_new (const gchar *device,
                                                      const gchar **drivers,
                                                      const gchar *plugin,
