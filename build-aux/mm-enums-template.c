@@ -51,7 +51,7 @@ const gchar *
     guint i;
 
     for (i = 0; @enum_name@_values[i].value_nick; i++) {
-        if (val == @enum_name@_values[i].value)
+        if ((gint)val == @enum_name@_values[i].value)
             return @enum_name@_values[i].value_nick;
     }
 
