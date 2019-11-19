@@ -244,7 +244,14 @@ libmm_generated_la_CPPFLAGS = \
 	-Wno-shadow \
 	$(NULL)
 
-libmm_generated_la_LIBADD = $(LIBMM_GLIB_LIBS)
+libmm_generated_la_CFLAGS = \
+	$(WARN_CFLAGS) \
+	$(NULL)
+
+libmm_generated_la_LDFLAGS = \
+	$(WARN_LDFLAGS) \
+	$(LIBMM_GLIB_LIBS) \
+	$(NULL)
 
 includedir = @includedir@/libmm-glib
 nodist_include_HEADERS = $(GENERATED_H)

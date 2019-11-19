@@ -92,6 +92,7 @@ libmm_glib_la_SOURCES = \
 	$(NULL)
 
 libmm_glib_la_CPPFLAGS = \
+	$(LIBMM_GLIB_CFLAGS) \
 	-I$(srcdir) \
 	-I$(top_srcdir) \
 	-I$(top_builddir) \
@@ -100,22 +101,20 @@ libmm_glib_la_CPPFLAGS = \
 	-I${top_srcdir}/libmm-glib/generated \
 	-I${top_builddir}/libmm-glib/generated \
 	-DLIBMM_GLIB_COMPILATION \
-	$(AM_CPPFLAGS) \
 	$(NULL)
 
-libmm_glib_la_CFLAGS = \
-	$(LIBMM_GLIB_CFLAGS) \
-	$(AM_CFLAGS) \
+libmm_glib_gla_CFLAGS = \
+	$(WARN_CFLAGS) \
 	$(NULL)
 
 libmm_glib_la_LIBADD = \
 	${top_builddir}/libmm-glib/generated/libmm-generated.la \
-	$(LIBMM_GLIB_LIBS) \
 	$(NULL)
 
 libmm_glib_la_LDFLAGS = \
 	-version-info $(MM_GLIB_LT_CURRENT):$(MM_GLIB_LT_REVISION):$(MM_GLIB_LT_AGE) \
-	$(AM_LDFLAGS) \
+	$(WARN_LDFLAGS) \
+	$(LIBMM_GLIB_LIBS) \
 	$(NULL)
 
 includedir = @includedir@/libmm-glib
@@ -209,6 +208,7 @@ ModemManager_1_0_gir_CFLAGS = $(libmm_glib_la_CPPFLAGS)
 ModemManager_1_0_gir_LIBS = libmm-glib.la
 ModemManager_1_0_gir_EXPORT_PACKAGES = libmm-glib
 ModemManager_1_0_gir_SCANNERFLAGS = \
+	$(WARN_SCANNERFLAGS) \
 	--c-include "libmm-glib.h" \
 	--identifier-prefix=MM \
 	--identifier-prefix=Mm \

@@ -1,5 +1,13 @@
-AM_CFLAGS = $(CODE_COVERAGE_CFLAGS)
-AM_LDFLAGS = $(CODE_COVERAGE_LDFLAGS)
+
+AM_CFLAGS = \
+	$(WARN_CFLAGS) \
+	$(CODE_COVERAGE_CFLAGS) \
+	$(NULL)
+
+AM_LDFLAGS = \
+	$(WARN_LDFLAGS) \
+	$(CODE_COVERAGE_LDFLAGS) \
+	$(NULL)
 
 noinst_LTLIBRARIES = libqcdm.la libqcdm-test.la
 
@@ -41,4 +49,3 @@ libqcdm_test_la_SOURCES = \
 
 libqcdm_test_la_LIBADD = \
 	$(MM_LIBS)
-

@@ -1,6 +1,7 @@
 bin_PROGRAMS = mmcli
 
 mmcli_CPPFLAGS = \
+	$(WARN_CFLAGS) \
 	$(MMCLI_CFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
@@ -34,13 +35,17 @@ mmcli_SOURCES = \
 	$(NULL)
 
 mmcli_LDADD = \
-	$(MMCLI_LIBS) \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
+mmcli_LDFLAGS = \
+	$(WARN_LDFLAGS) \
+	$(MMCLI_LIBS) \
 	$(NULL)
 
 if WITH_UDEV
 mmcli_CPPFLAGS += $(GUDEV_CFLAGS)
-mmcli_LDADD    += $(GUDEV_LIBS)
+mmcli_LDFLAGS  += $(GUDEV_LIBS)
 endif
 
 completiondir = $(datadir)/bash-completion/completions

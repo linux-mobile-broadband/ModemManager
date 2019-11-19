@@ -6,6 +6,7 @@ include $(top_srcdir)/gtester.make
 ################################################################################
 
 AM_CFLAGS = \
+	$(WARN_CFLAGS) \
 	$(MM_CFLAGS) \
 	$(CODE_COVERAGE_CFLAGS) \
 	$(GUDEV_CFLAGS)	\
@@ -22,6 +23,7 @@ AM_CFLAGS = \
 	$(NULL)
 
 AM_LDFLAGS = \
+	$(WARN_LDFLAGS) \
 	$(MM_LIBS)               \
 	$(CODE_COVERAGE_LDFLAGS) \
 	$(GUDEV_LIBS)            \
