@@ -266,7 +266,7 @@ test_com_teardown (gpointer user_data)
 static void
 print_buf (const char *detail, const char *buf, gsize len)
 {
-    int i = 0;
+    unsigned int i = 0;
     gboolean newline = FALSE;
 
     g_print ("%s (%zu)  ", detail, len);
@@ -320,7 +320,7 @@ wait_reply (TestComData *d, char *buf, gsize len)
     struct timeval timeout = { 1, 0 };
     char readbuf[1024];
     ssize_t bytes_read;
-    int total = 0, retries = 0;
+    unsigned int total = 0, retries = 0;
     gsize decap_len = 0;
 
     FD_ZERO (&in);
