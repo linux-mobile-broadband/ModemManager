@@ -135,6 +135,8 @@ nv_mode_pref_from_qcdm (uint8_t qcdm)
         return DIAG_NV_MODE_PREF_GSM_UMTS_LTE_ONLY;
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_LTE_ONLY:
         return DIAG_NV_MODE_PREF_1X_HDR_LTE_ONLY;
+    default:
+        break;
     }
     return DIAG_NV_MODE_PREF_AUTO;
 };
