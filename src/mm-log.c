@@ -88,6 +88,8 @@ mm_to_syslog_priority (MMLogLevel level)
         return LOG_INFO;
     case MM_LOG_LEVEL_ERR:
         return LOG_ERR;
+    default:
+        break;
     }
     g_assert_not_reached ();
     return 0;
@@ -124,6 +126,8 @@ log_level_description (MMLogLevel level)
         return "<info> ";
     case MM_LOG_LEVEL_ERR:
         return "<error>";
+    default:
+        break;
     }
     g_assert_not_reached ();
     return NULL;
