@@ -755,7 +755,7 @@ qcdm_cmd_pilot_sets_result_get_pilot (QcdmResult *result,
     *out_pn_offset = set->pn_offset;
     *out_ecio = set->ecio;
     /* EC/IO is in units of -0.5 dB per the specs */
-    *out_db = (float) set->ecio * -0.5;
+    *out_db = (float) (set->ecio * -0.5);
     return TRUE;
 }
 
