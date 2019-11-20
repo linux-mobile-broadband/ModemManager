@@ -2200,7 +2200,7 @@ initable_init_async (GAsyncInitable *initable,
 
 void
 mm_broadband_bearer_new (MMBroadbandModem *modem,
-                         MMBearerProperties *properties,
+                         MMBearerProperties *bearer_properties,
                          GCancellable *cancellable,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
@@ -2219,7 +2219,7 @@ mm_broadband_bearer_new (MMBroadbandModem *modem,
         callback,
         user_data,
         MM_BASE_BEARER_MODEM,             modem,
-        MM_BASE_BEARER_CONFIG,            properties,
+        MM_BASE_BEARER_CONFIG,            bearer_properties,
         MM_BROADBAND_BEARER_FLOW_CONTROL, flow_control,
         NULL);
 }
