@@ -867,8 +867,8 @@ cid_selection_3gpp_context_step (GTask *task)
 
     switch (ctx->step) {
     case CID_SELECTION_3GPP_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case CID_SELECTION_3GPP_STEP_FORMAT:
         cid_selection_3gpp_query_format (task);
@@ -2119,8 +2119,8 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_CDMA_RM_PROTOCOL:
         /* If a specific RM protocol is given, we need to check whether it is
@@ -2140,8 +2140,8 @@ interface_initialization_step (GTask *task)
             return;
         }
 
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
