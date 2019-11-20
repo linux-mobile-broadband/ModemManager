@@ -495,6 +495,8 @@ plugin_supports_port_ready (MMPlugin     *plugin,
     case MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED:
         port_context_defer_until_suggested (port_context, plugin);
         break;
+    default:
+        g_assert_not_reached ();
     }
 
     /* We received a full reference, to make sure the context was always
