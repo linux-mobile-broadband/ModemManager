@@ -1586,8 +1586,8 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_SIM_IDENTIFIER:
         /* SIM ID is meant to be loaded only once during the whole
@@ -1602,8 +1602,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_IMSI:
         /* IMSI is meant to be loaded only once during the whole
@@ -1618,8 +1618,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_OPERATOR_ID:
         /* Operator ID is meant to be loaded only once during the whole
@@ -1634,8 +1634,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_OPERATOR_NAME:
         /* Operator Name is meant to be loaded only once during the whole
@@ -1650,8 +1650,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_EMERGENCY_NUMBERS:
         /* Emergency Numbers are meant to be loaded only once during the whole
@@ -1666,8 +1666,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* Fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
