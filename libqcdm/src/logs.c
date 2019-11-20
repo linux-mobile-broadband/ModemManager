@@ -176,7 +176,7 @@ qcdm_log_item_evdo_pilot_sets_v2_get_pilot (QcdmResult *result,
     pilot = (DMLogItemEvdoPilotSetsV2Pilot *) &array[num * sizeof (DMLogItemEvdoPilotSetsV2Pilot)];
     *out_pilot_pn = le16toh (pilot->pilot_pn);
     *out_pilot_energy = le16toh (pilot->pilot_energy);
-    *out_rssi_dbm = (int32_t) (-110.0 + ((float) MAX (le16toh (pilot->pilot_energy) - 50, 0) / 14.0));
+    *out_rssi_dbm = (int32_t) (-110.0 + (MAX (le16toh (pilot->pilot_energy) - 50, 0) / 14.0));
     return TRUE;
 }
 
