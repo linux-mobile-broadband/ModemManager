@@ -489,6 +489,8 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
     case MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY:
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_EMERGENCY_ONLY;
         break;
+    default:
+        g_assert_not_reached ();
     }
 
     /* If no reason to disconnect, or if it's a mixed CDMA+LTE modem without a CDMA reason,
