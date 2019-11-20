@@ -36,7 +36,7 @@ static int debug = 0;
 static void
 print_buf (const char *detail, const char *buf, size_t len)
 {
-	int i = 0, z;
+	unsigned int i, z;
 	qcdmbool newline = FALSE;
 	char tmp[500];
 	uint32_t flen;
@@ -120,7 +120,7 @@ qcdm_wait_reply (int fd, char *buf, size_t len)
 	struct timeval timeout = { 1, 0 };
 	char readbuf[1024];
 	ssize_t bytes_read;
-	int total = 0, retries = 0;
+	unsigned int total = 0, retries = 0;
 	size_t decap_len = 0;
 
 	FD_ZERO (&in);
