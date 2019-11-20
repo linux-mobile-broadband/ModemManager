@@ -891,6 +891,9 @@ cid_selection_3gpp_context_step (GTask *task)
         g_task_return_int (task, (gssize) ctx->cid);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -1856,6 +1859,7 @@ disconnect (MMBaseBearer *self,
         break;
 
     case CONNECTION_TYPE_NONE:
+    default:
         g_assert_not_reached ();
     }
 
@@ -2144,6 +2148,9 @@ interface_initialization_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 
     g_assert_not_reached ();
