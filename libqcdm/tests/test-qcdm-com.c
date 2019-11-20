@@ -1082,7 +1082,7 @@ test_com_pilot_sets (void *f, void *data)
                                               &ecio,
                                               &db);
         g_message ("   %d: PN offset %d", i, pn_offset);
-        g_message ("      EC/IO     %d  (%.1f dB)", ecio, db);
+        g_message ("      EC/IO     %d  (%.1lf dB)", ecio, (double)db);
     }
 
     num = 0;
