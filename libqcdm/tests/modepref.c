@@ -536,7 +536,7 @@ main (int argc, char *argv[])
 	}
 
 	if (debug)
-		putenv ("QCDM_DEBUG=1");
+		putenv ((char *)"QCDM_DEBUG=1");
 
 	fd = com_setup (dmport);
 	if (fd < 0)
