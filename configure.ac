@@ -399,7 +399,88 @@ dnl
 AM_CONDITIONAL(QCDM_STANDALONE, test "yes" = "no")
 
 dnl-----------------------------------------------------------------------------
-dnl Protocol libs
+dnl Plugins
+dnl
+dnl By default all plugins are built and installed. If the user wants to build only
+dnl some specific plugins, this can be done by disabling all first and then enabling
+dnl only the ones required, e.g.:
+dnl   $ ./configure               \
+dnl       --disable-all-plugins   \
+dnl       --enable-plugin-generic \
+dnl       --enable-plugin-zte ...
+dnl
+dnl If the user wants all plugins except for some specific ones, those can be
+dnl explicitly disabled, e.g.:
+dnl   $ ./configure \
+dnl       --disable-plugin-generic \
+dnl       --disable-plugin-zte ...
+dnl
+
+MM_ENABLE_ALL_PLUGINS
+
+MM_ENABLE_PLUGIN([generic])
+MM_ENABLE_PLUGIN([altair-lte])
+MM_ENABLE_PLUGIN([anydata])
+MM_ENABLE_PLUGIN([cinterion])
+MM_ENABLE_PLUGIN([dell],
+                 [with_shared_sierra,
+                  with_shared_novatel,
+                  with_shared_xmm,
+                  with_shared_telit,
+                  with_shared_foxconn])
+MM_ENABLE_PLUGIN([dlink])
+MM_ENABLE_PLUGIN([fibocom],
+                 [with_shared_xmm])
+MM_ENABLE_PLUGIN([foxconn],
+                 [with_shared_foxconn])
+MM_ENABLE_PLUGIN([haier])
+MM_ENABLE_PLUGIN([huawei])
+MM_ENABLE_PLUGIN([iridium])
+MM_ENABLE_PLUGIN([linktop])
+MM_ENABLE_PLUGIN([longcheer])
+MM_ENABLE_PLUGIN([mbm])
+MM_ENABLE_PLUGIN([motorola])
+MM_ENABLE_PLUGIN([mtk])
+MM_ENABLE_PLUGIN([nokia])
+MM_ENABLE_PLUGIN([nokia-icera],
+                 [with_shared_icera])
+MM_ENABLE_PLUGIN([novatel],
+                 [with_shared_novatel])
+MM_ENABLE_PLUGIN([novatel-lte])
+MM_ENABLE_PLUGIN([option],
+                 [with_shared_option])
+MM_ENABLE_PLUGIN([option-hso],
+                 [with_shared_option])
+MM_ENABLE_PLUGIN([pantech])
+MM_ENABLE_PLUGIN([quectel])
+MM_ENABLE_PLUGIN([samsung],
+                 [with_shared_icera])
+MM_ENABLE_PLUGIN([sierra-legacy],
+                 [with_shared_icera,
+                  with_shared_sierra])
+MM_ENABLE_PLUGIN([sierra])
+MM_ENABLE_PLUGIN([simtech])
+MM_ENABLE_PLUGIN([telit],
+                 [with_shared_telit])
+MM_ENABLE_PLUGIN([thuraya])
+MM_ENABLE_PLUGIN([tplink])
+MM_ENABLE_PLUGIN([ublox])
+MM_ENABLE_PLUGIN([via])
+MM_ENABLE_PLUGIN([wavecom])
+MM_ENABLE_PLUGIN([x22x])
+MM_ENABLE_PLUGIN([zte],
+                 [with_shared_icera])
+
+MM_BUILD_SHARED([icera])
+MM_BUILD_SHARED([sierra])
+MM_BUILD_SHARED([option])
+MM_BUILD_SHARED([novatel])
+MM_BUILD_SHARED([xmm])
+MM_BUILD_SHARED([telit])
+MM_BUILD_SHARED([foxconn])
+
+dnl-----------------------------------------------------------------------------
+dnl Output
 dnl
 
 AC_CONFIG_FILES([
@@ -466,6 +547,53 @@ echo "
       systemd suspend/resume:  ${with_systemd_suspend_resume}
       systemd journal:         ${with_systemd_journal}
       at command via dbus:     ${with_at_command_via_dbus}
+
+    Shared utils:
+      icera:                   ${with_shared_icera}
+      sierra:                  ${with_shared_sierra}
+      option:                  ${with_shared_option}
+      novatel:                 ${with_shared_novatel}
+      xmm:                     ${with_shared_xmm}
+      telit:                   ${with_shared_telit}
+      foxconn:                 ${with_shared_foxconn}
+
+    Plugins:
+      generic:                 ${enable_plugin_generic}
+      altair lte:              ${enable_plugin_altair_lte}
+      anydata:                 ${enable_plugin_anydata}
+      cinterion:               ${enable_plugin_cinterion}
+      dell:                    ${enable_plugin_dell}
+      dlink:                   ${enable_plugin_dlink}
+      fibocom:                 ${enable_plugin_fibocom}
+      foxconn:                 ${enable_plugin_foxconn}
+      haier:                   ${enable_plugin_haier}
+      huawei:                  ${enable_plugin_huawei}
+      iridium:                 ${enable_plugin_iridium}
+      linktop:                 ${enable_plugin_linktop}
+      longcheer:               ${enable_plugin_longcheer}
+      mbm:                     ${enable_plugin_mbm}
+      motorola:                ${enable_plugin_motorola}
+      mtk:                     ${enable_plugin_mtk}
+      nokia:                   ${enable_plugin_nokia}
+      nokia icera:             ${enable_plugin_nokia_icera}
+      novatel:                 ${enable_plugin_novatel}
+      novatel lte:             ${enable_plugin_novatel_lte}
+      option:                  ${enable_plugin_option}
+      option hso:              ${enable_plugin_option_hso}
+      pantech:                 ${enable_plugin_pantech}
+      quectel:                 ${enable_plugin_quectel}
+      samsung:                 ${enable_plugin_samsung}
+      sierra legacy:           ${enable_plugin_sierra_legacy}
+      sierra:                  ${enable_plugin_sierra}
+      simtech:                 ${enable_plugin_simtech}
+      telit:                   ${enable_plugin_telit}
+      thuraya:                 ${enable_plugin_thuraya}
+      tplink:                  ${enable_plugin_tplink}
+      ublox:                   ${enable_plugin_ublox}
+      via:                     ${enable_plugin_via}
+      wavecom:                 ${enable_plugin_wavecom}
+      x22x:                    ${enable_plugin_x22x}
+      zte:                     ${enable_plugin_zte}
 
     Miscellaneous:
       gobject introspection:   ${found_introspection}

@@ -12,6 +12,7 @@
  *
  * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
  */
+#include <config.h>
 
 #include <glib.h>
 #include <glib-object.h>
@@ -42,11 +43,13 @@ common_test (const gchar *keyfile_path)
 
 /************************************************************/
 
+#if defined ENABLE_PLUGIN_FOXCONN
 static void
 test_foxconn_t77w968 (void)
 {
     common_test (TESTKEYFILE_FOXCONN_T77W968);
 }
+#endif
 
 /************************************************************/
 
@@ -76,7 +79,9 @@ int main (int argc, char **argv)
 
     g_test_init (&argc, &argv, NULL);
 
+#if defined ENABLE_PLUGIN_FOXCONN
     g_test_add_func ("/MM/test-keyfiles/foxconn/t77w968", test_foxconn_t77w968);
+#endif
 
     return g_test_run ();
 }
