@@ -48,6 +48,35 @@ build-no-qmi-no-mbim:
     - make check
     - make install
 
+build-single-plugins:
+  stage: build
+  script:
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+    - pushd libmbim
+    - NOCONFIGURE=1 ./autogen.sh
+    - ./configure --prefix=/usr
+    - make
+    - make install
+    - popd
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+    - pushd libqmi
+    - NOCONFIGURE=1 ./autogen.sh
+    - ./configure --prefix=/usr --enable-mbim-qmux
+    - make
+    - make install
+    - popd
+    - NOCONFIGURE=1 ./autogen.sh
+    - for plugin in generic altair-lte anydata cinterion dell dlink
+                    fibocom foxconn haier huawei iridium linktop
+                    longcheer mbm motorola mtk nokia nokia-icera
+                    novatel novatel-lte option option-hso pantech
+                    quectel samsung sierra-legacy sierra simtech
+                    telit thuraya tplink ublox via wavecom x22x zte; do
+        ./configure --prefix=/usr --disable-gtk-doc --disable-all-plugins --enable-plugin-$plugin;
+        make;
+        make clean;
+      done
+
 build-default:
   stage: build
   script:
