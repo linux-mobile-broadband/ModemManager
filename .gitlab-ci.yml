@@ -5,7 +5,7 @@ stages:
 
 before_script:
     - apt update || true
-    - apt -y install autoconf automake libtool libglib2.0-dev libgudev-1.0-dev libgettextpo-dev autopoint xsltproc dbus
+    - apt -y install autoconf automake libtool libglib2.0-dev libgudev-1.0-dev libgettextpo-dev autopoint xsltproc dbus autoconf-archive
 
 build-no-qmi:
   stage: build
