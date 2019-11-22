@@ -5,10 +5,15 @@ stages:
 
 before_script:
     - apt update || true
-    - apt -y install autoconf automake libtool libglib2.0-dev libgudev-1.0-dev libgettextpo-dev autopoint xsltproc dbus autoconf-archive
+    - apt -y install autoconf automake libtool libglib2.0-dev libgudev-1.0-dev libgettextpo-dev autopoint xsltproc dbus autoconf-archive gettext
 
 build-no-qmi:
   stage: build
+  only:
+    - master
+    - merge_requests
+    - tags
+    - schedules
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
@@ -25,6 +30,11 @@ build-no-qmi:
 
 build-no-mbim:
   stage: build
+  only:
+    - master
+    - merge_requests
+    - tags
+    - schedules
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
@@ -41,6 +51,11 @@ build-no-mbim:
 
 build-no-qmi-no-mbim:
   stage: build
+  only:
+    - master
+    - merge_requests
+    - tags
+    - schedules
   script:
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/tmp/build-no-qmi-no-mbim --disable-gtk-doc --without-qmi --without-mbim
@@ -50,6 +65,8 @@ build-no-qmi-no-mbim:
 
 build-single-plugins:
   stage: build
+  only:
+    - schedules
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
@@ -79,8 +96,15 @@ build-single-plugins:
 
 build-default:
   stage: build
+  only:
+    - master
+    - branches
+    - merge_requests
+    - tags
+    - schedules
+    - pushes
   script:
-    - apt -y install autopoint gettext gtk-doc-tools gobject-introspection libgirepository1.0-dev libsystemd-dev libpolkit-gobject-1-dev libglib2.0-doc valac
+    - apt -y install gtk-doc-tools libglib2.0-doc gobject-introspection libgirepository1.0-dev libsystemd-dev libpolkit-gobject-1-dev valac
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh
