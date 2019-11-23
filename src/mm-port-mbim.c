@@ -424,6 +424,20 @@ mm_port_mbim_close (MMPortMbim *self,
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (self->priv->qmi_device) {
         GError *error = NULL;
+        GList *l;
+
+        /* Release all allocated clients */
+        for (l = self->priv->qmi_clients; l; l = g_list_next (l)) {
+            QmiClient *qmi_client = QMI_CLIENT (l->data);
+
+            mm_dbg ("Releasing client for service '%s'...", qmi_service_get_string (qmi_client_get_service (qmi_client)));
+            qmi_device_release_client (self->priv->qmi_device,
+                                       qmi_client,
+                                       QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
+                                       3, NULL, NULL, NULL);
+        }
+        g_list_free_full (self->priv->qmi_clients, g_object_unref);
+        self->priv->qmi_clients = NULL;
 
         if (!qmi_device_close (self->priv->qmi_device, &error)) {
             mm_warn ("Couldn't properly close QMI device: %s", error->message);
