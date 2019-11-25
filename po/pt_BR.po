@@ -1,21 +1,22 @@
 # Brazilian Portuguese translation for ModemManager.
-# Copyright (C) 2017 ModemManager's COPYRIGHT HOLDER
+# Copyright (C) 2019 ModemManager's COPYRIGHT HOLDER
 # This file is distributed under the same license as the ModemManager package.
-# Rafael Fontenelle <rafaelff@gnome.org>, 2017.
+# Rafael Fontenelle <rafaelff@gnome.org>, 2017-2019.
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
-"PO-Revision-Date: 2017-09-05 21:49-0200\n"
+"POT-Creation-Date: 2019-11-27 09:33+0100\n"
+"PO-Revision-Date: 2019-11-25 00:17-0300\n"
 "Last-Translator: Rafael Fontenelle <rafaelff@gnome.org>\n"
 "Language-Team: Brazilian Portuguese <gnome-pt_br-list@gnome.org>\n"
 "Language: pt_BR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n > 1);\n"
-"X-Generator: Virtaal 1.0.0-beta1\n"
+"Plural-Forms: nplurals=2; plural=(n > 1)\n"
+"X-Generator: Gtranslator 3.32.0\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
@@ -68,14 +69,12 @@ msgstr "A política de sistema impede chamadas de voz."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Consultar informações de hora e fuso horário da rede"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
 msgstr ""
-"A política de sistema impede de consultar ou utilizar serviços e informações "
-"de rede."
+"A política de sistema impede de consultar informações de horário da rede."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
