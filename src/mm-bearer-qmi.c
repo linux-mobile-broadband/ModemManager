@@ -1865,6 +1865,7 @@ disconnect_context_step (GTask *task)
                                          NULL,
                                          (GAsyncReadyCallback)stop_network_ready,
                                          task);
+            qmi_message_wds_stop_network_input_unref (input);
             return;
         }
 
@@ -1895,6 +1896,7 @@ disconnect_context_step (GTask *task)
                                          NULL,
                                          (GAsyncReadyCallback)stop_network_ready,
                                          task);
+            qmi_message_wds_stop_network_input_unref (input);
             return;
         }
 
