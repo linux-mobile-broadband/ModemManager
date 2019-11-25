@@ -39,6 +39,10 @@ G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BASE_BEARER)
 #define GLOBAL_PACKET_DATA_HANDLE 0xFFFFFFFF
 
 struct _MMBearerQmiPrivate {
+    /* Cancellables available during a connection attempt */
+    GCancellable *ongoing_connect_user_cancellable;
+    GCancellable *ongoing_connect_network_cancellable;
+
     /* State kept while connected */
     MMPortQmi *qmi;
     gboolean   explicit_qmi_open;
@@ -504,8 +508,14 @@ complete_connect (GTask                 *task,
                   MMBearerConnectResult *result,
                   GError                *error)
 {
+    ConnectContext *ctx;
+
     g_assert (result || error);
     g_assert (!(result && error));
+
+    ctx = g_task_get_task_data (task);
+    g_clear_object (&ctx->self->priv->ongoing_connect_user_cancellable);
+    g_clear_object (&ctx->self->priv->ongoing_connect_network_cancellable);
 
     if (error)
         g_task_return_error (task, error);
@@ -1231,17 +1241,28 @@ qmi_port_open_ready (MMPortQmi *qmi,
 static void
 connect_context_step (GTask *task)
 {
+    MMBearerQmi    *self;
     ConnectContext *ctx;
-    GCancellable   *cancellable;
 
-    cancellable = g_task_get_cancellable (task);
+    self = g_task_get_source_object (task);
 
-    if (g_cancellable_is_cancelled (cancellable)) {
+    g_assert (self->priv->ongoing_connect_user_cancellable);
+    if (g_cancellable_is_cancelled (self->priv->ongoing_connect_user_cancellable)) {
         complete_connect (task,
                           NULL,
                           g_error_new (G_IO_ERROR,
                                        G_IO_ERROR_CANCELLED,
                                        "operation cancelled"));
+        return;
+    }
+
+    g_assert (self->priv->ongoing_connect_network_cancellable);
+    if (g_cancellable_is_cancelled (self->priv->ongoing_connect_network_cancellable)) {
+        complete_connect (task,
+                          NULL,
+                          g_error_new (MM_CORE_ERROR,
+                                       MM_CORE_ERROR_ABORTED,
+                                       "aborted by the network"));
         return;
     }
 
@@ -1263,7 +1284,7 @@ connect_context_step (GTask *task)
         if (!mm_port_qmi_is_open (ctx->qmi)) {
             mm_port_qmi_open (ctx->qmi,
                               TRUE,
-                              cancellable,
+                              g_task_get_cancellable (task),
                               (GAsyncReadyCallback)qmi_port_open_ready,
                               task);
             return;
@@ -1313,7 +1334,7 @@ connect_context_step (GTask *task)
             mm_port_qmi_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
                                          MM_PORT_QMI_FLAG_WDS_IPV4,
-                                         cancellable,
+                                         g_task_get_cancellable (task),
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          task);
             return;
@@ -1336,7 +1357,7 @@ connect_context_step (GTask *task)
             qmi_client_wds_set_ip_family (ctx->client_ipv4,
                                           input,
                                           10,
-                                          cancellable,
+                                          g_task_get_cancellable (task),
                                           (GAsyncReadyCallback)set_ip_family_ready,
                                           task);
             qmi_message_wds_set_ip_family_input_unref (input);
@@ -1355,7 +1376,7 @@ connect_context_step (GTask *task)
                                                                        &ctx->packet_service_status_ipv4_indication_id);
         setup_event_report_unsolicited_events (ctx->self,
                                                ctx->client_ipv4,
-                                               cancellable,
+                                               g_task_get_cancellable (task),
                                                (GAsyncReadyCallback) connect_enable_indications_ipv4_ready,
                                                task);
         return;
@@ -1368,7 +1389,7 @@ connect_context_step (GTask *task)
         qmi_client_wds_start_network (ctx->client_ipv4,
                                       input,
                                       45,
-                                      cancellable,
+                                      g_task_get_cancellable (task),
                                       (GAsyncReadyCallback)start_network_ready,
                                       task);
         qmi_message_wds_start_network_input_unref (input);
@@ -1412,7 +1433,7 @@ connect_context_step (GTask *task)
             mm_port_qmi_allocate_client (ctx->qmi,
                                          QMI_SERVICE_WDS,
                                          MM_PORT_QMI_FLAG_WDS_IPV6,
-                                         cancellable,
+                                         g_task_get_cancellable (task),
                                          (GAsyncReadyCallback)qmi_port_allocate_client_ready,
                                          task);
             return;
@@ -1437,7 +1458,7 @@ connect_context_step (GTask *task)
             qmi_client_wds_set_ip_family (ctx->client_ipv6,
                                           input,
                                           10,
-                                          cancellable,
+                                          g_task_get_cancellable (task),
                                           (GAsyncReadyCallback)set_ip_family_ready,
                                           task);
             qmi_message_wds_set_ip_family_input_unref (input);
@@ -1456,7 +1477,7 @@ connect_context_step (GTask *task)
                                                                        &ctx->packet_service_status_ipv6_indication_id);
         setup_event_report_unsolicited_events (ctx->self,
                                                ctx->client_ipv6,
-                                               cancellable,
+                                               g_task_get_cancellable (task),
                                                (GAsyncReadyCallback) connect_enable_indications_ipv6_ready,
                                                task);
         return;
@@ -1469,7 +1490,7 @@ connect_context_step (GTask *task)
         qmi_client_wds_start_network (ctx->client_ipv6,
                                       input,
                                       45,
-                                      cancellable,
+                                      g_task_get_cancellable (task),
                                       (GAsyncReadyCallback)start_network_ready,
                                       task);
         qmi_message_wds_start_network_input_unref (input);
@@ -1552,11 +1573,19 @@ connect_context_step (GTask *task)
 }
 
 static void
-_connect (MMBaseBearer *self,
+cancel_operation_cancellable (GCancellable *cancellable,
+                              GCancellable *operation_cancellable)
+{
+    g_cancellable_cancel (operation_cancellable);
+}
+
+static void
+_connect (MMBaseBearer *_self,
           GCancellable *cancellable,
           GAsyncReadyCallback callback,
           gpointer user_data)
 {
+    MMBearerQmi *self = MM_BEARER_QMI (_self);
     MMBearerProperties *properties = NULL;
     ConnectContext *ctx;
     MMBaseModem *modem  = NULL;
@@ -1565,6 +1594,7 @@ _connect (MMBaseBearer *self,
     GError *error = NULL;
     const gchar *apn;
     GTask *task;
+    GCancellable *operation_cancellable = NULL;
 
     g_object_get (self,
                   MM_BASE_BEARER_MODEM, &modem,
@@ -1598,7 +1628,7 @@ _connect (MMBaseBearer *self,
     }
 
     /* Check whether we have an APN */
-    apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (_self));
 
     /* Is this a 3GPP only modem and no APN was given? If so, error */
     if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
@@ -1643,7 +1673,9 @@ _connect (MMBaseBearer *self,
                   MM_BASE_BEARER_CONFIG, &properties,
                   NULL);
 
-    task = g_task_new (self, cancellable, callback, user_data);
+    operation_cancellable = g_cancellable_new ();
+    task = g_task_new (self, operation_cancellable, callback, user_data);
+    g_task_set_check_cancellable (task, FALSE);
     g_task_set_task_data (task, ctx, (GDestroyNotify)connect_context_free);
 
     if (properties) {
@@ -1659,7 +1691,7 @@ _connect (MMBaseBearer *self,
             ip_family == MM_BEARER_IP_FAMILY_ANY) {
             gchar *ip_family_str;
 
-            ip_family = mm_base_bearer_get_default_ip_family (self);
+            ip_family = mm_base_bearer_get_default_ip_family (_self);
             ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
             mm_dbg ("No specific IP family requested, defaulting to %s",
                     ip_family_str);
@@ -1718,10 +1750,27 @@ _connect (MMBaseBearer *self,
         }
     }
 
+    /* setup network cancellable */
+    g_assert (!self->priv->ongoing_connect_network_cancellable);
+    self->priv->ongoing_connect_network_cancellable = g_cancellable_new ();
+    g_cancellable_connect (self->priv->ongoing_connect_network_cancellable,
+                           G_CALLBACK (cancel_operation_cancellable),
+                           g_object_ref (operation_cancellable),
+                           g_object_unref);
+
+    /* setup user cancellable */
+    g_assert (!self->priv->ongoing_connect_user_cancellable);
+    self->priv->ongoing_connect_user_cancellable = g_object_ref (cancellable);
+    g_cancellable_connect (self->priv->ongoing_connect_user_cancellable,
+                           G_CALLBACK (cancel_operation_cancellable),
+                           g_object_ref (operation_cancellable),
+                           g_object_unref);
+
     /* Run! */
     connect_context_step (task);
 
  out:
+    g_clear_object (&operation_cancellable);
     g_clear_object (&qmi);
     g_clear_object (&data);
     g_clear_object (&modem);
@@ -2004,7 +2053,6 @@ disconnect (MMBaseBearer *_self,
     ctx->packet_data_handle_ipv6 = self->priv->packet_data_handle_ipv6;
     ctx->step = DISCONNECT_STEP_FIRST;
 
-    task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)disconnect_context_free);
 
     /* Run! */
@@ -2014,15 +2062,20 @@ disconnect (MMBaseBearer *_self,
 /*****************************************************************************/
 
 static void
-report_connection_status (MMBaseBearer *self,
-                          MMBearerConnectionStatus status)
+report_connection_status (MMBaseBearer             *_self,
+                          MMBearerConnectionStatus  status)
 {
-    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
+    MMBearerQmi *self = MM_BEARER_QMI (_self);
+
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
+        /* Cancel any ongoing connection attempt */
+        g_cancellable_cancel (self->priv->ongoing_connect_network_cancellable);
         /* Cleanup all connection related data */
-        reset_bearer_connection (MM_BEARER_QMI (self), TRUE, TRUE);
+        reset_bearer_connection (self, TRUE, TRUE);
+    }
 
     /* Chain up parent's report_connection_status() */
-    MM_BASE_BEARER_CLASS (mm_bearer_qmi_parent_class)->report_connection_status (self, status);
+    MM_BASE_BEARER_CLASS (mm_bearer_qmi_parent_class)->report_connection_status (_self, status);
 }
 
 /*****************************************************************************/
