@@ -1518,8 +1518,8 @@ _connect (MMBaseBearer *self,
     MMBearerProperties *properties = NULL;
     ConnectContext *ctx;
     MMBaseModem *modem  = NULL;
-    MMPort *data;
-    MMPortQmi *qmi;
+    MMPort *data = NULL;
+    MMPortQmi *qmi = NULL;
     GError *error = NULL;
     const gchar *apn;
     GTask *task;
@@ -1540,8 +1540,7 @@ _connect (MMBaseBearer *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_NOT_FOUND,
             "No valid data port found to launch connection");
-        g_object_unref (modem);
-        return;
+        goto out;
     }
 
     /* Each data port has a single QMI port associated */
@@ -1553,9 +1552,7 @@ _connect (MMBaseBearer *self,
             user_data,
             _connect,
             error);
-        g_object_unref (data);
-        g_object_unref (modem);
-        return;
+        goto out;
     }
 
     /* Check whether we have an APN */
@@ -1571,8 +1568,7 @@ _connect (MMBaseBearer *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_INVALID_ARGS,
             "3GPP connection logic requires APN setting");
-        g_object_unref (modem);
-        return;
+        goto out;
     }
 
     /* Is this a 3GPP2 only modem and APN was given? If so, error */
@@ -1585,11 +1581,8 @@ _connect (MMBaseBearer *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_INVALID_ARGS,
             "3GPP2 doesn't support APN setting");
-        g_object_unref (modem);
-        return;
+        goto out;
     }
-
-    g_object_unref (modem);
 
     mm_dbg ("Launching connection with QMI port (%s/%s) and data port (%s/%s)",
             mm_port_subsys_get_string (mm_port_get_subsys (MM_PORT (qmi))),
@@ -1599,8 +1592,8 @@ _connect (MMBaseBearer *self,
 
     ctx = g_slice_new0 (ConnectContext);
     ctx->self = g_object_ref (self);
-    ctx->qmi = qmi;
-    ctx->data = data;
+    ctx->qmi = g_object_ref (qmi);
+    ctx->data = g_object_ref (data);
     ctx->step = CONNECT_STEP_FIRST;
     ctx->ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
 
@@ -1653,7 +1646,7 @@ _connect (MMBaseBearer *self,
                 str);
             g_object_unref (task);
             g_free (str);
-            return;
+            goto out;
         }
 
         auth = mm_bearer_properties_get_allowed_auth (properties);
@@ -1679,12 +1672,17 @@ _connect (MMBaseBearer *self,
                 str);
             g_object_unref (task);
             g_free (str);
-            return;
+            goto out;
         }
     }
 
     /* Run! */
     connect_context_step (task);
+
+ out:
+    g_clear_object (&qmi);
+    g_clear_object (&data);
+    g_clear_object (&modem);
 }
 
 /*****************************************************************************/
