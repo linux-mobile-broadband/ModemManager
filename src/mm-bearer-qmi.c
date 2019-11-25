@@ -499,6 +499,21 @@ connect_finish (MMBaseBearer *self,
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
+static void
+complete_connect (GTask                 *task,
+                  MMBearerConnectResult *result,
+                  GError                *error)
+{
+    g_assert (result || error);
+    g_assert (!(result && error));
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, result, (GDestroyNotify)mm_bearer_connect_result_unref);
+    g_object_unref (task);
+}
+
 static void connect_context_step (GTask *task);
 
 static void
@@ -1169,8 +1184,10 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
     g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
 
     if (!mm_port_qmi_allocate_client_finish (qmi, res, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        g_prefix_error (&error, "Couldn't allocate %s client in QMI port %s: ",
+                        ctx->running_ipv4 ? "IPv4" : "IPv6",
+                        mm_port_get_device (MM_PORT (qmi)));
+        complete_connect (task, NULL, error);
         return;
     }
 
@@ -1197,8 +1214,9 @@ qmi_port_open_ready (MMPortQmi *qmi,
     GError *error = NULL;
 
     if (!mm_port_qmi_open_finish (qmi, res, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        g_prefix_error (&error, "Couldn't open QMI port %s: ",
+                        mm_port_get_device (MM_PORT (qmi)));
+        complete_connect (task, NULL, error);
         return;
     }
 
@@ -1214,16 +1232,20 @@ static void
 connect_context_step (GTask *task)
 {
     ConnectContext *ctx;
-    GCancellable *cancellable;
+    GCancellable   *cancellable;
 
-    /* If cancelled, complete */
-    if (g_task_return_error_if_cancelled (task)) {
-        g_object_unref (task);
+    cancellable = g_task_get_cancellable (task);
+
+    if (g_cancellable_is_cancelled (cancellable)) {
+        complete_connect (task,
+                          NULL,
+                          g_error_new (G_IO_ERROR,
+                                       G_IO_ERROR_CANCELLED,
+                                       "operation cancelled"));
         return;
     }
 
     ctx = g_task_get_task_data (task);
-    cancellable = g_task_get_cancellable (task);
 
     switch (ctx->step) {
     case CONNECT_STEP_FIRST:
@@ -1467,50 +1489,7 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_LAST:
         /* If one of IPv4 or IPv6 succeeds, we're connected */
-        if (ctx->packet_data_handle_ipv4 || ctx->packet_data_handle_ipv6) {
-            /* Port is connected; update the state */
-            mm_port_set_connected (MM_PORT (ctx->data), TRUE);
-
-            /* Keep connection related data */
-
-            g_assert (ctx->self->priv->qmi == NULL);
-            ctx->self->priv->qmi = g_object_ref (ctx->qmi);
-            if (ctx->explicit_qmi_open) {
-                ctx->self->priv->explicit_qmi_open = TRUE;
-                ctx->explicit_qmi_open = FALSE;
-            }
-
-            g_assert (ctx->self->priv->data == NULL);
-            ctx->self->priv->data = g_object_ref (ctx->data);
-
-            g_assert (ctx->self->priv->packet_data_handle_ipv4 == 0);
-            g_assert (ctx->self->priv->client_ipv4 == NULL);
-            if (ctx->packet_data_handle_ipv4) {
-                ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
-                ctx->self->priv->packet_service_status_ipv4_indication_id = ctx->packet_service_status_ipv4_indication_id;
-                ctx->packet_service_status_ipv4_indication_id = 0;
-                ctx->self->priv->event_report_ipv4_indication_id = ctx->event_report_ipv4_indication_id;
-                ctx->event_report_ipv4_indication_id = 0;
-                ctx->self->priv->client_ipv4 = g_object_ref (ctx->client_ipv4);
-            }
-
-            g_assert (ctx->self->priv->packet_data_handle_ipv6 == 0);
-            g_assert (ctx->self->priv->client_ipv6 == NULL);
-            if (ctx->packet_data_handle_ipv6) {
-                ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
-                ctx->self->priv->packet_service_status_ipv6_indication_id = ctx->packet_service_status_ipv6_indication_id;
-                ctx->packet_service_status_ipv6_indication_id = 0;
-                ctx->self->priv->event_report_ipv6_indication_id = ctx->event_report_ipv6_indication_id;
-                ctx->event_report_ipv6_indication_id = 0;
-                ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
-            }
-
-            /* Set operation result */
-            g_task_return_pointer (
-                task,
-                mm_bearer_connect_result_new (ctx->data, ctx->ipv4_config, ctx->ipv6_config),
-                (GDestroyNotify)mm_bearer_connect_result_unref);
-        } else {
+        if (!ctx->packet_data_handle_ipv4 && !ctx->packet_data_handle_ipv6) {
             GError *error;
 
             /* No connection, set error. If both set, IPv4 error preferred */
@@ -1522,10 +1501,52 @@ connect_context_step (GTask *task)
                 ctx->error_ipv6 = NULL;
             }
 
-            g_task_return_error (task, error);
+            complete_connect (task, NULL, error);
+            return;
         }
 
-        g_object_unref (task);
+        /* Port is connected; update the state */
+        mm_port_set_connected (MM_PORT (ctx->data), TRUE);
+
+        /* Keep connection related data */
+
+        g_assert (ctx->self->priv->qmi == NULL);
+        ctx->self->priv->qmi = g_object_ref (ctx->qmi);
+        if (ctx->explicit_qmi_open) {
+            ctx->self->priv->explicit_qmi_open = TRUE;
+            ctx->explicit_qmi_open = FALSE;
+        }
+
+        g_assert (ctx->self->priv->data == NULL);
+        ctx->self->priv->data = g_object_ref (ctx->data);
+
+        g_assert (ctx->self->priv->packet_data_handle_ipv4 == 0);
+        g_assert (ctx->self->priv->client_ipv4 == NULL);
+        if (ctx->packet_data_handle_ipv4) {
+            ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
+            ctx->self->priv->packet_service_status_ipv4_indication_id = ctx->packet_service_status_ipv4_indication_id;
+            ctx->packet_service_status_ipv4_indication_id = 0;
+            ctx->self->priv->event_report_ipv4_indication_id = ctx->event_report_ipv4_indication_id;
+            ctx->event_report_ipv4_indication_id = 0;
+            ctx->self->priv->client_ipv4 = g_object_ref (ctx->client_ipv4);
+        }
+
+        g_assert (ctx->self->priv->packet_data_handle_ipv6 == 0);
+        g_assert (ctx->self->priv->client_ipv6 == NULL);
+        if (ctx->packet_data_handle_ipv6) {
+            ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
+            ctx->self->priv->packet_service_status_ipv6_indication_id = ctx->packet_service_status_ipv6_indication_id;
+            ctx->packet_service_status_ipv6_indication_id = 0;
+            ctx->self->priv->event_report_ipv6_indication_id = ctx->event_report_ipv6_indication_id;
+            ctx->event_report_ipv6_indication_id = 0;
+            ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
+        }
+
+        complete_connect (task,
+                          mm_bearer_connect_result_new (ctx->data,
+                                                        ctx->ipv4_config,
+                                                        ctx->ipv6_config),
+                          NULL);
         return;
     }
 }
