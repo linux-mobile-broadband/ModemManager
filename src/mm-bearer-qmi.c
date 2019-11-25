@@ -40,6 +40,9 @@ G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BASE_BEARER)
 
 struct _MMBearerQmiPrivate {
     /* State kept while connected */
+    MMPortQmi *qmi;
+    gboolean   explicit_qmi_open;
+
     QmiClientWds *client_ipv4;
     guint packet_service_status_ipv4_indication_id;
     guint event_report_ipv4_indication_id;
@@ -414,6 +417,7 @@ typedef struct {
     ConnectStep step;
     MMPort *data;
     MMPortQmi *qmi;
+    gboolean explicit_qmi_open;
     gchar *user;
     gchar *password;
     gchar *apn;
@@ -471,6 +475,9 @@ connect_context_free (ConnectContext *ctx)
                                                  ctx->client_ipv6,
                                                  &ctx->event_report_ipv6_indication_id);
     }
+
+    if (ctx->explicit_qmi_open)
+        mm_port_qmi_close (ctx->qmi);
 
     g_clear_error (&ctx->error_ipv4);
     g_clear_error (&ctx->error_ipv6);
@@ -1195,8 +1202,10 @@ qmi_port_open_ready (MMPortQmi *qmi,
         return;
     }
 
-    /* Keep on */
     ctx = g_task_get_task_data (task);
+    ctx->explicit_qmi_open = TRUE;
+
+    /* Keep on */
     ctx->step++;
     connect_context_step (task);
 }
@@ -1225,6 +1234,10 @@ connect_context_step (GTask *task)
         ctx->step++;
 
     case CONNECT_STEP_OPEN_QMI_PORT:
+        /* If we're explicitly opening the port (e.g. using a different cdc-wdm
+         * port because the primary one is already connected by a different
+         * bearer), then make sure we also close it if anything goes wrong and
+         * during disconnect */
         if (!mm_port_qmi_is_open (ctx->qmi)) {
             mm_port_qmi_open (ctx->qmi,
                               TRUE,
@@ -1459,6 +1472,14 @@ connect_context_step (GTask *task)
             mm_port_set_connected (MM_PORT (ctx->data), TRUE);
 
             /* Keep connection related data */
+
+            g_assert (ctx->self->priv->qmi == NULL);
+            ctx->self->priv->qmi = g_object_ref (ctx->qmi);
+            if (ctx->explicit_qmi_open) {
+                ctx->self->priv->explicit_qmi_open = TRUE;
+                ctx->explicit_qmi_open = FALSE;
+            }
+
             g_assert (ctx->self->priv->data == NULL);
             ctx->self->priv->data = g_object_ref (ctx->data);
 
@@ -1768,8 +1789,15 @@ reset_bearer_connection (MMBearerQmi *self,
         g_clear_object (&self->priv->client_ipv6);
     }
 
-    if (!self->priv->packet_data_handle_ipv4 &&
-        !self->priv->packet_data_handle_ipv6) {
+    if (!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) {
+        /* Close port if we had it explicitly open for this connection */
+        if (self->priv->qmi) {
+            if (self->priv->explicit_qmi_open) {
+                self->priv->explicit_qmi_open = FALSE;
+                mm_port_qmi_close (self->priv->qmi);
+            }
+            g_clear_object (&self->priv->qmi);
+        }
         if (self->priv->data) {
             /* Port is disconnected; update the state */
             mm_port_set_connected (self->priv->data, FALSE);
@@ -1935,7 +1963,8 @@ disconnect (MMBaseBearer *_self,
 
     if ((!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) ||
         (!self->priv->client_ipv4 && !self->priv->client_ipv6) ||
-        !self->priv->data) {
+        !self->priv->data ||
+        !self->priv->qmi) {
         g_task_report_new_error (
             self,
             callback,
