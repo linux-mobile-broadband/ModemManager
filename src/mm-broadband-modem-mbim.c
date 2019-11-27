@@ -2449,18 +2449,26 @@ lte_attach_status_query_ready (MbimDevice   *device,
 }
 
 static void
-modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *self,
+modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *_self,
                                     GAsyncReadyCallback  callback,
                                     gpointer             user_data)
 {
-    MbimDevice  *device;
-    MbimMessage *message;
-    GTask       *task;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice           *device;
+    MbimMessage          *message;
+    GTask                *task;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_lte_attach_status_supported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "LTE attach status is unsupported");
+        g_object_unref (task);
+        return;
+    }
 
     message = mbim_message_ms_basic_connect_extensions_lte_attach_status_query_new (NULL);
     mbim_device_command (device,
@@ -2569,18 +2577,26 @@ lte_attach_configuration_query_ready (MbimDevice   *device,
 }
 
 static void
-modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *self,
+modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
                                              GAsyncReadyCallback  callback,
                                              gpointer             user_data)
 {
-    MbimDevice  *device;
-    MbimMessage *message;
-    GTask       *task;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice           *device;
+    MbimMessage          *message;
+    GTask                *task;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_lte_attach_status_supported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "LTE attach configuration is unsupported");
+        g_object_unref (task);
+        return;
+    }
 
     message = mbim_message_ms_basic_connect_extensions_lte_attach_configuration_query_new (NULL);
     mbim_device_command (device,
@@ -2731,19 +2747,28 @@ before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
 }
 
 static void
-modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *self,
+modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
                                             MMBearerProperties  *config,
                                             GAsyncReadyCallback  callback,
                                             gpointer             user_data)
 {
-    GTask       *task;
-    MbimDevice  *device;
-    MbimMessage *message;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                *task;
+    MbimDevice           *device;
+    MbimMessage          *message;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_lte_attach_status_supported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "LTE attach configuration is unsupported");
+        g_object_unref (task);
+        return;
+    }
+
     g_task_set_task_data (task, g_object_ref (config), g_object_unref);
 
     message = mbim_message_ms_basic_connect_extensions_lte_attach_configuration_query_new (NULL);
