@@ -34,6 +34,7 @@ struct _MMPortMbimPrivate {
     gboolean    in_progress;
     MbimDevice *mbim_device;
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    gboolean    qmi_supported;
     QmiDevice  *qmi_device;
     GList      *qmi_clients;
 #endif
@@ -183,6 +184,7 @@ qmi_device_open_ready (QmiDevice    *dev,
         /* Ignore error and complete */
         mm_info ("[%s] MBIM device is not QMI capable",
                  mm_port_get_device (MM_PORT (self)));
+        self->priv->qmi_supported = FALSE;
     } else {
         mm_info ("[%s] MBIM device is QMI capable",
                  mm_port_get_device (MM_PORT (self)));
@@ -212,6 +214,7 @@ qmi_device_new_ready (GObject      *unused,
         /* Ignore error and complete */
         mm_info ("[%s] MBIM device is not QMI capable",
                  mm_port_get_device (MM_PORT (self)));
+        self->priv->qmi_supported = FALSE;
         self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -230,6 +233,89 @@ qmi_device_new_ready (GObject      *unused,
                      g_task_get_cancellable (task),
                      (GAsyncReadyCallback)qmi_device_open_ready,
                      task);
+}
+
+static void
+mbim_query_device_services_ready (MbimDevice   *device,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    MMPortMbim                *self;
+    MbimMessage               *response;
+    GError                    *error = NULL;
+    MbimDeviceServiceElement **device_services;
+    guint32                    device_services_count;
+    GFile                     *file;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_device_services_response_parse (
+            response,
+            &device_services_count,
+            NULL, /* max_dss_sessions */
+            &device_services,
+            &error)) {
+        guint32 i;
+
+        /* Look for the QMI service */
+        for (i = 0; i < device_services_count; i++) {
+            if (mbim_uuid_to_service (&device_services[i]->device_service_id) == MBIM_SERVICE_QMI)
+                break;
+        }
+        /* If we were able to successfully list device services and none of them
+         * is the QMI service, we'll skip trying to check QMI support. */
+        if (i == device_services_count)
+            self->priv->qmi_supported = FALSE;
+        mbim_device_service_element_array_free (device_services);
+    } else {
+        /* Ignore error */
+        mm_dbg ("Couldn't query device services, will attempt QMI open anyway: %s", error->message);
+        g_error_free (error);
+    }
+
+    if (response)
+        mbim_message_unref (response);
+
+    /* File path of the device */
+    file = G_FILE (g_task_get_task_data (task));
+
+    if (!file || !self->priv->qmi_supported) {
+        mm_info ("[%s] MBIM device is not QMI capable",
+                 mm_port_get_device (MM_PORT (self)));
+        self->priv->in_progress = FALSE;
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Attempt to create and open the QMI device */
+    mm_dbg ("[%s] checking if QMI over MBIM is supported",
+            mm_port_get_device (MM_PORT (self)));
+    qmi_device_new (file,
+                    g_task_get_cancellable (task),
+                    (GAsyncReadyCallback) qmi_device_new_ready,
+                    task);
+}
+
+static void
+mbim_query_device_services (GTask *task)
+{
+    MbimMessage *message;
+    MMPortMbim  *self;
+
+    self = g_task_get_source_object (task);
+
+    message = mbim_message_device_services_query_new (NULL);
+    mbim_device_command (self->priv->mbim_device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)mbim_query_device_services_ready,
+                         task);
+    mbim_message_unref (message);
 }
 
 #endif
@@ -256,25 +342,15 @@ mbim_device_open_ready (MbimDevice   *mbim_device,
             mm_port_get_device (MM_PORT (self)));
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    {
-        GFile *file;
-
-        if ((file = G_FILE (g_task_get_task_data (task)))) {
-            mm_dbg ("[%s] checking if QMI over MBIM is supported",
-                    mm_port_get_device (MM_PORT (self)));
-            qmi_device_new (file,
-                            g_task_get_cancellable (task),
-                            (GAsyncReadyCallback) qmi_device_new_ready,
-                            task);
-            return;
-        }
+    if (self->priv->qmi_supported) {
+        mbim_query_device_services (task);
+        return;
     }
 #endif
 
     self->priv->in_progress = FALSE;
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-
 }
 
 static void
@@ -481,6 +557,12 @@ static void
 mm_port_mbim_init (MMPortMbim *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_PORT_MBIM, MMPortMbimPrivate);
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    /* By default, always assume that QMI is supported, we'll later check if
+     * that's true or not. */
+    self->priv->qmi_supported = TRUE;
+#endif
 }
 
 static void
