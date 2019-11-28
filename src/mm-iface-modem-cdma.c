@@ -25,14 +25,41 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-#define REGISTRATION_CHECK_TIMEOUT_SEC 30
-
 #define SUBSYSTEM_CDMA1X "cdma1x"
 #define SUBSYSTEM_EVDO "evdo"
 
-#define REGISTRATION_CHECK_CONTEXT_TAG    "cdma-registration-check-context-tag"
+/*****************************************************************************/
+/* Private data context */
 
-static GQuark registration_check_context_quark;
+#define PRIVATE_TAG "iface-modem-cdma-private-tag"
+static GQuark private_quark;
+
+typedef struct {
+    gboolean activation_ongoing;
+} Private;
+
+static void
+private_free (Private *priv)
+{
+    g_slice_free (Private, priv);
+}
+
+static Private *
+get_private (MMIfaceModemCdma *self)
+{
+    Private *priv;
+
+    if (G_UNLIKELY (!private_quark))
+        private_quark = g_quark_from_static_string (PRIVATE_TAG);
+
+    priv = g_object_get_qdata (G_OBJECT (self), private_quark);
+    if (!priv) {
+        priv = g_slice_new0 (Private);
+        g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
+    }
+
+    return priv;
+}
 
 /*****************************************************************************/
 
@@ -91,7 +118,11 @@ handle_activate_ready (MMIfaceModemCdma *self,
                        GAsyncResult *res,
                        HandleActivateContext *ctx)
 {
-    GError *error = NULL;
+    Private *priv;
+    GError  *error = NULL;
+
+    priv = get_private (self);
+    priv->activation_ongoing = FALSE;
 
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish (self, res,&error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -106,11 +137,24 @@ handle_activate_auth_ready (MMBaseModem *self,
                             GAsyncResult *res,
                             HandleActivateContext *ctx)
 {
-    MMModemState modem_state;
-    GError *error = NULL;
+    Private      *priv;
+    MMModemState  modem_state;
+    GError       *error = NULL;
+
+    priv = get_private (MM_IFACE_MODEM_CDMA (self));
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_activate_context_free (ctx);
+        return;
+    }
+
+    /* Fail if we have already an activation ongoing */
+    if (priv->activation_ongoing) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_IN_PROGRESS,
+                                               "An activation operation is already in progress");
         handle_activate_context_free (ctx);
         return;
     }
@@ -171,6 +215,7 @@ handle_activate_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_ENABLED:
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
+        priv->activation_ongoing = TRUE;
         MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate (
             MM_IFACE_MODEM_CDMA (self),
             ctx->carrier,
@@ -256,7 +301,11 @@ handle_activate_manual_ready (MMIfaceModemCdma *self,
                               GAsyncResult *res,
                               HandleActivateManualContext *ctx)
 {
-    GError *error = NULL;
+    Private *priv;
+    GError  *error = NULL;
+
+    priv = get_private (self);
+    priv->activation_ongoing = FALSE;
 
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish (self, res,&error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -272,11 +321,24 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
                                    HandleActivateManualContext *ctx)
 {
     MMCdmaManualActivationProperties *properties;
-    MMModemState modem_state;
-    GError *error = NULL;
+    Private                          *priv;
+    MMModemState                      modem_state;
+    GError                           *error = NULL;
+
+    priv = get_private (MM_IFACE_MODEM_CDMA (self));
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_activate_manual_context_free (ctx);
+        return;
+    }
+
+    /* Fail if we have already an activation ongoing */
+    if (priv->activation_ongoing) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_IN_PROGRESS,
+                                               "An activation operation is already in progress");
         handle_activate_manual_context_free (ctx);
         return;
     }
@@ -333,6 +395,7 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_ENABLED:
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
+        priv->activation_ongoing = TRUE;
         MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual (
             MM_IFACE_MODEM_CDMA (self),
             properties,
@@ -442,6 +505,11 @@ mm_iface_modem_cdma_register_in_network (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+
+#define REGISTRATION_CHECK_TIMEOUT_SEC 30
+#define REGISTRATION_CHECK_CONTEXT_TAG "cdma-registration-check-context-tag"
+
+static GQuark registration_check_context_quark;
 
 typedef struct _RunRegistrationChecksContext RunRegistrationChecksContext;
 static void registration_check_step (GTask *task);
