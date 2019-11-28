@@ -150,8 +150,7 @@ generate_3gpp_submit_pdus (MMBaseSms *self,
         if (split_text)
             g_strfreev (split_text);
         else if (split_data) {
-            guint i = 0;
-
+            i = 0;
             while (split_data[i])
                 g_byte_array_unref (split_data[i++]);
             g_free (split_data);
