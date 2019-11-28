@@ -168,11 +168,13 @@ refresh_context_cb (MMIfaceModemSignal *self)
 static void
 teardown_refresh_context (MMIfaceModemSignal *self)
 {
-    mm_dbg ("Extended signal information reporting disabled");
     clear_values (self);
     if (G_UNLIKELY (!refresh_context_quark))
         refresh_context_quark  = g_quark_from_static_string (REFRESH_CONTEXT_TAG);
-    g_object_set_qdata (G_OBJECT (self), refresh_context_quark, NULL);
+    if (g_object_get_qdata (G_OBJECT (self), refresh_context_quark)) {
+        mm_dbg ("Extended signal information reporting disabled");
+        g_object_set_qdata (G_OBJECT (self), refresh_context_quark, NULL);
+    }
 }
 
 static gboolean
