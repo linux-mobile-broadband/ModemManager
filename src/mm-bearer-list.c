@@ -147,13 +147,13 @@ mm_bearer_list_foreach (MMBearerList *self,
 }
 
 MMBaseBearer *
-mm_bearer_list_find_by_properties (MMBearerList *self,
-                                   MMBearerProperties *properties)
+mm_bearer_list_find_by_properties (MMBearerList       *self,
+                                   MMBearerProperties *props)
 {
     GList *l;
 
     for (l = self->priv->bearers; l; l = g_list_next (l)) {
-        if (mm_bearer_properties_cmp (mm_base_bearer_peek_config (MM_BASE_BEARER (l->data)), properties))
+        if (mm_bearer_properties_cmp (mm_base_bearer_peek_config (MM_BASE_BEARER (l->data)), props))
             return g_object_ref (l->data);
     }
 
