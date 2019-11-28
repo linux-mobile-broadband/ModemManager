@@ -102,6 +102,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_ussd_supported;
     gboolean is_atds_location_supported;
     gboolean is_atds_signal_supported;
+    gboolean is_intel_reset_supported;
 
     /* Process unsolicited notifications */
     guint notification_id;
@@ -1713,6 +1714,111 @@ modem_load_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Reset */
+
+static gboolean
+modem_reset_finish (MMIfaceModem  *self,
+                    GAsyncResult  *res,
+                    GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+shared_qmi_reset_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_shared_qmi_reset_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_reset_shared_qmi (GTask *task)
+{
+    mm_shared_qmi_reset (MM_IFACE_MODEM (g_task_get_source_object (task)),
+                         (GAsyncReadyCallback)shared_qmi_reset_ready,
+                         task);
+}
+
+#endif
+
+static void
+intel_firmware_update_modem_reboot_set_ready (MbimDevice   *device,
+                                              GAsyncResult *res,
+                                              GTask        *task)
+{
+    MbimMessage *response;
+    GError      *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+        /* We don't really expect the Intel firmware update service to be
+         * available in QMI modems, but doesn't harm to fallback to the QMI
+         * implementation here */
+        mm_dbg ("Couldn't run intel reset: %s", error->message);
+        g_error_free (error);
+        modem_reset_shared_qmi (task);
+#else
+        g_task_return_error (task, error);
+        g_object_unref (task);
+#endif
+    } else {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+    }
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+modem_reset (MMIfaceModem        *_self,
+             GAsyncReadyCallback  callback,
+             gpointer             user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                *task;
+    MbimDevice           *device;
+    MbimMessage          *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_intel_reset_supported) {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+        modem_reset_shared_qmi (task);
+#else
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "modem reset operation is not supported");
+        g_object_unref (task);
+#endif
+        return;
+    }
+
+    /* This message is defined in the Intel Firmware Update service, but it
+     * really is just a standard modem reboot. */
+    message = mbim_message_intel_firmware_update_modem_reboot_set_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)intel_firmware_update_modem_reboot_set_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBaseBearer *
@@ -2052,6 +2158,14 @@ query_device_services_ready (MbimDevice   *device,
                         } else if (device_services[i]->cids[j] == MBIM_CID_ATDS_SIGNAL) {
                             mm_dbg ("ATDS signal is supported");
                             self->priv->is_atds_signal_supported = TRUE;
+                        }
+                    }
+                    break;
+                case MBIM_SERVICE_INTEL_FIRMWARE_UPDATE:
+                    for (j = 0; j < device_services[i]->cids_count; j++) {
+                        if (device_services[i]->cids[j] == MBIM_CID_INTEL_FIRMWARE_UPDATE_MODEM_REBOOT) {
+                            mm_dbg ("Intel reset is supported");
+                            self->priv->is_intel_reset_supported = TRUE;
                         }
                     }
                     break;
@@ -5272,6 +5386,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = power_up_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = power_down_finish;
+    iface->reset = modem_reset;
+    iface->reset_finish = modem_reset_finish;
     iface->load_supported_ip_families = modem_load_supported_ip_families;
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
 
@@ -5318,8 +5434,6 @@ iface_modem_init (MMIfaceModem *iface)
 
     /* Other actions */
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    iface->reset = mm_shared_qmi_reset;
-    iface->reset_finish = mm_shared_qmi_reset_finish;
     iface->factory_reset = mm_shared_qmi_factory_reset;
     iface->factory_reset_finish = mm_shared_qmi_factory_reset_finish;
 #endif
