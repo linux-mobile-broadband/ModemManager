@@ -4578,6 +4578,7 @@ process_ussd_message (MMBroadbandModemMbim *self,
             g_task_return_pointer (task, converted, g_free);
         else
             g_assert_not_reached ();
+        g_object_unref (task);
         return;
     }
 
