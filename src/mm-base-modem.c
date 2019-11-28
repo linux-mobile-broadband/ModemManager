@@ -1181,6 +1181,14 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             break;
 #endif
 
+        case MM_PORT_TYPE_UNKNOWN:
+        case MM_PORT_TYPE_IGNORED:
+#if !defined WITH_MBIM
+        case MM_PORT_TYPE_MBIM:
+#endif
+#if !defined WITH_QMI
+        case MM_PORT_TYPE_QMI:
+#endif
         default:
             /* Ignore port */
             break;
