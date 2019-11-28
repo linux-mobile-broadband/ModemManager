@@ -1822,8 +1822,10 @@ in_call_setup_context_step (GTask *task)
     MMIfaceModemVoice  *self;
     InCallSetupContext *ctx;
 
-    if (g_task_return_error_if_cancelled (task))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -1950,8 +1952,10 @@ in_call_cleanup_context_step (GTask *task)
     MMIfaceModemVoice    *self;
     InCallCleanupContext *ctx;
 
-    if (g_task_return_error_if_cancelled (task))
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
         return;
+    }
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
