@@ -1827,9 +1827,9 @@ mm_base_sms_multipart_new (MMBaseModem *modem,
 }
 
 MMBaseSms *
-mm_base_sms_new_from_properties (MMBaseModem *modem,
-                                 MMSmsProperties *properties,
-                                 GError **error)
+mm_base_sms_new_from_properties (MMBaseModem      *modem,
+                                 MMSmsProperties  *props,
+                                 GError          **error)
 {
     MMBaseSms *self;
     const gchar *text;
@@ -1837,17 +1837,17 @@ mm_base_sms_new_from_properties (MMBaseModem *modem,
 
     g_assert (MM_IS_IFACE_MODEM_MESSAGING (modem));
 
-    text = mm_sms_properties_get_text (properties);
-    data = mm_sms_properties_peek_data_bytearray (properties);
+    text = mm_sms_properties_get_text (props);
+    data = mm_sms_properties_peek_data_bytearray (props);
 
     /* Don't create SMS from properties if either (text|data) or number is missing */
-    if (!mm_sms_properties_get_number (properties) ||
+    if (!mm_sms_properties_get_number (props) ||
         (!text && !data)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
                      "Cannot create SMS: mandatory parameter '%s' is missing",
-                     (!mm_sms_properties_get_number (properties)?
+                     (!mm_sms_properties_get_number (props)?
                       "number" : "text' or 'data"));
         return NULL;
     }
@@ -1866,8 +1866,8 @@ mm_base_sms_new_from_properties (MMBaseModem *modem,
     g_object_set (self,
                   "state",    MM_SMS_STATE_UNKNOWN,
                   "storage",  MM_SMS_STORAGE_UNKNOWN,
-                  "number",   mm_sms_properties_get_number (properties),
-                  "pdu-type", (mm_sms_properties_get_teleservice_id (properties) == MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN ?
+                  "number",   mm_sms_properties_get_number (props),
+                  "pdu-type", (mm_sms_properties_get_teleservice_id (props) == MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN ?
                                MM_SMS_PDU_TYPE_SUBMIT :
                                MM_SMS_PDU_TYPE_CDMA_SUBMIT),
                   "text",     text,
@@ -1879,14 +1879,14 @@ mm_base_sms_new_from_properties (MMBaseModem *modem,
                                                         (GDestroyNotify) g_byte_array_unref,
                                                         g_byte_array_ref (data)) :
                                NULL),
-                  "smsc",     mm_sms_properties_get_smsc (properties),
-                  "class",    mm_sms_properties_get_class (properties),
-                  "teleservice-id",          mm_sms_properties_get_teleservice_id (properties),
-                  "service-category",        mm_sms_properties_get_service_category (properties),
-                  "delivery-report-request", mm_sms_properties_get_delivery_report_request (properties),
+                  "smsc",     mm_sms_properties_get_smsc (props),
+                  "class",    mm_sms_properties_get_class (props),
+                  "teleservice-id",          mm_sms_properties_get_teleservice_id (props),
+                  "service-category",        mm_sms_properties_get_service_category (props),
+                  "delivery-report-request", mm_sms_properties_get_delivery_report_request (props),
                   "delivery-state",          MM_SMS_DELIVERY_STATE_UNKNOWN,
-                  "validity", (mm_sms_properties_get_validity_type (properties) == MM_SMS_VALIDITY_TYPE_RELATIVE ?
-                               g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (mm_sms_properties_get_validity_relative (properties))) :
+                  "validity", (mm_sms_properties_get_validity_type (props) == MM_SMS_VALIDITY_TYPE_RELATIVE ?
+                               g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_RELATIVE, g_variant_new_uint32 (mm_sms_properties_get_validity_relative (props))) :
                                g_variant_new ("(uv)", MM_SMS_VALIDITY_TYPE_UNKNOWN, g_variant_new_boolean (FALSE))),
                   NULL);
 
