@@ -824,7 +824,7 @@ dump_output_human (void)
 
         /* Ignore items without a value set */
         if ((single && (!single->value || !single->value[0])) ||
-            (multiple && !multiple->values))
+            (multiple && (!multiple->values || !g_strv_length (multiple->values))))
             continue;
 
         /* Section change? */
