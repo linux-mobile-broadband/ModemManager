@@ -1805,15 +1805,12 @@ disconnect (MMBaseBearer *self,
     MMBaseModem *modem = NULL;
     GTask *task;
 
+    task = g_task_new (self, NULL, callback, user_data);
+
     if (!MM_BROADBAND_BEARER (self)->priv->port) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            disconnect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Couldn't disconnect: this bearer is not connected");
+        mm_dbg ("No need to disconnect: bearer is already disconnected");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
@@ -1825,19 +1822,14 @@ disconnect (MMBaseBearer *self,
     /* We need the primary port to disconnect... */
     primary = mm_base_modem_peek_port_primary (modem);
     if (!primary) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            disconnect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Couldn't disconnect: couldn't get primary port");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't disconnect: couldn't get primary port");
+        g_object_unref (task);
         g_object_unref (modem);
         return;
     }
-
-    task = g_task_new (self, NULL, callback , user_data);
 
     switch (MM_BROADBAND_BEARER (self)->priv->connection_type) {
     case CONNECTION_TYPE_3GPP:

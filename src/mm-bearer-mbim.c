@@ -1319,20 +1319,17 @@ disconnect (MMBaseBearer *_self,
     DisconnectContext *ctx;
     GTask *task;
 
-    if (!self->priv->data) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            disconnect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Couldn't disconnect MBIM bearer: this bearer is not connected");
-        return;
-    }
-
     if (!peek_ports (self, &device, NULL, callback, user_data))
         return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->data) {
+        mm_dbg ("No need to disconnect: MBIM bearer is already disconnected");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
 
     mm_dbg ("Launching disconnection on data port (%s/%s)",
             mm_port_subsys_get_string (mm_port_get_subsys (self->priv->data)),
@@ -1343,7 +1340,6 @@ disconnect (MMBaseBearer *_self,
     ctx->data = g_object_ref (self->priv->data);
     ctx->step = DISCONNECT_STEP_FIRST;
 
-    task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)disconnect_context_free);
 
     /* Run! */
