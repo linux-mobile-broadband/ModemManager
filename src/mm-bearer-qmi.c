@@ -860,12 +860,31 @@ get_current_settings_ready (QmiClientWds *client,
     g_assert (ctx->running_ipv4 || ctx->running_ipv6);
 
     output = qmi_client_wds_get_current_settings_finish (client, res, &error);
-    if (!output ||
-        !qmi_message_wds_get_current_settings_output_get_result (output, &error)) {
-        /* Never treat this as a hard connection error; not all devices support
-         * "WDS Get Current Settings" */
-        mm_info ("error: couldn't get current settings: %s", error->message);
+    if (!output || !qmi_message_wds_get_current_settings_output_get_result (output, &error)) {
+        MMBearerIpConfig *config;
+
+        /* When we're using static IP address, the current settings are mandatory */
+        if (ctx->ip_method == MM_BEARER_IP_METHOD_STATIC) {
+            mm_warn ("Failed to retrieve mandatory IP settings: %s", error->message);
+            if (output)
+                qmi_message_wds_get_current_settings_output_unref (output);
+            complete_connect (task, NULL, error);
+            return;
+        }
+
+        /* Otherwise, just go on as we're asking for DHCP */
+        mm_dbg ("Couldn't get current settings: %s", error->message);
         g_error_free (error);
+
+        config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (config, ctx->ip_method);
+
+        if (ctx->running_ipv4)
+            ctx->ipv4_config = config;
+        else if (ctx->running_ipv6)
+            ctx->ipv6_config = config;
+        else
+            g_assert_not_reached ();
     } else {
         QmiWdsIpFamily ip_family = QMI_WDS_IP_FAMILY_UNSPECIFIED;
         guint32 mtu = 0;
