@@ -2031,18 +2031,15 @@ disconnect (MMBaseBearer *_self,
     DisconnectContext *ctx;
     GTask *task;
 
+    task = g_task_new (self, NULL, callback, user_data);
+
     if ((!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) ||
         (!self->priv->client_ipv4 && !self->priv->client_ipv6) ||
         !self->priv->data ||
         !self->priv->qmi) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            disconnect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_FAILED,
-            "Couldn't disconnect QMI bearer: this bearer is not connected");
+        mm_dbg ("No need to disconnect: QMI bearer is already disconnected");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
     }
 
