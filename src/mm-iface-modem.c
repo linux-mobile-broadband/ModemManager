@@ -749,11 +749,6 @@ handle_command_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
-        handle_command_context_free (ctx);
-        return;
-    }
-
 #if ! defined WITH_AT_COMMAND_VIA_DBUS
     /* If we are not in Debug mode, report an error */
     if (!mm_context_get_debug ()) {
