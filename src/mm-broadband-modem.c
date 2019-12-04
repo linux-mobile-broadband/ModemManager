@@ -7828,7 +7828,7 @@ run_voice_unsolicited_events_setup (GTask *task)
     }
     /* CLIP on secondary port */
     else if (!ctx->clip_secondary_done && ctx->clip_command && ctx->secondary) {
-        mm_dbg ("%s +CLIP calling line reporting in primary port...", ctx->enable ? "Enabling" : "Disabling");
+        mm_dbg ("%s +CLIP calling line reporting in secondary port...", ctx->enable ? "Enabling" : "Disabling");
         ctx->clip_secondary_done = TRUE;
         command = ctx->clip_command;
         port = ctx->secondary;
