@@ -877,7 +877,7 @@ slcc_command_ready (MMBaseModem  *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+    if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
         mm_dbg ("Couldn't %s ^SLCC reporting: '%s'",
                 ctx->enable ? "enable" : "disable",
                 error->message);
