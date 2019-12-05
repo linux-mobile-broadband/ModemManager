@@ -1055,19 +1055,28 @@ call_start_ready (MMBaseModem *modem,
 }
 
 static void
-call_start (MMBaseCall *self,
-            GCancellable *cancellable,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+call_start (MMBaseCall          *self,
+            GCancellable        *cancellable,
+            GAsyncReadyCallback  callback,
+            gpointer             user_data)
 {
-    GTask *task;
-    gchar *cmd;
+    GError         *error = NULL;
+    GTask          *task;
+    gchar          *cmd;
+    MMPortSerialAt *port;
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self->priv->modem), &error);
+    if (!port) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
     cmd = g_strdup_printf ("ATD%s;", mm_gdbus_call_get_number (MM_GDBUS_CALL (self)));
     mm_base_modem_at_command_full (self->priv->modem,
-                                   mm_base_modem_peek_port_primary (self->priv->modem),
+                                   port,
                                    cmd,
                                    90,
                                    FALSE, /* no cached */
