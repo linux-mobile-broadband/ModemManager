@@ -69,6 +69,9 @@ struct _MMBroadbandModemUbloxPrivate {
     /* Voice +UCALLSTAT support */
     GRegex *ucallstat_regex;
 
+    FeatureSupport udtmfd_support;
+    GRegex *udtmfd_regex;
+
     /* Regex to ignore */
     GRegex *pbready_regex;
 };
@@ -928,6 +931,213 @@ load_unlock_retries (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Common enable/disable voice unsolicited events */
+
+typedef enum {
+    VOICE_UNSOLICITED_EVENTS_STEP_FIRST,
+    VOICE_UNSOLICITED_EVENTS_STEP_UCALLSTAT_PRIMARY,
+    VOICE_UNSOLICITED_EVENTS_STEP_UCALLSTAT_SECONDARY,
+    VOICE_UNSOLICITED_EVENTS_STEP_UDTMFD_PRIMARY,
+    VOICE_UNSOLICITED_EVENTS_STEP_UDTMFD_SECONDARY,
+    VOICE_UNSOLICITED_EVENTS_STEP_LAST,
+} VoiceUnsolicitedEventsStep;
+
+typedef struct {
+    gboolean                    enable;
+    VoiceUnsolicitedEventsStep  step;
+    MMPortSerialAt             *primary;
+    MMPortSerialAt             *secondary;
+    gchar                      *ucallstat_command;
+    gchar                      *udtmfd_command;
+} VoiceUnsolicitedEventsContext;
+
+static void
+voice_unsolicited_events_context_free (VoiceUnsolicitedEventsContext *ctx)
+{
+    g_clear_object (&ctx->secondary);
+    g_clear_object (&ctx->primary);
+    g_free (ctx->ucallstat_command);
+    g_free (ctx->udtmfd_command);
+    g_slice_free (VoiceUnsolicitedEventsContext, ctx);
+}
+
+static gboolean
+common_voice_enable_disable_unsolicited_events_finish (MMBroadbandModemUblox  *self,
+                                                       GAsyncResult           *res,
+                                                       GError                **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void voice_unsolicited_events_context_step (GTask *task);
+
+static void
+udtmfd_ready (MMBaseModem  *self,
+              GAsyncResult *res,
+              GTask        *task)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GError                        *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
+        mm_dbg ("Couldn't %s +UUDTMFD reporting: '%s'",
+                ctx->enable ? "enable" : "disable",
+                error->message);
+        g_error_free (error);
+    }
+
+    ctx->step++;
+    voice_unsolicited_events_context_step (task);
+}
+
+static void
+ucallstat_ready (MMBaseModem  *self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GError                        *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
+        mm_dbg ("Couldn't %s +UCALLSTAT reporting: '%s'",
+                ctx->enable ? "enable" : "disable",
+                error->message);
+        g_error_free (error);
+    }
+
+    ctx->step++;
+    voice_unsolicited_events_context_step (task);
+}
+
+static void
+voice_unsolicited_events_context_step (GTask *task)
+{
+    MMBroadbandModemUblox         *self;
+    VoiceUnsolicitedEventsContext *ctx;
+
+    self = MM_BROADBAND_MODEM_UBLOX (g_task_get_source_object (task));
+    ctx  = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case VOICE_UNSOLICITED_EVENTS_STEP_FIRST:
+        ctx->step++;
+        /* fall-through */
+
+    case VOICE_UNSOLICITED_EVENTS_STEP_UCALLSTAT_PRIMARY:
+        if (ctx->primary) {
+            mm_dbg ("%s extended call status reporting in primary port...",
+                    ctx->enable ? "Enabling" : "Disabling");
+            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           ctx->primary,
+                                           ctx->ucallstat_command,
+                                           3,
+                                           FALSE,
+                                           FALSE,
+                                           NULL,
+                                           (GAsyncReadyCallback)ucallstat_ready,
+                                           task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
+    case VOICE_UNSOLICITED_EVENTS_STEP_UCALLSTAT_SECONDARY:
+        if (ctx->secondary) {
+            mm_dbg ("%s extended call status reporting in secondary port...",
+                    ctx->enable ? "Enabling" : "Disabling");
+            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           ctx->secondary,
+                                           ctx->ucallstat_command,
+                                           3,
+                                           FALSE,
+                                           FALSE,
+                                           NULL,
+                                           (GAsyncReadyCallback)ucallstat_ready,
+                                           task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
+    case VOICE_UNSOLICITED_EVENTS_STEP_UDTMFD_PRIMARY:
+        if ((self->priv->udtmfd_support == FEATURE_SUPPORTED) && (ctx->primary)) {
+            mm_dbg ("%s DTMF detection and reporting in primary port...",
+                    ctx->enable ? "Enabling" : "Disabling");
+            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           ctx->primary,
+                                           ctx->udtmfd_command,
+                                           3,
+                                           FALSE,
+                                           FALSE,
+                                           NULL,
+                                           (GAsyncReadyCallback)udtmfd_ready,
+                                           task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
+    case VOICE_UNSOLICITED_EVENTS_STEP_UDTMFD_SECONDARY:
+        if ((self->priv->udtmfd_support == FEATURE_SUPPORTED) && (ctx->secondary)) {
+            mm_dbg ("%s DTMF detection and reporting in secondary port...",
+                    ctx->enable ? "Enabling" : "Disabling");
+            mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                           ctx->secondary,
+                                           ctx->udtmfd_command,
+                                           3,
+                                           FALSE,
+                                           FALSE,
+                                           NULL,
+                                           (GAsyncReadyCallback)udtmfd_ready,
+                                           task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
+    case VOICE_UNSOLICITED_EVENTS_STEP_LAST:
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        g_assert_not_reached ();
+    }
+}
+
+static void
+common_voice_enable_disable_unsolicited_events (MMBroadbandModemUblox *self,
+                                                gboolean               enable,
+                                                GAsyncReadyCallback    callback,
+                                                gpointer               user_data)
+{
+    VoiceUnsolicitedEventsContext *ctx;
+    GTask                         *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (VoiceUnsolicitedEventsContext);
+    ctx->step = VOICE_UNSOLICITED_EVENTS_STEP_FIRST;
+    ctx->enable = enable;
+    if (enable) {
+        ctx->ucallstat_command = g_strdup ("+UCALLSTAT=1");
+        ctx->udtmfd_command = g_strdup ("+UDTMFD=1,2");
+    } else {
+        ctx->ucallstat_command = g_strdup ("+UCALLSTAT=0");
+        ctx->udtmfd_command = g_strdup ("+UDTMFD=0");
+    }
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    g_task_set_task_data (task, ctx, (GDestroyNotify) voice_unsolicited_events_context_free);
+
+    voice_unsolicited_events_context_step (task);
+}
+
+/*****************************************************************************/
 /* Enabling unsolicited events (Voice interface) */
 
 static gboolean
@@ -939,17 +1149,18 @@ modem_voice_enable_unsolicited_events_finish (MMIfaceModemVoice  *self,
 }
 
 static void
-own_voice_enable_unsolicited_events_ready (MMBaseModem *self,
-                                           GAsyncResult *res,
-                                           GTask *task)
+voice_enable_unsolicited_events_ready (MMBroadbandModemUblox *self,
+                                       GAsyncResult          *res,
+                                       GTask                 *task)
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_full_finish (self, res, &error);
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
+    if (!common_voice_enable_disable_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't enable u-blox-specific voice unsolicited events: %s", error->message);
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
@@ -966,17 +1177,10 @@ parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
         return;
     }
 
-    /* Our own enable now */
-    mm_base_modem_at_command_full (
-        MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-        "+UCALLSTAT=1",
-        5,
-        FALSE, /* allow_cached */
-        FALSE, /* raw */
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)own_voice_enable_unsolicited_events_ready,
-        task);
+    common_voice_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_UBLOX (self),
+                                                    TRUE,
+                                                    (GAsyncReadyCallback) voice_enable_unsolicited_events_ready,
+                                                    task);
 }
 
 static void
@@ -1024,20 +1228,17 @@ parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
 }
 
 static void
-own_voice_disable_unsolicited_events_ready (MMBaseModem  *self,
-                                            GAsyncResult *res,
-                                            GTask        *task)
+voice_disable_unsolicited_events_ready (MMBroadbandModemUblox *self,
+                                        GAsyncResult          *res,
+                                        GTask                 *task)
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_full_finish (self, res, &error);
-    if (error) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
+    if (!common_voice_enable_disable_unsolicited_events_finish (self, res, &error)) {
+        mm_warn ("Couldn't disable u-blox-specific voice unsolicited events: %s", error->message);
+        g_error_free (error);
     }
 
-    /* Chain up parent's disable */
     iface_modem_voice_parent->disable_unsolicited_events (
         MM_IFACE_MODEM_VOICE (self),
         (GAsyncReadyCallback)parent_voice_disable_unsolicited_events_ready,
@@ -1053,16 +1254,10 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_base_modem_at_command_full (
-        MM_BASE_MODEM (self),
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-        "+UCALLSTAT=0",
-        5,
-        FALSE, /* allow_cached */
-        FALSE, /* raw */
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)own_voice_disable_unsolicited_events_ready,
-        task);
+    common_voice_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_UBLOX (self),
+                                                    FALSE,
+                                                    (GAsyncReadyCallback) voice_enable_unsolicited_events_ready,
+                                                    task);
 }
 
 /*****************************************************************************/
@@ -1119,6 +1314,20 @@ ucallstat_received (MMPortSerialAt        *port,
 }
 
 static void
+udtmfd_received (MMPortSerialAt        *port,
+                 GMatchInfo            *match_info,
+                 MMBroadbandModemUblox *self)
+{
+    gchar *dtmf;
+
+    dtmf = g_match_info_fetch (match_info, 1);
+    mm_dbg ("received DTMF: %s", dtmf);
+    /* call index unknown */
+    mm_iface_modem_voice_received_dtmf (MM_IFACE_MODEM_VOICE (self), 0, dtmf);
+    g_free (dtmf);
+}
+
+static void
 common_voice_setup_cleanup_unsolicited_events (MMBroadbandModemUblox *self,
                                                gboolean               enable)
 {
@@ -1128,6 +1337,10 @@ common_voice_setup_cleanup_unsolicited_events (MMBroadbandModemUblox *self,
     if (G_UNLIKELY (!self->priv->ucallstat_regex))
         self->priv->ucallstat_regex = g_regex_new ("\\r\\n\\+UCALLSTAT:\\s*(\\d+),(\\d+)\\r\\n",
                                                    G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    if (G_UNLIKELY (!self->priv->udtmfd_regex))
+        self->priv->udtmfd_regex = g_regex_new ("\\r\\n\\+UUDTMFD:\\s*([0-9A-D\\*\\#])\\r\\n",
+                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
@@ -1139,6 +1352,12 @@ common_voice_setup_cleanup_unsolicited_events (MMBroadbandModemUblox *self,
         mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
                                                        self->priv->ucallstat_regex,
                                                        enable ? (MMPortSerialAtUnsolicitedMsgFn)ucallstat_received : NULL,
+                                                       enable ? self : NULL,
+                                                       NULL);
+
+        mm_port_serial_at_add_unsolicited_msg_handler (ports[i],
+                                                       self->priv->udtmfd_regex,
+                                                       enable ? (MMPortSerialAtUnsolicitedMsgFn)udtmfd_received : NULL,
                                                        enable ? self : NULL,
                                                        NULL);
     }
@@ -1250,6 +1469,69 @@ create_call (MMIfaceModemVoice *self,
                              TRUE,  /* skip_incoming_timeout */
                              TRUE,  /* supports_dialing_to_ringing */
                              TRUE); /* supports_ringing_to_active */
+}
+
+/*****************************************************************************/
+/* Check if Voice supported (Voice interface) */
+
+static gboolean
+modem_voice_check_support_finish (MMIfaceModemVoice  *self,
+                                  GAsyncResult       *res,
+                                  GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+udtmfd_test_ready (MMBaseModem  *_self,
+                   GAsyncResult *res,
+                   GTask        *task)
+{
+    MMBroadbandModemUblox *self = MM_BROADBAND_MODEM_UBLOX (_self);
+
+    self->priv->udtmfd_support = (!!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL) ?
+                                  FEATURE_SUPPORTED : FEATURE_UNSUPPORTED);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_voice_check_support_ready (MMIfaceModemVoice *self,
+                                  GAsyncResult      *res,
+                                  GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->check_support_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* voice is supported, check if +UDTMFD is available */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+UDTMFD=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback) udtmfd_test_ready,
+                              task);
+}
+
+static void
+modem_voice_check_support (MMIfaceModemVoice   *self,
+                           GAsyncReadyCallback  callback,
+                           gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* chain up parent's setup first */
+    iface_modem_voice_parent->check_support (
+        self,
+        (GAsyncReadyCallback)parent_voice_check_support_ready,
+        task);
 }
 
 /*****************************************************************************/
@@ -1594,6 +1876,7 @@ mm_broadband_modem_ublox_init (MMBroadbandModemUblox *self)
     self->priv->support_config.method   = SETTINGS_UPDATE_METHOD_UNKNOWN;
     self->priv->support_config.uact     = FEATURE_SUPPORT_UNKNOWN;
     self->priv->support_config.ubandsel = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->udtmfd_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->pbready_regex = g_regex_new ("\\r\\n\\+PBREADY\\r\\n",
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
@@ -1643,6 +1926,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
 
+    iface->check_support = modem_voice_check_support;
+    iface->check_support_finish = modem_voice_check_support_finish;
     iface->setup_unsolicited_events = modem_voice_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_voice_setup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
@@ -1664,6 +1949,8 @@ finalize (GObject *object)
 
     if (self->priv->ucallstat_regex)
         g_regex_unref (self->priv->ucallstat_regex);
+    if (self->priv->udtmfd_regex)
+        g_regex_unref (self->priv->udtmfd_regex);
     g_free (self->priv->operator_id);
 
     G_OBJECT_CLASS (mm_broadband_modem_ublox_parent_class)->finalize (object);
