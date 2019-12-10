@@ -1,4 +1,50 @@
 
+ModemManager 1.12.2
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version splits all common logic from different plugins into separate
+   shared libraries that are loaded before the plugins. This means that in
+   addition to 'libmm-plugin-*.so' files, a new set of 'libmm-shared-*.so'
+   files will also be installed in ${libdir}/ModemManager.
+
+The list of changes in this version includes:
+
+ * Simple interface:
+   ** Avoid assertion on the ongoing connect cancellable.
+
+ * Plugin manager:
+   ** Fix waiting the minimum probing time.
+   ** Explicitly cancel timeouts when device probing is cancelled.
+   ** Disable lazy plugin loading, we now require all missing symbols to be
+      resolved at loading time for a plugin to correctly be loaded.
+
+ * Bearer:
+   ** Avoid reporting disconnection error if trying to disconnect a bearer that
+      is already disconnected.
+
+ * MBIM:
+   ** Completely skip LTE attach config/status if unsupported.
+
+ * QMI:
+   ** Make current settings mandatory when using 'static' addressing.
+   ** Handle disconnection indications during connection attempt.
+   ** Explicitly close QMI port during disconnection if it was opened during a
+      connection attempt.
+
+ * Plugins:
+   ** huawei: avoid using QCDM port during a voice call.
+   ** sierra: added port type hints for the EM7565.
+   ** dell,dw5821e: added support for the DW5821e with eSIM variant.
+
+ * mmcli:
+   ** Fix printing empty value lists in human-friendly output.
+
+ * Several other minor fixes and memory leak plugs.
+
+
 ModemManager 1.12.0
 -------------------------------------------
 This is a new stable release of ModemManager.
