@@ -87,8 +87,8 @@ mmsmspdu_CPPFLAGS = \
 
 mmsmspdu_LDADD = \
 	$(MM_LIBS) \
-	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(top_builddir)/src/libhelpers.la \
 	$(NULL)
 
 ################################################################################
@@ -112,8 +112,8 @@ mmsmsmonitor_CPPFLAGS = \
 
 mmsmsmonitor_LDADD = \
 	$(MM_LIBS) \
-	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(top_builddir)/src/libhelpers.la \
 	$(NULL)
 
 ################################################################################
