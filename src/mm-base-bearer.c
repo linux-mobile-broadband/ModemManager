@@ -195,20 +195,22 @@ static gboolean
 connection_monitor_cb (MMBaseBearer *self)
 {
     /* If the implementation knows how to load connection status, run it */
-    MM_BASE_BEARER_GET_CLASS (self)->load_connection_status (
-        self,
-        (GAsyncReadyCallback)load_connection_status_ready,
-        NULL);
+    if (self->priv->status == MM_BEARER_STATUS_CONNECTED)
+        MM_BASE_BEARER_GET_CLASS (self)->load_connection_status (
+            self,
+            (GAsyncReadyCallback)load_connection_status_ready,
+            NULL);
     return G_SOURCE_CONTINUE;
 }
 
 static gboolean
 initial_connection_monitor_cb (MMBaseBearer *self)
 {
-    MM_BASE_BEARER_GET_CLASS (self)->load_connection_status (
-        self,
-        (GAsyncReadyCallback)load_connection_status_ready,
-        NULL);
+    if (self->priv->status == MM_BEARER_STATUS_CONNECTED)
+        MM_BASE_BEARER_GET_CLASS (self)->load_connection_status (
+            self,
+            (GAsyncReadyCallback)load_connection_status_ready,
+            NULL);
 
     /* Add new monitor timeout at a higher rate */
     self->priv->connection_monitor_id = g_timeout_add_seconds (BEARER_CONNECTION_MONITOR_TIMEOUT,
@@ -305,6 +307,10 @@ reload_stats_ready (MMBaseBearer *self,
 static gboolean
 stats_update_cb (MMBaseBearer *self)
 {
+    /* Ignore stats update if we're not connected */
+    if (self->priv->status != MM_BEARER_STATUS_CONNECTED)
+        return G_SOURCE_CONTINUE;
+
     /* If the implementation knows how to update stat values, run it */
     if (!self->priv->reload_stats_unsupported &&
         MM_BASE_BEARER_GET_CLASS (self)->reload_stats &&
@@ -411,15 +417,15 @@ bearer_update_status_connected (MMBaseBearer *self,
         self->priv->ignore_disconnection_reports = TRUE;
     }
 
+    /* Update the property value */
+    self->priv->status = MM_BEARER_STATUS_CONNECTED;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+
     /* Start statistics */
     bearer_stats_start (self);
 
     /* Start connection monitor, if supported */
     connection_monitor_start (self);
-
-    /* Update the property value */
-    self->priv->status = MM_BEARER_STATUS_CONNECTED;
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
 }
 
 /*****************************************************************************/
