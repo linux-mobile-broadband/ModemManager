@@ -670,10 +670,34 @@ cgact_deactivate_ready (MMBaseModem  *modem,
     GError      *error = NULL;
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
-    if (!response)
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
+    if (!response) {
+        /* TOBY-L4 and TOBY-L2 L2 don't allow to disconnect the last LTE bearer
+         * as that would imply de-registration from the LTE network, so we just
+         * assume that it's disconnected from the user point of view.
+         *
+         * TOBY-L4 reports this as a generic unknown Packet Domain Error, which
+         * is a bit unfortunate:
+         *    AT+CGACT=0,1
+         *    +CME ERROR: 148
+         *
+         * TOBY-L2 reports this as "LAST PDN disconnection not allowed" but using
+         * the legacy numeric value before 3GPP Rel 11 (i.e. 151 instead of 171).
+         *   AT+CGACT=0,1
+         *    +CME ERROR: 151
+         */
+        if (!g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN) &&
+            !g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED) &&
+            !g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED_LEGACY)) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+
+        mm_dbg ("ignored error when disconnecting last LTE bearer: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
