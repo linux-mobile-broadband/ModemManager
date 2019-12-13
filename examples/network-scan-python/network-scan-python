@@ -47,10 +47,10 @@ if __name__ == "__main__":
         if networks:
             for network in networks:
                 print('%s: %s - %s (%s, %s)' % (
-                      ModemManager.Modem3gpp.network_get_operator_code(network),
-                      ModemManager.Modem3gpp.network_get_operator_short(network),
-                      ModemManager.Modem3gpp.network_get_operator_short(network),
-                      ModemManager.modem_access_technology_build_string_from_mask (ModemManager.Modem3gpp.network_get_access_technology(network)),
-                      ModemManager.Modem3gppNetworkAvailability.get_string(ModemManager.Modem3gpp.network_get_availability(network))))
+                      network.get_operator_code(),
+                      network.get_operator_short(),
+                      network.get_operator_short(),
+                      ModemManager.modem_access_technology_build_string_from_mask (network.get_access_technology()),
+                      ModemManager.Modem3gppNetworkAvailability.get_string(network.get_availability())))
         else:
             print('no networks found')

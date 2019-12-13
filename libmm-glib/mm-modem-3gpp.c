@@ -549,6 +549,23 @@ mm_modem_3gpp_network_free (MMModem3gppNetwork *network)
     g_slice_free (MMModem3gppNetwork, network);
 }
 
+static MMModem3gppNetwork *
+modem_3gpp_network_copy (MMModem3gppNetwork *network)
+{
+    MMModem3gppNetwork *network_copy;
+
+    network_copy = g_slice_new0 (MMModem3gppNetwork);
+    network_copy->availability      = network->availability;
+    network_copy->operator_long     = g_strdup (network->operator_long);
+    network_copy->operator_short    = g_strdup (network->operator_short);
+    network_copy->operator_code     = g_strdup (network->operator_code);
+    network_copy->access_technology = network->access_technology;
+
+    return network_copy;
+}
+
+G_DEFINE_BOXED_TYPE (MMModem3gppNetwork, mm_modem_3gpp_network, (GBoxedCopyFunc)modem_3gpp_network_copy, (GBoxedFreeFunc)mm_modem_3gpp_network_free)
+
 /**
  * mm_modem_3gpp_network_get_availability:
  * @network: A #MMModem3gppNetwork.

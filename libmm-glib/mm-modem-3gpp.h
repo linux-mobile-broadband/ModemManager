@@ -116,12 +116,19 @@ gboolean mm_modem_3gpp_register_sync   (MMModem3gpp *self,
  */
 typedef struct _MMModem3gppNetwork MMModem3gppNetwork;
 
+#define MM_TYPE_MODEM_3GPP_NETWORK (mm_modem_3gpp_network_get_type ())
+GType mm_modem_3gpp_network_get_type (void);
+
 MMModem3gppNetworkAvailability  mm_modem_3gpp_network_get_availability      (const MMModem3gppNetwork *network);
 const gchar                    *mm_modem_3gpp_network_get_operator_long     (const MMModem3gppNetwork *network);
 const gchar                    *mm_modem_3gpp_network_get_operator_short    (const MMModem3gppNetwork *network);
 const gchar                    *mm_modem_3gpp_network_get_operator_code     (const MMModem3gppNetwork *network);
 MMModemAccessTechnology         mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network);
 void                            mm_modem_3gpp_network_free                  (MMModem3gppNetwork *network);
+
+#if GLIB_CHECK_VERSION(2, 44, 0)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModem3gppNetwork, mm_modem_3gpp_network_free)
+#endif
 
 void   mm_modem_3gpp_scan        (MMModem3gpp *self,
                                   GCancellable *cancellable,
