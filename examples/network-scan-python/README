@@ -1,0 +1,17 @@
+
+The network-scan-python program makes use of the 'libmm-glib' library through
+GObject Introspection to talk to ModemManager.
+
+The program will:
+ * Detect whether ModemManager is found in the bus
+ * Loop through each modem found in the system, running a network scan for each
+
+The output will look like this:
+
+$ ./network-scan-python
+
+
+Note that the program requires ModemManager and libmm-glib to be installed in
+the system and the introspection typelibs available in the standard paths.
+
+Have fun!
