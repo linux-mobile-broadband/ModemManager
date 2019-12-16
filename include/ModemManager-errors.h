@@ -150,6 +150,7 @@ typedef enum { /*< underscore_name=mm_core_error >*/
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN: Unspecified GPRS error.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE: PDP authentication failure.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS: Invalid mobile class.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED_LEGACY: Last PDN disconnection not allowed (legacy value defined before 3GPP Rel-11). Since: 1.14.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED: Last PDN disconnection not allowed. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE: Semantically incorrect message. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MANDATORY_IE_ERROR: Mandatory IE error. Since: 1.8.
@@ -240,6 +241,7 @@ typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN                                   = 148, /*< nick=GprsUnknown >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE                          = 149, /*< nick=GprsPdpAuthFailure >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS                      = 150, /*< nick=GprsInvalidMobileClass >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED_LEGACY = 151, /*< nick=GprsLastPdnDisconnectionNotAllowedLegacy >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED        = 171, /*< nick=GprsLastPdnDisconnectionNotAllowed >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE            = 172, /*< nick=GprsSemanticallyIncorrectMessage >*/
     MM_MOBILE_EQUIPMENT_ERROR_GPRS_MANDATORY_IE_ERROR                        = 173, /*< nick=GprsMandatoryIeError >*/
