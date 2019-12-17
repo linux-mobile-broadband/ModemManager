@@ -55,6 +55,7 @@ noinst_PROGRAMS = \
 	test-sms-part-3gpp \
 	test-sms-part-cdma \
 	test-udev-rules \
+	test-error-helpers \
 	$(NULL)
 
 if WITH_QMI
