@@ -59,6 +59,7 @@ Makefile.in
 /src/tests/test-sms-part-3gpp
 /src/tests/test-sms-part-cdma
 /src/tests/test-udev-rules
+/src/tests/test-error-helpers
 
 /cli/mmcli
 
