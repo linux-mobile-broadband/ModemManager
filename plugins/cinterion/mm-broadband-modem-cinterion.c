@@ -74,9 +74,6 @@ struct _MMBroadbandModemCinterionPrivate {
     /* Command to go into sleep mode */
     gchar *sleep_mode_cmd;
 
-    /* Cached manual selection attempt */
-    gchar *manual_operator_id;
-
     /* Cached supported bands in Cinterion format */
     guint supported_bands;
 
@@ -1054,6 +1051,20 @@ set_current_modes_finish (MMIfaceModem  *self,
 }
 
 static void
+set_current_modes_reregister_in_network_ready (MMIfaceModem3gpp *self,
+                                               GAsyncResult     *res,
+                                               GTask            *task)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_3gpp_reregister_in_network_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
 allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
                                         GAsyncResult              *res,
                                         GTask                     *task)
@@ -1105,10 +1116,10 @@ set_current_modes (MMIfaceModem        *_self,
          * AT+COPS=,,, (i.e. just without a last value). Instead, we need to
          * re-run the last manual/automatic selection command which succeeded,
          * (or auto by default if none was launched) */
-        if (self->priv->manual_operator_id)
-            command = g_strdup_printf ("+COPS=1,2,\"%s\"", self->priv->manual_operator_id);
-        else
-            command = g_strdup ("+COPS=0");
+        mm_iface_modem_3gpp_reregister_in_network (MM_IFACE_MODEM_3GPP (self),
+                                                   (GAsyncReadyCallback) set_current_modes_reregister_in_network_ready,
+                                                   task);
+        return;
     }
 
     mm_base_modem_at_command (
@@ -1119,66 +1130,6 @@ set_current_modes (MMIfaceModem        *_self,
         (GAsyncReadyCallback)allowed_access_technology_update_ready,
         task);
 
-    g_free (command);
-}
-
-/*****************************************************************************/
-/* Register in network (3GPP interface) */
-
-static gboolean
-register_in_network_finish (MMIfaceModem3gpp  *self,
-                            GAsyncResult      *res,
-                            GError           **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-cops_write_ready (MMBaseModem  *_self,
-                  GAsyncResult *res,
-                  GTask        *task)
-{
-    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
-    GError                    *error = NULL;
-
-    if (!mm_base_modem_at_command_full_finish (_self, res, &error))
-        g_task_return_error (task, error);
-    else {
-        g_free (self->priv->manual_operator_id);
-        self->priv->manual_operator_id = g_strdup (g_task_get_task_data (task));
-        g_task_return_boolean (task, TRUE);
-    }
-    g_object_unref (task);
-}
-
-static void
-register_in_network (MMIfaceModem3gpp    *self,
-                     const gchar         *operator_id,
-                     GCancellable        *cancellable,
-                     GAsyncReadyCallback  callback,
-                     gpointer             user_data)
-{
-    GTask *task;
-    gchar *command;
-
-    task = g_task_new (self, cancellable, callback, user_data);
-    g_task_set_task_data (task, g_strdup (operator_id), g_free);
-
-    /* If the user sent a specific network to use, lock it in. */
-    if (operator_id)
-        command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id);
-    else
-        command = g_strdup ("+COPS=0");
-
-    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
-                                   command,
-                                   120,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   cancellable,
-                                   (GAsyncReadyCallback)cops_write_ready,
-                                   task);
     g_free (command);
 }
 
@@ -1865,7 +1816,6 @@ finalize (GObject *object)
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (object);
 
     g_free (self->priv->sleep_mode_cmd);
-    g_free (self->priv->manual_operator_id);
 
     if (self->priv->cnmi_supported_mode)
         g_array_unref (self->priv->cnmi_supported_mode);
@@ -1930,9 +1880,6 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
-
-    iface->register_in_network = register_in_network;
-    iface->register_in_network_finish = register_in_network_finish;
 }
 
 static void
