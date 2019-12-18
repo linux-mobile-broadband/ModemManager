@@ -4666,34 +4666,105 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 /* Register in network (3GPP interface) */
 
 static gboolean
-modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
-                                       GAsyncResult *res,
-                                       GError **error)
+modem_3gpp_register_in_network_finish (MMIfaceModem3gpp  *self,
+                                       GAsyncResult      *res,
+                                       GError           **error)
 {
-    return !!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
-                                const gchar *operator_id,
-                                GCancellable *cancellable,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data)
+cops_set_ready (MMBaseModem  *self,
+                GAsyncResult *res,
+                GTask        *task)
 {
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+cops_ascii_set_ready (MMBaseModem  *self,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error)) {
+        /* If it failed with an unsupported error, retry with current modem charset */
+        if (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
+            gchar *operator_id;
+            gchar *operator_id_current_charset;
+
+            operator_id = g_task_get_task_data (task);
+            operator_id_current_charset = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), g_strdup (operator_id));
+
+            if (g_strcmp0 (operator_id, operator_id_current_charset) != 0) {
+                gchar *command;
+
+                command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id_current_charset);
+                mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                               mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
+                                               command,
+                                               120,
+                                               FALSE,
+                                               FALSE, /* raw */
+                                               g_task_get_cancellable (task),
+                                               (GAsyncReadyCallback)cops_set_ready,
+                                               task);
+                g_error_free (error);
+                g_free (operator_id_current_charset);
+                g_free (command);
+                return;
+            }
+            /* operator id string would be the same on the current charset,
+             * so fallback and return the not supported error */
+            g_free (operator_id_current_charset);
+        }
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
+                                const gchar         *operator_id,
+                                GCancellable        *cancellable,
+                                GAsyncReadyCallback  callback,
+                                gpointer             user_data)
+{
+    GTask *task;
     gchar *command;
 
-    /* If the user sent a specific network to use, lock it in. */
-    if (operator_id)
-        command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id);
-    /* If no specific network was given, and the modem is not registered and not
-     * searching, kick it to search for a network. Also do auto registration if
-     * the modem had been set to manual registration last time but now is not.
-     */
-    else
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    /* Trigger automatic network registration if no explicit operator id given */
+    if (!operator_id) {
         /* Note that '+COPS=0,,' (same but with commas) won't work in some Nokia
          * phones */
-        command = g_strdup ("+COPS=0");
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                       mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
+                                       "+COPS=0",
+                                       120,
+                                       FALSE,
+                                       FALSE, /* raw */
+                                       cancellable,
+                                       (GAsyncReadyCallback)cops_set_ready,
+                                       task);
+        return;
+    }
 
+    /* Store operator id in context, in case we need to retry with the current
+     * modem charset */
+    g_task_set_task_data (task, g_strdup (operator_id), g_free);
+
+    /* Use the operator id given in ASCII initially */
+    command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id);
     mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                    mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
                                    command,
@@ -4701,8 +4772,8 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                                    FALSE,
                                    FALSE, /* raw */
                                    cancellable,
-                                   callback,
-                                   user_data);
+                                   (GAsyncReadyCallback)cops_ascii_set_ready,
+                                   task);
     g_free (command);
 }
 
