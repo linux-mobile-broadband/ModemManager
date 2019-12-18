@@ -154,6 +154,7 @@ check_next_registration (GTask *task)
         mm_iface_modem_3gpp_register_in_network (
             MM_IFACE_MODEM_3GPP (self),
             ctx->operator_id,
+            FALSE, /* if already registered with same settings, do nothing */
             ctx->max_try_time,
             (GAsyncReadyCallback)register_in_3gpp_network_ready,
             task);

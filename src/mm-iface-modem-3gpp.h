@@ -307,6 +307,7 @@ void     mm_iface_modem_3gpp_clear_current_operator                  (MMIfaceMod
 /* Allow registering in the network */
 void     mm_iface_modem_3gpp_register_in_network        (MMIfaceModem3gpp    *self,
                                                          const gchar         *operator_id,
+                                                         gboolean             force_registration,
                                                          guint                max_registration_time,
                                                          GAsyncReadyCallback  callback,
                                                          gpointer             user_data);

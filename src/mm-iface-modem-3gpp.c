@@ -41,7 +41,6 @@ typedef struct {
     MMModem3gppRegistrationState  cs;
     MMModem3gppRegistrationState  ps;
     MMModem3gppRegistrationState  eps;
-    gboolean                      force_registration;
     gboolean                      manual_registration;
     gchar                        *manual_registration_operator_id;
     GCancellable                 *pending_registration_cancellable;
@@ -384,6 +383,7 @@ register_in_network_ready (MMIfaceModem3gpp *self,
 void
 mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
                                          const gchar         *operator_id,
+                                         gboolean             force_registration,
                                          guint                max_registration_time,
                                          GAsyncReadyCallback  callback,
                                          gpointer             user_data)
@@ -437,7 +437,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     /* Manual registration requested? */
     if (ctx->operator_id) {
         /* If already registered manually with the requested operator, we're done */
-        if (!priv->force_registration &&
+        if (!force_registration &&
             (g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
             REG_STATE_IS_REGISTERED (reg_state) &&
             priv->manual_registration) {
@@ -451,7 +451,6 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 
         /* Manual registration to a new operator required */
         mm_dbg ("Launching manual network registration (%s)...", ctx->operator_id);
-        priv->force_registration = FALSE;
         g_free (priv->manual_registration_operator_id);
         priv->manual_registration_operator_id = g_strdup (ctx->operator_id);
         priv->manual_registration = TRUE;
@@ -460,7 +459,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     else {
         /* If the modem is already registered and the last time it was asked
          * automatic registration, we're done */
-        if (!priv->force_registration &&
+        if (!force_registration &&
             (current_operator_code || REG_STATE_IS_REGISTERED (reg_state)) &&
             !priv->manual_registration) {
             mm_dbg ("Already registered automatically in network '%s',"
@@ -473,7 +472,6 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 
         /* Automatic registration to a new operator requested */
         mm_dbg ("Launching automatic network registration...");
-        priv->force_registration = FALSE;
         g_clear_pointer (&priv->manual_registration_operator_id, g_free);
         priv->manual_registration = FALSE;
     }
@@ -515,9 +513,9 @@ mm_iface_modem_3gpp_reregister_in_network (MMIfaceModem3gpp    *self,
 
     /* Relaunch registration using the last used settings */
     priv = get_private (self);
-    priv->force_registration = TRUE;
     mm_iface_modem_3gpp_register_in_network (self,
                                              priv->manual_registration_operator_id,
+                                             TRUE, /* if already registered with same settings, force re-registration */
                                              REREGISTER_IN_NETWORK_TIMEOUT,
                                              callback,
                                              user_data);
@@ -601,6 +599,7 @@ handle_register_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_REGISTERED:
         mm_iface_modem_3gpp_register_in_network (MM_IFACE_MODEM_3GPP (self),
                                                  ctx->operator_id,
+                                                 FALSE, /* if already registered with same settings, do nothing */
                                                  60,
                                                  (GAsyncReadyCallback)handle_register_ready,
                                                  ctx);
