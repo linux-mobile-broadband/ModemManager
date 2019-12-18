@@ -35,14 +35,12 @@
 #include "mm-ublox-enums-types.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_voice_init (MMIfaceModemVoice *iface);
 
 static MMIfaceModemVoice *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemUblox, mm_broadband_modem_ublox, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init))
 
 
@@ -62,9 +60,6 @@ struct _MMBroadbandModemUbloxPrivate {
 
     /* AT command configuration */
     UbloxSupportConfig support_config;
-
-    /* Operator ID for manual registration */
-    gchar *operator_id;
 
     /* Voice +UCALLSTAT support */
     GRegex *ucallstat_regex;
@@ -354,6 +349,24 @@ common_set_current_modes_bands_finish (MMIfaceModem  *self,
 static void set_current_modes_bands_step (GTask *task);
 
 static void
+set_current_modes_bands_reregister_in_network_ready (MMIfaceModem3gpp *self,
+                                                     GAsyncResult     *res,
+                                                     GTask            *task)
+{
+    SetCurrentModesBandsContext *ctx;
+
+    ctx = (SetCurrentModesBandsContext *) g_task_get_task_data (task);
+    g_assert (ctx);
+
+    /* propagate the error if none already set */
+    mm_iface_modem_3gpp_reregister_in_network_finish (self, res, ctx->saved_error ? NULL : &ctx->saved_error);
+
+    /* Go to next step (release power operation) regardless of the result */
+    ctx->step++;
+    set_current_modes_bands_step (task);
+}
+
+static void
 set_current_modes_bands_after_command_ready (MMBaseModem  *self,
                                              GAsyncResult *res,
                                              GTask        *task)
@@ -514,22 +527,9 @@ set_current_modes_bands_step (GTask *task)
     case SET_CURRENT_MODES_BANDS_STEP_AFTER_COMMAND:
         /* If COPS required around the set command, run it unconditionally */
         if (ctx->self->priv->support_config.method == SETTINGS_UPDATE_METHOD_COPS) {
-            gchar *command;
-
-            /* If the user sent a specific network to use, lock it in. */
-            if (ctx->self->priv->operator_id)
-                command = g_strdup_printf ("+COPS=1,2,\"%s\"", ctx->self->priv->operator_id);
-            else
-                command = g_strdup ("+COPS=0");
-
-            mm_base_modem_at_command (
-                MM_BASE_MODEM (ctx->self),
-                command,
-                120,
-                FALSE,
-                (GAsyncReadyCallback) set_current_modes_bands_after_command_ready,
-                task);
-            g_free (command);
+            mm_iface_modem_3gpp_reregister_in_network (MM_IFACE_MODEM_3GPP (ctx->self),
+                                                       (GAsyncReadyCallback) set_current_modes_bands_reregister_in_network_ready,
+                                                       task);
             return;
         }
         /* If CFUN required, see if we need to recover power */
@@ -792,66 +792,6 @@ common_modem_power_operation (MMBroadbandModemUblox  *self,
                               FALSE,
                               (GAsyncReadyCallback) power_operation_ready,
                               task);
-}
-
-/*****************************************************************************/
-/* Register in network (3GPP interface) */
-
-static gboolean
-register_in_network_finish (MMIfaceModem3gpp  *self,
-                            GAsyncResult      *res,
-                            GError           **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-cops_write_ready (MMBaseModem  *_self,
-                  GAsyncResult *res,
-                  GTask        *task)
-{
-    MMBroadbandModemUblox *self  = MM_BROADBAND_MODEM_UBLOX (_self);
-    GError                *error = NULL;
-
-    if (!mm_base_modem_at_command_full_finish (_self, res, &error))
-        g_task_return_error (task, error);
-    else {
-        g_free (self->priv->operator_id);
-        self->priv->operator_id = g_strdup (g_task_get_task_data (task));
-        g_task_return_boolean (task, TRUE);
-    }
-    g_object_unref (task);
-}
-
-static void
-register_in_network (MMIfaceModem3gpp    *self,
-                     const gchar         *operator_id,
-                     GCancellable        *cancellable,
-                     GAsyncReadyCallback  callback,
-                     gpointer             user_data)
-{
-    GTask *task;
-    gchar *command;
-
-    task = g_task_new (self, cancellable, callback, user_data);
-    g_task_set_task_data (task, g_strdup (operator_id), g_free);
-
-    /* If the user sent a specific network to use, lock it in. */
-    if (operator_id)
-        command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id);
-    else
-        command = g_strdup ("+COPS=0");
-
-    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                   mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
-                                   command,
-                                   120,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   cancellable,
-                                   (GAsyncReadyCallback)cops_write_ready,
-                                   task);
-    g_free (command);
 }
 
 static void
@@ -1915,13 +1855,6 @@ iface_modem_init (MMIfaceModem *iface)
 }
 
 static void
-iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
-{
-    iface->register_in_network = register_in_network;
-    iface->register_in_network_finish = register_in_network_finish;
-}
-
-static void
 iface_modem_voice_init (MMIfaceModemVoice *iface)
 {
     iface_modem_voice_parent = g_type_interface_peek_parent (iface);
@@ -1951,7 +1884,6 @@ finalize (GObject *object)
         g_regex_unref (self->priv->ucallstat_regex);
     if (self->priv->udtmfd_regex)
         g_regex_unref (self->priv->udtmfd_regex);
-    g_free (self->priv->operator_id);
 
     G_OBJECT_CLASS (mm_broadband_modem_ublox_parent_class)->finalize (object);
 }
