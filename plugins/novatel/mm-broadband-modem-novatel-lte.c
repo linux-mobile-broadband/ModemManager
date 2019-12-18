@@ -38,6 +38,8 @@
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
+static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNovatelLte, mm_broadband_modem_novatel_lte, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
@@ -571,31 +573,20 @@ scan_networks_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-cops_query_ready (MMBroadbandModemNovatelLte *self,
-                  GAsyncResult *res,
-                  GTask *task)
+parent_scan_networks_ready (MMIfaceModem3gpp *self,
+                            GAsyncResult     *res,
+                            GTask            *task)
 {
-    const gchar *response;
     GError *error = NULL;
-    GList *scan_result;
+    GList  *scan_result;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
+    scan_result = iface_modem_3gpp_parent->scan_networks_finish (self, res, &error);
+    if (!scan_result)
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    scan_result = mm_3gpp_parse_cops_test_response (response, &error);
-    if (error) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    g_task_return_pointer (task,
-                           scan_result,
-                           (GDestroyNotify)mm_3gpp_network_info_list_free);
+    else
+        g_task_return_pointer (task,
+                               scan_result,
+                               (GDestroyNotify)mm_3gpp_network_info_list_free);
     g_object_unref (task);
 }
 
@@ -611,11 +602,11 @@ scan_networks (MMIfaceModem3gpp *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    access_tech = mm_iface_modem_get_access_technologies (MM_IFACE_MODEM (self));
     /* The Novatel LTE modem does not properly support AT+COPS=? in LTE mode.
      * Thus, do not try to scan networks when the current access technologies
      * include LTE.
      */
+    access_tech = mm_iface_modem_get_access_technologies (MM_IFACE_MODEM (self));
     if (access_tech & MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
         gchar *access_tech_string;
 
@@ -631,12 +622,10 @@ scan_networks (MMIfaceModem3gpp *self,
         return;
     }
 
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+COPS=?",
-                              300,
-                              FALSE,
-                              (GAsyncReadyCallback)cops_query_ready,
-                              task);
+    /* Otherwise, just fallback to the generic scan method */
+    iface_modem_3gpp_parent->scan_networks (self,
+                                            (GAsyncReadyCallback)parent_scan_networks_ready,
+                                            task);
 }
 
 /*****************************************************************************/
@@ -691,6 +680,8 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
+    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
+
     iface->scan_networks = scan_networks;
     iface->scan_networks_finish = scan_networks_finish;
 }
