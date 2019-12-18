@@ -385,11 +385,12 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
                                          GAsyncReadyCallback  callback,
                                          gpointer             user_data)
 {
-    RegisterInNetworkContext *ctx;
-    const gchar              *current_operator_code;
-    GError                   *error = NULL;
-    GTask                    *task;
-    Private                  *priv;
+    RegisterInNetworkContext     *ctx;
+    const gchar                  *current_operator_code;
+    GError                       *error = NULL;
+    GTask                        *task;
+    Private                      *priv;
+    MMModem3gppRegistrationState  reg_state;
 
     priv = get_private (self);
 
@@ -428,14 +429,16 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     }
 
     current_operator_code = mm_gdbus_modem3gpp_get_operator_code (ctx->skeleton);
+    reg_state = mm_gdbus_modem3gpp_get_registration_state (ctx->skeleton);
 
     /* Manual registration requested? */
     if (ctx->operator_id) {
-        /* If already registered with the requested operator, we're done */
-        if (current_operator_code &&
-            g_str_equal (current_operator_code, ctx->operator_id)) {
-            priv->manual_registration = TRUE;
-            mm_dbg ("Already registered in selected network '%s'...",
+        /* If already registered manually with the requested operator, we're done */
+        if ((g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
+            REG_STATE_IS_REGISTERED (reg_state) &&
+            priv->manual_registration) {
+            mm_dbg ("Already registered manually in selected network '%s',"
+                    " manual registration not launched...",
                     current_operator_code);
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
@@ -448,15 +451,11 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     }
     /* Automatic registration requested? */
     else {
-        MMModem3gppRegistrationState reg_state;
-
-        reg_state = mm_gdbus_modem3gpp_get_registration_state (ctx->skeleton);
-
         /* If the modem is already registered and the last time it was asked
          * automatic registration, we're done */
         if ((current_operator_code || REG_STATE_IS_REGISTERED (reg_state)) &&
             !priv->manual_registration) {
-            mm_dbg ("Already registered in network '%s',"
+            mm_dbg ("Already registered automatically in network '%s',"
                     " automatic registration not launched...",
                     current_operator_code);
             g_task_return_boolean (task, TRUE);
