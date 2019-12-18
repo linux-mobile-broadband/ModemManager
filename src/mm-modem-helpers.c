@@ -1268,8 +1268,9 @@ parse_access_tech (const gchar *str)
 }
 
 GList *
-mm_3gpp_parse_cops_test_response (const gchar *reply,
-                                  GError **error)
+mm_3gpp_parse_cops_test_response (const gchar     *reply,
+                                  MMModemCharset   cur_charset,
+                                  GError         **error)
 {
     GRegex *r;
     GList *info_list = NULL;
@@ -1362,6 +1363,11 @@ mm_3gpp_parse_cops_test_response (const gchar *reply,
         info->operator_long = mm_get_string_unquoted_from_match_info (match_info, 2);
         info->operator_short = mm_get_string_unquoted_from_match_info (match_info, 3);
         info->operator_code = mm_get_string_unquoted_from_match_info (match_info, 4);
+
+        /* The returned strings may be given in e.g. UCS2 */
+        mm_3gpp_normalize_operator (&info->operator_long,  cur_charset);
+        mm_3gpp_normalize_operator (&info->operator_short, cur_charset);
+        mm_3gpp_normalize_operator (&info->operator_code,  cur_charset);
 
         /* Only try for access technology with UMTS-format matches.
          * If none give, assume GSM */

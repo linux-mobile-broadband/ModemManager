@@ -476,6 +476,7 @@ test_cmgr_response_telit (void *f, gpointer d)
 static void
 test_cops_results (const gchar *desc,
                    const gchar *reply,
+                   MMModemCharset cur_charset,
                    MM3gppNetworkInfo *expected_results,
                    guint32 expected_results_len)
 {
@@ -485,7 +486,7 @@ test_cops_results (const gchar *desc,
 
     g_debug ("Testing %s +COPS response...", desc);
 
-    results = mm_3gpp_parse_cops_test_response (reply, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, cur_charset, &error);
     g_assert (results);
     g_assert_no_error (error);
     g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
@@ -494,6 +495,7 @@ test_cops_results (const gchar *desc,
         MM3gppNetworkInfo *info = l->data;
         gboolean found = FALSE;
         guint i;
+        gchar *access_tech_str;
 
         for (i = 0; !found && i < expected_results_len; i++) {
             MM3gppNetworkInfo *expected;
@@ -514,10 +516,17 @@ test_cops_results (const gchar *desc,
                     g_assert_cmpstr (info->operator_short, ==, expected->operator_short);
                 else
                     g_assert (info->operator_short == NULL);
-
-                g_debug ("info: %s, expected: %s", info->operator_code, expected->operator_code);
             }
         }
+
+        access_tech_str = mm_modem_access_technology_build_string_from_mask (info->access_tech);
+        g_debug ("info: [%s,%s,%s,%s] %sfound in expected results",
+                 info->operator_long ? info->operator_long : "",
+                 info->operator_short ? info->operator_short : "",
+                 info->operator_code,
+                 access_tech_str,
+                 found ? "" : "not ");
+        g_free (access_tech_str);
 
         g_assert (found == TRUE);
     }
@@ -535,7 +544,7 @@ test_cops_response_tm506 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM }
     };
 
-    test_cops_results ("TM-506", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("TM-506", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -547,7 +556,7 @@ test_cops_response_gt3gplus (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Cingular", "Cingular", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("GlobeTrotter 3G+ (nozomi)", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("GlobeTrotter 3G+ (nozomi)", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -560,7 +569,7 @@ test_cops_response_ac881 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Sierra AirCard 881", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Sierra AirCard 881", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -573,7 +582,7 @@ test_cops_response_gtmax36 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Option GlobeTrotter MAX 3.6", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Option GlobeTrotter MAX 3.6", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -586,7 +595,7 @@ test_cops_response_ac860 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Cingular", "Cinglr", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Sierra AirCard 860", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Sierra AirCard 860", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -599,7 +608,7 @@ test_cops_response_gtm378 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Option GTM378", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Option GTM378", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -611,7 +620,7 @@ test_cops_response_motoc (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN, "Cingular Wireless", NULL, "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("BUSlink SCWi275u (Motorola C-series)", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("BUSlink SCWi275u (Motorola C-series)", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -623,7 +632,7 @@ test_cops_response_mf627a (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, "Voicestream Wireless Corporation", "VSTREAM", "31026", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("ZTE MF627 (A)", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("ZTE MF627 (A)", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -635,7 +644,7 @@ test_cops_response_mf627b (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "31026", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("ZTE MF627 (B)", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("ZTE MF627 (B)", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -647,7 +656,7 @@ test_cops_response_e160g (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Huawei E160G", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Huawei E160G", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -660,7 +669,7 @@ test_cops_response_mercury (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Sierra AT&T USBConnect Mercury", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Sierra AT&T USBConnect Mercury", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -673,7 +682,7 @@ test_cops_response_quicksilver (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", NULL, "310260", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Option AT&T Quicksilver", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Option AT&T Quicksilver", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -685,7 +694,7 @@ test_cops_response_icon225 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Option iCON 225", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Option iCON 225", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -699,7 +708,7 @@ test_cops_response_icon452 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM }
     };
 
-    test_cops_results ("Option iCON 452", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Option iCON 452", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -712,7 +721,7 @@ test_cops_response_f3507g (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_UMTS }
     };
 
-    test_cops_results ("Ericsson F3507g", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Ericsson F3507g", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -725,7 +734,7 @@ test_cops_response_f3607gw (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM }
     };
 
-    test_cops_results ("Ericsson F3607gw", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Ericsson F3607gw", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -738,7 +747,7 @@ test_cops_response_mc8775 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM }
     };
 
-    test_cops_results ("Sierra MC8775", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Sierra MC8775", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -751,7 +760,7 @@ test_cops_response_n80 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Cingular", NULL, "31041", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Nokia N80", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Nokia N80", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -763,7 +772,7 @@ test_cops_response_e1550 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Huawei E1550", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Huawei E1550", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -775,7 +784,7 @@ test_cops_response_mf622 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, NULL, NULL, "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("ZTE MF622", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("ZTE MF622", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -788,7 +797,7 @@ test_cops_response_e226 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, NULL, NULL, "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Huawei E226", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Huawei E226", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -801,7 +810,7 @@ test_cops_response_xu870 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Novatel XU870", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Novatel XU870", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -814,7 +823,7 @@ test_cops_response_gtultraexpress (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Option GlobeTrotter Ultra Express", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Option GlobeTrotter Ultra Express", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -826,7 +835,7 @@ test_cops_response_n2720 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", NULL, "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Nokia 2720", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Nokia 2720", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -839,7 +848,7 @@ test_cops_response_gobi (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Qualcomm Gobi", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Qualcomm Gobi", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -860,7 +869,7 @@ test_cops_response_sek600i (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "26207", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Sony-Ericsson K600i", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Sony-Ericsson K600i", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -873,7 +882,31 @@ test_cops_response_samsung_z810 (void *f, gpointer d)
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
-    test_cops_results ("Samsung Z810", reply, &expected[0], G_N_ELEMENTS (expected));
+    test_cops_results ("Samsung Z810", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
+}
+
+static void
+test_cops_response_ublox_lara (void *f, gpointer d)
+{
+    /* strings in UCS2 */
+    const char *reply =
+        "+COPS: "
+        "(2,\"004D006F007600690073007400610072\",\"004D006F007600690073007400610072\",\"00320031003400300037\",7),"
+        "(1,\"0059004F00490047004F\",\"0059004F00490047004F\",\"00320031003400300034\",7),"
+        "(1,\"0076006F006400610066006F006E0065002000450053\",\"0076006F00640061002000450053\",\"00320031003400300031\",7),"
+        "(1,\"004F00720061006E00670065002000530050\",\"00450053005000520054\",\"00320031003400300033\",0),"
+        "(1,\"0076006F006400610066006F006E0065002000450053\",\"0076006F00640061002000450053\",\"00320031003400300031\",0),"
+        "(1,\"004F00720061006E00670065002000530050\",\"00450053005000520054\",\"00320031003400300033\",7)";
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT,   "Movistar",    "Movistar", "21407", MM_MODEM_ACCESS_TECHNOLOGY_LTE },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "YOIGO",       "YOIGO",    "21404", MM_MODEM_ACCESS_TECHNOLOGY_LTE },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "vodafone ES", "voda ES",  "21401", MM_MODEM_ACCESS_TECHNOLOGY_LTE },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Orange SP",   "ESPRT",    "21403", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "vodafone ES", "voda ES",  "21401", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Orange SP",   "ESPRT",    "21403", MM_MODEM_ACCESS_TECHNOLOGY_LTE },
+    };
+
+    test_cops_results ("u-blox LARA", reply, MM_MODEM_CHARSET_UCS2, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -883,7 +916,7 @@ test_cops_response_gsm_invalid (void *f, gpointer d)
     GList *results;
     GError *error = NULL;
 
-    results = mm_3gpp_parse_cops_test_response (reply, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, MM_MODEM_CHARSET_GSM, &error);
     g_assert (results == NULL);
     g_assert_no_error (error);
 }
@@ -895,7 +928,7 @@ test_cops_response_umts_invalid (void *f, gpointer d)
    GList *results;
     GError *error = NULL;
 
-    results = mm_3gpp_parse_cops_test_response (reply, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, MM_MODEM_CHARSET_GSM, &error);
     g_assert (results == NULL);
     g_assert_no_error (error);
 }
@@ -4549,6 +4582,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_samsung_z810, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_ublox_lara, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));

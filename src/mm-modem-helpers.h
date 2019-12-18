@@ -157,8 +157,9 @@ typedef struct {
     MMModemAccessTechnology access_tech;
 } MM3gppNetworkInfo;
 void mm_3gpp_network_info_list_free (GList *info_list);
-GList *mm_3gpp_parse_cops_test_response (const gchar *reply,
-                                         GError **error);
+GList *mm_3gpp_parse_cops_test_response (const gchar     *reply,
+                                         MMModemCharset   cur_charset,
+                                         GError         **error);
 
 /* AT+COPS? (current operator) response parser */
 gboolean mm_3gpp_parse_cops_read_response (const gchar              *response,
