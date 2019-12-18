@@ -41,7 +41,9 @@ typedef struct {
     MMModem3gppRegistrationState  cs;
     MMModem3gppRegistrationState  ps;
     MMModem3gppRegistrationState  eps;
+    gboolean                      force_registration;
     gboolean                      manual_registration;
+    gchar                        *manual_registration_operator_id;
     GCancellable                 *pending_registration_cancellable;
     gboolean                      reloading_registration_info;
     /* Registration checks */
@@ -52,6 +54,7 @@ typedef struct {
 static void
 private_free (Private *priv)
 {
+    g_free (priv->manual_registration_operator_id);
     if (priv->pending_registration_cancellable) {
         g_cancellable_cancel (priv->pending_registration_cancellable);
         g_object_unref (priv->pending_registration_cancellable);
@@ -434,7 +437,8 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     /* Manual registration requested? */
     if (ctx->operator_id) {
         /* If already registered manually with the requested operator, we're done */
-        if ((g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
+        if (!priv->force_registration &&
+            (g_strcmp0 (current_operator_code, ctx->operator_id) == 0) &&
             REG_STATE_IS_REGISTERED (reg_state) &&
             priv->manual_registration) {
             mm_dbg ("Already registered manually in selected network '%s',"
@@ -447,13 +451,17 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 
         /* Manual registration to a new operator required */
         mm_dbg ("Launching manual network registration (%s)...", ctx->operator_id);
+        priv->force_registration = FALSE;
+        g_free (priv->manual_registration_operator_id);
+        priv->manual_registration_operator_id = g_strdup (ctx->operator_id);
         priv->manual_registration = TRUE;
     }
     /* Automatic registration requested? */
     else {
         /* If the modem is already registered and the last time it was asked
          * automatic registration, we're done */
-        if ((current_operator_code || REG_STATE_IS_REGISTERED (reg_state)) &&
+        if (!priv->force_registration &&
+            (current_operator_code || REG_STATE_IS_REGISTERED (reg_state)) &&
             !priv->manual_registration) {
             mm_dbg ("Already registered automatically in network '%s',"
                     " automatic registration not launched...",
@@ -465,6 +473,8 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 
         /* Automatic registration to a new operator requested */
         mm_dbg ("Launching automatic network registration...");
+        priv->force_registration = FALSE;
+        g_clear_pointer (&priv->manual_registration_operator_id, g_free);
         priv->manual_registration = FALSE;
     }
 
@@ -482,6 +492,39 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         (GAsyncReadyCallback)register_in_network_ready,
         task);
 }
+
+/*****************************************************************************/
+/* Request to reregister using the last settings */
+
+#define REREGISTER_IN_NETWORK_TIMEOUT 120
+
+gboolean
+mm_iface_modem_3gpp_reregister_in_network_finish (MMIfaceModem3gpp  *self,
+                                                  GAsyncResult      *res,
+                                                  GError           **error)
+{
+    return mm_iface_modem_3gpp_register_in_network_finish (self, res, error);
+}
+
+void
+mm_iface_modem_3gpp_reregister_in_network (MMIfaceModem3gpp    *self,
+                                           GAsyncReadyCallback  callback,
+                                           gpointer             user_data)
+{
+    Private *priv;
+
+    /* Relaunch registration using the last used settings */
+    priv = get_private (self);
+    priv->force_registration = TRUE;
+    mm_iface_modem_3gpp_register_in_network (self,
+                                             priv->manual_registration_operator_id,
+                                             REREGISTER_IN_NETWORK_TIMEOUT,
+                                             callback,
+                                             user_data);
+}
+
+
+/*****************************************************************************/
 
 typedef struct {
     MmGdbusModem3gpp *skeleton;

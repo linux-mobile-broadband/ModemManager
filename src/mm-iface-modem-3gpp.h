@@ -305,14 +305,22 @@ gboolean mm_iface_modem_3gpp_reload_current_registration_info_finish (MMIfaceMod
 void     mm_iface_modem_3gpp_clear_current_operator                  (MMIfaceModem3gpp *self);
 
 /* Allow registering in the network */
-gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
-                                                         GAsyncResult *res,
-                                                         GError **error);
-void     mm_iface_modem_3gpp_register_in_network        (MMIfaceModem3gpp *self,
-                                                         const gchar *operator_id,
-                                                         guint max_registration_time,
-                                                         GAsyncReadyCallback callback,
-                                                         gpointer user_data);
+void     mm_iface_modem_3gpp_register_in_network        (MMIfaceModem3gpp    *self,
+                                                         const gchar         *operator_id,
+                                                         guint                max_registration_time,
+                                                         GAsyncReadyCallback  callback,
+                                                         gpointer             user_data);
+gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp    *self,
+                                                         GAsyncResult        *res,
+                                                         GError             **error);
+
+/* Allow re-registering in the network with last settings */
+void     mm_iface_modem_3gpp_reregister_in_network        (MMIfaceModem3gpp     *self,
+                                                           GAsyncReadyCallback   callback,
+                                                           gpointer              user_data);
+gboolean mm_iface_modem_3gpp_reregister_in_network_finish (MMIfaceModem3gpp     *self,
+                                                           GAsyncResult         *res,
+                                                           GError              **error);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
