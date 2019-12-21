@@ -238,9 +238,28 @@ typedef struct {
 } ConnectionContext;
 
 static void
+cleanup_cancellation (ConnectionContext *ctx)
+{
+    Private *priv;
+
+    /* The ongoing connect cancellable and the one in the connection context
+     * must be the same, as they're set together, so if the one in the
+     * context doesn't exist, do nothing. */
+    if (!ctx->cancellable)
+        return;
+
+    /* If the ongoing connect cancellable is cancelled via the Simple.Disconnect
+     * method, it won't exist in the private struct, so don't assume they
+     * both exist. */
+    priv = get_private (ctx->self);
+    g_clear_object (&priv->ongoing_connect);
+    g_clear_object (&ctx->cancellable);
+}
+
+static void
 connection_context_free (ConnectionContext *ctx)
 {
-    g_clear_object (&ctx->cancellable);
+    cleanup_cancellation (ctx);
     g_clear_object (&ctx->properties);
     g_clear_object (&ctx->bearer);
     g_variant_unref (ctx->dictionary);
@@ -485,16 +504,6 @@ completed_if_cancelled (ConnectionContext *ctx)
         "Connection attempt cancelled");
     connection_context_free (ctx);
     return TRUE;
-}
-
-static void
-cleanup_cancellation (ConnectionContext *ctx)
-{
-    Private *priv;
-
-    priv = get_private (ctx->self);
-    g_clear_object (&priv->ongoing_connect);
-    g_clear_object (&ctx->cancellable);
 }
 
 static gboolean
