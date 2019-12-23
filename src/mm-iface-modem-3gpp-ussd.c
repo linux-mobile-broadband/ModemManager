@@ -568,8 +568,8 @@ interface_disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->disable_unsolicited_events (
@@ -715,8 +715,8 @@ interface_enabling_step (GTask *task)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->setup_unsolicited_events (
@@ -848,8 +848,8 @@ interface_initialization_step (GTask *task)
             supported_quark = (g_quark_from_static_string (
                                    SUPPORTED_TAG));
 
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_CHECK_SUPPORT:
         if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
@@ -876,8 +876,8 @@ interface_initialization_step (GTask *task)
              * support it. */
         }
 
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED:
         if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
@@ -890,8 +890,8 @@ interface_initialization_step (GTask *task)
             return;
         }
 
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
