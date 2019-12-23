@@ -536,8 +536,8 @@ connection_step (ConnectionContext *ctx)
 
     switch (ctx->step) {
     case CONNECTION_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case CONNECTION_STEP_UNLOCK_CHECK:
         mm_info ("Simple connect state (%d/%d): Unlock check",
@@ -590,9 +590,9 @@ connection_step (ConnectionContext *ctx)
         }
 
         /* If not 3GPP and not CDMA, this will possibly be a POTS modem,
-         * which won't require any specific registration anywhere.
-         * So, fall down to next step */
+         * which won't require any specific registration anywhere. */
         ctx->step++;
+        /* fall through */
 
     case CONNECTION_STEP_BEARER: {
         MMBearerList *list = NULL;
@@ -675,9 +675,8 @@ connection_step (ConnectionContext *ctx)
                 mm_base_bearer_get_path (ctx->bearer));
         g_object_unref (list);
         g_object_unref (bearer_properties);
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case CONNECTION_STEP_CONNECT:
         mm_info ("Simple connect state (%d/%d): Connect",
@@ -699,8 +698,8 @@ connection_step (ConnectionContext *ctx)
         mm_dbg ("Bearer at '%s' is already connected...",
                 mm_base_bearer_get_path (ctx->bearer));
 
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case CONNECTION_STEP_LAST:
         mm_info ("Simple connect state (%d/%d): All done",
