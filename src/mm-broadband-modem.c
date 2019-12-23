@@ -1508,6 +1508,7 @@ csim_ready (MMBaseModem  *self,
     LoadUnlockRetriesContext *ctx;
     const gchar              *response;
     GError                   *error = NULL;
+    gint                      val;
 
     ctx = g_task_get_task_data (task);
 
@@ -1516,18 +1517,21 @@ csim_ready (MMBaseModem  *self,
         mm_dbg ("Couldn't load retry count for lock '%s': %s",
                 mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock),
                 error->message);
-        g_error_free (error);
-    } else {
-        gint val;
-
-        val = mm_parse_csim_response (response, &error);
-        if (val < 0) {
-            mm_warn ("Parse error in step %d: %s.", ctx->i, error->message);
-            mm_dbg ("Couldn't parse retry count value for lock '%s'",
-                    mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock));
-        } else
-           mm_unlock_retries_set (ctx->retries, unlock_retries_map[ctx->i].lock, val);
+        goto next;
     }
+
+    val = mm_parse_csim_response (response, &error);
+    if (val < 0) {
+        mm_dbg ("Couldn't parse retry count value for lock '%s': %s",
+                mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock),
+                error->message);
+        goto next;
+    }
+
+    mm_unlock_retries_set (ctx->retries, unlock_retries_map[ctx->i].lock, val);
+
+next:
+    g_clear_error (&error);
 
     /* Go to next lock value */
     ctx->i++;
