@@ -611,8 +611,8 @@ interface_disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
@@ -624,8 +624,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
@@ -637,8 +637,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_LAST:
         /* Clear SMS list */
@@ -958,9 +958,8 @@ interface_enabling_step (GTask *task)
 
         g_object_unref (list);
 
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case ENABLING_STEP_SETUP_SMS_FORMAT:
         /* Allow setting SMS format to use */
@@ -972,8 +971,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_STORAGE_DEFAULTS: {
         MMSmsStorage default_storage;
@@ -1001,9 +1000,8 @@ interface_enabling_step (GTask *task)
             return;
         }
 
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
         /* Allow loading the initial list of SMS parts */
@@ -1012,8 +1010,8 @@ interface_enabling_step (GTask *task)
             load_initial_sms_parts_from_storages (task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
@@ -1025,8 +1023,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events */
@@ -1038,8 +1036,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
@@ -1282,8 +1280,8 @@ interface_initialization_step (GTask *task)
             supported_quark = (g_quark_from_static_string (
                                    SUPPORTED_TAG));
 
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_CHECK_SUPPORT:
         if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
@@ -1309,8 +1307,8 @@ interface_initialization_step (GTask *task)
             /* If there is no implementation to check support, assume we DON'T
              * support it. */
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED:
         if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
@@ -1322,8 +1320,8 @@ interface_initialization_step (GTask *task)
             g_object_unref (task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_LOAD_SUPPORTED_STORAGES:
         if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_supported_storages &&
@@ -1334,8 +1332,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_INIT_CURRENT_STORAGES:
         if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->init_current_storages &&
@@ -1346,8 +1344,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
