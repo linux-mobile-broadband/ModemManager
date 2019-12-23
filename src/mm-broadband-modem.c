@@ -2842,18 +2842,19 @@ static void
 cgev_process_detach (MMBroadbandModem *self,
                      MM3gppCgev        type)
 {
-    switch (type) {
-    case MM_3GPP_CGEV_NW_DETACH:
+    if (type == MM_3GPP_CGEV_NW_DETACH) {
         mm_info ("network forced PS detach: all contexts have been deactivated");
         bearer_list_report_disconnections (self, 0);
-        break;
-    case MM_3GPP_CGEV_ME_DETACH:
+        return;
+    }
+
+    if (type == MM_3GPP_CGEV_ME_DETACH) {
         mm_info ("mobile equipment forced PS detach: all contexts have been deactivated");
         bearer_list_report_disconnections (self, 0);
-        break;
-    default:
-        g_assert_not_reached ();
+        return;
     }
+
+    g_assert_not_reached ();
 }
 
 static void
@@ -2885,6 +2886,21 @@ cgev_process_primary (MMBroadbandModem *self,
         mm_info ("mobile equipment request to deactivate context (cid %u)", cid);
         bearer_list_report_disconnections (self, cid);
         break;
+    case MM_3GPP_CGEV_UNKNOWN:
+    case MM_3GPP_CGEV_NW_DETACH:
+    case MM_3GPP_CGEV_ME_DETACH:
+    case MM_3GPP_CGEV_NW_CLASS:
+    case MM_3GPP_CGEV_ME_CLASS:
+    case MM_3GPP_CGEV_NW_ACT_SECONDARY:
+    case MM_3GPP_CGEV_ME_ACT_SECONDARY:
+    case MM_3GPP_CGEV_NW_DEACT_SECONDARY:
+    case MM_3GPP_CGEV_ME_DEACT_SECONDARY:
+    case MM_3GPP_CGEV_NW_DEACT_PDP:
+    case MM_3GPP_CGEV_ME_DEACT_PDP:
+    case MM_3GPP_CGEV_NW_MODIFY:
+    case MM_3GPP_CGEV_ME_MODIFY:
+    case MM_3GPP_CGEV_REJECT:
+    case MM_3GPP_CGEV_NW_REACT:
     default:
         g_assert_not_reached ();
         break;
@@ -2921,6 +2937,21 @@ cgev_process_secondary (MMBroadbandModem *self,
         mm_info ("mobile equipment request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
         bearer_list_report_disconnections (self, cid);
         break;
+    case MM_3GPP_CGEV_UNKNOWN:
+    case MM_3GPP_CGEV_NW_DETACH:
+    case MM_3GPP_CGEV_ME_DETACH:
+    case MM_3GPP_CGEV_NW_CLASS:
+    case MM_3GPP_CGEV_ME_CLASS:
+    case MM_3GPP_CGEV_NW_ACT_PRIMARY:
+    case MM_3GPP_CGEV_ME_ACT_PRIMARY:
+    case MM_3GPP_CGEV_NW_DEACT_PRIMARY:
+    case MM_3GPP_CGEV_ME_DEACT_PRIMARY:
+    case MM_3GPP_CGEV_NW_DEACT_PDP:
+    case MM_3GPP_CGEV_ME_DEACT_PDP:
+    case MM_3GPP_CGEV_NW_MODIFY:
+    case MM_3GPP_CGEV_ME_MODIFY:
+    case MM_3GPP_CGEV_REJECT:
+    case MM_3GPP_CGEV_NW_REACT:
     default:
         g_assert_not_reached ();
         break;
@@ -2968,6 +2999,21 @@ cgev_process_pdp (MMBroadbandModem *self,
         } else
             mm_info ("mobile equipment request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
         break;
+    case MM_3GPP_CGEV_UNKNOWN:
+    case MM_3GPP_CGEV_NW_DETACH:
+    case MM_3GPP_CGEV_ME_DETACH:
+    case MM_3GPP_CGEV_NW_CLASS:
+    case MM_3GPP_CGEV_ME_CLASS:
+    case MM_3GPP_CGEV_NW_ACT_PRIMARY:
+    case MM_3GPP_CGEV_ME_ACT_PRIMARY:
+    case MM_3GPP_CGEV_NW_ACT_SECONDARY:
+    case MM_3GPP_CGEV_ME_ACT_SECONDARY:
+    case MM_3GPP_CGEV_NW_DEACT_PRIMARY:
+    case MM_3GPP_CGEV_ME_DEACT_PRIMARY:
+    case MM_3GPP_CGEV_NW_DEACT_SECONDARY:
+    case MM_3GPP_CGEV_ME_DEACT_SECONDARY:
+    case MM_3GPP_CGEV_NW_MODIFY:
+    case MM_3GPP_CGEV_ME_MODIFY:
     default:
         g_assert_not_reached ();
         break;
@@ -3020,6 +3066,7 @@ cgev_received (MMPortSerialAt   *port,
     case MM_3GPP_CGEV_ME_MODIFY:
         /* ignore */
         break;
+    case MM_3GPP_CGEV_UNKNOWN:
     default:
         mm_dbg ("unhandled +CGEV indication: %s", str);
         break;
@@ -3854,6 +3901,7 @@ ifc_test_ready (MMBaseModem  *_self,
     case MM_FLOW_CONTROL_NONE:
         cmd = "+IFC=0,0";
         break;
+    case MM_FLOW_CONTROL_UNKNOWN:
     default:
         g_assert_not_reached ();
     }
@@ -10500,6 +10548,15 @@ disabling_wait_for_final_state_ready (MMIfaceModem *self,
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+    case MM_MODEM_STATE_INITIALIZING:
+    case MM_MODEM_STATE_DISABLING:
+    case MM_MODEM_STATE_ENABLING:
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
     default:
         break;
     }
