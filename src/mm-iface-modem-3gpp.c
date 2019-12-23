@@ -1806,19 +1806,19 @@ interface_disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_INITIAL_EPS_BEARER:
         mm_iface_modem_3gpp_update_initial_eps_bearer (self, NULL);
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
         /* Disable periodic registration checks, if they were set */
         periodic_registration_check_disable (self);
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_REGISTRATION_EVENTS: {
         gboolean cs_supported = FALSE;
@@ -1842,9 +1842,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION_EVENTS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->cleanup_unsolicited_registration_events &&
@@ -1855,8 +1854,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->cleanup_unsolicited_events &&
@@ -1867,8 +1866,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->disable_unsolicited_events &&
@@ -1879,15 +1878,15 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_REGISTRATION_STATE:
         update_registration_state (self, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN, FALSE);
         mm_iface_modem_3gpp_update_access_technologies (self, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (self, 0, 0, 0);
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
@@ -2113,8 +2112,8 @@ interface_enabling_step (GTask *task)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_unsolicited_events &&
@@ -2125,8 +2124,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->enable_unsolicited_events &&
@@ -2137,8 +2136,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION_EVENTS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_unsolicited_registration_events &&
@@ -2149,8 +2148,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_REGISTRATION_EVENTS: {
         gboolean cs_supported = FALSE;
@@ -2174,9 +2173,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case ENABLING_STEP_INITIAL_EPS_BEARER: {
         gboolean eps_supported = FALSE;
@@ -2194,9 +2192,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
@@ -2418,8 +2415,8 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_IMEI:
         /* IMEI value is meant to be loaded only once during the whole
@@ -2434,8 +2431,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks &&
@@ -2446,8 +2443,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_EPS_UE_MODE_OPERATION:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_eps_ue_mode_operation &&
@@ -2458,8 +2455,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_EPS_INITIAL_BEARER_SETTINGS:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings &&
@@ -2470,9 +2467,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
-
+        /* fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
