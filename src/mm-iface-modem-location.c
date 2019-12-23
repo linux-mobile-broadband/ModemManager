@@ -1406,8 +1406,8 @@ interface_disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_DISABLE_GATHERING:
         setup_gathering (self,
@@ -1528,8 +1528,8 @@ interface_enabling_step (GTask *task)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_ENABLE_GATHERING: {
         MMModemLocationSource default_sources;
@@ -1735,8 +1735,8 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_CAPABILITIES:
         /* Location capabilities value is meant to be loaded only once during
@@ -1751,8 +1751,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_VALIDATE_CAPABILITIES:
         /* If the modem doesn't support any location capabilities, we won't export
@@ -1765,8 +1765,8 @@ interface_initialization_step (GTask *task)
             g_object_unref (task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_SUPL_SERVER:
         /* If the modem supports A-GPS, load SUPL server */
@@ -1780,8 +1780,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_SUPPORTED_ASSISTANCE_DATA:
         /* If the modem supports any GPS-related technology, check assistance data types supported */
@@ -1797,8 +1797,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_ASSISTANCE_DATA_SERVERS:
         /* If any assistance data supported, load servers */
@@ -1811,8 +1811,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_GPS_REFRESH_RATE:
         /* If we have GPS capabilities, expose the GPS refresh rate */
@@ -1821,8 +1821,8 @@ interface_initialization_step (GTask *task)
             /* Set the default rate in the interface */
             mm_gdbus_modem_location_set_gps_refresh_rate (ctx->skeleton, MM_LOCATION_GPS_REFRESH_TIME_SECS);
 
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
