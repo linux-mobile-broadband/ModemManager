@@ -813,6 +813,11 @@ prepare_hold_and_accept_foreach (MMBaseCall                 *call,
         if (!ctx->next_call)
             ctx->next_call = g_object_ref (call);
         break;
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_RINGING_OUT:
+    case MM_CALL_STATE_TERMINATED:
     default:
         break;
     }
@@ -941,6 +946,11 @@ prepare_hangup_and_accept_foreach (MMBaseCall                   *call,
         if (!ctx->next_call)
             ctx->next_call = g_object_ref (call);
         break;
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_RINGING_OUT:
+    case MM_CALL_STATE_TERMINATED:
     default:
         break;
     }
@@ -1082,6 +1092,8 @@ prepare_hangup_all_foreach (MMBaseCall             *call,
         break;
     case MM_CALL_STATE_WAITING:
     case MM_CALL_STATE_HELD:
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_TERMINATED:
     default:
         break;
     }
@@ -1199,6 +1211,12 @@ prepare_transfer_foreach (MMBaseCall            *call,
     case MM_CALL_STATE_HELD:
         ctx->calls = g_list_append (ctx->calls, g_object_ref (call));
         break;
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_WAITING:
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_RINGING_OUT:
+    case MM_CALL_STATE_TERMINATED:
     default:
         break;
     }
@@ -1471,6 +1489,12 @@ prepare_leave_multiparty_foreach (MMBaseCall             *call,
     case MM_CALL_STATE_HELD:
         ctx->other_calls = g_list_append (ctx->other_calls, g_object_ref (call));
         break;
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_WAITING:
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_RINGING_OUT:
+    case MM_CALL_STATE_TERMINATED:
     default:
         break;
     }
@@ -1615,6 +1639,12 @@ prepare_join_multiparty_foreach (MMBaseCall            *call,
     case MM_CALL_STATE_HELD:
         ctx->all_calls = g_list_append (ctx->all_calls, g_object_ref (call));
         break;
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_DIALING:
+    case MM_CALL_STATE_RINGING_IN:
+    case MM_CALL_STATE_RINGING_OUT:
+    case MM_CALL_STATE_WAITING:
+    case MM_CALL_STATE_TERMINATED:
     default:
         break;
     }
@@ -2130,6 +2160,8 @@ call_list_foreach_count_in_call (MMBaseCall *call,
         /* NOTE: ringing-in and waiting calls are NOT yet in-call, e.g. there must
          * be no audio settings enabled and we must not enable in-call URC handling
          * yet. */
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_TERMINATED:
     default:
         break;
     }
@@ -2373,6 +2405,9 @@ call_list_foreach_count_establishing (MMBaseCall *call,
     case MM_CALL_STATE_WAITING:
         *n_calls_establishing = *n_calls_establishing + 1;
         break;
+    case MM_CALL_STATE_ACTIVE:
+    case MM_CALL_STATE_TERMINATED:
+    case MM_CALL_STATE_UNKNOWN:
     default:
         break;
     }
