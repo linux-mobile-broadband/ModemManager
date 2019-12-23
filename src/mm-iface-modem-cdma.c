@@ -848,8 +848,8 @@ registration_check_step (GTask *task)
 
     switch (ctx->step) {
     case REGISTRATION_CHECK_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case REGISTRATION_CHECK_STEP_SETUP_REGISTRATION_CHECKS:
         /* Allow implementations to run an initial setup check. This setup allows
@@ -864,8 +864,8 @@ registration_check_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case REGISTRATION_CHECK_STEP_QCDM_CALL_MANAGER_STATE:
         mm_dbg ("Starting QCDM-based registration checks");
@@ -898,8 +898,8 @@ registration_check_step (GTask *task)
             return;
         }
         mm_dbg ("  Skipping HDR check");
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case REGISTRATION_CHECK_STEP_QCDM_CDMA1X_SERVING_SYSTEM:
         /* We only care about SID/NID here; nothing to do with registration
@@ -914,8 +914,8 @@ registration_check_step (GTask *task)
             return;
         }
         mm_dbg ("  Skipping CDMA1x Serving System check");
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case REGISTRATION_CHECK_STEP_QCDM_LAST:
         /* When we get all QCDM results, parse them */
@@ -937,8 +937,8 @@ registration_check_step (GTask *task)
             return;
         }
         mm_dbg ("  Skipping CDMA service status check, assuming with service");
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case REGISTRATION_CHECK_STEP_AT_CDMA1X_SERVING_SYSTEM:
         /* Now that we have some sort of service, check if the the device is
@@ -961,8 +961,8 @@ registration_check_step (GTask *task)
             return;
         }
         mm_dbg ("  Skipping CDMA1x Serving System check");
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case REGISTRATION_CHECK_STEP_AT_LAST:
         /* When we get all AT results, parse them */
@@ -989,8 +989,8 @@ registration_check_step (GTask *task)
             return;
         }
         mm_dbg ("  Skipping detailed registration state check");
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case REGISTRATION_CHECK_STEP_LAST:
         /* We are done without errors! */
@@ -1447,13 +1447,13 @@ interface_disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
         periodic_registration_check_disable (self);
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->disable_unsolicited_events &&
@@ -1464,8 +1464,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->cleanup_unsolicited_events &&
@@ -1476,8 +1476,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
@@ -1615,8 +1615,8 @@ interface_enabling_step (GTask *task)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_unsolicited_events &&
@@ -1627,8 +1627,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->enable_unsolicited_events &&
@@ -1639,13 +1639,13 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
         periodic_registration_check_enable (self);
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
@@ -1786,8 +1786,8 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_MEID:
         /* MEID value is meant to be loaded only once during the whole
@@ -1802,8 +1802,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_ESN:
         /* ESN value is meant to be loaded only once during the whole
@@ -1818,8 +1818,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_ACTIVATION_STATE:
         /* Initial activation state is meant to be loaded only once during the
@@ -1834,8 +1834,8 @@ interface_initialization_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
