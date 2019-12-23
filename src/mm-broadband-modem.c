@@ -2464,6 +2464,8 @@ access_tech_and_mask_new (AccessTechContext *ctx)
             act = MM_MODEM_ACCESS_TECHNOLOGY_LTE;
             mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
             break;
+        default:
+            break;
         }
     }
 
@@ -10741,6 +10743,9 @@ disabling_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -11100,6 +11105,9 @@ enabling_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -11164,6 +11172,9 @@ enable (MMBaseModem *self,
         /* Just return success, don't relaunch enabling */
         g_task_return_boolean (task, TRUE);
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 
     g_object_unref (task);
@@ -11656,6 +11667,9 @@ sim_hot_swap_enabled:
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -11721,6 +11735,9 @@ initialize (MMBaseModem *self,
         /* Just return success, don't relaunch initialization */
         g_task_return_boolean (task, TRUE);
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 
     g_object_unref (task);
