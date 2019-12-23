@@ -2596,8 +2596,8 @@ interface_disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
@@ -2609,8 +2609,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
         /* Allow cleaning up unsolicited events */
@@ -2622,8 +2622,8 @@ interface_disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
@@ -2759,8 +2759,8 @@ interface_enabling_step (GTask *task)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events to get notified of incoming calls */
@@ -2772,8 +2772,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         /* Allow setting up unsolicited events to get notified of incoming calls */
@@ -2785,8 +2785,8 @@ interface_enabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
@@ -2896,8 +2896,8 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case INITIALIZATION_STEP_CHECK_SUPPORT:
         /* Always check voice support when we run initialization, because
@@ -2970,9 +2970,8 @@ interface_initialization_step (GTask *task)
         }
         g_object_unref (list);
 
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case INITIALIZATION_STEP_LAST:
         /* Setup all method handlers */
