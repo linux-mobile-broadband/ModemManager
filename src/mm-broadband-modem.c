@@ -418,7 +418,7 @@ broadband_bearer_new_ready (GObject *source,
 
 static void
 modem_create_bearer (MMIfaceModem *self,
-                     MMBearerProperties *properties,
+                     MMBearerProperties *props,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
@@ -429,7 +429,7 @@ modem_create_bearer (MMIfaceModem *self,
     /* We just create a MMBroadbandBearer */
     mm_dbg ("Creating Broadband bearer in broadband modem");
     mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
-                             properties,
+                             props,
                              NULL, /* cancellable */
                              (GAsyncReadyCallback)broadband_bearer_new_ready,
                              task);
@@ -1519,7 +1519,6 @@ csim_ready (MMBaseModem  *self,
         g_error_free (error);
     } else {
         gint val;
-        GError *error = NULL;
 
         val = mm_parse_csim_response (response, &error);
         if (val < 0) {
@@ -5479,14 +5478,14 @@ cancel_command_ready (MMBroadbandModem *self,
 
     /* Complete the pending action, regardless of the CUSD result */
     if (self->priv->pending_ussd_action) {
-        GTask *task;
+        GTask *pending_task;
 
-        task = self->priv->pending_ussd_action;
+        pending_task = self->priv->pending_ussd_action;
         self->priv->pending_ussd_action = NULL;
 
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+        g_task_return_new_error (pending_task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
                                  "USSD session was cancelled");
-        g_object_unref (task);
+        g_object_unref (pending_task);
     }
 
     mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
