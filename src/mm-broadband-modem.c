@@ -10565,8 +10565,8 @@ disabling_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_WAIT_FOR_FINAL_STATE:
         mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
@@ -10583,16 +10583,16 @@ disabling_step (GTask *task)
                 task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_SIMPLE:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_FIRMWARE:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_VOICE:
         if (ctx->self->priv->modem_voice_dbus_skeleton) {
@@ -10603,8 +10603,8 @@ disabling_step (GTask *task)
                                           task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_SIGNAL:
         if (ctx->self->priv->modem_signal_dbus_skeleton) {
@@ -10615,8 +10615,8 @@ disabling_step (GTask *task)
                                            task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_OMA:
         if (ctx->self->priv->modem_oma_dbus_skeleton) {
@@ -10627,8 +10627,8 @@ disabling_step (GTask *task)
                                         task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_TIME:
         if (ctx->self->priv->modem_time_dbus_skeleton) {
@@ -10639,8 +10639,8 @@ disabling_step (GTask *task)
                                          task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_MESSAGING:
         if (ctx->self->priv->modem_messaging_dbus_skeleton) {
@@ -10651,8 +10651,8 @@ disabling_step (GTask *task)
                                               task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_LOCATION:
         if (ctx->self->priv->modem_location_dbus_skeleton) {
@@ -10663,8 +10663,8 @@ disabling_step (GTask *task)
                                              task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_CDMA:
         if (ctx->self->priv->modem_cdma_dbus_skeleton) {
@@ -10675,8 +10675,8 @@ disabling_step (GTask *task)
                                         task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_3GPP_USSD:
         if (ctx->self->priv->modem_3gpp_ussd_dbus_skeleton) {
@@ -10687,8 +10687,8 @@ disabling_step (GTask *task)
                                               task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_3GPP:
         if (ctx->self->priv->modem_3gpp_dbus_skeleton) {
@@ -10699,8 +10699,8 @@ disabling_step (GTask *task)
                                         task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_IFACE_MODEM:
         /* This skeleton may be NULL when mm_base_modem_disable() gets called at
@@ -10712,8 +10712,8 @@ disabling_step (GTask *task)
                                     task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLING_STEP_LAST:
         ctx->disabled = TRUE;
@@ -10914,8 +10914,8 @@ enabling_step (GTask *task)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_WAIT_FOR_FINAL_STATE:
         mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
@@ -10932,8 +10932,8 @@ enabling_step (GTask *task)
                                                                         task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_IFACE_MODEM:
         g_assert (ctx->self->priv->modem_dbus_skeleton != NULL);
@@ -10954,8 +10954,8 @@ enabling_step (GTask *task)
                                         task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_IFACE_3GPP_USSD:
         if (ctx->self->priv->modem_3gpp_ussd_dbus_skeleton) {
@@ -10965,8 +10965,8 @@ enabling_step (GTask *task)
                                              task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_IFACE_CDMA:
         if (ctx->self->priv->modem_cdma_dbus_skeleton) {
@@ -10978,8 +10978,8 @@ enabling_step (GTask *task)
                                         task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_IFACE_LOCATION:
         if (ctx->self->priv->modem_location_dbus_skeleton) {
@@ -10991,8 +10991,8 @@ enabling_step (GTask *task)
                                             task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_IFACE_MESSAGING:
         if (ctx->self->priv->modem_messaging_dbus_skeleton) {
@@ -11004,8 +11004,8 @@ enabling_step (GTask *task)
                                              task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLING_STEP_IFACE_TIME:
         if (ctx->self->priv->modem_time_dbus_skeleton) {
@@ -11017,8 +11017,8 @@ enabling_step (GTask *task)
                                         task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case ENABLING_STEP_IFACE_SIGNAL:
         if (ctx->self->priv->modem_signal_dbus_skeleton) {
@@ -11030,8 +11030,8 @@ enabling_step (GTask *task)
                                           task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case ENABLING_STEP_IFACE_OMA:
         if (ctx->self->priv->modem_oma_dbus_skeleton) {
@@ -11043,8 +11043,8 @@ enabling_step (GTask *task)
                                        task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case ENABLING_STEP_IFACE_VOICE:
         if (ctx->self->priv->modem_voice_dbus_skeleton) {
@@ -11056,16 +11056,16 @@ enabling_step (GTask *task)
                                          task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case ENABLING_STEP_IFACE_FIRMWARE:
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case ENABLING_STEP_IFACE_SIMPLE:
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case ENABLING_STEP_LAST:
         ctx->enabled = TRUE;
@@ -11378,14 +11378,14 @@ initialize_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZE_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_SETUP_PORTS:
         if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->setup_ports)
             MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->setup_ports (ctx->self);
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_STARTED:
         if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_started &&
@@ -11395,8 +11395,8 @@ initialize_step (GTask *task)
                                                                               task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_SETUP_SIMPLE_STATUS:
         /* Simple status must be created before any interface initialization,
@@ -11404,8 +11404,8 @@ initialize_step (GTask *task)
          */
         if (!ctx->self->priv->modem_simple_status)
             ctx->self->priv->modem_simple_status = mm_simple_status_new ();
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_IFACE_MODEM:
         /* Initialize the Modem interface */
@@ -11425,8 +11425,8 @@ initialize_step (GTask *task)
             return;
         }
 
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_IFACE_3GPP_USSD:
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
@@ -11436,8 +11436,8 @@ initialize_step (GTask *task)
                                                  task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_IFACE_CDMA:
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
@@ -11448,8 +11448,8 @@ initialize_step (GTask *task)
                                             task);
             return;
         }
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_IFACE_LOCATION:
         /* Initialize the Location interface */
@@ -11493,9 +11493,9 @@ initialize_step (GTask *task)
 
     case INITIALIZE_STEP_FALLBACK_LIMITED:
         /* All the initialization steps after this one will be run both on
-         * successful and locked/failed initializations.
-         * Fall down to next step */
+         * successful and locked/failed initializations. */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_IFACE_VOICE:
         /* Initialize the Voice interface */
@@ -11548,14 +11548,14 @@ initialize_step (GTask *task)
         } else
             mm_dbg ("Ports context for SIM hot swap already available");
 
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_IFACE_SIMPLE:
         if (ctx->self->priv->modem_state != MM_MODEM_STATE_FAILED)
             mm_iface_modem_simple_initialize (MM_IFACE_MODEM_SIMPLE (ctx->self));
-        /* Fall down to next step */
         ctx->step++;
+       /* fall through */
 
     case INITIALIZE_STEP_LAST:
         if (ctx->self->priv->modem_state == MM_MODEM_STATE_FAILED) {
