@@ -531,6 +531,7 @@ update_location_source_status (MMIfaceModemLocation *self,
     case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
     case MM_MODEM_LOCATION_SOURCE_AGPS_MSA:
     case MM_MODEM_LOCATION_SOURCE_AGPS_MSB:
+    case MM_MODEM_LOCATION_SOURCE_NONE:
         /* Nothing to setup in the context */
     default:
         break;
