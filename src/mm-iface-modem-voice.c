@@ -1890,7 +1890,12 @@ in_call_setup_context_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
+
+    g_assert_not_reached ();
 }
 
 static void
@@ -2020,7 +2025,12 @@ in_call_cleanup_context_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
+
+    g_assert_not_reached ();
 }
 
 static void
@@ -2620,6 +2630,9 @@ interface_disabling_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -2780,6 +2793,9 @@ interface_enabling_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -2979,6 +2995,9 @@ interface_initialization_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
