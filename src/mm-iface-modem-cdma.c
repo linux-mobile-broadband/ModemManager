@@ -249,6 +249,9 @@ handle_activate_auth_ready (MMBaseModem *self,
                                                "Cannot perform OTA activation: "
                                                "modem is connected");
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 
     handle_activate_context_free (ctx);
@@ -430,6 +433,9 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
                                                "Cannot perform manual activation: "
                                                "modem is connected");
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 
     g_object_unref (properties);
@@ -999,6 +1005,9 @@ registration_check_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -1148,6 +1157,9 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                                                    MM_MODEM_STATE_ENABLED,
                                                    MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
             break;
+        default:
+            g_assert_not_reached ();
+            break;
         }
     }
 
@@ -1198,6 +1210,9 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_ENABLED,
                                                    MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+            break;
+        default:
+            g_assert_not_reached ();
             break;
         }
     }
@@ -1469,6 +1484,9 @@ interface_disabling_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -1634,6 +1652,9 @@ interface_enabling_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -1836,6 +1857,9 @@ interface_initialization_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
