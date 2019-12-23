@@ -3110,41 +3110,47 @@ set_cgev_unsolicited_events_handlers (MMBroadbandModem *self,
 }
 
 static void
-ciev_received (MMPortSerialAt *port,
-               GMatchInfo *info,
+ciev_signal_received (MMBroadbandModem *self,
+                      GMatchInfo       *match_info)
+{
+    guint quality;
+
+    if (!mm_get_uint_from_match_info (match_info, 2, &quality)) {
+        mm_dbg ("Couldn't parse signal quality value from +CIEV");
+        return;
+    }
+
+    mm_iface_modem_update_signal_quality (
+        MM_IFACE_MODEM (self),
+        normalize_ciev_cind_signal_quality (quality,
+                                            self->priv->modem_cind_min_signal_quality,
+                                            self->priv->modem_cind_max_signal_quality));
+}
+
+static void
+ciev_received (MMPortSerialAt   *port,
+               GMatchInfo       *match_info,
                MMBroadbandModem *self)
 {
-    gint ind = 0;
+    guint  ind;
     gchar *item;
 
-    item = g_match_info_fetch (info, 1);
-    if (item)
-        ind = atoi (item);
+    item = mm_get_string_unquoted_from_match_info (match_info, 1);
+    if (!item)
+        return;
 
-    /* Handle signal quality change indication */
-    if (ind == self->priv->modem_cind_indicator_signal_quality ||
-        g_str_equal (item, "signal")) {
-        gchar *value;
-
-        value = g_match_info_fetch (info, 2);
-        if (value) {
-            gint quality = 0;
-
-            quality = atoi (value);
-
-            mm_iface_modem_update_signal_quality (
-                MM_IFACE_MODEM (self),
-                normalize_ciev_cind_signal_quality (quality,
-                                                    self->priv->modem_cind_min_signal_quality,
-                                                    self->priv->modem_cind_max_signal_quality));
-            g_free (value);
-        }
+    /* numeric index? */
+    if (mm_get_uint_from_str (item, &ind)) {
+        if (ind == self->priv->modem_cind_indicator_signal_quality)
+            ciev_signal_received (self, match_info);
+    }
+    /* string index? */
+    else {
+        if (g_str_equal (item, "signal"))
+            ciev_signal_received (self, match_info);
     }
 
     g_free (item);
-
-    /* FIXME: handle roaming and service indicators.
-     * ... wait, arent these already handle by unsolicited CREG responses? */
 }
 
 static void
