@@ -10099,34 +10099,6 @@ initialization_started_finish (MMBroadbandModem *self,
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-static gboolean
-open_ports_initialization (MMBroadbandModem *self,
-                           PortsContext *ctx,
-                           GError **error)
-{
-    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    if (!ctx->primary) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Couldn't get primary port");
-        return FALSE;
-    }
-
-    /* Open and send first commands to the primary serial port.
-     * We do keep the primary port open during the whole initialization
-     * sequence. Note that this port is not really passed to the interfaces,
-     * they will get the primary port themselves. */
-    if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->primary), error)) {
-        g_prefix_error (error, "Couldn't open primary port: ");
-        return FALSE;
-    }
-
-    ctx->primary_open = TRUE;
-
-    return TRUE;
-}
-
 static void
 initialization_started (MMBroadbandModem *self,
                         GAsyncReadyCallback callback,
