@@ -712,6 +712,9 @@ connection_step (ConnectionContext *ctx)
             mm_base_bearer_get_path (ctx->bearer));
         connection_context_free (ctx);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
@@ -822,6 +825,10 @@ connect_auth_ready (MMBaseModem *self,
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
         ctx->step = CONNECTION_STEP_ENABLE + 1;
+        break;
+
+    default:
+        g_assert_not_reached ();
         break;
     }
     connection_step (ctx);
