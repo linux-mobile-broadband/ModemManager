@@ -637,6 +637,9 @@ set_current_capabilities_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -898,6 +901,9 @@ load_current_capabilities_step (GTask *task)
         g_task_return_int (task, priv->current_capabilities);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -2542,6 +2548,9 @@ setup_carrier_config_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -3034,6 +3043,9 @@ load_carrier_config_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
