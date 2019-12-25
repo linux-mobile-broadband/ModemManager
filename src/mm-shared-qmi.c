@@ -4216,6 +4216,7 @@ pds_set_default_tracking_session_ready (QmiClientPds *client,
         case GPS_OPERATION_MODE_STANDALONE:
             mm_dbg ("Standalone mode enabled (A-GPS disabled)");
             break;
+        case GPS_OPERATION_MODE_UNKNOWN:
         default:
             g_assert_not_reached ();
     }
@@ -4361,6 +4362,7 @@ loc_location_set_operation_mode_indication_cb (QmiClientLoc                     
         case GPS_OPERATION_MODE_STANDALONE:
             mm_dbg ("Standalone mode enabled (A-GPS disabled)");
             break;
+        case GPS_OPERATION_MODE_UNKNOWN:
         default:
             g_assert_not_reached ();
     }
