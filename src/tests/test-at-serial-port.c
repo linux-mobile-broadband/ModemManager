@@ -21,8 +21,8 @@
 #include "mm-log.h"
 
 typedef struct {
-    gchar *original;
-    gchar *without_echo;
+    const gchar *original;
+    const gchar *without_echo;
 } EchoRemovalTest;
 
 static const EchoRemovalTest echo_removal_tests[] = {
