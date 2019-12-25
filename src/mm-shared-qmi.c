@@ -2826,7 +2826,7 @@ get_config_info_indication (QmiClientPdc                        *client,
     ConfigInfo               *current_config = NULL;
     guint32                   token;
     const gchar              *description;
-    int                       i;
+    guint                     i;
     guint16                   error_code = 0;
 
     ctx = g_task_get_task_data (task);
@@ -2892,7 +2892,7 @@ list_configs_indication (QmiClientPdc                      *client,
     LoadCarrierConfigContext *ctx;
     GError                   *error = NULL;
     GArray                   *configs = NULL;
-    int                       i;
+    guint                     i;
     guint16                   error_code = 0;
 
     ctx = g_task_get_task_data (task);
