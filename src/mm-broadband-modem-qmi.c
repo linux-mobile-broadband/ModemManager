@@ -1121,6 +1121,9 @@ load_unlock_required_context_step (GTask *task)
                                         (GAsyncReadyCallback) unlock_required_uim_get_card_status_ready,
                                         task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -5783,6 +5786,9 @@ load_initial_sms_parts_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 
     g_assert (mode != -1);
@@ -8268,6 +8274,9 @@ signal_load_values_context_step (GTask *task)
         }
         g_object_unref (task);
         return;
+
+    default:
+        break;
     }
 
     g_assert_not_reached ();
