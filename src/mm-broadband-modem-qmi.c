@@ -1392,6 +1392,13 @@ qmi_dbm_valid (gint8 dbm, QmiNasRadioInterface radio_interface)
         return (dbm > -125 && dbm < -30);
     case QMI_NAS_RADIO_INTERFACE_UMTS:
         return (dbm > -125 && dbm < -30);
+    case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
+    case QMI_NAS_RADIO_INTERFACE_NONE:
+    case QMI_NAS_RADIO_INTERFACE_AMPS:
+    case QMI_NAS_RADIO_INTERFACE_GSM:
+    case QMI_NAS_RADIO_INTERFACE_LTE:
+    case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
+        /* no explicit validation */
     default:
         break;
     }
@@ -1994,6 +2001,10 @@ dms_get_operating_mode_ready (QmiClientDms *client,
         case QMI_DMS_OPERATING_MODE_OFFLINE:
             g_task_return_int (task, MM_MODEM_POWER_STATE_OFF);
             break;
+        case QMI_DMS_OPERATING_MODE_SHUTTING_DOWN:
+        case QMI_DMS_OPERATING_MODE_FACTORY_TEST:
+        case QMI_DMS_OPERATING_MODE_RESET:
+        case QMI_DMS_OPERATING_MODE_UNKNOWN:
         default:
             g_task_return_new_error (task,
                                      MM_CORE_ERROR,
@@ -8029,6 +8040,10 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
                     ctx->values_result->lte = mm_signal_new ();
                 mm_signal_set_rssi (ctx->values_result->lte, (gdouble)element->rssi);
                 break;
+            case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
+            case QMI_NAS_RADIO_INTERFACE_NONE:
+            case QMI_NAS_RADIO_INTERFACE_AMPS:
+            case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
             default:
                 break;
             }
@@ -8058,6 +8073,12 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
                     mm_signal_set_ecio (ctx->values_result->umts, ((gdouble)element->ecio) * (-0.5));
                 break;
             default:
+            case QMI_NAS_RADIO_INTERFACE_GSM:
+            case QMI_NAS_RADIO_INTERFACE_LTE:
+            case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
+            case QMI_NAS_RADIO_INTERFACE_NONE:
+            case QMI_NAS_RADIO_INTERFACE_AMPS:
+            case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
                 break;
             }
         }
