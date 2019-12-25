@@ -196,6 +196,9 @@ reload_stats_context_step (GTask *task)
                                g_free);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -359,6 +362,9 @@ connection_status_context_step (GTask *task)
             g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_CONNECTED);
             g_object_unref (task);
             return;
+
+        default:
+            g_assert_not_reached ();
     }
 }
 
@@ -1588,6 +1594,9 @@ connect_context_step (GTask *task)
                                                         ctx->ipv6_config),
                           NULL);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -2038,6 +2047,9 @@ disconnect_context_step (GTask *task)
 
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
