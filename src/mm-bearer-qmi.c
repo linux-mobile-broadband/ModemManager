@@ -164,8 +164,8 @@ reload_stats_context_step (GTask *task)
 
     switch (ctx->step) {
     case RELOAD_STATS_CONTEXT_STEP_FIRST:
-        /* Fall through */
         ctx->step++;
+        /* fall through */
     case RELOAD_STATS_CONTEXT_STEP_IPV4:
         if (self->priv->client_ipv4) {
             qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (self->priv->client_ipv4),
@@ -177,7 +177,7 @@ reload_stats_context_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* Fall through */
+        /* fall through */
     case RELOAD_STATS_CONTEXT_STEP_IPV6:
         if (self->priv->client_ipv6) {
             qmi_client_wds_get_packet_statistics (QMI_CLIENT_WDS (self->priv->client_ipv6),
@@ -189,7 +189,7 @@ reload_stats_context_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* Fall through */
+        /* fall through */
     case RELOAD_STATS_CONTEXT_STEP_LAST:
         g_task_return_pointer (task,
                                g_memdup (&ctx->stats, sizeof (ctx->stats)),
@@ -329,7 +329,7 @@ connection_status_context_step (GTask *task)
                 return;
             }
             ctx->step++;
-            /* fall down to next step */
+            /* fall through */
 
         case CONNECTION_STATUS_CONTEXT_STEP_IPV4:
             if (self->priv->client_ipv4) {
@@ -342,7 +342,7 @@ connection_status_context_step (GTask *task)
                 return;
             }
             ctx->step++;
-            /* fall down to next step */
+            /* fall through */
 
         case CONNECTION_STATUS_CONTEXT_STEP_IPV6:
             if (self->priv->client_ipv6) {
@@ -355,7 +355,7 @@ connection_status_context_step (GTask *task)
                 return;
             }
             ctx->step++;
-            /* fall down to next step */
+            /* fall through */
 
         case CONNECTION_STATUS_CONTEXT_STEP_LAST:
             /* All available clients are connected */
@@ -1295,11 +1295,9 @@ connect_context_step (GTask *task)
 
     switch (ctx->step) {
     case CONNECT_STEP_FIRST:
-
         g_assert (ctx->ipv4 || ctx->ipv6);
-
-        /* Fall down */
         ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_OPEN_QMI_PORT:
         /* If we're explicitly opening the port (e.g. using a different cdc-wdm
@@ -1315,8 +1313,8 @@ connect_context_step (GTask *task)
             return;
         }
 
-        /* If already open, just fall down */
         ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_IP_METHOD:
         /* Once the QMI port is open, we decide the IP method we're going
@@ -1329,9 +1327,8 @@ connect_context_step (GTask *task)
             ctx->ip_method = MM_BEARER_IP_METHOD_DHCP;
 
         mm_dbg ("Defaulting to use %s IP method", mm_bearer_ip_method_get_string (ctx->ip_method));
-
-        /* Just fall down */
         ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_IPV4:
         /* If no IPv4 setup needed, jump to IPv6 */
@@ -1345,8 +1342,8 @@ connect_context_step (GTask *task)
         mm_dbg ("Running IPv4 connection setup");
         ctx->running_ipv4 = TRUE;
         ctx->running_ipv6 = FALSE;
-        /* Just fall down */
         ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_WDS_CLIENT_IPV4: {
         QmiClient *client;
@@ -1366,9 +1363,8 @@ connect_context_step (GTask *task)
         }
 
         ctx->client_ipv4 = QMI_CLIENT_WDS (client);
-        /* Just fall down */
         ctx->step++;
-    }
+    } /* fall through */
 
     case CONNECT_STEP_IP_FAMILY_IPV4:
         /* If client is new enough, select IP family */
@@ -1391,8 +1387,8 @@ connect_context_step (GTask *task)
 
         ctx->default_ip_family_set = FALSE;
 
-        /* Just fall down */
         ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_ENABLE_INDICATIONS_IPV4:
         common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
@@ -1421,16 +1417,15 @@ connect_context_step (GTask *task)
         return;
     }
 
-    case CONNECT_STEP_GET_CURRENT_SETTINGS_IPV4: {
+    case CONNECT_STEP_GET_CURRENT_SETTINGS_IPV4:
         /* Retrieve and print IP configuration */
         if (ctx->packet_data_handle_ipv4) {
             mm_dbg ("Getting IPv4 configuration...");
             get_current_settings (task, ctx->client_ipv4);
             return;
         }
-        /* Fall through */
         ctx->step++;
-    }
+        /* fall through */
 
     case CONNECT_STEP_IPV6:
         /* If no IPv6 setup needed, jump to last */
@@ -1444,8 +1439,8 @@ connect_context_step (GTask *task)
         mm_dbg ("Running IPv6 connection setup");
         ctx->running_ipv4 = FALSE;
         ctx->running_ipv6 = TRUE;
-        /* Just fall down */
         ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_WDS_CLIENT_IPV6: {
         QmiClient *client;
@@ -1465,9 +1460,8 @@ connect_context_step (GTask *task)
         }
 
         ctx->client_ipv6 = QMI_CLIENT_WDS (client);
-        /* Just fall down */
         ctx->step++;
-    }
+    } /* fall through */
 
     case CONNECT_STEP_IP_FAMILY_IPV6:
 
@@ -1492,8 +1486,8 @@ connect_context_step (GTask *task)
 
         ctx->default_ip_family_set = FALSE;
 
-        /* Just fall down */
         ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_ENABLE_INDICATIONS_IPV6:
         common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
@@ -1522,16 +1516,15 @@ connect_context_step (GTask *task)
         return;
     }
 
-    case CONNECT_STEP_GET_CURRENT_SETTINGS_IPV6: {
+    case CONNECT_STEP_GET_CURRENT_SETTINGS_IPV6:
         /* Retrieve and print IP configuration */
         if (ctx->packet_data_handle_ipv6) {
             mm_dbg ("Getting IPv6 configuration...");
             get_current_settings (task, ctx->client_ipv6);
             return;
         }
-        /* Fall through */
         ctx->step++;
-    }
+        /* fall through */
 
     case CONNECT_STEP_LAST:
         /* If one of IPv4 or IPv6 succeeds, we're connected */
@@ -1962,8 +1955,8 @@ disconnect_context_step (GTask *task)
 
     switch (ctx->step) {
     case DISCONNECT_STEP_FIRST:
-        /* Fall down */
         ctx->step++;
+        /* fall through */
 
     case DISCONNECT_STEP_STOP_NETWORK_IPV4:
         if (ctx->packet_data_handle_ipv4) {
@@ -1993,8 +1986,8 @@ disconnect_context_step (GTask *task)
             return;
         }
 
-        /* Fall down */
         ctx->step++;
+        /* fall through */
 
     case DISCONNECT_STEP_STOP_NETWORK_IPV6:
         if (ctx->packet_data_handle_ipv6) {
@@ -2024,8 +2017,8 @@ disconnect_context_step (GTask *task)
             return;
         }
 
-        /* Fall down */
         ctx->step++;
+        /* fall through */
 
     case DISCONNECT_STEP_LAST:
         if (!ctx->error_ipv4 && !ctx->error_ipv6)
