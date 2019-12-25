@@ -25,10 +25,9 @@
 /*****************************************************************************/
 
 #define MM_DEFINE_SINGLETON_INSTANCE(TYPE)      \
-    static TYPE *singleton_instance
+    static TYPE *singleton_instance;
 
 #define MM_DEFINE_SINGLETON_WEAK_REF(TYPE)                              \
-    MM_DEFINE_SINGLETON_INSTANCE (TYPE);                                \
     static void                                                         \
     _singleton_instance_weak_ref_cb (gpointer data,                     \
                                      GObject *where_the_object_was)     \
@@ -43,7 +42,6 @@
     }
 
 #define MM_DEFINE_SINGLETON_DESTRUCTOR(TYPE)                            \
-    MM_DEFINE_SINGLETON_INSTANCE (TYPE);                                \
     static void __attribute__((destructor))                             \
     _singleton_destructor (void)                                        \
     {                                                                   \
@@ -61,8 +59,8 @@
 #endif
 
 #define MM_DEFINE_SINGLETON_GETTER(TYPE, GETTER, GTYPE, ...)            \
-    MM_DEFINE_SINGLETON_INSTANCE (TYPE);                                \
-    MM_DEFINE_SINGLETON_WEAK_REF (TYPE);                                \
+    MM_DEFINE_SINGLETON_INSTANCE (TYPE)                                 \
+    MM_DEFINE_SINGLETON_WEAK_REF (TYPE)                                 \
     TYPE *                                                              \
     GETTER (void)                                                       \
     {                                                                   \
