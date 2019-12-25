@@ -844,6 +844,13 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
 
     /* PIN1 */
     switch (app->pin1_state) {
+    case QMI_UIM_PIN_STATE_NOT_INITIALIZED:
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
+                     "SIM PIN/PUK status not known yet");
+        return FALSE;
+
     case QMI_UIM_PIN_STATE_PERMANENTLY_BLOCKED:
         g_set_error (error,
                      MM_MOBILE_EQUIPMENT_ERROR,
@@ -875,6 +882,10 @@ uim_get_card_status_output_parse (QmiMessageUimGetCardStatusOutput  *output,
     /* PIN2 */
     if (lock == MM_MODEM_LOCK_NONE) {
         switch (app->pin2_state) {
+        case QMI_UIM_PIN_STATE_NOT_INITIALIZED:
+            mm_warn ("SIM PIN2/PUK2 status not known yet");
+            break;
+
         case QMI_UIM_PIN_STATE_ENABLED_NOT_VERIFIED:
             lock = MM_MODEM_LOCK_SIM_PIN2;
             break;
