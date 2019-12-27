@@ -421,42 +421,67 @@ static void
 propagate_port_mode_results (GList *probes)
 {
     MMDevice *device;
-    GList *l;
-    gboolean primary_flagged = FALSE;
+    GList    *l;
+    gboolean  primary_flagged = FALSE;
 
     g_assert (probes != NULL);
-    device = mm_port_probe_peek_device (MM_PORT_PROBE (probes->data));
 
     /* Now we propagate the tags to the specific port probes */
+    device = mm_port_probe_peek_device (MM_PORT_PROBE (probes->data));
     for (l = probes; l; l = g_list_next (l)) {
-        MMPortSerialAtFlag at_port_flags = MM_PORT_SERIAL_AT_FLAG_NONE;
-        guint usbif;
+        MMPortSerialAtFlag  at_port_flags = MM_PORT_SERIAL_AT_FLAG_NONE;
+        MMPortProbe        *probe;
+        guint               usbif;
+        const gchar        *description;
 
-        usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
+        probe = MM_PORT_PROBE (l->data);
 
+        /* Tags only applicable to AT ports */
+        if (!mm_port_probe_is_at (probe))
+            goto next;
+
+        /* Port type hints from AT^GETPORTMODE */
+        usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (probe), "ID_USB_INTERFACE_NUM");
         if (GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED))) {
             if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT))) {
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
                 primary_flagged = TRUE;
-            } else if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT)))
+            } else if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT))) {
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
-            else if (!g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT) &&
-                     usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT)))
+            } else if (!g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT) &&
+                     usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT))) {
                 /* If NDIS reported only instead of MDM, use it */
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
-        } else if (usbif == 0 &&
-                   mm_port_probe_is_at (MM_PORT_PROBE (l->data))) {
-            /* If GETPORTMODE is not supported, we assume usbif 0 is the modem port */
-            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
-
-            /* /\* TODO. */
-            /*  * For CDMA modems we assume usbif0 is both primary and PPP, since */
-            /*  * they don't have problems with talking on secondary ports. */
-            /*  *\/ */
-            /* if (caps & CAP_CDMA) */
-            /*     pflags |= MM_PORT_SERIAL_AT_FLAG_PRIMARY; */
+            }
+            goto next;
         }
 
+        /* Port type hints from interface description */
+        description = mm_kernel_device_get_interface_description (mm_port_probe_peek_port (probe));
+        if (description) {
+            gchar *lower_description;
+
+            mm_dbg ("(Huawei) %s interface description: %s", mm_port_probe_get_port_name (probe), description);
+
+            lower_description = g_ascii_strdown (description, -1);
+            if (strstr (lower_description, "modem"))
+                at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
+            else if (strstr (lower_description, "pcui")) {
+                at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
+                primary_flagged = TRUE;
+            }
+            g_free (lower_description);
+            goto next;
+        }
+
+        /* If GETPORTMODE unsupported and no other port type hints, we assume
+         * usbif 0 is the modem port */
+        if (usbif == 0) {
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
+            goto next;
+        }
+
+    next:
         g_object_set_data (G_OBJECT (l->data), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (at_port_flags));
     }
 
