@@ -183,6 +183,16 @@ mm_kernel_device_get_interface_sysfs_path (MMKernelDevice *self)
             NULL);
 }
 
+const gchar *
+mm_kernel_device_get_interface_description (MMKernelDevice *self)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), NULL);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_interface_description ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_interface_description (self) :
+            NULL);
+}
+
 gboolean
 mm_kernel_device_cmp (MMKernelDevice *a,
                       MMKernelDevice *b)

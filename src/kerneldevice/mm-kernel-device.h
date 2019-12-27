@@ -41,10 +41,11 @@ struct _MMKernelDeviceClass {
     const gchar * (* get_driver)      (MMKernelDevice *self);
     const gchar * (* get_sysfs_path)  (MMKernelDevice *self);
 
-    gint          (* get_interface_class)      (MMKernelDevice *self);
-    gint          (* get_interface_subclass)   (MMKernelDevice *self);
-    gint          (* get_interface_protocol)   (MMKernelDevice *self);
-    const gchar * (* get_interface_sysfs_path) (MMKernelDevice *self);
+    gint          (* get_interface_class)       (MMKernelDevice *self);
+    gint          (* get_interface_subclass)    (MMKernelDevice *self);
+    gint          (* get_interface_protocol)    (MMKernelDevice *self);
+    const gchar * (* get_interface_sysfs_path)  (MMKernelDevice *self);
+    const gchar * (* get_interface_description) (MMKernelDevice *self);
 
     const gchar * (* get_physdev_uid) (MMKernelDevice *self);
     guint16       (* get_physdev_vid) (MMKernelDevice *self);
@@ -77,10 +78,11 @@ const gchar *mm_kernel_device_get_name        (MMKernelDevice *self);
 const gchar *mm_kernel_device_get_driver      (MMKernelDevice *self);
 const gchar *mm_kernel_device_get_sysfs_path  (MMKernelDevice *self);
 
-gint         mm_kernel_device_get_interface_class      (MMKernelDevice *self);
-gint         mm_kernel_device_get_interface_subclass   (MMKernelDevice *self);
-gint         mm_kernel_device_get_interface_protocol   (MMKernelDevice *self);
-const gchar *mm_kernel_device_get_interface_sysfs_path (MMKernelDevice *self);
+gint         mm_kernel_device_get_interface_class       (MMKernelDevice *self);
+gint         mm_kernel_device_get_interface_subclass    (MMKernelDevice *self);
+gint         mm_kernel_device_get_interface_protocol    (MMKernelDevice *self);
+const gchar *mm_kernel_device_get_interface_sysfs_path  (MMKernelDevice *self);
+const gchar *mm_kernel_device_get_interface_description (MMKernelDevice *self);
 
 const gchar *mm_kernel_device_get_physdev_uid          (MMKernelDevice *self);
 guint16      mm_kernel_device_get_physdev_vid          (MMKernelDevice *self);

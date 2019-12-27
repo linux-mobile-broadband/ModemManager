@@ -59,6 +59,7 @@ struct _MMKernelDeviceGenericPrivate {
     guint8   interface_subclass;
     guint8   interface_protocol;
     guint8   interface_number;
+    gchar   *interface_description;
     gchar   *physdev_sysfs_path;
     guint16  physdev_vid;
     guint16  physdev_pid;
@@ -425,22 +426,33 @@ preload_interface_number (MMKernelDeviceGeneric *self)
 }
 
 static void
+preload_interface_description (MMKernelDeviceGeneric *self)
+{
+    self->priv->interface_description = (self->priv->interface_sysfs_path ? read_sysfs_property_as_string (self->priv->interface_sysfs_path, "interface") : NULL);
+    mm_dbg ("(%s/%s) interface description: %s",
+            mm_kernel_event_properties_get_subsystem (self->priv->properties),
+            mm_kernel_event_properties_get_name      (self->priv->properties),
+            self->priv->interface_description ? self->priv->interface_description : "unknown");
+}
+
+static void
 preload_contents (MMKernelDeviceGeneric *self)
 {
-    preload_sysfs_path           (self);
-    preload_interface_sysfs_path (self);
-    preload_interface_class      (self);
-    preload_interface_subclass   (self);
-    preload_interface_protocol   (self);
-    preload_interface_number     (self);
-    preload_physdev_sysfs_path   (self);
-    preload_manufacturer         (self);
-    preload_product              (self);
-    preload_driver               (self);
-    preload_physdev_vid          (self);
-    preload_physdev_pid          (self);
-    preload_physdev_revision     (self);
-    preload_physdev_subsystem    (self);
+    preload_sysfs_path            (self);
+    preload_interface_sysfs_path  (self);
+    preload_interface_class       (self);
+    preload_interface_subclass    (self);
+    preload_interface_protocol    (self);
+    preload_interface_number      (self);
+    preload_interface_description (self);
+    preload_physdev_sysfs_path    (self);
+    preload_manufacturer          (self);
+    preload_product               (self);
+    preload_driver                (self);
+    preload_physdev_vid           (self);
+    preload_physdev_pid           (self);
+    preload_physdev_revision      (self);
+    preload_physdev_subsystem     (self);
 }
 
 /*****************************************************************************/
@@ -499,6 +511,14 @@ kernel_device_get_interface_sysfs_path (MMKernelDevice *self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_GENERIC (self), NULL);
 
     return MM_KERNEL_DEVICE_GENERIC (self)->priv->interface_sysfs_path;
+}
+
+static const gchar *
+kernel_device_get_interface_description (MMKernelDevice *self)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE_GENERIC (self), NULL);
+
+    return MM_KERNEL_DEVICE_GENERIC (self)->priv->interface_description;
 }
 
 static const gchar *
@@ -1114,28 +1134,29 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
-    kernel_device_class->get_subsystem            = kernel_device_get_subsystem;
-    kernel_device_class->get_name                 = kernel_device_get_name;
-    kernel_device_class->get_driver               = kernel_device_get_driver;
-    kernel_device_class->get_sysfs_path           = kernel_device_get_sysfs_path;
-    kernel_device_class->get_physdev_uid          = kernel_device_get_physdev_uid;
-    kernel_device_class->get_physdev_vid          = kernel_device_get_physdev_vid;
-    kernel_device_class->get_physdev_pid          = kernel_device_get_physdev_pid;
-    kernel_device_class->get_physdev_revision     = kernel_device_get_physdev_revision;
-    kernel_device_class->get_physdev_sysfs_path   = kernel_device_get_physdev_sysfs_path;
-    kernel_device_class->get_physdev_subsystem    = kernel_device_get_physdev_subsystem;
-    kernel_device_class->get_physdev_manufacturer = kernel_device_get_physdev_manufacturer;
-    kernel_device_class->get_physdev_product      = kernel_device_get_physdev_product;
-    kernel_device_class->get_interface_class      = kernel_device_get_interface_class;
-    kernel_device_class->get_interface_subclass   = kernel_device_get_interface_subclass;
-    kernel_device_class->get_interface_protocol   = kernel_device_get_interface_protocol;
-    kernel_device_class->get_interface_sysfs_path = kernel_device_get_interface_sysfs_path;
-    kernel_device_class->cmp                      = kernel_device_cmp;
-    kernel_device_class->has_property             = kernel_device_has_property;
-    kernel_device_class->get_property             = kernel_device_get_property;
-    kernel_device_class->get_property_as_boolean  = kernel_device_get_property_as_boolean;
-    kernel_device_class->get_property_as_int      = kernel_device_get_property_as_int;
-    kernel_device_class->get_property_as_int_hex  = kernel_device_get_property_as_int_hex;
+    kernel_device_class->get_subsystem             = kernel_device_get_subsystem;
+    kernel_device_class->get_name                  = kernel_device_get_name;
+    kernel_device_class->get_driver                = kernel_device_get_driver;
+    kernel_device_class->get_sysfs_path            = kernel_device_get_sysfs_path;
+    kernel_device_class->get_physdev_uid           = kernel_device_get_physdev_uid;
+    kernel_device_class->get_physdev_vid           = kernel_device_get_physdev_vid;
+    kernel_device_class->get_physdev_pid           = kernel_device_get_physdev_pid;
+    kernel_device_class->get_physdev_revision      = kernel_device_get_physdev_revision;
+    kernel_device_class->get_physdev_sysfs_path    = kernel_device_get_physdev_sysfs_path;
+    kernel_device_class->get_physdev_subsystem     = kernel_device_get_physdev_subsystem;
+    kernel_device_class->get_physdev_manufacturer  = kernel_device_get_physdev_manufacturer;
+    kernel_device_class->get_physdev_product       = kernel_device_get_physdev_product;
+    kernel_device_class->get_interface_class       = kernel_device_get_interface_class;
+    kernel_device_class->get_interface_subclass    = kernel_device_get_interface_subclass;
+    kernel_device_class->get_interface_protocol    = kernel_device_get_interface_protocol;
+    kernel_device_class->get_interface_sysfs_path  = kernel_device_get_interface_sysfs_path;
+    kernel_device_class->get_interface_description = kernel_device_get_interface_description;
+    kernel_device_class->cmp                       = kernel_device_cmp;
+    kernel_device_class->has_property              = kernel_device_has_property;
+    kernel_device_class->get_property              = kernel_device_get_property;
+    kernel_device_class->get_property_as_boolean   = kernel_device_get_property_as_boolean;
+    kernel_device_class->get_property_as_int       = kernel_device_get_property_as_int;
+    kernel_device_class->get_property_as_int_hex   = kernel_device_get_property_as_int_hex;
 
     /* Device-wide properties are stored per-port in the generic backend */
     kernel_device_class->has_global_property            = kernel_device_has_property;
