@@ -1744,18 +1744,28 @@ flash_cancel_cb (GTask *task)
 void
 mm_port_serial_flash_cancel (MMPortSerial *self)
 {
-    GTask *task;
+    FlashContext *ctx;
+    GTask        *task;
 
     /* Do nothing if there is no flash task */
     if (!self->priv->flash_task)
         return;
 
-    /* Recover task and schedule it to be cancelled in an idle.
+    /* Recover task */
+    task = self->priv->flash_task;
+    self->priv->flash_task = NULL;
+
+    /* If flash operation is scheduled, unschedule it */
+    ctx = g_task_get_task_data (task);
+    if (ctx->flash_id) {
+        g_source_remove (ctx->flash_id);
+        ctx->flash_id = 0;
+    }
+
+    /* Schedule task to be cancelled in an idle.
      * We do NOT want this cancellation to happen right away,
      * because the object reference in the flashing task may
      * be the last one valid. */
-    task = self->priv->flash_task;
-    self->priv->flash_task = NULL;
     g_idle_add ((GSourceFunc)flash_cancel_cb, task);
 }
 
