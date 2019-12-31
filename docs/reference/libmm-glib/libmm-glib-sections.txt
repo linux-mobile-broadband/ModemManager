@@ -528,6 +528,7 @@ mm_location_3gpp_get_type
 MMLocationGpsNmea
 <SUBSECTION Getters>
 mm_location_gps_nmea_get_trace
+mm_location_gps_nmea_get_traces
 mm_location_gps_nmea_build_full
 <SUBSECTION Private>
 mm_location_gps_nmea_new

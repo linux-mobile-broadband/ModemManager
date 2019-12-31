@@ -153,6 +153,42 @@ mm_location_gps_nmea_get_trace (MMLocationGpsNmea *self,
 /*****************************************************************************/
 
 static void
+build_all_foreach (const gchar  *trace_type,
+                   const gchar  *trace,
+                   GPtrArray   **built)
+{
+    if (*built == NULL)
+        *built = g_ptr_array_new ();
+    g_ptr_array_add (*built, g_strdup (trace));
+}
+
+/**
+ * mm_location_gps_nmea_get_traces:
+ * @self: a #MMLocationGpsNmea.
+ *
+ * Gets all cached traces.
+ *
+ * Returns: (transfer full): The list of traces, or %NULL if none available. The returned value should be freed with g_strfreev().
+ * Since: 1.14
+ */
+gchar **
+mm_location_gps_nmea_get_traces (MMLocationGpsNmea *self)
+{
+    GPtrArray *built = NULL;
+
+    g_hash_table_foreach (self->priv->traces,
+                          (GHFunc)build_all_foreach,
+                          &built);
+    if (!built)
+        return NULL;
+
+    g_ptr_array_add (built, NULL);
+    return (gchar **) g_ptr_array_free (built, FALSE);
+}
+
+/*****************************************************************************/
+
+static void
 build_full_foreach (const gchar *trace_type,
                     const gchar *trace,
                     GString **built)

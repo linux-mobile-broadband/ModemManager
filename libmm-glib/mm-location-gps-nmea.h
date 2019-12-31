@@ -59,9 +59,10 @@ GType mm_location_gps_nmea_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMLocationGpsNmea, g_object_unref)
 #endif
 
-const gchar *mm_location_gps_nmea_get_trace (MMLocationGpsNmea *self,
-                                             const gchar *trace_type);
-gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
+const gchar  *mm_location_gps_nmea_get_trace  (MMLocationGpsNmea *self,
+                                               const gchar       *trace_type);
+gchar       **mm_location_gps_nmea_get_traces (MMLocationGpsNmea *self);
+gchar        *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
