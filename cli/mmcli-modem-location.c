@@ -510,18 +510,18 @@ get_location_process_reply (MMLocation3gpp *location_3gpp,
                             MMLocationCdmaBs *location_cdma_bs,
                             const GError *error)
 {
-    gchar       *nmea = NULL;
-    gchar       *mcc = NULL;
-    gchar       *mnc = NULL;
-    gchar       *lac = NULL;
-    gchar       *tac = NULL;
-    gchar       *cid = NULL;
-    const gchar *gps_utc = NULL;
-    gchar       *gps_longitude = NULL;
-    gchar       *gps_latitude = NULL;
-    gchar       *gps_altitude = NULL;
-    gchar       *cdma_bs_longitude = NULL;
-    gchar       *cdma_bs_latitude = NULL;
+    gchar       **nmea = NULL;
+    gchar        *mcc = NULL;
+    gchar        *mnc = NULL;
+    gchar        *lac = NULL;
+    gchar        *tac = NULL;
+    gchar        *cid = NULL;
+    const gchar  *gps_utc = NULL;
+    gchar        *gps_longitude = NULL;
+    gchar        *gps_latitude = NULL;
+    gchar        *gps_altitude = NULL;
+    gchar        *cdma_bs_longitude = NULL;
+    gchar        *cdma_bs_latitude = NULL;
 
     if (error) {
         g_printerr ("error: couldn't get location from the modem: '%s'\n",
@@ -538,7 +538,7 @@ get_location_process_reply (MMLocation3gpp *location_3gpp,
     }
 
     if (location_gps_nmea)
-        nmea = mm_location_gps_nmea_build_full (location_gps_nmea);
+        nmea = mm_location_gps_nmea_get_traces (location_gps_nmea);
 
     if (location_gps_raw) {
         gps_utc = mm_location_gps_raw_get_utc_time (location_gps_raw);
@@ -557,7 +557,7 @@ get_location_process_reply (MMLocation3gpp *location_3gpp,
     mmcli_output_string_take           (MMC_F_LOCATION_3GPP_LAC,    lac);
     mmcli_output_string_take           (MMC_F_LOCATION_3GPP_TAC,    tac);
     mmcli_output_string_take           (MMC_F_LOCATION_3GPP_CID,    cid);
-    mmcli_output_string_multiline_take (MMC_F_LOCATION_GPS_NMEA,    nmea);
+    mmcli_output_string_array_take     (MMC_F_LOCATION_GPS_NMEA,    nmea, TRUE);
     mmcli_output_string                (MMC_F_LOCATION_GPS_UTC,     gps_utc);
     mmcli_output_string_take           (MMC_F_LOCATION_GPS_LONG,    gps_longitude);
     mmcli_output_string_take           (MMC_F_LOCATION_GPS_LAT,     gps_latitude);
