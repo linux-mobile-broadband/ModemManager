@@ -33,12 +33,13 @@ typedef struct _MMDevice MMDevice;
 typedef struct _MMDeviceClass MMDeviceClass;
 typedef struct _MMDevicePrivate MMDevicePrivate;
 
-#define MM_DEVICE_UID        "uid"
-#define MM_DEVICE_PLUGIN     "plugin"
-#define MM_DEVICE_MODEM      "modem"
-#define MM_DEVICE_HOTPLUGGED "hotplugged"
-#define MM_DEVICE_VIRTUAL    "virtual"
-#define MM_DEVICE_INHIBITED  "inhibited"
+#define MM_DEVICE_UID            "uid"
+#define MM_DEVICE_PLUGIN         "plugin"
+#define MM_DEVICE_MODEM          "modem"
+#define MM_DEVICE_HOTPLUGGED     "hotplugged"
+#define MM_DEVICE_VIRTUAL        "virtual"
+#define MM_DEVICE_INHIBITED      "inhibited"
+#define MM_DEVICE_OBJECT_MANAGER "object-manager"
 
 #define MM_DEVICE_PORT_GRABBED  "port-grabbed"
 #define MM_DEVICE_PORT_RELEASED "port-released"
@@ -60,9 +61,10 @@ struct _MMDeviceClass {
 
 GType mm_device_get_type (void);
 
-MMDevice *mm_device_new (const gchar *uid,
-                         gboolean     hotplugged,
-                         gboolean     virtual);
+MMDevice *mm_device_new (const gchar              *uid,
+                         gboolean                  hotplugged,
+                         gboolean                  virtual,
+                         GDBusObjectManagerServer *object_manager);
 
 void     mm_device_grab_port    (MMDevice       *self,
                                  MMKernelDevice *kernel_port);
@@ -73,10 +75,9 @@ gboolean mm_device_owns_port    (MMDevice       *self,
 void     mm_device_ignore_port  (MMDevice       *self,
                                  MMKernelDevice *kernel_port);
 
-gboolean mm_device_create_modem (MMDevice                  *self,
-                                 GDBusObjectManagerServer  *object_manager,
-                                 GError                   **error);
-void     mm_device_remove_modem (MMDevice *self);
+gboolean mm_device_create_modem (MMDevice  *self,
+                                 GError   **error);
+void     mm_device_remove_modem (MMDevice  *self);
 
 void     mm_device_inhibit        (MMDevice                  *self,
                                    GAsyncReadyCallback        callback,
@@ -85,7 +86,6 @@ gboolean mm_device_inhibit_finish (MMDevice                  *self,
                                    GAsyncResult              *res,
                                    GError                   **error);
 gboolean mm_device_uninhibit      (MMDevice                  *self,
-                                   GDBusObjectManagerServer  *object_manager,
                                    GError                   **error);
 
 
