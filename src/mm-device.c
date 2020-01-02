@@ -86,6 +86,9 @@ struct _MMDevicePrivate {
 
     /* Virtual ports */
     gchar **virtual_ports;
+
+    /* Scheduled reprobe */
+    guint reprobe_id;
 };
 
 /*****************************************************************************/
@@ -327,6 +330,24 @@ mm_device_remove_modem (MMDevice  *self)
 
 /*****************************************************************************/
 
+#define REPROBE_SECS 2
+
+static gboolean
+reprobe (MMDevice *self)
+{
+    GError *error = NULL;
+
+    if (!mm_device_create_modem (self, &error)) {
+        mm_warn ("Could not recreate modem for device '%s': %s",
+                 self->priv->uid,
+                 error ? error->message : "unknown");
+        g_error_free (error);
+    } else
+        mm_dbg ("Modem recreated for device '%s'", self->priv->uid);
+
+    return G_SOURCE_REMOVE;
+}
+
 static void
 modem_valid (MMBaseModem *modem,
              GParamSpec  *pspec,
@@ -335,19 +356,8 @@ modem_valid (MMBaseModem *modem,
     if (!mm_base_modem_get_valid (modem)) {
         /* Modem no longer valid */
         mm_device_remove_modem (self);
-
-        if (mm_base_modem_get_reprobe (modem)) {
-            GError *error = NULL;
-
-            if (!mm_device_create_modem (self, &error)) {
-                mm_warn ("Could not recreate modem for device '%s': %s",
-                         self->priv->uid,
-                         error ? error->message : "unknown");
-                g_error_free (error);
-            } else {
-                mm_dbg ("Modem recreated for device '%s'", self->priv->uid);
-            }
-        }
+        if (mm_base_modem_get_reprobe (modem))
+            self->priv->reprobe_id = g_timeout_add_seconds (REPROBE_SECS, (GSourceFunc)reprobe, self);
     } else {
         /* Modem now valid, export it, but only if we really have it around.
          * It may happen that the initialization sequence fails because the
@@ -734,6 +744,10 @@ dispose (GObject *object)
 {
     MMDevice *self = MM_DEVICE (object);
 
+    if (self->priv->reprobe_id) {
+        g_source_remove (self->priv->reprobe_id);
+        self->priv->reprobe_id = 0;
+    }
     g_clear_object (&(self->priv->object_manager));
     g_clear_object (&(self->priv->plugin));
     g_list_free_full (self->priv->port_probes, g_object_unref);
