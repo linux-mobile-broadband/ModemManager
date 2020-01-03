@@ -2813,8 +2813,10 @@ check_support_ready (MMIfaceModemVoice *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
-        mm_dbg ("Voice support check failed: '%s'", error->message);
-        g_error_free (error);
+        if (error) {
+            mm_dbg ("Voice support check failed: '%s'", error->message);
+            g_error_free (error);
+        }
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "Voice not supported");
         g_object_unref (task);
         return;
