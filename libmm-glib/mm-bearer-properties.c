@@ -514,8 +514,8 @@ mm_bearer_properties_consume_string (MMBearerProperties *self,
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Invalid properties string, unexpected key '%s'",
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Invalid properties string, unsupported key '%s'",
                      key);
         return FALSE;
     }

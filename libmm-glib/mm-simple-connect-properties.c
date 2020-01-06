@@ -490,11 +490,23 @@ key_value_foreach (const gchar *key,
                    const gchar *value,
                    ParseKeyValueContext *ctx)
 {
+    GError *inner_error = NULL;
+
     /* First, check if we can consume this as bearer properties */
     if (mm_bearer_properties_consume_string (ctx->self->priv->bearer_properties,
                                              key, value,
-                                             NULL))
+                                             &inner_error))
         return TRUE;
+
+    /* Unknown keys are reported as unsupported. Any other error is right away
+     * fatal (e.g. an invalid value given to a known bearer property) */
+    if (!g_error_matches (inner_error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+        ctx->error = inner_error;
+        return FALSE;
+    }
+
+    /* On unsupported errors, try with the Simple.Connect specific properties */
+    g_clear_error (&inner_error);
 
     if (g_str_equal (key, PROPERTY_PIN))
         mm_simple_connect_properties_set_pin (ctx->self, value);
@@ -502,8 +514,8 @@ key_value_foreach (const gchar *key,
         mm_simple_connect_properties_set_operator_id (ctx->self, value);
     else {
         ctx->error = g_error_new (MM_CORE_ERROR,
-                                  MM_CORE_ERROR_INVALID_ARGS,
-                                  "Invalid properties string, unexpected key '%s'",
+                                  MM_CORE_ERROR_UNSUPPORTED,
+                                  "Invalid properties string, unsupported key '%s'",
                                   key);
     }
 
