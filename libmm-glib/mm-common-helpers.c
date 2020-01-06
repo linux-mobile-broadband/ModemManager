@@ -952,10 +952,10 @@ gboolean
 mm_common_get_boolean_from_string (const gchar *value,
                                    GError **error)
 {
-    if (!g_ascii_strcasecmp (value, "true") || g_str_equal (value, "1"))
+    if (!g_ascii_strcasecmp (value, "true") || g_str_equal (value, "1") || !g_ascii_strcasecmp (value, "yes"))
         return TRUE;
 
-    if (!g_ascii_strcasecmp (value, "false") || g_str_equal (value, "0"))
+    if (!g_ascii_strcasecmp (value, "false") || g_str_equal (value, "0") || !g_ascii_strcasecmp (value, "no"))
         return FALSE;
 
     g_set_error (error,
