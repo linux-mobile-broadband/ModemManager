@@ -492,17 +492,6 @@ send_pin (MMBaseSim *self,
 /*****************************************************************************/
 /* SEND PIN/PUK (common logic) */
 
-typedef struct {
-    GError *save_error;
-} SendPinPukContext;
-
-static void
-send_pin_puk_context_free (SendPinPukContext *ctx)
-{
-    g_clear_error (&ctx->save_error);
-    g_free (ctx);
-}
-
 static GError *
 error_for_unlock_check (MMModemLock lock)
 {
@@ -536,17 +525,17 @@ error_for_unlock_check (MMModemLock lock)
 }
 
 gboolean
-mm_base_sim_send_pin_finish (MMBaseSim *self,
-                             GAsyncResult *res,
-                             GError **error)
+mm_base_sim_send_pin_finish (MMBaseSim     *self,
+                             GAsyncResult  *res,
+                             GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 gboolean
-mm_base_sim_send_puk_finish (MMBaseSim *self,
-                             GAsyncResult *res,
-                             GError **error)
+mm_base_sim_send_puk_finish (MMBaseSim     *self,
+                             GAsyncResult  *res,
+                             GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -554,13 +543,10 @@ mm_base_sim_send_puk_finish (MMBaseSim *self,
 static void
 update_lock_info_ready (MMIfaceModem *modem,
                         GAsyncResult *res,
-                        GTask *task)
+                        GTask        *task)
 {
-    SendPinPukContext *ctx;
-    GError *error = NULL;
-    MMModemLock lock;
-
-    ctx = g_task_get_task_data (task);
+    GError      *error = NULL;
+    MMModemLock  lock;
 
     lock = mm_iface_modem_update_lock_info_finish (modem, res, &error);
     /* Even if we may be SIM-PIN2/PUK2 locked, we don't consider this an error
@@ -568,15 +554,17 @@ update_lock_info_ready (MMIfaceModem *modem,
     if (lock != MM_MODEM_LOCK_NONE &&
         lock != MM_MODEM_LOCK_SIM_PIN2 &&
         lock != MM_MODEM_LOCK_SIM_PUK2) {
+        const GError *saved_error;
+
         /* Device is locked. Now:
          *   - If we got an error in the original send-pin action, report it.
          *   - If we got an error in the pin-check action, report it.
          *   - Otherwise, build our own error from the lock code.
          */
-        if (ctx->save_error) {
+        saved_error = g_task_get_task_data (task);
+        if (saved_error) {
             g_clear_error (&error);
-            error = ctx->save_error;
-            ctx->save_error = NULL;
+            error = g_error_copy (saved_error);
         } else if (!error)
             error = error_for_unlock_check (lock);
 
@@ -588,17 +576,16 @@ update_lock_info_ready (MMIfaceModem *modem,
 }
 
 static void
-send_pin_ready (MMBaseSim *self,
+send_pin_ready (MMBaseSim    *self,
                 GAsyncResult *res,
-                GTask *task)
+                GTask        *task)
 {
-    SendPinPukContext *ctx;
-    MMModemLock known_lock = MM_MODEM_LOCK_UNKNOWN;
+    GError      *error = NULL;
+    MMModemLock  known_lock = MM_MODEM_LOCK_UNKNOWN;
 
-    ctx = g_task_get_task_data (task);
-
-    if (!MM_BASE_SIM_GET_CLASS (self)->send_pin_finish (self, res, &ctx->save_error)) {
-        if (g_error_matches (ctx->save_error,
+    if (!MM_BASE_SIM_GET_CLASS (self)->send_pin_finish (self, res, &error)) {
+        g_task_set_task_data (task, error, (GDestroyNotify)g_error_free);
+        if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK))
             known_lock = MM_MODEM_LOCK_SIM_PUK;
@@ -613,15 +600,14 @@ send_pin_ready (MMBaseSim *self,
 }
 
 static void
-send_puk_ready (MMBaseSim *self,
+send_puk_ready (MMBaseSim    *self,
                 GAsyncResult *res,
-                GTask *task)
+                GTask        *task)
 {
-    SendPinPukContext *ctx;
+    GError *error = NULL;
 
-    ctx = g_task_get_task_data (task);
-
-    MM_BASE_SIM_GET_CLASS (self)->send_puk_finish (self, res, &ctx->save_error);
+    if (!MM_BASE_SIM_GET_CLASS (self)->send_puk_finish (self, res, &error))
+        g_task_set_task_data (task, error, (GDestroyNotify)g_error_free);
 
     /* Once pin/puk has been sent, recheck lock */
     mm_iface_modem_update_lock_info (MM_IFACE_MODEM (self->priv->modem),
@@ -631,73 +617,55 @@ send_puk_ready (MMBaseSim *self,
 }
 
 void
-mm_base_sim_send_pin (MMBaseSim *self,
-                      const gchar *pin,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+mm_base_sim_send_pin (MMBaseSim           *self,
+                      const gchar         *pin,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
 {
-    SendPinPukContext *ctx;
     GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If sending PIN is not implemented, report an error */
     if (!MM_BASE_SIM_GET_CLASS (self)->send_pin ||
         !MM_BASE_SIM_GET_CLASS (self)->send_pin_finish) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_base_sim_send_pin,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_UNSUPPORTED,
-                                 "Cannot send PIN: "
-                                 "operation not supported");
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot send PIN: operation not supported");
+        g_object_unref (task);
         return;
     }
 
-    ctx = g_new0 (SendPinPukContext, 1);
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)send_pin_puk_context_free);
-
     MM_BASE_SIM_GET_CLASS (self)->send_pin (self,
-                                       pin,
-                                       (GAsyncReadyCallback)send_pin_ready,
-                                       task);
+                                            pin,
+                                            (GAsyncReadyCallback)send_pin_ready,
+                                            task);
 }
 
 void
-mm_base_sim_send_puk (MMBaseSim *self,
-                      const gchar *puk,
-                      const gchar *new_pin,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+mm_base_sim_send_puk (MMBaseSim           *self,
+                      const gchar         *puk,
+                      const gchar         *new_pin,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
 {
-    SendPinPukContext *ctx;
     GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
     /* If sending PIN is not implemented, report an error */
     if (!MM_BASE_SIM_GET_CLASS (self)->send_puk ||
         !MM_BASE_SIM_GET_CLASS (self)->send_puk_finish) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 mm_base_sim_send_puk,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_UNSUPPORTED,
-                                 "Cannot send PUK: "
-                                 "operation not supported");
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot send PUK: operation not supported");
+        g_object_unref (task);
         return;
     }
 
-    ctx = g_new0 (SendPinPukContext, 1);
-
-    task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)send_pin_puk_context_free);
-
     MM_BASE_SIM_GET_CLASS (self)->send_puk (self,
-                                       puk,
-                                       new_pin,
-                                       (GAsyncReadyCallback)send_puk_ready,
-                                       task);
+                                            puk,
+                                            new_pin,
+                                            (GAsyncReadyCallback)send_puk_ready,
+                                            task);
 }
 
 /*****************************************************************************/
