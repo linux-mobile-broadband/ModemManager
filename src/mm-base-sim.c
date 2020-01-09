@@ -635,6 +635,14 @@ mm_base_sim_send_pin (MMBaseSim           *self,
         return;
     }
 
+    /* Only allow sending SIM-PIN if really SIM-PIN locked */
+    if (mm_iface_modem_get_unlock_required (MM_IFACE_MODEM (self->priv->modem)) != MM_MODEM_LOCK_SIM_PIN) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot send PIN: device is not SIM-PIN locked");
+        g_object_unref (task);
+        return;
+    }
+
     MM_BASE_SIM_GET_CLASS (self)->send_pin (self,
                                             pin,
                                             (GAsyncReadyCallback)send_pin_ready,
@@ -657,6 +665,14 @@ mm_base_sim_send_puk (MMBaseSim           *self,
         !MM_BASE_SIM_GET_CLASS (self)->send_puk_finish) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Cannot send PUK: operation not supported");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Only allow sending SIM-PUK if really SIM-PUK locked */
+    if (mm_iface_modem_get_unlock_required (MM_IFACE_MODEM (self->priv->modem)) != MM_MODEM_LOCK_SIM_PUK) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Cannot send PUK: device is not SIM-PUK locked");
         g_object_unref (task);
         return;
     }
