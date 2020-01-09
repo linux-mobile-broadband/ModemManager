@@ -1033,6 +1033,7 @@ dms_uim_get_pin_status_ready (QmiClientDms *client,
     }
 
     /* We're done! */
+    qmi_message_dms_uim_get_pin_status_output_unref (output);
     g_task_return_int (task, lock);
     g_object_unref (task);
 }
