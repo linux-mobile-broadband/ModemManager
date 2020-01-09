@@ -2153,6 +2153,11 @@ dispose (GObject *object)
                                                  &self->priv->event_report_ipv6_indication_id);
     }
 
+    if (self->priv->qmi && self->priv->explicit_qmi_open) {
+        self->priv->explicit_qmi_open = FALSE;
+        mm_port_qmi_close (self->priv->qmi);
+    }
+    g_clear_object (&self->priv->qmi);
     g_clear_object (&self->priv->data);
     g_clear_object (&self->priv->client_ipv4);
     g_clear_object (&self->priv->client_ipv6);
