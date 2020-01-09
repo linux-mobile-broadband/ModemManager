@@ -155,13 +155,13 @@ handle_change_pin_context_free (HandleChangePinContext *ctx)
 }
 
 static void
-after_change_update_lock_info_ready (MMIfaceModem *self,
+after_change_update_lock_info_ready (MMIfaceModem *modem,
                                      GAsyncResult *res,
                                      HandleChangePinContext *ctx)
 {
     /* We just want to ensure that we tried to update the unlock
      * retries, no big issue if it failed */
-    mm_iface_modem_update_lock_info_finish (self, res, NULL);
+    mm_iface_modem_update_lock_info_finish (modem, res, NULL);
 
     if (ctx->save_error) {
         g_dbus_method_invocation_take_error (ctx->invocation, ctx->save_error);
