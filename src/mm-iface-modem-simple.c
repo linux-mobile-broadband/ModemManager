@@ -431,10 +431,11 @@ update_lock_info_ready (MMIfaceModem *self,
     }
 
     /* If we are already unlocked, go on to next step. Note that we do also
-     * allow SIM-PIN2, as we don't need to unlock that in order to get
+     * allow SIM-PIN2/SIM-PUK2, as we don't need to unlock that in order to get
      * connected. */
     if (lock == MM_MODEM_LOCK_NONE ||
-        lock == MM_MODEM_LOCK_SIM_PIN2) {
+        lock == MM_MODEM_LOCK_SIM_PIN2 ||
+        lock == MM_MODEM_LOCK_SIM_PUK2) {
         ctx->step++;
         connection_step (ctx);
         return;
