@@ -3171,6 +3171,24 @@ set_lock_status (MMIfaceModem *self,
     }
 }
 
+MMModemLock
+mm_iface_modem_get_unlock_required (MMIfaceModem *self)
+{
+    MmGdbusModem *skeleton = NULL;
+    MMModemLock   lock;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (skeleton) {
+        lock = mm_gdbus_modem_get_unlock_required (skeleton);
+        g_object_unref (skeleton);
+    } else
+        lock = MM_MODEM_LOCK_UNKNOWN;
+
+    return lock;
+}
+
 MMUnlockRetries *
 mm_iface_modem_get_unlock_retries (MMIfaceModem *self)
 {
