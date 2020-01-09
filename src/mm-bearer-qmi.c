@@ -2130,37 +2130,9 @@ dispose (GObject *object)
 {
     MMBearerQmi *self = MM_BEARER_QMI (object);
 
-    if (self->priv->packet_service_status_ipv4_indication_id) {
-        common_setup_cleanup_packet_service_status_unsolicited_events (self,
-                                                                       self->priv->client_ipv4,
-                                                                       FALSE,
-                                                                       &self->priv->packet_service_status_ipv4_indication_id);
-    }
-    if (self->priv->event_report_ipv4_indication_id) {
-        cleanup_event_report_unsolicited_events (self,
-                                                 self->priv->client_ipv4,
-                                                 &self->priv->event_report_ipv4_indication_id);
-    }
-    if (self->priv->packet_service_status_ipv6_indication_id) {
-        common_setup_cleanup_packet_service_status_unsolicited_events (self,
-                                                                       self->priv->client_ipv6,
-                                                                       FALSE,
-                                                                       &self->priv->packet_service_status_ipv6_indication_id);
-    }
-    if (self->priv->event_report_ipv6_indication_id) {
-        cleanup_event_report_unsolicited_events (self,
-                                                 self->priv->client_ipv6,
-                                                 &self->priv->event_report_ipv6_indication_id);
-    }
-
-    if (self->priv->qmi && self->priv->explicit_qmi_open) {
-        self->priv->explicit_qmi_open = FALSE;
-        mm_port_qmi_close (self->priv->qmi);
-    }
-    g_clear_object (&self->priv->qmi);
-    g_clear_object (&self->priv->data);
-    g_clear_object (&self->priv->client_ipv4);
-    g_clear_object (&self->priv->client_ipv6);
+    g_assert (!self->priv->ongoing_connect_user_cancellable);
+    g_assert (!self->priv->ongoing_connect_network_cancellable);
+    reset_bearer_connection (self, TRUE, TRUE);
 
     G_OBJECT_CLASS (mm_bearer_qmi_parent_class)->dispose (object);
 }
