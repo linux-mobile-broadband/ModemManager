@@ -460,7 +460,8 @@ MMModemLock mm_iface_modem_update_lock_info_finish (MMIfaceModem *self,
                                                     GAsyncResult *res,
                                                     GError **error);
 
-MMUnlockRetries *mm_iface_modem_get_unlock_retries (MMIfaceModem *self);
+MMModemLock      mm_iface_modem_get_unlock_required (MMIfaceModem *self);
+MMUnlockRetries *mm_iface_modem_get_unlock_retries  (MMIfaceModem *self);
 
 void mm_iface_modem_update_unlock_retries (MMIfaceModem *self,
                                            MMUnlockRetries *unlock_retries);
