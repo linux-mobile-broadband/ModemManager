@@ -128,15 +128,19 @@ build_location_dictionary (GVariant *previous,
         while (g_variant_iter_next (&iter, "{uv}", &source, &value)) {
             switch (source) {
             case MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI:
+                g_assert (!location_3gpp_value);
                 location_3gpp_value = value;
                 break;
             case MM_MODEM_LOCATION_SOURCE_GPS_NMEA:
+                g_assert (!location_gps_nmea_value);
                 location_gps_nmea_value = value;
                 break;
             case MM_MODEM_LOCATION_SOURCE_GPS_RAW:
+                g_assert (!location_gps_raw_value);
                 location_gps_raw_value = value;
                 break;
             case MM_MODEM_LOCATION_SOURCE_CDMA_BS:
+                g_assert (!location_cdma_bs_value);
                 location_cdma_bs_value = value;
                 break;
             case MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED:
