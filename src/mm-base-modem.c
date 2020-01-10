@@ -1516,7 +1516,7 @@ mm_base_modem_init (MMBaseModem *self)
                                               MMBaseModemPrivate);
 
     /* Setup authorization provider */
-    self->priv->authp = mm_auth_get_provider ();
+    self->priv->authp = mm_auth_provider_get ();
     self->priv->authp_cancellable = g_cancellable_new ();
 
     /* Setup modem-wide cancellable */

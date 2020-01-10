@@ -286,8 +286,6 @@ ModemManager_SOURCES = \
 	mm-utils.h \
 	mm-private-boxed-types.h \
 	mm-private-boxed-types.c \
-	mm-auth.h \
-	mm-auth.c \
 	mm-auth-provider.h \
 	mm-auth-provider.c \
 	mm-filter.h \
@@ -354,11 +352,6 @@ ModemManager_SOURCES = \
 	$(NULL)
 
 nodist_ModemManager_SOURCES = $(DAEMON_ENUMS_GENERATED)
-
-# Additional Polkit support
-if WITH_POLKIT
-ModemManager_SOURCES += mm-auth-provider-polkit.h mm-auth-provider-polkit.c
-endif
 
 # Additional suspend/resume support via systemd
 if WITH_SYSTEMD_SUSPEND_RESUME

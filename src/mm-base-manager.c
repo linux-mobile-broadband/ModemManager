@@ -41,7 +41,7 @@
 #include "mm-daemon-enums-types.h"
 #include "mm-device.h"
 #include "mm-plugin-manager.h"
-#include "mm-auth.h"
+#include "mm-auth-provider.h"
 #include "mm-plugin.h"
 #include "mm-filter.h"
 #include "mm-log.h"
@@ -1439,7 +1439,7 @@ mm_base_manager_init (MMBaseManager *manager)
                                                         MMBaseManagerPrivate);
 
     /* Setup authorization provider */
-    priv->authp = mm_auth_get_provider ();
+    priv->authp = mm_auth_provider_get ();
     priv->authp_cancellable = g_cancellable_new ();
 
     /* Setup internal lists of device objects */
