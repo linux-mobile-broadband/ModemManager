@@ -151,6 +151,7 @@ build_location_dictionary (GVariant *previous,
                 g_assert_not_reached ();
             default:
                 g_warn_if_reached ();
+                g_variant_unref (value);
                 break;
             }
         }
