@@ -411,7 +411,7 @@ utf8_to_gsm_ext_char (const char *utf8, guint32 len, guint8 *out_gsm)
 guint8 *
 mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm, guint32 len)
 {
-    int i;
+    guint i;
     GByteArray *utf8;
 
     g_return_val_if_fail (gsm != NULL, NULL);
@@ -559,7 +559,7 @@ pccp437_is_subset (gunichar c, const char *utf8, gsize ulen)
         0x2321, 0x00f7, 0x2248, 0x00b0, 0x2219, 0x00b7, 0x221a, 0x207f, 0x00b2,
         0x25a0, 0x00a0
     };
-    int i;
+    guint i;
 
     if (c <= 0x7F)
         return TRUE;
@@ -590,7 +590,7 @@ pcdn_is_subset (gunichar c, const char *utf8, gsize ulen)
         0x00a7, 0x00f7, 0x00b8, 0x00b0, 0x00a8, 0x00b7, 0x00b9, 0x00b3, 0x00b2,
         0x25a0, 0x00a0
     };
-    int i;
+    guint i;
 
     if (c <= 0x7F)
         return TRUE;
@@ -672,7 +672,7 @@ mm_charset_gsm_unpack (const guint8 *gsm,
                        guint32 *out_unpacked_len)
 {
     GByteArray *unpacked;
-    int i;
+    guint i;
 
     unpacked = g_byte_array_sized_new (num_septets + 1);
 
@@ -709,7 +709,7 @@ mm_charset_gsm_pack (const guint8 *src,
 {
     guint8 *packed;
     guint octet = 0, lshift, plen;
-    int i = 0;
+    guint i = 0;
 
     g_return_val_if_fail (start_offset < 8, NULL);
 
