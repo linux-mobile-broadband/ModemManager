@@ -4402,12 +4402,12 @@ atds_signal_query_ready (MbimDevice   *device,
     if (ecno <= 49) {
         if (!result->umts)
             result->umts = mm_signal_new ();
-        mm_signal_set_ecio (result->umts, -24.0 + ((float) ecno / 2));
+        mm_signal_set_ecio (result->umts, -24.0 + ((gdouble) ecno / 2));
     }
 
     if (rsrq <= 34) {
         result->lte = mm_signal_new ();
-        mm_signal_set_rsrq (result->lte, -19.5 + ((float) rsrq / 2));
+        mm_signal_set_rsrq (result->lte, -19.5 + ((gdouble) rsrq / 2));
     }
 
     if (rsrp <= 97) {
