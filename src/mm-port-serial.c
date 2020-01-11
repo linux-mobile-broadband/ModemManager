@@ -606,7 +606,8 @@ port_serial_process_command (MMPortSerial *self,
                 ctx->idx += written;
                 break;
             }
-            /* If written == 0, treat as EAGAIN, so fall down */
+            /* If written == 0 treat as EAGAIN */
+            /* Fall through */
 
         case G_IO_STATUS_AGAIN:
             /* We're in a non-blocking channel and therefore we're up to receive
