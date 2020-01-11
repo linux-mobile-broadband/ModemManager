@@ -4011,8 +4011,8 @@ mm_3gpp_parse_pdu_cmgl_response (const gchar *str,
  * many more facilities defined (for various flavors of call
  * barring); we only map the ones we care about. */
 typedef struct {
-    MMModem3gppFacility facility;
-    gchar *acronym;
+    MMModem3gppFacility  facility;
+    const gchar         *acronym;
 } FacilityAcronym;
 
 static const FacilityAcronym facility_acronyms[] = {
@@ -4039,7 +4039,7 @@ mm_3gpp_acronym_to_facility (const gchar *str)
     return MM_MODEM_3GPP_FACILITY_NONE;
 }
 
-gchar *
+const gchar *
 mm_3gpp_facility_to_acronym (MMModem3gppFacility facility)
 {
     guint i;

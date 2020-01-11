@@ -414,8 +414,8 @@ gboolean mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
 
 /* Additional 3GPP-specific helpers */
 
-MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);
-gchar *mm_3gpp_facility_to_acronym (MMModem3gppFacility facility);
+MMModem3gppFacility  mm_3gpp_acronym_to_facility (const gchar         *str);
+const gchar         *mm_3gpp_facility_to_acronym (MMModem3gppFacility  facility);
 
 MMModemAccessTechnology mm_string_to_access_tech (const gchar *string);
 
