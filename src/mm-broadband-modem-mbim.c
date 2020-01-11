@@ -1677,7 +1677,7 @@ signal_state_query_ready (MbimDevice *device,
         guint32 quality;
 
         /* Normalize the quality. 99 means unknown, we default it to 0 */
-        quality = CLAMP (rssi == 99 ? 0 : rssi, 0, 31) * 100 / 31;
+        quality = CLAMP (rssi == 99 ? 0 : (gint)rssi, 0, 31) * 100 / 31;
 
         g_task_return_int (task, quality);
     } else
