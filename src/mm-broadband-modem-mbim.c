@@ -2920,7 +2920,7 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
         guint32 quality;
 
         /* Normalize the quality. 99 means unknown, we default it to 0 */
-        quality = CLAMP (rssi == 99 ? 0 : rssi, 0, 31) * 100 / 31;
+        quality = CLAMP (rssi == 99 ? 0 : (gint)rssi, 0, 31) * 100 / 31;
 
         mm_dbg ("Signal state indication: %u --> %u%%", rssi, quality);
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
