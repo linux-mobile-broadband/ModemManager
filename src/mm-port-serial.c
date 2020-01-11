@@ -622,6 +622,9 @@ port_serial_process_command (MMPortSerial *self,
                 return FALSE;
             }
             break;
+
+        default:
+            g_assert_not_reached ();
         }
     }
     /* Socket based setup */
@@ -945,6 +948,8 @@ parse_response_buffer (MMPortSerial *self)
     case MM_PORT_SERIAL_RESPONSE_NONE:
         /* Nothing to do this time */
         break;
+    default:
+        g_assert_not_reached ();
     }
 }
 
