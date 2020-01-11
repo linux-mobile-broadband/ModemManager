@@ -731,6 +731,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
             g_warn_if_fail (mm_sms_part_get_text (sms_part) != NULL);
             break;
 
+        case MM_SMS_ENCODING_8BIT:
         case MM_SMS_ENCODING_UNKNOWN:
         default:
             {
@@ -923,6 +924,8 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         mm_dbg ("  using GSM7 encoding...");
         pdu[offset] |= SMS_DCS_CODING_DEFAULT;  /* GSM */
         break;
+    case MM_SMS_ENCODING_8BIT:
+    case MM_SMS_ENCODING_UNKNOWN:
     default:
         mm_dbg ("  using 8bit encoding...");
         pdu[offset] |= SMS_DCS_CODING_8BIT;
