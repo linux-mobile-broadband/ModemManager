@@ -47,9 +47,6 @@ MMModemLock
 mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
 {
     switch (pin_type) {
-    case MBIM_PIN_TYPE_UNKNOWN:
-    case MBIM_PIN_TYPE_CUSTOM:
-        break;
     case MBIM_PIN_TYPE_PIN1:
         return MM_MODEM_LOCK_SIM_PIN;
     case MBIM_PIN_TYPE_PIN2:
@@ -82,6 +79,10 @@ mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type)
         return MM_MODEM_LOCK_PH_SP_PIN;
     case MBIM_PIN_TYPE_CORPORATE_PUK:
         return MM_MODEM_LOCK_PH_CORP_PUK;
+    case MBIM_PIN_TYPE_UNKNOWN:
+    case MBIM_PIN_TYPE_CUSTOM:
+    default:
+        break;
     }
 
     return MM_MODEM_LOCK_UNKNOWN;
@@ -431,6 +432,8 @@ mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
         return MM_SMS_STATE_STORED;
     case MBIM_SMS_STATUS_SENT:
         return MM_SMS_STATE_SENT;
+    default:
+        break;
     }
 
     return MM_SMS_STATE_UNKNOWN;
