@@ -1465,8 +1465,8 @@ mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx
     if (ctx->nas_ssp_mode_preference_mask)
         tmp = mm_modem_capability_from_qmi_rat_mode_preference (ctx->nas_ssp_mode_preference_mask);
     /* If no value retrieved from SSP, check TP. We only process TP
-     * values if not 'auto'. */
-    else if (ctx->nas_tp_mask && (ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO))
+     * values if not 'auto' (0). */
+    else if (ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO)
         tmp = mm_modem_capability_from_qmi_radio_technology_preference (ctx->nas_tp_mask);
 
     /* Final capabilities are the intersection between the Technology
