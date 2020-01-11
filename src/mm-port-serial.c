@@ -1372,7 +1372,7 @@ static void
 _close_internal (MMPortSerial *self, gboolean force)
 {
     const char *device;
-    int i;
+    guint       i;
 
     g_return_if_fail (MM_IS_PORT_SERIAL (self));
 
