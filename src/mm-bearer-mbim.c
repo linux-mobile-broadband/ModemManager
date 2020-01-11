@@ -839,8 +839,8 @@ connect_context_step (GTask *task)
 
     switch (ctx->step) {
     case CONNECT_STEP_FIRST:
-        /* Fall down */
         ctx->step++;
+        /* Fall through */
 
     case CONNECT_STEP_PACKET_SERVICE: {
         GError *error = NULL;
@@ -1268,8 +1268,8 @@ disconnect_context_step (GTask *task)
 
     switch (ctx->step) {
     case DISCONNECT_STEP_FIRST:
-        /* Fall down */
         ctx->step++;
+        /* Fall through */
 
     case DISCONNECT_STEP_DISCONNECT: {
         MbimMessage *message;
