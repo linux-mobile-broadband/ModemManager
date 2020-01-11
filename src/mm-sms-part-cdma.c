@@ -1148,6 +1148,8 @@ mm_sms_part_cdma_new_from_binary_pdu (guint index,
         if (mm_sms_part_get_message_reference (sms_part) == 0)
             mm_dbg ("    mandatory parameter missing: cause codes not found or invalid in acknowledge message");
         break;
+    default:
+        break;
     }
 
 #undef PDU_SIZE_CHECK
