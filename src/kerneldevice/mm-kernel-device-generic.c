@@ -844,6 +844,7 @@ check_rule (MMKernelDeviceGeneric *self,
 
         case MM_UDEV_RULE_RESULT_TYPE_GOTO_TAG:
         case MM_UDEV_RULE_RESULT_TYPE_UNKNOWN:
+        default:
             g_assert_not_reached ();
         }
     }
