@@ -2125,53 +2125,58 @@ query_device_services_ready (MbimDevice   *device,
 
         for (i = 0; i < device_services_count; i++) {
             MbimService service;
-            guint32 j;
+            guint32     j;
 
             service = mbim_uuid_to_service (&device_services[i]->device_service_id);
 
-            switch (service) {
-                case MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS:
-                    for (j = 0; j < device_services[i]->cids_count; j++) {
-                        if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO) {
-                            mm_dbg ("PCO is supported");
-                            self->priv->is_pco_supported = TRUE;
-                        } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_STATUS) {
-                            mm_dbg ("LTE attach status is supported");
-                            self->priv->is_lte_attach_status_supported = TRUE;
-                        }
+            if (service == MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS) {
+                for (j = 0; j < device_services[i]->cids_count; j++) {
+                    if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO) {
+                        mm_dbg ("PCO is supported");
+                        self->priv->is_pco_supported = TRUE;
+                    } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_STATUS) {
+                        mm_dbg ("LTE attach status is supported");
+                        self->priv->is_lte_attach_status_supported = TRUE;
                     }
-                    break;
-                case MBIM_SERVICE_USSD:
-                    for (j = 0; j < device_services[i]->cids_count; j++) {
-                        if (device_services[i]->cids[j] == MBIM_CID_USSD) {
-                            mm_dbg ("USSD is supported");
-                            self->priv->is_ussd_supported = TRUE;
-                            break;
-                        }
-                    }
-                    break;
-                case MBIM_SERVICE_ATDS:
-                    for (j = 0; j < device_services[i]->cids_count; j++) {
-                        if (device_services[i]->cids[j] == MBIM_CID_ATDS_LOCATION) {
-                            mm_dbg ("ATDS location is supported");
-                            self->priv->is_atds_location_supported = TRUE;
-                        } else if (device_services[i]->cids[j] == MBIM_CID_ATDS_SIGNAL) {
-                            mm_dbg ("ATDS signal is supported");
-                            self->priv->is_atds_signal_supported = TRUE;
-                        }
-                    }
-                    break;
-                case MBIM_SERVICE_INTEL_FIRMWARE_UPDATE:
-                    for (j = 0; j < device_services[i]->cids_count; j++) {
-                        if (device_services[i]->cids[j] == MBIM_CID_INTEL_FIRMWARE_UPDATE_MODEM_REBOOT) {
-                            mm_dbg ("Intel reset is supported");
-                            self->priv->is_intel_reset_supported = TRUE;
-                        }
-                    }
-                    break;
-                default:
-                    break;
+                }
+                continue;
             }
+
+            if (service == MBIM_SERVICE_USSD) {
+                for (j = 0; j < device_services[i]->cids_count; j++) {
+                    if (device_services[i]->cids[j] == MBIM_CID_USSD) {
+                        mm_dbg ("USSD is supported");
+                        self->priv->is_ussd_supported = TRUE;
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            if (service == MBIM_SERVICE_ATDS) {
+                for (j = 0; j < device_services[i]->cids_count; j++) {
+                    if (device_services[i]->cids[j] == MBIM_CID_ATDS_LOCATION) {
+                        mm_dbg ("ATDS location is supported");
+                        self->priv->is_atds_location_supported = TRUE;
+                    } else if (device_services[i]->cids[j] == MBIM_CID_ATDS_SIGNAL) {
+                        mm_dbg ("ATDS signal is supported");
+                        self->priv->is_atds_signal_supported = TRUE;
+                    }
+                }
+                continue;
+            }
+
+            if (service == MBIM_SERVICE_INTEL_FIRMWARE_UPDATE) {
+                for (j = 0; j < device_services[i]->cids_count; j++) {
+                    if (device_services[i]->cids[j] == MBIM_CID_INTEL_FIRMWARE_UPDATE_MODEM_REBOOT) {
+                        mm_dbg ("Intel reset is supported");
+                        self->priv->is_intel_reset_supported = TRUE;
+                    }
+                }
+                continue;
+            }
+
+            /* no optional features to check in remaining services */
         }
         mbim_device_service_element_array_free (device_services);
     } else {
@@ -3425,6 +3430,17 @@ device_notification_cb (MbimDevice *device,
     case MBIM_SERVICE_USSD:
         ussd_notification (self, notification);
         break;
+    case MBIM_SERVICE_INVALID:
+    case MBIM_SERVICE_PHONEBOOK:
+    case MBIM_SERVICE_STK:
+    case MBIM_SERVICE_AUTH:
+    case MBIM_SERVICE_DSS:
+    case MBIM_SERVICE_MS_FIRMWARE_ID:
+    case MBIM_SERVICE_MS_HOST_SHUTDOWN:
+    case MBIM_SERVICE_PROXY_CONTROL:
+    case MBIM_SERVICE_QMI:
+    case MBIM_SERVICE_ATDS:
+    case MBIM_SERVICE_INTEL_FIRMWARE_UPDATE:
     default:
         /* Ignore */
         break;
@@ -4926,6 +4942,8 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *_self,
         case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
             action = MBIM_USSD_ACTION_CONTINUE;
             break;
+        case MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN:
+        case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
         default:
             g_assert_not_reached ();
             return;
