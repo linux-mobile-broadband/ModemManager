@@ -838,6 +838,9 @@ mm_charset_take_and_convert_to_utf8 (gchar *str, MMModemCharset charset)
     case MM_MODEM_CHARSET_UTF8:
         utf8 = str;
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 
     /* Validate UTF-8 always before returning. This result will be exposed in DBus
@@ -932,6 +935,9 @@ mm_utf8_take_and_convert_to_charset (gchar *str,
     case MM_MODEM_CHARSET_UTF8:
         encoded = str;
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 
     return encoded;
