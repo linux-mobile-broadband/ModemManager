@@ -1655,7 +1655,7 @@ gchar *
 mm_qmi_unique_id_to_firmware_unique_id (GArray  *qmi_unique_id,
                                         GError **error)
 {
-    gint     i;
+    guint    i;
     gboolean expect_nul_byte = FALSE;
 
     if (qmi_unique_id->len != EXPECTED_QMI_UNIQUE_ID_LENGTH) {
