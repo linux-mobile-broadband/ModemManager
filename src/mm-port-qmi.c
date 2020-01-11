@@ -397,7 +397,7 @@ port_open_step (GTask *task)
     case PORT_OPEN_STEP_FIRST:
         mm_dbg ("Opening QMI device...");
         ctx->step++;
-        /* Fall down to next step */
+        /* Fall through */
 
     case PORT_OPEN_STEP_CHECK_OPENING:
         mm_dbg ("Checking if QMI device already opening...");
@@ -410,7 +410,7 @@ port_open_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* Fall down to next step */
+        /* Fall through */
 
     case PORT_OPEN_STEP_CHECK_ALREADY_OPEN:
         mm_dbg ("Checking if QMI device already open...");
@@ -420,7 +420,7 @@ port_open_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* Fall down to next step */
+        /* Fall through */
 
     case PORT_OPEN_STEP_DEVICE_NEW: {
         GFile *file;
@@ -468,7 +468,7 @@ port_open_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* Fall down to next step */
+        /* Fall through */
 
     case PORT_OPEN_STEP_ALLOCATE_WDA_CLIENT:
         /* Allocate WDA client */
@@ -518,7 +518,7 @@ port_open_step (GTask *task)
         }
 
         ctx->step++;
-        /* Fall down to next step */
+        /* Fall through */
 
     case PORT_OPEN_STEP_SET_KERNEL_DATA_FORMAT:
         /* Update the data format to be expected by the kernel */
