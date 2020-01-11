@@ -4170,6 +4170,8 @@ mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily family)
         return "IPV6";
     case MM_BEARER_IP_FAMILY_IPV4V6:
         return "IPV4V6";
+    case MM_BEARER_IP_FAMILY_NONE:
+    case MM_BEARER_IP_FAMILY_ANY:
     default:
         return NULL;
     }
