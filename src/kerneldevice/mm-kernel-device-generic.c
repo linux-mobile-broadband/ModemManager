@@ -952,29 +952,29 @@ kernel_device_get_property_as_int_hex (MMKernelDevice *self,
 /*****************************************************************************/
 
 MMKernelDevice *
-mm_kernel_device_generic_new_with_rules (MMKernelEventProperties  *properties,
+mm_kernel_device_generic_new_with_rules (MMKernelEventProperties  *props,
                                          GArray                   *rules,
                                          GError                  **error)
 {
-    g_return_val_if_fail (MM_IS_KERNEL_EVENT_PROPERTIES (properties), NULL);
+    g_return_val_if_fail (MM_IS_KERNEL_EVENT_PROPERTIES (props), NULL);
 
     /* Note: we allow NULL rules, e.g. for virtual devices */
 
     return MM_KERNEL_DEVICE (g_initable_new (MM_TYPE_KERNEL_DEVICE_GENERIC,
                                              NULL,
                                              error,
-                                             "properties", properties,
+                                             "properties", props,
                                              "rules",      rules,
                                              NULL));
 }
 
 MMKernelDevice *
-mm_kernel_device_generic_new (MMKernelEventProperties  *properties,
+mm_kernel_device_generic_new (MMKernelEventProperties  *props,
                               GError                  **error)
 {
     static GArray *rules = NULL;
 
-    g_return_val_if_fail (MM_IS_KERNEL_EVENT_PROPERTIES (properties), NULL);
+    g_return_val_if_fail (MM_IS_KERNEL_EVENT_PROPERTIES (props), NULL);
 
     /* We only try to load the default list of rules once */
     if (G_UNLIKELY (!rules)) {
@@ -983,7 +983,7 @@ mm_kernel_device_generic_new (MMKernelEventProperties  *properties,
             return NULL;
     }
 
-    return mm_kernel_device_generic_new_with_rules (properties, rules, error);
+    return mm_kernel_device_generic_new_with_rules (props, rules, error);
 }
 
 /*****************************************************************************/
