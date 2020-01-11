@@ -5004,14 +5004,14 @@ ussd_cancel_ready (MbimDevice   *device,
 
     /* Complete the pending action, regardless of the operation result */
     if (self->priv->pending_ussd_action) {
-        GTask *task;
+        GTask *pending_task;
 
-        task = self->priv->pending_ussd_action;
+        pending_task = self->priv->pending_ussd_action;
         self->priv->pending_ussd_action = NULL;
 
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+        g_task_return_new_error (pending_task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
                                  "USSD session was cancelled");
-        g_object_unref (task);
+        g_object_unref (pending_task);
     }
 
     mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
