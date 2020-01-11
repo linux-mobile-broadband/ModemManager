@@ -1932,7 +1932,11 @@ mm_3gpp_parse_cgact_read_response (const gchar *reply,
 /*************************************************************************/
 
 static gulong
-parse_uint (char *str, int base, glong nmin, glong nmax, gboolean *valid)
+parse_uint (gchar    *str,
+            gint      base,
+            gulong    nmin,
+            gulong    nmax,
+            gboolean *valid)
 {
     gulong ret = 0;
     gchar *endquote;
@@ -4677,7 +4681,7 @@ mm_cdma_parse_eri (const gchar *reply,
             *out_ind = ind;
 
         while (iter->num != -1) {
-            if (iter->num == ind) {
+            if ((guint)iter->num == ind) {
                 *out_roaming = iter->roam_ind;
                 if (out_desc)
                     *out_desc = iter->banner;
