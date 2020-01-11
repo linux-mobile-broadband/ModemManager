@@ -48,6 +48,7 @@ udev_rule_clear (MMUdevRule *rule)
         break;
     case MM_UDEV_RULE_RESULT_TYPE_GOTO_INDEX:
     case MM_UDEV_RULE_RESULT_TYPE_UNKNOWN:
+    default:
         break;
     }
 
