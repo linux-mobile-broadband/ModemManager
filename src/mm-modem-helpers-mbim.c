@@ -201,6 +201,8 @@ mm_3gpp_network_info_list_from_mbim_providers (const MbimProvider *const *provid
 GError *
 mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
 {
+    const gchar *msg;
+
     switch (nw_error) {
     case MBIM_NW_ERROR_IMSI_UNKNOWN_IN_HLR:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
@@ -306,11 +308,41 @@ mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUESTED_APN_NOT_SUPPORTED,
                             "Requested APN not supported");
+
+    case MBIM_NW_ERROR_SEMANTICALLY_INCORRECT_MESSAGE:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE,
+                            "Semantically incorrect message");
+
+    case MBIM_NW_ERROR_PROTOCOL_ERROR_UNSPECIFIED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNSPECIFIED_PROTOCOL_ERROR,
+                            "Unspecified protocol error");
+
+    case MBIM_NW_ERROR_IMEI_NOT_ACCEPTED:
+    case MBIM_NW_ERROR_MS_IDENTITY_NOT_DERIVED_BY_NETWORK:
+    case MBIM_NW_ERROR_IMPLICITLY_DETACHED:
+    case MBIM_NW_ERROR_MSC_TEMPORARILY_NOT_REACHABLE:
+    case MBIM_NW_ERROR_MAC_FAILURE:
+    case MBIM_NW_ERROR_SYNCH_FAILURE:
+    case MBIM_NW_ERROR_NO_PDP_CONTEXT_ACTIVATED:
+    case MBIM_NW_ERROR_PDP_TYPE_IPV4_ONLY_ALLOWED:
+    case MBIM_NW_ERROR_PDP_TYPE_IPV6_ONLY_ALLOWED:
+    case MBIM_NW_ERROR_INVALID_MANDATORY_INFORMATION:
+    case MBIM_NW_ERROR_MESSAGE_TYPE_NON_EXISTENT_OR_NOT_IMPLEMENTED:
+    case MBIM_NW_ERROR_MESSAGE_TYPE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE:
+    case MBIM_NW_ERROR_INFORMATION_ELEMENT_NON_EXISTENT_OR_NOT_IMPLEMENTED:
+    case MBIM_NW_ERROR_CONDITIONAL_IE_ERROR:
+    case MBIM_NW_ERROR_MESSAGE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE:
+    case MBIM_NW_ERROR_APN_RESTRICTION_VALUE_INCOMPATIBLE_WITH_ACTIVE_PDP_CONTEXT:
+    case MBIM_NW_ERROR_MULTIPLE_ACCESSES_TO_A_PDN_CONNECTION_NOT_ALLOWED:
+    case MBIM_NW_ERROR_UNKNOWN:
     default:
+        msg = mbim_nw_error_get_string (nw_error);
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                             MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN,
-                            "Unknown error (%u)",
-                            nw_error);
+                            "Unsupported error (%u): %s",
+                            nw_error, msg ? msg : "unknown");
     }
 }
 
@@ -378,6 +410,7 @@ mm_bearer_ip_family_from_mbim_context_ip_type (MbimContextIpType ip_type)
         return MM_BEARER_IP_FAMILY_IPV4V6;
     case MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6:
         return MM_BEARER_IP_FAMILY_IPV4 | MM_BEARER_IP_FAMILY_IPV6;
+    case MBIM_CONTEXT_IP_TYPE_DEFAULT:
     default:
         return MM_BEARER_IP_FAMILY_NONE;
     }
