@@ -767,13 +767,13 @@ mm_kernel_device_udev_new (GUdevDevice *udev_device)
 /*****************************************************************************/
 
 MMKernelDevice *
-mm_kernel_device_udev_new_from_properties (MMKernelEventProperties  *properties,
+mm_kernel_device_udev_new_from_properties (MMKernelEventProperties  *props,
                                            GError                  **error)
 {
     return MM_KERNEL_DEVICE (g_initable_new (MM_TYPE_KERNEL_DEVICE_UDEV,
                                              NULL,
                                              error,
-                                             "properties", properties,
+                                             "properties", props,
                                              NULL));
 }
 
