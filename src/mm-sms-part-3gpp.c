@@ -618,6 +618,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         case MM_SMS_ENCODING_8BIT:
             mm_dbg ("  user data encoding is 8bit");
             break;
+        case MM_SMS_ENCODING_UNKNOWN:
         default:
             mm_dbg ("  user data encoding is unknown");
             break;
@@ -730,6 +731,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
             g_warn_if_fail (mm_sms_part_get_text (sms_part) != NULL);
             break;
 
+        case MM_SMS_ENCODING_UNKNOWN:
         default:
             {
                 GByteArray *raw;
