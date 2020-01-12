@@ -1,4 +1,57 @@
 
+ModemManager 1.12.4
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+This release breaks the API of the bindings supporting the MMModem3gppNetwork
+type, used as result when a Modem3gpp.Scan() operation finishes. This type is
+now a boxed type with explicit copy/free info, so the interpreter using the
+bindings is now able to cleanly dispose these variables (it would make the
+program crash otherwise, so the change is well justified).
+
+The getters for the MMModem3gppNetwork type now look like this:
+
+    E.g. instead of:
+      ModemManager.Modem3gpp.network_get_operator_code(network)
+    We should now do:
+      network.get_operator_code()
+
+A new example python application using the Modem3gpp.Scan() operation is
+provided in the sources, under examples/network-scan-python.
+
+There is no API/ABI break in libmm-glib itself.
+
+The list of additional changes in this version includes:
+
+ * Core:
+   ** Added missing ME error codes when building GError variables for the
+      MM_MOBILE_EQUIPMENT_ERROR domain.
+
+ * Bearer:
+   ** Avoid connection checks or stats updates while disconnecting.
+
+ * Serial port:
+   ** Fix segfault when port flash operation gets cancelled.
+
+ * Simple interface:
+   ** Fix the ongoing connection cancellable handling.
+
+ * Voice interface:
+   ** Fix segfault when voice support check fails.
+
+ * QMI:
+   ** Fixed several memory leaks, including a severe one happening when multiple
+      GPS sources (e.g. raw and nmea) were enabled at the same time.
+
+ * Plugins:
+   ** ublox: ignore errors when attempting to disconnect last bearer.
+
+ * mmcli:
+   ** Allow "yes" and "no" as boolean strings.
+
+ * Several other minor fixes and memory leak plugs.
+
+
 ModemManager 1.12.2
 -------------------------------------------
 This is a new bugfix release of ModemManager.
