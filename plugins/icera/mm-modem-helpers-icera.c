@@ -216,7 +216,7 @@ mm_icera_parse_ipdpaddr_response (const gchar *response,
     gboolean success = FALSE;
     char **items;
     guint num_items, i;
-    gint num;
+    guint num;
 
     g_return_val_if_fail (out_ip4_config, FALSE);
     g_return_val_if_fail (out_ip6_config, FALSE);
@@ -252,7 +252,7 @@ mm_icera_parse_ipdpaddr_response (const gchar *response,
     }
 
     /* Validate context ID */
-    if (!mm_get_int_from_str (items[0], &num) ||
+    if (!mm_get_uint_from_str (items[0], &num) ||
         num != expected_cid) {
         g_set_error (error,
                      MM_CORE_ERROR,
