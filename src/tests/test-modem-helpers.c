@@ -1103,7 +1103,7 @@ test_creg_match (const char *test,
                  RegTestData *data,
                  const CregResult *result)
 {
-    int i;
+    guint i;
     GMatchInfo *info  = NULL;
     MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     MMModemAccessTechnology access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
