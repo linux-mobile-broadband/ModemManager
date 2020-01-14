@@ -127,7 +127,7 @@ common_get_modem (TestFixture *fixture,
         n_modems = g_list_length (modems);
         g_assert_cmpuint (n_modems, <=, 1);
 
-        if (modem_expected == n_modems) {
+        if ((guint)modem_expected == n_modems) {
             if (modems) {
                 found = MM_OBJECT (g_object_ref (modems->data));
                 g_message ("Found modem at '%s'", mm_object_get_path (found));
