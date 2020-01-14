@@ -2163,6 +2163,7 @@ test_cgev_indication (const CgevIndicationTest *t)
         g_debug ("[%u] type: %u", i, type);
 
         switch (type) {
+        case MM_3GPP_CGEV_UNKNOWN:
         case MM_3GPP_CGEV_NW_DETACH:
         case MM_3GPP_CGEV_ME_DETACH:
             break;
