@@ -148,6 +148,7 @@ uim_read (MMSimQmi            *self,
     GArray *file_path_bytes;
     gsize i;
     QmiMessageUimReadTransparentInput *input;
+    GArray *aid;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -167,11 +168,13 @@ uim_read (MMSimQmi            *self,
     }
 
     input = qmi_message_uim_read_transparent_input_new ();
-    qmi_message_uim_read_transparent_input_set_session_information (
+    aid = g_array_new (FALSE, FALSE, sizeof (guint8)); /* empty AID */
+    qmi_message_uim_read_transparent_input_set_session (
         input,
         QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING,
-        "",
+        aid,
         NULL);
+    g_array_unref (aid);
     qmi_message_uim_read_transparent_input_set_file (input,
                                                      file_id,
                                                      file_path_bytes,
@@ -662,6 +665,7 @@ uim_verify_pin (MMSimQmi *self,
 {
     QmiMessageUimVerifyPinInput *input;
     QmiClient *client = NULL;
+    GArray *aid;
 
     if (!ensure_qmi_client (task,
                             self,
@@ -674,11 +678,13 @@ uim_verify_pin (MMSimQmi *self,
         QMI_UIM_PIN_ID_PIN1,
         g_task_get_task_data (task),
         NULL);
-    qmi_message_uim_verify_pin_input_set_session_information (
+    aid = g_array_new (FALSE, FALSE, sizeof (guint8)); /* empty AID */
+    qmi_message_uim_verify_pin_input_set_session (
         input,
         QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
-        "", /* ignored */
+        aid,
         NULL);
+    g_array_unref (aid);
     qmi_client_uim_verify_pin (QMI_CLIENT_UIM (client),
                                input,
                                5,
@@ -818,6 +824,7 @@ uim_unblock_pin (MMSimQmi *self,
     QmiMessageUimUnblockPinInput *input;
     QmiClient *client = NULL;
     UnblockPinContext *ctx;
+    GArray *aid;
 
     if (!ensure_qmi_client (task,
                             self,
@@ -833,11 +840,13 @@ uim_unblock_pin (MMSimQmi *self,
         ctx->puk,
         ctx->new_pin,
         NULL);
-    qmi_message_uim_unblock_pin_input_set_session_information (
+    aid = g_array_new (FALSE, FALSE, sizeof (guint8)); /* empty AID */
+    qmi_message_uim_unblock_pin_input_set_session (
         input,
         QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
-        "", /* ignored */
+        aid,
         NULL);
+    g_array_unref (aid);
     qmi_client_uim_unblock_pin (QMI_CLIENT_UIM (client),
                                 input,
                                 5,
@@ -985,6 +994,7 @@ uim_change_pin (MMSimQmi *self,
     QmiMessageUimChangePinInput *input;
     QmiClient *client = NULL;
     ChangePinContext *ctx;
+    GArray *aid;
 
     if (!ensure_qmi_client (task,
                             self,
@@ -1000,11 +1010,13 @@ uim_change_pin (MMSimQmi *self,
         ctx->old_pin,
         ctx->new_pin,
         NULL);
-    qmi_message_uim_change_pin_input_set_session_information (
+    aid = g_array_new (FALSE, FALSE, sizeof (guint8)); /* empty AID */
+    qmi_message_uim_change_pin_input_set_session (
         input,
         QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
-        "", /* ignored */
+        aid,
         NULL);
+    g_array_unref (aid);
     qmi_client_uim_change_pin (QMI_CLIENT_UIM (client),
                                input,
                                5,
@@ -1151,6 +1163,7 @@ uim_enable_pin (MMSimQmi *self,
     QmiMessageUimSetPinProtectionInput *input;
     QmiClient *client = NULL;
     EnablePinContext *ctx;
+    GArray *aid;
 
     if (!ensure_qmi_client (task,
                             MM_SIM_QMI (self),
@@ -1166,11 +1179,13 @@ uim_enable_pin (MMSimQmi *self,
         ctx->enabled,
         ctx->pin,
         NULL);
-    qmi_message_uim_set_pin_protection_input_set_session_information (
+    aid = g_array_new (FALSE, FALSE, sizeof (guint8)); /* empty AID */
+    qmi_message_uim_set_pin_protection_input_set_session (
         input,
         QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
-        "", /* ignored */
+        aid,
         NULL);
+    g_array_unref (aid);
     qmi_client_uim_set_pin_protection (QMI_CLIENT_UIM (client),
                                        input,
                                        5,
