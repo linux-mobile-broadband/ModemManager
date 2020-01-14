@@ -34,7 +34,7 @@
 #define MAX_BANDS_LIST_LEN 17
 
 typedef struct {
-    gchar       *response;
+    const gchar *response;
     gboolean     modem_is_2g;
     gboolean     modem_is_3g;
     gboolean     modem_is_4g;
