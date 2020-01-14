@@ -29,7 +29,7 @@
   test_error_helpers_## ERROR_SMALL (void)                                  \
   {                                                                         \
       GError     *error;                                                    \
-      guint       i;                                                        \
+      gint       i;                                                        \
       GEnumClass *enum_class;                                               \
                                                                             \
       enum_class = g_type_class_ref (MM_TYPE_ ## ERROR_CAPS);               \
