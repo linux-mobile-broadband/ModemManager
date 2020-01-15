@@ -54,10 +54,7 @@ struct _MMFirmwareUpdateSettingsClass {
 };
 
 GType mm_firmware_update_settings_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMFirmwareUpdateSettings, g_object_unref)
-#endif
 
 MMModemFirmwareUpdateMethod mm_firmware_update_settings_get_method (MMFirmwareUpdateSettings *self);
 

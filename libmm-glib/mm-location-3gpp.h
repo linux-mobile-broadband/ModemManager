@@ -54,10 +54,7 @@ struct _MMLocation3gppClass {
 };
 
 GType mm_location_3gpp_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMLocation3gpp, g_object_unref)
-#endif
 
 guint  mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self);
 guint  mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);

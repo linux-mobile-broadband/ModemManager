@@ -56,10 +56,7 @@ struct _MMSimpleConnectPropertiesClass {
 };
 
 GType mm_simple_connect_properties_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSimpleConnectProperties, g_object_unref)
-#endif
 
 MMSimpleConnectProperties *mm_simple_connect_properties_new (void);
 

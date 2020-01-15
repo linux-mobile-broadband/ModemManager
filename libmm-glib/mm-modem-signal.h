@@ -63,10 +63,7 @@ struct _MMModemSignalClass {
 };
 
 GType mm_modem_signal_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemSignal, g_object_unref)
-#endif
 
 const gchar *mm_modem_signal_get_path (MMModemSignal *self);
 gchar       *mm_modem_signal_dup_path (MMModemSignal *self);

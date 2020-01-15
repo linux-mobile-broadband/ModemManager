@@ -54,10 +54,7 @@ struct _MMCallPropertiesClass {
 };
 
 GType mm_call_properties_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCallProperties, g_object_unref)
-#endif
 
 MMCallProperties *mm_call_properties_new        (void);
 void              mm_call_properties_set_number (MMCallProperties *self,

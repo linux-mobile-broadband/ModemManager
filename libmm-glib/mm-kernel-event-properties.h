@@ -54,10 +54,7 @@ struct _MMKernelEventPropertiesClass {
 };
 
 GType mm_kernel_event_properties_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMKernelEventProperties, g_object_unref)
-#endif
 
 MMKernelEventProperties *mm_kernel_event_properties_new (void);
 

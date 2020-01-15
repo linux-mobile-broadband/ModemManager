@@ -65,10 +65,7 @@ struct _MMModemFirmwareClass {
 };
 
 GType mm_modem_firmware_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemFirmware, g_object_unref)
-#endif
 
 const gchar *mm_modem_firmware_get_path (MMModemFirmware *self);
 gchar       *mm_modem_firmware_dup_path (MMModemFirmware *self);

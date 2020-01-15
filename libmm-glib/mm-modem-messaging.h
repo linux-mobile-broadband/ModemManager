@@ -65,10 +65,7 @@ struct _MMModemMessagingClass {
 };
 
 GType mm_modem_messaging_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModemMessaging, g_object_unref)
-#endif
 
 const gchar *mm_modem_messaging_get_path (MMModemMessaging *self);
 gchar       *mm_modem_messaging_dup_path (MMModemMessaging *self);

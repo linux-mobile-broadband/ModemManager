@@ -56,10 +56,7 @@ struct _MMLocationCdmaBsClass {
 };
 
 GType mm_location_cdma_bs_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMLocationCdmaBs, g_object_unref)
-#endif
 
 gdouble mm_location_cdma_bs_get_longitude (MMLocationCdmaBs *self);
 gdouble mm_location_cdma_bs_get_latitude  (MMLocationCdmaBs *self);

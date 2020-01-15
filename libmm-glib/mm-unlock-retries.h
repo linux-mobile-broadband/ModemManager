@@ -63,10 +63,7 @@ struct _MMUnlockRetriesClass {
 };
 
 GType mm_unlock_retries_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMUnlockRetries, g_object_unref)
-#endif
 
 guint mm_unlock_retries_get (MMUnlockRetries *self,
                              MMModemLock lock);

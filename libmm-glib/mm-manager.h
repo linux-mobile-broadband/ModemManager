@@ -66,10 +66,7 @@ struct _MMManagerClass {
 };
 
 GType mm_manager_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMManager, g_object_unref)
-#endif
 
 void mm_manager_new (
     GDBusConnection               *connection,

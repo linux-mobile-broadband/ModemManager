@@ -64,10 +64,7 @@ struct _MMModem3gppClass {
 };
 
 GType mm_modem_3gpp_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModem3gpp, g_object_unref)
-#endif
 
 const gchar *mm_modem_3gpp_get_path (MMModem3gpp *self);
 gchar       *mm_modem_3gpp_dup_path (MMModem3gpp *self);
@@ -125,10 +122,7 @@ const gchar                    *mm_modem_3gpp_network_get_operator_short    (con
 const gchar                    *mm_modem_3gpp_network_get_operator_code     (const MMModem3gppNetwork *network);
 MMModemAccessTechnology         mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network);
 void                            mm_modem_3gpp_network_free                  (MMModem3gppNetwork *network);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModem3gppNetwork, mm_modem_3gpp_network_free)
-#endif
 
 void   mm_modem_3gpp_scan        (MMModem3gpp *self,
                                   GCancellable *cancellable,

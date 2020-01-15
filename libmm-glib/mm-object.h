@@ -74,10 +74,7 @@ struct _MMObjectClass {
 };
 
 GType mm_object_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMObject, g_object_unref)
-#endif
 
 const gchar *mm_object_get_path (MMObject *self);
 gchar       *mm_object_dup_path (MMObject *self);

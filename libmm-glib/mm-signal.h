@@ -63,10 +63,7 @@ struct _MMSignalClass {
 };
 
 GType mm_signal_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSignal, g_object_unref)
-#endif
 
 gdouble  mm_signal_get_rssi (MMSignal *self);
 gdouble  mm_signal_get_rscp (MMSignal *self);

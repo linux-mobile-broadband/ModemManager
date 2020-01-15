@@ -66,10 +66,7 @@ struct _MMBearerClass {
 };
 
 GType mm_bearer_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearer, g_object_unref)
-#endif
 
 const gchar  *mm_bearer_get_path        (MMBearer *self);
 gchar        *mm_bearer_dup_path        (MMBearer *self);

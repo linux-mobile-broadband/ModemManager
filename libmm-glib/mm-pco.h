@@ -54,10 +54,7 @@ struct _MMPcoClass {
 };
 
 GType mm_pco_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPco, g_object_unref)
-#endif
 
 guint32       mm_pco_get_session_id (MMPco *self);
 gboolean      mm_pco_is_complete    (MMPco *self);

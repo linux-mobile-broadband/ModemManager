@@ -54,10 +54,7 @@ struct _MMBearerIpConfigClass {
 };
 
 GType mm_bearer_ip_config_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerIpConfig, g_object_unref)
-#endif
 
 MMBearerIpMethod   mm_bearer_ip_config_get_method  (MMBearerIpConfig *self);
 const gchar       *mm_bearer_ip_config_get_address (MMBearerIpConfig *self);

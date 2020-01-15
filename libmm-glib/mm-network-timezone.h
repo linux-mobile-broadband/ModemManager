@@ -72,10 +72,7 @@ struct _MMNetworkTimezoneClass {
 };
 
 GType mm_network_timezone_get_type (void);
-
-#if GLIB_CHECK_VERSION(2, 44, 0)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMNetworkTimezone, g_object_unref)
-#endif
 
 gint32 mm_network_timezone_get_offset       (MMNetworkTimezone *self);
 gint32 mm_network_timezone_get_dst_offset   (MMNetworkTimezone *self);
