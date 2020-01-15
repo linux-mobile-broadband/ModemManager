@@ -5319,11 +5319,14 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
 }
 
 static void
-finalize (GObject *object)
+dispose (GObject *object)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
     MMPortMbim *mbim;
 
+    /* If any port cleanup is needed, it must be done during dispose(), as
+     * the modem object will be affected by an explciit g_object_run_dispose()
+     * that will remove all port references right away */
     mbim = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
     if (mbim) {
         /* Explicitly remove notification handler */
@@ -5335,6 +5338,14 @@ finalize (GObject *object)
         if (mm_port_mbim_is_open (mbim))
             mm_port_mbim_close (mbim, NULL, NULL);
     }
+
+    G_OBJECT_CLASS (mm_broadband_modem_mbim_parent_class)->dispose (object);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
 
     g_free (self->priv->caps_device_id);
     g_free (self->priv->caps_firmware_info);
@@ -5600,6 +5611,7 @@ mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemMbimPrivate));
 
+    object_class->dispose = dispose;
     object_class->finalize = finalize;
 
     broadband_modem_class->initialization_started = initialization_started;
