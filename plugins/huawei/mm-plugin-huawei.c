@@ -99,7 +99,7 @@ huawei_custom_init_finish (MMPortProbe *probe,
 
 static void huawei_custom_init_step (GTask *task);
 
-static void
+static gboolean
 cache_port_mode (MMDevice *device,
                  const gchar *reply,
                  const gchar *type,
@@ -114,9 +114,12 @@ cache_port_mode (MMDevice *device,
         errno = 0;
         /* shift by 1 so NULL return from g_object_get_data() means no tag */
         i = 1 + strtol (p + strlen (type), NULL, 10);
-        if (i > 0 && i < 256 && errno == 0)
+        if (i > 0 && i < 256 && errno == 0) {
             g_object_set_data (G_OBJECT (device), tag, GINT_TO_POINTER ((gint) i));
+            return TRUE;
+        }
     }
+    return FALSE;
 }
 
 static void
@@ -146,20 +149,22 @@ getportmode_ready (MMPortSerialAt *port,
         /* Port mode not supported */
     } else {
         MMDevice *device;
+        guint     n_cached_port_modes = 0;
 
         mm_dbg ("(Huawei) port mode layout retrieved");
 
         /* Results are cached in the parent device object */
         device = mm_port_probe_peek_device (ctx->probe);
-        cache_port_mode (device, response, "PCUI:", TAG_HUAWEI_PCUI_PORT);
-        cache_port_mode (device, response, "MDM:",  TAG_HUAWEI_MODEM_PORT);
-        cache_port_mode (device, response, "NDIS:", TAG_HUAWEI_NDIS_PORT);
-        cache_port_mode (device, response, "DIAG:", TAG_HUAWEI_DIAG_PORT);
+        n_cached_port_modes += cache_port_mode (device, response, "PCUI:", TAG_HUAWEI_PCUI_PORT);
+        n_cached_port_modes += cache_port_mode (device, response, "MDM:",  TAG_HUAWEI_MODEM_PORT);
+        n_cached_port_modes += cache_port_mode (device, response, "NDIS:", TAG_HUAWEI_NDIS_PORT);
+        n_cached_port_modes += cache_port_mode (device, response, "DIAG:", TAG_HUAWEI_DIAG_PORT);
         /* GETPORTMODE response format in newer devices... (e.g. E3372) */
-        cache_port_mode (device, response, "pcui:",  TAG_HUAWEI_PCUI_PORT);
-        cache_port_mode (device, response, "modem:", TAG_HUAWEI_MODEM_PORT);
+        n_cached_port_modes += cache_port_mode (device, response, "pcui:",  TAG_HUAWEI_PCUI_PORT);
+        n_cached_port_modes += cache_port_mode (device, response, "modem:", TAG_HUAWEI_MODEM_PORT);
 
-        g_object_set_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
+        if (n_cached_port_modes > 0)
+            g_object_set_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (TRUE));
 
         /* Mark port as being AT already */
         mm_port_probe_set_result_at (ctx->probe, TRUE);
