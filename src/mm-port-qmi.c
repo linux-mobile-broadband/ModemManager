@@ -195,45 +195,74 @@ typedef enum {
     PORT_OPEN_STEP_GET_WDA_DATA_FORMAT,
     PORT_OPEN_STEP_CHECK_DATA_FORMAT,
     PORT_OPEN_STEP_SET_KERNEL_DATA_FORMAT,
+    PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT,
     PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT,
     PORT_OPEN_STEP_LAST
 } PortOpenStep;
 
 typedef struct {
-    QmiDevice *device;
-    QmiClient *wda;
-    GError *error;
-    PortOpenStep step;
-    gboolean set_data_format;
-    QmiDeviceExpectedDataFormat kernel_data_format;
-    QmiWdaLinkLayerProtocol llp;
+    QmiDevice                   *device;
+    QmiClient                   *wda;
+    GError                      *error;
+    PortOpenStep                 step;
+    gboolean                     set_data_format;
+    QmiDeviceExpectedDataFormat  kernel_data_format;
+    QmiWdaLinkLayerProtocol      llp;
 } PortOpenContext;
 
 static void
 port_open_context_free (PortOpenContext *ctx)
 {
-    if (ctx->wda) {
-        g_assert (ctx->device);
+    g_assert (!ctx->error);
+    if (ctx->wda && ctx->device)
         qmi_device_release_client (ctx->device,
                                    ctx->wda,
                                    QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
                                    3, NULL, NULL, NULL);
-        g_object_unref (ctx->wda);
-    }
-    if (ctx->device)
-        g_object_unref (ctx->device);
+    g_clear_object (&ctx->wda);
+    g_clear_object (&ctx->device);
     g_slice_free (PortOpenContext, ctx);
 }
 
 gboolean
-mm_port_qmi_open_finish (MMPortQmi *self,
-                         GAsyncResult *res,
-                         GError **error)
+mm_port_qmi_open_finish (MMPortQmi     *self,
+                         GAsyncResult  *res,
+                         GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void port_open_step (GTask *task);
+
+static void
+port_open_complete_with_error (GTask *task)
+{
+    MMPortQmi       *self;
+    PortOpenContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    g_assert (ctx->error);
+    self->priv->opening = FALSE;
+    g_task_return_error (task, g_steal_pointer (&ctx->error));
+    g_object_unref (task);
+}
+
+static void
+qmi_device_close_on_error_ready (QmiDevice    *qmi_device,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!qmi_device_close_finish (qmi_device, res, &error)) {
+        mm_warn ("Couldn't close QMI device after failed open sequence: %s", error->message);
+        g_error_free (error);
+    }
+
+    port_open_complete_with_error (task);
+}
 
 static void
 qmi_device_open_second_ready (QmiDevice *qmi_device,
@@ -252,6 +281,23 @@ qmi_device_open_second_ready (QmiDevice *qmi_device,
 }
 
 static void
+qmi_device_close_to_reopen_ready (QmiDevice    *qmi_device,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    PortOpenContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!qmi_device_close_finish (qmi_device, res, &ctx->error)) {
+        mm_warn ("Couldn't close QMI device to reopen it");
+        ctx->step = PORT_OPEN_STEP_LAST;
+    } else
+        ctx->step++;
+    port_open_step (task);
+}
+
+static void
 get_data_format_ready (QmiClientWda *client,
                        GAsyncResult *res,
                        GTask *task)
@@ -265,7 +311,7 @@ get_data_format_ready (QmiClientWda *client,
         !qmi_message_wda_get_data_format_output_get_result (output, NULL) ||
         !qmi_message_wda_get_data_format_output_get_link_layer_protocol (output, &ctx->llp, NULL))
         /* If loading WDA data format fails, fallback to 802.3 requested via CTL */
-        ctx->step = PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT;
+        ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
     else
         /* Go on to next step */
         ctx->step++;
@@ -288,7 +334,7 @@ allocate_client_wda_ready (QmiDevice *device,
     if (!ctx->wda) {
         /* If no WDA supported, then we just fallback to reopening explicitly
          * requesting 802.3 in the CTL service. */
-        ctx->step = PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT;
+        ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
         port_open_step (task);
         return;
     }
@@ -417,7 +463,7 @@ port_open_step (GTask *task)
         ctx->kernel_data_format = qmi_device_get_expected_data_format (ctx->device, NULL);
         /* If data format cannot be retrieved, we fallback to 802.3 via CTL */
         if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN) {
-            ctx->step = PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT;
+            ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
             port_open_step (task);
             return;
         }
@@ -494,16 +540,17 @@ port_open_step (GTask *task)
         port_open_step (task);
         return;
 
+    case PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT:
+        mm_dbg ("Closing device to reopen it right away...");
+        qmi_device_close_async (ctx->device,
+                                5,
+                                g_task_get_cancellable (task),
+                                (GAsyncReadyCallback) qmi_device_close_to_reopen_ready,
+                                task);
+        return;
+
     case PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT:
         /* Need to reopen setting 802.3 using CTL */
-        mm_dbg ("Closing device to reopen it right away...");
-        if (!qmi_device_close (ctx->device, &ctx->error)) {
-            mm_warn ("Couldn't close QMI device to reopen it");
-            ctx->step = PORT_OPEN_STEP_LAST;
-            port_open_step (task);
-            return;
-        }
-
         mm_dbg ("Reopening device with data format...");
         qmi_device_open (ctx->device,
                          (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
@@ -517,24 +564,30 @@ port_open_step (GTask *task)
         return;
 
     case PORT_OPEN_STEP_LAST:
-        mm_dbg ("QMI port open operation finished");
-
-        /* Reset opening flag */
-        self->priv->opening = FALSE;
-
         if (ctx->error) {
-            /* Propagate error */
-            if (ctx->device)
-                qmi_device_close (ctx->device, NULL);
-            g_task_return_error (task, ctx->error);
-            ctx->error = NULL;
-        } else {
-            /* Store device in private info */
-            g_assert (ctx->device);
-            g_assert (!self->priv->qmi_device);
-            self->priv->qmi_device = g_object_ref (ctx->device);
-            g_task_return_boolean (task, TRUE);
+            mm_dbg ("QMI port open operation failed: %s", ctx->error->message);
+
+            if (ctx->device) {
+                qmi_device_close_async (ctx->device,
+                                        5,
+                                        NULL,
+                                        (GAsyncReadyCallback) qmi_device_close_on_error_ready,
+                                        task);
+                return;
+            }
+
+            port_open_complete_with_error (task);
+            return;
         }
+
+        mm_dbg ("QMI port open operation finished successfully");
+
+        /* Store device in private info */
+        g_assert (ctx->device);
+        g_assert (!self->priv->qmi_device);
+        self->priv->qmi_device = g_steal_pointer (&ctx->device);
+        self->priv->opening = FALSE;
+        g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
