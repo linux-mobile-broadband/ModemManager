@@ -1584,6 +1584,14 @@ finalize (GObject *object)
     G_OBJECT_CLASS (mm_base_modem_parent_class)->finalize (object);
 }
 
+#if defined WITH_MBIM
+static void
+foreach_port_mbim_close (MMPortMbim *port_mbim)
+{
+    mm_port_mbim_close (port_mbim, NULL, NULL);
+}
+#endif
+
 static void
 dispose (GObject *object)
 {
@@ -1621,7 +1629,7 @@ dispose (GObject *object)
 #endif
 #if defined WITH_MBIM
     /* We need to close the MBIM port cleanly when disposing the modem object */
-    g_list_foreach (self->priv->mbim, (GFunc)mm_port_mbim_close, NULL);
+    g_list_foreach (self->priv->mbim, (GFunc)foreach_port_mbim_close, NULL);
     g_list_free_full (self->priv->mbim, g_object_unref);
     self->priv->mbim = NULL;
 #endif
