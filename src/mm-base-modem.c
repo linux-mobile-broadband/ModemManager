@@ -1663,19 +1663,16 @@ dispose (GObject *object)
 
     g_clear_object (&self->priv->primary);
     g_clear_object (&self->priv->secondary);
-    g_list_free_full (self->priv->data, g_object_unref);
-    self->priv->data = NULL;
+    g_list_free_full (g_steal_pointer (&self->priv->data), g_object_unref);
     g_clear_object (&self->priv->qcdm);
     g_clear_object (&self->priv->gps_control);
     g_clear_object (&self->priv->gps);
     g_clear_object (&self->priv->audio);
 #if defined WITH_QMI
-    g_list_free_full (self->priv->qmi, g_object_unref);
-    self->priv->qmi = NULL;
+    g_list_free_full (g_steal_pointer (&self->priv->qmi), g_object_unref);
 #endif
 #if defined WITH_MBIM
-    g_list_free_full (self->priv->mbim, g_object_unref);
-    self->priv->mbim = NULL;
+    g_list_free_full (g_steal_pointer (&self->priv->mbim), g_object_unref);
 #endif
 
     teardown_ports_table (self);
