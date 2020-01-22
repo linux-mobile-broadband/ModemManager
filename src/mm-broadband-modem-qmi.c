@@ -8623,17 +8623,7 @@ mm_broadband_modem_qmi_init (MMBroadbandModemQmi *self)
 static void
 finalize (GObject *object)
 {
-    MMPortQmi *qmi;
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (object);
-
-    qmi = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
-    if (qmi) {
-        /* Disconnect signal handler for qmi-proxy disappearing, if it exists */
-        untrack_qmi_device_removed (self, qmi);
-        /* If we did open the QMI port during initialization, close it now */
-        if (mm_port_qmi_is_open (qmi))
-            mm_port_qmi_close (qmi);
-    }
 
     g_free (self->priv->imei);
     g_free (self->priv->meid);
