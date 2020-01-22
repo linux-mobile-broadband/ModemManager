@@ -1463,6 +1463,12 @@ cleanup_modem_port (MMBaseModem *self,
             mm_port_subsys_get_string (mm_port_get_subsys (MM_PORT (port))),
             mm_port_get_device (MM_PORT (port)));
 
+    /* Cleanup for serial ports */
+    if (MM_IS_PORT_SERIAL (port)) {
+        g_signal_handlers_disconnect_by_func (port, serial_port_timed_out_cb, self);
+        return;
+    }
+
 #if defined WITH_MBIM
     /* We need to close the MBIM port cleanly when disposing the modem object */
     if (MM_IS_PORT_MBIM (port)) {
