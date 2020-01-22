@@ -441,40 +441,91 @@ mm_port_mbim_is_open (MMPortMbim *self)
 
 /*****************************************************************************/
 
+typedef struct {
+    MbimDevice *mbim_device;
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    QmiDevice *qmi_device;
+#endif
+} PortMbimCloseContext;
+
+static void
+port_mbim_close_context_free (PortMbimCloseContext *ctx)
+{
+    g_clear_object (&ctx->mbim_device);
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    g_clear_object (&ctx->qmi_device);
+#endif
+    g_slice_free (PortMbimCloseContext, ctx);
+}
+
 gboolean
-mm_port_mbim_close_finish (MMPortMbim *self,
-                           GAsyncResult *res,
-                           GError **error)
+mm_port_mbim_close_finish (MMPortMbim    *self,
+                           GAsyncResult  *res,
+                           GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-mbim_device_close_ready (MbimDevice *device,
+mbim_device_close_ready (MbimDevice   *mbim_device,
                          GAsyncResult *res,
-                         GTask *task)
+                         GTask        *task)
 {
-    GError *error = NULL;
+    GError     *error = NULL;
     MMPortMbim *self;
 
     self = g_task_get_source_object (task);
-    self->priv->in_progress = FALSE;
-    g_clear_object (&self->priv->mbim_device);
 
-    if (!mbim_device_close_finish (device, res, &error))
+    g_assert (!self->priv->mbim_device);
+    self->priv->in_progress = FALSE;
+
+    if (!mbim_device_close_finish (mbim_device, res, &error))
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
-
     g_object_unref (task);
 }
 
-void
-mm_port_mbim_close (MMPortMbim *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+static void
+port_mbim_device_close (GTask *task)
 {
-    GTask *task;
+    PortMbimCloseContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    g_assert (ctx->mbim_device);
+    mbim_device_close (ctx->mbim_device,
+                       5,
+                       NULL,
+                       (GAsyncReadyCallback)mbim_device_close_ready,
+                       task);
+}
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+qmi_device_close_ready (QmiDevice    *qmi_device,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!qmi_device_close_finish (qmi_device, res, &error)) {
+        mm_warn ("Couldn't properly close QMI device: %s", error->message);
+        g_error_free (error);
+    }
+
+    port_mbim_device_close (task);
+}
+
+#endif
+
+void
+mm_port_mbim_close (MMPortMbim          *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    PortMbimCloseContext *ctx;
+    GTask                *task;
 
     g_return_if_fail (MM_IS_PORT_MBIM (self));
 
@@ -497,9 +548,13 @@ mm_port_mbim_close (MMPortMbim *self,
 
     self->priv->in_progress = TRUE;
 
+    /* Store device(s) to close in the context */
+    ctx = g_slice_new0 (PortMbimCloseContext);
+    ctx->mbim_device = g_steal_pointer (&self->priv->mbim_device);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)port_mbim_close_context_free);
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (self->priv->qmi_device) {
-        GError *error = NULL;
         GList *l;
 
         /* Release all allocated clients */
@@ -515,20 +570,17 @@ mm_port_mbim_close (MMPortMbim *self,
         g_list_free_full (self->priv->qmi_clients, g_object_unref);
         self->priv->qmi_clients = NULL;
 
-        if (!qmi_device_close (self->priv->qmi_device, &error)) {
-            mm_warn ("Couldn't properly close QMI device: %s", error->message);
-            g_error_free (error);
-        }
-        g_clear_object (&self->priv->qmi_device);
+        ctx->qmi_device = g_steal_pointer (&self->priv->qmi_device);
+        qmi_device_close_async (ctx->qmi_device,
+                                5,
+                                NULL,
+                                (GAsyncReadyCallback)qmi_device_close_ready,
+                                task);
+        return;
     }
 #endif
 
-    mbim_device_close (self->priv->mbim_device,
-                       5,
-                       NULL,
-                       (GAsyncReadyCallback)mbim_device_close_ready,
-                       task);
-    g_clear_object (&self->priv->mbim_device);
+    port_mbim_device_close (task);
 }
 
 /*****************************************************************************/
