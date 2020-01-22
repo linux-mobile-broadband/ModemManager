@@ -8651,7 +8651,7 @@ dispose (GObject *object)
         untrack_qmi_device_removed (self, qmi);
         /* If we did open the QMI port during initialization, close it now */
         if (mm_port_qmi_is_open (qmi))
-            mm_port_qmi_close (qmi);
+            mm_port_qmi_close (qmi, NULL, NULL);
     }
 
     g_list_free_full (self->priv->firmware_list, g_object_unref);

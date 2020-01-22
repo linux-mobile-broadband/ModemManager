@@ -33,7 +33,7 @@ typedef struct {
 } ServiceInfo;
 
 struct _MMPortQmiPrivate {
-    gboolean opening;
+    gboolean in_progress;
     QmiDevice *qmi_device;
     GList *services;
     gboolean llp_is_raw_ip;
@@ -244,7 +244,7 @@ port_open_complete_with_error (GTask *task)
     ctx  = g_task_get_task_data (task);
 
     g_assert (ctx->error);
-    self->priv->opening = FALSE;
+    self->priv->in_progress = FALSE;
     g_task_return_error (task, g_steal_pointer (&ctx->error));
     g_object_unref (task);
 }
@@ -401,11 +401,11 @@ port_open_step (GTask *task)
 
     case PORT_OPEN_STEP_CHECK_OPENING:
         mm_dbg ("Checking if QMI device already opening...");
-        if (self->priv->opening) {
+        if (self->priv->in_progress) {
             g_task_return_new_error (task,
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_IN_PROGRESS,
-                                     "QMI device already being opened");
+                                     "QMI device open/close operation in progress");
             g_object_unref (task);
             return;
         }
@@ -432,7 +432,7 @@ port_open_step (GTask *task)
         /* We flag in this point that we're opening. From now on, if we stop
          * for whatever reason, we should clear this flag. We do this by ensuring
          * that all callbacks go through the LAST step for completing. */
-        self->priv->opening = TRUE;
+        self->priv->in_progress = TRUE;
 
         mm_dbg ("Creating QMI device...");
         qmi_device_new (file,
@@ -585,8 +585,8 @@ port_open_step (GTask *task)
         /* Store device in private info */
         g_assert (ctx->device);
         g_assert (!self->priv->qmi_device);
-        self->priv->qmi_device = g_steal_pointer (&ctx->device);
-        self->priv->opening = FALSE;
+        self->priv->qmi_device = g_object_ref (ctx->device);
+        self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -617,6 +617,8 @@ mm_port_qmi_open (MMPortQmi *self,
     port_open_step (task);
 }
 
+/*****************************************************************************/
+
 gboolean
 mm_port_qmi_is_open (MMPortQmi *self)
 {
@@ -625,23 +627,88 @@ mm_port_qmi_is_open (MMPortQmi *self)
     return !!self->priv->qmi_device;
 }
 
-void
-mm_port_qmi_close (MMPortQmi *self)
+/*****************************************************************************/
+
+typedef struct {
+    QmiDevice *qmi_device;
+} PortQmiCloseContext;
+
+static void
+port_qmi_close_context_free (PortQmiCloseContext *ctx)
 {
-    GList *l;
-    GError *error = NULL;
+    g_clear_object (&ctx->qmi_device);
+    g_slice_free (PortQmiCloseContext, ctx);
+}
+
+gboolean
+mm_port_qmi_close_finish (MMPortQmi     *self,
+                          GAsyncResult  *res,
+                          GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+qmi_device_close_ready (QmiDevice    *qmi_device,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    GError    *error = NULL;
+    MMPortQmi *self;
+
+    self = g_task_get_source_object (task);
+
+    g_assert (!self->priv->qmi_device);
+    self->priv->in_progress = FALSE;
+
+    if (!qmi_device_close_finish (qmi_device, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_port_qmi_close (MMPortQmi           *self,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
+{
+    PortQmiCloseContext *ctx;
+    GTask               *task;
+    GList               *l;
 
     g_return_if_fail (MM_IS_PORT_QMI (self));
 
-    if (!self->priv->qmi_device)
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->in_progress) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_IN_PROGRESS,
+                                 "QMI device open/close operation in progress");
+        g_object_unref (task);
         return;
+    }
+
+    if (!self->priv->qmi_device) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    self->priv->in_progress = TRUE;
+
+    /* Store device to close in the context */
+    ctx = g_slice_new0 (PortQmiCloseContext);
+    ctx->qmi_device = g_steal_pointer (&self->priv->qmi_device);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)port_qmi_close_context_free);
 
     /* Release all allocated clients */
     for (l = self->priv->services; l; l = g_list_next (l)) {
         ServiceInfo *info = l->data;
 
         mm_dbg ("Releasing client for service '%s'...", qmi_service_get_string (info->service));
-        qmi_device_release_client (self->priv->qmi_device,
+        qmi_device_release_client (ctx->qmi_device,
                                    info->client,
                                    QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
                                    3, NULL, NULL, NULL);
@@ -650,14 +717,11 @@ mm_port_qmi_close (MMPortQmi *self)
     g_list_free_full (self->priv->services, g_free);
     self->priv->services = NULL;
 
-    /* Close and release the device */
-    if (!qmi_device_close (self->priv->qmi_device, &error)) {
-        mm_warn ("Couldn't properly close QMI device: %s",
-                 error->message);
-        g_error_free (error);
-    }
-
-    g_clear_object (&self->priv->qmi_device);
+    qmi_device_close_async (ctx->qmi_device,
+                            5,
+                            NULL,
+                            (GAsyncReadyCallback)qmi_device_close_ready,
+                            task);
 }
 
 /*****************************************************************************/

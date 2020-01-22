@@ -48,16 +48,21 @@ GType mm_port_qmi_get_type (void);
 
 MMPortQmi *mm_port_qmi_new (const gchar *name);
 
-void     mm_port_qmi_open        (MMPortQmi *self,
-                                  gboolean set_data_format,
-                                  GCancellable *cancellable,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data);
-gboolean mm_port_qmi_open_finish (MMPortQmi *self,
-                                  GAsyncResult *res,
-                                  GError **error);
-gboolean mm_port_qmi_is_open     (MMPortQmi *self);
-void     mm_port_qmi_close       (MMPortQmi *self);
+void     mm_port_qmi_open         (MMPortQmi            *self,
+                                   gboolean              set_data_format,
+                                   GCancellable         *cancellable,
+                                   GAsyncReadyCallback   callback,
+                                   gpointer              user_data);
+gboolean mm_port_qmi_open_finish  (MMPortQmi            *self,
+                                   GAsyncResult         *res,
+                                   GError              **error);
+gboolean mm_port_qmi_is_open      (MMPortQmi            *self);
+void     mm_port_qmi_close        (MMPortQmi            *self,
+                                   GAsyncReadyCallback   callback,
+                                   gpointer              user_data);
+gboolean mm_port_qmi_close_finish (MMPortQmi            *self,
+                                   GAsyncResult         *res,
+                                   GError              **error);
 
 typedef enum {
     MM_PORT_QMI_FLAG_DEFAULT  = 0,

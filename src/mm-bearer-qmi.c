@@ -481,7 +481,7 @@ connect_context_free (ConnectContext *ctx)
     }
 
     if (ctx->explicit_qmi_open)
-        mm_port_qmi_close (ctx->qmi);
+        mm_port_qmi_close (ctx->qmi, NULL, NULL);
 
     g_clear_error (&ctx->error_ipv4);
     g_clear_error (&ctx->error_ipv6);
@@ -1883,7 +1883,7 @@ reset_bearer_connection (MMBearerQmi *self,
         if (self->priv->qmi) {
             if (self->priv->explicit_qmi_open) {
                 self->priv->explicit_qmi_open = FALSE;
-                mm_port_qmi_close (self->priv->qmi);
+                mm_port_qmi_close (self->priv->qmi, NULL, NULL);
             }
             g_clear_object (&self->priv->qmi);
         }

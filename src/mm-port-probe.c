@@ -435,8 +435,8 @@ port_probe_run_context_free (PortProbeRunContext *ctx)
 
 #if defined WITH_QMI
     if (ctx->port_qmi) {
-        if (mm_port_qmi_is_open (ctx->port_qmi))
-            mm_port_qmi_close (ctx->port_qmi);
+        /* We should have closed it cleanly before */
+        g_assert (!mm_port_qmi_is_open (ctx->port_qmi));
         g_object_unref (ctx->port_qmi);
     }
 #endif
@@ -465,6 +465,22 @@ static gboolean wdm_probe (MMPortProbe *self);
 #if defined WITH_QMI
 
 static void
+qmi_port_close_ready (MMPortQmi    *qmi_port,
+                      GAsyncResult *res,
+                      MMPortProbe  *self)
+{
+    PortProbeRunContext *ctx;
+
+    g_assert (self->priv->task);
+    ctx = g_task_get_task_data (self->priv->task);
+
+    mm_port_qmi_close_finish (qmi_port, res, NULL);
+
+    /* Keep on */
+    ctx->source_id = g_idle_add ((GSourceFunc) wdm_probe, self);
+}
+
+static void
 port_qmi_open_ready (MMPortQmi    *port_qmi,
                      GAsyncResult *res,
                      MMPortProbe  *self)
@@ -487,10 +503,10 @@ port_qmi_open_ready (MMPortQmi    *port_qmi,
 
     /* Set probing result */
     mm_port_probe_set_result_qmi (self, is_qmi);
-    mm_port_qmi_close (port_qmi);
 
-    /* Keep on */
-    ctx->source_id = g_idle_add ((GSourceFunc) wdm_probe, self);
+    mm_port_qmi_close (ctx->port_qmi,
+                       (GAsyncReadyCallback) qmi_port_close_ready,
+                       self);
 }
 
 #endif /* WITH_QMI */

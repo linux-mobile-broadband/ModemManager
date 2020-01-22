@@ -1584,6 +1584,14 @@ finalize (GObject *object)
     G_OBJECT_CLASS (mm_base_modem_parent_class)->finalize (object);
 }
 
+#if defined WITH_QMI
+static void
+foreach_port_qmi_close (MMPortQmi *port_qmi)
+{
+    mm_port_qmi_close (port_qmi, NULL, NULL);
+}
+#endif
+
 #if defined WITH_MBIM
 static void
 foreach_port_mbim_close (MMPortMbim *port_mbim)
@@ -1623,7 +1631,7 @@ dispose (GObject *object)
      * otherwise the allocated CIDs will be kept allocated, and if we end up
      * allocating too many newer allocations will fail with client-ids-exhausted
      * errors. */
-    g_list_foreach (self->priv->qmi, (GFunc)mm_port_qmi_close, NULL);
+    g_list_foreach (self->priv->qmi, (GFunc)foreach_port_qmi_close, NULL);
     g_list_free_full (self->priv->qmi, g_object_unref);
     self->priv->qmi = NULL;
 #endif
