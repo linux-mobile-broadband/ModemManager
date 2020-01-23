@@ -21,27 +21,57 @@
 #include "mm-log.h"
 
 static void
+common_test_gsm7 (const gchar *in_utf8)
+{
+    guint32 unpacked_gsm_len = 0;
+    guint32 packed_gsm_len = 0;
+    guint32 unpacked_gsm_len_2 = 0;
+    g_autofree guint8 *unpacked_gsm = NULL;
+    g_autofree guint8 *packed_gsm = NULL;
+    g_autofree guint8 *unpacked_gsm_2 = NULL;
+    g_autofree gchar *built_utf8 = NULL;
+
+    /* Convert to GSM */
+    unpacked_gsm = mm_charset_utf8_to_unpacked_gsm (in_utf8, &unpacked_gsm_len);
+    g_assert_nonnull (unpacked_gsm);
+    g_assert_cmpuint (unpacked_gsm_len, >, 0);
+
+    /* Pack */
+    packed_gsm = mm_charset_gsm_pack (unpacked_gsm, unpacked_gsm_len, 0, &packed_gsm_len);
+    g_assert_nonnull (packed_gsm);
+    g_assert_cmpuint (packed_gsm_len, <=, unpacked_gsm_len);
+
+#if 0
+    {
+        g_autofree gchar *hex_packed = NULL;
+
+        /* Print */
+        hex_packed = mm_utils_bin2hexstr (packed_gsm, packed_gsm_len);
+        g_print ("----------\n");
+        g_print ("input string: '%s'\n", in_utf8);
+        g_print ("gsm-7 encoded string: %s\n", hex_packed);
+    }
+#endif
+
+    /* Unpack */
+    unpacked_gsm_2 = mm_charset_gsm_unpack (packed_gsm, packed_gsm_len * 8 / 7, 0, &unpacked_gsm_len_2);
+    g_assert_nonnull (unpacked_gsm_2);
+
+    /* And back to UTF-8 */
+    built_utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked_gsm_2, unpacked_gsm_len_2);
+    g_assert_nonnull (built_utf8);
+    g_assert_cmpstr (built_utf8, ==, in_utf8);
+}
+
+static void
 test_gsm7_default_chars (void)
 {
     /* Test that a string with all the characters in the GSM 03.38 charset
      * are converted from UTF-8 to GSM and back to UTF-8 successfully.
      */
     static const char *s = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
-    guint8 *gsm, *utf8;
-    guint32 len = 0;
 
-    /* Convert to GSM */
-    gsm = mm_charset_utf8_to_unpacked_gsm (s, &len);
-    g_assert (gsm);
-    g_assert_cmpint (len, ==, 127);
-
-    /* And back to UTF-8 */
-    utf8 = mm_charset_gsm_unpacked_to_utf8 (gsm, len);
-    g_assert (utf8);
-    g_assert_cmpstr (s, ==, (const char *) utf8);
-
-    g_free (gsm);
-    g_free (utf8);
+    common_test_gsm7 (s);
 }
 
 static void
@@ -51,21 +81,8 @@ test_gsm7_extended_chars (void)
      * charset are converted from UTF-8 to GSM and back to UTF-8 successfully.
      */
     static const char *s = "\f^{}\\[~]|€";
-    guint8 *gsm, *utf8;
-    guint32 len = 0;
 
-    /* Convert to GSM */
-    gsm = mm_charset_utf8_to_unpacked_gsm (s, &len);
-    g_assert (gsm);
-    g_assert_cmpint (len, ==, 20);
-
-    /* And back to UTF-8 */
-    utf8 = mm_charset_gsm_unpacked_to_utf8 (gsm, len);
-    g_assert (utf8);
-    g_assert_cmpstr (s, ==, (const char *) utf8);
-
-    g_free (gsm);
-    g_free (utf8);
+    common_test_gsm7 (s);
 }
 
 static void
@@ -75,21 +92,8 @@ test_gsm7_mixed_chars (void)
      * is converted from UTF-8 to GSM and back to UTF-8 successfully.
      */
     static const char *s = "@£$¥èéùìø\fΩΠΨΣΘ{ΞÆæß(})789\\:;<=>[?¡QRS]TUÖ|ÑÜ§¿abpqrstuvöñüà€";
-    guint8 *gsm, *utf8;
-    guint32 len = 0;
 
-    /* Convert to GSM */
-    gsm = mm_charset_utf8_to_unpacked_gsm (s, &len);
-    g_assert (gsm);
-    g_assert_cmpint (len, ==, 69);
-
-    /* And back to UTF-8 */
-    utf8 = mm_charset_gsm_unpacked_to_utf8 (gsm, len);
-    g_assert (utf8);
-    g_assert_cmpstr (s, ==, (const char *) utf8);
-
-    g_free (gsm);
-    g_free (utf8);
+    common_test_gsm7 (s);
 }
 
 static void
