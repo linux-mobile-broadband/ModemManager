@@ -304,15 +304,26 @@ get_data_format_ready (QmiClientWda *client,
 {
     PortOpenContext *ctx;
     QmiMessageWdaGetDataFormatOutput *output;
+    g_autoptr(GError) error = NULL;
 
     ctx = g_task_get_task_data (task);
     output = qmi_client_wda_get_data_format_finish (client, res, NULL);
     if (!output ||
-        !qmi_message_wda_get_data_format_output_get_result (output, NULL) ||
-        !qmi_message_wda_get_data_format_output_get_link_layer_protocol (output, &ctx->llp, NULL))
-        /* If loading WDA data format fails, fallback to 802.3 requested via CTL */
-        ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
-    else
+        !qmi_message_wda_get_data_format_output_get_result (output, &error) ||
+        !qmi_message_wda_get_data_format_output_get_link_layer_protocol (output, &ctx->llp, NULL)) {
+        /* A 'missing argument' error when querying data format is seen in new
+         * devices like the Quectel RM500Q, requiring the 'endpoint info' TLV.
+         * When this happens, assume the device supports only raw-ip and be done
+         * with it. */
+        if (error && g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_MISSING_ARGUMENT)) {
+            mm_dbg ("Querying data format failed: '%s', assuming raw-ip is only supported", error->message);
+            ctx->llp = QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP;
+            ctx->step++;
+        } else {
+            /* If loading WDA data format fails, fallback to 802.3 requested via CTL */
+            ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
+        }
+    } else
         /* Go on to next step */
         ctx->step++;
 
