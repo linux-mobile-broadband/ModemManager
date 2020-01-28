@@ -1651,7 +1651,8 @@ dispose (GObject *object)
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp_cancellable);
-    g_clear_object (&self->priv->authp);
+
+    /* note: authp is a singleton, we don't keep a full reference */
 
     /* Ensure we cancel any ongoing operation, but before
      * disconnect our own signal handler, or we'll end up with

@@ -1558,8 +1558,7 @@ finalize (GObject *object)
     if (priv->connection)
         g_object_unref (priv->connection);
 
-    if (priv->authp)
-        g_object_unref (priv->authp);
+    /* note: authp is a singleton, we don't keep a full reference */
 
     if (priv->authp_cancellable)
         g_object_unref (priv->authp_cancellable);
