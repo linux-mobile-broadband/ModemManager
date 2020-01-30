@@ -1100,7 +1100,7 @@ static const guint modem_band_any_bit = 1 << (G_N_ELEMENTS (modem_bands) - 1);
 static MMModemBand
 icera_band_to_mm (const char *icera)
 {
-    int i;
+    guint i;
 
     for (i = 0 ; i < G_N_ELEMENTS (modem_bands); i++) {
         if (g_strcmp0 (icera, modem_bands[i].name) == 0)
