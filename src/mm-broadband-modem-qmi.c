@@ -1399,6 +1399,7 @@ qmi_dbm_valid (gint8 dbm, QmiNasRadioInterface radio_interface)
     case QMI_NAS_RADIO_INTERFACE_GSM:
     case QMI_NAS_RADIO_INTERFACE_LTE:
     case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
+    case QMI_NAS_RADIO_INTERFACE_5GNR:
         /* no explicit validation */
     default:
         break;
@@ -8060,6 +8061,7 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
             case QMI_NAS_RADIO_INTERFACE_NONE:
             case QMI_NAS_RADIO_INTERFACE_AMPS:
             case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
+            case QMI_NAS_RADIO_INTERFACE_5GNR:
             default:
                 break;
             }
@@ -8095,6 +8097,7 @@ signal_load_values_get_signal_strength_ready (QmiClientNas *client,
             case QMI_NAS_RADIO_INTERFACE_NONE:
             case QMI_NAS_RADIO_INTERFACE_AMPS:
             case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
+            case QMI_NAS_RADIO_INTERFACE_5GNR:
                 break;
             }
         }

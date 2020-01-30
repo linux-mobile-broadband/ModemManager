@@ -40,6 +40,7 @@ mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network)
         return MM_MODEM_CAPABILITY_GSM_UMTS;
     case QMI_DMS_RADIO_INTERFACE_LTE:
         return MM_MODEM_CAPABILITY_LTE;
+    case QMI_DMS_RADIO_INTERFACE_5GNR:
     default:
         mm_warn ("Unhandled QMI radio interface (%u)",
                  (guint)network);
@@ -63,6 +64,7 @@ mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network)
         return MM_MODEM_MODE_3G;
     case QMI_DMS_RADIO_INTERFACE_LTE:
         return MM_MODEM_MODE_4G;
+    case QMI_DMS_RADIO_INTERFACE_5GNR:
     default:
         mm_warn ("Unhandled QMI radio interface (%u)",
                  (guint)network);
@@ -785,6 +787,7 @@ mm_modem_access_technology_from_qmi_radio_interface (QmiNasRadioInterface interf
         return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
     case QMI_NAS_RADIO_INTERFACE_LTE:
         return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    case QMI_NAS_RADIO_INTERFACE_5GNR:
     case QMI_NAS_RADIO_INTERFACE_UNKNOWN:
     case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
     case QMI_NAS_RADIO_INTERFACE_AMPS:
@@ -881,6 +884,7 @@ mm_modem_mode_from_qmi_nas_radio_interface (QmiNasRadioInterface iface)
             return MM_MODEM_MODE_3G;
         case QMI_NAS_RADIO_INTERFACE_LTE:
             return MM_MODEM_MODE_4G;
+        case QMI_NAS_RADIO_INTERFACE_5GNR:
         case QMI_NAS_RADIO_INTERFACE_NONE:
         case QMI_NAS_RADIO_INTERFACE_AMPS:
         case QMI_NAS_RADIO_INTERFACE_TD_SCDMA:
