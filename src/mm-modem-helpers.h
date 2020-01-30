@@ -504,4 +504,10 @@ gboolean mm_parse_supl_address (const gchar  *supl,
                                 guint16      *out_port,
                                 GError      **error);
 
+/*****************************************************************************/
+
+/* Useful when clamp-ing an unsigned integer with implicit low limit set to 0,
+ * and in order to avoid -Wtype-limits warnings. */
+#define MM_CLAMP_HIGH(x, high) (((x) > (high)) ? (high) : (x))
+
 #endif  /* MM_MODEM_HELPERS_H */

@@ -808,7 +808,7 @@ option_signal_changed (MMPortSerialAt *port,
                        MMBroadbandModemOption *self)
 {
     gchar *str;
-    gint quality = 0;
+    guint quality = 0;
 
     str = g_match_info_fetch (match_info, 1);
     if (str) {
@@ -821,10 +821,10 @@ option_signal_changed (MMPortSerialAt *port,
         quality = 0;
     } else {
         /* Normalize the quality */
-        quality = CLAMP (quality, 0, 31) * 100 / 31;
+        quality = MM_CLAMP_HIGH (quality, 31) * 100 / 31;
     }
 
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void

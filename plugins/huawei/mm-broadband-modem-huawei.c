@@ -1537,11 +1537,11 @@ huawei_signal_changed (MMPortSerialAt *port,
         quality = 0;
     } else {
         /* Normalize the quality */
-        quality = CLAMP (quality, 0, 31) * 100 / 31;
+        quality = MM_CLAMP_HIGH (quality, 31) * 100 / 31;
     }
 
     mm_dbg ("3GPP signal quality: %u", quality);
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void
@@ -2373,9 +2373,9 @@ huawei_1x_signal_changed (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 1, &quality))
         return;
 
-    quality = CLAMP (quality, 0, 100);
+    quality = MM_CLAMP_HIGH (quality, 100);
     mm_dbg ("1X signal quality: %u", quality);
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void
@@ -2388,9 +2388,9 @@ huawei_evdo_signal_changed (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 1, &quality))
         return;
 
-    quality = CLAMP (quality, 0, 100);
+    quality = MM_CLAMP_HIGH (quality, 100);
     mm_dbg ("EVDO signal quality: %u", quality);
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 /* Signal quality loading (Modem interface) */
@@ -2459,7 +2459,7 @@ signal_ready (MMBaseModem *self,
         buf[i++] = *response++;
 
     if (mm_get_uint_from_str (buf, &quality)) {
-        quality = CLAMP (quality, 0, 100);
+        quality = MM_CLAMP_HIGH (quality, 100);
         g_task_return_int (task, quality);
     } else {
         g_task_return_new_error (task,

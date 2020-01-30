@@ -116,7 +116,7 @@ simtech_signal_changed (MMPortSerialAt *port,
         return;
 
     if (quality != 99)
-        quality = CLAMP (quality, 0, 31) * 100 / 31;
+        quality = MM_CLAMP_HIGH (quality, 31) * 100 / 31;
     else
         quality = 0;
 

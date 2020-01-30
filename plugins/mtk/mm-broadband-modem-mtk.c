@@ -545,10 +545,10 @@ mtk_80_signal_changed (MMPortSerialAt *port,
     if (quality == 99)
         quality = 0;
     else
-        quality = CLAMP(quality, 0, 31) * 100 / 31;
+        quality = MM_CLAMP_HIGH (quality, 31) * 100 / 31;
 
     mm_dbg ("6280 signal quality URC received: quality = %u", quality);
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void
@@ -564,10 +564,10 @@ mtk_90_2g_signal_changed (MMPortSerialAt *port,
     if (quality == 99)
         quality = 0;
     else
-        quality = CLAMP (quality, 0, 63) * 100 / 63;
+        quality = MM_CLAMP_HIGH (quality, 63) * 100 / 63;
 
     mm_dbg ("2G signal quality URC received: quality = %u", quality);
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void
@@ -580,10 +580,10 @@ mtk_90_3g_signal_changed (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 1, &quality))
         return;
 
-    quality = CLAMP (quality, 0, 96) * 100 / 96;
+    quality = MM_CLAMP_HIGH (quality, 96) * 100 / 96;
 
     mm_dbg ("3G signal quality URC received: quality = %u", quality);
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void
@@ -596,10 +596,10 @@ mtk_90_4g_signal_changed (MMPortSerialAt *port,
     if (!mm_get_uint_from_match_info (match_info, 1, &quality))
         return;
 
-    quality = CLAMP (quality, 0, 97) * 100 / 97;
+    quality = MM_CLAMP_HIGH (quality, 97) * 100 / 97;
 
     mm_dbg ("4G signal quality URC received: quality = %u", quality);
-    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void

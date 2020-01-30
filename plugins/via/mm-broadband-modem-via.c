@@ -281,7 +281,7 @@ handle_evdo_quality_change (MMPortSerialAt *port,
     guint quality = 0;
 
     if (mm_get_uint_from_match_info (match_info, 1, &quality)) {
-        quality = CLAMP (quality, 0, 100);
+        quality = MM_CLAMP_HIGH (quality, 100);
         mm_dbg ("EVDO signal quality: %u", quality);
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
     }

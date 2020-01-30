@@ -1674,12 +1674,8 @@ signal_state_query_ready (MbimDevice *device,
             NULL, /* rssi_threshold */
             NULL, /* error_rate_threshold */
             &error)) {
-        guint32 quality;
-
         /* Normalize the quality. 99 means unknown, we default it to 0 */
-        quality = CLAMP (rssi == 99 ? 0 : (gint)rssi, 0, 31) * 100 / 31;
-
-        g_task_return_int (task, quality);
+        g_task_return_int (task, MM_CLAMP_HIGH (rssi == 99 ? 0 : rssi, 31) * 100 / 31);
     } else
         g_task_return_error (task, error);
 
@@ -2920,7 +2916,7 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
         guint32 quality;
 
         /* Normalize the quality. 99 means unknown, we default it to 0 */
-        quality = CLAMP (rssi == 99 ? 0 : (gint)rssi, 0, 31) * 100 / 31;
+        quality = MM_CLAMP_HIGH (rssi == 99 ? 0 : rssi, 31) * 100 / 31;
 
         mm_dbg ("Signal state indication: %u --> %u%%", rssi, quality);
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
