@@ -51,9 +51,9 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
  * We use this command also for checking AT support in the port.
  */
 static const MMPortProbeAtCommand custom_at_probe[] = {
-    { "ATE0+CPMS?", 3, mm_port_probe_response_processor_is_at },
-    { "ATE0+CPMS?", 3, mm_port_probe_response_processor_is_at },
-    { "ATE0+CPMS?", 3, mm_port_probe_response_processor_is_at },
+    { (gchar *) "ATE0+CPMS?", 3, mm_port_probe_response_processor_is_at },
+    { (gchar *) "ATE0+CPMS?", 3, mm_port_probe_response_processor_is_at },
+    { (gchar *) "ATE0+CPMS?", 3, mm_port_probe_response_processor_is_at },
     { NULL }
 };
 
