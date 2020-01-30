@@ -521,7 +521,7 @@ mm_huawei_parse_prefmode_response (const gchar *response,
                                    const GArray *supported_mode_combinations,
                                    GError **error)
 {
-    gint mode;
+    guint mode;
     guint i;
 
     /* Format:
@@ -530,7 +530,7 @@ mm_huawei_parse_prefmode_response (const gchar *response,
      */
 
     response = mm_strip_tag (response, "^PREFMODE:");
-    if (!sscanf (response, "%d", &mode)) {
+    if (!mm_get_uint_from_str (response, &mode)) {
         /* Dump error to upper layer */
         g_set_error (error,
                      MM_CORE_ERROR,
