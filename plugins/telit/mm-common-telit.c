@@ -51,17 +51,20 @@ telit_grab_port (MMPlugin *self,
 
     /* AT#PORTCFG (if supported) can be used for identifying the port layout */
     if (g_object_get_data (G_OBJECT (device), TAG_GETPORTCFG_SUPPORTED) != NULL) {
-        if (g_strcmp0 (mm_kernel_device_get_property (port, "ID_USB_INTERFACE_NUM"), g_object_get_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT)) == 0) {
+        guint usbif;
+
+        usbif = mm_kernel_device_get_property_as_int_hex (port, "ID_USB_INTERFACE_NUM");
+        if (usbif == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT))) {
             mm_dbg ("telit: AT port '%s/%s' flagged as primary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
             pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-        } else if (g_strcmp0 (mm_kernel_device_get_property (port, "ID_USB_INTERFACE_NUM"), g_object_get_data (G_OBJECT (device), TAG_TELIT_AUX_PORT)) == 0) {
+        } else if (usbif == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_TELIT_AUX_PORT))) {
             mm_dbg ("telit: AT port '%s/%s' flagged as secondary",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
             pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
-        } else if (g_strcmp0 (mm_kernel_device_get_property (port, "ID_USB_INTERFACE_NUM"), g_object_get_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT)) == 0) {
+        } else if (usbif == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT))) {
             mm_dbg ("telit: port '%s/%s' flagged as NMEA",
                 mm_port_probe_get_port_subsys (probe),
                 mm_port_probe_get_port_name (probe));
@@ -133,28 +136,26 @@ cache_port_mode (MMDevice *device,
     case 9:
     case 10:
     case 11:
-        g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, "00");
-
+        g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, GUINT_TO_POINTER (0x00));
         if (mm_device_get_product (device) == TELIT_GE910_FAMILY_PID)
-            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "02");
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, GUINT_TO_POINTER (0x02));
         else
-            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "06");
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, GUINT_TO_POINTER (0x06));
         break;
     case 2:
     case 3:
     case 6:
-        g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, "00");
+        g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, GUINT_TO_POINTER (0x00));
         break;
     case 8:
     case 12:
-        g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, "00");
-
+        g_object_set_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT, GUINT_TO_POINTER (0x00));
         if (mm_device_get_product (device) == TELIT_GE910_FAMILY_PID) {
-            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "02");
-            g_object_set_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT, "04");
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, GUINT_TO_POINTER (0x02));
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT, GUINT_TO_POINTER (0x04));
         } else {
-            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, "06");
-            g_object_set_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT, "0a");
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_AUX_PORT, GUINT_TO_POINTER (0x06));
+            g_object_set_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT, GUINT_TO_POINTER (0x0a));
         }
         break;
     default:
