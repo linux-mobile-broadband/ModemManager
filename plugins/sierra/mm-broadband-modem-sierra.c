@@ -1812,8 +1812,8 @@ parse_time_reply (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand time_check_sequence[] = {
-    { "!TIME?", 3, FALSE, parse_time_reply },    /* 3GPP */
-    { "!SYSTIME?", 3, FALSE, parse_time_reply }, /* CDMA */
+    { (gchar *) "!TIME?", 3, FALSE, parse_time_reply },    /* 3GPP */
+    { (gchar *) "!SYSTIME?", 3, FALSE, parse_time_reply }, /* CDMA */
     { NULL }
 };
 
