@@ -989,7 +989,7 @@ parse_mode_combination_string (const gchar *mode_str,
     case 1:
         /* If only one mode allowed, NONE preferred */
         *preferred = MM_MODEM_MODE_NONE;
-        /* fall down */
+        /* fall through */
     default:
         return TRUE;
     }
