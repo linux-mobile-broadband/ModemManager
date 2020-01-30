@@ -1490,13 +1490,6 @@ typedef struct {
     MMCdmaManualActivationProperties *properties;
 } CdmaManualActivationContext;
 
-static void
-cdma_manual_activation_context_free (CdmaManualActivationContext *ctx)
-{
-    g_object_unref (ctx->properties);
-    g_slice_free (CdmaManualActivationContext, ctx);
-}
-
 static gboolean
 modem_cdma_activate_manual_finish (MMIfaceModemCdma  *self,
                                    GAsyncResult      *res,
