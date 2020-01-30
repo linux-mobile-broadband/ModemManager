@@ -1078,6 +1078,7 @@ gps_engine_start (GTask *task)
             transport_protocol = 1;
             pos_mode = 2;
             break;
+        case GPS_ENGINE_STATE_OFF:
         default:
             g_assert_not_reached ();
             break;
