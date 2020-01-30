@@ -664,6 +664,9 @@ qss_setup_step (GTask *task)
                 g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             break;
+
+        default:
+            g_assert_not_reached ();
     }
 }
 
