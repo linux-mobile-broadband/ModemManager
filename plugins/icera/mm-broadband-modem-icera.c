@@ -869,10 +869,10 @@ broadband_bearer_new_ready (GObject *source,
 }
 
 static void
-modem_create_bearer (MMIfaceModem *self,
-                     MMBearerProperties *properties,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+modem_create_bearer (MMIfaceModem        *self,
+                     MMBearerProperties  *props,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
     GTask *task;
 
@@ -883,7 +883,7 @@ modem_create_bearer (MMIfaceModem *self,
         mm_broadband_bearer_icera_new (
             MM_BROADBAND_MODEM (self),
             MM_BROADBAND_MODEM_ICERA (self)->priv->default_ip_method,
-            properties,
+            props,
             NULL, /* cancellable */
             (GAsyncReadyCallback)broadband_bearer_icera_new_ready,
             task);
@@ -893,7 +893,7 @@ modem_create_bearer (MMIfaceModem *self,
     /* Otherwise, plain generic broadband bearer */
     mm_broadband_bearer_new (
         MM_BROADBAND_MODEM (self),
-        properties,
+        props,
         NULL, /* cancellable */
         (GAsyncReadyCallback)broadband_bearer_new_ready,
         task);
