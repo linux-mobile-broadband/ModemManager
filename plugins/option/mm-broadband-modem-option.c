@@ -604,6 +604,9 @@ load_access_technologies_step (GTask *task)
         g_task_return_int (task, ctx->access_technology);
         g_object_unref (task);
         break;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
