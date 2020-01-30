@@ -1737,6 +1737,7 @@ modem_time_load_network_time (MMIfaceModemTime *self,
     case TIME_METHOD_SYSTIME:
         command = "!SYSTIME?";
         break;
+    case TIME_METHOD_UNKNOWN:
     default:
         g_assert_not_reached ();
     }
