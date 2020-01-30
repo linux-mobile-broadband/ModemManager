@@ -225,19 +225,19 @@ mm_telit_build_bnd_request (GArray    *bands_array,
         band = g_array_index (bands_array, MMModemBand, i);
 
         /* Convert 2G bands into a bitmask, to match against telit_2g_to_mm_band_mask. */
-        if (flag2g && mm_common_band_is_gsm (band) &&
+        if (modem_is_2g && mm_common_band_is_gsm (band) &&
             (band >= MM_MODEM_BAND_TELIT_2G_FIRST) && (band <= MM_MODEM_BAND_TELIT_2G_LAST))
             mask2g += B2G_FLAG (band);
 
         /* Convert 3G bands into a bitmask, to match against telit_3g_to_mm_band_mask. We use
          * a 64-bit explicit bitmask so that all values fit correctly. */
-        if (flag3g && mm_common_band_is_utran (band) &&
+        if (modem_is_3g && mm_common_band_is_utran (band) &&
             (B3G_NUM (band) >= B3G_NUM (MM_MODEM_BAND_TELIT_3G_FIRST)) && (B3G_NUM (band) <= B3G_NUM (MM_MODEM_BAND_TELIT_3G_LAST)))
             mask3g += B3G_FLAG (band);
 
         /* Convert 4G bands into a bitmask. We use a 64bit explicit bitmask so that
          * all values fit correctly. */
-        if (flag4g && mm_common_band_is_eutran (band) &&
+        if (modem_is_4g && mm_common_band_is_eutran (band) &&
             (band >= MM_MODEM_BAND_TELIT_4G_FIRST && band <= MM_MODEM_BAND_TELIT_4G_LAST))
              mask4g += B4G_FLAG (band);
     }
