@@ -772,22 +772,22 @@ static const SyscfgexTest syscfgex_tests[] = {
         "\r\n",
         {
             {
-                .mode_str = "00",
+                .mode_str = (gchar *) "00",
                 .allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
                 .preferred = MM_MODEM_MODE_NONE
             },
             {
-                .mode_str = "03",
+                .mode_str = (gchar *) "03",
                 .allowed = MM_MODEM_MODE_4G,
                 .preferred = MM_MODEM_MODE_NONE
             },
             {
-                .mode_str = "02",
+                .mode_str = (gchar *) "02",
                 .allowed = MM_MODEM_MODE_3G,
                 .preferred = MM_MODEM_MODE_NONE
             },
             {
-                .mode_str = "01",
+                .mode_str = (gchar *) "01",
                 .allowed = MM_MODEM_MODE_2G,
                 .preferred = MM_MODEM_MODE_NONE
             },
@@ -803,17 +803,17 @@ static const SyscfgexTest syscfgex_tests[] = {
         "\r\n",
         {
             {
-                .mode_str = "030201",
+                .mode_str = (gchar *) "030201",
                 .allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
                 .preferred = MM_MODEM_MODE_4G
             },
             {
-                .mode_str = "0302",
+                .mode_str = (gchar *) "0302",
                 .allowed = (MM_MODEM_MODE_4G | MM_MODEM_MODE_3G),
                 .preferred = MM_MODEM_MODE_4G
             },
             {
-                .mode_str = "03",
+                .mode_str = (gchar *) "03",
                 .allowed = MM_MODEM_MODE_4G,
                 .preferred = MM_MODEM_MODE_NONE
             },
@@ -829,7 +829,7 @@ static const SyscfgexTest syscfgex_tests[] = {
         "\r\n",
         {
             {
-                .mode_str = "03",
+                .mode_str = (gchar *) "03",
                 .allowed = MM_MODEM_MODE_4G,
                 .preferred = MM_MODEM_MODE_NONE
             },
@@ -845,27 +845,27 @@ static const SyscfgexTest syscfgex_tests[] = {
         "\r\n",
         {
             {
-                .mode_str = "00",
+                .mode_str = (gchar *) "00",
                 .allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_2G),
                 .preferred = MM_MODEM_MODE_NONE
             },
             {
-                .mode_str = "01",
+                .mode_str = (gchar *) "01",
                 .allowed = MM_MODEM_MODE_2G,
                 .preferred = MM_MODEM_MODE_NONE
             },
             {
-                .mode_str = "02",
+                .mode_str = (gchar *) "02",
                 .allowed = MM_MODEM_MODE_3G,
                 .preferred = MM_MODEM_MODE_NONE
             },
             {
-                .mode_str = "0102",
+                .mode_str = (gchar *) "0102",
                 .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
                 .preferred = MM_MODEM_MODE_2G
             },
             {
-                .mode_str = "0201",
+                .mode_str = (gchar *) "0201",
                 .allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G),
                 .preferred = MM_MODEM_MODE_3G
             }
@@ -1080,7 +1080,7 @@ typedef struct {
     gboolean ret;
     gboolean test_iso8601;
     gboolean test_tz;
-    gchar *iso8601;
+    const gchar *iso8601;
     gint32 offset;
     gint32 dst_offset;
     gint32 leap_seconds;
@@ -1169,7 +1169,7 @@ test_nwtime (void)
 typedef struct {
     const gchar *str;
     gboolean ret;
-    gchar *iso8601;
+    const gchar *iso8601;
 } TimeTest;
 
 static const TimeTest time_tests[] = {
