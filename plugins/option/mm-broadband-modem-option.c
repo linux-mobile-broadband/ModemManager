@@ -561,8 +561,8 @@ load_access_technologies_step (GTask *task)
 
     switch (ctx->step) {
     case ACCESS_TECHNOLOGIES_STEP_FIRST:
-        /* Go on to next step */
         ctx->step++;
+        /* fall through */
 
     case ACCESS_TECHNOLOGIES_STEP_OSSYS:
         mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -583,8 +583,8 @@ load_access_technologies_step (GTask *task)
                                       task);
             return;
         }
-        /* Go on to next step */
         ctx->step++;
+        /* fall through */
 
     case ACCESS_TECHNOLOGIES_STEP_OWCTI:
         if (ctx->check_3g) {
@@ -596,8 +596,8 @@ load_access_technologies_step (GTask *task)
                                       task);
             return;
         }
-        /* Go on to next step */
         ctx->step++;
+        /* fall through */
 
     case ACCESS_TECHNOLOGIES_STEP_LAST:
         /* All done, set result and complete */
