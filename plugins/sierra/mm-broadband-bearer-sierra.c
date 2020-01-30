@@ -300,8 +300,8 @@ dial_3gpp_context_step (GTask *task)
 
     switch (ctx->step) {
     case DIAL_3GPP_STEP_FIRST:
-        /* Fall down */
         ctx->step++;
+        /* fall through */
 
     case DIAL_3GPP_STEP_PS_ATTACH:
         mm_base_modem_at_command_full (ctx->modem,
@@ -394,8 +394,8 @@ dial_3gpp_context_step (GTask *task)
             return;
         }
 
-        /* Fall down */
         ctx->step++;
+        /* fall through */
 
     case DIAL_3GPP_STEP_CONNECT:
         /* We need a net or AT data port */
