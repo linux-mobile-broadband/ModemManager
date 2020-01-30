@@ -72,7 +72,7 @@ struct _MMBroadbandModemTelitPrivate {
 
 typedef struct {
     MMModemLocationSource source;
-    gint gps_enable_step;
+    guint gps_enable_step;
 } LocationGatheringContext;
 
 /*
