@@ -975,10 +975,10 @@ own_enable_unsolicited_events_ready (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
-    { "_OSSYS=1",  3, FALSE, NULL },
-    { "_OCTI=1",   3, FALSE, NULL },
-    { "_OUWCTI=1", 3, FALSE, NULL },
-    { "_OSQI=1",   3, FALSE, NULL },
+    { (gchar *) "_OSSYS=1",  3, FALSE, NULL },
+    { (gchar *) "_OCTI=1",   3, FALSE, NULL },
+    { (gchar *) "_OUWCTI=1", 3, FALSE, NULL },
+    { (gchar *) "_OSQI=1",   3, FALSE, NULL },
     { NULL }
 };
 
@@ -1030,10 +1030,10 @@ modem_3gpp_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
 }
 
 static const MMBaseModemAtCommand unsolicited_disable_sequence[] = {
-    { "_OSSYS=0",  3, FALSE, NULL },
-    { "_OCTI=0",   3, FALSE, NULL },
-    { "_OUWCTI=0", 3, FALSE, NULL },
-    { "_OSQI=0",   3, FALSE, NULL },
+    { (gchar *) "_OSSYS=0",  3, FALSE, NULL },
+    { (gchar *) "_OCTI=0",   3, FALSE, NULL },
+    { (gchar *) "_OUWCTI=0", 3, FALSE, NULL },
+    { (gchar *) "_OSQI=0",   3, FALSE, NULL },
     { NULL }
 };
 
