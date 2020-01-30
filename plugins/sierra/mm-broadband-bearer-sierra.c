@@ -434,6 +434,9 @@ dial_3gpp_context_step (GTask *task)
                                g_object_unref);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
