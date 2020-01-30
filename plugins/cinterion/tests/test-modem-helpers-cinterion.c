@@ -746,7 +746,7 @@ static void
 test_slcc_urc_single (void)
 {
     static const MMCallInfo expected_call_info_list[] = {
-        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE, "123456789" }
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE, (gchar *) "123456789" }
     };
 
     const gchar *urc =
@@ -760,9 +760,9 @@ static void
 test_slcc_urc_multiple (void)
 {
     static const MMCallInfo expected_call_info_list[] = {
-        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  NULL        },
-        { 2, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "123456789" },
-        { 3, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "987654321" },
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE, NULL        },
+        { 2, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE, (gchar *) "123456789" },
+        { 3, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE, (gchar *) "987654321" },
     };
 
     const gchar *urc =
@@ -778,8 +778,8 @@ static void
 test_slcc_urc_complex (void)
 {
     static const MMCallInfo expected_call_info_list[] = {
-        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  "123456789" },
-        { 2, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_WAITING, "987654321" },
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_ACTIVE,  (gchar *) "123456789" },
+        { 2, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_WAITING, (gchar *) "987654321" },
     };
 
     const gchar *urc =
