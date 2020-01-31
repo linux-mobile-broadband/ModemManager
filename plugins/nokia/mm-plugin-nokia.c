@@ -34,9 +34,9 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
 /* Custom commands for AT probing */
 
 static const MMPortProbeAtCommand custom_at_probe[] = {
-    { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
-    { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
-    { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
+    { (gchar *) "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
+    { (gchar *) "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
+    { (gchar *) "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
     { NULL }
 };
 
