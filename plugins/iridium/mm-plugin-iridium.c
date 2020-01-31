@@ -61,7 +61,7 @@ mm_plugin_create (void)
     static const guint16 vendor_ids[] = { 0x1edd, 0 };
     static const gchar *vendor_strings[] = { "iridium", NULL };
     /* Also support motorola-branded Iridium modems */
-    static const mm_str_pair product_strings[] = {{"motorola", "satellite" },
+    static const mm_str_pair product_strings[] = {{(gchar *)"motorola", (gchar *)"satellite" },
                                                   { NULL, NULL }};
 
     return MM_PLUGIN (
