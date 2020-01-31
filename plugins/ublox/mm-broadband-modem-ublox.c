@@ -1252,6 +1252,10 @@ ucallstat_received (MMPortSerialAt        *port,
     case MM_CALL_STATE_WAITING:
         call_info.direction = MM_CALL_DIRECTION_INCOMING;
         break;
+    case MM_CALL_STATE_UNKNOWN:
+    case MM_CALL_STATE_ACTIVE:
+    case MM_CALL_STATE_HELD:
+    case MM_CALL_STATE_TERMINATED:
     default:
         call_info.direction = MM_CALL_DIRECTION_UNKNOWN;
         break;
