@@ -303,6 +303,9 @@ huawei_parse_auth_type (MMBearerAllowedAuth mm_auth)
     case MM_BEARER_ALLOWED_AUTH_MSCHAPV2:
         return MM_BEARER_HUAWEI_AUTH_MSCHAPV2;
     default:
+    case MM_BEARER_ALLOWED_AUTH_UNKNOWN:
+    case MM_BEARER_ALLOWED_AUTH_MSCHAP:
+    case MM_BEARER_ALLOWED_AUTH_EAP:
         return MM_BEARER_HUAWEI_AUTH_UNKNOWN;
     }
 }

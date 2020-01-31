@@ -1813,14 +1813,17 @@ huawei_hcsq_changed (MMPortSerialAt *port,
 
     detailed_signal_clear (&self->priv->detailed_signal);
 
-    switch (act) {
-    case MM_MODEM_ACCESS_TECHNOLOGY_GSM:
+    /* 2G */
+    if (act == MM_MODEM_ACCESS_TECHNOLOGY_GSM) {
         self->priv->detailed_signal.gsm = mm_signal_new ();
         /* value1: gsm_rssi */
         if (get_rssi_dbm (value1, &v))
             mm_signal_set_rssi (self->priv->detailed_signal.gsm, v);
-        break;
-    case MM_MODEM_ACCESS_TECHNOLOGY_UMTS:
+        return;
+    }
+
+    /* 3G */
+    if (act == MM_MODEM_ACCESS_TECHNOLOGY_UMTS) {
         self->priv->detailed_signal.umts = mm_signal_new ();
         /* value1: wcdma_rssi */
         if (get_rssi_dbm (value1, &v))
@@ -1829,8 +1832,11 @@ huawei_hcsq_changed (MMPortSerialAt *port,
         /* value3: wcdma_ecio */
         if (get_ecio_db (value3, &v))
             mm_signal_set_ecio (self->priv->detailed_signal.umts, v);
-        break;
-    case MM_MODEM_ACCESS_TECHNOLOGY_LTE:
+        return;
+    }
+
+    /* 4G */
+    if (act == MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
         self->priv->detailed_signal.lte = mm_signal_new ();
         /* value1: lte_rssi */
         if (get_rssi_dbm (value1, &v))
@@ -1844,11 +1850,10 @@ huawei_hcsq_changed (MMPortSerialAt *port,
         /* value4: lte_rsrq */
         if (get_rsrq_db (value4, &v))
             mm_signal_set_rsrq (self->priv->detailed_signal.lte, v);
-        break;
-    default:
-        /* CDMA and EVDO not yet supported */
-        break;
+        return;
     }
+
+    /* CDMA and EVDO not yet supported */
 }
 
 static void
@@ -3641,8 +3646,7 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
         }
     }
 
-    switch (self->priv->rfswitch_support) {
-    case FEATURE_SUPPORT_UNKNOWN:
+    if (self->priv->rfswitch_support == FEATURE_SUPPORT_UNKNOWN) {
         if (error) {
             mm_dbg ("The device does not support ^RFSWITCH");
             self->priv->rfswitch_support = FEATURE_NOT_SUPPORTED;
@@ -3656,12 +3660,6 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
 
         mm_dbg ("The device supports ^RFSWITCH");
         self->priv->rfswitch_support = FEATURE_SUPPORTED;
-        break;
-    case FEATURE_SUPPORTED:
-        break;
-    default:
-        g_assert_not_reached ();
-        break;
     }
 
     if (error)
@@ -3760,6 +3758,7 @@ huawei_modem_power_up (MMIfaceModem *self,
                                   callback,
                                   user_data);
         break;
+    case FEATURE_SUPPORT_UNKNOWN:
     default:
         g_assert_not_reached ();
         break;
@@ -3801,6 +3800,7 @@ huawei_modem_power_down (MMIfaceModem *self,
                                   callback,
                                   user_data);
         break;
+    case FEATURE_SUPPORT_UNKNOWN:
     default:
         g_assert_not_reached ();
         break;
