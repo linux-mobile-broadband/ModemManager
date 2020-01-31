@@ -122,9 +122,9 @@ ip_config_ready (MMBaseModem *modem,
 
     for (i = 0, dns_i = 0; items[i]; i++) {
         if (i == 0) { /* CID */
-            gint num;
+            guint num;
 
-            if (!mm_get_int_from_str (items[i], &num) ||
+            if (!mm_get_uint_from_str (items[i], &num) ||
                 num != ctx->cid) {
                 error = g_error_new (MM_CORE_ERROR,
                                      MM_CORE_ERROR_FAILED,
