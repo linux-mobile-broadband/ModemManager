@@ -376,8 +376,7 @@ connect_3gpp_context_step (GTask *task)
         self->priv->connect_pending = task;
 
         ctx->step++;
-        /* Fall down to the next step */
-    }
+    } /* fall through */
 
     case CONNECT_3GPP_CONTEXT_STEP_NDISDUP: {
         const gchar         *apn;
@@ -706,7 +705,7 @@ disconnect_3gpp_context_step (GTask *task)
         }
 
         ctx->step++;
-        /* Fall down to the next step */
+        /* fall through */
 
     case DISCONNECT_3GPP_CONTEXT_STEP_NDISDUP:
         mm_base_modem_at_command_full (ctx->modem,
