@@ -104,6 +104,7 @@ print_rule (MMUdevRule *rule)
                          i, rule_match->parameter, rule_match->value);
                 break;
             case MM_UDEV_RULE_MATCH_TYPE_UNKNOWN:
+            default:
                 g_assert_not_reached ();
             }
         }
@@ -123,6 +124,7 @@ print_rule (MMUdevRule *rule)
         break;
     case MM_UDEV_RULE_RESULT_TYPE_GOTO_TAG:
     case MM_UDEV_RULE_RESULT_TYPE_UNKNOWN:
+    default:
         g_assert_not_reached ();
     }
 }
