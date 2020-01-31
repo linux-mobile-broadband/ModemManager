@@ -123,7 +123,7 @@ mmcli_sms_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -142,7 +142,7 @@ context_free (Context *ctx)
 void
 mmcli_sms_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static void
@@ -411,7 +411,6 @@ mmcli_sms_run_synchronous (GDBusConnection *connection)
     if (store_in_storage_str) {
         gboolean operation_result;
         MMSmsStorage storage;
-        GError *error = NULL;
 
         storage = mm_common_get_sms_storage_from_string (store_in_storage_str, &error);
         if (error) {

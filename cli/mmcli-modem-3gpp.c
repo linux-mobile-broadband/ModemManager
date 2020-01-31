@@ -154,7 +154,7 @@ mmcli_modem_3gpp_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -207,7 +207,7 @@ ensure_modem_3gpp_ussd (void)
 void
 mmcli_modem_3gpp_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static void
@@ -624,7 +624,6 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
 
     /* Request to set initial EPS bearer properties? */
     if (set_initial_eps_bearer_settings_str) {
-        GError             *error = NULL;
         gboolean            result;
         MMBearerProperties *config;
 

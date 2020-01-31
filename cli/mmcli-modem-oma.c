@@ -125,7 +125,7 @@ mmcli_modem_oma_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -155,7 +155,7 @@ ensure_modem_oma (void)
 void
 mmcli_modem_oma_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static void
@@ -439,7 +439,6 @@ mmcli_modem_oma_run_synchronous (GDBusConnection *connection)
     /* Request to setup OMA features? */
     if (setup_str) {
         gboolean result;
-        GError *error = NULL;
         MMOmaFeature features;
 
         features = mm_common_get_oma_features_from_string (setup_str, &error);
@@ -460,7 +459,6 @@ mmcli_modem_oma_run_synchronous (GDBusConnection *connection)
     /* Request to start session? */
     if (start_str) {
         gboolean result;
-        GError *error = NULL;
         MMOmaSessionType session_type;
 
         session_type = mm_common_get_oma_session_type_from_string (start_str, &error);
@@ -481,7 +479,6 @@ mmcli_modem_oma_run_synchronous (GDBusConnection *connection)
     /* Request to accept or reject session? */
     if (accept_str || reject_str) {
         gboolean result;
-        GError *error = NULL;
         guint session_id;
 
         if (!mm_get_uint_from_str (accept_str ? accept_str : reject_str, &session_id)) {

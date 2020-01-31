@@ -106,7 +106,7 @@ mmcli_modem_firmware_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -136,7 +136,7 @@ ensure_modem_firmware (void)
 void
 mmcli_modem_firmware_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static void
@@ -344,7 +344,6 @@ mmcli_modem_firmware_run_synchronous (GDBusConnection *connection)
     /* Request to select a given image? */
     if (select_str) {
         gboolean result;
-        GError *error = NULL;
 
         g_debug ("Synchronously selecting firmware image in modem...");
         result = mm_modem_firmware_select_sync (ctx->modem_firmware,

@@ -156,7 +156,7 @@ mmcli_modem_voice_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -188,7 +188,7 @@ ensure_modem_voice (void)
 void
 mmcli_modem_voice_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static MMCallProperties *
@@ -673,7 +673,6 @@ mmcli_modem_voice_run_synchronous (GDBusConnection *connection)
     /* Request to create a new call? */
     if (create_str) {
         MMCall *call;
-        GError *error = NULL;
         MMCallProperties *properties;
 
         properties = build_call_properties_from_input (create_str);

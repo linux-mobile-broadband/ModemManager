@@ -133,7 +133,7 @@ mmcli_sim_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -152,7 +152,7 @@ context_free (Context *ctx)
 void
 mmcli_sim_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static void

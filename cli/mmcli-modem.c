@@ -205,7 +205,7 @@ mmcli_modem_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -230,7 +230,7 @@ context_free (Context *ctx)
 void
 mmcli_modem_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static void
@@ -1294,7 +1294,6 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     /* Request to create a new bearer? */
     if (create_bearer_str) {
         MMBearer *bearer;
-        GError *error = NULL;
         MMBearerProperties *properties;
 
         properties = mm_bearer_properties_new_from_string (create_bearer_str, &error);

@@ -124,7 +124,7 @@ mmcli_modem_messaging_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -161,7 +161,7 @@ ensure_modem_messaging (void)
 void
 mmcli_modem_messaging_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static MMSmsProperties *
@@ -457,7 +457,6 @@ mmcli_modem_messaging_run_synchronous (GDBusConnection *connection)
     /* Request to create a new SMS? */
     if (create_str) {
         MMSms *sms;
-        GError *error = NULL;
         MMSmsProperties *properties;
 
         properties = build_sms_properties_from_input (create_str,

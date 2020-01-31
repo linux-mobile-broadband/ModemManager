@@ -227,7 +227,7 @@ mmcli_modem_location_options_enabled (void)
 }
 
 static void
-context_free (Context *ctx)
+context_free (void)
 {
     if (!ctx)
         return;
@@ -262,7 +262,7 @@ ensure_modem_location (void)
 void
 mmcli_modem_location_shutdown (void)
 {
-    context_free (ctx);
+    context_free ();
 }
 
 static void
