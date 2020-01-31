@@ -1713,6 +1713,7 @@ common_create_bearer (GTask *task)
                                            (GAsyncReadyCallback)broadband_bearer_cinterion_new_ready,
                                            task);
         return;
+    case FEATURE_SUPPORT_UNKNOWN:
     default:
         g_assert_not_reached ();
     }

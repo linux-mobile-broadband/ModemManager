@@ -187,6 +187,9 @@ parse_auth_type (MMBearerAllowedAuth mm_auth)
         return BEARER_CINTERION_AUTH_CHAP;
     case MM_BEARER_ALLOWED_AUTH_MSCHAPV2:
         return BEARER_CINTERION_AUTH_MSCHAPV2;
+    case MM_BEARER_ALLOWED_AUTH_UNKNOWN:
+    case MM_BEARER_ALLOWED_AUTH_MSCHAP:
+    case MM_BEARER_ALLOWED_AUTH_EAP:
     default:
         return BEARER_CINTERION_AUTH_UNKNOWN;
     }
@@ -568,6 +571,8 @@ disconnect_connection_status_ready (MMBroadbandBearerCinterion *self,
                                  "CID %u is reported connected", ctx->cid);
         g_object_unref (task);
         return;
+    case MM_BEARER_CONNECTION_STATUS_DISCONNECTING:
+    case MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED:
     default:
         g_assert_not_reached ();
     }
