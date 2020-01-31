@@ -412,7 +412,7 @@ disable_location_gathering_context_gps_step (GTask *task)
     switch (ctx->gps_step) {
     case DISABLE_LOCATION_GATHERING_GPS_STEP_FIRST:
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSS:
         if (priv->sgpss_support == FEATURE_SUPPORTED) {
@@ -422,7 +422,7 @@ disable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE:
         if (priv->sgpsc_support == FEATURE_SUPPORTED) {
@@ -433,7 +433,7 @@ disable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ANTENNA:
         if (priv->sgpsc_support == FEATURE_SUPPORTED) {
@@ -444,7 +444,7 @@ disable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case DISABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_OUTPUT:
         if (priv->sgpsc_support == FEATURE_SUPPORTED) {
@@ -455,7 +455,7 @@ disable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case DISABLE_LOCATION_GATHERING_GPS_STEP_LAST:
         /* Only use the GPS port in NMEA/RAW setups */
@@ -668,7 +668,7 @@ enable_location_gathering_context_gps_step (GTask *task)
     switch (ctx->gps_step) {
     case ENABLE_LOCATION_GATHERING_GPS_STEP_FIRST:
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSS:
         if (priv->sgpss_support == FEATURE_SUPPORTED) {
@@ -678,7 +678,7 @@ enable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_OUTPUT:
         if (priv->sgpsc_support == FEATURE_SUPPORTED) {
@@ -689,8 +689,7 @@ enable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
-
+        /* fall through */
 
     case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ANTENNA:
         if (priv->sgpsc_support == FEATURE_SUPPORTED) {
@@ -701,7 +700,7 @@ enable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case ENABLE_LOCATION_GATHERING_GPS_STEP_SGPSC_ENGINE:
         if (priv->sgpsc_support == FEATURE_SUPPORTED) {
@@ -712,7 +711,7 @@ enable_location_gathering_context_gps_step (GTask *task)
             return;
         }
         ctx->gps_step++;
-        /* Fall down to next step */
+        /* fall through */
 
     case ENABLE_LOCATION_GATHERING_GPS_STEP_LAST:
         /* Only use the GPS port in NMEA/RAW setups */
