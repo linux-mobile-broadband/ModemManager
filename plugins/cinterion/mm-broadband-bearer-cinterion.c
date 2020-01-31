@@ -389,9 +389,8 @@ dial_3gpp_context_step (GTask *task)
             return;
         }
 
-        /* Fall down to next step */
         ctx->step++;
-    }
+    } /* fall through */
 
     case DIAL_3GPP_CONTEXT_STEP_AUTH: {
         gchar *command;
@@ -414,10 +413,9 @@ dial_3gpp_context_step (GTask *task)
             return;
         }
 
-        /* Fall down to next step */
         mm_dbg ("cinterion dial step %u/%u: authentication not required", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
         ctx->step++;
-    }
+    } /* fall through */
 
     case DIAL_3GPP_CONTEXT_STEP_START_SWWAN: {
         gchar *command;
@@ -612,8 +610,8 @@ disconnect_3gpp_context_step (GTask *task)
 
     switch (ctx->step) {
     case DISCONNECT_3GPP_CONTEXT_STEP_FIRST:
-        /* Fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISCONNECT_3GPP_CONTEXT_STEP_STOP_SWWAN: {
         gchar *command;
