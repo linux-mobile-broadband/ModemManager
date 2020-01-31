@@ -1104,35 +1104,35 @@ serial_probe_at (MMPortProbe *self)
 }
 
 static const MMPortProbeAtCommand at_probing[] = {
-    { (gchar *)"AT",  3, mm_port_probe_response_processor_is_at },
-    { (gchar *)"AT",  3, mm_port_probe_response_processor_is_at },
-    { (gchar *)"AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
     { NULL }
 };
 
 static const MMPortProbeAtCommand vendor_probing[] = {
-    { (gchar *)"+CGMI", 3, mm_port_probe_response_processor_string },
-    { (gchar *)"+GMI",  3, mm_port_probe_response_processor_string },
-    { (gchar *)"I",     3, mm_port_probe_response_processor_string },
+    { "+CGMI", 3, mm_port_probe_response_processor_string },
+    { "+GMI",  3, mm_port_probe_response_processor_string },
+    { "I",     3, mm_port_probe_response_processor_string },
     { NULL }
 };
 
 static const MMPortProbeAtCommand product_probing[] = {
-    { (gchar *)"+CGMM", 3, mm_port_probe_response_processor_string },
-    { (gchar *)"+GMM",  3, mm_port_probe_response_processor_string },
-    { (gchar *)"I",     3, mm_port_probe_response_processor_string },
+    { "+CGMM", 3, mm_port_probe_response_processor_string },
+    { "+GMM",  3, mm_port_probe_response_processor_string },
+    { "I",     3, mm_port_probe_response_processor_string },
     { NULL }
 };
 
 static const MMPortProbeAtCommand icera_probing[] = {
-    { (gchar *)"%IPSYS?", 3, mm_port_probe_response_processor_string },
-    { (gchar *)"%IPSYS?", 3, mm_port_probe_response_processor_string },
-    { (gchar *)"%IPSYS?", 3, mm_port_probe_response_processor_string },
+    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
+    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
+    { "%IPSYS?", 3, mm_port_probe_response_processor_string },
     { NULL }
 };
 
 static const MMPortProbeAtCommand xmm_probing[] = {
-    { (gchar *)"+XACT=?", 3, mm_port_probe_response_processor_string },
+    { "+XACT=?", 3, mm_port_probe_response_processor_string },
     { NULL }
 };
 

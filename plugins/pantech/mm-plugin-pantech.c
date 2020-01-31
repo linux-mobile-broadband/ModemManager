@@ -66,9 +66,9 @@ port_probe_response_processor_is_pantech_at (const gchar *command,
 }
 
 static const MMPortProbeAtCommand custom_at_probe[] = {
-    { (gchar *) "ATE0", 3, port_probe_response_processor_is_pantech_at },
-    { (gchar *) "ATE0", 3, port_probe_response_processor_is_pantech_at },
-    { (gchar *) "ATE0", 3, port_probe_response_processor_is_pantech_at },
+    { "ATE0", 3, port_probe_response_processor_is_pantech_at },
+    { "ATE0", 3, port_probe_response_processor_is_pantech_at },
+    { "ATE0", 3, port_probe_response_processor_is_pantech_at },
     { NULL }
 };
 

@@ -41,9 +41,9 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
    take longer to respond after a reset.
  */
 static const MMPortProbeAtCommand custom_at_probe[] = {
-    { (gchar *) "AT",  7, mm_port_probe_response_processor_is_at },
-    { (gchar *) "AT",  7, mm_port_probe_response_processor_is_at },
-    { (gchar *) "AT",  7, mm_port_probe_response_processor_is_at },
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { "AT",  7, mm_port_probe_response_processor_is_at },
+    { "AT",  7, mm_port_probe_response_processor_is_at },
     { NULL }
 };
 

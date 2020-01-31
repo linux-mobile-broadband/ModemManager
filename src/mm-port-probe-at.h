@@ -52,7 +52,7 @@ typedef gboolean (* MMPortProbeAtResponseProcessor) (const gchar *command,
 /* Struct to configure port probing commands */
 typedef struct {
     /* The AT command */
-    gchar *command;
+    const gchar *command;
     /* Timeout of the command, in seconds */
     guint timeout;
     /* The response processor */
@@ -75,6 +75,5 @@ gboolean mm_port_probe_response_processor_is_at (const gchar *command,
                                                  const GError *error,
                                                  GVariant **result,
                                                  GError **result_error);
-
 
 #endif /* MM_PORT_PROBE_AT_H */
