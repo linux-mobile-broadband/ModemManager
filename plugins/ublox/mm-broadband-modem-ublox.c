@@ -1203,7 +1203,7 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
 
     common_voice_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_UBLOX (self),
                                                     FALSE,
-                                                    (GAsyncReadyCallback) voice_enable_unsolicited_events_ready,
+                                                    (GAsyncReadyCallback) voice_disable_unsolicited_events_ready,
                                                     task);
 }
 
