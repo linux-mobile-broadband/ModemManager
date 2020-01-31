@@ -1331,14 +1331,27 @@ mm_get_int_from_str (const gchar *str,
                      gint *out)
 {
     glong num;
+    guint eol = 0;
 
     if (!str || !str[0])
         return FALSE;
 
     for (num = 0; str[num]; num++) {
-        if (str[num] != '+' && str[num] != '-' && !g_ascii_isdigit (str[num]))
+        if (str[num] != '+' && str[num] != '-' && !g_ascii_isdigit (str[num])) {
+            /* ignore \r\n at the end of the string */
+            if ((str[num] == '\r') || (str[num] == '\n')) {
+                eol++;
+                continue;
+            }
+            return FALSE;
+        }
+        /* if eol found before a valid char, the string is not parseable */
+        if (eol)
             return FALSE;
     }
+    /* if all characters were eol, the string is not parseable */
+    if (eol == num)
+        return FALSE;
 
     errno = 0;
     num = strtol (str, NULL, 10);
@@ -1385,14 +1398,27 @@ mm_get_u64_from_str (const gchar *str,
                      guint64     *out)
 {
     guint64 num;
+    guint   eol = 0;
 
     if (!str || !str[0])
         return FALSE;
 
     for (num = 0; str[num]; num++) {
-        if (!g_ascii_isdigit (str[num]))
+        if (!g_ascii_isdigit (str[num])) {
+            /* ignore \r\n at the end of the string */
+            if ((str[num] == '\r') || (str[num] == '\n')) {
+                eol++;
+                continue;
+            }
+            return FALSE;
+        }
+        /* if eol found before a valid char, the string is not parseable */
+        if (eol)
             return FALSE;
     }
+    /* if all characters were eol, the string is not parseable */
+    if (eol == num)
+        return FALSE;
 
     errno = 0;
     num = (guint64) strtoull (str, NULL, 10);
@@ -1421,6 +1447,7 @@ mm_get_u64_from_hex_str (const gchar *str,
                          guint64     *out)
 {
     guint64 num;
+    guint   eol = 0;
 
     if (!str)
         return FALSE;
@@ -1432,9 +1459,21 @@ mm_get_u64_from_hex_str (const gchar *str,
         return FALSE;
 
     for (num = 0; str[num]; num++) {
-        if (!g_ascii_isxdigit (str[num]))
+        if (!g_ascii_isxdigit (str[num])) {
+            /* ignore \r\n at the end of the string */
+            if ((str[num] == '\r') || (str[num] == '\n')) {
+                eol++;
+                continue;
+            }
+            return FALSE;
+        }
+        /* if eol found before a valid char, the string is not parseable */
+        if (eol)
             return FALSE;
     }
+    /* if all characters were eol, the string is not parseable */
+    if (eol == num)
+        return FALSE;
 
     errno = 0;
     num = (guint64) strtoull (str, NULL, 16);
@@ -1481,8 +1520,9 @@ gboolean
 mm_get_double_from_str (const gchar *str,
                         gdouble *out)
 {
-    gdouble num;
-    guint i;
+    gdouble  num;
+    guint    i;
+    guint    eol = 0;
 
     if (!str || !str[0])
         return FALSE;
@@ -1490,11 +1530,21 @@ mm_get_double_from_str (const gchar *str,
     for (i = 0; str[i]; i++) {
         /* we don't really expect numbers in scientific notation, so
          * don't bother looking for exponents and such */
-        if (str[i] != '-' &&
-            str[i] != '.' &&
-            !g_ascii_isdigit (str[i]))
+        if ((str[i] != '-') && (str[i] != '.') && !g_ascii_isdigit (str[i])) {
+            /* ignore \r\n at the end of the string */
+            if ((str[i] == '\r') || (str[i] == '\n')) {
+                eol++;
+                continue;
+            }
+            return FALSE;
+        }
+        /* if eol found before a valid char, the string is not parseable */
+        if (eol)
             return FALSE;
     }
+    /* if all characters were eol, the string is not parseable */
+    if (eol == i)
+        return FALSE;
 
     errno = 0;
     num = strtod (str, NULL);

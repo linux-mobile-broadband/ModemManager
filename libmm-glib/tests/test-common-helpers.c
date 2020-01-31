@@ -366,6 +366,8 @@ field_parser_int (void)
 
     g_assert (mm_get_int_from_str ("100a", &num) == FALSE);
 
+    g_assert (mm_get_int_from_str ("\r\n", &num) == FALSE);
+
     str = g_strdup_printf ("%" G_GINT64_FORMAT, (gint64)G_MAXINT + 1);
     g_assert (mm_get_int_from_str (str, &num) == FALSE);
     g_free (str);
@@ -384,6 +386,9 @@ field_parser_int (void)
 
     g_assert (mm_get_int_from_str ("100", &num) == TRUE);
     g_assert_cmpint (num, ==, 100);
+
+    g_assert (mm_get_int_from_str ("-256\r\n", &num) == TRUE);
+    g_assert_cmpint (num, ==, -256);
 
     str = g_strdup_printf ("%" G_GINT64_FORMAT, (gint64)G_MAXINT);
     g_assert (mm_get_int_from_str (str, &num) == TRUE);
@@ -416,6 +421,8 @@ field_parser_uint (void)
 
     g_assert (mm_get_uint_from_str ("-100", &num) == FALSE);
 
+    g_assert (mm_get_uint_from_str ("\r\n", &num) == FALSE);
+
     str = g_strdup_printf ("%" G_GUINT64_FORMAT, (guint64)(G_MAXUINT) + 1);
     g_assert (mm_get_uint_from_str (str, &num) == FALSE);
     g_free (str);
@@ -427,6 +434,9 @@ field_parser_uint (void)
 
     g_assert (mm_get_uint_from_str ("100", &num) == TRUE);
     g_assert_cmpuint (num, ==, 100);
+
+    g_assert (mm_get_uint_from_str ("256\r\n", &num) == TRUE);
+    g_assert_cmpuint (num, ==, 256);
 
     str = g_strdup_printf ("%" G_GUINT64_FORMAT, (guint64)G_MAXUINT);
     g_assert (mm_get_uint_from_str (str, &num) == TRUE);
@@ -452,6 +462,8 @@ field_parser_double (void)
 
     g_assert (mm_get_double_from_str ("100a", &num) == FALSE);
 
+    g_assert (mm_get_double_from_str ("\r\n", &num) == FALSE);
+
     /* Successes */
 
     g_assert (mm_get_double_from_str ("-100", &num) == TRUE);
@@ -473,6 +485,9 @@ field_parser_double (void)
     g_assert (num - (100.0) < 0000000.1);
 
     g_assert (mm_get_double_from_str ("100.7567", &num) == TRUE);
+    g_assert (num - (100.7567) < 0000000.1);
+
+    g_assert (mm_get_double_from_str ("100.7567\r\n", &num) == TRUE);
     g_assert (num - (100.7567) < 0000000.1);
 
     str = g_strdup_printf ("%lf", (gdouble)G_MINDOUBLE);
