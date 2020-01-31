@@ -50,8 +50,13 @@ find_qcdm_start (GByteArray *response, gsize *start)
      * uses HDLC framing (like Sierra CnS) that starts and ends with 0x7E.
      */
     for (i = 0; i < response->len; i++) {
+        /* Marker found */
         if (response->data[i] == 0x7E) {
-            if (i > (guint)(last + 3)) {
+            /* If we didn't get an initial marker, count at least 3 bytes since
+             * origin; if we did get an initial marker, count at least 3 bytes
+             * since the marker.
+             */
+            if (((last == -1) && (i >= 3)) || ((last >= 0) && (i > (guint)(last + 3)))) {
                 /* Got a full QCDM frame; 3 non-0x7E bytes and a terminator */
                 if (start)
                     *start = last + 1;
