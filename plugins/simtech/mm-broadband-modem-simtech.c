@@ -377,8 +377,8 @@ enable_unsolicited_events_context_step (GTask *task)
 
     switch (ctx->step) {
     case ENABLE_UNSOLICITED_EVENTS_STEP_FIRST:
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLE_UNSOLICITED_EVENTS_STEP_PARENT:
         iface_modem_3gpp_parent->enable_unsolicited_events (
@@ -397,8 +397,8 @@ enable_unsolicited_events_context_step (GTask *task)
                                       task);
             return;
         }
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLE_UNSOLICITED_EVENTS_STEP_ENABLE_CNSMOD:
         if (self->priv->cnsmod_support == FEATURE_SUPPORTED) {
@@ -411,8 +411,8 @@ enable_unsolicited_events_context_step (GTask *task)
                                       task);
             return;
         }
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLE_UNSOLICITED_EVENTS_STEP_CHECK_SUPPORT_AUTOCSQ:
         if (self->priv->autocsq_support == FEATURE_SUPPORT_UNKNOWN) {
@@ -424,8 +424,8 @@ enable_unsolicited_events_context_step (GTask *task)
                                       task);
             return;
         }
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLE_UNSOLICITED_EVENTS_STEP_ENABLE_AUTOCSQ:
         if (self->priv->autocsq_support == FEATURE_SUPPORTED) {
@@ -438,8 +438,8 @@ enable_unsolicited_events_context_step (GTask *task)
                                       task);
             return;
         }
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case ENABLE_UNSOLICITED_EVENTS_STEP_LAST:
         g_task_return_boolean (task, TRUE);
@@ -565,8 +565,8 @@ disable_unsolicited_events_context_step (GTask *task)
 
     switch (ctx->step) {
     case DISABLE_UNSOLICITED_EVENTS_STEP_FIRST:
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLE_UNSOLICITED_EVENTS_STEP_DISABLE_AUTOCSQ:
         if (self->priv->autocsq_support == FEATURE_SUPPORTED) {
@@ -578,8 +578,8 @@ disable_unsolicited_events_context_step (GTask *task)
                                       task);
             return;
         }
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLE_UNSOLICITED_EVENTS_STEP_DISABLE_CNSMOD:
         if (self->priv->cnsmod_support == FEATURE_SUPPORTED) {
@@ -591,8 +591,8 @@ disable_unsolicited_events_context_step (GTask *task)
                                       task);
             return;
         }
-        /* fall down to next step */
         ctx->step++;
+        /* fall through */
 
     case DISABLE_UNSOLICITED_EVENTS_STEP_PARENT:
         iface_modem_3gpp_parent->disable_unsolicited_events (
