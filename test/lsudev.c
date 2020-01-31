@@ -55,7 +55,7 @@ println (guint indent, const char *fmt, ...)
 {
     va_list args;
     GString *output;
-    int i;
+    guint i;
 
     g_return_if_fail (fmt != NULL);
 
@@ -175,4 +175,3 @@ main (int argc, char *argv[])
 
     return 0;
 }
-
