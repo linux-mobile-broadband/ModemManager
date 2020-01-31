@@ -79,7 +79,7 @@ test_pco_list_add (void)
         g_assert_cmpint (memcmp (pco_data, expected_pco->pco_data, pco_data_size), ==, 0);
     }
 
-    mm_pco_list_free (list);
+    g_list_free_full (list, g_object_unref);
 }
 
 /**************************************************************/
