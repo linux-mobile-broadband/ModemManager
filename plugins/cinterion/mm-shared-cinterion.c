@@ -480,6 +480,9 @@ disable_location_gathering_context_gps_step (GTask *task)
         }
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -735,6 +738,9 @@ enable_location_gathering_context_gps_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
