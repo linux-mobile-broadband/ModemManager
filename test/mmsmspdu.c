@@ -93,6 +93,7 @@ show_part_info (MMSmsPart *part)
     case MM_SMS_ENCODING_8BIT:
         g_print ("encoding: 8BIT\n");
         break;
+    case MM_SMS_ENCODING_UNKNOWN:
     default:
         g_print ("encoding: unknown (0x%x)\n", encoding);
         break;
