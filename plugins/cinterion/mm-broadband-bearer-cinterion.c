@@ -454,6 +454,9 @@ dial_3gpp_context_step (GTask *task)
         g_task_return_pointer (task, g_object_ref (ctx->data), g_object_unref);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -648,6 +651,9 @@ disconnect_3gpp_context_step (GTask *task)
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
