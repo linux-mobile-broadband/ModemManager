@@ -406,9 +406,9 @@ enabling_init_sequence_ready (MMBaseModem *self,
 
 static const MMBaseModemAtCommand enabling_modem_init_sequence[] = {
     /* Init command */
-    { "&F", 3, FALSE, NULL },
+    { (gchar *) "&F", 3, FALSE, NULL },
     /* Ensure disconnected */
-    { "*ENAP=0", 3, FALSE, NULL },
+    { (gchar *) "*ENAP=0", 3, FALSE, NULL },
     { NULL }
 };
 
@@ -614,18 +614,18 @@ factory_reset_finish (MMIfaceModem *self,
 
 static const MMBaseModemAtCommand factory_reset_sequence[] = {
     /* Init command */
-    { "&F +CMEE=0", 3, FALSE, NULL },
-    { "+COPS=0", 3, FALSE, NULL },
-    { "+CR=0", 3, FALSE, NULL },
-    { "+CRC=0", 3, FALSE, NULL },
-    { "+CREG=0", 3, FALSE, NULL },
-    { "+CMER=0", 3, FALSE, NULL },
-    { "*EPEE=0", 3, FALSE, NULL },
-    { "+CNMI=2, 0, 0, 0, 0", 3, FALSE, NULL },
-    { "+CGREG=0", 3, FALSE, NULL },
-    { "*EIAD=0", 3, FALSE, NULL },
-    { "+CGSMS=3", 3, FALSE, NULL },
-    { "+CSCA=\"\",129", 3, FALSE, NULL },
+    { (gchar *) "&F +CMEE=0", 3, FALSE, NULL },
+    { (gchar *) "+COPS=0", 3, FALSE, NULL },
+    { (gchar *) "+CR=0", 3, FALSE, NULL },
+    { (gchar *) "+CRC=0", 3, FALSE, NULL },
+    { (gchar *) "+CREG=0", 3, FALSE, NULL },
+    { (gchar *) "+CMER=0", 3, FALSE, NULL },
+    { (gchar *) "*EPEE=0", 3, FALSE, NULL },
+    { (gchar *) "+CNMI=2, 0, 0, 0, 0", 3, FALSE, NULL },
+    { (gchar *) "+CGREG=0", 3, FALSE, NULL },
+    { (gchar *) "*EIAD=0", 3, FALSE, NULL },
+    { (gchar *) "+CGSMS=3", 3, FALSE, NULL },
+    { (gchar *) "+CSCA=\"\",129", 3, FALSE, NULL },
     { NULL }
 };
 
@@ -943,8 +943,8 @@ own_enable_unsolicited_events_ready (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
-    { "*ERINFO=1", 5, FALSE, NULL },
-    { "*E2NAP=1",  5, FALSE, NULL },
+    { (gchar *) "*ERINFO=1", 5, FALSE, NULL },
+    { (gchar *) "*E2NAP=1",  5, FALSE, NULL },
     { NULL }
 };
 
@@ -1033,8 +1033,8 @@ own_disable_unsolicited_events_ready (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand unsolicited_disable_sequence[] = {
-    { "*ERINFO=0", 5, FALSE, NULL },
-    { "*E2NAP=0",  5, FALSE, NULL },
+    { (gchar *) "*ERINFO=0", 5, FALSE, NULL },
+    { (gchar *) "*E2NAP=0",  5, FALSE, NULL },
     { NULL }
 };
 
