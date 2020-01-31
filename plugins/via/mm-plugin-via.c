@@ -56,9 +56,9 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", NULL };
-    static const mm_str_pair product_strings[] = { { "via",    "cbp7" },
-                                                   { "fusion", "2770p" },
-                                                   { NULL,     NULL } };
+    static const mm_str_pair product_strings[] = { { (gchar *) "via",    (gchar *) "cbp7" },
+                                                   { (gchar *) "fusion", (gchar *) "2770p" },
+                                                   { NULL, NULL } };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_VIA,
