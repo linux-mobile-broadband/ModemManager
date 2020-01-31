@@ -105,8 +105,8 @@ cache_port_mode (MMDevice *device,
                  const gchar *type,
                  const gchar *tag)
 {
-    gchar *p;
-    glong i;
+    gchar  *p;
+    gulong  i;
 
     /* Get the USB interface number of the PCUI port */
     p = strstr (reply, type);
@@ -115,7 +115,7 @@ cache_port_mode (MMDevice *device,
         /* shift by 1 so NULL return from g_object_get_data() means no tag */
         i = 1 + strtol (p + strlen (type), NULL, 10);
         if (i > 0 && i < 256 && errno == 0)
-            g_object_set_data (G_OBJECT (device), tag, GINT_TO_POINTER ((gint) i));
+            g_object_set_data (G_OBJECT (device), tag, GUINT_TO_POINTER ((guint) i));
     }
 }
 
@@ -212,14 +212,14 @@ try_next_usbif (MMDevice *device)
 {
     FirstInterfaceContext *fi_ctx;
     GList *l;
-    gint closest;
+    guint closest;
 
     fi_ctx = g_object_get_data (G_OBJECT (device), TAG_FIRST_INTERFACE_CONTEXT);
     g_assert (fi_ctx != NULL);
 
     /* Look for the next closest one among the list of interfaces in the device,
      * and enable that one as being first */
-    closest = G_MAXINT;
+    closest = G_MAXUINT;
     for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
         MMPortProbe *probe = MM_PORT_PROBE (l->data);
 
@@ -237,7 +237,7 @@ try_next_usbif (MMDevice *device)
         }
     }
 
-    if (closest == G_MAXINT) {
+    if (closest == G_MAXUINT) {
         /* No more ttys to try! Just return something */
         closest = 0;
         mm_dbg ("(Huawei) No more ports to run initial probing");
@@ -436,13 +436,13 @@ propagate_port_mode_results (GList *probes)
         usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)), "ID_USB_INTERFACE_NUM");
 
         if (GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED))) {
-            if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT))) {
+            if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT))) {
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
                 primary_flagged = TRUE;
-            } else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT)))
+            } else if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT)))
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
             else if (!g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT) &&
-                     usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT)))
+                     usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT)))
                 /* If NDIS reported only instead of MDM, use it */
                 at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
         } else if (usbif == 0 &&
