@@ -456,7 +456,7 @@ set_current_modes_bands_step (GTask *task)
     switch (ctx->step) {
     case SET_CURRENT_MODES_BANDS_STEP_FIRST:
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case SET_CURRENT_MODES_BANDS_STEP_ACQUIRE:
         mm_dbg ("acquiring power operation...");
@@ -466,7 +466,7 @@ set_current_modes_bands_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case SET_CURRENT_MODES_BANDS_STEP_CURRENT_POWER:
         /* If using CFUN, we check whether we're already in low-power mode.
@@ -483,7 +483,7 @@ set_current_modes_bands_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case SET_CURRENT_MODES_BANDS_STEP_BEFORE_COMMAND:
         /* If COPS required around the set command, run it unconditionally */
@@ -515,7 +515,7 @@ set_current_modes_bands_step (GTask *task)
         }
 
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case SET_CURRENT_MODES_BANDS_STEP_COMMAND:
         mm_dbg ("updating configuration...");
@@ -553,13 +553,13 @@ set_current_modes_bands_step (GTask *task)
             }
         }
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case SET_CURRENT_MODES_BANDS_STEP_RELEASE:
         mm_dbg ("releasing power operation...");
         release_power_operation (ctx->self);
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case SET_CURRENT_MODES_BANDS_STEP_LAST:
         if (ctx->saved_error) {
@@ -1647,7 +1647,7 @@ create_bearer_step (GTask *task)
     switch (ctx->step) {
     case CREATE_BEARER_STEP_FIRST:
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case CREATE_BEARER_STEP_CHECK_PROFILE:
         if (!ctx->self->priv->profile_checked) {
@@ -1662,7 +1662,7 @@ create_bearer_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case CREATE_BEARER_STEP_CHECK_MODE:
         if (!ctx->self->priv->mode_checked) {
@@ -1677,7 +1677,7 @@ create_bearer_step (GTask *task)
             return;
         }
         ctx->step++;
-        /* fall down */
+        /* fall through */
 
     case CREATE_BEARER_STEP_CREATE_BEARER:
         /* If we have a net interface, we'll create a u-blox bearer, unless for
