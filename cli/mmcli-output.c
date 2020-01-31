@@ -332,6 +332,8 @@ output_item_free (OutputItem *item)
             g_free (((OutputItemListitem *)item)->value);
             g_free (((OutputItemListitem *)item)->extra);
             break;
+        default:
+            g_assert_not_reached ();
     }
 }
 
@@ -1217,6 +1219,8 @@ mmcli_output_dump (void)
     case MMC_OUTPUT_TYPE_JSON:
         dump_output_json ();
         break;
+    default:
+        g_assert_not_reached ();
     }
 
     g_list_free_full (output_items, (GDestroyNotify) output_item_free);
@@ -1240,6 +1244,8 @@ mmcli_output_list_dump (MmcF field)
     case MMC_OUTPUT_TYPE_JSON:
         dump_output_list_json (field);
         break;
+    default:
+        g_assert_not_reached ();
     }
 
     g_list_free_full (output_items, (GDestroyNotify) output_item_free);

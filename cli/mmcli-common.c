@@ -1551,10 +1551,9 @@ mmcli_get_state_reason_string (MMModemStateChangeReason reason)
         return "Suspend";
     case MM_MODEM_STATE_CHANGE_REASON_FAILURE:
         return "Failure";
+    default:
+        g_assert_not_reached ();
     }
-
-    g_warn_if_reached ();
-    return NULL;
 }
 
 /* Common options */
