@@ -1161,7 +1161,7 @@ parse_bands (const gchar *response, guint32 *out_len)
 /* Load supported bands (Modem interface) */
 
 typedef struct {
-    MMBaseModemAtCommand *cmds;
+    MMBaseModemAtCommandAlloc *cmds;
     GSList *check_bands;
     GSList *enabled_bands;
     guint32 idx;
@@ -1173,7 +1173,7 @@ supported_bands_context_free (SupportedBandsContext *ctx)
     guint i;
 
     for (i = 0; ctx->cmds[i].command; i++)
-        g_free (ctx->cmds[i].command);
+        mm_base_modem_at_command_alloc_clear (&ctx->cmds[i]);
     g_free (ctx->cmds);
     g_slist_free_full (ctx->check_bands, (GDestroyNotify) band_free);
     g_slist_free_full (ctx->enabled_bands, (GDestroyNotify) band_free);
@@ -1272,7 +1272,7 @@ load_supported_bands_get_current_bands_ready (MMIfaceModem *self,
      * to its current enabled/disabled state.
      */
     iter = ctx->check_bands = parse_bands (response, &len);
-    ctx->cmds = g_new0 (MMBaseModemAtCommand, len + 1);
+    ctx->cmds = g_new0 (MMBaseModemAtCommandAlloc, len + 1);
 
     while (iter) {
         Band *b = iter->data;
@@ -1296,7 +1296,7 @@ load_supported_bands_get_current_bands_ready (MMIfaceModem *self,
     }
 
     mm_base_modem_at_sequence (MM_BASE_MODEM (self),
-                               ctx->cmds,
+                               (const MMBaseModemAtCommand *)ctx->cmds,
                                ctx,
                                (GDestroyNotify) supported_bands_context_free,
                                (GAsyncReadyCallback) load_supported_bands_ready,

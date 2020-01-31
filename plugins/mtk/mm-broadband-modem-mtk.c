@@ -724,13 +724,13 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
 
 static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
     /* enable signal URC */
-    { (gchar *) "+ECSQ=2", 5, FALSE, NULL },
+    { "+ECSQ=2", 5, FALSE, NULL },
     { NULL }
 };
 
 static const MMBaseModemAtCommand unsolicited_disable_sequence[] = {
     /* disable signal URC */
-    { (gchar *) "+ECSQ=0" , 5, FALSE, NULL },
+    { "+ECSQ=0" , 5, FALSE, NULL },
     { NULL }
 };
 

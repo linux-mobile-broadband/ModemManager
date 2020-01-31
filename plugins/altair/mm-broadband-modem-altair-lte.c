@@ -883,9 +883,9 @@ response_processor_no_result_stop_on_error (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand unsolicited_events_enable_sequence[] = {
-  { (gchar *) "%STATCM=1", 10, FALSE, response_processor_no_result_stop_on_error },
-  { (gchar *) "%NOTIFYEV=\"SIMREFRESH\",1", 10, FALSE, NULL },
-  { (gchar *) "%PCOINFO=1", 10, FALSE, NULL },
+  { "%STATCM=1", 10, FALSE, response_processor_no_result_stop_on_error },
+  { "%NOTIFYEV=\"SIMREFRESH\",1", 10, FALSE, NULL },
+  { "%PCOINFO=1", 10, FALSE, NULL },
   { NULL }
 };
 
@@ -955,9 +955,9 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
 /* Disabling unsolicited events (3GPP interface) */
 
 static const MMBaseModemAtCommand unsolicited_events_disable_sequence[] = {
-  { (gchar *) "%STATCM=0", 10, FALSE, NULL },
-  { (gchar *) "%NOTIFYEV=\"SIMREFRESH\",0", 10, FALSE, NULL },
-  { (gchar *) "%PCOINFO=0", 10, FALSE, NULL },
+  { "%STATCM=0", 10, FALSE, NULL },
+  { "%NOTIFYEV=\"SIMREFRESH\",0", 10, FALSE, NULL },
+  { "%PCOINFO=0", 10, FALSE, NULL },
   { NULL }
 };
 

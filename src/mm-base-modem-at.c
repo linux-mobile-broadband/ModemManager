@@ -616,3 +616,9 @@ mm_base_modem_at_command_raw (MMBaseModem *self,
 {
     _at_command (self, command, timeout, allow_cached, TRUE, callback, user_data);
 }
+
+void
+mm_base_modem_at_command_alloc_clear (MMBaseModemAtCommandAlloc *command)
+{
+    g_free (command->command);
+}

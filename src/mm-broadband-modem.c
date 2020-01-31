@@ -675,10 +675,10 @@ parse_caps_cgmm (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand capabilities[] = {
-    { (gchar *)"+GCAP",  2, TRUE,  parse_caps_gcap },
-    { (gchar *)"I",      1, TRUE,  parse_caps_gcap }, /* yes, really parse as +GCAP */
-    { (gchar *)"+CPIN?", 1, FALSE, parse_caps_cpin },
-    { (gchar *)"+CGMM",  1, TRUE,  parse_caps_cgmm },
+    { "+GCAP",  2, TRUE,  parse_caps_gcap },
+    { "I",      1, TRUE,  parse_caps_gcap }, /* yes, really parse as +GCAP */
+    { "+CPIN?", 1, FALSE, parse_caps_cpin },
+    { "+CGMM",  1, TRUE,  parse_caps_cgmm },
     { NULL }
 };
 
@@ -926,8 +926,8 @@ modem_load_manufacturer_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand manufacturers[] = {
-    { (gchar *)"+CGMI",  3, TRUE, response_processor_string_ignore_at_errors },
-    { (gchar *)"+GMI",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGMI",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GMI",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -966,8 +966,8 @@ modem_load_model_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand models[] = {
-    { (gchar *)"+CGMM",  3, TRUE, response_processor_string_ignore_at_errors },
-    { (gchar *)"+GMM",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGMM",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GMM",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -1006,8 +1006,8 @@ modem_load_revision_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand revisions[] = {
-    { (gchar *)"+CGMR",  3, TRUE, response_processor_string_ignore_at_errors },
-    { (gchar *)"+GMR",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGMR",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GMR",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -1066,8 +1066,8 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand equipment_identifiers[] = {
-    { (gchar *)"+CGSN",  3, TRUE, response_processor_string_ignore_at_errors },
-    { (gchar *)"+GSN",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGSN",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GSN",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -1156,8 +1156,8 @@ parse_ati_reply (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand device_identifier_steps[] = {
-    { (gchar *)"ATI",  3, TRUE, (MMBaseModemAtResponseProcessor)parse_ati_reply },
-    { (gchar *)"ATI1", 3, TRUE, (MMBaseModemAtResponseProcessor)parse_ati_reply },
+    { "ATI",  3, TRUE, (MMBaseModemAtResponseProcessor)parse_ati_reply },
+    { "ATI1", 3, TRUE, (MMBaseModemAtResponseProcessor)parse_ati_reply },
     { NULL }
 };
 
@@ -2083,8 +2083,8 @@ signal_quality_csq_ready (MMBroadbandModem *self,
  * try the other command if the first one fails.
  */
 static const MMBaseModemAtCommand signal_quality_csq_sequence[] = {
-    { (gchar *)"+CSQ",  3, FALSE, response_processor_string_ignore_at_errors },
-    { (gchar *)"+CSQ?", 3, FALSE, response_processor_string_ignore_at_errors },
+    { "+CSQ",  3, FALSE, response_processor_string_ignore_at_errors },
+    { "+CSQ?", 3, FALSE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -3600,14 +3600,14 @@ typedef struct {
      *  First one with quotes
      *  Second without.
      *  + last NUL */
-    MMBaseModemAtCommand charset_commands[3];
+    MMBaseModemAtCommandAlloc charset_commands[3];
 } SetupCharsetContext;
 
 static void
 setup_charset_context_free (SetupCharsetContext *ctx)
 {
-    g_free (ctx->charset_commands[0].command);
-    g_free (ctx->charset_commands[1].command);
+    mm_base_modem_at_command_alloc_clear (&ctx->charset_commands[0]);
+    mm_base_modem_at_command_alloc_clear (&ctx->charset_commands[1]);
     g_free (ctx);
 }
 
@@ -3735,7 +3735,7 @@ modem_setup_charset (MMIfaceModem *self,
     /* Launch sequence */
     mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
-        ctx->charset_commands,
+        (const MMBaseModemAtCommand *)ctx->charset_commands,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         (GAsyncReadyCallback)charset_change_ready,
@@ -5235,43 +5235,43 @@ parse_registration_setup_reply (MMBaseModem *self,
 
 static const MMBaseModemAtCommand cs_registration_sequence[] = {
     /* Enable unsolicited registration notifications in CS network, with location */
-    { (gchar *)"+CREG=2", 3, FALSE, parse_registration_setup_reply },
+    { "+CREG=2", 3, FALSE, parse_registration_setup_reply },
     /* Enable unsolicited registration notifications in CS network, without location */
-    { (gchar *)"+CREG=1", 3, FALSE, parse_registration_setup_reply },
+    { "+CREG=1", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
 static const MMBaseModemAtCommand cs_unregistration_sequence[] = {
     /* Disable unsolicited registration notifications in CS network */
-    { (gchar *)"+CREG=0", 3, FALSE, parse_registration_setup_reply },
+    { "+CREG=0", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
 static const MMBaseModemAtCommand ps_registration_sequence[] = {
     /* Enable unsolicited registration notifications in PS network, with location */
-    { (gchar *)"+CGREG=2", 3, FALSE, parse_registration_setup_reply },
+    { "+CGREG=2", 3, FALSE, parse_registration_setup_reply },
     /* Enable unsolicited registration notifications in PS network, without location */
-    { (gchar *)"+CGREG=1", 3, FALSE, parse_registration_setup_reply },
+    { "+CGREG=1", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
 static const MMBaseModemAtCommand ps_unregistration_sequence[] = {
     /* Disable unsolicited registration notifications in PS network */
-    { (gchar *)"+CGREG=0", 3, FALSE, parse_registration_setup_reply },
+    { "+CGREG=0", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
 static const MMBaseModemAtCommand eps_registration_sequence[] = {
     /* Enable unsolicited registration notifications in EPS network, with location */
-    { (gchar *)"+CEREG=2", 3, FALSE, parse_registration_setup_reply },
+    { "+CEREG=2", 3, FALSE, parse_registration_setup_reply },
     /* Enable unsolicited registration notifications in EPS network, without location */
-    { (gchar *)"+CEREG=1", 3, FALSE, parse_registration_setup_reply },
+    { "+CEREG=1", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
 static const MMBaseModemAtCommand eps_unregistration_sequence[] = {
     /* Disable unsolicited registration notifications in PS network */
-    { (gchar *)"+CEREG=0", 3, FALSE, parse_registration_setup_reply },
+    { "+CEREG=0", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
@@ -7039,16 +7039,16 @@ cnmi_response_processor (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand cnmi_sequence[] = {
-    { (gchar *)"+CNMI=2,1,2,1,0", 3, FALSE, cnmi_response_processor },
+    { "+CNMI=2,1,2,1,0", 3, FALSE, cnmi_response_processor },
 
     /* Many Qualcomm-based devices don't support <ds> of '1', despite
      * reporting they support it in the +CNMI=? response.  But they do
      * accept '2'.
      */
-    { (gchar *)"+CNMI=2,1,2,2,0", 3, FALSE, cnmi_response_processor },
+    { "+CNMI=2,1,2,2,0", 3, FALSE, cnmi_response_processor },
 
     /* Last resort: turn off delivery status reports altogether */
-    { (gchar *)"+CNMI=2,1,2,0,0", 3, FALSE, cnmi_response_processor },
+    { "+CNMI=2,1,2,0,0", 3, FALSE, cnmi_response_processor },
     { NULL }
 };
 
@@ -9881,8 +9881,8 @@ modem_time_load_network_timezone (MMIfaceModemTime *self,
 /* Check support (Time interface) */
 
 static const MMBaseModemAtCommand time_check_sequence[] = {
-    { (gchar *)"+CTZU=1",  3, TRUE, mm_base_modem_response_processor_no_result_continue },
-    { (gchar *)"+CCLK?",   3, TRUE, mm_base_modem_response_processor_string },
+    { "+CTZU=1",  3, TRUE, mm_base_modem_response_processor_no_result_continue },
+    { "+CCLK?",   3, TRUE, mm_base_modem_response_processor_string },
     { NULL }
 };
 

@@ -246,8 +246,8 @@ response_processor_nwmdn_ignore_at_errors (MMBaseModem *self,
 }
 
 static const MMBaseModemAtCommand own_numbers_commands[] = {
-    { (gchar *) "+CNUM",  3, TRUE, response_processor_cnum_ignore_at_errors },
-    { (gchar *) "$NWMDN", 3, TRUE, response_processor_nwmdn_ignore_at_errors },
+    { "+CNUM",  3, TRUE, response_processor_cnum_ignore_at_errors },
+    { "$NWMDN", 3, TRUE, response_processor_nwmdn_ignore_at_errors },
     { NULL }
 };
 

@@ -2013,8 +2013,8 @@ own_enable_unsolicited_events_ready (MMBaseModem *self,
 static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
     /* With ^PORTSEL we specify whether we want the PCUI port (0) or the
      * modem port (1) to receive the unsolicited messages */
-    { (gchar *) "^PORTSEL=0", 5, FALSE, NULL },
-    { (gchar *) "^CURC=1",    3, FALSE, NULL },
+    { "^PORTSEL=0", 5, FALSE, NULL },
+    { "^CURC=1",    3, FALSE, NULL },
     { NULL }
 };
 
@@ -3363,7 +3363,7 @@ own_voice_enable_unsolicited_events_ready (MMBaseModem  *self,
 
 static const MMBaseModemAtCommand unsolicited_voice_enable_sequence[] = {
     /* With ^DDTMFCFG we active the DTMF Decoder */
-    { (gchar *) "^DDTMFCFG=0,1", 3, FALSE, NULL },
+    { "^DDTMFCFG=0,1", 3, FALSE, NULL },
     { NULL }
 };
 
@@ -3436,7 +3436,7 @@ own_voice_disable_unsolicited_events_ready (MMBaseModem  *self,
 
 static const MMBaseModemAtCommand unsolicited_voice_disable_sequence[] = {
     /* With ^DDTMFCFG we deactivate the DTMF Decoder */
-    { (gchar *) "^DDTMFCFG=1,0", 3, FALSE, NULL },
+    { "^DDTMFCFG=1,0", 3, FALSE, NULL },
     { NULL }
 };
 
@@ -4187,8 +4187,8 @@ modem_check_time_reply (MMBaseModem *_self,
 }
 
 static const MMBaseModemAtCommand time_cmd_sequence[] = {
-    { (gchar *) "^NTCT?", 3, FALSE, modem_check_time_reply }, /* 3GPP/LTE */
-    { (gchar *) "^TIME",  3, FALSE, modem_check_time_reply }, /* CDMA */
+    { "^NTCT?", 3, FALSE, modem_check_time_reply }, /* 3GPP/LTE */
+    { "^TIME",  3, FALSE, modem_check_time_reply }, /* CDMA */
     { NULL }
 };
 

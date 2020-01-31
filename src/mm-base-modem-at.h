@@ -51,10 +51,10 @@ typedef gboolean (* MMBaseModemAtResponseProcessor) (MMBaseModem *self,
                                                      GVariant **result,
                                                      GError **result_error);
 
-/* Struct to configure AT command operations */
+/* Struct to configure AT command operations (constant) */
 typedef struct {
     /* The AT command */
-    gchar *command;
+    const gchar *command;
     /* Timeout of the command, in seconds */
     guint timeout;
     /* Flag to allow cached replies */
@@ -163,5 +163,25 @@ void mm_base_modem_at_command_full                (MMBaseModem *self,
 const gchar *mm_base_modem_at_command_full_finish (MMBaseModem *self,
                                                    GAsyncResult *res,
                                                    GError **error);
+
+/******************************************************************************/
+/* Support for MMBaseModemAtCommand with heap allocated contents */
+
+/* Exactly same format as MMBaseModemAtCommand, just without
+ * a constant command string. */
+typedef struct {
+    gchar    *command;
+    guint     timeout;
+    gboolean  allow_cached;
+    MMBaseModemAtResponseProcessor response_processor;
+} MMBaseModemAtCommandAlloc;
+
+G_STATIC_ASSERT (sizeof (MMBaseModemAtCommandAlloc) == sizeof (MMBaseModemAtCommand));
+G_STATIC_ASSERT (G_STRUCT_OFFSET (MMBaseModemAtCommandAlloc, command)            == G_STRUCT_OFFSET (MMBaseModemAtCommand, command));
+G_STATIC_ASSERT (G_STRUCT_OFFSET (MMBaseModemAtCommandAlloc, timeout)            == G_STRUCT_OFFSET (MMBaseModemAtCommand, timeout));
+G_STATIC_ASSERT (G_STRUCT_OFFSET (MMBaseModemAtCommandAlloc, allow_cached)       == G_STRUCT_OFFSET (MMBaseModemAtCommand, allow_cached));
+G_STATIC_ASSERT (G_STRUCT_OFFSET (MMBaseModemAtCommandAlloc, response_processor) == G_STRUCT_OFFSET (MMBaseModemAtCommand, response_processor));
+
+void mm_base_modem_at_command_alloc_clear (MMBaseModemAtCommandAlloc *command);
 
 #endif /* MM_BASE_MODEM_AT_H */
