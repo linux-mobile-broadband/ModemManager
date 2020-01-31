@@ -107,6 +107,8 @@ preload_support_config (MMBroadbandModemUblox *self)
         case SETTINGS_UPDATE_METHOD_UNKNOWN:
             /* not an error, this just means we don't need anything special */
             break;
+        default:
+            g_assert_not_reached ();
     }
 
     switch (self->priv->support_config.uact) {
@@ -117,6 +119,7 @@ preload_support_config (MMBroadbandModemUblox *self)
             mm_dbg ("  UACT based band configuration unsupported");
             break;
         case FEATURE_SUPPORT_UNKNOWN:
+        default:
             g_assert_not_reached();
     }
 
@@ -128,6 +131,7 @@ preload_support_config (MMBroadbandModemUblox *self)
             mm_dbg ("  UBANDSEL based band configuration unsupported");
             break;
         case FEATURE_SUPPORT_UNKNOWN:
+        default:
             g_assert_not_reached();
     }
 }
@@ -565,6 +569,9 @@ set_current_modes_bands_step (GTask *task)
             g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 }
 
@@ -1703,6 +1710,9 @@ create_bearer_step (GTask *task)
         g_task_return_pointer (task, g_object_ref (ctx->bearer), g_object_unref);
         g_object_unref (task);
         return;
+
+    default:
+        g_assert_not_reached ();
     }
 
     g_assert_not_reached ();
