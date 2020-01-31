@@ -237,16 +237,14 @@ mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
 GVariant *
 mm_location_gps_nmea_get_string_variant (MMLocationGpsNmea *self)
 {
-    GVariant *variant = NULL;
-    gchar *built;
+    g_autofree gchar *built = NULL;
+    g_auto (GStrv)    traces = NULL;
 
     g_return_val_if_fail (MM_IS_LOCATION_GPS_NMEA (self), NULL);
 
-    built = mm_location_gps_nmea_build_full (self);
-    variant = g_variant_new_string (built);
-    g_free (built);
-
-    return variant;
+    traces = mm_location_gps_nmea_get_traces (self);
+    built = g_strjoinv ("\r\n", traces);
+    return g_variant_new_string (built);
 }
 
 /*****************************************************************************/
