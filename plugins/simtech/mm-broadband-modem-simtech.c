@@ -72,7 +72,7 @@ struct _MMBroadbandModemSimtechPrivate {
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
 static MMModemAccessTechnology
-simtech_act_to_mm_act (int nsmod)
+simtech_act_to_mm_act (guint nsmod)
 {
     static const MMModemAccessTechnology simtech_act_to_mm_act_map[] = {
         [0] = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
@@ -94,15 +94,15 @@ simtech_tech_changed (MMPortSerialAt *port,
                       GMatchInfo *match_info,
                       MMBroadbandModemSimtech *self)
 {
-    gchar *str;
+    guint simtech_act = 0;
 
-    str = g_match_info_fetch (match_info, 1);
-    if (str && str[0])
-        mm_iface_modem_update_access_technologies (
-            MM_IFACE_MODEM (self),
-            simtech_act_to_mm_act (atoi (str)),
-            MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
-    g_free (str);
+    if (!mm_get_uint_from_match_info (match_info, 1, &simtech_act))
+        return;
+
+    mm_iface_modem_update_access_technologies (
+        MM_IFACE_MODEM (self),
+        simtech_act_to_mm_act (simtech_act),
+        MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
 }
 
 static void
