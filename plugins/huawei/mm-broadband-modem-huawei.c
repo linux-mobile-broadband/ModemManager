@@ -2179,8 +2179,6 @@ create_bearer_for_net_port (GTask *task)
     properties = g_task_get_task_data (task);
 
     switch (self->priv->ndisdup_support) {
-    case FEATURE_SUPPORT_UNKNOWN:
-        g_assert_not_reached ();
     case FEATURE_NOT_SUPPORTED:
         mm_dbg ("^NDISDUP not supported, creating default bearer...");
         mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
@@ -2197,6 +2195,9 @@ create_bearer_for_net_port (GTask *task)
                                         (GAsyncReadyCallback)broadband_bearer_huawei_new_ready,
                                         task);
         return;
+    case FEATURE_SUPPORT_UNKNOWN:
+    default:
+        g_assert_not_reached ();
     }
 }
 
