@@ -35,12 +35,23 @@ common_test (const gchar *plugindir)
     GArray *rules;
     GError *error = NULL;
 
+    if (!plugindir)
+        return;
+
     rules = mm_kernel_device_generic_rules_load (plugindir, &error);
     g_assert_no_error (error);
     g_assert (rules);
     g_assert (rules->len > 0);
 
     g_array_unref (rules);
+}
+
+/* Dummy test to avoid compiler warning about common_test() being unused
+ * when none of the plugins enabled in build have custom udev rules. */
+static void
+test_dummy (void)
+{
+    common_test (NULL);
 }
 
 /************************************************************/
@@ -176,6 +187,7 @@ int main (int argc, char **argv)
     setlocale (LC_ALL, "");
 
     g_test_init (&argc, &argv, NULL);
+    g_test_add_func ("/MM/test-udev-rules/dummy", test_dummy);
 
 #if defined ENABLE_PLUGIN_HUAWEI
     g_test_add_func ("/MM/test-udev-rules/huawei", test_huawei);
