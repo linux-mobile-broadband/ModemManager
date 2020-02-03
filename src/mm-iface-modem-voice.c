@@ -196,6 +196,7 @@ match_single_call_info (const MMCallInfo *call_info,
     const gchar     *number;
     guint            idx;
     gboolean         match_direction_and_state = FALSE;
+    gboolean         match_number = FALSE;
     gboolean         match_index = FALSE;
     gboolean         match_terminated = FALSE;
 
@@ -217,6 +218,11 @@ match_single_call_info (const MMCallInfo *call_info,
         (!call_info->index || !idx || match_index))
         match_direction_and_state = TRUE;
 
+    /* Match number */
+    if (call_info->number && number &&
+        g_strcmp0 (call_info->number, number) == 0)
+        match_number = TRUE;
+
     /* Match special terminated event.
      * We cannot apply this match if the call is part of a multiparty
      * call, because we don't know which of the calls in the multiparty
@@ -230,11 +236,16 @@ match_single_call_info (const MMCallInfo *call_info,
         match_terminated = TRUE;
 
     /* If no clear match, nothing to do */
-    if (!match_index && !match_direction_and_state && !match_terminated)
+    if (!match_direction_and_state &&
+        !match_number &&
+        !match_index &&
+        !match_terminated)
         return FALSE;
 
-    mm_dbg ("call info matched (matched direction/state %s, matched index %s, matched terminated %s) with call at '%s'",
+    mm_dbg ("call info matched (matched direction/state %s, matched number %s"
+            ", matched index %s, matched terminated %s) with call at '%s'",
             match_direction_and_state ? "yes" : "no",
+            match_number ? "yes" : "no",
             match_index ? "yes" : "no",
             match_terminated ? "yes" : "no",
             mm_base_call_get_path (call));
