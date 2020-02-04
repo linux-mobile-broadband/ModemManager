@@ -7543,7 +7543,7 @@ modem_voice_setup_in_call_unsolicited_events (MMIfaceModemVoice   *_self,
 
         mm_dbg ("Setting up in-call ports context");
         ctx = ports_context_new ();
-        if (!ports_context_open (self, ctx, FALSE, FALSE, FALSE, &error)) {
+        if (!ports_context_open (self, ctx, FALSE, TRUE, FALSE, &error)) {
             ports_context_unref (ctx);
             g_prefix_error (&error, "Couldn't open ports in-call: ");
         } else {
