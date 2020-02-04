@@ -2366,11 +2366,11 @@ load_call_list_ready (MMIfaceModemVoice *self,
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
         mm_warn ("couldn't load call list: %s", error->message);
         g_error_free (error);
+    } else {
+        /* Always report the list even if NULL (it would mean no ongoing calls) */
+        mm_iface_modem_voice_report_all_calls (self, call_info_list);
+        mm_3gpp_call_info_list_free (call_info_list);
     }
-
-    /* Always report the list even if NULL (it would mean no ongoing calls) */
-    mm_iface_modem_voice_report_all_calls (self, call_info_list);
-    mm_3gpp_call_info_list_free (call_info_list);
 
     /* setup the polling again */
     g_assert (!ctx->polling_id);
