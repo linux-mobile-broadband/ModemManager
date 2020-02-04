@@ -7633,7 +7633,7 @@ set_voice_in_call_unsolicited_events_handlers (MMBroadbandModem *self,
     GRegex         *in_call_event_regex;
     guint           i;
 
-    in_call_event_regex = g_regex_new ("\\r\\n(NO CARRIER|BUSY|NO ANSWER|NO DIALTONE)\\r\\n$",
+    in_call_event_regex = g_regex_new ("\\r\\n(NO CARRIER|BUSY|NO ANSWER|NO DIALTONE)(\\r)?\\r\\n$",
                                        G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     ports[0] = MM_PORT_SERIAL_AT (ports_ctx->primary);
