@@ -400,10 +400,12 @@ static void
 report_all_calls_foreach (MMBaseCall                   *call,
                           ReportAllCallsForeachContext *ctx)
 {
+    MMCallState state;
     GList *l;
 
     /* fully ignore already terminated calls */
-    if (mm_base_call_get_state (call) == MM_CALL_STATE_TERMINATED)
+    state = mm_base_call_get_state (call);
+    if (state == MM_CALL_STATE_TERMINATED)
         return;
 
     /* Iterate over the call info list */
@@ -418,6 +420,13 @@ report_all_calls_foreach (MMBaseCall                   *call,
     }
 
     /* not found in list! this call is now terminated */
+    mm_dbg ("Call '%s' with direction %s, state %s, number '%s', index %u"
+            " not found in list, terminating",
+            mm_base_call_get_path (call),
+            mm_call_direction_get_string (mm_base_call_get_direction (call)),
+            mm_call_state_get_string (state),
+            mm_base_call_get_number (call),
+            mm_base_call_get_index (call));
     mm_base_call_change_state (call, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
 }
 
