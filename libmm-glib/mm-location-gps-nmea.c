@@ -244,7 +244,7 @@ mm_location_gps_nmea_get_string_variant (MMLocationGpsNmea *self)
 
     traces = mm_location_gps_nmea_get_traces (self);
     built = g_strjoinv ("\r\n", traces);
-    return g_variant_new_string (built);
+    return g_variant_ref_sink (g_variant_new_string (built));
 }
 
 /*****************************************************************************/

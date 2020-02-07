@@ -165,11 +165,10 @@ build_location_dictionary (GVariant *previous,
         if (location_3gpp_value)
             g_variant_unref (location_3gpp_value);
         location_3gpp_value = mm_location_3gpp_get_string_variant (location_3gpp);
-        if (location_3gpp_value)
-            g_variant_ref_sink (location_3gpp_value);
     }
 
     if (location_3gpp_value) {
+        g_assert (!g_variant_is_floating (location_3gpp_value));
         g_variant_builder_add (&builder,
                                "{uv}",
                                MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI,
@@ -182,11 +181,10 @@ build_location_dictionary (GVariant *previous,
         if (location_gps_nmea_value)
             g_variant_unref (location_gps_nmea_value);
         location_gps_nmea_value = mm_location_gps_nmea_get_string_variant (location_gps_nmea);
-        if (location_gps_nmea_value)
-            g_variant_ref_sink (location_gps_nmea_value);
     }
 
     if (location_gps_nmea_value) {
+        g_assert (!g_variant_is_floating (location_gps_nmea_value));
         g_variant_builder_add (&builder,
                                "{uv}",
                                MM_MODEM_LOCATION_SOURCE_GPS_NMEA,
@@ -199,11 +197,10 @@ build_location_dictionary (GVariant *previous,
         if (location_gps_raw_value)
             g_variant_unref (location_gps_raw_value);
         location_gps_raw_value = mm_location_gps_raw_get_dictionary (location_gps_raw);
-        if (location_gps_raw_value)
-            g_variant_ref_sink (location_gps_raw_value);
     }
 
     if (location_gps_raw_value) {
+        g_assert (!g_variant_is_floating (location_gps_raw_value));
         g_variant_builder_add (&builder,
                                "{uv}",
                                MM_MODEM_LOCATION_SOURCE_GPS_RAW,
@@ -216,11 +213,10 @@ build_location_dictionary (GVariant *previous,
         if (location_cdma_bs_value)
             g_variant_unref (location_cdma_bs_value);
         location_cdma_bs_value = mm_location_cdma_bs_get_dictionary (location_cdma_bs);
-        if (location_cdma_bs_value)
-            g_variant_ref_sink (location_cdma_bs_value);
     }
 
     if (location_cdma_bs_value) {
+        g_assert (!g_variant_is_floating (location_cdma_bs_value));
         g_variant_builder_add (&builder,
                                "{uv}",
                                MM_MODEM_LOCATION_SOURCE_CDMA_BS,
