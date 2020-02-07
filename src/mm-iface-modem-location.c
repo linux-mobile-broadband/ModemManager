@@ -253,14 +253,14 @@ notify_gps_location_update (MMIfaceModemLocation *self,
                                        NULL));
 }
 
-void
-mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
-                                    const gchar *nmea_trace)
+static void
+location_gps_update_nmea (MMIfaceModemLocation *self,
+                          const gchar          *nmea_trace)
 {
     MmGdbusModemLocation *skeleton;
-    LocationContext *ctx;
-    gboolean update_nmea = FALSE;
-    gboolean update_raw = FALSE;
+    LocationContext      *ctx;
+    gboolean              update_nmea = FALSE;
+    gboolean              update_raw = FALSE;
 
     ctx = get_location_context (self);
     g_object_get (self,
@@ -296,6 +296,50 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
                                     update_raw ? ctx->location_gps_raw : NULL);
 
     g_object_unref (skeleton);
+}
+
+void
+mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
+                                    const gchar          *nmea_trace)
+{
+    /* Helper to debug GPS location related issues. Don't depend on a real GPS
+     * fix for debugging, just use some random values to update */
+#if 0
+    {
+        const gchar *prefix = NULL;
+        const gchar *lat = NULL;
+
+        /* lat N/S just to test which one is used */
+        if (g_str_has_prefix (nmea_trace, "$GPGGA")) {
+            prefix = "GPGGA";
+            lat = "S";
+        } else if (g_str_has_prefix (nmea_trace, "$GNGGA")) {
+            prefix = "GNGGA";
+            lat = "N";
+        }
+
+        if (prefix && lat) {
+            g_autoptr(GString)   str = NULL;
+            g_autoptr(GDateTime) now = NULL;
+
+            mm_dbg ("GGA trace detected: '%s'", nmea_trace);
+
+            now = g_date_time_new_now_utc ();
+            str = g_string_new ("");
+            g_string_append_printf (str,
+                                    "$%s,%02u%02u%02u,4807.038,%s,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47",
+                                    prefix,
+                                    g_date_time_get_hour (now),
+                                    g_date_time_get_minute (now),
+                                    g_date_time_get_second (now),
+                                    lat);
+            location_gps_update_nmea (self, str->str);
+            return;
+        }
+    }
+#endif
+
+    location_gps_update_nmea (self, nmea_trace);
 }
 
 /*****************************************************************************/

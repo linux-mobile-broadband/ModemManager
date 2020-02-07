@@ -950,47 +950,6 @@ nmea_received (MMPortSerialAt *port,
     gchar *trace;
 
     trace = g_match_info_fetch (info, 1);
-
-    /* Helper to debug GPS location related issues. Don't depend on a real GPS
-     * fix for debugging, just use some random values to update */
-#if 0
-    {
-        const gchar *prefix = NULL;
-        const gchar *lat = NULL;
-
-        /* lat N/S just to test which one is used */
-        if (g_str_has_prefix (trace, "$GPGGA")) {
-            prefix = "GPGGA";
-            lat = "S";
-        } else if (g_str_has_prefix (trace, "$GNGGA")) {
-            prefix = "GNGGA";
-            lat = "N";
-        }
-
-        if (prefix && lat) {
-            GString *str;
-            GDateTime *now;
-
-            mm_dbg ("GGA trace detected: '%s'", trace);
-            g_free (trace);
-
-            now = g_date_time_new_now_utc ();
-            str = g_string_new ("");
-            g_string_append_printf (str,
-                                    "$%s,%02u%02u%02u,4807.038,%s,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47",
-                                    prefix,
-                                    g_date_time_get_hour (now),
-                                    g_date_time_get_minute (now),
-                                    g_date_time_get_second (now),
-                                    lat);
-            mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), str->str);
-            g_string_free (str, TRUE);
-            g_date_time_unref (now);
-            return;
-        }
-    }
-#endif
-
     mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), trace);
     g_free (trace);
 }
