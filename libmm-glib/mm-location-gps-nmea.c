@@ -200,7 +200,7 @@ mm_location_gps_nmea_get_string_variant (MMLocationGpsNmea *self)
     g_return_val_if_fail (MM_IS_LOCATION_GPS_NMEA (self), NULL);
 
     built = mm_location_gps_nmea_build_full (self);
-    variant = g_variant_new_string (built);
+    variant = g_variant_ref_sink (g_variant_new_string (built));
     g_free (built);
 
     return variant;

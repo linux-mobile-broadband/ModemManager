@@ -291,7 +291,7 @@ mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
                                self->priv->cell_id,
                                self->priv->tracking_area_code);
 
-        variant = g_variant_new_string (str);
+        variant = g_variant_ref_sink (g_variant_new_string (str));
         g_free (str);
     }
 
