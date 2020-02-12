@@ -1,4 +1,30 @@
 
+ModemManager 1.12.6
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * SIM:
+   ** Updated logic to avoid sending PIN/PUK to the SIM card when not required
+      (e.g. if already unlocked).
+
+ * Simple interface:
+   ** Avoid aborting connection if SIM-PUK2 locked, as PIN2/PUK2 doesn't
+      prevent us from getting connected.
+
+ * Location interface:
+   ** Fixed memory leak happening as soon as a position fix was obtained and
+      gps-raw location source was enabled.
+
+ * Core:
+   ** Fixed handling of 0x00 bytes at the end of GSM encoded strings.
+   ** Fixed cleaning up 'timed-out' signal on the serial port objects.
+   ** Fixed logic that closes MBIM ports during cleanup.
+
+ * Several other minor fixes and memory leak plugs.
+
+
 ModemManager 1.12.4
 -------------------------------------------
 This is a new bugfix release of ModemManager.
