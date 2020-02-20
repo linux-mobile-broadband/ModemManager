@@ -39,7 +39,7 @@ static GParamSpec *properties[PROP_LAST];
 
 struct _MMKernelDeviceUdevPrivate {
     GUdevDevice *device;
-    GUdevDevice *parent;
+    GUdevDevice *interface;
     GUdevDevice *physdev;
     guint16      vendor;
     guint16      product;
@@ -263,12 +263,42 @@ ensure_physdev (MMKernelDeviceUdev *self)
 /*****************************************************************************/
 
 static void
-ensure_parent (MMKernelDeviceUdev *self)
+ensure_interface (MMKernelDeviceUdev *self)
 {
-    if (self->priv->parent)
+    GUdevDevice *new_parent;
+    GUdevDevice *parent;
+
+    if (self->priv->interface)
         return;
-    if (self->priv->device)
-        self->priv->parent = g_udev_device_get_parent (self->priv->device);
+
+    if (!self->priv->device)
+        return;
+
+    ensure_physdev (self);
+
+    parent = g_udev_device_get_parent (self->priv->device);
+    while (1) {
+        /* Abort if no parent found */
+        if (!parent)
+            break;
+
+        /* Look for the first parent that is a USB interface (i.e. has
+         * bInterfaceClass) */
+        if (g_udev_device_has_sysfs_attr (parent, "bInterfaceClass")) {
+            self->priv->interface = parent;
+            break;
+        }
+
+        /* If unknown physdev, just stop right away */
+        if (!self->priv->physdev || parent == self->priv->physdev) {
+            g_object_unref (parent);
+            break;
+        }
+
+        new_parent = g_udev_device_get_parent (parent);
+        g_object_unref (parent);
+        parent = new_parent;
+    }
 }
 
 /*****************************************************************************/
@@ -494,8 +524,8 @@ kernel_device_get_interface_class (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), -1);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
-    ensure_parent (self);
-    return (self->priv->parent ? g_udev_device_get_sysfs_attr_as_int (self->priv->parent, "bInterfaceClass") : -1);
+    ensure_interface (self);
+    return (self->priv->interface ? g_udev_device_get_sysfs_attr_as_int (self->priv->interface, "bInterfaceClass") : -1);
 }
 
 static gint
@@ -506,8 +536,8 @@ kernel_device_get_interface_subclass (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), -1);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
-    ensure_parent (self);
-    return (self->priv->parent ? g_udev_device_get_sysfs_attr_as_int (self->priv->parent, "bInterfaceSubClass") : -1);
+    ensure_interface (self);
+    return (self->priv->interface ? g_udev_device_get_sysfs_attr_as_int (self->priv->interface, "bInterfaceSubClass") : -1);
 }
 
 static gint
@@ -518,8 +548,8 @@ kernel_device_get_interface_protocol (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), -1);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
-    ensure_parent (self);
-    return (self->priv->parent ? g_udev_device_get_sysfs_attr_as_int (self->priv->parent, "bInterfaceProtocol") : -1);
+    ensure_interface (self);
+    return (self->priv->interface ? g_udev_device_get_sysfs_attr_as_int (self->priv->interface, "bInterfaceProtocol") : -1);
 }
 
 static const gchar *
@@ -530,8 +560,8 @@ kernel_device_get_interface_sysfs_path (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
-    ensure_parent (self);
-    return (self->priv->parent ? g_udev_device_get_sysfs_path (self->priv->parent) : NULL);
+    ensure_interface (self);
+    return (self->priv->interface ? g_udev_device_get_sysfs_path (self->priv->interface) : NULL);
 }
 
 static const gchar *
@@ -542,8 +572,8 @@ kernel_device_get_interface_description (MMKernelDevice *_self)
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE_UDEV (_self), NULL);
 
     self = MM_KERNEL_DEVICE_UDEV (_self);
-    ensure_parent (self);
-    return (self->priv->parent ? g_udev_device_get_sysfs_attr (self->priv->parent, "interface") : NULL);
+    ensure_interface (self);
+    return (self->priv->interface ? g_udev_device_get_sysfs_attr (self->priv->interface, "interface") : NULL);
 }
 
 static gboolean
@@ -906,7 +936,7 @@ dispose (GObject *object)
     MMKernelDeviceUdev *self = MM_KERNEL_DEVICE_UDEV (object);
 
     g_clear_object (&self->priv->physdev);
-    g_clear_object (&self->priv->parent);
+    g_clear_object (&self->priv->interface);
     g_clear_object (&self->priv->device);
     g_clear_object (&self->priv->properties);
 
