@@ -261,7 +261,6 @@ huawei_custom_init_step (GTask *task)
     if (g_task_return_error_if_cancelled (task)) {
         mm_dbg ("(Huawei) no need to keep on running custom init in (%s)",
                 mm_port_get_device (MM_PORT (ctx->port)));
-        g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
