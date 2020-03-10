@@ -1,14 +1,14 @@
 # Italian translation for ModemManager.
-# Copyright (C) 2018 ModemManager's COPYRIGHT HOLDER
+# Copyright (C) 2018, 2020 ModemManager's COPYRIGHT HOLDER
 # This file is distributed under the same license as the ModemManager package.
-# Milo Casagrande <milo@ubuntu.com>, 2018.
+# Milo Casagrande <milo@milo.name>, 2018, 2020.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
 "POT-Creation-Date: 2019-09-25 12:48+0200\n"
-"PO-Revision-Date: 2018-09-11 11:25+0200\n"
+"PO-Revision-Date: 2020-03-10 20:15+0100\n"
 "Last-Translator: Milo Casagrande <milo@milo.name>\n"
 "Language-Team: Italian <gnome-it-list@gnome.org>\n"
 "Language: it\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 2.1.1\n"
+"X-Generator: Poedit 2.2.4\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
@@ -69,14 +69,13 @@ msgstr "La politica di sistema impedisce di effettuare chiamate vocali."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Interroga le informazioni sull'ora di rete e sul fuso orario"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
 msgstr ""
-"La politica di sistema impedisce di interrogare o di utilizzare le "
-"informazioni e i servizi della rete."
+"La politica di sistema impedisce di interrogare le informazioni sull'ora di "
+"rete"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
