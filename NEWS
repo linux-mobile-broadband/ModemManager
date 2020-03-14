@@ -1,4 +1,30 @@
 
+ModemManager 1.12.8
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * Plugin manager:
+   ** Updated logic to allow new ports added to a device up to 1500ms since last
+      port was added.
+
+ * Voice interface:
+   ** Match calls in call list by number.
+   ** Don't report an empty list if +CLCC for any reason fails.
+   ** Expect in-call URCs also in secondary port.
+   ** Allow optional extra CR in in-call URCs.
+
+ * Kernel device:
+   ** Fix looking up for interface details in udev-based builds.
+
+ * Huawei:
+   ** Allow reading port type hints from USB interface descriptions.
+   ** Fix segfault if device is removed while probing is ongoing.
+
+ * Several other minor fixes.
+
+
 ModemManager 1.12.6
 -------------------------------------------
 This is a new bugfix release of ModemManager.
