@@ -365,7 +365,7 @@ qmi_load_current_capabilities_ready (MMIfaceModem *self,
     ctx = g_task_get_task_data (task);
 
     ctx->current_qmi = mm_shared_qmi_load_current_capabilities_finish (self, res, &error);
-    if (!ctx->current_qmi) {
+    if (error) {
         mm_dbg ("Couldn't load currrent capabilities using QMI over MBIM: %s", error->message);
         g_clear_error (&error);
     }
