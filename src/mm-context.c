@@ -178,7 +178,7 @@ log_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("log",
-                                "Logging options",
+                                "Logging options:",
                                 "Show logging options",
                                 NULL,
                                 NULL);
@@ -248,7 +248,7 @@ test_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("test",
-                                "Test options",
+                                "Test options:",
                                 "Show Test options",
                                 NULL,
                                 NULL);
