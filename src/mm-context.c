@@ -279,8 +279,7 @@ mm_context_get_test_plugin_dir (void)
 static void
 print_version (void)
 {
-    g_print ("\n"
-             "ModemManager " MM_DIST_VERSION "\n"
+    g_print ("ModemManager " MM_DIST_VERSION "\n"
              "Copyright (C) 2008-2020 The ModemManager authors\n"
              "License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl-2.0.html>\n"
              "This is free software: you are free to change and redistribute it.\n"
