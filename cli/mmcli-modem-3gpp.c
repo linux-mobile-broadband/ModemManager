@@ -103,7 +103,7 @@ mmcli_modem_3gpp_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("3gpp",
-                                "3GPP options",
+                                "3GPP options:",
                                 "Show 3GPP related options",
                                 NULL,
                                 NULL);

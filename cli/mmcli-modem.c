@@ -140,7 +140,7 @@ mmcli_modem_get_option_group (void)
 
     /* Status options */
     group = g_option_group_new ("modem",
-                                "Modem options",
+                                "Modem options:",
                                 "Show modem options",
                                 NULL,
                                 NULL);

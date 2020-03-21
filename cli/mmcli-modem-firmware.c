@@ -71,7 +71,7 @@ mmcli_modem_firmware_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("firmware",
-                                "Firmware options",
+                                "Firmware options:",
                                 "Show Firmware options",
                                 NULL,
                                 NULL);

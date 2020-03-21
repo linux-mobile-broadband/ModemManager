@@ -70,7 +70,7 @@ mmcli_modem_cdma_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("cdma",
-                                "CDMA options",
+                                "CDMA options:",
                                 "Show CDMA related options",
                                 NULL,
                                 NULL);

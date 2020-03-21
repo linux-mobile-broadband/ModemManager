@@ -66,7 +66,7 @@ mmcli_modem_signal_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("signal",
-                                "Signal options",
+                                "Signal options:",
                                 "Show Signal options",
                                 NULL,
                                 NULL);

@@ -108,7 +108,7 @@ mmcli_manager_get_option_group (void)
 
     /* Status options */
     group = g_option_group_new ("manager",
-                                "Manager options",
+                                "Manager options:",
                                 "Show manager options",
                                 NULL,
                                 NULL);

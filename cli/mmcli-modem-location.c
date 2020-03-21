@@ -163,7 +163,7 @@ mmcli_modem_location_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("location",
-                                "Location options",
+                                "Location options:",
                                 "Show Location options",
                                 NULL,
                                 NULL);

@@ -87,7 +87,7 @@ mmcli_modem_oma_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("oma",
-                                "OMA options",
+                                "OMA options:",
                                 "Show OMA options",
                                 NULL,
                                 NULL);

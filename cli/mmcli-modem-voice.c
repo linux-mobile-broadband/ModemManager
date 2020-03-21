@@ -113,7 +113,7 @@ mmcli_modem_voice_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("voice",
-                                "Voice options",
+                                "Voice options:",
                                 "Show Voice options",
                                 NULL,
                                 NULL);

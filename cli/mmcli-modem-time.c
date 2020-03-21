@@ -61,7 +61,7 @@ mmcli_modem_time_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("time",
-                                "Time options",
+                                "Time options:",
                                 "Show Time options",
                                 NULL,
                                 NULL);

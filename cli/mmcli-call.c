@@ -94,7 +94,7 @@ mmcli_call_get_option_group (void)
 
     /* Status options */
     group = g_option_group_new ("call",
-                                "Call options",
+                                "Call options:",
                                 "Show call options",
                                 NULL,
                                 NULL);

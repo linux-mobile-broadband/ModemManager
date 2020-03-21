@@ -82,7 +82,7 @@ mmcli_modem_messaging_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("messaging",
-                                "Messaging options",
+                                "Messaging options:",
                                 "Show Messaging options",
                                 NULL,
                                 NULL);

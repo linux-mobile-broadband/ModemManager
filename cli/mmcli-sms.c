@@ -78,7 +78,7 @@ mmcli_sms_get_option_group (void)
 
     /* Status options */
     group = g_option_group_new ("sms",
-                                "SMS options",
+                                "SMS options:",
                                 "Show SMS options",
                                 NULL,
                                 NULL);

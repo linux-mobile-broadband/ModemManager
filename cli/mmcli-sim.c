@@ -83,7 +83,7 @@ mmcli_sim_get_option_group (void)
 
     /* Status options */
     group = g_option_group_new ("sim",
-                                "SIM options",
+                                "SIM options:",
                                 "Show SIM options",
                                 NULL,
                                 NULL);

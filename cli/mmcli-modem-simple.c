@@ -65,7 +65,7 @@ mmcli_modem_simple_get_option_group (void)
     GOptionGroup *group;
 
     group = g_option_group_new ("simple",
-                                "Simple options",
+                                "Simple options:",
                                 "Show Simple options",
                                 NULL,
                                 NULL);

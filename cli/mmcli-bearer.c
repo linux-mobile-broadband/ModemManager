@@ -68,7 +68,7 @@ mmcli_bearer_get_option_group (void)
 
     /* Status options */
     group = g_option_group_new ("bearer",
-                                "Bearer options",
+                                "Bearer options:",
                                 "Show bearer options",
                                 NULL,
                                 NULL);
