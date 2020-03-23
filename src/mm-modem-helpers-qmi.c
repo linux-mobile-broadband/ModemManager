@@ -1029,8 +1029,6 @@ mm_modem_capability_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
     if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_LTE)
         caps |= MM_MODEM_CAPABILITY_LTE;
 
-    /* FIXME: LTE Advanced? */
-
     return caps;
 }
 

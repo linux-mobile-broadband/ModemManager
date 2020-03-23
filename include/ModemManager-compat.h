@@ -709,6 +709,23 @@ typedef int MMModemLocationSourceDeprecated;
  */
 #define MM_MODEM_LOCATION_SOURCE_AGPS ((MMModemLocationSourceDeprecated)MM_MODEM_LOCATION_SOURCE_AGPS_MSA)
 
+/* The following type exists just so that we can get deprecation warnings */
+MM_DEPRECATED
+typedef int MMModemCapabilityDeprecated;
+
+/**
+ * MM_MODEM_CAPABILITY_LTE_ADVANCED:
+ *
+ * Modem has LTE Advanced data capability.
+ *
+ * This value is deprecated because it is not used anywhere. LTE Advanced
+ * capable devices are reported as LTE capable.
+ *
+ * Since: 1.0
+ * Deprecated: 1.14.0.
+ */
+#define MM_MODEM_CAPABILITY_LTE_ADVANCED ((MMModemCapabilityDeprecated)(1 << 4))
+
 #endif /* MM_DISABLE_DEPRECATED */
 
 #endif /* _MODEMMANAGER_COMPAT_H_ */

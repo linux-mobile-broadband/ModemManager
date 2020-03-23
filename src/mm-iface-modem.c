@@ -5546,7 +5546,7 @@ mm_iface_modem_is_3gpp (MMIfaceModem *self)
 gboolean
 mm_iface_modem_is_3gpp_lte (MMIfaceModem *self)
 {
-    return (mm_iface_modem_get_current_capabilities (self) & MM_MODEM_CAPABILITY_3GPP_LTE);
+    return (mm_iface_modem_get_current_capabilities (self) & MM_MODEM_CAPABILITY_LTE);
 }
 
 gboolean
@@ -5570,7 +5570,7 @@ mm_iface_modem_is_3gpp_lte_only (MMIfaceModem *self)
     MMModemCapability capabilities;
 
     capabilities = mm_iface_modem_get_current_capabilities (self);
-    return (capabilities & MM_MODEM_CAPABILITY_3GPP_LTE) && !((MM_MODEM_CAPABILITY_3GPP_LTE ^ capabilities) & capabilities);
+    return (capabilities & MM_MODEM_CAPABILITY_LTE) && !((MM_MODEM_CAPABILITY_LTE ^ capabilities) & capabilities);
 }
 
 gboolean

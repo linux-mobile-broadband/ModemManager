@@ -407,7 +407,7 @@ print_modem_info (void)
             pco_list = mm_modem_3gpp_get_pco (ctx->modem_3gpp);
             initial_eps_bearer_path = mm_modem_3gpp_get_initial_eps_bearer_path (ctx->modem_3gpp);
 
-            if (mm_modem_get_current_capabilities (ctx->modem) & (MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_LTE_ADVANCED)) {
+            if (mm_modem_get_current_capabilities (ctx->modem) & (MM_MODEM_CAPABILITY_LTE)) {
                 MMBearerProperties *initial_eps_bearer_properties;
 
                 initial_eps_bearer_properties = mm_modem_3gpp_peek_initial_eps_bearer_settings (ctx->modem_3gpp);

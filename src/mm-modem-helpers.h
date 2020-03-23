@@ -39,13 +39,9 @@
 /* Common utilities */
 /*****************************************************************************/
 
-#define MM_MODEM_CAPABILITY_3GPP_LTE    \
-    (MM_MODEM_CAPABILITY_LTE |          \
-     MM_MODEM_CAPABILITY_LTE_ADVANCED)
-
 #define MM_MODEM_CAPABILITY_3GPP        \
     (MM_MODEM_CAPABILITY_GSM_UMTS |     \
-     MM_MODEM_CAPABILITY_3GPP_LTE)
+     MM_MODEM_CAPABILITY_LTE)
 
 gchar       *mm_strip_quotes (gchar *str);
 const gchar *mm_strip_tag    (const gchar *str,

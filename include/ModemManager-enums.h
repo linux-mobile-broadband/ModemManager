@@ -36,7 +36,6 @@
  * @MM_MODEM_CAPABILITY_CDMA_EVDO: Modem supports at least one of CDMA 1xRTT, EVDO revision 0, EVDO revision A, or EVDO revision B.
  * @MM_MODEM_CAPABILITY_GSM_UMTS: Modem supports at least one of GSM, GPRS, EDGE, UMTS, HSDPA, HSUPA, or HSPA+ packet switched data capability.
  * @MM_MODEM_CAPABILITY_LTE: Modem has LTE data capability.
- * @MM_MODEM_CAPABILITY_LTE_ADVANCED: Modem has LTE Advanced data capability.
  * @MM_MODEM_CAPABILITY_IRIDIUM: Modem has Iridium capabilities.
  * @MM_MODEM_CAPABILITY_ANY: Mask specifying all capabilities.
  *
@@ -51,7 +50,7 @@ typedef enum { /*< underscore_name=mm_modem_capability >*/
     MM_MODEM_CAPABILITY_CDMA_EVDO    = 1 << 1,
     MM_MODEM_CAPABILITY_GSM_UMTS     = 1 << 2,
     MM_MODEM_CAPABILITY_LTE          = 1 << 3,
-    MM_MODEM_CAPABILITY_LTE_ADVANCED = 1 << 4,
+    /* MM_MODEM_CAPABILITY_LTE_ADVANCED = 1 << 4 */
     MM_MODEM_CAPABILITY_IRIDIUM      = 1 << 5,
     MM_MODEM_CAPABILITY_ANY          = 0xFFFFFFFF
 } MMModemCapability;
