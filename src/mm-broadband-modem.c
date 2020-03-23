@@ -501,6 +501,10 @@ current_capabilities_ws46_test_ready (MMBaseModem *self,
     const gchar *response;
     GArray      *modes;
     guint        i;
+    gboolean     is_2g = FALSE;
+    gboolean     is_3g = FALSE;
+    gboolean     is_4g = FALSE;
+    gboolean     is_5g = FALSE;
 
     ctx = g_task_get_task_data (task);
 
@@ -513,27 +517,37 @@ current_capabilities_ws46_test_ready (MMBaseModem *self,
     if (!modes)
         goto out;
 
-    /* Add LTE caps if any of the reported modes supports 4G */
+    /* Process list of modes to gather supported ones */
     for (i = 0; i < modes->len; i++) {
-        if (g_array_index (modes, MMModemMode, i) & MM_MODEM_MODE_4G) {
-            ctx->caps |= MM_MODEM_CAPABILITY_LTE;
-            break;
-        }
+        if (g_array_index (modes, MMModemMode, i) & MM_MODEM_MODE_2G)
+            is_2g = TRUE;
+        if (g_array_index (modes, MMModemMode, i) & MM_MODEM_MODE_3G)
+            is_3g = TRUE;
+        if (g_array_index (modes, MMModemMode, i) & MM_MODEM_MODE_4G)
+            is_4g = TRUE;
+        if (g_array_index (modes, MMModemMode, i) & MM_MODEM_MODE_5G)
+            is_5g = TRUE;
     }
+
+    /* Add capabilities from modes */
+    if (is_2g || is_3g)
+        ctx->caps |= MM_MODEM_CAPABILITY_GSM_UMTS;
+    if (is_4g)
+        ctx->caps |= MM_MODEM_CAPABILITY_LTE;
+    if (is_5g)
+        ctx->caps |= MM_MODEM_CAPABILITY_5GNR;
 
     /* The +CGSM capability is saying that the modem is a 3GPP modem, but that
      * doesn't necessarily mean it's a GSM/UMTS modem, it could be a LTE-only
-     * device. We did add the GSM_UMTS capability when +CGSM was found, so now
-     * we'll check if the device only reports 4G-only mode, and remove the
-     * capability if so.
+     * or 5GNR-only device. We did add the GSM_UMTS capability when +CGSM was
+     * found, so now we'll check if the device only reports 4G or 5G modes, and
+     * remove the capability if so.
      *
      * Note that we don't change the default +CGSM -> GSM/UMTS logic, we just
      * fix it up.
      */
-    if ((modes->len == 1) && (g_array_index (modes, MMModemMode, 0) == MM_MODEM_MODE_4G)) {
-        g_assert (ctx->caps & MM_MODEM_CAPABILITY_LTE);
+    if ((is_4g || is_5g) && !is_2g && !is_3g)
         ctx->caps &= ~MM_MODEM_CAPABILITY_GSM_UMTS;
-    }
 
     g_array_unref (modes);
 
