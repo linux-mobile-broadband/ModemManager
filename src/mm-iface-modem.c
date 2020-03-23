@@ -4220,8 +4220,7 @@ current_capabilities_internal_load_unlock_required_ready (MMIfaceModem *self,
 
             mm_obj_dbg (self, "multimode device without SIM, no 3GPP capabilities");
             caps = mm_gdbus_modem_get_current_capabilities (ctx->skeleton);
-            caps &= ~MM_MODEM_CAPABILITY_GSM_UMTS;
-            caps &= ~MM_MODEM_CAPABILITY_LTE;
+            caps &= ~MM_MODEM_CAPABILITY_3GPP;
 
             /* CDMA-EVDO must still be around */
             g_assert (caps & MM_MODEM_CAPABILITY_CDMA_EVDO);
@@ -4283,8 +4282,7 @@ load_current_capabilities_ready (MMIfaceModem *self,
 
     /* If the device is a multimode device (3GPP+3GPP2) check whether we have a
      * SIM or not. */
-    if (caps & MM_MODEM_CAPABILITY_CDMA_EVDO &&
-        (caps & MM_MODEM_CAPABILITY_GSM_UMTS || caps & MM_MODEM_CAPABILITY_LTE)) {
+    if ((caps & MM_MODEM_CAPABILITY_CDMA_EVDO) && (caps & MM_MODEM_CAPABILITY_3GPP)) {
         mm_obj_dbg (self, "checking if multimode device has a SIM...");
         internal_load_unlock_required (
             self,
@@ -5570,7 +5568,7 @@ mm_iface_modem_is_3gpp_lte_only (MMIfaceModem *self)
     MMModemCapability capabilities;
 
     capabilities = mm_iface_modem_get_current_capabilities (self);
-    return (capabilities & MM_MODEM_CAPABILITY_LTE) && !((MM_MODEM_CAPABILITY_LTE ^ capabilities) & capabilities);
+    return ((capabilities & MM_MODEM_CAPABILITY_LTE) && !((MM_MODEM_CAPABILITY_LTE ^ capabilities) & capabilities));
 }
 
 gboolean

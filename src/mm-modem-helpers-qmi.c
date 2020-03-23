@@ -1029,6 +1029,9 @@ mm_modem_capability_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
     if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_LTE)
         caps |= MM_MODEM_CAPABILITY_LTE;
 
+    if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_5GNR)
+        caps |= MM_MODEM_CAPABILITY_5GNR;
+
     return caps;
 }
 
@@ -1050,6 +1053,9 @@ mm_modem_capability_to_qmi_rat_mode_preference (MMModemCapability caps)
     if (caps & MM_MODEM_CAPABILITY_LTE)
         qmi |= QMI_NAS_RAT_MODE_PREFERENCE_LTE;
 
+    if (caps & MM_MODEM_CAPABILITY_5GNR)
+        qmi |= QMI_NAS_RAT_MODE_PREFERENCE_5GNR;
+
     return qmi;
 }
 
@@ -1062,6 +1068,11 @@ mm_modem_capability_to_qmi_acquisition_order_preference (MMModemCapability caps)
     QmiNasRadioInterface  value;
 
     array = g_array_new (FALSE, FALSE, sizeof (QmiNasRadioInterface));
+
+    if (caps & MM_MODEM_CAPABILITY_5GNR) {
+        value = QMI_NAS_RADIO_INTERFACE_5GNR;
+        g_array_append_val (array, value);
+    }
 
     if (caps & MM_MODEM_CAPABILITY_LTE) {
         value = QMI_NAS_RADIO_INTERFACE_LTE;
@@ -1166,7 +1177,7 @@ mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyP
     if (qmi & QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_LTE)
         caps |= MM_MODEM_CAPABILITY_LTE;
 
-    /* FIXME: LTE Advanced? */
+    /* NOTE: no 5GNR defined in Technology Preference */
 
     return caps;
 }
