@@ -113,12 +113,15 @@ mmcli_get_manager_sync (GDBusConnection *connection)
 /******************************************************************************/
 /* Common to all objects */
 
+#define ANY_OBJECT_STR "any"
+
 static void
 get_object_lookup_info (const gchar  *str,
                         const gchar  *object_type,
                         const gchar  *object_prefix,
                         gchar       **object_path,
-                        gchar       **modem_uid)
+                        gchar       **modem_uid,
+                        gboolean     *find_any)
 {
     gboolean all_numeric;
     guint    i;
@@ -129,15 +132,18 @@ get_object_lookup_info (const gchar  *str,
         exit (EXIT_FAILURE);
     }
 
-    /* User string may come in three ways:
+    /* User string may come in four ways:
      *   a) full DBus path
      *   b) object index
      *   c) modem UID (for modem or SIM lookup only)
+     *   d) "any" string (for modem or SIM lookup only)
      */
 
     *object_path = NULL;
     if (modem_uid)
         *modem_uid  = NULL;
+    if (find_any)
+        *find_any = FALSE;
 
     /* If match the DBus prefix, we have a DBus object path */
     if (g_str_has_prefix (str, object_prefix)) {
@@ -160,6 +166,14 @@ get_object_lookup_info (const gchar  *str,
         return;
     }
 
+    /* If it matches the lookup keyword or any of its substrings, we have
+     * to look for the first available object */
+    if ((find_any) && (g_ascii_strncasecmp (str, ANY_OBJECT_STR, strlen (str)) == 0)) {
+        g_debug ("Will look for first available %s", object_type);
+        *find_any = TRUE;
+        return;
+    }
+
     /* Otherwise we have the UID */
     if (modem_uid) {
         g_debug ("Assuming '%s' is the modem UID", str);
@@ -178,14 +192,12 @@ get_object_lookup_info (const gchar  *str,
 static MMObject *
 find_modem (MMManager   *manager,
             const gchar *modem_path,
-            const gchar *modem_uid)
+            const gchar *modem_uid,
+            gboolean     modem_any)
 {
     GList *modems;
     GList *l;
     MMObject *found = NULL;
-
-    g_assert (modem_path || modem_uid);
-    g_assert (!(modem_path && modem_uid));
 
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
     for (l = modems; l; l = g_list_next (l)) {
@@ -195,12 +207,9 @@ find_modem (MMManager   *manager,
         obj   = MM_OBJECT (l->data);
         modem = MM_MODEM (mm_object_get_modem (obj));
 
-        if (modem_path && g_str_equal (mm_object_get_path (obj), modem_path)) {
-            found = g_object_ref (obj);
-            break;
-        }
-
-        if (modem_uid && g_str_equal (mm_modem_get_device (modem), modem_uid)) {
+        if (modem_any ||
+            (modem_path && g_str_equal (mm_object_get_path (obj), modem_path)) ||
+            (modem_uid && g_str_equal (mm_modem_get_device (modem), modem_uid))) {
             found = g_object_ref (obj);
             break;
         }
@@ -218,8 +227,9 @@ find_modem (MMManager   *manager,
 }
 
 typedef struct {
-    gchar *modem_path;
-    gchar *modem_uid;
+    gchar    *modem_path;
+    gchar    *modem_uid;
+    gboolean  modem_any;
 } GetModemContext;
 
 typedef struct {
@@ -271,7 +281,7 @@ get_manager_ready (GDBusConnection *connection,
 
     results = g_new (GetModemResults, 1);
     results->manager = mmcli_get_manager_finish (res);
-    results->object = find_modem (results->manager, ctx->modem_path, ctx->modem_uid);
+    results->object = find_modem (results->manager, ctx->modem_path, ctx->modem_uid, ctx->modem_any);
     g_task_return_pointer (task, results, (GDestroyNotify)get_modem_results_free);
     g_object_unref (task);
 }
@@ -290,8 +300,8 @@ mmcli_get_modem (GDBusConnection     *connection,
 
     ctx = g_new0 (GetModemContext, 1);
     get_object_lookup_info (str, "modem", MM_DBUS_MODEM_PREFIX,
-                            &ctx->modem_path, &ctx->modem_uid);
-    g_assert (ctx->modem_path || ctx->modem_uid);
+                            &ctx->modem_path, &ctx->modem_uid, &ctx->modem_any);
+    g_assert (!!ctx->modem_path + !!ctx->modem_uid + ctx->modem_any == 1);
     g_task_set_task_data (task, ctx, (GDestroyNotify) get_modem_context_free);
 
     mmcli_get_manager (connection,
@@ -309,12 +319,13 @@ mmcli_get_modem_sync (GDBusConnection  *connection,
     MMObject *found;
     gchar *modem_path = NULL;
     gchar *modem_uid = NULL;
+    gboolean modem_any = FALSE;
 
     manager = mmcli_get_manager_sync (connection);
     get_object_lookup_info (str, "modem", MM_DBUS_MODEM_PREFIX,
-                            &modem_path, &modem_uid);
-    g_assert (modem_path || modem_uid);
-    found = find_modem (manager, modem_path, modem_uid);
+                            &modem_path, &modem_uid, &modem_any);
+    g_assert (!!modem_path + !!modem_uid + modem_any == 1);
+    found = find_modem (manager, modem_path, modem_uid, modem_any);
 
     if (o_manager)
         *o_manager = manager;
@@ -579,7 +590,7 @@ mmcli_get_bearer (GDBusConnection     *connection,
 
     ctx = g_new0 (GetBearerContext, 1);
     get_object_lookup_info (str, "bearer", MM_DBUS_BEARER_PREFIX,
-                            &ctx->bearer_path, NULL);
+                            &ctx->bearer_path, NULL, NULL);
     g_assert (ctx->bearer_path);
     g_task_set_task_data (task, ctx, (GDestroyNotify) get_bearer_context_free);
 
@@ -602,7 +613,7 @@ mmcli_get_bearer_sync (GDBusConnection  *connection,
     gchar *bearer_path = NULL;
 
     get_object_lookup_info (str, "bearer", MM_DBUS_BEARER_PREFIX,
-                            &bearer_path, NULL);
+                            &bearer_path, NULL, NULL);
     g_assert (bearer_path);
 
     manager = mmcli_get_manager_sync (connection);
@@ -685,6 +696,7 @@ mmcli_get_bearer_sync (GDBusConnection  *connection,
 typedef struct {
     gchar     *sim_path;
     gchar     *modem_uid;
+    gboolean   sim_any;
     MMManager *manager;
     MMObject  *current;
 } GetSimContext;
@@ -792,8 +804,13 @@ get_sim_manager_ready (GDBusConnection *connection,
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
 
+        /* check if we can match the first object found */
+        if (ctx->sim_any) {
+            g_assert (!ctx->sim_path);
+            ctx->sim_path = g_strdup (mm_modem_get_sim_path (modem));
+        }
         /* check if modem UID matches */
-        if (ctx->modem_uid) {
+        else if (ctx->modem_uid) {
             if (g_str_equal (ctx->modem_uid, mm_modem_get_device (modem))) {
                 g_assert (!ctx->sim_path);
                 ctx->sim_path = g_strdup (mm_modem_get_sim_path (modem));
@@ -834,8 +851,8 @@ mmcli_get_sim (GDBusConnection     *connection,
 
     ctx = g_new0 (GetSimContext, 1);
     get_object_lookup_info (str, "SIM", MM_DBUS_SIM_PREFIX,
-                            &ctx->sim_path, &ctx->modem_uid);
-    g_assert (ctx->sim_path || ctx->modem_uid);
+                            &ctx->sim_path, &ctx->modem_uid, &ctx->sim_any);
+    g_assert (!!ctx->sim_path + !!ctx->modem_uid + ctx->sim_any == 1);
     g_task_set_task_data (task, ctx, (GDestroyNotify) get_sim_context_free);
 
     mmcli_get_manager (connection,
@@ -856,10 +873,11 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
     MMSim *found = NULL;
     gchar *sim_path = NULL;
     gchar *modem_uid = NULL;
+    gboolean sim_any = FALSE;
 
     get_object_lookup_info (str, "SIM", MM_DBUS_SIM_PREFIX,
-                            &sim_path, &modem_uid);
-    g_assert (sim_path || modem_uid);
+                            &sim_path, &modem_uid, &sim_any);
+    g_assert (!!sim_path + !!modem_uid + sim_any == 1);
 
     manager = mmcli_get_manager_sync (connection);
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
@@ -877,8 +895,13 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
 
+        /* check if we can match the first object found */
+        if (sim_any) {
+            g_assert (!sim_path);
+            sim_path = g_strdup (mm_modem_get_sim_path (modem));
+        }
         /* check if modem UID matches */
-        if (modem_uid) {
+        else if (modem_uid) {
             if (g_str_equal (modem_uid, mm_modem_get_device (modem))) {
                 g_assert (!sim_path);
                 sim_path = g_strdup (mm_modem_get_sim_path (modem));
@@ -1105,7 +1128,7 @@ mmcli_get_sms (GDBusConnection     *connection,
 
     ctx = g_new0 (GetSmsContext, 1);
     get_object_lookup_info (str, "SMS", MM_DBUS_SMS_PREFIX,
-                            &ctx->sms_path, NULL);
+                            &ctx->sms_path, NULL, NULL);
     g_task_set_task_data (task, ctx, (GDestroyNotify) get_sms_context_free);
 
     mmcli_get_manager (connection,
@@ -1127,7 +1150,7 @@ mmcli_get_sms_sync (GDBusConnection  *connection,
     gchar *sms_path = NULL;
 
     get_object_lookup_info (str, "SMS", MM_DBUS_SMS_PREFIX,
-                            &sms_path, NULL);
+                            &sms_path, NULL, NULL);
 
     manager = mmcli_get_manager_sync (connection);
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
@@ -1368,7 +1391,7 @@ mmcli_get_call (GDBusConnection     *connection,
 
     ctx = g_new0 (GetCallContext, 1);
     get_object_lookup_info (str, "call", MM_DBUS_CALL_PREFIX,
-                            &ctx->call_path, NULL);
+                            &ctx->call_path, NULL, NULL);
     g_task_set_task_data (task, ctx, (GDestroyNotify) get_call_context_free);
 
     mmcli_get_manager (connection,
@@ -1390,7 +1413,7 @@ mmcli_get_call_sync (GDBusConnection  *connection,
     gchar *call_path = NULL;
 
     get_object_lookup_info (str, "call", MM_DBUS_CALL_PREFIX,
-                            &call_path, NULL);
+                            &call_path, NULL, NULL);
 
     manager = mmcli_get_manager_sync (connection);
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
