@@ -1498,16 +1498,16 @@ static gchar *call_str;
 
 static GOptionEntry entries[] = {
     { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
-      "Specify modem by path or index. Shows modem information if no action specified.",
-      "[PATH|INDEX]"
+      "Specify modem by path, index, UID or 'any'. Shows modem information if no action specified.",
+      "[PATH|INDEX|UID|any]"
     },
     { "bearer", 'b', 0, G_OPTION_ARG_STRING, &bearer_str,
       "Specify bearer by path or index. Shows bearer information if no action specified.",
       "[PATH|INDEX]"
     },
     { "sim", 'i', 0, G_OPTION_ARG_STRING, &sim_str,
-      "Specify SIM card by path or index. Shows SIM card information if no action specified.",
-      "[PATH|INDEX]"
+      "Specify SIM card by path, index, UID or 'any'. Shows SIM card information if no action specified.",
+      "[PATH|INDEX|UID|any]"
     },
     { "sms", 's', 0, G_OPTION_ARG_STRING, &sms_str,
       "Specify SMS by path or index. Shows SMS information if no action specified.",
