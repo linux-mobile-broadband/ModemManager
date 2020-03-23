@@ -34,18 +34,18 @@ MMManager *mmcli_get_manager_finish (GAsyncResult        *res);
 MMManager *mmcli_get_manager_sync   (GDBusConnection     *connection);
 
 void     mmcli_get_modem         (GDBusConnection      *connection,
-                                  const gchar          *modem_str,
+                                  const gchar          *str,
                                   GCancellable         *cancellable,
                                   GAsyncReadyCallback   callback,
                                   gpointer              user_data);
 MMObject *mmcli_get_modem_finish (GAsyncResult         *res,
                                   MMManager           **o_manager);
 MMObject *mmcli_get_modem_sync   (GDBusConnection      *connection,
-                                  const gchar          *modem_str,
+                                  const gchar          *str,
                                   MMManager           **o_manager);
 
 void      mmcli_get_bearer        (GDBusConnection      *connection,
-                                   const gchar          *path_or_index,
+                                   const gchar          *str,
                                    GCancellable         *cancellable,
                                    GAsyncReadyCallback   callback,
                                    gpointer              user_data);
@@ -53,12 +53,12 @@ MMBearer *mmcli_get_bearer_finish (GAsyncResult         *res,
                                    MMManager           **manager,
                                    MMObject            **object);
 MMBearer *mmcli_get_bearer_sync   (GDBusConnection      *connection,
-                                   const gchar          *path_or_index,
+                                   const gchar          *str,
                                    MMManager           **manager,
                                    MMObject            **object);
 
 void   mmcli_get_sim        (GDBusConnection      *connection,
-                             const gchar          *path_or_index,
+                             const gchar          *str,
                              GCancellable         *cancellable,
                              GAsyncReadyCallback   callback,
                              gpointer              user_data);
@@ -66,12 +66,12 @@ MMSim *mmcli_get_sim_finish (GAsyncResult         *res,
                              MMManager           **manager,
                              MMObject            **object);
 MMSim *mmcli_get_sim_sync   (GDBusConnection      *connection,
-                             const gchar          *path_or_index,
+                             const gchar          *str,
                              MMManager           **manager,
                              MMObject            **object);
 
 void   mmcli_get_sms        (GDBusConnection     *connection,
-                             const gchar         *path_or_index,
+                             const gchar         *str,
                              GCancellable        *cancellable,
                              GAsyncReadyCallback  callback,
                              gpointer             user_data);
@@ -79,12 +79,12 @@ MMSms *mmcli_get_sms_finish (GAsyncResult        *res,
                              MMManager          **manager,
                              MMObject           **object);
 MMSms *mmcli_get_sms_sync   (GDBusConnection     *connection,
-                             const gchar         *path_or_index,
+                             const gchar         *str,
                              MMManager          **manager,
                              MMObject           **object);
 
 void    mmcli_get_call        (GDBusConnection      *connection,
-                               const gchar          *path_or_index,
+                               const gchar          *str,
                                GCancellable         *cancellable,
                                GAsyncReadyCallback   callback,
                                gpointer              user_data);
@@ -92,7 +92,7 @@ MMCall *mmcli_get_call_finish (GAsyncResult         *res,
                                MMManager           **manager,
                                MMObject            **object);
 MMCall *mmcli_get_call_sync   (GDBusConnection      *connection,
-                               const gchar          *path_or_index,
+                               const gchar          *str,
                                MMManager           **manager,
                                MMObject            **object);
 
