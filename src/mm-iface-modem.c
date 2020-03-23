@@ -4256,22 +4256,33 @@ load_current_capabilities_ready (MMIfaceModem *self,
         return;
     }
 
-    /* If LTE capability is reported, enable EPS network registration checks */
+    /* By default CS/PS/CDMA1X/EVDO network registration checks are the only
+     * ones enabled, so fix them up based on capabilities, enabling EPS or 5GS
+     * checks if required, and disabling CS/PS/CDMA1X/EVDO if required. */
     if (caps & MM_MODEM_CAPABILITY_LTE) {
         mm_obj_dbg (self, "setting EPS network as supported");
         g_object_set (G_OBJECT (self),
                       MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, TRUE,
                       NULL);
     }
-
-    /* If LTE capability is the only one reported, disable all other network registration checks */
-    if (caps == MM_MODEM_CAPABILITY_LTE) {
-        mm_obj_dbg (self, "setting CS/PS/CDMA1x/EVDO networks as unsupported");
+    if (caps & MM_MODEM_CAPABILITY_5GNR) {
+        mm_obj_dbg (self, "setting 5GS network as supported");
         g_object_set (G_OBJECT (self),
-                      MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED,     FALSE,
-                      MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED,     FALSE,
+                      MM_IFACE_MODEM_3GPP_5GS_NETWORK_SUPPORTED, TRUE,
+                      NULL);
+    }
+    if (!(caps & MM_MODEM_CAPABILITY_CDMA_EVDO)) {
+        mm_obj_dbg (self, "setting CDMA1x/EVDO networks as unsupported");
+        g_object_set (G_OBJECT (self),
                       MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, FALSE,
                       MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,   FALSE,
+                      NULL);
+    }
+    if (!(caps & MM_MODEM_CAPABILITY_GSM_UMTS)) {
+        mm_obj_dbg (self, "setting CS/PS networks as unsupported");
+        g_object_set (G_OBJECT (self),
+                      MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, FALSE,
+                      MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, FALSE,
                       NULL);
     }
 

@@ -4066,9 +4066,10 @@ register_state_query_ready (MbimDevice   *device,
 
 static void
 modem_3gpp_run_registration_checks (MMIfaceModem3gpp    *self,
-                                    gboolean             cs_supported,
-                                    gboolean             ps_supported,
-                                    gboolean             eps_supported,
+                                    gboolean             is_cs_supported,
+                                    gboolean             is_ps_supported,
+                                    gboolean             is_eps_supported,
+                                    gboolean             is_5gs_supported,
                                     GAsyncReadyCallback  callback,
                                     gpointer             user_data)
 {

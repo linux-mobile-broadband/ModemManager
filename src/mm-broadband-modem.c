@@ -106,6 +106,7 @@ enum {
     PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED,
+    PROP_MODEM_3GPP_5GS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS,
     PROP_MODEM_3GPP_INITIAL_EPS_BEARER,
     PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
@@ -179,6 +180,7 @@ struct _MMBroadbandModemPrivate {
     gboolean modem_3gpp_cs_network_supported;
     gboolean modem_3gpp_ps_network_supported;
     gboolean modem_3gpp_eps_network_supported;
+    gboolean modem_3gpp_5gs_network_supported;
     /* Implementation helpers */
     GPtrArray *modem_3gpp_registration_regex;
     MMModem3gppFacility modem_3gpp_ignored_facility_locks;
@@ -4860,9 +4862,9 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 /* Registration checks (3GPP interface) */
 
 typedef struct {
-    gboolean cs_supported;
-    gboolean ps_supported;
-    gboolean eps_supported;
+    gboolean is_cs_supported;
+    gboolean is_ps_supported;
+    gboolean is_eps_supported;
     gboolean run_cs;
     gboolean run_ps;
     gboolean run_eps;
@@ -5100,10 +5102,10 @@ run_registration_checks_context_step (GTask *task)
     }
 
     /* If all run checks returned errors we fail */
-    if ((ctx->cs_supported || ctx->ps_supported || ctx->eps_supported) &&
-        (!ctx->cs_supported || ctx->cs_error) &&
-        (!ctx->ps_supported || ctx->ps_error) &&
-        (!ctx->eps_supported || ctx->eps_error)) {
+    if ((ctx->is_cs_supported || ctx->is_ps_supported || ctx->is_eps_supported) &&
+        (!ctx->is_cs_supported || ctx->cs_error) &&
+        (!ctx->is_ps_supported || ctx->ps_error) &&
+        (!ctx->is_eps_supported || ctx->eps_error)) {
         /* Prefer the EPS, and then PS error if any */
         if (ctx->eps_error) {
             g_propagate_error (&error, ctx->eps_error);
@@ -5126,23 +5128,25 @@ run_registration_checks_context_step (GTask *task)
 }
 
 static void
-modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
-                                    gboolean cs_supported,
-                                    gboolean ps_supported,
-                                    gboolean eps_supported,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data)
+modem_3gpp_run_registration_checks (MMIfaceModem3gpp    *self,
+                                    gboolean             is_cs_supported,
+                                    gboolean             is_ps_supported,
+                                    gboolean             is_eps_supported,
+                                    gboolean             is_5gs_supported,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
 {
     RunRegistrationChecksContext *ctx;
     GTask *task;
 
     ctx = g_new0 (RunRegistrationChecksContext, 1);
-    ctx->cs_supported = cs_supported;
-    ctx->ps_supported = ps_supported;
-    ctx->eps_supported = eps_supported;
-    ctx->run_cs = cs_supported;
-    ctx->run_ps = ps_supported;
-    ctx->run_eps = eps_supported;
+    ctx->is_cs_supported = is_cs_supported;
+    ctx->is_ps_supported = is_ps_supported;
+    ctx->is_eps_supported = is_eps_supported;
+    ctx->run_cs = is_cs_supported;
+    ctx->run_ps = is_ps_supported;
+    ctx->run_eps = is_eps_supported;
+    /* TODO: 5gs */
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)run_registration_checks_context_free);
@@ -11915,6 +11919,9 @@ set_property (GObject *object,
     case PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED:
         self->priv->modem_3gpp_eps_network_supported = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_3GPP_5GS_NETWORK_SUPPORTED:
+        self->priv->modem_3gpp_5gs_network_supported = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS:
         self->priv->modem_3gpp_ignored_facility_locks = g_value_get_flags (value);
         break;
@@ -12051,6 +12058,9 @@ get_property (GObject *object,
     case PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED:
         g_value_set_boolean (value, self->priv->modem_3gpp_eps_network_supported);
         break;
+    case PROP_MODEM_3GPP_5GS_NETWORK_SUPPORTED:
+        g_value_set_boolean (value, self->priv->modem_3gpp_5gs_network_supported);
+        break;
     case PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS:
         g_value_set_flags (value, self->priv->modem_3gpp_ignored_facility_locks);
         break;
@@ -12131,6 +12141,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_3gpp_cs_network_supported = TRUE;
     self->priv->modem_3gpp_ps_network_supported = TRUE;
     self->priv->modem_3gpp_eps_network_supported = FALSE;
+    self->priv->modem_3gpp_5gs_network_supported = FALSE;
     self->priv->modem_3gpp_ignored_facility_locks = MM_MODEM_3GPP_FACILITY_NONE;
     self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -12617,6 +12628,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_EPS_NETWORK_SUPPORTED,
                                       MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_3GPP_5GS_NETWORK_SUPPORTED,
+                                      MM_IFACE_MODEM_3GPP_5GS_NETWORK_SUPPORTED);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS,

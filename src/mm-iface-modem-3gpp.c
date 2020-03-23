@@ -38,9 +38,10 @@ static GQuark private_quark;
 
 typedef struct {
     /* Registration state */
-    MMModem3gppRegistrationState  cs;
-    MMModem3gppRegistrationState  ps;
-    MMModem3gppRegistrationState  eps;
+    MMModem3gppRegistrationState  state_cs;
+    MMModem3gppRegistrationState  state_ps;
+    MMModem3gppRegistrationState  state_eps;
+    MMModem3gppRegistrationState  state_5gs;
     gboolean                      manual_registration;
     gchar                        *manual_registration_operator_id;
     GCancellable                 *pending_registration_cancellable;
@@ -74,9 +75,10 @@ get_private (MMIfaceModem3gpp *self)
     priv = g_object_get_qdata (G_OBJECT (self), private_quark);
     if (!priv) {
         priv = g_slice_new0 (Private);
-        priv->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-        priv->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-        priv->eps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        priv->state_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        priv->state_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        priv->state_eps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        priv->state_5gs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
 
@@ -140,50 +142,59 @@ get_consolidated_reg_state (MMIfaceModem3gpp *self)
      * So here we prefer the +CREG response, but if we never got a successful
      * +CREG response, we'll take +CGREG instead.
      */
-    if (priv->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        priv->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-        consolidated = priv->cs;
+    if (priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        consolidated = priv->state_cs;
         goto out;
     }
-    if (priv->ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        priv->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-        consolidated = priv->ps;
+    if (priv->state_ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        priv->state_ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        consolidated = priv->state_ps;
         goto out;
     }
-    if (priv->eps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        priv->eps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-        consolidated = priv->eps;
+    if (priv->state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        priv->state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        consolidated = priv->state_eps;
+        goto out;
+    }
+    if (priv->state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        priv->state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        consolidated = priv->state_5gs;
         goto out;
     }
 
     /* Searching? */
-    if (priv->cs  == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
-        priv->ps  == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
-        priv->eps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING) {
+    if (priv->state_cs  == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
+        priv->state_ps  == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
+        priv->state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ||
+        priv->state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING) {
          consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING;
          goto out;
     }
 
     /* If at least one state is DENIED and the others are UNKNOWN or IDLE, use DENIED */
-    if ((priv->cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
-         priv->ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
-         priv->eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) &&
-        REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->cs) &&
-        REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->ps) &&
-        REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->eps)) {
+    if ((priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
+         priv->state_ps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
+         priv->state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED ||
+         priv->state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED) &&
+        REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->state_cs) &&
+        REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->state_ps) &&
+        REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->state_eps) &&
+        REG_STATE_IS_UNKNOWN_IDLE_DENIED (priv->state_5gs)) {
         consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_DENIED;
         goto out;
     }
 
     /* Emergency services? */
-    if (priv->cs  == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
-        priv->ps  == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
-        priv->eps == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY) {
+    if (priv->state_cs  == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
+        priv->state_ps  == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
+        priv->state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY ||
+        priv->state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY) {
          consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY;
          goto out;
     }
 
-    /* Support for additional registration states reported when on LTE.
+    /* Support for additional registration states reported when on LTE/5GNR.
      *
      * For example, we may see the modem registered in LTE (EPS==HOME), and we
      * may get "SMS only" reported for CS.
@@ -195,29 +206,31 @@ get_consolidated_reg_state (MMIfaceModem3gpp *self)
      * We also warn in that case, because ideally we should always report the
      * LTE registration state first, not this one.
      */
-    if (priv->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY ||
-        priv->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY ||
-        priv->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED ||
-        priv->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
+    if (priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY ||
+        priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_SMS_ONLY ||
+        priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED ||
+        priv->state_cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
         mm_obj_warn (self, "3GPP CSFB registration state is consolidated: %s",
-                     mm_modem_3gpp_registration_state_get_string (priv->cs));
-        consolidated = priv->cs;
+                     mm_modem_3gpp_registration_state_get_string (priv->state_cs));
+        consolidated = priv->state_cs;
         goto out;
     }
 
     /* Idle? */
-    if (priv->cs  == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||
-        priv->ps  == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||
-        priv->eps == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE) {
+    if (priv->state_cs  == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||
+        priv->state_ps  == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||
+        priv->state_eps == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||
+        priv->state_5gs == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE) {
          consolidated = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
          goto out;
     }
 
  out:
-    mm_obj_dbg (self, "building consolidated registration state: cs '%s', ps '%s', eps '%s' --> '%s'",
-                mm_modem_3gpp_registration_state_get_string (priv->cs),
-                mm_modem_3gpp_registration_state_get_string (priv->ps),
-                mm_modem_3gpp_registration_state_get_string (priv->eps),
+    mm_obj_dbg (self, "building consolidated registration state: cs '%s', ps '%s', eps '%s', 5gs '%s' --> '%s'",
+                mm_modem_3gpp_registration_state_get_string (priv->state_cs),
+                mm_modem_3gpp_registration_state_get_string (priv->state_ps),
+                mm_modem_3gpp_registration_state_get_string (priv->state_eps),
+                mm_modem_3gpp_registration_state_get_string (priv->state_5gs),
                 mm_modem_3gpp_registration_state_get_string (consolidated));
 
     return consolidated;
@@ -1141,27 +1154,31 @@ mm_iface_modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
                                              GAsyncReadyCallback callback,
                                              gpointer user_data)
 {
-    gboolean cs_supported = FALSE;
-    gboolean ps_supported = FALSE;
-    gboolean eps_supported = FALSE;
+    gboolean is_cs_supported = FALSE;
+    gboolean is_ps_supported = FALSE;
+    gboolean is_eps_supported = FALSE;
+    gboolean is_5gs_supported = FALSE;
 
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_registration_checks != NULL);
 
     g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &cs_supported,
-                  MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ps_supported,
-                  MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &eps_supported,
+                  MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED,  &is_cs_supported,
+                  MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED,  &is_ps_supported,
+                  MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &is_eps_supported,
+                  MM_IFACE_MODEM_3GPP_5GS_NETWORK_SUPPORTED, &is_5gs_supported,
                   NULL);
 
-    mm_obj_dbg (self, "running registration checks (CS: '%s', PS: '%s', EPS: '%s')",
-                cs_supported ? "yes" : "no",
-                ps_supported ? "yes" : "no",
-                eps_supported ? "yes" : "no");
+    mm_obj_dbg (self, "running registration checks (CS: '%s', PS: '%s', EPS: '%s', 5GS: '%s')",
+                is_cs_supported ? "yes" : "no",
+                is_ps_supported ? "yes" : "no",
+                is_eps_supported ? "yes" : "no",
+                is_5gs_supported ? "yes" : "no");
 
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_registration_checks (self,
-                                                                       cs_supported,
-                                                                       ps_supported,
-                                                                       eps_supported,
+                                                                       is_cs_supported,
+                                                                       is_ps_supported,
+                                                                       is_eps_supported,
+                                                                       is_5gs_supported,
                                                                        callback,
                                                                        user_data);
 }
@@ -1531,7 +1548,7 @@ mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp             *
         return;
 
     priv = get_private (self);
-    priv->cs = state;
+    priv->state_cs = state;
     update_registration_state (self, get_consolidated_reg_state (self), TRUE);
 }
 
@@ -1550,7 +1567,7 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp             *
         return;
 
     priv = get_private (self);
-    priv->ps = state;
+    priv->state_ps = state;
     update_registration_state (self, get_consolidated_reg_state (self), TRUE);
 }
 
@@ -1569,7 +1586,26 @@ mm_iface_modem_3gpp_update_eps_registration_state (MMIfaceModem3gpp             
         return;
 
     priv = get_private (self);
-    priv->eps = state;
+    priv->state_eps = state;
+    update_registration_state (self, get_consolidated_reg_state (self), TRUE);
+}
+
+void
+mm_iface_modem_3gpp_update_5gs_registration_state (MMIfaceModem3gpp             *self,
+                                                   MMModem3gppRegistrationState  state)
+{
+    Private  *priv;
+    gboolean supported = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_5GS_NETWORK_SUPPORTED, &supported,
+                  NULL);
+
+    if (!supported)
+        return;
+
+    priv = get_private (self);
+    priv->state_5gs = state;
     update_registration_state (self, get_consolidated_reg_state (self), TRUE);
 }
 
@@ -2624,6 +2660,14 @@ iface_modem_3gpp_init (gpointer g_iface)
          g_param_spec_boolean (MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED,
                                "EPS network supported",
                                "Whether the modem works in the EPS network",
+                               FALSE,
+                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_3GPP_5GS_NETWORK_SUPPORTED,
+                               "5GS network supported",
+                               "Whether the modem works in the 5GS network",
                                FALSE,
                                G_PARAM_READWRITE));
 

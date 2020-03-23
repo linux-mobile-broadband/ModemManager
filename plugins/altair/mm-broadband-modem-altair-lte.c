@@ -504,12 +504,13 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
 }
 
 static void
-modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
-                                    gboolean cs_supported,
-                                    gboolean ps_supported,
-                                    gboolean eps_supported,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data)
+modem_3gpp_run_registration_checks (MMIfaceModem3gpp    *self,
+                                    gboolean             is_cs_supported,
+                                    gboolean             is_ps_supported,
+                                    gboolean             is_eps_supported,
+                                    gboolean             is_5gs_supported,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
 {
     GTask *task;
 
@@ -517,9 +518,10 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp *self,
 
     g_assert (iface_modem_3gpp_parent->run_registration_checks);
     iface_modem_3gpp_parent->run_registration_checks (self,
-                                                      cs_supported,
-                                                      ps_supported,
-                                                      eps_supported,
+                                                      is_cs_supported,
+                                                      is_ps_supported,
+                                                      is_eps_supported,
+                                                      is_5gs_supported,
                                                       (GAsyncReadyCallback) run_registration_checks_ready,
                                                       task);
 }
