@@ -1039,7 +1039,9 @@ mm_3gpp_cds_regex_get (void)
  * NOTE: ignore WS46 prefix or it will break Cinterion handling.
  *
  * For the specific case of '25', we will check if any other mode supports
- * 4G, and if there is none, we'll remove 4G caps from it.
+ * 4G, and if there is none, we'll remove 4G caps from it. This is needed
+ * because pre-LTE modems used '25' to report GERAN+URAN instead of the
+ * new '29' value since LTE modems are around.
  */
 
 typedef struct {
@@ -1054,7 +1056,7 @@ static const Ws46Mode ws46_modes[] = {
     /* UTRAN only */
     { 22, MM_MODEM_MODE_3G },
     /* 3GPP Systems (GERAN, UTRAN and E-UTRAN) */
-    { 25, MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G },
+    { 25, MM_MODEM_MODE_ANY },
     /* E-UTRAN only */
     { 28, MM_MODEM_MODE_4G },
     /* GERAN and UTRAN */
@@ -1098,6 +1100,8 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
     gboolean    supported_4g = FALSE;
     gboolean    supported_3g = FALSE;
     gboolean    supported_2g = FALSE;
+    gboolean    supported_mode_25 = FALSE;
+    gboolean    supported_mode_29 = FALSE;
 
     r = g_regex_new ("(?:\\+WS46:)?\\s*\\((.*)\\)(?:\\r\\n)?", 0, 0, NULL);
     g_assert (r != NULL);
@@ -1126,21 +1130,38 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
 
         for (j = 0; j < G_N_ELEMENTS (ws46_modes); j++) {
             if (ws46_modes[j].ws46 == val) {
-                if (ws46_modes[j].mode & MM_MODEM_MODE_5G)
-                    supported_5g = TRUE;
-                if (ws46_modes[j].mode & MM_MODEM_MODE_4G)
-                    supported_4g = TRUE;
-                if (ws46_modes[j].mode & MM_MODEM_MODE_3G)
-                    supported_3g = TRUE;
-                if (ws46_modes[j].mode & MM_MODEM_MODE_2G)
-                    supported_2g = TRUE;
-                g_array_append_val (modes, ws46_modes[j].mode);
+                if (val == 25)
+                    supported_mode_25 = TRUE;
+                else {
+                    if (val == 29)
+                        supported_mode_29 = TRUE;
+                    if (ws46_modes[j].mode & MM_MODEM_MODE_5G)
+                        supported_5g = TRUE;
+                    if (ws46_modes[j].mode & MM_MODEM_MODE_4G)
+                        supported_4g = TRUE;
+                    if (ws46_modes[j].mode & MM_MODEM_MODE_3G)
+                        supported_3g = TRUE;
+                    if (ws46_modes[j].mode & MM_MODEM_MODE_2G)
+                        supported_2g = TRUE;
+                    g_array_append_val (modes, ws46_modes[j].mode);
+                }
                 break;
             }
         }
 
         if (j == G_N_ELEMENTS (ws46_modes))
             g_warning ("Unknown +WS46 mode reported: %u", val);
+    }
+
+    if (supported_mode_25) {
+        MMModemMode mode_25;
+
+        mode_25 = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
+        if (supported_4g) {
+            mode_25 |= MM_MODEM_MODE_4G;
+            g_array_append_val (modes, mode_25);
+        } else if (!supported_mode_29)
+            g_array_append_val (modes, mode_25);
     }
 
     if (modes->len == 0) {
