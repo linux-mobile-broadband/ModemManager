@@ -1047,22 +1047,38 @@ typedef struct {
     MMModemMode mode;
 } Ws46Mode;
 
-/* 3GPP TS 27.007 r14, section 5.9: select wireless network +WS46 */
+/* 3GPP TS 27.007 v16.3.0, section 5.9: select wireless network +WS46 */
 static const Ws46Mode ws46_modes[] = {
     /* GSM Digital Cellular Systems (GERAN only) */
     { 12, MM_MODEM_MODE_2G },
     /* UTRAN only */
     { 22, MM_MODEM_MODE_3G },
     /* 3GPP Systems (GERAN, UTRAN and E-UTRAN) */
-    { 25, MM_MODEM_MODE_ANY },
+    { 25, MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G },
     /* E-UTRAN only */
     { 28, MM_MODEM_MODE_4G },
     /* GERAN and UTRAN */
     { 29, MM_MODEM_MODE_2G | MM_MODEM_MODE_3G },
     /* GERAN and E-UTRAN */
     { 30, MM_MODEM_MODE_2G | MM_MODEM_MODE_4G },
-    /* UERAN and E-UTRAN */
+    /* UTRAN and E-UTRAN */
     { 31, MM_MODEM_MODE_3G | MM_MODEM_MODE_4G },
+    /* GERAN, UTRAN, E-UTRAN and NG-RAN */
+    { 35, MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G },
+    /* NG-RAN only */
+    { 36, MM_MODEM_MODE_5G },
+    /* E-UTRAN and NG-RAN */
+    { 37, MM_MODEM_MODE_4G | MM_MODEM_MODE_5G },
+    /* UTRAN, E-UTRAN and NG-RAN */
+    { 38, MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G },
+    /* GERAN, E-UTRAN and NG-RAN */
+    { 39, MM_MODEM_MODE_2G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G },
+    /* UTRAN and NG-RAN */
+    { 40, MM_MODEM_MODE_3G | MM_MODEM_MODE_5G },
+    /* GERAN, UTRAN and NG-RAN */
+    { 41, MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_5G },
+    /* GERAN and NG-RAN */
+    { 42, MM_MODEM_MODE_2G | MM_MODEM_MODE_5G },
 };
 
 GArray *
@@ -1078,6 +1094,7 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
     guint       val;
     guint       i;
     guint       j;
+    gboolean    supported_5g = FALSE;
     gboolean    supported_4g = FALSE;
     gboolean    supported_3g = FALSE;
     gboolean    supported_2g = FALSE;
@@ -1109,14 +1126,14 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
 
         for (j = 0; j < G_N_ELEMENTS (ws46_modes); j++) {
             if (ws46_modes[j].ws46 == val) {
-                if (val != 25) {
-                    if (ws46_modes[j].mode & MM_MODEM_MODE_4G)
-                        supported_4g = TRUE;
-                    if (ws46_modes[j].mode & MM_MODEM_MODE_3G)
-                        supported_3g = TRUE;
-                    if (ws46_modes[j].mode & MM_MODEM_MODE_2G)
-                        supported_2g = TRUE;
-                }
+                if (ws46_modes[j].mode & MM_MODEM_MODE_5G)
+                    supported_5g = TRUE;
+                if (ws46_modes[j].mode & MM_MODEM_MODE_4G)
+                    supported_4g = TRUE;
+                if (ws46_modes[j].mode & MM_MODEM_MODE_3G)
+                    supported_3g = TRUE;
+                if (ws46_modes[j].mode & MM_MODEM_MODE_2G)
+                    supported_2g = TRUE;
                 g_array_append_val (modes, ws46_modes[j].mode);
                 break;
             }
@@ -1145,6 +1162,8 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
                 *mode |= MM_MODEM_MODE_3G;
             if (supported_4g)
                 *mode |= MM_MODEM_MODE_4G;
+            if (supported_5g)
+                *mode |= MM_MODEM_MODE_5G;
 
             if (*mode == 0) {
                 inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "No way to fixup the ANY value");

@@ -975,6 +975,9 @@ mm_modem_mode_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi)
     if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_LTE)
         mode |= MM_MODEM_MODE_4G;
 
+    if (qmi & QMI_NAS_RAT_MODE_PREFERENCE_5GNR)
+        mode |= MM_MODEM_MODE_5G;
+
     return mode;
 }
 
@@ -1002,6 +1005,9 @@ mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mode,
 
         if (mode & MM_MODEM_MODE_4G)
             pref |= QMI_NAS_RAT_MODE_PREFERENCE_LTE;
+
+        if (mode & MM_MODEM_MODE_5G)
+            pref |= QMI_NAS_RAT_MODE_PREFERENCE_5GNR;
     }
 
     return pref;
@@ -1106,6 +1112,14 @@ mm_modem_mode_to_qmi_acquisition_order_preference (MMModemMode allowed,
     QmiNasRadioInterface  value;
 
     array = g_array_new (FALSE, FALSE, sizeof (QmiNasRadioInterface));
+
+    if (allowed & MM_MODEM_MODE_5G) {
+        value = QMI_NAS_RADIO_INTERFACE_5GNR;
+        if (preferred == MM_MODEM_MODE_5G)
+            g_array_prepend_val (array, value);
+        else
+            g_array_append_val (array, value);
+    }
 
     if (allowed & MM_MODEM_MODE_4G) {
         value = QMI_NAS_RADIO_INTERFACE_LTE;
@@ -1300,6 +1314,7 @@ mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode,
         return QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_AUTOMATIC;
     case MM_MODEM_MODE_CS:
     case MM_MODEM_MODE_4G:
+    case MM_MODEM_MODE_5G:
     case MM_MODEM_MODE_ANY:
     default:
         break;

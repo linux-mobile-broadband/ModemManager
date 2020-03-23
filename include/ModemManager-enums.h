@@ -243,6 +243,7 @@ typedef enum { /*< underscore_name=mm_modem_access_technology >*/
  * @MM_MODEM_MODE_2G: GPRS, EDGE.
  * @MM_MODEM_MODE_3G: UMTS, HSxPA.
  * @MM_MODEM_MODE_4G: LTE.
+ * @MM_MODEM_MODE_5G: 5GNR. Since 1.14.
  * @MM_MODEM_MODE_ANY: Any mode can be used (only this value allowed for POTS modems).
  *
  * Bitfield to indicate which access modes are supported, allowed or
@@ -256,6 +257,7 @@ typedef enum { /*< underscore_name=mm_modem_mode >*/
     MM_MODEM_MODE_2G   = 1 << 1,
     MM_MODEM_MODE_3G   = 1 << 2,
     MM_MODEM_MODE_4G   = 1 << 3,
+    MM_MODEM_MODE_5G   = 1 << 4,
     MM_MODEM_MODE_ANY  = 0xFFFFFFFF
 } MMModemMode;
 

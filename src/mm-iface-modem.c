@@ -5515,6 +5515,22 @@ mm_iface_modem_is_4g_only (MMIfaceModem *self)
             FALSE);
 }
 
+gboolean
+mm_iface_modem_is_5g (MMIfaceModem *self)
+{
+    return find_supported_mode (self, MM_MODEM_MODE_5G, NULL);
+}
+
+gboolean
+mm_iface_modem_is_5g_only (MMIfaceModem *self)
+{
+    gboolean only;
+
+    return (find_supported_mode (self, MM_MODEM_MODE_5G, &only) ?
+            only :
+            FALSE);
+}
+
 /*****************************************************************************/
 
 MMModemCapability
