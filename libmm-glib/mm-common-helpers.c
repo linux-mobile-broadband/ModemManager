@@ -1322,7 +1322,14 @@ mm_get_int_from_str (const gchar *str,
     glong num;
     guint eol = 0;
 
-    if (!str || !str[0])
+    if (!str)
+        return FALSE;
+
+    /* ignore all leading whitespaces */
+    while (str[0] == ' ')
+        str++;
+
+    if (!str[0])
         return FALSE;
 
     for (num = 0; str[num]; num++) {
@@ -1382,7 +1389,14 @@ mm_get_u64_from_str (const gchar *str,
     guint64 num;
     guint   eol = 0;
 
-    if (!str || !str[0])
+    if (!str)
+        return FALSE;
+
+    /* ignore all leading whitespaces */
+    while (str[0] == ' ')
+        str++;
+
+    if (!str[0])
         return FALSE;
 
     for (num = 0; str[num]; num++) {
@@ -1433,6 +1447,10 @@ mm_get_u64_from_hex_str (const gchar *str,
 
     if (!str)
         return FALSE;
+
+    /* ignore all leading whitespaces */
+    while (str[0] == ' ')
+        str++;
 
     if (g_str_has_prefix (str, "0x"))
         str = &str[2];
