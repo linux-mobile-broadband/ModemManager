@@ -1234,7 +1234,8 @@ get_mm_access_tech_from_etsi_access_tech (guint act)
 {
     /* See ETSI TS 27.007 */
     switch (act) {
-    case 0:
+    case 0: /* GSM */
+    case 8: /* EC-GSM-IoT (A/Gb mode) */
         return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
     case 1:
         return MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT;
@@ -1248,8 +1249,15 @@ get_mm_access_tech_from_etsi_access_tech (guint act)
         return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     case 6:
         return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
-    case 7:
+    case 7:  /* E-UTRAN */
+    case 9:  /* E-UTRAN (NB-S1) */
+    case 10: /* E-UTRA connected to a 5GCN */
         return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    case 11: /* NR connected to a 5G CN */
+    case 12: /* NG-RAN */
+        return MM_MODEM_ACCESS_TECHNOLOGY_5GNR;
+    case 13: /* E-UTRA-NR dual connectivity */
+        return (MM_MODEM_ACCESS_TECHNOLOGY_5GNR | MM_MODEM_ACCESS_TECHNOLOGY_LTE);
     default:
         return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     }
