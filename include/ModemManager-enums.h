@@ -1193,6 +1193,7 @@ typedef enum { /*< underscore_name=mm_modem_cdma_rm_protocol >*/
  * @MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY: Emergency services only. Since 1.8.
  * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", home network (applicable only when on LTE). Since 1.8.
  * @MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED: Registered for "CSFB not preferred", roaming network (applicable only when on LTE). Since 1.8.
+ * @MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS: Attached for access to Restricted Local Operator Services (applicable only when on LTE). Since 1.14.
  *
  * GSM registration code as defined in 3GPP TS 27.007.
  *
@@ -1210,6 +1211,7 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_registration_state >*/
     MM_MODEM_3GPP_REGISTRATION_STATE_EMERGENCY_ONLY             = 8,
     MM_MODEM_3GPP_REGISTRATION_STATE_HOME_CSFB_NOT_PREFERRED    = 9,
     MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED = 10,
+    MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS              = 11,
 } MMModem3gppRegistrationState;
 
 /**

@@ -2096,8 +2096,8 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
         return FALSE;
     }
 
-    /* 'roaming (csfb not preferred)' is the last valid state */
-    if (stat > MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
+    /* 'attached RLOS' is the last valid state */
+    if (stat > MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS) {
         mm_obj_warn (log_object, "unknown registration state value '%lu'", stat);
         stat = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     }
