@@ -4578,6 +4578,7 @@ registration_state_changed (MMPortSerialAt *port,
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     gboolean cgreg = FALSE;
     gboolean cereg = FALSE;
+    gboolean c5greg = FALSE;
     GError *error = NULL;
 
     if (!mm_3gpp_parse_creg_response (match_info,
@@ -4588,6 +4589,7 @@ registration_state_changed (MMPortSerialAt *port,
                                       &act,
                                       &cgreg,
                                       &cereg,
+                                      &c5greg,
                                       &error)) {
         mm_obj_warn (self, "error parsing unsolicited registration: %s",
                      error && error->message ? error->message : "(unknown)");
@@ -4598,7 +4600,7 @@ registration_state_changed (MMPortSerialAt *port,
     /* Report new registration state and fix LAC/TAC.
      * According to 3GPP TS 27.007:
      *  - If CREG reports <AcT> 7 (LTE) then the <lac> field contains TAC
-     *  - CEREG always reports TAC
+     *  - CEREG/C5GREG always reports TAC
      */
     if (cgreg)
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
@@ -4606,6 +4608,10 @@ registration_state_changed (MMPortSerialAt *port,
         tac = lac;
         lac = 0;
         mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+    } else if (c5greg) {
+        tac = lac;
+        lac = 0;
+        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
     } else {
         if (act == MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
             tac = lac;
@@ -4865,33 +4871,35 @@ typedef struct {
     gboolean is_cs_supported;
     gboolean is_ps_supported;
     gboolean is_eps_supported;
+    gboolean is_5gs_supported;
     gboolean run_cs;
     gboolean run_ps;
     gboolean run_eps;
+    gboolean run_5gs;
     gboolean running_cs;
     gboolean running_ps;
     gboolean running_eps;
-    GError *cs_error;
-    GError *ps_error;
-    GError *eps_error;
+    gboolean running_5gs;
+    GError *error_cs;
+    GError *error_ps;
+    GError *error_eps;
+    GError *error_5gs;
 } RunRegistrationChecksContext;
 
 static void
 run_registration_checks_context_free (RunRegistrationChecksContext *ctx)
 {
-    if (ctx->cs_error)
-        g_error_free (ctx->cs_error);
-    if (ctx->ps_error)
-        g_error_free (ctx->ps_error);
-    if (ctx->eps_error)
-        g_error_free (ctx->eps_error);
+    g_clear_error (&ctx->error_cs);
+    g_clear_error (&ctx->error_ps);
+    g_clear_error (&ctx->error_eps);
+    g_clear_error (&ctx->error_5gs);
     g_free (ctx);
 }
 
 static gboolean
-modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
-                                           GAsyncResult *res,
-                                           GError **error)
+modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp  *self,
+                                           GAsyncResult      *res,
+                                           GError           **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -4899,9 +4907,26 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
 static void run_registration_checks_context_step (GTask *task);
 
 static void
+run_registration_checks_context_set_error (RunRegistrationChecksContext *ctx,
+                                           GError                       *error)
+{
+    g_assert (error != NULL);
+    if (ctx->running_cs)
+        ctx->error_cs = error;
+    else if (ctx->running_ps)
+        ctx->error_ps = error;
+    else if (ctx->running_eps)
+        ctx->error_eps = error;
+    else if (ctx->running_5gs)
+        ctx->error_5gs = error;
+    else
+        g_assert_not_reached ();
+}
+
+static void
 registration_status_check_ready (MMBroadbandModem *self,
-                                 GAsyncResult *res,
-                                 GTask *task)
+                                 GAsyncResult     *res,
+                                 GTask            *task)
 {
     RunRegistrationChecksContext *ctx;
     const gchar *response;
@@ -4909,31 +4934,23 @@ registration_status_check_ready (MMBroadbandModem *self,
     GMatchInfo *match_info = NULL;
     guint i;
     gboolean parsed;
-    gboolean cgreg;
-    gboolean cereg;
-    MMModem3gppRegistrationState state;
-    MMModemAccessTechnology act;
-    gulong lac;
-    gulong tac;
-    gulong cid;
+    gboolean cgreg = FALSE;
+    gboolean cereg = FALSE;
+    gboolean c5greg = FALSE;
+    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gulong lac = 0;
+    gulong tac = 0;
+    gulong cid = 0;
 
     ctx = g_task_get_task_data (task);
 
     /* Only one must be running */
-    g_assert ((ctx->running_cs ? 1 : 0) +
-              (ctx->running_ps ? 1 : 0) +
-              (ctx->running_eps ? 1 : 0) == 1);
+    g_assert ((ctx->running_cs + ctx->running_ps + ctx->running_eps + ctx->running_5gs) == 1);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        g_assert (error != NULL);
-        if (ctx->running_cs)
-            ctx->cs_error = error;
-        else if (ctx->running_ps)
-            ctx->ps_error = error;
-        else
-            ctx->eps_error = error;
-
+        run_registration_checks_context_set_error (ctx, error);
         run_registration_checks_context_step (task);
         return;
     }
@@ -4951,8 +4968,7 @@ registration_status_check_ready (MMBroadbandModem *self,
     for (i = 0;
          i < self->priv->modem_3gpp_registration_regex->len;
          i++) {
-        if (g_regex_match ((GRegex *)g_ptr_array_index (
-                               self->priv->modem_3gpp_registration_regex, i),
+        if (g_regex_match ((GRegex *)g_ptr_array_index (self->priv->modem_3gpp_registration_regex, i),
                            response,
                            0,
                            &match_info))
@@ -4966,24 +4982,11 @@ registration_status_check_ready (MMBroadbandModem *self,
                              MM_CORE_ERROR_FAILED,
                              "Unknown registration status response: '%s'",
                              response);
-        if (ctx->running_cs)
-            ctx->cs_error = error;
-        else if (ctx->running_ps)
-            ctx->ps_error = error;
-        else
-            ctx->eps_error = error;
-
+        run_registration_checks_context_set_error (ctx, error);
         run_registration_checks_context_step (task);
         return;
     }
 
-    cgreg = FALSE;
-    cereg = FALSE;
-    state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    tac = 0;
-    lac = 0;
-    cid = 0;
     parsed = mm_3gpp_parse_creg_response (match_info,
                                           self,
                                           &state,
@@ -4992,6 +4995,7 @@ registration_status_check_ready (MMBroadbandModem *self,
                                           &act,
                                           &cgreg,
                                           &cereg,
+                                          &c5greg,
                                           &error);
     g_match_info_free (match_info);
 
@@ -5001,12 +5005,7 @@ registration_status_check_ready (MMBroadbandModem *self,
                                  MM_CORE_ERROR_FAILED,
                                  "Error parsing registration response: '%s'",
                                  response);
-        if (ctx->running_cs)
-            ctx->cs_error = error;
-        else if (ctx->running_ps)
-            ctx->ps_error = error;
-        else
-            ctx->eps_error = error;
+        run_registration_checks_context_set_error (ctx, error);
         run_registration_checks_context_step (task);
         return;
     }
@@ -5021,6 +5020,8 @@ registration_status_check_ready (MMBroadbandModem *self,
             mm_obj_dbg (self, "got PS registration state when checking CS registration state");
         else if (ctx->running_eps)
             mm_obj_dbg (self, "got PS registration state when checking EPS registration state");
+        else if (ctx->running_5gs)
+            mm_obj_dbg (self, "got PS registration state when checking 5GS registration state");
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
     } else if (cereg) {
         tac = lac;
@@ -5029,7 +5030,19 @@ registration_status_check_ready (MMBroadbandModem *self,
             mm_obj_dbg (self, "got EPS registration state when checking CS registration state");
         else if (ctx->running_ps)
             mm_obj_dbg (self, "got EPS registration state when checking PS registration state");
+        else if (ctx->running_5gs)
+            mm_obj_dbg (self, "got EPS registration state when checking 5GS registration state");
         mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+    } else if (c5greg) {
+        tac = lac;
+        lac = 0;
+        if (ctx->running_cs)
+            mm_obj_dbg (self, "got 5GS registration state when checking CS registration state");
+        else if (ctx->running_ps)
+            mm_obj_dbg (self, "got 5GS registration state when checking PS registration state");
+        else if (ctx->running_eps)
+            mm_obj_dbg (self, "got 5GS registration state when checking EPS registration state");
+        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
     } else {
         if (act == MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
             tac = lac;
@@ -5039,6 +5052,8 @@ registration_status_check_ready (MMBroadbandModem *self,
             mm_obj_dbg (self, "got CS registration state when checking PS registration state");
         else if (ctx->running_eps)
             mm_obj_dbg (self, "got CS registration state when checking EPS registration state");
+        else if (ctx->running_5gs)
+            mm_obj_dbg (self, "got CS registration state when checking 5GS registration state");
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), state);
     }
 
@@ -5061,6 +5076,7 @@ run_registration_checks_context_step (GTask *task)
     ctx->running_cs = FALSE;
     ctx->running_ps = FALSE;
     ctx->running_eps = FALSE;
+    ctx->running_5gs = FALSE;
 
     if (ctx->run_cs) {
         ctx->running_cs = TRUE;
@@ -5101,22 +5117,35 @@ run_registration_checks_context_step (GTask *task)
         return;
     }
 
+    if (ctx->run_5gs) {
+        ctx->running_5gs = TRUE;
+        ctx->run_5gs = FALSE;
+        /* Check current 5GS-registration state. */
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+C5GREG?",
+                                  10,
+                                  FALSE,
+                                  (GAsyncReadyCallback)registration_status_check_ready,
+                                  task);
+        return;
+    }
+
     /* If all run checks returned errors we fail */
-    if ((ctx->is_cs_supported || ctx->is_ps_supported || ctx->is_eps_supported) &&
-        (!ctx->is_cs_supported || ctx->cs_error) &&
-        (!ctx->is_ps_supported || ctx->ps_error) &&
-        (!ctx->is_eps_supported || ctx->eps_error)) {
-        /* Prefer the EPS, and then PS error if any */
-        if (ctx->eps_error) {
-            g_propagate_error (&error, ctx->eps_error);
-            ctx->eps_error = NULL;
-        } else if (ctx->ps_error) {
-            g_propagate_error (&error, ctx->ps_error);
-            ctx->ps_error = NULL;
-        } else if (ctx->cs_error) {
-            g_propagate_error (&error, ctx->cs_error);
-            ctx->cs_error = NULL;
-        } else
+    if ((ctx->is_cs_supported || ctx->is_ps_supported || ctx->is_eps_supported || ctx->is_5gs_supported) &&
+        (!ctx->is_cs_supported || ctx->error_cs) &&
+        (!ctx->is_ps_supported || ctx->error_ps) &&
+        (!ctx->is_eps_supported || ctx->error_eps) &&
+        (!ctx->is_5gs_supported || ctx->error_5gs)) {
+        /* When reporting errors, prefer the 5GS, then EPS, then PS, then CS */
+        if (ctx->error_5gs)
+            error = g_steal_pointer (&ctx->error_5gs);
+        else if (ctx->error_eps)
+            error = g_steal_pointer (&ctx->error_eps);
+        else if (ctx->error_ps)
+            error = g_steal_pointer (&ctx->error_ps);
+        else if (ctx->error_cs)
+            error = g_steal_pointer (&ctx->error_cs);
+        else
             g_assert_not_reached ();
     }
 
@@ -5143,10 +5172,11 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp    *self,
     ctx->is_cs_supported = is_cs_supported;
     ctx->is_ps_supported = is_ps_supported;
     ctx->is_eps_supported = is_eps_supported;
+    ctx->is_5gs_supported = is_5gs_supported;
     ctx->run_cs = is_cs_supported;
     ctx->run_ps = is_ps_supported;
     ctx->run_eps = is_eps_supported;
-    /* TODO: 5gs */
+    ctx->run_5gs = is_5gs_supported;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)run_registration_checks_context_free);

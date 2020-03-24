@@ -222,6 +222,7 @@ gboolean mm_3gpp_parse_creg_response (GMatchInfo                    *info,
                                       MMModemAccessTechnology       *out_act,
                                       gboolean                      *out_cgreg,
                                       gboolean                      *out_cereg,
+                                      gboolean                      *out_c5greg,
                                       GError                       **error);
 
 /* AT+CMGF=? (SMS message format) response parser */

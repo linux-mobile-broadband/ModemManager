@@ -821,10 +821,10 @@ mm_flow_control_from_string (const gchar  *str,
 /*************************************************************************/
 
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
-#define CREG1 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9])"
+#define CREG1 "\\+(CREG|CGREG|CEREG|C5GREG):\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>                  (GSM 07.07 CREG=1 solicited) */
-#define CREG2 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*0*([0-9])"
+#define CREG2 "\\+(CREG|CGREG|CEREG|C5GREG):\\s*0*([0-9]),\\s*0*([0-9])"
 
 /* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
 #define CREG3 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
@@ -853,13 +853,19 @@ mm_flow_control_from_string (const gchar  *str,
 /* +CEREG: <n>,<stat>,<lac>,<rac>,<ci>,<AcT> (ETSI 27.007 v8.6 CREG=2 solicited with RAC) */
 #define CEREG2 "\\+(CEREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
 
+/* +C5GREG: <stat>,<lac>,<ci>,<AcT>,<Allowed_NSSAI_length>,<Allowed_NSSAI>   (ETSI 27.007 CREG=2 unsolicited) */
+#define C5GREG1 "\\+(C5GREG):\\s*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+
+/* +C5GREG: <n>,<stat>,<lac>,<ci>,<AcT>,<Allowed_NSSAI_length>,<Allowed_NSSAI> (ETSI 27.007 solicited) */
+#define C5GREG2 "\\+(C5GREG):\\s*([0-9]+)\\s*,\\s*([0-9+])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([0-9]+)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+
 GPtrArray *
 mm_3gpp_creg_regex_get (gboolean solicited)
 {
     GPtrArray *array;
     GRegex    *regex;
 
-    array = g_ptr_array_sized_new (12);
+    array = g_ptr_array_sized_new (14);
 
     /* #1 */
     if (solicited)
@@ -954,6 +960,22 @@ mm_3gpp_creg_regex_get (gboolean solicited)
         regex = g_regex_new (CEREG2 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     else
         regex = g_regex_new ("\\r\\n" CEREG2 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* C5GREG #1 */
+    if (solicited)
+        regex = g_regex_new (C5GREG1 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" C5GREG1 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* C5GREG #2 */
+    if (solicited)
+        regex = g_regex_new (C5GREG2 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" C5GREG2 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_assert (regex);
     g_ptr_array_add (array, regex);
 
@@ -1962,6 +1984,7 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
                              MMModemAccessTechnology       *out_act,
                              gboolean                      *out_cgreg,
                              gboolean                      *out_cereg,
+                             gboolean                      *out_c5greg,
                              GError                       **error)
 {
     gint n_matches, act = -1;
@@ -1970,17 +1993,19 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
     guint istat = 0, ilac = 0, ici = 0, iact = 0;
     gchar *str;
 
-    g_return_val_if_fail (info != NULL, FALSE);
-    g_return_val_if_fail (out_reg_state != NULL, FALSE);
-    g_return_val_if_fail (out_lac != NULL, FALSE);
-    g_return_val_if_fail (out_ci != NULL, FALSE);
-    g_return_val_if_fail (out_act != NULL, FALSE);
-    g_return_val_if_fail (out_cgreg != NULL, FALSE);
-    g_return_val_if_fail (out_cereg != NULL, FALSE);
+    g_assert (info != NULL);
+    g_assert (out_reg_state != NULL);
+    g_assert (out_lac != NULL);
+    g_assert (out_ci != NULL);
+    g_assert (out_act != NULL);
+    g_assert (out_cgreg != NULL);
+    g_assert (out_cereg != NULL);
+    g_assert (out_c5greg != NULL);
 
     str = g_match_info_fetch (info, 1);
     *out_cgreg = (str && strstr (str, "CGREG")) ? TRUE : FALSE;
     *out_cereg = (str && strstr (str, "CEREG")) ? TRUE : FALSE;
+    *out_c5greg = (str && strstr (str, "C5GREG")) ? TRUE : FALSE;
     g_free (str);
 
     /* Normally the number of matches could be used to determine what each
@@ -2025,37 +2050,49 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
             /* Check if the third item is the LAC to distinguish the two cases */
             if (item_is_lac_not_stat (info, 3)) {
                 istat = 2;
-                ilac = 3;
+                ilac  = 3;
             } else {
                 istat = 3;
-                ilac = 4;
+                ilac  = 4;
             }
-            ici = 5;
+            ici  = 5;
             iact = 6;
         } else {
             /* Check if the third item is the LAC to distinguish the two cases */
             if (item_is_lac_not_stat (info, 3)) {
                 istat = 2;
-                ilac = 3;
-                ici = 4;
-                iact = 5;
+                ilac  = 3;
+                ici   = 4;
+                iact  = 5;
             } else {
                 istat = 3;
-                ilac = 4;
-                ici = 5;
-                iact = 6;
+                ilac  = 4;
+                ici   = 5;
+                iact  = 6;
             }
         }
     } else if (n_matches == 8) {
         /* CEREG=2 (solicited with RAC):  +CEREG: <n>,<stat>,<lac>,<rac>,<ci>,<AcT>
+         * C5GREG=2 (unsolicited):        +C5GREG: <stat>,<tac>,<ci>,<AcT>,<Allowed_NSSAI_length>,<Allowed_NSSAI>
          */
         if (*out_cereg) {
             istat = 3;
-            ilac = 4;
-            ici = 6;
-            iact = 7;
+            ilac  = 4;
+            ici   = 6;
+            iact  = 7;
+        } else if (*out_c5greg) {
+            istat = 2;
+            ilac  = 3;
+            ici   = 4;
+            iact  = 5;
         }
-     }
+    } else if (n_matches == 9) {
+        /* C5GREG=2 (solicited): +C5GREG: <n>,<stat>,<tac>,<ci>,<AcT>,<Allowed_NSSAI_length>,<Allowed_NSSAI> */
+        istat = 3;
+        ilac  = 4;
+        ici   = 5;
+        iact  = 6;
+    }
 
     /* Status */
     if (!mm_get_uint_from_match_info (info, istat, &stat)) {
