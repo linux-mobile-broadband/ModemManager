@@ -13,4 +13,14 @@ SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInte
 #  ttyACM2 (if #6): AT port
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0007", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
 
+# Fibocom FM150
+#  ttyUSB0 (if #0): QCDM port
+#  ttyUSB1 (if #1): AT port
+#  ttyUSB2 (if #2): AT port
+#  ttyUSB2 (if #3): Ignore
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0104", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0104", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0104", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0104", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
+
 LABEL="mm_fibocom_port_types_end"
