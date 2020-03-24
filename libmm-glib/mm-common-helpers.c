@@ -1492,6 +1492,31 @@ mm_get_u64_from_match_info (GMatchInfo *match_info,
 }
 
 gboolean
+mm_get_uint_from_hex_match_info (GMatchInfo *match_info,
+                                 guint32     match_index,
+                                 guint      *out)
+{
+    guint64 num;
+
+    if (!mm_get_u64_from_hex_match_info (match_info, match_index, &num) || num > G_MAXUINT)
+        return FALSE;
+
+    *out = (guint)num;
+    return TRUE;
+}
+
+gboolean
+mm_get_u64_from_hex_match_info (GMatchInfo *match_info,
+                                guint32     match_index,
+                                guint64    *out)
+{
+    g_autofree gchar *s = NULL;
+
+    s = mm_get_string_unquoted_from_match_info (match_info, match_index);
+    return (s ? mm_get_u64_from_hex_str (s, out) : FALSE);
+}
+
+gboolean
 mm_get_double_from_str (const gchar *str,
                         gdouble *out)
 {

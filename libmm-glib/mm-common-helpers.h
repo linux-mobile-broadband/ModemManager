@@ -164,6 +164,12 @@ gboolean  mm_get_uint_from_match_info            (GMatchInfo  *match_info,
 gboolean  mm_get_u64_from_match_info             (GMatchInfo  *match_info,
                                                   guint32      match_index,
                                                   guint64     *out);
+gboolean  mm_get_uint_from_hex_match_info        (GMatchInfo  *match_info,
+                                                  guint32      match_index,
+                                                  guint       *out);
+gboolean  mm_get_u64_from_hex_match_info         (GMatchInfo  *match_info,
+                                                  guint32      match_index,
+                                                  guint64     *out);
 gboolean  mm_get_double_from_str                 (const gchar *str,
                                                   gdouble     *out);
 gboolean  mm_get_double_from_match_info          (GMatchInfo  *match_info,
