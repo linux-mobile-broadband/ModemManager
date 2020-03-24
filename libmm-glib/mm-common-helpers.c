@@ -1356,17 +1356,10 @@ mm_get_int_from_match_info (GMatchInfo *match_info,
                             guint32 match_index,
                             gint *out)
 {
-    gchar *s;
-    gboolean ret;
+    g_autofree gchar *s = NULL;
 
-    s = g_match_info_fetch (match_info, match_index);
-    if (!s)
-        return FALSE;
-
-    ret = mm_get_int_from_str (s, out);
-    g_free (s);
-
-    return ret;
+    s = mm_get_string_unquoted_from_match_info (match_info, match_index);
+    return (s ? mm_get_int_from_str (s, out) : FALSE);
 }
 
 gboolean
@@ -1492,17 +1485,10 @@ mm_get_u64_from_match_info (GMatchInfo *match_info,
                             guint32     match_index,
                             guint64    *out)
 {
-    gchar *s;
-    gboolean ret;
+    g_autofree gchar *s = NULL;
 
-    s = g_match_info_fetch (match_info, match_index);
-    if (!s)
-        return FALSE;
-
-    ret = mm_get_u64_from_str (s, out);
-    g_free (s);
-
-    return ret;
+    s = mm_get_string_unquoted_from_match_info (match_info, match_index);
+    return (s ? mm_get_u64_from_str (s, out) : FALSE);
 }
 
 gboolean
@@ -1549,17 +1535,10 @@ mm_get_double_from_match_info (GMatchInfo *match_info,
                                guint32 match_index,
                                gdouble *out)
 {
-    gchar *s;
-    gboolean ret;
+    g_autofree gchar *s = NULL;
 
-    s = g_match_info_fetch (match_info, match_index);
-    if (!s)
-        return FALSE;
-
-    ret = mm_get_double_from_str (s, out);
-    g_free (s);
-
-    return ret;
+    s = mm_get_string_unquoted_from_match_info (match_info, match_index);
+    return (s ? mm_get_double_from_str (s, out) : FALSE);
 }
 
 gchar *
