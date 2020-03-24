@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2018-2020 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <stdlib.h>
@@ -27,6 +27,10 @@
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
 #include "mm-broadband-modem-mbim-xmm.h"
+#endif
+
+#if defined WITH_QMI
+#include "mm-broadband-modem-qmi.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginFibocom, mm_plugin_fibocom, MM_TYPE_PLUGIN)
@@ -64,6 +68,17 @@ create_modem (MMPlugin     *self,
     }
 #endif
 
+#if defined WITH_QMI
+    if (mm_port_probe_list_has_qmi_port (probes)) {
+        mm_obj_dbg (self, "QMI-powered Fibocom modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
+    }
+#endif
+
     if (mm_port_probe_list_is_xmm (probes)) {
         mm_obj_dbg (self, "XMM-based Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_xmm_new (uid,
@@ -88,7 +103,7 @@ mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
     static const guint16 vendor_ids[] = { 0x2cb7, 0 };
-    static const gchar *drivers[] = { "cdc_mbim", NULL };
+    static const gchar *drivers[] = { "cdc_mbim", "qmi_wwan", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_FIBOCOM,
