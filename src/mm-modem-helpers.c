@@ -828,7 +828,6 @@ mm_flow_control_from_string (const gchar  *str,
 
 /* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
 #define CREG3 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
-#define CREG11 "\\+(CREG|CGREG|CEREG):\\s*0*([0-9]),\\s*(\"[^\"\\s]*\")\\s*,\\s*(\"[^\"\\s]*\")"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
 #define CREG4 "\\+(CREG|CGREG|CEREG):\\s*([0-9]),\\s*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
@@ -857,8 +856,10 @@ mm_flow_control_from_string (const gchar  *str,
 GPtrArray *
 mm_3gpp_creg_regex_get (gboolean solicited)
 {
-    GPtrArray *array = g_ptr_array_sized_new (13);
-    GRegex *regex;
+    GPtrArray *array;
+    GRegex    *regex;
+
+    array = g_ptr_array_sized_new (12);
 
     /* #1 */
     if (solicited)
@@ -937,14 +938,6 @@ mm_3gpp_creg_regex_get (gboolean solicited)
         regex = g_regex_new (CREG10 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     else
         regex = g_regex_new ("\\r\\n" CREG10 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #11 */
-    if (solicited)
-        regex = g_regex_new (CREG11 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG11 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_assert (regex);
     g_ptr_array_add (array, regex);
 
@@ -1946,35 +1939,6 @@ mm_3gpp_parse_cgact_read_response (const gchar *reply,
 
 /*************************************************************************/
 
-static gulong
-parse_uint (gchar    *str,
-            gint      base,
-            gulong    nmin,
-            gulong    nmax,
-            gboolean *valid)
-{
-    gulong ret = 0;
-    gchar *endquote;
-
-    *valid = FALSE;
-    if (!str)
-        return 0;
-
-    /* Strip quotes */
-    if (str[0] == '"')
-        str++;
-    endquote = strchr (str, '"');
-    if (endquote)
-        *endquote = '\0';
-
-    if (strlen (str)) {
-        ret = strtol (str, NULL, base);
-        if ((nmin == nmax) || (ret >= nmin && ret <= nmax))
-            *valid = TRUE;
-    }
-    return *valid ? (guint) ret : 0;
-}
-
 static gboolean
 item_is_lac_not_stat (GMatchInfo *info, guint32 item)
 {
@@ -2000,9 +1964,9 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
                              gboolean                      *out_cereg,
                              GError                       **error)
 {
-    gboolean success = FALSE, foo;
     gint n_matches, act = -1;
-    gulong stat = 0, lac = 0, ci = 0;
+    guint stat = 0;
+    guint64 lac = 0, ci = 0;
     guint istat = 0, ilac = 0, ici = 0, iact = 0;
     gchar *str;
 
@@ -2094,10 +2058,7 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
      }
 
     /* Status */
-    str = g_match_info_fetch (info, istat);
-    stat = parse_uint (str, 10, 0, G_MAXUINT, &success);
-    g_free (str);
-    if (!success) {
+    if (!mm_get_uint_from_match_info (info, istat, &stat)) {
         g_set_error_literal (error,
                              MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Could not parse the registration status response");
@@ -2106,43 +2067,31 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
 
     /* 'attached RLOS' is the last valid state */
     if (stat > MM_MODEM_3GPP_REGISTRATION_STATE_ATTACHED_RLOS) {
-        mm_obj_warn (log_object, "unknown registration state value '%lu'", stat);
+        mm_obj_warn (log_object, "unknown registration state value '%u'", stat);
         stat = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     }
 
-    /* Location Area Code */
-    if (ilac) {
-        /* FIXME: some phones apparently swap the LAC bytes (LG, SonyEricsson,
-         * Sagem).  Need to handle that.
-         */
-        str = g_match_info_fetch (info, ilac);
-        lac = parse_uint (str, 16, 1, 0xFFFF, &foo);
-        g_free (str);
-    }
+    /* Location Area Code/Tracking Area Code
+     * FIXME: some phones apparently swap the LAC bytes (LG, SonyEricsson,
+     * Sagem).  Need to handle that.
+     */
+    if (ilac)
+        mm_get_u64_from_hex_match_info (info, ilac, &lac);
 
     /* Cell ID */
-    if (ici) {
-        str = g_match_info_fetch (info, ici);
-        ci = parse_uint (str, 16, 1, 0x0FFFFFFE, &foo);
-        g_free (str);
-    }
+    if (ici)
+        mm_get_u64_from_hex_match_info (info, ici, &ci);
 
     /* Access Technology */
-    if (iact) {
-        str = g_match_info_fetch (info, iact);
-        act = (gint) parse_uint (str, 10, 0, 7, &foo);
-        g_free (str);
-        if (!foo)
-            act = -1;
-    }
+    if (iact)
+        mm_get_int_from_match_info (info, iact, &act);
 
     *out_reg_state = (MMModem3gppRegistrationState) stat;
     if (stat != MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN) {
         /* Don't fill in lac/ci/act if the device's state is unknown */
-        *out_lac = lac;
-        *out_ci = ci;
-
-        *out_act = get_mm_access_tech_from_etsi_access_tech (act);
+        *out_lac = (gulong)lac;
+        *out_ci  = (gulong)ci;
+        *out_act = (act >= 0 ? get_mm_access_tech_from_etsi_access_tech (act) : MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
     }
     return TRUE;
 }

@@ -1435,7 +1435,7 @@ test_creg2_s8500_wave_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,1,000B,2816, B, C2816\r\n";
-    const CregResult result = { 1, 0x000B, 0x2816, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 9, FALSE, FALSE };
+    const CregResult result = { 1, 0x000B, 0x2816, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 9, FALSE, FALSE };
 
     test_creg_match ("Samsung Wave S8500 CREG=2", FALSE, reply, data, &result);
 }
@@ -1525,7 +1525,7 @@ test_cereg2_novatel_lte_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CEREG: 2,1, 1F00, 20 ,79D903 ,7\r\n";
-    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 13, FALSE, TRUE };
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 12, FALSE, TRUE };
 
     test_creg_match ("Novatel LTE E362 CEREG=2", TRUE, reply, data, &result);
 }
@@ -1535,7 +1535,7 @@ test_cereg2_novatel_lte_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CEREG: 1, 1F00, 20 ,79D903 ,7\r\n";
-    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 12, FALSE, TRUE };
+    const CregResult result = { 1, 0x1F00, 0x79D903, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 11, FALSE, TRUE };
 
     test_creg_match ("Novatel LTE E362 CEREG=2", FALSE, reply, data, &result);
 }
@@ -1544,8 +1544,8 @@ static void
 test_cgreg2_thuraya_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
-    const char *reply = "+CGREG: 1, \"0426\", \"F0,0F\"";
-    const CregResult result = { 1, 0x0426, 0x00F0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 11, TRUE, FALSE };
+    const char *reply = "+CGREG: 2, 1, \"0426\", \"F00F\"";
+    const CregResult result = { 1, 0x0426, 0xF00F, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, TRUE, FALSE };
 
     test_creg_match ("Thuraya solicited CREG=2", TRUE, reply, data, &result);
 }
@@ -1554,8 +1554,8 @@ static void
 test_cgreg2_thuraya_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
-    const char *reply = "\r\n+CGREG: 1, \"0426\", \"F0,0F\"\r\n";
-    const CregResult result = { 1, 0x0426, 0x00F0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 11, TRUE, FALSE };
+    const char *reply = "\r\n+CGREG: 1, \"0426\", \"F00F\"\r\n";
+    const CregResult result = { 1, 0x0426, 0xF00F, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 3, TRUE, FALSE };
 
     test_creg_match ("Thuraya unsolicited CREG=2", FALSE, reply, data, &result);
 }
