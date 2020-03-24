@@ -1324,7 +1324,6 @@ test_creg2_ublox_solicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const gchar *reply = "\r\n+CREG: 2,6,\"8B37\",\"0A265185\",7\r\n";
-    /* NOTE: '6' means registered for "SMS only", home network; we just assume UNKNOWN in this case */
     const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY, 0x8B37, 0x0A265185, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 8, FALSE, FALSE };
 
     test_creg_match ("Ublox Toby-L2 solicited while on LTE", TRUE, reply, data, &result);
@@ -1335,7 +1334,6 @@ test_creg2_ublox_unsolicited (void *f, gpointer d)
 {
     RegTestData *data = (RegTestData *) d;
     const gchar *reply = "\r\n+CREG: 6,\"8B37\",\"0A265185\",7\r\n";
-    /* NOTE: '6' means registered for "SMS only", home network; we just assume UNKNOWN in this case */
     const CregResult result = { MM_MODEM_3GPP_REGISTRATION_STATE_HOME_SMS_ONLY, 0x8B37, 0x0A265185, MM_MODEM_ACCESS_TECHNOLOGY_LTE, 6, FALSE, FALSE };
 
     test_creg_match ("Ublox Toby-L2 unsolicited while on LTE", FALSE, reply, data, &result);
