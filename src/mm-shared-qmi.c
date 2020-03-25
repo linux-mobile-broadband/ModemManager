@@ -1557,73 +1557,68 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
         return;
     }
 
-    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 5);
+    combinations = g_array_new (FALSE, FALSE, sizeof (MMModemModeCombination));
+
+#define ADD_MODE_PREFERENCE(MODE1, MODE2, MODE3, MODE4) do {            \
+        mode.allowed = MODE1;                                           \
+        if (MODE2 != MM_MODEM_MODE_NONE) {                              \
+            mode.allowed |= MODE2;                                      \
+            if (MODE3 != MM_MODEM_MODE_NONE) {                          \
+                mode.allowed |= MODE3;                                  \
+                if (MODE4 != MM_MODEM_MODE_NONE)                        \
+                    mode.allowed |= MODE4;                              \
+            }                                                           \
+            if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) { \
+                if (MODE3 != MM_MODEM_MODE_NONE) {                      \
+                    if (MODE4 != MM_MODEM_MODE_NONE) {                  \
+                        mode.preferred = MODE4;                         \
+                        g_array_append_val (combinations, mode);        \
+                    }                                                   \
+                    mode.preferred = MODE3;                             \
+                    g_array_append_val (combinations, mode);            \
+                }                                                       \
+                mode.preferred = MODE2;                                 \
+                g_array_append_val (combinations, mode);                \
+                mode.preferred = MODE1;                                 \
+                g_array_append_val (combinations, mode);                \
+            } else {                                                    \
+                mode.preferred = MM_MODEM_MODE_NONE;                    \
+                g_array_append_val (combinations, mode);                \
+            }                                                           \
+        } else {                                                        \
+            mode.allowed = MODE1;                                       \
+            mode.preferred = MM_MODEM_MODE_NONE;                        \
+            g_array_append_val (combinations, mode);                    \
+        }                                                               \
+    } while (0)
 
     /* 2G-only, 3G-only */
-    mode.allowed = MM_MODEM_MODE_2G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
-    mode.allowed = MM_MODEM_MODE_3G;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (combinations, mode);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
 
     /* 4G-only mode is not possible in multimode GSM/UMTS+CDMA/EVDO+LTE
      * devices. This configuration may be selected as "LTE only" capability
      * instead. */
-    if (!priv->disable_4g_only_mode) {
-        mode.allowed = MM_MODEM_MODE_4G;
-        mode.preferred = MM_MODEM_MODE_NONE;
-        g_array_append_val (combinations, mode);
-    }
+    if (!priv->disable_4g_only_mode)
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
 
-    /* 2G+3G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
-        mode.preferred = MM_MODEM_MODE_3G;
-        g_array_append_val (combinations, mode);
-        mode.preferred = MM_MODEM_MODE_2G;
-        g_array_append_val (combinations, mode);
-    } else {
-        mode.preferred = MM_MODEM_MODE_NONE;
-        g_array_append_val (combinations, mode);
-    }
+    /* 2G, 3G, 4G combinations */
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_NONE);
 
-    /* 2G+4G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+    /* 5G related mode combinations are only supported when NAS SSP is supported,
+     * as there is no 5G support in NAS TP. */
     if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
-        mode.preferred = MM_MODEM_MODE_4G;
-        g_array_append_val (combinations, mode);
-        mode.preferred = MM_MODEM_MODE_2G;
-        g_array_append_val (combinations, mode);
-    } else {
-        mode.preferred = MM_MODEM_MODE_NONE;
-        g_array_append_val (combinations, mode);
-    }
-
-    /* 3G+4G */
-    mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
-        mode.preferred = MM_MODEM_MODE_3G;
-        g_array_append_val (combinations, mode);
-        mode.preferred = MM_MODEM_MODE_4G;
-        g_array_append_val (combinations, mode);
-    } else {
-        mode.preferred = MM_MODEM_MODE_NONE;
-        g_array_append_val (combinations, mode);
-    }
-
-    /* 2G+3G+4G */
-    mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    if (priv->feature_nas_system_selection_preference != FEATURE_UNSUPPORTED) {
-        mode.preferred = MM_MODEM_MODE_4G;
-        g_array_append_val (combinations, mode);
-        mode.preferred = MM_MODEM_MODE_3G;
-        g_array_append_val (combinations, mode);
-        mode.preferred = MM_MODEM_MODE_2G;
-        g_array_append_val (combinations, mode);
-    } else {
-        mode.preferred = MM_MODEM_MODE_NONE;
-        g_array_append_val (combinations, mode);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_5G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G);
     }
 
     /* Filter out unsupported modes */
