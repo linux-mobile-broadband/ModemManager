@@ -1496,27 +1496,28 @@ mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx
     /* If not a multimode device, we're done */
 #define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
     if ((ctx->dms_capabilities & MULTIMODE) != MULTIMODE)
-        return ctx->dms_capabilities;
-
-    /* We have a multimode CDMA/EVDO+GSM/UMTS device, check SSP and TP */
-
-    /* SSP logic to gather capabilities uses the Mode Preference TLV if available */
-    if (ctx->nas_ssp_mode_preference_mask)
-        tmp = mm_modem_capability_from_qmi_rat_mode_preference (ctx->nas_ssp_mode_preference_mask);
-    /* If no value retrieved from SSP, check TP. We only process TP
-     * values if not 'auto' (0). */
-    else if (ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO)
-        tmp = mm_modem_capability_from_qmi_radio_technology_preference (ctx->nas_tp_mask);
-
-    /* Final capabilities are the intersection between the Technology
-     * Preference or SSP and the device's capabilities.
-     * If the Technology Preference was "auto" or unknown we just fall back
-     * to the Get Capabilities response.
-     */
-    if (tmp == MM_MODEM_CAPABILITY_NONE)
         tmp = ctx->dms_capabilities;
-    else
-        tmp &= ctx->dms_capabilities;
+    else {
+        /* We have a multimode CDMA/EVDO+GSM/UMTS device, check SSP and TP */
+
+        /* SSP logic to gather capabilities uses the Mode Preference TLV if available */
+        if (ctx->nas_ssp_mode_preference_mask)
+            tmp = mm_modem_capability_from_qmi_rat_mode_preference (ctx->nas_ssp_mode_preference_mask);
+        /* If no value retrieved from SSP, check TP. We only process TP
+         * values if not 'auto' (0). */
+        else if (ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO)
+            tmp = mm_modem_capability_from_qmi_radio_technology_preference (ctx->nas_tp_mask);
+
+        /* Final capabilities are the intersection between the Technology
+         * Preference or SSP and the device's capabilities.
+         * If the Technology Preference was "auto" or unknown we just fall back
+         * to the Get Capabilities response.
+         */
+        if (tmp == MM_MODEM_CAPABILITY_NONE)
+            tmp = ctx->dms_capabilities;
+        else
+            tmp &= ctx->dms_capabilities;
+    }
 
     /* Log about the logic applied */
     nas_ssp_mode_preference_str = qmi_nas_rat_mode_preference_build_string_from_mask (ctx->nas_ssp_mode_preference_mask);
