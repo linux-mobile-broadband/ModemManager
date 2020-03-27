@@ -254,18 +254,19 @@ bearer_update_interface_stats (MMBaseBearer *self)
 }
 
 static void
-bearer_reset_interface_stats (MMBaseBearer *self)
+bearer_reset_ongoing_interface_stats (MMBaseBearer *self)
 {
-    g_clear_object (&self->priv->stats);
-    mm_gdbus_bearer_set_stats (MM_GDBUS_BEARER (self), NULL);
+    mm_bearer_stats_set_duration (self->priv->stats, 0);
+    mm_bearer_stats_set_tx_bytes (self->priv->stats, 0);
+    mm_bearer_stats_set_rx_bytes (self->priv->stats, 0);
+    bearer_update_interface_stats (self);
 }
 
 static void
 bearer_stats_stop (MMBaseBearer *self)
 {
     if (self->priv->duration_timer) {
-        if (self->priv->stats)
-            mm_bearer_stats_set_duration (self->priv->stats, (guint64) g_timer_elapsed (self->priv->duration_timer, NULL));
+        mm_bearer_stats_set_duration (self->priv->stats, (guint64) g_timer_elapsed (self->priv->duration_timer, NULL));
         g_timer_destroy (self->priv->duration_timer);
         self->priv->duration_timer = NULL;
     }
@@ -337,11 +338,6 @@ stats_update_cb (MMBaseBearer *self)
 static void
 bearer_stats_start (MMBaseBearer *self)
 {
-    /* Allocate new stats object. If there was one already created from a
-     * previous run, deallocate it */
-    g_assert (!self->priv->stats);
-    self->priv->stats = mm_bearer_stats_new ();
-
     /* Start duration timer */
     g_assert (!self->priv->duration_timer);
     self->priv->duration_timer = g_timer_new ();
@@ -731,7 +727,13 @@ connect_ready (MMBaseBearer *self,
     /* NOTE: connect() implementations *MUST* handle cancellations themselves */
     result = MM_BASE_BEARER_GET_CLASS (self)->connect_finish (self, res, &error);
     if (!result) {
-        mm_obj_dbg (self, "couldn't connect: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't connect: %s", error->message);
+
+        /* Update failed attempts */
+        mm_bearer_stats_set_failed_attempts (self->priv->stats,
+                                             mm_bearer_stats_get_failed_attempts (self->priv->stats) + 1);
+        bearer_update_interface_stats (self);
+
         if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
             /* Will launch disconnection */
             launch_disconnect = TRUE;
@@ -862,11 +864,15 @@ mm_base_bearer_connect (MMBaseBearer *self,
         return;
     }
 
+    /* Update total attempts */
+    mm_bearer_stats_set_attempts (self->priv->stats,
+                                  mm_bearer_stats_get_attempts (self->priv->stats) + 1);
+    bearer_reset_ongoing_interface_stats (self);
+
     /* Connecting! */
     mm_obj_dbg (self, "connecting...");
     self->priv->connect_cancellable = g_cancellable_new ();
     bearer_update_status (self, MM_BEARER_STATUS_CONNECTING);
-    bearer_reset_interface_stats (self);
     MM_BASE_BEARER_GET_CLASS (self)->connect (
         self,
         self->priv->connect_cancellable,
@@ -1450,6 +1456,7 @@ mm_base_bearer_init (MMBaseBearer *self)
     self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->default_ip_family = MM_BEARER_IP_FAMILY_IPV4;
+    self->priv->stats = mm_bearer_stats_new ();
 
     /* Set defaults */
     mm_gdbus_bearer_set_interface   (MM_GDBUS_BEARER (self), NULL);
@@ -1462,6 +1469,7 @@ mm_base_bearer_init (MMBaseBearer *self)
                                      mm_bearer_ip_config_get_dictionary (NULL));
     mm_gdbus_bearer_set_ip6_config  (MM_GDBUS_BEARER (self),
                                      mm_bearer_ip_config_get_dictionary (NULL));
+    bearer_update_interface_stats (self);
 }
 
 static void

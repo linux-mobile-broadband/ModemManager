@@ -244,28 +244,50 @@
     <!--
         Stats:
 
-        If the modem supports it, this property will show statistics of the
-        ongoing connection.
+        If the modem supports it, this property will show statistics associated
+        to the bearer.
+
+        There are two main different statistic types reported: either applicable
+        to the ongoing connection, or otherwise compiled for all connections
+        that have been done on this bearer object.
 
         When the connection is disconnected automatically or explicitly by the
-        user, the values in this property will show the last values cached.
-        The statistics are reset
+        user, the values applicable to the ongoing connection will show the last
+        values cached.
 
         The following items may appear in the list of statistics:
         <variablelist>
           <varlistentry><term><literal>"rx-bytes"</literal></term>
             <listitem>
-              Number of bytes received without error, given as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+              Number of bytes received without error in the ongoing connection,
+              given as an unsigned 64-bit integer value (signature
+              <literal>"t"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"tx-bytes"</literal></term>
             <listitem>
-              Number bytes transmitted without error, given as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+              Number bytes transmitted without error in the ongoing connection,
+              given as an unsigned 64-bit integer value (signature
+              <literal>"t"</literal>).
             </listitem>
             </varlistentry>
           <varlistentry><term><literal>"duration"</literal></term>
             <listitem>
-              Duration of the connection, in seconds, given as an unsigned integer value (signature <literal>"u"</literal>).
+              Duration of the ongoing connection, in seconds, given as an
+              unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"attempts"</literal></term>
+            <listitem>
+              Total number of connection attempts done with this bearer, given
+              as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"failed-attempts"</literal></term>
+            <listitem>
+              Number of failed connection attempts done with this bearer,
+              given as an unsigned integer value (signature
+              <literal>"u"</literal>).
             </listitem>
           </varlistentry>
         </variablelist>

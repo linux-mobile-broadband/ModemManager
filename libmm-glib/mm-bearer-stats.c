@@ -11,8 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2015 Azimut Electronics
- *
- * Author: Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2015-2020 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <string.h>
@@ -34,14 +33,18 @@
 
 G_DEFINE_TYPE (MMBearerStats, mm_bearer_stats, G_TYPE_OBJECT)
 
-#define PROPERTY_DURATION "duration"
-#define PROPERTY_RX_BYTES "rx-bytes"
-#define PROPERTY_TX_BYTES "tx-bytes"
+#define PROPERTY_DURATION        "duration"
+#define PROPERTY_RX_BYTES        "rx-bytes"
+#define PROPERTY_TX_BYTES        "tx-bytes"
+#define PROPERTY_ATTEMPTS        "attempts"
+#define PROPERTY_FAILED_ATTEMPTS "failed-attempts"
 
 struct _MMBearerStatsPrivate {
     guint   duration;
     guint64 rx_bytes;
     guint64 tx_bytes;
+    guint   attempts;
+    guint   failed_attempts;
 };
 
 /*****************************************************************************/
@@ -143,6 +146,70 @@ mm_bearer_stats_set_tx_bytes (MMBearerStats *self,
 /*****************************************************************************/
 
 /**
+ * mm_bearer_stats_get_attempts:
+ * @self: a #MMBearerStats.
+ *
+ * Gets the number of connection attempts done with this bearer.
+ *
+ * Returns: a #guint.
+ *
+ * Since: 1.14
+ */
+guint
+mm_bearer_stats_get_attempts (MMBearerStats *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_STATS (self), 0);
+
+    return self->priv->attempts;
+}
+
+/**
+ * mm_bearer_stats_set_attempts: (skip)
+ */
+void
+mm_bearer_stats_set_attempts (MMBearerStats *self,
+                              guint          attempts)
+{
+    g_return_if_fail (MM_IS_BEARER_STATS (self));
+
+    self->priv->attempts = attempts;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_stats_get_failed_attempts:
+ * @self: a #MMBearerStats.
+ *
+ * Gets the number of failed connection attempts done with this bearer.
+ *
+ * Returns: a #guint.
+ *
+ * Since: 1.14
+ */
+guint
+mm_bearer_stats_get_failed_attempts (MMBearerStats *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_STATS (self), 0);
+
+    return self->priv->failed_attempts;
+}
+
+/**
+ * mm_bearer_stats_set_failed_attempts: (skip)
+ */
+void
+mm_bearer_stats_set_failed_attempts (MMBearerStats *self,
+                                     guint          failed_attempts)
+{
+    g_return_if_fail (MM_IS_BEARER_STATS (self));
+
+    self->priv->failed_attempts = failed_attempts;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_stats_get_dictionary: (skip)
  */
 GVariant *
@@ -167,6 +234,14 @@ mm_bearer_stats_get_dictionary (MMBearerStats *self)
                             "{sv}",
                             PROPERTY_TX_BYTES,
                             g_variant_new_uint64 (self->priv->tx_bytes));
+    g_variant_builder_add  (&builder,
+                            "{sv}",
+                            PROPERTY_ATTEMPTS,
+                            g_variant_new_uint32 (self->priv->attempts));
+    g_variant_builder_add  (&builder,
+                            "{sv}",
+                            PROPERTY_FAILED_ATTEMPTS,
+                            g_variant_new_uint32 (self->priv->failed_attempts));
     return g_variant_builder_end (&builder);
 }
 
@@ -212,6 +287,14 @@ mm_bearer_stats_new_from_dictionary (GVariant *dictionary,
             mm_bearer_stats_set_tx_bytes (
                 self,
                 g_variant_get_uint64 (value));
+        } else if (g_str_equal (key, PROPERTY_ATTEMPTS)) {
+            mm_bearer_stats_set_attempts (
+                self,
+                g_variant_get_uint32 (value));
+        } else if (g_str_equal (key, PROPERTY_FAILED_ATTEMPTS)) {
+            mm_bearer_stats_set_failed_attempts (
+                self,
+                g_variant_get_uint32 (value));
         }
         g_free (key);
         g_variant_unref (value);

@@ -248,6 +248,8 @@ print_bearer_info (MMBearer *bearer)
         gchar *duration = NULL;
         gchar *bytes_rx = NULL;
         gchar *bytes_tx = NULL;
+        gchar *attempts = NULL;
+        gchar *failed_attempts = NULL;
 
         if (stats) {
             guint64 val;
@@ -261,11 +263,19 @@ print_bearer_info (MMBearer *bearer)
             val = mm_bearer_stats_get_tx_bytes (stats);
             if (val)
                 bytes_tx = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
+            val = mm_bearer_stats_get_attempts (stats);
+            if (val)
+                attempts = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
+            val = mm_bearer_stats_get_failed_attempts (stats);
+            if (val)
+                failed_attempts = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
         }
 
-        mmcli_output_string_take (MMC_F_BEARER_STATS_DURATION, duration);
-        mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_RX, bytes_rx);
-        mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_TX, bytes_tx);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_DURATION,        duration);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_RX,        bytes_rx);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_TX,        bytes_tx);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_ATTEMPTS,        attempts);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_FAILED_ATTEMPTS, failed_attempts);
     }
 
     mmcli_output_dump ();
