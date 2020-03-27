@@ -263,10 +263,64 @@ bearer_reset_ongoing_interface_stats (MMBaseBearer *self)
 }
 
 static void
+bearer_set_ongoing_interface_stats (MMBaseBearer *self,
+                                    guint         duration,
+                                    guint64       rx_bytes,
+                                    guint64       tx_bytes)
+{
+    guint n_updates = 0;
+
+    /* Make sure we don't reset to 0 these values if we had ever set them
+     * before. Just ignore the update if we're reported 0 */
+
+    if (duration) {
+        gint delta_duration;
+
+        delta_duration = duration - mm_bearer_stats_get_duration (self->priv->stats);
+        if (delta_duration > 0) {
+            mm_bearer_stats_set_duration (self->priv->stats, duration);
+            mm_bearer_stats_set_total_duration (self->priv->stats,
+                                                mm_bearer_stats_get_total_duration (self->priv->stats) + delta_duration);
+            n_updates++;
+        }
+    }
+
+    if (rx_bytes) {
+        gint64 delta_rx_bytes;
+
+        delta_rx_bytes = rx_bytes - mm_bearer_stats_get_rx_bytes (self->priv->stats);
+        if (delta_rx_bytes > 0) {
+            mm_bearer_stats_set_rx_bytes (self->priv->stats, rx_bytes);
+            mm_bearer_stats_set_total_rx_bytes (self->priv->stats,
+                                                mm_bearer_stats_get_total_rx_bytes (self->priv->stats) + delta_rx_bytes);
+            n_updates++;
+        }
+    }
+
+    if (tx_bytes) {
+        gint64 delta_tx_bytes;
+
+        delta_tx_bytes = tx_bytes - mm_bearer_stats_get_tx_bytes (self->priv->stats);
+        if (delta_tx_bytes > 0) {
+            mm_bearer_stats_set_tx_bytes (self->priv->stats, tx_bytes);
+            mm_bearer_stats_set_total_tx_bytes (self->priv->stats,
+                                                mm_bearer_stats_get_total_tx_bytes (self->priv->stats) + delta_tx_bytes);
+            n_updates++;
+        }
+    }
+
+    if (n_updates)
+        bearer_update_interface_stats (self);
+}
+
+static void
 bearer_stats_stop (MMBaseBearer *self)
 {
     if (self->priv->duration_timer) {
-        mm_bearer_stats_set_duration (self->priv->stats, (guint64) g_timer_elapsed (self->priv->duration_timer, NULL));
+        bearer_set_ongoing_interface_stats (self,
+                                            (guint64) g_timer_elapsed (self->priv->duration_timer, NULL),
+                                            0,
+                                            0);
         g_timer_destroy (self->priv->duration_timer);
         self->priv->duration_timer = NULL;
     }
@@ -303,10 +357,10 @@ reload_stats_ready (MMBaseBearer *self,
     }
 
     /* We only update stats if they were retrieved properly */
-    mm_bearer_stats_set_duration (self->priv->stats, (guint32) g_timer_elapsed (self->priv->duration_timer, NULL));
-    mm_bearer_stats_set_tx_bytes (self->priv->stats, tx_bytes);
-    mm_bearer_stats_set_rx_bytes (self->priv->stats, rx_bytes);
-    bearer_update_interface_stats (self);
+    bearer_set_ongoing_interface_stats (self,
+                                        (guint32) g_timer_elapsed (self->priv->duration_timer, NULL),
+                                        rx_bytes,
+                                        tx_bytes);
 }
 
 static gboolean
@@ -328,10 +382,10 @@ stats_update_cb (MMBaseBearer *self)
     }
 
     /* Otherwise, just update duration and we're done */
-    mm_bearer_stats_set_duration (self->priv->stats, (guint32) g_timer_elapsed (self->priv->duration_timer, NULL));
-    mm_bearer_stats_set_tx_bytes (self->priv->stats, 0);
-    mm_bearer_stats_set_rx_bytes (self->priv->stats, 0);
-    bearer_update_interface_stats (self);
+    bearer_set_ongoing_interface_stats (self,
+                                        (guint32) g_timer_elapsed (self->priv->duration_timer, NULL),
+                                        0,
+                                        0);
     return G_SOURCE_CONTINUE;
 }
 

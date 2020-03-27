@@ -38,6 +38,9 @@ G_DEFINE_TYPE (MMBearerStats, mm_bearer_stats, G_TYPE_OBJECT)
 #define PROPERTY_TX_BYTES        "tx-bytes"
 #define PROPERTY_ATTEMPTS        "attempts"
 #define PROPERTY_FAILED_ATTEMPTS "failed-attempts"
+#define PROPERTY_TOTAL_DURATION  "total-duration"
+#define PROPERTY_TOTAL_RX_BYTES  "total-rx-bytes"
+#define PROPERTY_TOTAL_TX_BYTES  "total-tx-bytes"
 
 struct _MMBearerStatsPrivate {
     guint   duration;
@@ -45,6 +48,9 @@ struct _MMBearerStatsPrivate {
     guint64 tx_bytes;
     guint   attempts;
     guint   failed_attempts;
+    guint   total_duration;
+    guint64 total_rx_bytes;
+    guint64 total_tx_bytes;
 };
 
 /*****************************************************************************/
@@ -210,6 +216,104 @@ mm_bearer_stats_set_failed_attempts (MMBearerStats *self,
 /*****************************************************************************/
 
 /**
+ * mm_bearer_stats_get_total_duration:
+ * @self: a #MMBearerStats.
+ *
+ * Gets the total duration of all the connections of this bearer.
+ *
+ * Returns: a #guint.
+ *
+ * Since: 1.14
+ */
+guint
+mm_bearer_stats_get_total_duration (MMBearerStats *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_STATS (self), 0);
+
+    return self->priv->total_duration;
+}
+
+/**
+ * mm_bearer_stats_set_total_duration: (skip)
+ */
+void
+mm_bearer_stats_set_total_duration (MMBearerStats *self,
+                                    guint          total_duration)
+{
+    g_return_if_fail (MM_IS_BEARER_STATS (self));
+
+    self->priv->total_duration = total_duration;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_stats_get_total_rx_bytes:
+ * @self: a #MMBearerStats.
+ *
+ * Gets the total number of bytes received without error during all the
+ * connections of this bearer.
+ *
+ * Returns: a #guint64.
+ *
+ * Since: 1.14
+ */
+guint64
+mm_bearer_stats_get_total_rx_bytes (MMBearerStats *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_STATS (self), 0);
+
+    return self->priv->total_rx_bytes;
+}
+
+/**
+ * mm_bearer_stats_set_total_rx_bytes: (skip)
+ */
+void
+mm_bearer_stats_set_total_rx_bytes (MMBearerStats *self,
+                                    guint64        total_bytes)
+{
+    g_return_if_fail (MM_IS_BEARER_STATS (self));
+
+    self->priv->total_rx_bytes = total_bytes;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_stats_get_total_tx_bytes:
+ * @self: a #MMBearerStats.
+ *
+ * Gets the total number of bytes transmitted without error during all the
+ * connections of this bearer.
+ *
+ * Returns: a #guint64.
+ *
+ * Since: 1.14
+ */
+guint64
+mm_bearer_stats_get_total_tx_bytes (MMBearerStats *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_STATS (self), 0);
+
+    return self->priv->total_tx_bytes;
+}
+
+/**
+ * mm_bearer_stats_set_total_tx_bytes: (skip)
+ */
+void
+mm_bearer_stats_set_total_tx_bytes (MMBearerStats *self,
+                                    guint64        total_bytes)
+{
+    g_return_if_fail (MM_IS_BEARER_STATS (self));
+
+    self->priv->total_tx_bytes = total_bytes;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_stats_get_dictionary: (skip)
  */
 GVariant *
@@ -242,6 +346,18 @@ mm_bearer_stats_get_dictionary (MMBearerStats *self)
                             "{sv}",
                             PROPERTY_FAILED_ATTEMPTS,
                             g_variant_new_uint32 (self->priv->failed_attempts));
+    g_variant_builder_add  (&builder,
+                            "{sv}",
+                            PROPERTY_TOTAL_DURATION,
+                            g_variant_new_uint32 (self->priv->total_duration));
+    g_variant_builder_add  (&builder,
+                            "{sv}",
+                            PROPERTY_TOTAL_RX_BYTES,
+                            g_variant_new_uint64 (self->priv->total_rx_bytes));
+    g_variant_builder_add  (&builder,
+                            "{sv}",
+                            PROPERTY_TOTAL_TX_BYTES,
+                            g_variant_new_uint64 (self->priv->total_tx_bytes));
     return g_variant_builder_end (&builder);
 }
 
@@ -295,7 +411,20 @@ mm_bearer_stats_new_from_dictionary (GVariant *dictionary,
             mm_bearer_stats_set_failed_attempts (
                 self,
                 g_variant_get_uint32 (value));
+        } else if (g_str_equal (key, PROPERTY_TOTAL_DURATION)) {
+            mm_bearer_stats_set_total_duration (
+                self,
+                g_variant_get_uint32 (value));
+        } else if (g_str_equal (key, PROPERTY_TOTAL_RX_BYTES)) {
+            mm_bearer_stats_set_total_rx_bytes (
+                self,
+                g_variant_get_uint64 (value));
+        } else if (g_str_equal (key, PROPERTY_TOTAL_TX_BYTES)) {
+            mm_bearer_stats_set_total_tx_bytes (
+                self,
+                g_variant_get_uint64 (value));
         }
+
         g_free (key);
         g_variant_unref (value);
     }

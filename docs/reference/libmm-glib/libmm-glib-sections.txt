@@ -1130,6 +1130,9 @@ mm_bearer_stats_get_rx_bytes
 mm_bearer_stats_get_tx_bytes
 mm_bearer_stats_get_attempts
 mm_bearer_stats_get_failed_attempts
+mm_bearer_stats_get_total_duration
+mm_bearer_stats_get_total_rx_bytes
+mm_bearer_stats_get_total_tx_bytes
 <SUBSECTION Private>
 mm_bearer_stats_get_dictionary
 mm_bearer_stats_new
@@ -1139,6 +1142,9 @@ mm_bearer_stats_set_rx_bytes
 mm_bearer_stats_set_tx_bytes
 mm_bearer_stats_set_attempts
 mm_bearer_stats_set_failed_attempts
+mm_bearer_stats_set_total_duration
+mm_bearer_stats_set_total_rx_bytes
+mm_bearer_stats_set_total_tx_bytes
 <SUBSECTION Standard>
 MMBearerStatsClass
 MMBearerStatsPrivate

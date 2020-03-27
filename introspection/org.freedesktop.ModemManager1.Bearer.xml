@@ -266,8 +266,8 @@
           </varlistentry>
           <varlistentry><term><literal>"tx-bytes"</literal></term>
             <listitem>
-              Number bytes transmitted without error in the ongoing connection,
-              given as an unsigned 64-bit integer value (signature
+              Number of bytes transmitted without error in the ongoing
+              connection, given as an unsigned 64-bit integer value (signature
               <literal>"t"</literal>).
             </listitem>
             </varlistentry>
@@ -287,6 +287,27 @@
             <listitem>
               Number of failed connection attempts done with this bearer,
               given as an unsigned integer value (signature
+              <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"total-rx-bytes"</literal></term>
+            <listitem>
+              Total number of bytes received without error in all the successful
+              connection establishments, given as an unsigned 64-bit integer
+              value (signature <literal>"t"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"total-tx-bytes"</literal></term>
+            <listitem>
+              Total number of bytes transmitted without error in all the
+              successful connection establishments, given as an unsigned 64-bit
+              integer value (signature <literal>"t"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"total-duration"</literal></term>
+            <listitem>
+              Total duration of all the successful connection establishments, in
+              seconds, given as an unsigned integer value (signature
               <literal>"u"</literal>).
             </listitem>
           </varlistentry>
