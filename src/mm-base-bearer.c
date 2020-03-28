@@ -800,7 +800,9 @@ connect_ready (MMBaseBearer *self,
     /* NOTE: connect() implementations *MUST* handle cancellations themselves */
     result = MM_BASE_BEARER_GET_CLASS (self)->connect_finish (self, res, &error);
     if (!result) {
-        mm_obj_dbg (self, "couldn't connect: %s", error->message);
+        mm_obj_warn (self, "connection attempt #%u failed: %s",
+                     mm_bearer_stats_get_attempts (self->priv->stats),
+                     error->message);
 
         /* Update failed attempts */
         mm_bearer_stats_set_failed_attempts (self->priv->stats,
