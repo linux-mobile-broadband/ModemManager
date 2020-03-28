@@ -439,6 +439,8 @@ bearer_update_status (MMBaseBearer *self,
     /* Ensure that we don't expose any connection related data in the
      * interface when going into disconnected state. */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
+        g_autoptr(GString) report = NULL;
+
         bearer_reset_interface_status (self);
         /* Cleanup flag to ignore disconnection reports */
         self->priv->ignore_disconnection_reports = FALSE;
@@ -446,6 +448,19 @@ bearer_update_status (MMBaseBearer *self,
         bearer_stats_stop (self);
         /* Stop connection monitoring */
         connection_monitor_stop (self);
+
+        /* Build and log report */
+        report = g_string_new (NULL);
+        g_string_append_printf (report,
+                                "connection #%u finished: duration %us",
+                                mm_bearer_stats_get_attempts (self->priv->stats),
+                                mm_bearer_stats_get_duration (self->priv->stats));
+        if (!self->priv->reload_stats_unsupported)
+            g_string_append_printf (report,
+                                    ", tx: %" G_GUINT64_FORMAT " bytes, rx :%" G_GUINT64_FORMAT " bytes",
+                                    mm_bearer_stats_get_tx_bytes (self->priv->stats),
+                                    mm_bearer_stats_get_rx_bytes (self->priv->stats));
+        mm_obj_info (self, "%s", report->str);
     }
 }
 
