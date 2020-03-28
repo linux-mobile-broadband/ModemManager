@@ -251,8 +251,7 @@ static void
 export_modem (MMDevice *self)
 {
     GDBusConnection *connection = NULL;
-    static guint32 id = 0;
-    gchar *path;
+    gchar           *path;
 
     g_assert (MM_IS_BASE_MODEM (self->priv->modem));
     g_assert (G_IS_DBUS_OBJECT_MANAGER (self->priv->object_manager));
@@ -275,7 +274,7 @@ export_modem (MMDevice *self)
 
     /* No outstanding port tasks, so if the modem is valid we can export it */
 
-    path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%d", id++);
+    path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%d", mm_base_modem_get_dbus_id (self->priv->modem));
     g_object_get (self->priv->object_manager,
                   "connection", &connection,
                   NULL);

@@ -61,6 +61,7 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMBaseModemPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
+    guint            dbus_id;
 
     /* Modem-wide cancellable. If it ever gets cancelled, no further operations
      * should be done by the modem. */
@@ -112,6 +113,12 @@ struct _MMBaseModemPrivate {
     GList *mbim;
 #endif
 };
+
+guint
+mm_base_modem_get_dbus_id (MMBaseModem *self)
+{
+    return self->priv->dbus_id;
+}
 
 static gchar *
 get_hash_key (const gchar *subsys,
@@ -1518,10 +1525,15 @@ teardown_ports_table (MMBaseModem *self)
 static void
 mm_base_modem_init (MMBaseModem *self)
 {
+    static guint id = 0;
+
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BASE_MODEM,
                                               MMBaseModemPrivate);
+
+    /* Each modem is given a unique id to build its own DBus path */
+    self->priv->dbus_id = id++;
 
     /* Setup authorization provider */
     self->priv->authp = mm_auth_provider_get ();
