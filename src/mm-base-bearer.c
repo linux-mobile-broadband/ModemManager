@@ -428,6 +428,10 @@ bearer_update_status (MMBaseBearer *self,
     /* NOTE: we do allow status 'CONNECTED' here; it may happen if we go into
      * DISCONNECTING and we cannot disconnect */
 
+    /* Do nothing if the status is the same */
+    if (self->priv->status == status)
+        return;
+
     /* Update the property value */
     self->priv->status = status;
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
