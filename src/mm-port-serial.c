@@ -290,7 +290,7 @@ parse_baudrate (guint  baudrate_num,
 static int
 parse_bits (guint i)
 {
-    int bits;
+    int bits = -1;
 
     switch (i) {
     case 5:
@@ -306,8 +306,7 @@ parse_bits (guint i)
         bits = CS8;
         break;
     default:
-        mm_warn ("Invalid bits (%d). Valid values are 5, 6, 7, 8.", i);
-        bits = CS8;
+        g_assert_not_reached ();
     }
 
     return bits;
@@ -316,7 +315,7 @@ parse_bits (guint i)
 static int
 parse_parity (char c)
 {
-    int parity;
+    int parity = -1;
 
     switch (c) {
     case 'n':
@@ -332,8 +331,7 @@ parse_parity (char c)
         parity = PARENB | PARODD;
         break;
     default:
-        mm_warn ("Invalid parity (%c). Valid values are n, e, o", c);
-        parity = 0;
+        g_assert_not_reached ();
     }
 
     return parity;
@@ -342,7 +340,7 @@ parse_parity (char c)
 static int
 parse_stopbits (guint i)
 {
-    int stopbits;
+    int stopbits = -1;
 
     switch (i) {
     case 1:
@@ -352,8 +350,7 @@ parse_stopbits (guint i)
         stopbits = CSTOPB;
         break;
     default:
-        mm_warn ("Invalid stop bits (%d). Valid values are 1 and 2)", i);
-        stopbits = 0;
+        g_assert_not_reached ();
     }
 
     return stopbits;
