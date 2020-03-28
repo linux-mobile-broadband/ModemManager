@@ -25,7 +25,7 @@
 
 #include <libqmi-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-location.h"
@@ -795,11 +795,11 @@ load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
 
     output = qmi_client_nas_get_technology_preference_finish (client, res, &error);
     if (!output) {
-        mm_dbg ("QMI operation failed: %s", error->message);
+        mm_obj_dbg (self, "QMI operation failed: %s", error->message);
         g_error_free (error);
         priv->feature_nas_technology_preference = FEATURE_UNSUPPORTED;
     } else if (!qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
-        mm_dbg ("Couldn't get technology preference: %s", error->message);
+        mm_obj_dbg (self, "couldn't get technology preference: %s", error->message);
         g_error_free (error);
         priv->feature_nas_technology_preference = FEATURE_SUPPORTED;
     } else {
@@ -835,11 +835,11 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output) {
-        mm_dbg ("QMI operation failed: %s", error->message);
+        mm_obj_dbg (self, "QMI operation failed: %s", error->message);
         g_error_free (error);
         priv->feature_nas_system_selection_preference = FEATURE_UNSUPPORTED;
     } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
-        mm_dbg ("Couldn't get system selection preference: %s", error->message);
+        mm_obj_dbg (self, "couldn't get system selection preference: %s", error->message);
         g_error_free (error);
         priv->feature_nas_system_selection_preference = FEATURE_SUPPORTED;
     } else {
@@ -1946,14 +1946,17 @@ reset_set_operating_mode_reset_ready (QmiClientDms *client,
                                       GAsyncResult *res,
                                       GTask *task)
 {
+    MMSharedQmi                         *self;
     QmiMessageDmsSetOperatingModeOutput *output;
-    GError *error = NULL;
+    GError                              *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
     if (!output || !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
         g_task_return_error (task, error);
     } else {
-        mm_info ("Modem is being rebooted now");
+        mm_obj_info (self, "rebooting now");
         g_task_return_boolean (task, TRUE);
     }
 
@@ -2093,7 +2096,7 @@ mm_shared_qmi_factory_reset (MMIfaceModem        *self,
         return;
     }
 
-    mm_dbg ("performing a factory reset...");
+    mm_obj_dbg (self, "performing a factory reset...");
     qmi_client_dms_restore_factory_defaults (QMI_CLIENT_DMS (client),
                                              input,
                                              10,
@@ -2381,7 +2384,7 @@ find_requested_carrier_config (GTask *task)
 
     /* Match generic configuration */
     config_fallback = g_key_file_get_string (ctx->keyfile, group, GENERIC_CONFIG_FALLBACK, NULL);
-    mm_dbg ("Fallback carrier configuration %sfound in group '%s'", config_fallback ? "" : "not ", group);
+    mm_obj_dbg (self, "fallback carrier configuration %sfound in group '%s'", config_fallback ? "" : "not ", group);
 
     /* First, try to match 6 MCCMNC digits (3-digit MNCs) */
     strncpy (mccmnc, ctx->imsi, 6);
@@ -2392,8 +2395,8 @@ find_requested_carrier_config (GTask *task)
         mccmnc[5] = '\0';
         ctx->config_requested = g_key_file_get_string (ctx->keyfile, group, mccmnc, NULL);
     }
-    mm_dbg ("Requested carrier configuration %sfound for '%s' in group '%s': %s",
-            ctx->config_requested ? "" : "not ", mccmnc, group, ctx->config_requested ? ctx->config_requested : "n/a");
+    mm_obj_dbg (self, "requested carrier configuration %sfound for '%s' in group '%s': %s",
+                ctx->config_requested ? "" : "not ", mccmnc, group, ctx->config_requested ? ctx->config_requested : "n/a");
 
     if (!ctx->config_requested && !config_fallback) {
         setup_carrier_config_abort (task, g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
@@ -2410,16 +2413,16 @@ find_requested_carrier_config (GTask *task)
 
             config = &g_array_index (priv->config_list, ConfigInfo, i);
             if (ctx->config_requested && !g_strcmp0 (ctx->config_requested, config->description)) {
-                mm_dbg ("Requested carrier configuration '%s' is available (version 0x%08x, size %u bytes)",
-                        config->description, config->version, config->total_size);
+                mm_obj_dbg (self, "requested carrier configuration '%s' is available (version 0x%08x, size %u bytes)",
+                            config->description, config->version, config->total_size);
                 if (ctx->config_requested_i < 0)
                     ctx->config_requested_i = i;
                 else
                     ctx->config_requested_i = select_newest_carrier_config (self, ctx->config_requested_i, i);
             }
             if (config_fallback && !g_strcmp0 (config_fallback, config->description)) {
-                mm_dbg ("Fallback carrier configuration '%s' is available (version 0x%08x, size %u bytes)",
-                        config->description, config->version, config->total_size);
+                mm_obj_dbg (self, "fallback carrier configuration '%s' is available (version 0x%08x, size %u bytes)",
+                            config->description, config->version, config->total_size);
                 if (config_fallback_i < 0)
                     config_fallback_i = i;
                 else
@@ -2444,8 +2447,8 @@ find_requested_carrier_config (GTask *task)
         g_assert (config_fallback_i >= 0);
 
         config = &g_array_index (priv->config_list, ConfigInfo, config_fallback_i);
-        mm_info ("Using fallback carrier configuration '%s' (version 0x%08x, size %u bytes)",
-                        config->description, config->version, config->total_size);
+        mm_obj_info (self, "using fallback carrier configuration '%s' (version 0x%08x, size %u bytes)",
+                     config->description, config->version, config->total_size);
 
         g_free (ctx->config_requested);
         ctx->config_requested = config_fallback;
@@ -2455,8 +2458,8 @@ find_requested_carrier_config (GTask *task)
         ConfigInfo *config;
 
         config = &g_array_index (priv->config_list, ConfigInfo, ctx->config_requested_i);
-        mm_dbg ("Using requested carrier configuration '%s' (version 0x%08x, size %u bytes)",
-                config->description, config->version, config->total_size);
+        mm_obj_dbg (self, "using requested carrier configuration '%s' (version 0x%08x, size %u bytes)",
+                    config->description, config->version, config->total_size);
     }
 
     ctx->step++;
@@ -2470,11 +2473,13 @@ out:
 static void
 setup_carrier_config_step (GTask *task)
 {
+    MMSharedQmi               *self;
     SetupCarrierConfigContext *ctx;
     Private                   *priv;
 
-    ctx = g_task_get_task_data (task);
-    priv = get_private (g_task_get_source_object (task));
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+    priv = get_private (self);
 
     switch (ctx->step) {
     case SETUP_CARRIER_CONFIG_STEP_FIRST:
@@ -2489,7 +2494,7 @@ setup_carrier_config_step (GTask *task)
         g_assert (ctx->config_requested_i >= 0);
         g_assert (priv->config_active_i >= 0 || priv->config_active_default);
         if (ctx->config_requested_i == priv->config_active_i) {
-            mm_info ("Carrier config switching not needed: already using '%s'", ctx->config_requested);
+            mm_obj_info (self, "carrier config switching not needed: already using '%s'", ctx->config_requested);
             ctx->step = SETUP_CARRIER_CONFIG_STEP_LAST;
             setup_carrier_config_step (task);
             return;
@@ -2506,8 +2511,8 @@ setup_carrier_config_step (GTask *task)
 
         requested_config = &g_array_index (priv->config_list, ConfigInfo, ctx->config_requested_i);
         active_config = (priv->config_active_default ? NULL : &g_array_index (priv->config_list, ConfigInfo, priv->config_active_i));
-        mm_warn ("Carrier config switching needed: '%s' -> '%s'",
-                 active_config ? active_config->description : DEFAULT_CONFIG_DESCRIPTION, requested_config->description);
+        mm_obj_warn (self, "carrier config switching needed: '%s' -> '%s'",
+                     active_config ? active_config->description : DEFAULT_CONFIG_DESCRIPTION, requested_config->description);
 
         type_and_id.config_type = requested_config->config_type;;
         type_and_id.id = requested_config->id;
@@ -2730,13 +2735,15 @@ get_selected_config_indication (QmiClientPdc                            *client,
                                 QmiIndicationPdcGetSelectedConfigOutput *output,
                                 GTask                                   *task)
 {
+    MMSharedQmi              *self;
     LoadCarrierConfigContext *ctx;
     GArray                   *active_id = NULL;
     GError                   *error = NULL;
     guint16                   error_code = 0;
     guint                     i;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     if (!qmi_indication_pdc_get_selected_config_output_get_indication_result (output, &error_code, &error)) {
         load_carrier_config_abort (task, error);
@@ -2753,7 +2760,7 @@ get_selected_config_indication (QmiClientPdc                            *client,
 
     qmi_indication_pdc_get_selected_config_output_get_active_id (output, &active_id, NULL);
     if (!active_id) {
-        mm_dbg ("no carrier config currently selected (default in use)");
+        mm_obj_dbg (self, "no carrier config currently selected (default in use)");
         ctx->config_active_default = TRUE;
         goto next;
     }
@@ -2889,13 +2896,15 @@ list_configs_indication (QmiClientPdc                      *client,
                          QmiIndicationPdcListConfigsOutput *output,
                          GTask                             *task)
 {
+    MMSharedQmi              *self;
     LoadCarrierConfigContext *ctx;
     GError                   *error = NULL;
     GArray                   *configs = NULL;
     guint                     i;
     guint16                   error_code = 0;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     if (!qmi_indication_pdc_list_configs_output_get_indication_result (output, &error_code, &error)) {
         load_carrier_config_abort (task, error);
@@ -2923,7 +2932,7 @@ list_configs_indication (QmiClientPdc                      *client,
     }
 
     /* Preallocate config list and request details for each */
-    mm_dbg ("found %u carrier configurations...", configs->len);
+    mm_obj_dbg (self, "found %u carrier configurations...", configs->len);
     ctx->config_list = g_array_sized_new (FALSE, TRUE, sizeof (ConfigInfo), configs->len);
     g_array_set_size (ctx->config_list, configs->len);
     g_array_set_clear_func (ctx->config_list, (GDestroyNotify) config_info_clear);
@@ -3828,15 +3837,15 @@ pds_location_event_report_indication_cb (QmiClientPds                      *clie
             output,
             &session_status,
             NULL)) {
-        mm_dbg ("[GPS] session status changed: '%s'",
-                qmi_pds_position_session_status_get_string (session_status));
+        mm_obj_dbg (self, "[GPS] session status changed: '%s'",
+                    qmi_pds_position_session_status_get_string (session_status));
     }
 
     if (qmi_indication_pds_event_report_output_get_nmea_position (
             output,
             &nmea,
             NULL)) {
-        mm_dbg ("[NMEA] %s", nmea);
+        mm_obj_dbg (self, "[NMEA] %s", nmea);
         mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), nmea);
     }
 }
@@ -3852,7 +3861,7 @@ loc_location_nmea_indication_cb (QmiClientLoc               *client,
     if (!nmea)
         return;
 
-    mm_dbg ("[NMEA] %s", nmea);
+    mm_obj_dbg (self, "[NMEA] %s", nmea);
     mm_iface_modem_location_gps_update (MM_IFACE_MODEM_LOCATION (self), nmea);
 }
 
@@ -4182,11 +4191,13 @@ pds_set_default_tracking_session_ready (QmiClientPds *client,
                                         GAsyncResult *res,
                                         GTask        *task)
 {
+    MMSharedQmi                                  *self;
     SetGpsOperationModeContext                   *ctx;
     QmiMessagePdsSetDefaultTrackingSessionOutput *output;
     GError                                       *error = NULL;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     output = qmi_client_pds_set_default_tracking_session_finish (client, res, &error);
     if (!output) {
@@ -4208,13 +4219,13 @@ pds_set_default_tracking_session_ready (QmiClientPds *client,
 
     switch (ctx->mode) {
         case GPS_OPERATION_MODE_AGPS_MSA:
-            mm_dbg ("MSA A-GPS operation mode enabled");
+            mm_obj_dbg (self, "MSA A-GPS operation mode enabled");
             break;
         case GPS_OPERATION_MODE_AGPS_MSB:
-            mm_dbg ("MSB A-GPS operation mode enabled");
+            mm_obj_dbg (self, "MSB A-GPS operation mode enabled");
             break;
         case GPS_OPERATION_MODE_STANDALONE:
-            mm_dbg ("Standalone mode enabled (A-GPS disabled)");
+            mm_obj_dbg (self, "standalone mode enabled (A-GPS disabled)");
             break;
         case GPS_OPERATION_MODE_UNKNOWN:
         default:
@@ -4229,6 +4240,7 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
                                         GAsyncResult *res,
                                         GTask        *task)
 {
+    MMSharedQmi                                  *self;
     SetGpsOperationModeContext                   *ctx;
     QmiMessagePdsSetDefaultTrackingSessionInput  *input;
     QmiMessagePdsGetDefaultTrackingSessionOutput *output;
@@ -4237,6 +4249,9 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
     guint8                                        data_timeout;
     guint32                                       interval;
     guint32                                       accuracy_threshold;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     output = qmi_client_pds_get_default_tracking_session_finish (client, res, &error);
     if (!output) {
@@ -4254,8 +4269,6 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
         return;
     }
 
-    ctx  = g_task_get_task_data (task);
-
     qmi_message_pds_get_default_tracking_session_output_get_info (
         output,
         &session_operation,
@@ -4268,30 +4281,30 @@ pds_get_default_tracking_session_ready (QmiClientPds *client,
 
     if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSA) {
         if (session_operation == QMI_PDS_OPERATING_MODE_MS_ASSISTED) {
-            mm_dbg ("MSA A-GPS already enabled");
+            mm_obj_dbg (self, "MSA A-GPS already enabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to enable MSA A-GPS");
+        mm_obj_dbg (self, "need to enable MSA A-GPS");
         session_operation = QMI_PDS_OPERATING_MODE_MS_ASSISTED;
     } else if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSB) {
         if (session_operation == QMI_PDS_OPERATING_MODE_MS_BASED) {
-            mm_dbg ("MSB A-GPS already enabled");
+            mm_obj_dbg (self, "MSB A-GPS already enabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to enable MSB A-GPS");
+        mm_obj_dbg (self, "need to enable MSB A-GPS");
         session_operation = QMI_PDS_OPERATING_MODE_MS_BASED;
     } else if (ctx->mode == GPS_OPERATION_MODE_STANDALONE) {
         if (session_operation == QMI_PDS_OPERATING_MODE_STANDALONE) {
-            mm_dbg ("A-GPS already disabled");
+            mm_obj_dbg (self, "A-GPS already disabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to disable A-GPS");
+        mm_obj_dbg (self, "need to disable A-GPS");
         session_operation = QMI_PDS_OPERATING_MODE_STANDALONE;
     } else
         g_assert_not_reached ();
@@ -4333,11 +4346,13 @@ loc_location_set_operation_mode_indication_cb (QmiClientLoc                     
                                                QmiIndicationLocSetOperationModeOutput *output,
                                                GTask                                  *task)
 {
+    MMSharedQmi                *self;
     SetGpsOperationModeContext *ctx;
     QmiLocIndicationStatus      status;
     GError                     *error = NULL;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     if (!qmi_indication_loc_set_operation_mode_output_get_indication_status (output, &status, &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
@@ -4354,13 +4369,13 @@ loc_location_set_operation_mode_indication_cb (QmiClientLoc                     
 
     switch (ctx->mode) {
         case GPS_OPERATION_MODE_AGPS_MSA:
-            mm_dbg ("MSA A-GPS operation mode enabled");
+            mm_obj_dbg (self, "MSA A-GPS operation mode enabled");
             break;
         case GPS_OPERATION_MODE_AGPS_MSB:
-            mm_dbg ("MSB A-GPS operation mode enabled");
+            mm_obj_dbg (self, "MSB A-GPS operation mode enabled");
             break;
         case GPS_OPERATION_MODE_STANDALONE:
-            mm_dbg ("Standalone mode enabled (A-GPS disabled)");
+            mm_obj_dbg (self, "standalone mode enabled (A-GPS disabled)");
             break;
         case GPS_OPERATION_MODE_UNKNOWN:
         default:
@@ -4414,13 +4429,15 @@ loc_location_get_operation_mode_indication_cb (QmiClientLoc                     
                                                QmiIndicationLocGetOperationModeOutput *output,
                                                GTask                                  *task)
 {
+    MMSharedQmi                        *self;
     SetGpsOperationModeContext         *ctx;
     QmiLocIndicationStatus              status;
     GError                             *error = NULL;
     QmiLocOperationMode                 mode = QMI_LOC_OPERATION_MODE_DEFAULT;
     QmiMessageLocSetOperationModeInput *input;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     if (!qmi_indication_loc_get_operation_mode_output_get_indication_status (output, &status, &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
@@ -4439,30 +4456,30 @@ loc_location_get_operation_mode_indication_cb (QmiClientLoc                     
 
     if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSA) {
         if (mode == QMI_LOC_OPERATION_MODE_MSA) {
-            mm_dbg ("MSA A-GPS already enabled");
+            mm_obj_dbg (self, "MSA A-GPS already enabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to enable MSA A-GPS");
+        mm_obj_dbg (self, "need to enable MSA A-GPS");
         mode = QMI_LOC_OPERATION_MODE_MSA;
     } else if (ctx->mode == GPS_OPERATION_MODE_AGPS_MSB) {
         if (mode == QMI_LOC_OPERATION_MODE_MSB) {
-            mm_dbg ("MSB A-GPS already enabled");
+            mm_obj_dbg (self, "MSB A-GPS already enabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to enable MSB A-GPS");
+        mm_obj_dbg (self, "need to enable MSB A-GPS");
         mode = QMI_LOC_OPERATION_MODE_MSB;
     } else if (ctx->mode == GPS_OPERATION_MODE_STANDALONE) {
         if (mode == QMI_LOC_OPERATION_MODE_STANDALONE) {
-            mm_dbg ("A-GPS already disabled");
+            mm_obj_dbg (self, "A-GPS already disabled");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
         }
-        mm_dbg ("Need to disable A-GPS");
+        mm_obj_dbg (self, "need to disable A-GPS");
         mode = QMI_LOC_OPERATION_MODE_STANDALONE;
     } else
         g_assert_not_reached ();
@@ -5254,13 +5271,15 @@ out:
 static void
 inject_xtra_data_next (GTask *task)
 {
+    MMSharedQmi                      *self;
     QmiMessageLocInjectXtraDataInput *input;
     InjectAssistanceDataContext      *ctx;
     goffset                           total_bytes_left;
     gsize                             count;
     GArray                           *data;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     g_assert (ctx->data_size >= ctx->i);
     total_bytes_left = ctx->data_size - ctx->i;
@@ -5295,8 +5314,8 @@ inject_xtra_data_next (GTask *task)
 
     ctx->i += count;
 
-    mm_info ("injecting xtra data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
-             count, (guint) ctx->n_part, (guint) ctx->total_parts);
+    mm_obj_info (self, "injecting xtra data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
+                 count, (guint) ctx->n_part, (guint) ctx->total_parts);
     qmi_client_loc_inject_xtra_data (ctx->client,
                                      input,
                                      10,
@@ -5401,13 +5420,15 @@ out:
 static void
 inject_assistance_data_next (GTask *task)
 {
+    MMSharedQmi                                 *self;
     QmiMessageLocInjectPredictedOrbitsDataInput *input;
     InjectAssistanceDataContext                 *ctx;
     goffset                                      total_bytes_left;
     gsize                                        count;
     GArray                                      *data;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     g_assert (ctx->data_size >= ctx->i);
     total_bytes_left = ctx->data_size - ctx->i;
@@ -5446,8 +5467,8 @@ inject_assistance_data_next (GTask *task)
 
     ctx->i += count;
 
-    mm_info ("injecting predicted orbits data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
-             count, (guint) ctx->n_part, (guint) ctx->total_parts);
+    mm_obj_info (self, "injecting predicted orbits data: %" G_GSIZE_FORMAT " bytes (%u/%u)",
+                 count, (guint) ctx->n_part, (guint) ctx->total_parts);
     qmi_client_loc_inject_predicted_orbits_data (ctx->client,
                                                  input,
                                                  10,
@@ -5498,7 +5519,7 @@ mm_shared_qmi_location_inject_assistance_data (MMIfaceModemLocation *self,
         ctx->total_parts++;
     g_assert (ctx->total_parts <= G_MAXUINT16);
 
-    mm_dbg ("Injecting gpsOneXTRA data (%" G_GOFFSET_FORMAT " bytes)...", ctx->data_size);
+    mm_obj_dbg (self, "injecting gpsOneXTRA data (%" G_GOFFSET_FORMAT " bytes)...", ctx->data_size);
 
     inject_assistance_data_next (task);
 }
