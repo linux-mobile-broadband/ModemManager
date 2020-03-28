@@ -318,7 +318,8 @@ test_rxdtmf_urc_one_cr (void)
 /*****************************************************************************/
 
 void
-_mm_log (const char *loc,
+_mm_log (gpointer obj,
+         const char *loc,
          const char *func,
          guint32 level,
          const char *fmt,

@@ -53,7 +53,8 @@ TEST_ERROR_HELPER (MESSAGE_ERROR,          message_error,          MessageError)
 /*****************************************************************************/
 
 void
-_mm_log (const char *loc,
+_mm_log (gpointer obj,
+         const char *loc,
          const char *func,
          guint32 level,
          const char *fmt,

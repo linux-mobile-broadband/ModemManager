@@ -86,7 +86,8 @@ test_cpms_response_thuraya (void *f, gpointer d)
 /*****************************************************************************/
 
 void
-_mm_log (const char *loc,
+_mm_log (gpointer obj,
+         const char *loc,
          const char *func,
          guint32 level,
          const char *fmt,
