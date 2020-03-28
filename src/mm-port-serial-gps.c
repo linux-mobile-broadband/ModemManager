@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "mm-port-serial-gps.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 G_DEFINE_TYPE (MMPortSerialGps, mm_port_serial_gps, MM_TYPE_PORT_SERIAL)
 
@@ -135,10 +135,13 @@ parse_response (MMPortSerial *port,
 /*****************************************************************************/
 
 static void
-debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
+debug_log (MMPortSerial *self,
+           const gchar  *prefix,
+           const gchar  *buf,
+           gsize         len)
 {
     static GString *debug = NULL;
-    const char *s;
+    const gchar    *s;
 
     if (!debug)
         debug = g_string_sized_new (256);
@@ -161,7 +164,7 @@ debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
     }
 
     g_string_append_c (debug, '\'');
-    mm_dbg ("(%s): %s", mm_port_get_device (MM_PORT (port)), debug->str);
+    mm_obj_dbg (self, "%s", debug->str);
     g_string_truncate (debug, 0);
 }
 

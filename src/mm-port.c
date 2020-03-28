@@ -19,9 +19,13 @@
 #include <string.h>
 
 #include "mm-port.h"
-#include "mm-log.h"
+#include "mm-port-enums-types.h"
+#include "mm-log-object.h"
 
-G_DEFINE_TYPE (MMPort, mm_port, G_TYPE_OBJECT)
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMPort, mm_port, G_TYPE_OBJECT, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 enum {
     PROP_0,
@@ -88,10 +92,7 @@ mm_port_set_connected (MMPort *self, gboolean connected)
     if (self->priv->connected != connected) {
         self->priv->connected = connected;
         g_object_notify (G_OBJECT (self), MM_PORT_CONNECTED);
-
-        mm_dbg ("(%s): port now %s",
-                self->priv->device,
-                connected ? "connected" : "disconnected");
+        mm_obj_dbg (self, "port now %s", connected ? "connected" : "disconnected");
     }
 }
 
@@ -101,6 +102,19 @@ mm_port_peek_kernel_device (MMPort *self)
     g_return_val_if_fail (MM_IS_PORT (self), NULL);
 
     return self->priv->kernel_device;
+}
+
+/*****************************************************************************/
+
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    MMPort *self;
+
+    self = MM_PORT (_self);
+    return g_strdup_printf ("%s/%s",
+                            mm_port_get_device (self),
+                            mm_modem_port_type_get_string (mm_port_get_port_type (self)));
 }
 
 /*****************************************************************************/
@@ -192,6 +206,12 @@ dispose (GObject *object)
     g_clear_object (&self->priv->kernel_device);
 
     G_OBJECT_CLASS (mm_port_parent_class)->dispose (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void

@@ -34,7 +34,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-port-serial.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-helper-enums-types.h"
 
 static gboolean port_serial_queue_process          (gpointer data);
@@ -398,11 +398,9 @@ internal_tcsetattr (MMPortSerial          *self,
     memset (&other, 0, sizeof (struct termios));
     errno = 0;
     if (tcgetattr (fd, &other) != 0)
-        mm_dbg ("(%s): couldn't get serial port attributes after setting them: %s",
-                mm_port_get_device (MM_PORT (self)), g_strerror (errno));
+        mm_obj_dbg (self, "couldn't get serial port attributes after setting them: %s", g_strerror (errno));
     else if (memcmp (options, &other, sizeof (struct termios)) != 0)
-        mm_dbg ("(%s): port attributes not fully set",
-                mm_port_get_device (MM_PORT (self)));
+        mm_obj_dbg (self, "port attributes not fully set");
 
 #undef MAX_TCSETATTR_RETRIES
 
@@ -430,19 +428,19 @@ set_flow_control_termios (MMPortSerial    *self,
     /* setup the requested flags */
     switch (flow_control) {
         case MM_FLOW_CONTROL_XON_XOFF:
-            mm_dbg ("(%s): enabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
+            mm_obj_dbg (self, "enabling XON/XOFF flow control");
             options->c_iflag |= (IXON | IXOFF | IXANY);
             break;
         case MM_FLOW_CONTROL_RTS_CTS:
-            mm_dbg ("(%s): enabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
+            mm_obj_dbg (self, "enabling RTS/CTS flow control");
             options->c_cflag |= (CRTSCTS);
             break;
         case MM_FLOW_CONTROL_NONE:
         case MM_FLOW_CONTROL_UNKNOWN:
             if (had_xon_xoff)
-                mm_dbg ("(%s): disabling XON/XOFF flow control", mm_port_get_device (MM_PORT (self)));
+                mm_obj_dbg (self, "disabling XON/XOFF flow control");
             if (had_rts_cts)
-                mm_dbg ("(%s): disabling RTS/CTS flow control", mm_port_get_device (MM_PORT (self)));
+                mm_obj_dbg (self, "disabling RTS/CTS flow control");
             break;
         default:
             g_assert_not_reached ();
@@ -464,13 +462,9 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
     if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY)
         return TRUE;
 
-    mm_dbg ("(%s): setting up baudrate: %u",
-            mm_port_get_device (MM_PORT (self)),
-            self->priv->baud);
+    mm_obj_dbg (self, "setting up baudrate: %u", self->priv->baud);
     if (!parse_baudrate (self->priv->baud, &speed) || speed == B0) {
-        mm_warn ("(%s): baudrate invalid: %u; defaulting to 57600",
-                 mm_port_get_device (MM_PORT (self)),
-                 self->priv->baud);
+        mm_obj_warn (self, "baudrate invalid: %u; defaulting to 57600", self->priv->baud);
         speed = B57600;
     }
 
@@ -479,11 +473,8 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
     stopbits = parse_stopbits (self->priv->stopbits);
 
     memset (&stbuf, 0, sizeof (struct termios));
-    if (tcgetattr (fd, &stbuf) != 0) {
-        mm_warn ("(%s): tcgetattr() error: %d",
-                 mm_port_get_device (MM_PORT (self)),
-                 errno);
-    }
+    if (tcgetattr (fd, &stbuf) != 0)
+        mm_obj_warn (self, "error getting serial port attributes: %s", g_strerror (errno));
 
     stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | PARENB | PARODD | CRTSCTS);
     stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXOFF | IXANY );
@@ -523,13 +514,10 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
         gchar *str;
 
         str = mm_flow_control_build_string_from_mask (self->priv->flow_control);
-        mm_dbg ("(%s): flow control explicitly requested for device is: %s",
-                mm_port_get_device (MM_PORT (self)),
-                str ? str : "unknown");
+        mm_obj_dbg (self, "flow control explicitly requested for device is: %s", str ? str : "unknown");
         g_free (str);
     } else
-        mm_dbg ("(%s): no flow control explicitly requested for device",
-                mm_port_get_device (MM_PORT (self)));
+        mm_obj_dbg (self, "no flow control explicitly requested for device");
 
     set_flow_control_termios (self, self->priv->flow_control, &stbuf);
 
@@ -537,7 +525,10 @@ real_config_fd (MMPortSerial *self, int fd, GError **error)
 }
 
 static void
-serial_debug (MMPortSerial *self, const char *prefix, const char *buf, gsize len)
+serial_debug (MMPortSerial *self,
+              const gchar  *prefix,
+              const gchar  *buf,
+              gsize         len)
 {
     g_return_if_fail (len > 0);
 
@@ -569,7 +560,7 @@ port_serial_process_command (MMPortSerial *self,
     /* Only print command the first time */
     if (ctx->started == FALSE) {
         ctx->started = TRUE;
-        serial_debug (self, "-->", (const char *) ctx->command->data, ctx->command->len);
+        serial_debug (self, "-->", (const gchar *) ctx->command->data, ctx->command->len);
     }
 
     if (self->priv->send_delay == 0 || mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_TTY) {
@@ -616,7 +607,7 @@ port_serial_process_command (MMPortSerial *self,
                 g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
 
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
-                             "Sending command failed: '%s'", strerror (errno));
+                             "Sending command failed: '%s'", g_strerror (errno));
                 return FALSE;
             }
             break;
@@ -651,7 +642,7 @@ port_serial_process_command (MMPortSerial *self,
                 self->priv->n_consecutive_timeouts++;
                 g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
-                             "Sending command failed: '%s'", strerror (errno));
+                             "Sending command failed: '%s'", g_strerror (errno));
                 return FALSE;
             }
 
@@ -959,15 +950,12 @@ common_input_available (MMPortSerial *self,
     gsize bytes_read;
     GIOStatus status = G_IO_STATUS_NORMAL;
     CommandContext *ctx;
-    const char *device;
     GError *error = NULL;
     gboolean iterate = TRUE;
     gboolean keep_source = G_SOURCE_CONTINUE;
 
     if (condition & G_IO_HUP) {
-        device = mm_port_get_device (MM_PORT (self));
-        mm_dbg ("(%s) unexpected port hangup!", device);
-
+        mm_obj_dbg (self, "unexpected port hangup!");
         if (self->priv->response->len)
             g_byte_array_remove_range (self->priv->response, 0, self->priv->response->len);
         port_serial_close_force (self);
@@ -995,11 +983,8 @@ common_input_available (MMPortSerial *self,
                                               &bytes_read,
                                               &error);
             if (status == G_IO_STATUS_ERROR) {
-                if (error) {
-                    mm_warn ("(%s): read error: %s",
-                             mm_port_get_device (MM_PORT (self)),
-                             error->message);
-                }
+                if (error)
+                    mm_obj_warn (self, "read error: %s", error->message);
                 g_clear_error (&error);
             }
         } else if (self->priv->socket) {
@@ -1016,9 +1001,7 @@ common_input_available (MMPortSerial *self,
                     status = G_IO_STATUS_AGAIN;
                 else
                     status = G_IO_STATUS_ERROR;
-                mm_warn ("(%s): receive error: %s",
-                         mm_port_get_device (MM_PORT (self)),
-                         error->message);
+                mm_obj_warn (self, "receive error: %s", error->message);
                 g_clear_error (&error);
             } else {
                 bytes_read = (gsize) sbytes_read;
@@ -1137,11 +1120,9 @@ port_connected (MMPortSerial *self, GParamSpec *pspec, gpointer user_data)
     connected = mm_port_get_connected (MM_PORT (self));
 
     if (self->priv->fd >= 0 && ioctl (self->priv->fd, (connected ? TIOCNXCL : TIOCEXCL)) < 0) {
-        mm_warn ("(%s): could not %s serial port lock: (%d) %s",
-                 mm_port_get_device (MM_PORT (self)),
-                 connected ? "drop" : "re-acquire",
-                 errno,
-                 strerror (errno));
+        mm_obj_warn (self, "could not %s serial port lock: %s",
+                     connected ? "drop" : "re-acquire",
+                     g_strerror (errno));
         if (!connected) {
             // FIXME: do something here, maybe try again in a few seconds or
             // close the port and error out?
@@ -1197,7 +1178,7 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
         goto success;
     }
 
-    mm_dbg ("(%s) opening serial port...", device);
+    mm_obj_dbg (self, "opening serial port...");
 
     g_get_current_time (&tv_start);
 
@@ -1221,7 +1202,6 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
                          MM_SERIAL_ERROR,
                          (errno == ENODEV) ? MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE : MM_SERIAL_ERROR_OPEN_FAILED,
                          "Could not open serial device %s: %s", device, strerror (errno_save));
-            mm_warn ("(%s) could not open serial device (%d)", device, errno_save);
             return FALSE;
         }
     }
@@ -1233,7 +1213,6 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
             errno_save = errno;
             g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
                          "Could not lock serial device %s: %s", device, strerror (errno_save));
-            mm_warn ("(%s) could not lock serial device (%d)", device, errno_save);
             goto error;
         }
 
@@ -1247,21 +1226,20 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
         if (ioctl (self->priv->fd, TIOCGSERIAL, &sinfo) == 0) {
             sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
             if (ioctl (self->priv->fd, TIOCSSERIAL, &sinfo) < 0)
-                mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
-                         device, g_strerror (errno));
+                mm_obj_warn (self, "couldn't set serial port closing_wait to none: %s", g_strerror (errno));
         }
     }
 
     g_warn_if_fail (MM_PORT_SERIAL_GET_CLASS (self)->config_fd);
     if (self->priv->fd >= 0 && !MM_PORT_SERIAL_GET_CLASS (self)->config_fd (self, self->priv->fd, error)) {
-        mm_dbg ("(%s) failed to configure serial device", device);
+        mm_obj_dbg (self, "failed to configure serial device");
         goto error;
     }
 
     g_get_current_time (&tv_end);
 
     if (tv_end.tv_sec - tv_start.tv_sec > 7)
-        mm_warn ("(%s): open blocked by driver for more than 7 seconds!", device);
+        mm_obj_warn (self, "open blocked by driver for more than 7 seconds!");
 
     if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_UNIX) {
         /* Create new GIOChannel */
@@ -1327,7 +1305,7 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
 
 success:
     self->priv->open_count++;
-    mm_dbg ("(%s) device open count is %d (open)", device, self->priv->open_count);
+    mm_obj_dbg (self, "device open count is %d (open)", self->priv->open_count);
 
     /* Run additional port config if just opened */
     if (self->priv->open_count == 1 && MM_PORT_SERIAL_GET_CLASS (self)->config)
@@ -1336,7 +1314,7 @@ success:
     return TRUE;
 
 error:
-    mm_warn ("(%s) failed to open serial device", device);
+    mm_obj_warn (self, "failed to open serial device");
 
     if (self->priv->iochannel) {
         g_io_channel_unref (self->priv->iochannel);
@@ -1369,8 +1347,7 @@ mm_port_serial_is_open (MMPortSerial *self)
 static void
 _close_internal (MMPortSerial *self, gboolean force)
 {
-    const char *device;
-    guint       i;
+    guint i;
 
     g_return_if_fail (MM_IS_PORT_SERIAL (self));
 
@@ -1381,9 +1358,7 @@ _close_internal (MMPortSerial *self, gboolean force)
         self->priv->open_count--;
     }
 
-    device = mm_port_get_device (MM_PORT (self));
-
-    mm_dbg ("(%s) device open count is %d (close)", device, self->priv->open_count);
+    mm_obj_dbg (self, "device open count is %d (close)", self->priv->open_count);
 
     if (self->priv->open_count > 0)
         return;
@@ -1402,7 +1377,7 @@ _close_internal (MMPortSerial *self, gboolean force)
         GTimeVal tv_start, tv_end;
         struct serial_struct sinfo = { 0 };
 
-        mm_dbg ("(%s) closing serial port...", device);
+        mm_obj_dbg (self, "closing serial port...");
 
         mm_port_set_connected (MM_PORT (self), FALSE);
 
@@ -1415,11 +1390,10 @@ _close_internal (MMPortSerial *self, gboolean force)
              */
             if (ioctl (self->priv->fd, TIOCGSERIAL, &sinfo) == 0) {
                 if (sinfo.closing_wait != ASYNC_CLOSING_WAIT_NONE) {
-                    mm_warn ("(%s): serial port closing_wait was reset!", device);
+                    mm_obj_warn (self, "serial port closing_wait was reset!");
                     sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
                     if (ioctl (self->priv->fd, TIOCSSERIAL, &sinfo) < 0)
-                        mm_warn ("(%s): couldn't set serial port closing_wait to none: %s",
-                                 device, g_strerror (errno));
+                        mm_obj_warn (self, "couldn't set serial port closing_wait to none: %s", g_strerror (errno));
                 }
             }
 
@@ -1452,7 +1426,7 @@ _close_internal (MMPortSerial *self, gboolean force)
 
         g_get_current_time (&tv_end);
 
-        mm_dbg ("(%s) serial port closed", device);
+        mm_obj_dbg (self, "serial port closed");
 
         /* Some ports don't respond to data and when close is called
          * the serial layer waits up to 30 second (closing_wait) for
@@ -1460,7 +1434,7 @@ _close_internal (MMPortSerial *self, gboolean force)
          * Log that.  See GNOME bug #630670 for more details.
          */
         if (tv_end.tv_sec - tv_start.tv_sec > 7)
-            mm_warn ("(%s): close blocked by driver for more than 7 seconds!", device);
+            mm_obj_warn (self, "close blocked by driver for more than 7 seconds!");
     }
 
     /* Clear the command queue */
@@ -1514,7 +1488,7 @@ port_serial_close_force (MMPortSerial *self)
     if (self->priv->forced_close)
         return;
 
-    mm_dbg ("(%s) forced to close port", mm_port_get_device (MM_PORT (self)));
+    mm_obj_dbg (self, "forced to close port");
 
     /* Mark as having forced the close, so that we don't warn about incorrect
      * open counts */
@@ -1651,9 +1625,7 @@ mm_port_serial_reopen (MMPortSerial *self,
         return;
     }
 
-    mm_dbg ("(%s) reopening port (%u)",
-            mm_port_get_device (MM_PORT (self)),
-            ctx->initial_open_count);
+    mm_obj_dbg (self, "reopening port (%u)", ctx->initial_open_count);
 
     for (i = 0; i < ctx->initial_open_count; i++)
         mm_port_serial_close (self);
@@ -1896,16 +1868,14 @@ mm_port_serial_set_flow_control (MMPortSerial   *self,
 
     /* Return if current settings are already what we want */
     if (!set_flow_control_termios (self, flow_control, &options)) {
-        mm_dbg ("(%s): no need to change flow control settings: already %s",
-                mm_port_get_device (MM_PORT (self)), flow_control_str);
+        mm_obj_dbg (self, "no need to change flow control settings: already %s", flow_control_str);
         goto out;
     }
 
     if (!internal_tcsetattr (self, self->priv->fd, &options, &inner_error))
         goto out;
 
-    mm_dbg ("(%s): flow control settings updated to %s",
-            mm_port_get_device (MM_PORT (self)), flow_control_str);
+    mm_obj_dbg (self, "flow control settings updated to %s", flow_control_str);
 
  out:
     g_free (flow_control_str);

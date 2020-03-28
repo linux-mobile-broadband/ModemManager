@@ -22,7 +22,7 @@
 #include <string.h>
 
 #include "mm-port-serial-at.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 G_DEFINE_TYPE (MMPortSerialAt, mm_port_serial_at, MM_TYPE_PORT_SERIAL)
 
@@ -435,10 +435,13 @@ mm_port_serial_at_command (MMPortSerialAt *self,
 }
 
 static void
-debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
+debug_log (MMPortSerial *self,
+           const gchar  *prefix,
+           const gchar  *buf,
+           gsize         len)
 {
     static GString *debug = NULL;
-    const char *s;
+    const  char    *s;
 
     if (!debug)
         debug = g_string_sized_new (256);
@@ -461,7 +464,7 @@ debug_log (MMPortSerial *port, const char *prefix, const char *buf, gsize len)
     }
 
     g_string_append_c (debug, '\'');
-    mm_dbg ("(%s): %s", mm_port_get_device (MM_PORT (port)), debug->str);
+    mm_obj_dbg (self, "%s", debug->str);
     g_string_truncate (debug, 0);
 }
 
@@ -497,7 +500,7 @@ mm_port_serial_at_run_init_sequence (MMPortSerialAt *self)
     if (!self->priv->init_sequence)
         return;
 
-    mm_dbg ("(%s): running init sequence...", mm_port_get_device (MM_PORT (self)));
+    mm_obj_dbg (self, "running init sequence...");
 
     /* Just queue the init commands, don't wait for reply */
     for (i = 0; self->priv->init_sequence[i]; i++) {

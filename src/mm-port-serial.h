@@ -93,12 +93,12 @@ struct _MMPortSerialClass {
 
     /* Called to configure the serial port after it's opened. Errors, if any,
      * should get ignored. */
-    void     (*config)            (MMPortSerial *self);
+    void (*config)                (MMPortSerial *self);
 
     void (*debug_log)             (MMPortSerial *self,
-                                   const char *prefix,
-                                   const char *buf,
-                                   gsize len);
+                                   const gchar  *prefix,
+                                   const gchar  *buf,
+                                   gsize         len);
 
     /* Signals */
     void (*buffer_full)           (MMPortSerial *port, const GByteArray *buffer);

@@ -26,7 +26,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-port-mbim.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 G_DEFINE_TYPE (MMPortMbim, mm_port_mbim, MM_TYPE_PORT)
 
@@ -176,18 +176,14 @@ qmi_device_open_ready (QmiDevice    *dev,
     self = g_task_get_source_object (task);
 
     if (!qmi_device_open_finish (dev, res, &error)) {
-        mm_dbg ("[%s] error: couldn't open QmiDevice: %s",
-                mm_port_get_device (MM_PORT (self)),
-                error->message);
+        mm_obj_dbg (self, "error: couldn't open QmiDevice: %s", error->message);
         g_error_free (error);
         g_clear_object (&self->priv->qmi_device);
         /* Ignore error and complete */
-        mm_info ("[%s] MBIM device is not QMI capable",
-                 mm_port_get_device (MM_PORT (self)));
+        mm_obj_info (self, "MBIM device is not QMI capable");
         self->priv->qmi_supported = FALSE;
     } else {
-        mm_info ("[%s] MBIM device is QMI capable",
-                 mm_port_get_device (MM_PORT (self)));
+        mm_obj_info (self, "MBIM device is QMI capable");
     }
 
     self->priv->in_progress = FALSE;
@@ -207,13 +203,10 @@ qmi_device_new_ready (GObject      *unused,
 
     self->priv->qmi_device = qmi_device_new_finish (res, &error);
     if (!self->priv->qmi_device) {
-        mm_dbg ("[%s] error: couldn't create QmiDevice: %s",
-                mm_port_get_device (MM_PORT (self)),
-                error->message);
+        mm_obj_dbg (self, "error: couldn't create QmiDevice: %s", error->message);
         g_error_free (error);
         /* Ignore error and complete */
-        mm_info ("[%s] MBIM device is not QMI capable",
-                 mm_port_get_device (MM_PORT (self)));
+        mm_obj_info (self, "MBIM device is not QMI capable");
         self->priv->qmi_supported = FALSE;
         self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
@@ -222,8 +215,7 @@ qmi_device_new_ready (GObject      *unused,
     }
 
     /* Try to open using QMI over MBIM */
-    mm_dbg ("[%s] trying to open QMI over MBIM device...",
-            mm_port_get_device (MM_PORT (self)));
+    mm_obj_dbg (self, "trying to open QMI over MBIM device...");
     qmi_device_open (self->priv->qmi_device,
                      (QMI_DEVICE_OPEN_FLAGS_PROXY        |
                       QMI_DEVICE_OPEN_FLAGS_MBIM         |
@@ -272,7 +264,7 @@ mbim_query_device_services_ready (MbimDevice   *device,
         mbim_device_service_element_array_free (device_services);
     } else {
         /* Ignore error */
-        mm_dbg ("Couldn't query device services, will attempt QMI open anyway: %s", error->message);
+        mm_obj_dbg (self, "Couldn't query device services, will attempt QMI open anyway: %s", error->message);
         g_error_free (error);
     }
 
@@ -283,8 +275,7 @@ mbim_query_device_services_ready (MbimDevice   *device,
     file = G_FILE (g_task_get_task_data (task));
 
     if (!file || !self->priv->qmi_supported) {
-        mm_info ("[%s] MBIM device is not QMI capable",
-                 mm_port_get_device (MM_PORT (self)));
+        mm_obj_info (self, "MBIM device is not QMI capable");
         self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -292,8 +283,7 @@ mbim_query_device_services_ready (MbimDevice   *device,
     }
 
     /* Attempt to create and open the QMI device */
-    mm_dbg ("[%s] checking if QMI over MBIM is supported",
-            mm_port_get_device (MM_PORT (self)));
+    mm_obj_dbg (self, "checking if QMI over MBIM is supported...");
     qmi_device_new (file,
                     g_task_get_cancellable (task),
                     (GAsyncReadyCallback) qmi_device_new_ready,
@@ -338,8 +328,7 @@ mbim_device_open_ready (MbimDevice   *mbim_device,
         return;
     }
 
-    mm_dbg ("[%s] MBIM device is now open",
-            mm_port_get_device (MM_PORT (self)));
+    mm_obj_dbg (self, "MBIM device is now open");
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (self->priv->qmi_supported) {
@@ -507,10 +496,13 @@ qmi_device_close_ready (QmiDevice    *qmi_device,
                         GAsyncResult *res,
                         GTask        *task)
 {
-    GError *error = NULL;
+    GError     *error = NULL;
+    MMPortMbim *self;
+
+    self = g_task_get_source_object (task);
 
     if (!qmi_device_close_finish (qmi_device, res, &error)) {
-        mm_warn ("Couldn't properly close QMI device: %s", error->message);
+        mm_obj_warn (self, "Couldn't properly close QMI device: %s", error->message);
         g_error_free (error);
     }
 
@@ -561,7 +553,8 @@ mm_port_mbim_close (MMPortMbim          *self,
         for (l = self->priv->qmi_clients; l; l = g_list_next (l)) {
             QmiClient *qmi_client = QMI_CLIENT (l->data);
 
-            mm_dbg ("Releasing client for service '%s'...", qmi_service_get_string (qmi_client_get_service (qmi_client)));
+            mm_obj_dbg (self, "Releasing client for service '%s'...",
+                        qmi_service_get_string (qmi_client_get_service (qmi_client)));
             qmi_device_release_client (self->priv->qmi_device,
                                        qmi_client,
                                        QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
