@@ -25,7 +25,7 @@
 
 #include "mm-kernel-device-generic.h"
 #include "mm-kernel-device-generic-rules.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #if !defined UDEVRULESDIR
 # error UDEVRULESDIR is not defined
@@ -126,19 +126,16 @@ preload_sysfs_path (MMKernelDeviceGeneric *self)
 
     self->priv->sysfs_path = realpath (tmp, NULL);
     if (!self->priv->sysfs_path || !g_file_test (self->priv->sysfs_path, G_FILE_TEST_EXISTS)) {
-        mm_warn ("Invalid sysfs path read for %s/%s",
-                 mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                 mm_kernel_event_properties_get_name      (self->priv->properties));
+        mm_obj_warn (self, "invalid sysfs path read for %s/%s",
+                     mm_kernel_event_properties_get_subsystem (self->priv->properties),
+                     mm_kernel_event_properties_get_name      (self->priv->properties));
         g_clear_pointer (&self->priv->sysfs_path, g_free);
     }
 
     if (self->priv->sysfs_path) {
         const gchar *devpath;
 
-        mm_dbg ("(%s/%s) sysfs path: %s",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->sysfs_path);
+        mm_obj_dbg (self, "sysfs path: %s", self->priv->sysfs_path);
         devpath = (g_str_has_prefix (self->priv->sysfs_path, "/sys") ?
                    &self->priv->sysfs_path[4] :
                    self->priv->sysfs_path);
@@ -210,10 +207,7 @@ preload_interface_sysfs_path (MMKernelDeviceGeneric *self)
     }
 
     if (self->priv->interface_sysfs_path)
-        mm_dbg ("(%s/%s) interface sysfs path: %s",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->interface_sysfs_path);
+        mm_obj_dbg (self, "interface sysfs path: %s", self->priv->interface_sysfs_path);
 }
 
 static void
@@ -229,10 +223,7 @@ preload_physdev_sysfs_path (MMKernelDeviceGeneric *self)
         self->priv->physdev_sysfs_path = g_path_get_dirname (self->priv->interface_sysfs_path);
 
     if (self->priv->physdev_sysfs_path)
-        mm_dbg ("(%s/%s) physdev sysfs path: %s",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->physdev_sysfs_path);
+        mm_obj_dbg (self, "physdev sysfs path: %s", self->priv->physdev_sysfs_path);
 }
 
 static void
@@ -251,10 +242,7 @@ preload_driver (MMKernelDeviceGeneric *self)
     }
 
     if (self->priv->driver)
-        mm_dbg ("(%s/%s) driver: %s",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->driver);
+        mm_obj_dbg (self, "driver: %s", self->priv->driver);
 }
 
 static void
@@ -269,15 +257,10 @@ preload_physdev_vid (MMKernelDeviceGeneric *self)
     }
 
     if (self->priv->physdev_vid) {
-        mm_dbg ("(%s/%s) vid (ID_VENDOR_ID): 0x%04x",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->physdev_vid);
+        mm_obj_dbg (self, "vid (ID_VENDOR_ID): 0x%04x", self->priv->physdev_vid);
         g_object_set_data_full (G_OBJECT (self), "ID_VENDOR_ID", g_strdup_printf ("%04x", self->priv->physdev_vid), g_free);
     } else
-        mm_dbg ("(%s/%s) vid: unknown",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties));
+        mm_obj_dbg (self, "vid: unknown");
 
 }
 
@@ -293,15 +276,10 @@ preload_physdev_pid (MMKernelDeviceGeneric *self)
     }
 
     if (self->priv->physdev_pid) {
-        mm_dbg ("(%s/%s) pid (ID_MODEL_ID): 0x%04x",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->physdev_pid);
+        mm_obj_dbg (self, "pid (ID_MODEL_ID): 0x%04x", self->priv->physdev_pid);
         g_object_set_data_full (G_OBJECT (self), "ID_MODEL_ID", g_strdup_printf ("%04x", self->priv->physdev_pid), g_free);
     } else
-        mm_dbg ("(%s/%s) pid: unknown",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties));
+        mm_obj_dbg (self, "pid: unknown");
 }
 
 static void
@@ -316,15 +294,10 @@ preload_physdev_revision (MMKernelDeviceGeneric *self)
     }
 
     if (self->priv->physdev_revision) {
-        mm_dbg ("(%s/%s) revision (ID_REVISION): 0x%04x",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->physdev_revision);
+        mm_obj_dbg (self, "revision (ID_REVISION): 0x%04x", self->priv->physdev_revision);
         g_object_set_data_full (G_OBJECT (self), "ID_REVISION", g_strdup_printf ("%04x", self->priv->physdev_revision), g_free);
     } else
-        mm_dbg ("(%s/%s) revision: unknown",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties));
+        mm_obj_dbg (self, "revision: unknown");
 }
 
 static void
@@ -341,10 +314,7 @@ preload_physdev_subsystem (MMKernelDeviceGeneric *self)
         g_free (aux);
     }
 
-    mm_dbg ("(%s/%s) subsystem: %s",
-            mm_kernel_event_properties_get_subsystem (self->priv->properties),
-            mm_kernel_event_properties_get_name      (self->priv->properties),
-            self->priv->physdev_subsystem ? self->priv->physdev_subsystem : "unknown");
+    mm_obj_dbg (self, "subsystem: %s", self->priv->physdev_subsystem ? self->priv->physdev_subsystem : "unknown");
 }
 
 static void
@@ -354,15 +324,10 @@ preload_manufacturer (MMKernelDeviceGeneric *self)
         self->priv->physdev_manufacturer = (self->priv->physdev_sysfs_path ? read_sysfs_property_as_string (self->priv->physdev_sysfs_path, "manufacturer") : NULL);
 
     if (self->priv->physdev_manufacturer) {
-        mm_dbg ("(%s/%s) manufacturer (ID_VENDOR): %s",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->physdev_manufacturer);
+        mm_obj_dbg (self, "manufacturer (ID_VENDOR): %s", self->priv->physdev_manufacturer);
         g_object_set_data_full (G_OBJECT (self), "ID_VENDOR", g_strdup (self->priv->physdev_manufacturer), g_free);
     } else
-        mm_dbg ("(%s/%s) manufacturer: unknown",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties));
+        mm_obj_dbg (self, "manufacturer: unknown");
 }
 
 static void
@@ -372,15 +337,10 @@ preload_product (MMKernelDeviceGeneric *self)
         self->priv->physdev_product = (self->priv->physdev_sysfs_path ? read_sysfs_property_as_string (self->priv->physdev_sysfs_path, "product") : NULL);
 
     if (self->priv->physdev_product) {
-        mm_dbg ("(%s/%s) product (ID_MODEL): %s",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->physdev_product);
+        mm_obj_dbg (self, "product (ID_MODEL): %s", self->priv->physdev_product);
         g_object_set_data_full (G_OBJECT (self), "ID_MODEL", g_strdup (self->priv->physdev_product), g_free);
     } else
-        mm_dbg ("(%s/%s) product: unknown",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties));
+        mm_obj_dbg (self, "product: unknown");
 
 }
 
@@ -388,40 +348,28 @@ static void
 preload_interface_class (MMKernelDeviceGeneric *self)
 {
     self->priv->interface_class = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceClass") : 0x00);
-    mm_dbg ("(%s/%s) interface class: 0x%02x",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->interface_class);
+    mm_obj_dbg (self, "interface class: 0x%02x", self->priv->interface_class);
 }
 
 static void
 preload_interface_subclass (MMKernelDeviceGeneric *self)
 {
     self->priv->interface_subclass = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceSubClass") : 0x00);
-    mm_dbg ("(%s/%s) interface subclass: 0x%02x",
-                mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                mm_kernel_event_properties_get_name      (self->priv->properties),
-                self->priv->interface_subclass);
+    mm_obj_dbg (self, "interface subclass: 0x%02x", self->priv->interface_subclass);
 }
 
 static void
 preload_interface_protocol (MMKernelDeviceGeneric *self)
 {
     self->priv->interface_protocol = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceProtocol") : 0x00);
-    mm_dbg ("(%s/%s) interface protocol: 0x%02x",
-            mm_kernel_event_properties_get_subsystem (self->priv->properties),
-            mm_kernel_event_properties_get_name      (self->priv->properties),
-            self->priv->interface_protocol);
+    mm_obj_dbg (self, "interface protocol: 0x%02x", self->priv->interface_protocol);
 }
 
 static void
 preload_interface_number (MMKernelDeviceGeneric *self)
 {
     self->priv->interface_number = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceNumber") : 0x00);
-    mm_dbg ("(%s/%s) interface number (ID_USB_INTERFACE_NUM): 0x%02x",
-            mm_kernel_event_properties_get_subsystem (self->priv->properties),
-            mm_kernel_event_properties_get_name      (self->priv->properties),
-            self->priv->interface_number);
+    mm_obj_dbg (self, "interface number (ID_USB_INTERFACE_NUM): 0x%02x", self->priv->interface_number);
     g_object_set_data_full (G_OBJECT (self), "ID_USB_INTERFACE_NUM", g_strdup_printf ("%02x", self->priv->interface_number), g_free);
 }
 
@@ -429,10 +377,7 @@ static void
 preload_interface_description (MMKernelDeviceGeneric *self)
 {
     self->priv->interface_description = (self->priv->interface_sysfs_path ? read_sysfs_property_as_string (self->priv->interface_sysfs_path, "interface") : NULL);
-    mm_dbg ("(%s/%s) interface description: %s",
-            mm_kernel_event_properties_get_subsystem (self->priv->properties),
-            mm_kernel_event_properties_get_name      (self->priv->properties),
-            self->priv->interface_description ? self->priv->interface_description : "unknown");
+    mm_obj_dbg (self, "interface description: %s", self->priv->interface_description ? self->priv->interface_description : "unknown");
 }
 
 static void
@@ -768,7 +713,7 @@ check_condition (MMKernelDeviceGeneric *self,
             result = (g_str_equal (match->value, "?*") || ((mm_get_uint_from_hex_str (match->value, &val)) &&
                                                            ((self->priv->interface_number == val) == condition_equal)));
         else
-            mm_warn ("Unknown attribute: %s", attribute);
+            mm_obj_warn (self, "unknown attribute: %s", attribute);
 
         g_free (contents);
         g_free (attribute);
@@ -790,7 +735,7 @@ check_condition (MMKernelDeviceGeneric *self,
         return result;
     }
 
-    mm_warn ("Unknown match condition parameter: %s", match->parameter);
+    mm_obj_warn (self, "unknown match condition parameter: %s", match->parameter);
     return FALSE;
 }
 
@@ -833,11 +778,9 @@ check_rule (MMKernelDeviceGeneric *self,
                 property_value_read = g_strdup_printf ("%02x", self->priv->interface_number);
 
             /* add new property */
-            mm_dbg ("(%s/%s) property added: %s=%s",
-                    mm_kernel_event_properties_get_subsystem (self->priv->properties),
-                    mm_kernel_event_properties_get_name      (self->priv->properties),
-                    rule->result.content.property.name,
-                    property_value_read ? property_value_read : rule->result.content.property.value);
+            mm_obj_dbg (self, "property added: %s=%s",
+                        rule->result.content.property.name,
+                        property_value_read ? property_value_read : rule->result.content.property.value);
 
             if (!property_value_read)
                 /* NOTE: we keep a reference to the list of rules ourselves, so it isn't
@@ -906,9 +849,7 @@ check_preload (MMKernelDeviceGeneric *self)
     if (g_strcmp0 (mm_kernel_event_properties_get_subsystem (self->priv->properties), "virtual") == 0)
         return;
 
-    mm_dbg ("(%s/%s) preloading contents and properties...",
-            mm_kernel_event_properties_get_subsystem (self->priv->properties),
-            mm_kernel_event_properties_get_name      (self->priv->properties));
+    mm_obj_dbg (self, "preloading contents and properties...");
     preload_contents (self);
     preload_properties (self);
 }

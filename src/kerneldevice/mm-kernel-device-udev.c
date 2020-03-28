@@ -21,7 +21,7 @@
 #include <ModemManager-tags.h>
 
 #include "mm-kernel-device-udev.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 static void initable_iface_init (GInitableIface *iface);
 
@@ -177,9 +177,7 @@ ensure_device_ids (MMKernelDeviceUdev *self)
         return;
 
     if (!get_device_ids (self->priv->device, &self->priv->vendor, &self->priv->product, &self->priv->revision))
-        mm_dbg ("(%s/%s) could not get vendor/product id",
-                g_udev_device_get_subsystem (self->priv->device),
-                g_udev_device_get_name      (self->priv->device));
+        mm_obj_dbg (self, "could not get vendor/product id");
 }
 
 /*****************************************************************************/

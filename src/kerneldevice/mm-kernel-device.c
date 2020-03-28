@@ -16,10 +16,13 @@
 #include <config.h>
 #include <string.h>
 
-#include "mm-log.h"
 #include "mm-kernel-device.h"
+#include "mm-log-object.h"
 
-G_DEFINE_ABSTRACT_TYPE (MMKernelDevice, mm_kernel_device, G_TYPE_OBJECT)
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_ABSTRACT_TYPE_WITH_CODE (MMKernelDevice, mm_kernel_device, G_TYPE_OBJECT,
+                                  G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 /*****************************************************************************/
 
@@ -317,9 +320,26 @@ mm_kernel_device_get_global_property_as_int_hex (MMKernelDevice *self,
 
 /*****************************************************************************/
 
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    MMKernelDevice *self;
+
+    self = MM_KERNEL_DEVICE (_self);
+    return g_strdup (mm_kernel_device_get_name (self));
+}
+
+/*****************************************************************************/
+
 static void
 mm_kernel_device_init (MMKernelDevice *self)
 {
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
