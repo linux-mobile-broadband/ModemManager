@@ -26,7 +26,7 @@
 #include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-base-modem.h"
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "3gpp-ussd-support-checked-tag"
 #define SUPPORTED_TAG       "3gpp-ussd-supported-tag"
@@ -526,7 +526,7 @@ disable_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
     MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't disable unsolicited USSD events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't disable unsolicited USSD events: %s", error->message);
         g_error_free (error);
     }
 
@@ -547,7 +547,7 @@ cleanup_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
     MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't cleanup unsolicited USSD events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't cleanup unsolicited USSD events: %s", error->message);
         g_error_free (error);
     }
 
@@ -673,7 +673,7 @@ setup_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
     MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't setup unsolicited USSD events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't setup unsolicited USSD events: %s", error->message);
         g_error_free (error);
     }
 
@@ -694,7 +694,7 @@ enable_unsolicited_events_ready (MMIfaceModem3gppUssd *self,
     MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Couldn't enable unsolicited USSD events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't enable unsolicited USSD events: %s", error->message);
         g_error_free (error);
     }
 
@@ -813,7 +813,7 @@ check_support_ready (MMIfaceModem3gppUssd *self,
                                                                               &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
-            mm_dbg ("USSD support check failed: '%s'", error->message);
+            mm_obj_dbg (self, "USSD support check failed: %s", error->message);
             g_error_free (error);
         }
     } else {
