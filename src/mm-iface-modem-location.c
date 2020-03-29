@@ -21,7 +21,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 
 #define MM_LOCATION_GPS_REFRESH_TIME_SECS 30
@@ -235,11 +235,7 @@ notify_gps_location_update (MMIfaceModemLocation *self,
                             MMLocationGpsNmea *location_gps_nmea,
                             MMLocationGpsRaw *location_gps_raw)
 {
-    const gchar *dbus_path;
-
-    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_dbg ("Modem %s: GPS location updated",
-            dbus_path);
+    mm_obj_dbg (self, "GPS location updated");
 
     /* We only update the property if we are supposed to signal
      * location */
@@ -322,7 +318,7 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
             g_autoptr(GString)   str = NULL;
             g_autoptr(GDateTime) now = NULL;
 
-            mm_dbg ("GGA trace detected: '%s'", nmea_trace);
+            mm_obj_dbg (self, "GGA trace detected: %s", nmea_trace);
 
             now = g_date_time_new_now_utc ();
             str = g_string_new ("");
@@ -349,17 +345,13 @@ notify_3gpp_location_update (MMIfaceModemLocation *self,
                              MmGdbusModemLocation *skeleton,
                              MMLocation3gpp *location_3gpp)
 {
-    const gchar *dbus_path;
-
-    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_dbg ("Modem %s: 3GPP location updated "
-            "(MCC: '%u', MNC: '%u', Location area code: '%lX', Tracking area code: '%lX', Cell ID: '%lX')",
-            dbus_path,
-            mm_location_3gpp_get_mobile_country_code (location_3gpp),
-            mm_location_3gpp_get_mobile_network_code (location_3gpp),
-            mm_location_3gpp_get_location_area_code (location_3gpp),
-            mm_location_3gpp_get_tracking_area_code (location_3gpp),
-            mm_location_3gpp_get_cell_id (location_3gpp));
+    mm_obj_dbg (self, "3GPP location updated "
+                "(MCC: '%u', MNC: '%u', location area code: '%lX', tracking area code: '%lX', cell ID: '%lX')",
+                mm_location_3gpp_get_mobile_country_code (location_3gpp),
+                mm_location_3gpp_get_mobile_network_code (location_3gpp),
+                mm_location_3gpp_get_location_area_code (location_3gpp),
+                mm_location_3gpp_get_tracking_area_code (location_3gpp),
+                mm_location_3gpp_get_cell_id (location_3gpp));
 
     /* We only update the property if we are supposed to signal
      * location */
@@ -461,14 +453,9 @@ notify_cdma_bs_location_update (MMIfaceModemLocation *self,
                                 MmGdbusModemLocation *skeleton,
                                 MMLocationCdmaBs *location_cdma_bs)
 {
-    const gchar *dbus_path;
-
-    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_dbg ("Modem %s: CDMA BS location updated "
-            "(Longitude: '%lf', Latitude: '%lf')",
-            dbus_path,
-            mm_location_cdma_bs_get_longitude (location_cdma_bs),
-            mm_location_cdma_bs_get_latitude (location_cdma_bs));
+    mm_obj_dbg (self, "CDMA base station location updated (longitude: '%lf', latitude: '%lf')",
+                mm_location_cdma_bs_get_longitude (location_cdma_bs),
+                mm_location_cdma_bs_get_latitude (location_cdma_bs));
 
     /* We only update the property if we are supposed to signal
      * location */
@@ -712,7 +699,7 @@ setup_gathering_step (GTask *task)
             }
 
             source_str = mm_modem_location_source_build_string_from_mask (ctx->current);
-            mm_dbg ("Enabled location '%s' gathering...", source_str);
+            mm_obj_dbg (self, "enabled location '%s' gathering...", source_str);
             g_free (source_str);
         } else if (ctx->to_disable & ctx->current) {
             /* Remove from mask */
@@ -732,7 +719,7 @@ setup_gathering_step (GTask *task)
             }
 
             source_str = mm_modem_location_source_build_string_from_mask (ctx->current);
-            mm_dbg ("Disabled location '%s' gathering...", source_str);
+            mm_obj_dbg (self, "disabled location '%s' gathering...", source_str);
             g_free (source_str);
         }
 
@@ -797,7 +784,7 @@ setup_gathering (MMIfaceModemLocation *self,
         if (mask & source) {
             /* Source set in mask, need to enable if disabled */
             if (currently_enabled & source)
-                mm_dbg ("Location '%s' gathering is already enabled...", str);
+                mm_obj_dbg (self, "location '%s' gathering is already enabled...", str);
             else
                 ctx->to_enable |= source;
         } else {
@@ -805,7 +792,7 @@ setup_gathering (MMIfaceModemLocation *self,
             if (currently_enabled & source)
                 ctx->to_disable |= source;
             else
-                mm_dbg ("Location '%s' gathering is already disabled...", str);
+                mm_obj_dbg (self, "location '%s' gathering is already disabled...", str);
         }
 
         g_free (str);
@@ -847,13 +834,13 @@ setup_gathering (MMIfaceModemLocation *self,
 
     if (ctx->to_enable != MM_MODEM_LOCATION_SOURCE_NONE) {
         str = mm_modem_location_source_build_string_from_mask (ctx->to_enable);
-        mm_dbg ("Need to enable the following location sources: '%s'", str);
+        mm_obj_dbg (self, "need to enable the following location sources: '%s'", str);
         g_free (str);
     }
 
     if (ctx->to_disable != MM_MODEM_LOCATION_SOURCE_NONE) {
         str = mm_modem_location_source_build_string_from_mask (ctx->to_disable);
-        mm_dbg ("Need to disable the following location sources: '%s'", str);
+        mm_obj_dbg (self, "need to disable the following location sources: '%s'", str);
         g_free (str);
     }
 
@@ -944,8 +931,8 @@ handle_setup_auth_ready (MMBaseModem *self,
     /* Enable/disable location signaling */
     location_ctx = get_location_context (ctx->self);
     if (mm_gdbus_modem_location_get_signals_location (ctx->skeleton) != ctx->signal_location) {
-        mm_dbg ("%s location signaling",
-                ctx->signal_location ? "Enabling" : "Disabling");
+        mm_obj_dbg (self, "%s location signaling",
+                    ctx->signal_location ? "enabling" : "disabling");
         mm_gdbus_modem_location_set_signals_location (ctx->skeleton,
                                                       ctx->signal_location);
         if (ctx->signal_location)
@@ -963,7 +950,7 @@ handle_setup_auth_ready (MMBaseModem *self,
     }
 
     str = mm_modem_location_source_build_string_from_mask (ctx->sources);
-    mm_dbg ("Setting up location sources: '%s'", str);
+    mm_obj_dbg (self, "setting up location sources: '%s'", str);
     g_free (str);
 
     /* Go on to enable or disable the requested sources */
@@ -1674,7 +1661,7 @@ load_assistance_data_servers_ready (MMIfaceModemLocation *self,
 
     servers = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_assistance_data_servers_finish (self, res, &error);
     if (error) {
-        mm_warn ("couldn't load assistance data servers: '%s'", error->message);
+        mm_obj_warn (self, "couldn't load assistance data servers: %s", error->message);
         g_error_free (error);
     }
 
@@ -1699,7 +1686,7 @@ load_supported_assistance_data_ready (MMIfaceModemLocation *self,
 
     mask = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supported_assistance_data_finish (self, res, &error);
     if (error) {
-        mm_warn ("couldn't load supported assistance data types: '%s'", error->message);
+        mm_obj_warn (self, "couldn't load supported assistance data types: %s", error->message);
         g_error_free (error);
     }
 
@@ -1723,7 +1710,7 @@ load_supl_server_ready (MMIfaceModemLocation *self,
 
     supl = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_supl_server_finish (self, res, &error);
     if (error) {
-        mm_warn ("couldn't load SUPL server: '%s'", error->message);
+        mm_obj_warn (self, "couldn't load SUPL server: %s", error->message);
         g_error_free (error);
     }
 
@@ -1747,7 +1734,7 @@ load_capabilities_ready (MMIfaceModemLocation *self,
 
     ctx->capabilities = MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->load_capabilities_finish (self, res, &error);
     if (error) {
-        mm_warn ("couldn't load location capabilities: '%s'", error->message);
+        mm_obj_warn (self, "couldn't load location capabilities: %s", error->message);
         g_error_free (error);
     }
 
