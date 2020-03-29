@@ -35,7 +35,7 @@
 #include "mm-base-bearer.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-bearer-stats.h"
 
@@ -50,7 +50,10 @@
 #define BEARER_CONNECTION_MONITOR_INITIAL_TIMEOUT 30
 #define BEARER_CONNECTION_MONITOR_TIMEOUT          5
 
-G_DEFINE_TYPE (MMBaseBearer, mm_base_bearer, MM_GDBUS_TYPE_BEARER_SKELETON)
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBaseBearer, mm_base_bearer, MM_GDBUS_TYPE_BEARER_SKELETON, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 typedef enum {
     CONNECTION_FORBIDDEN_REASON_NONE,
@@ -172,14 +175,14 @@ load_connection_status_ready (MMBaseBearer *self,
     if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN) {
         /* Only warn if not reporting an "unsupported" error */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
-            mm_warn ("checking if connected failed: %s", error->message);
+            mm_obj_warn (self, "checking if connected failed: %s", error->message);
             g_error_free (error);
             return;
         }
 
         /* If we're being told that connection monitoring is unsupported, just
          * ignore the error and remove the timeout. */
-        mm_dbg ("Connection monitoring is unsupported by the device");
+        mm_obj_dbg (self, "connection monitoring is unsupported by the device");
         self->priv->load_connection_status_unsupported = TRUE;
         connection_monitor_stop (self);
         g_error_free (error);
@@ -188,7 +191,7 @@ load_connection_status_ready (MMBaseBearer *self,
 
     /* Report connection or disconnection */
     g_assert (status == MM_BEARER_CONNECTION_STATUS_CONNECTED || status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
-    mm_dbg ("connection status loaded: %s", mm_bearer_connection_status_get_string (status));
+    mm_obj_dbg (self, "connection status loaded: %s", mm_bearer_connection_status_get_string (status));
     mm_base_bearer_report_connection_status (self, status);
 }
 
@@ -284,14 +287,14 @@ reload_stats_ready (MMBaseBearer *self,
     if (!MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish (self, &rx_bytes, &tx_bytes, res, &error)) {
         /* If reloading stats fails, warn about it and don't update anything */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
-            mm_warn ("Reloading stats failed: %s", error->message);
+            mm_obj_warn (self, "reloading stats failed: %s", error->message);
             g_error_free (error);
             return;
         }
 
         /* If we're being told that reloading stats is unsupported, just ignore
          * the error and update oly the duration timer. */
-        mm_dbg ("Reloading stats is unsupported by the device");
+        mm_obj_dbg (self, "reloading stats is unsupported by the device");
         self->priv->reload_stats_unsupported = TRUE;
         rx_bytes = 0;
         tx_bytes = 0;
@@ -414,7 +417,7 @@ bearer_update_status_connected (MMBaseBearer *self,
      * the bearer when ownership of the TTY is given back to MM. */
     if ((ipv4_config && mm_bearer_ip_config_get_method (ipv4_config) == MM_BEARER_IP_METHOD_PPP) ||
         (ipv6_config && mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_PPP)) {
-        mm_dbg ("PPP is required for connection, will ignore disconnection reports");
+        mm_obj_dbg (self, "PPP is required for connection, will ignore disconnection reports");
         self->priv->ignore_disconnection_reports = TRUE;
     }
 
@@ -451,7 +454,7 @@ deferred_3gpp_unregistration_cb (MMBaseBearer *self)
     g_warn_if_fail (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
     self->priv->deferred_3gpp_unregistration_id = 0;
 
-    mm_dbg ("Forcing bearer disconnection, not registered in 3GPP network");
+    mm_obj_dbg (self, "forcing bearer disconnection, not registered in 3GPP network");
     mm_base_bearer_disconnect_force (self);
     return G_SOURCE_REMOVE;
 }
@@ -505,7 +508,7 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
 
     /* Modem is roaming and roaming not allowed, report right away */
     if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_ROAMING) {
-        mm_dbg ("Bearer not allowed to connect, registered in roaming 3GPP network");
+        mm_obj_dbg (self, "bearer not allowed to connect, registered in roaming 3GPP network");
         reset_deferred_unregistration (self);
         mm_base_bearer_disconnect_force (self);
         return;
@@ -513,7 +516,7 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
 
     /* Modem is registered under emergency services only? */
     if (self->priv->reason_3gpp == CONNECTION_FORBIDDEN_REASON_EMERGENCY_ONLY) {
-        mm_dbg ("Bearer not allowed to connect, emergency services only");
+        mm_obj_dbg (self, "bearer not allowed to connect, emergency services only");
         reset_deferred_unregistration (self);
         mm_base_bearer_disconnect_force (self);
         return;
@@ -527,13 +530,13 @@ modem_3gpp_registration_state_changed (MMIfaceModem3gpp *modem,
 
         /* If the bearer is not connected, report right away */
         if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
-            mm_dbg ("Bearer not allowed to connect, not registered in 3GPP network");
+            mm_obj_dbg (self, "bearer not allowed to connect, not registered in 3GPP network");
             mm_base_bearer_disconnect_force (self);
             return;
         }
 
         /* Otherwise, setup the new timeout */
-        mm_dbg ("Connected bearer not registered in 3GPP network");
+        mm_obj_dbg (self, "connected bearer not registered in 3GPP network");
         self->priv->deferred_3gpp_unregistration_id =
             g_timeout_add_seconds (BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
                                    (GSourceFunc) deferred_3gpp_unregistration_cb,
@@ -550,7 +553,7 @@ deferred_cdma_unregistration_cb (MMBaseBearer *self)
     g_warn_if_fail (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
     self->priv->deferred_cdma_unregistration_id = 0;
 
-    mm_dbg ("Forcing bearer disconnection, not registered in CDMA network");
+    mm_obj_dbg (self, "forcing bearer disconnection, not registered in CDMA network");
     mm_base_bearer_disconnect_force (self);
     return G_SOURCE_REMOVE;
 }
@@ -592,7 +595,7 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
 
     /* Modem is roaming and roaming not allowed, report right away */
     if (self->priv->reason_cdma == CONNECTION_FORBIDDEN_REASON_ROAMING) {
-        mm_dbg ("Bearer not allowed to connect, registered in roaming CDMA network");
+        mm_obj_dbg (self, "bearer not allowed to connect, registered in roaming CDMA network");
         reset_deferred_unregistration (self);
         mm_base_bearer_disconnect_force (self);
         return;
@@ -606,13 +609,13 @@ modem_cdma_registration_state_changed (MMIfaceModemCdma *modem,
 
         /* If the bearer is not connected, report right away */
         if (self->priv->status != MM_BEARER_STATUS_CONNECTED) {
-            mm_dbg ("Bearer not allowed to connect, not registered in CDMA network");
+            mm_obj_dbg (self, "bearer not allowed to connect, not registered in CDMA network");
             mm_base_bearer_disconnect_force (self);
             return;
         }
 
         /* Otherwise, setup the new timeout */
-        mm_dbg ("Connected bearer not registered in CDMA network");
+        mm_obj_dbg (self, "connected bearer not registered in CDMA network");
         self->priv->deferred_cdma_unregistration_id =
             g_timeout_add_seconds (BEARER_DEFERRED_UNREGISTRATION_TIMEOUT,
                                    (GSourceFunc) deferred_cdma_unregistration_cb,
@@ -701,14 +704,11 @@ disconnect_after_cancel_ready (MMBaseBearer *self,
     GError *error = NULL;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
-        mm_warn ("Error disconnecting bearer '%s': '%s'. "
-                 "Will assume disconnected anyway.",
-                 self->priv->path,
-                 error->message);
+        mm_obj_warn (self, "error disconnecting: %s; will assume disconnected anyway", error->message);
         g_error_free (error);
     }
     else
-        mm_dbg ("Disconnected bearer '%s'", self->priv->path);
+        mm_obj_dbg (self, "disconnected bearer '%s'", self->priv->path);
 
     /* Report disconnection to the bearer object using class method
      * mm_bearer_report_connection_status. This gives subclass implementations a
@@ -730,9 +730,7 @@ connect_ready (MMBaseBearer *self,
     /* NOTE: connect() implementations *MUST* handle cancellations themselves */
     result = MM_BASE_BEARER_GET_CLASS (self)->connect_finish (self, res, &error);
     if (!result) {
-        mm_dbg ("Couldn't connect bearer '%s': '%s'",
-                self->priv->path,
-                error->message);
+        mm_obj_dbg (self, "couldn't connect: '%s'", error->message);
         if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
             /* Will launch disconnection */
             launch_disconnect = TRUE;
@@ -741,14 +739,14 @@ connect_ready (MMBaseBearer *self,
     }
     /* Handle cancellations detected after successful connection */
     else if (g_cancellable_is_cancelled (self->priv->connect_cancellable)) {
-        mm_dbg ("Connected bearer '%s', but need to disconnect", self->priv->path);
+        mm_obj_dbg (self, "connected, but need to disconnect");
         mm_bearer_connect_result_unref (result);
         error = g_error_new (G_IO_ERROR, G_IO_ERROR_CANCELLED,
                              "Bearer got connected, but had to disconnect after cancellation request");
         launch_disconnect = TRUE;
     }
     else {
-        mm_dbg ("Connected bearer '%s'", self->priv->path);
+        mm_obj_dbg (self, "connected");
 
         /* Update bearer and interface status */
         bearer_update_status_connected (
@@ -864,7 +862,7 @@ mm_base_bearer_connect (MMBaseBearer *self,
     }
 
     /* Connecting! */
-    mm_dbg ("Connecting bearer '%s'", self->priv->path);
+    mm_obj_dbg (self, "connecting...");
     self->priv->connect_cancellable = g_cancellable_new ();
     bearer_update_status (self, MM_BEARER_STATUS_CONNECTING);
     bearer_reset_interface_stats (self);
@@ -936,7 +934,7 @@ handle_connect (MMBaseBearer *self,
                   MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
 
-    mm_dbg ("User request to connect bearer '%s'", self->priv->path);
+    mm_obj_dbg (self, "user request to connect");
 
     mm_base_modem_authorize (ctx->modem,
                              invocation,
@@ -965,12 +963,12 @@ disconnect_ready (MMBaseBearer *self,
     GError *error = NULL;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
-        mm_dbg ("Couldn't disconnect bearer '%s': %s", self->priv->path, error->message);
+        mm_obj_dbg (self, "couldn't disconnect: %s", error->message);
         bearer_update_status (self, MM_BEARER_STATUS_CONNECTED);
         g_task_return_error (task, error);
     }
     else {
-        mm_dbg ("Disconnected bearer '%s'", self->priv->path);
+        mm_obj_dbg (self, "disconnected");
         bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
         g_task_return_boolean (task, TRUE);
     }
@@ -988,8 +986,7 @@ status_changed_complete_disconnect (MMBaseBearer *self,
     if (self->priv->status != MM_BEARER_STATUS_DISCONNECTED)
         return;
 
-    mm_dbg ("Disconnected bearer '%s' after cancelling previous connect request",
-            self->priv->path);
+    mm_obj_dbg (self, "disconnected after cancelling previous connect request");
     g_signal_handler_disconnect (self,
                                  self->priv->disconnect_signal_handler);
     self->priv->disconnect_signal_handler = 0;
@@ -1038,7 +1035,7 @@ mm_base_bearer_disconnect (MMBaseBearer *self,
         return;
     }
 
-    mm_dbg ("Disconnecting bearer '%s'", self->priv->path);
+    mm_obj_dbg (self, "disconnecting...");
 
     /* If currently connecting, try to cancel that operation, and wait to get
      * disconnected. */
@@ -1129,7 +1126,7 @@ handle_disconnect (MMBaseBearer *self,
                   MM_BASE_BEARER_MODEM, &ctx->modem,
                   NULL);
 
-    mm_dbg ("User request to disconnect bearer '%s'", self->priv->path);
+    mm_obj_dbg (self, "user request to disconnect");
 
     mm_base_modem_authorize (ctx->modem,
                              invocation,
@@ -1160,9 +1157,7 @@ base_bearer_dbus_export (MMBaseBearer *self)
                                            self->priv->connection,
                                            self->priv->path,
                                            &error)) {
-        mm_warn ("couldn't export BEARER at '%s': '%s'",
-                 self->priv->path,
-                 error->message);
+        mm_obj_warn (self, "couldn't export to bus: %s", error->message);
         g_error_free (error);
     }
 }
@@ -1175,7 +1170,7 @@ base_bearer_dbus_unexport (MMBaseBearer *self)
     path = g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (self));
     /* Only unexport if currently exported */
     if (path) {
-        mm_dbg ("Removing from DBus bearer at '%s'", path);
+        mm_obj_dbg (self, "removing from bus");
         g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (self));
     }
 }
@@ -1223,14 +1218,11 @@ disconnect_force_ready (MMBaseBearer *self,
     GError *error = NULL;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
-        mm_warn ("Error disconnecting bearer '%s': '%s'. "
-                 "Will assume disconnected anyway.",
-                 self->priv->path,
-                 error->message);
+        mm_obj_warn (self, "error disconnecting: %s; will assume disconnected anyway", error->message);
         g_error_free (error);
     }
     else
-        mm_dbg ("Disconnected bearer '%s'", self->priv->path);
+        mm_obj_dbg (self, "disconnected");
 
     /* Report disconnection to the bearer object using class method
      * mm_bearer_report_connection_status. This gives subclass implementations a
@@ -1247,7 +1239,7 @@ mm_base_bearer_disconnect_force (MMBaseBearer *self)
         self->priv->status == MM_BEARER_STATUS_DISCONNECTED)
         return;
 
-    mm_dbg ("Forcing disconnection of bearer '%s'", self->priv->path);
+    mm_obj_dbg (self, "forcing disconnection");
 
     /* If currently connecting, try to cancel that operation. */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
@@ -1311,11 +1303,22 @@ mm_base_bearer_report_connection_status (MMBaseBearer             *self,
                                          MMBearerConnectionStatus  status)
 {
     if ((status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) && self->priv->ignore_disconnection_reports) {
-        mm_dbg ("ignoring disconnection report for bearer '%s'", self->priv->path);
+        mm_obj_dbg (self, "ignoring disconnection report");
         return;
     }
 
     return MM_BASE_BEARER_GET_CLASS (self)->report_connection_status (self, status);
+}
+
+/*****************************************************************************/
+
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    MMBaseBearer *self;
+
+    self = MM_BASE_BEARER (_self);
+    return g_strdup_printf ("bearer%u", self->priv->dbus_id);
 }
 
 /*****************************************************************************/
@@ -1352,6 +1355,8 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
         if (self->priv->modem) {
+            /* Set owner ID */
+            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
             /* Bind the modem's connection (which is set when it is exported,
              * and unset when unexported) to the BEARER's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
@@ -1489,6 +1494,12 @@ dispose (GObject *object)
     g_clear_object (&self->priv->config);
 
     G_OBJECT_CLASS (mm_base_bearer_parent_class)->dispose (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
