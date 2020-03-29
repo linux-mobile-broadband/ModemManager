@@ -23,7 +23,7 @@
 #include "mm-iface-modem-cdma.h"
 #include "mm-base-modem.h"
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #define SUBSYSTEM_CDMA1X "cdma1x"
 #define SUBSYSTEM_EVDO "evdo"
@@ -161,7 +161,7 @@ handle_activate_auth_ready (MMBaseModem *self,
 
     /* If we're already activated, nothing to do */
     if (mm_gdbus_modem_cdma_get_activation_state (ctx->skeleton) == MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED) {
-        mm_dbg ("Modem is already activated");
+        mm_obj_dbg (self, "already activated");
         mm_gdbus_modem_cdma_complete_activate (ctx->skeleton, ctx->invocation);
         handle_activate_context_free (ctx);
         return;
@@ -348,7 +348,7 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
 
     /* If we're already activated, nothing to do */
     if (mm_gdbus_modem_cdma_get_activation_state (ctx->skeleton) == MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED) {
-        mm_dbg ("Modem is already activated");
+        mm_obj_dbg (self, "already activated");
         mm_gdbus_modem_cdma_complete_activate_manual (ctx->skeleton, ctx->invocation);
         handle_activate_manual_context_free (ctx);
         return;
@@ -617,7 +617,7 @@ get_call_manager_state_ready (MMIfaceModemCdma *self,
             &ctx->call_manager_system_mode,
             &ctx->call_manager_operating_mode,
             &error)) {
-        mm_dbg ("Could not get call manager state: %s", error->message);
+        mm_obj_dbg (self, "could not get call manager state: %s", error->message);
         g_error_free (error);
         /* Fallback to AT-based check */
         ctx->step = REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS;
@@ -654,7 +654,7 @@ get_hdr_state_ready (MMIfaceModemCdma *self,
             &ctx->hdr_session_state,
             &ctx->hdr_almp_state,
             &error)) {
-        mm_dbg ("Could not get HDR state: %s", error->message);
+        mm_obj_dbg (self, "could not get HDR state: %s", error->message);
         g_error_free (error);
         /* Fallback to AT-based check */
         ctx->step = REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS;
@@ -670,14 +670,16 @@ get_hdr_state_ready (MMIfaceModemCdma *self,
 static void
 parse_qcdm_results (GTask *task)
 {
+    MMIfaceModemCdma             *self;
     RunRegistrationChecksContext *ctx;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
-    mm_dbg ("QCDM CM System Mode: %d", ctx->call_manager_system_mode);
-    mm_dbg ("QCDM HDR Hybrid Mode: %d", ctx->hdr_hybrid_mode);
-    mm_dbg ("QCDM HDR Session State: %d", ctx->hdr_session_state);
-    mm_dbg ("QCDM HDR ALMP State: %d", ctx->hdr_almp_state);
+    mm_obj_dbg (self, "QCDM CM System Mode: %d", ctx->call_manager_system_mode);
+    mm_obj_dbg (self, "QCDM HDR Hybrid Mode: %d", ctx->hdr_hybrid_mode);
+    mm_obj_dbg (self, "QCDM HDR Session State: %d", ctx->hdr_session_state);
+    mm_obj_dbg (self, "QCDM HDR ALMP State: %d", ctx->hdr_almp_state);
 
     /* Set QCDM-obtained registration info */
     switch (ctx->call_manager_system_mode) {
@@ -725,7 +727,7 @@ get_service_status_ready (MMIfaceModemCdma *self,
                                                                               res,
                                                                               &has_service,
                                                                               &error)) {
-        mm_warn ("Could not get service status: %s", error->message);
+        mm_obj_warn (self, "could not get service status: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -733,7 +735,7 @@ get_service_status_ready (MMIfaceModemCdma *self,
 
     if (!has_service) {
         /* There is no CDMA service at all, end registration checks */
-        mm_dbg ("No CDMA service found");
+        mm_obj_dbg (self, "no CDMA service found");
         ctx->step = REGISTRATION_CHECK_STEP_LAST;
     } else
         /* If we do have service, go on to next step */
@@ -766,7 +768,7 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
         if (!g_error_matches (error,
                               MM_MOBILE_EQUIPMENT_ERROR,
                               MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK)) {
-            mm_warn ("Could not get serving system: %s", error->message);
+            mm_obj_warn (self, "could not get serving system: %s", error->message);
             g_task_return_error (task, error);
             g_object_unref (task);
             return;
@@ -786,15 +788,17 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
 static void
 parse_at_results (GTask *task)
 {
+    MMIfaceModemCdma             *self;
     RunRegistrationChecksContext *ctx;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     /* 99999 means unknown/no service */
     if (ctx->cdma1x_sid == MM_MODEM_CDMA_SID_UNKNOWN &&
         ctx->cdma1x_nid == MM_MODEM_CDMA_NID_UNKNOWN) {
         /* Not registered in CDMA network, end registration checks */
-        mm_dbg ("Not registered in any CDMA network");
+        mm_obj_dbg (self, "no registered in any CDMA network");
         ctx->step = REGISTRATION_CHECK_STEP_LAST;
     } else {
         /* We're registered on the CDMA 1x network (at least) */
@@ -826,7 +830,7 @@ get_detailed_registration_state_ready (MMIfaceModemCdma *self,
             &error)) {
         /* This error is NOT fatal. If we get an error here, we'll just fallback
          * to the non-detailed values we already got. */
-        mm_dbg ("Could not get more detailed registration state: %s", error->message);
+        mm_obj_dbg (self, "could not get more detailed registration state: %s", error->message);
     } else {
         ctx->cdma1x_state = detailed_cdma1x_state;
         ctx->evdo_state = detailed_evdo_state;
@@ -868,7 +872,7 @@ registration_check_step (GTask *task)
         /* fall through */
 
     case REGISTRATION_CHECK_STEP_QCDM_CALL_MANAGER_STATE:
-        mm_dbg ("Starting QCDM-based registration checks");
+        mm_obj_dbg (self, "starting QCDM-based registration checks...");
         if (!ctx->skip_qcdm_call_manager_step &&
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state &&
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_call_manager_state_finish) {
@@ -880,7 +884,7 @@ registration_check_step (GTask *task)
             return;
         }
         /* Fallback to AT-based check */
-        mm_dbg ("  Skipping all QCDM-based checks and falling back to AT-based checks");
+        mm_obj_dbg (self, "  skipping all QCDM-based checks and falling back to AT-based checks");
         ctx->step = REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS;
         registration_check_step (task);
         return;
@@ -897,7 +901,7 @@ registration_check_step (GTask *task)
                 task);
             return;
         }
-        mm_dbg ("  Skipping HDR check");
+        mm_obj_dbg (self, "  skipping HDR check");
         ctx->step++;
         /* fall through */
 
@@ -913,7 +917,7 @@ registration_check_step (GTask *task)
                 task);
             return;
         }
-        mm_dbg ("  Skipping CDMA1x Serving System check");
+        mm_obj_dbg (self, "  skipping CDMA1x serving system check");
         ctx->step++;
         /* fall through */
 
@@ -923,8 +927,7 @@ registration_check_step (GTask *task)
         return;
 
     case REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS:
-        mm_dbg ("Starting AT-based registration checks");
-
+        mm_obj_dbg (self, "starting AT-based registration checks");
         /* If we don't have means to get service status, just assume we do have
          * CDMA service and keep on */
         if (!ctx->skip_at_cdma_service_status_step &&
@@ -936,7 +939,7 @@ registration_check_step (GTask *task)
                 task);
             return;
         }
-        mm_dbg ("  Skipping CDMA service status check, assuming with service");
+        mm_obj_dbg (self, "  skipping CDMA service status check, assuming with service");
         ctx->step++;
         /* fall through */
 
@@ -960,7 +963,7 @@ registration_check_step (GTask *task)
                 task);
             return;
         }
-        mm_dbg ("  Skipping CDMA1x Serving System check");
+        mm_obj_dbg (self, "  skipping CDMA1x Serving System check");
         ctx->step++;
         /* fall through */
 
@@ -970,7 +973,7 @@ registration_check_step (GTask *task)
         return;
 
     case REGISTRATION_CHECK_STEP_DETAILED_REGISTRATION_STATE:
-        mm_dbg ("Starting detailed registration state check");
+        mm_obj_dbg (self, "starting detailed registration state check");
         /* We let classes implementing this interface to look for more detailed
          * registration info. */
         if (!ctx->skip_detailed_registration_state &&
@@ -988,13 +991,13 @@ registration_check_step (GTask *task)
                 task);
             return;
         }
-        mm_dbg ("  Skipping detailed registration state check");
+        mm_obj_dbg (self, "  skipping detailed registration state check");
         ctx->step++;
         /* fall through */
 
     case REGISTRATION_CHECK_STEP_LAST:
         /* We are done without errors! */
-        mm_dbg ("All CDMA registration state checks done");
+        mm_obj_dbg (self, "all CDMA registration state checks done");
         mm_iface_modem_cdma_update_cdma1x_registration_state (self,
                                                               ctx->cdma1x_state,
                                                               ctx->cdma1x_sid,
@@ -1043,9 +1046,9 @@ mm_iface_modem_cdma_run_registration_checks (MMIfaceModemCdma *self,
                   MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, &cdma1x_supported,
                   NULL);
 
-    mm_dbg ("Running registration checks (CDMA1x: '%s', EV-DO: '%s')",
-            cdma1x_supported ? "yes" : "no",
-            evdo_supported ? "yes" : "no");
+    mm_obj_dbg (self, "running registration checks (CDMA1x: '%s', EV-DO: '%s')",
+                cdma1x_supported ? "yes" : "no",
+                evdo_supported ? "yes" : "no");
 
     if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks &&
         MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->run_registration_checks_finish) {
@@ -1244,7 +1247,7 @@ periodic_registration_checks_ready (MMIfaceModemCdma *self,
 
     mm_iface_modem_cdma_run_registration_checks_finish (self, res, &error);
     if (error) {
-        mm_dbg ("Couldn't refresh CDMA registration status: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't refresh CDMA registration status: %s", error->message);
         g_error_free (error);
     }
 
@@ -1283,7 +1286,7 @@ periodic_registration_check_disable (MMIfaceModemCdma *self)
                         registration_check_context_quark,
                         NULL);
 
-    mm_dbg ("Periodic CDMA registration checks disabled");
+    mm_obj_dbg (self, "periodic CDMA registration checks disabled");
 }
 
 static void
@@ -1302,7 +1305,7 @@ periodic_registration_check_enable (MMIfaceModemCdma *self)
         return;
 
     /* Create context and keep it as object data */
-    mm_dbg ("Periodic CDMA registration checks enabled");
+    mm_obj_dbg (self, "periodic CDMA registration checks enabled");
     ctx = g_new0 (RegistrationCheckContext, 1);
     ctx->timeout_source = g_timeout_add_seconds (REGISTRATION_CHECK_TIMEOUT_SEC,
                                                  (GSourceFunc)periodic_registration_check,
@@ -1339,11 +1342,11 @@ mm_iface_modem_cdma_update_activation_state (MMIfaceModemCdma *self,
         return;
 
     if (activation_error) {
-        mm_dbg ("Activation failed: %s", activation_error->message);
+        mm_obj_dbg (self, "activation failed: %s", activation_error->message);
         if (activation_error->domain == MM_CDMA_ACTIVATION_ERROR)
             error = activation_error->code;
         else {
-            mm_warn ("Error given is not an activation error");
+            mm_obj_warn (self, "error given is not an activation error");
             error = MM_CDMA_ACTIVATION_ERROR_UNKNOWN;
         }
     }
@@ -1406,7 +1409,7 @@ disable_unsolicited_events_ready (MMIfaceModemCdma *self,
 
     MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
     if (error) {
-        mm_dbg ("Couldn't disable unsolicited events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't disable unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -1426,7 +1429,7 @@ cleanup_unsolicited_events_ready (MMIfaceModemCdma *self,
 
     MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
     if (error) {
-        mm_dbg ("Couldn't cleanup unsolicited events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't cleanup unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -1567,7 +1570,7 @@ setup_unsolicited_events_ready (MMIfaceModemCdma *self,
     MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Setting up unsolicited events failed: '%s'", error->message);
+        mm_obj_dbg (self, "setting up unsolicited events failed: %s", error->message);
         g_error_free (error);
     }
 
@@ -1588,7 +1591,7 @@ enable_unsolicited_events_ready (MMIfaceModemCdma *self,
     MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error);
     if (error) {
         /* This error shouldn't be treated as critical */
-        mm_dbg ("Enabling unsolicited events failed: '%s'", error->message);
+        mm_obj_dbg (self, "enabling unsolicited events failed: %s", error->message);
         g_error_free (error);
     }
 
@@ -1733,7 +1736,7 @@ initialization_context_free (InitializationContext *ctx)
         g_free (val);                                                   \
                                                                         \
         if (error) {                                                    \
-            mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
+            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message); \
             g_error_free (error);                                       \
         }                                                               \
                                                                         \
@@ -1760,7 +1763,7 @@ load_activation_state_ready (MMIfaceModemCdma *self,
     mm_gdbus_modem_cdma_set_activation_state (ctx->skeleton, state);
 
     if (error) {
-        mm_warn ("couldn't load activation state: '%s'", error->message);
+        mm_obj_warn (self, "couldn't load activation state: %s", error->message);
         g_error_free (error);
     }
 
