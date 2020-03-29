@@ -30,7 +30,7 @@
 #include "mm-modem-helpers-mbim.h"
 #include "mm-port-enums-types.h"
 #include "mm-bearer-mbim.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BASE_BEARER)
 
@@ -253,6 +253,7 @@ ip_configuration_query_ready (MbimDevice *device,
                               GAsyncResult *res,
                               GTask *task)
 {
+    MMBearerMbim *self;
     ConnectContext *ctx;
     GError *error = NULL;
     MbimMessage *response;
@@ -271,7 +272,8 @@ ip_configuration_query_ready (MbimDevice *device,
     guint32 ipv4mtu;
     guint32 ipv6mtu;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -302,17 +304,17 @@ ip_configuration_query_ready (MbimDevice *device,
         /* IPv4 info */
 
         str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv4configurationavailable);
-        mm_dbg ("IPv4 configuration available: '%s'", str);
+        mm_obj_dbg (self, "IPv4 configuration available: '%s'", str);
         g_free (str);
 
         if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv4addresscount) {
             guint i;
 
-            mm_dbg ("  IP addresses (%u)", ipv4addresscount);
+            mm_obj_dbg (self, "  IP addresses (%u)", ipv4addresscount);
             for (i = 0; i < ipv4addresscount; i++) {
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[i]->ipv4_address, G_SOCKET_FAMILY_IPV4);
                 str = g_inet_address_to_string (addr);
-                mm_dbg ("    IP [%u]: '%s/%u'", i, str, ipv4address[i]->on_link_prefix_length);
+                mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv4address[i]->on_link_prefix_length);
                 g_free (str);
                 g_object_unref (addr);
             }
@@ -321,7 +323,7 @@ ip_configuration_query_ready (MbimDevice *device,
         if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv4gateway) {
             addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
             str = g_inet_address_to_string (addr);
-            mm_dbg ("  Gateway: '%s'", str);
+            mm_obj_dbg (self, "  gateway: '%s'", str);
             g_free (str);
             g_object_unref (addr);
         }
@@ -329,12 +331,12 @@ ip_configuration_query_ready (MbimDevice *device,
         if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv4dnsservercount) {
             guint i;
 
-            mm_dbg ("  DNS addresses (%u)", ipv4dnsservercount);
+            mm_obj_dbg (self, "  DNS addresses (%u)", ipv4dnsservercount);
             for (i = 0; i < ipv4dnsservercount; i++) {
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
                 if (!g_inet_address_get_is_any (addr)) {
                     str = g_inet_address_to_string (addr);
-                    mm_dbg ("    DNS [%u]: '%s'", i, str);
+                    mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
                     g_free (str);
                 }
                 g_object_unref (addr);
@@ -342,23 +344,23 @@ ip_configuration_query_ready (MbimDevice *device,
         }
 
         if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv4mtu) {
-            mm_dbg ("  MTU: '%u'", ipv4mtu);
+            mm_obj_dbg (self, "  MTU: '%u'", ipv4mtu);
         }
 
         /* IPv6 info */
 
         str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv6configurationavailable);
-        mm_dbg ("IPv6 configuration available: '%s'", str);
+        mm_obj_dbg (self, "IPv6 configuration available: '%s'", str);
         g_free (str);
 
         if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv6addresscount) {
             guint i;
 
-            mm_dbg ("  IP addresses (%u)", ipv6addresscount);
+            mm_obj_dbg (self, "  IP addresses (%u)", ipv6addresscount);
             for (i = 0; i < ipv6addresscount; i++) {
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[i]->ipv6_address, G_SOCKET_FAMILY_IPV6);
                 str = g_inet_address_to_string (addr);
-                mm_dbg ("    IP [%u]: '%s/%u'", i, str, ipv6address[i]->on_link_prefix_length);
+                mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv6address[i]->on_link_prefix_length);
                 g_free (str);
                 g_object_unref (addr);
             }
@@ -367,7 +369,7 @@ ip_configuration_query_ready (MbimDevice *device,
         if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv6gateway) {
             addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
             str = g_inet_address_to_string (addr);
-            mm_dbg ("  Gateway: '%s'", str);
+            mm_obj_dbg (self, "  gateway: '%s'", str);
             g_free (str);
             g_object_unref (addr);
         }
@@ -375,12 +377,12 @@ ip_configuration_query_ready (MbimDevice *device,
         if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv6dnsservercount) {
             guint i;
 
-            mm_dbg ("  DNS addresses (%u)", ipv6dnsservercount);
+            mm_obj_dbg (self, "  DNS addresses (%u)", ipv6dnsservercount);
             for (i = 0; i < ipv6dnsservercount; i++) {
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
                 if (!g_inet_address_get_is_any (addr)) {
                     str = g_inet_address_to_string (addr);
-                    mm_dbg ("    DNS [%u]: '%s'", i, str);
+                    mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
                     g_free (str);
                 }
                 g_object_unref (addr);
@@ -388,7 +390,7 @@ ip_configuration_query_ready (MbimDevice *device,
         }
 
         if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv6mtu) {
-            mm_dbg ("  MTU: '%u'", ipv6mtu);
+            mm_obj_dbg (self, "  MTU: '%u'", ipv6mtu);
         }
 
         /* Build connection results */
@@ -563,6 +565,7 @@ connect_set_ready (MbimDevice *device,
                    GAsyncResult *res,
                    GTask *task)
 {
+    MMBearerMbim *self;
     ConnectContext *ctx;
     GError *error = NULL;
     MbimMessage *response;
@@ -570,7 +573,8 @@ connect_set_ready (MbimDevice *device,
     MbimActivationState activation_state;
     guint32 nw_error;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -597,10 +601,10 @@ connect_set_ready (MbimDevice *device,
                  * MBIM_CONTEXT_IP_TYPE_DEFAULT, which MM never does.  Some
                  * devices (K5160) report the wrong type in the response.
                  */
-                mm_dbg ("Session ID '%u': %s (IP type: %s)",
-                        session_id,
-                        mbim_activation_state_get_string (activation_state),
-                        mbim_context_ip_type_get_string (ctx->ip_type));
+                mm_obj_dbg (self, "session ID '%u': %s (IP type: %s)",
+                            session_id,
+                            mbim_activation_state_get_string (activation_state),
+                            mbim_context_ip_type_get_string (ctx->ip_type));
             }
         } else {
             /* Prefer the error from the result to the parsing error */
@@ -650,13 +654,15 @@ check_disconnected_ready (MbimDevice   *device,
                           GAsyncResult *res,
                           GTask        *task)
 {
+    MMBearerMbim *self;
     ConnectContext *ctx;
     GError *error = NULL;
     MbimMessage *response;
     guint32 session_id;
     MbimActivationState activation_state;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -670,7 +676,7 @@ check_disconnected_ready (MbimDevice   *device,
             NULL, /* context_type */
             NULL, /* nw_error */
             &error)) {
-        mm_dbg ("Session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
+        mm_obj_dbg (self, "session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
     } else
         activation_state = MBIM_ACTIVATION_STATE_UNKNOWN;
 
@@ -697,13 +703,15 @@ provisioned_contexts_query_ready (MbimDevice *device,
                                   GAsyncResult *res,
                                   GTask *task)
 {
+    MMBearerMbim *self;
     ConnectContext *ctx;
     GError *error = NULL;
     MbimMessage *response;
     guint32 provisioned_contexts_count;
     MbimProvisionedContextElement **provisioned_contexts;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -715,25 +723,25 @@ provisioned_contexts_query_ready (MbimDevice *device,
             &error)) {
         guint32 i;
 
-        mm_dbg ("Provisioned contexts found (%u):", provisioned_contexts_count);
+        mm_obj_dbg (self, "provisioned contexts found (%u):", provisioned_contexts_count);
         for (i = 0; i < provisioned_contexts_count; i++) {
             MbimProvisionedContextElement *el = provisioned_contexts[i];
             gchar *uuid_str;
 
             uuid_str = mbim_uuid_get_printable (&el->context_type);
-            mm_dbg ("[%u] context type: %s", el->context_id, mbim_context_type_get_string (mbim_uuid_to_context_type (&el->context_type)));
-            mm_dbg ("             uuid: %s", uuid_str);
-            mm_dbg ("    access string: %s", el->access_string ? el->access_string : "");
-            mm_dbg ("         username: %s", el->user_name ? el->user_name : "");
-            mm_dbg ("         password: %s", el->password ? el->password : "");
-            mm_dbg ("      compression: %s", mbim_compression_get_string (el->compression));
-            mm_dbg ("             auth: %s", mbim_auth_protocol_get_string (el->auth_protocol));
+            mm_obj_dbg (self, "[%u] context type: %s", el->context_id, mbim_context_type_get_string (mbim_uuid_to_context_type (&el->context_type)));
+            mm_obj_dbg (self, "             uuid: %s", uuid_str);
+            mm_obj_dbg (self, "    access string: %s", el->access_string ? el->access_string : "");
+            mm_obj_dbg (self, "         username: %s", el->user_name ? el->user_name : "");
+            mm_obj_dbg (self, "         password: %s", el->password ? el->password : "");
+            mm_obj_dbg (self, "      compression: %s", mbim_compression_get_string (el->compression));
+            mm_obj_dbg (self, "             auth: %s", mbim_auth_protocol_get_string (el->auth_protocol));
             g_free (uuid_str);
         }
 
         mbim_provisioned_context_element_array_free (provisioned_contexts);
     } else {
-        mm_dbg ("Error listing provisioned contexts: %s", error->message);
+        mm_obj_dbg (self, "error listing provisioned contexts: %s", error->message);
         g_error_free (error);
     }
 
@@ -750,6 +758,7 @@ packet_service_set_ready (MbimDevice *device,
                           GAsyncResult *res,
                           GTask *task)
 {
+    MMBearerMbim *self;
     ConnectContext *ctx;
     GError *error = NULL;
     MbimMessage *response;
@@ -759,6 +768,7 @@ packet_service_set_ready (MbimDevice *device,
     guint64 uplink_speed;
     guint64 downlink_speed;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
@@ -783,11 +793,11 @@ packet_service_set_ready (MbimDevice *device,
                 gchar *str;
 
                 str = mbim_data_class_build_string_from_mask (highest_available_data_class);
-                mm_dbg ("Packet service update:");
-                mm_dbg ("         state: '%s'", mbim_packet_service_state_get_string (packet_service_state));
-                mm_dbg ("    data class: '%s'", str);
-                mm_dbg ("        uplink: '%" G_GUINT64_FORMAT "' bps", uplink_speed);
-                mm_dbg ("      downlink: '%" G_GUINT64_FORMAT "' bps", downlink_speed);
+                mm_obj_dbg (self, "packet service update:");
+                mm_obj_dbg (self, "         state: '%s'", mbim_packet_service_state_get_string (packet_service_state));
+                mm_obj_dbg (self, "    data class: '%s'", str);
+                mm_obj_dbg (self, "        uplink: '%" G_GUINT64_FORMAT "' bps", uplink_speed);
+                mm_obj_dbg (self, "      downlink: '%" G_GUINT64_FORMAT "' bps", downlink_speed);
                 g_free (str);
             }
         } else {
@@ -806,7 +816,7 @@ packet_service_set_ready (MbimDevice *device,
         /* Don't make NoDeviceSupport errors fatal; just try to keep on the
          * connection sequence even with this error. */
         if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_NO_DEVICE_SUPPORT)) {
-            mm_dbg ("Device doesn't support packet service attach");
+            mm_obj_dbg (self, "device doesn't support packet service attach");
             g_error_free (error);
         } else {
             /* All other errors are fatal */
@@ -845,7 +855,7 @@ connect_context_step (GTask *task)
     case CONNECT_STEP_PACKET_SERVICE: {
         GError *error = NULL;
 
-        mm_dbg ("Activating packet service...");
+        mm_obj_dbg (self, "activating packet service...");
         message = (mbim_message_packet_service_set_new (
                        MBIM_PACKET_SERVICE_ACTION_ATTACH,
                        &error));
@@ -866,7 +876,7 @@ connect_context_step (GTask *task)
     }
 
     case CONNECT_STEP_PROVISIONED_CONTEXTS:
-        mm_dbg ("Listing provisioned contexts...");
+        mm_obj_dbg (self, "listing provisioned contexts...");
         message = mbim_message_provisioned_contexts_query_new (NULL);
         mbim_device_command (ctx->device,
                              message,
@@ -969,7 +979,7 @@ connect_context_step (GTask *task)
 
             ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (self));
             str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-            mm_dbg ("No specific IP family requested, defaulting to %s", str);
+            mm_obj_dbg (self, "no specific IP family requested, defaulting to %s", str);
             g_free (str);
         }
 
@@ -980,7 +990,7 @@ connect_context_step (GTask *task)
             return;
         }
 
-        mm_dbg ("Launching %s connection with APN '%s'...", mbim_context_ip_type_get_string (ctx->ip_type), apn);
+        mm_obj_dbg (self, "launching %s connection with APN '%s'...", mbim_context_ip_type_get_string (ctx->ip_type), apn);
         message = (mbim_message_connect_set_new (
                        self->priv->session_id,
                        MBIM_ACTIVATION_COMMAND_ACTIVATE,
@@ -1011,7 +1021,7 @@ connect_context_step (GTask *task)
     case CONNECT_STEP_IP_CONFIGURATION: {
         GError *error = NULL;
 
-        mm_dbg ("Querying IP configuration...");
+        mm_obj_dbg (self, "querying IP configuration...");
         message = (mbim_message_ip_configuration_query_new (
                        self->priv->session_id,
                        MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv4configurationavailable */
@@ -1108,7 +1118,7 @@ _connect (MMBaseBearer *self,
 
     g_object_unref (modem);
 
-    mm_dbg ("Launching connection with data port (%s/%s)",
+    mm_obj_dbg (self, "launching connection with data port (%s/%s)",
             mm_port_subsys_get_string (mm_port_get_subsys (data)),
             mm_port_get_device (data));
 
@@ -1174,6 +1184,7 @@ disconnect_set_ready (MbimDevice *device,
                       GAsyncResult *res,
                       GTask *task)
 {
+    MMBearerMbim *self;
     DisconnectContext *ctx;
     GError *error = NULL;
     MbimMessage *response;
@@ -1183,7 +1194,8 @@ disconnect_set_ready (MbimDevice *device,
     GError *inner_error = NULL;
     gboolean result = FALSE, parsed_result = FALSE;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response)
@@ -1211,16 +1223,16 @@ disconnect_set_ready (MbimDevice *device,
     if (result && parsed_result) {
         g_assert (!error);
         g_assert (!inner_error);
-        mm_dbg ("Session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
+        mm_obj_dbg (self, "session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
         /* success */
         goto out;
     }
 
     if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_CONTEXT_NOT_ACTIVATED)) {
         if (parsed_result)
-            mm_dbg ("Context not activated: session ID '%u' already disconnected", session_id);
+            mm_obj_dbg (self, "context not activated: session ID '%u' already disconnected", session_id);
         else
-            mm_dbg ("Context not activated: already disconnected");
+            mm_obj_dbg (self, "context not activated: already disconnected");
 
         g_clear_error (&error);
         g_clear_error (&inner_error);
@@ -1331,15 +1343,15 @@ disconnect (MMBaseBearer *_self,
     task = g_task_new (self, NULL, callback, user_data);
 
     if (!self->priv->data) {
-        mm_dbg ("No need to disconnect: MBIM bearer is already disconnected");
+        mm_obj_dbg (self, "no need to disconnect: MBIM bearer is already disconnected");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
 
-    mm_dbg ("Launching disconnection on data port (%s/%s)",
-            mm_port_subsys_get_string (mm_port_get_subsys (self->priv->data)),
-            mm_port_get_device (self->priv->data));
+    mm_obj_dbg (self, "launching disconnection on data port (%s/%s)",
+                mm_port_subsys_get_string (mm_port_get_subsys (self->priv->data)),
+                mm_port_get_device (self->priv->data));
 
     ctx = g_slice_new0 (DisconnectContext);
     ctx->device = g_object_ref (device);
