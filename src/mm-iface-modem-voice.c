@@ -21,7 +21,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-voice.h"
 #include "mm-call-list.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #define CALL_LIST_POLLING_CONTEXT_TAG "voice-call-list-polling-context-tag"
 #define IN_CALL_EVENT_CONTEXT_TAG     "voice-in-call-event-context-tag"
@@ -89,14 +89,14 @@ mm_iface_modem_voice_authorize_outgoing_call (MMIfaceModemVoice  *self,
 
     /* If we're not in emergency mode, the call (emergency or normal) is always allowed */
     if (!emergency_only) {
-        mm_dbg ("voice call to %s allowed", number);
+        mm_obj_dbg (self, "voice call to %s allowed", number);
         call_allowed = TRUE;
         goto out;
     }
 
     for (i = 0; i < G_N_ELEMENTS (always_valid_emergency_numbers); i++) {
         if (g_strcmp0 (number, always_valid_emergency_numbers[i]) == 0) {
-            mm_dbg ("voice call to %s allowed: emergency call number always valid", number);
+            mm_obj_dbg (self, "voice call to %s allowed: emergency call number always valid", number);
             call_allowed = TRUE;
             goto out;
         }
@@ -110,22 +110,22 @@ mm_iface_modem_voice_authorize_outgoing_call (MMIfaceModemVoice  *self,
         /* If no SIM available, some additional numbers may be valid emergency numbers */
         for (i = 0; i < G_N_ELEMENTS (no_sim_valid_emergency_numbers); i++) {
             if (g_strcmp0 (number, no_sim_valid_emergency_numbers[i]) == 0) {
-                mm_dbg ("voice call to %s allowed: emergency call number valid when no SIM", number);
+                mm_obj_dbg (self, "voice call to %s allowed: emergency call number valid when no SIM", number);
                 call_allowed = TRUE;
                 goto out;
             }
         }
 
-        mm_dbg ("voice call to %s NOT allowed: not a valid emergency call number when no SIM", number);
+        mm_obj_dbg (self, "voice call to %s NOT allowed: not a valid emergency call number when no SIM", number);
         goto out;
     }
 
     /* Check if the number is programmed in EF_ECC */
     if (mm_base_sim_is_emergency_number (sim, number)) {
-        mm_dbg ("voice call to %s allowed: emergency call number programmed in the SIM", number);
+        mm_obj_dbg (self, "voice call to %s allowed: emergency call number programmed in the SIM", number);
         call_allowed = TRUE;
     } else
-        mm_dbg ("voice call to %s NOT allowed: not a valid emergency call number programmed in the SIM", number);
+        mm_obj_dbg (self, "voice call to %s NOT allowed: not a valid emergency call number programmed in the SIM", number);
 
  out:
 
@@ -188,8 +188,9 @@ create_outgoing_call_from_properties (MMIfaceModemVoice  *self,
 /* Common helper to match call info against a known call object */
 
 static gboolean
-match_single_call_info (const MMCallInfo *call_info,
-                        MMBaseCall       *call)
+match_single_call_info (MMIfaceModemVoice *self,
+                        const MMCallInfo  *call_info,
+                        MMBaseCall        *call)
 {
     MMCallState      state;
     MMCallDirection  direction;
@@ -242,20 +243,20 @@ match_single_call_info (const MMCallInfo *call_info,
         !match_terminated)
         return FALSE;
 
-    mm_dbg ("call info matched (matched direction/state %s, matched number %s"
-            ", matched index %s, matched terminated %s) with call at '%s'",
-            match_direction_and_state ? "yes" : "no",
-            match_number ? "yes" : "no",
-            match_index ? "yes" : "no",
-            match_terminated ? "yes" : "no",
-            mm_base_call_get_path (call));
+    mm_obj_dbg (self, "call info matched (matched direction/state %s, matched number %s"
+                ", matched index %s, matched terminated %s) with call at '%s'",
+                match_direction_and_state ? "yes" : "no",
+                match_number ? "yes" : "no",
+                match_index ? "yes" : "no",
+                match_terminated ? "yes" : "no",
+                mm_base_call_get_path (call));
 
     /* Early detect if a known incoming call that was created
      * from a plain CRING URC (i.e. without caller number)
      * needs to have the number provided.
      */
     if (call_info->number && !number) {
-        mm_dbg ("  number set: %s", call_info->number);
+        mm_obj_dbg (self, "  number set: %s", call_info->number);
         mm_base_call_set_number (call, call_info->number);
     }
 
@@ -263,20 +264,20 @@ match_single_call_info (const MMCallInfo *call_info,
      * not have a known call index yet.
      */
     if (call_info->index && !idx) {
-        mm_dbg ("  index set: %u", call_info->index);
+        mm_obj_dbg (self, "  index set: %u", call_info->index);
         mm_base_call_set_index (call, call_info->index);
     }
 
     /* Update state if it changed */
     if (call_info->state != state) {
-        mm_dbg ("  state updated: %s", mm_call_state_get_string (call_info->state));
+        mm_obj_dbg (self, "  state updated: %s", mm_call_state_get_string (call_info->state));
         mm_base_call_change_state (call, call_info->state, MM_CALL_STATE_REASON_UNKNOWN);
     }
 
     /* refresh if incoming and new state is not terminated */
     if ((call_info->state != MM_CALL_STATE_TERMINATED) &&
         (direction == MM_CALL_DIRECTION_INCOMING)) {
-        mm_dbg ("  incoming refreshed");
+        mm_obj_dbg (self, "  incoming refreshed");
         mm_base_call_incoming_refresh (call);
     }
 
@@ -286,7 +287,8 @@ match_single_call_info (const MMCallInfo *call_info,
 /*****************************************************************************/
 
 typedef struct {
-    const MMCallInfo *call_info;
+    MMIfaceModemVoice *self;
+    const MMCallInfo  *call_info;
 } ReportCallForeachContext;
 
 static void
@@ -302,7 +304,7 @@ report_call_foreach (MMBaseCall               *call,
         return;
 
     /* Reset call info in context if the call info matches an existing call */
-    if (match_single_call_info (ctx->call_info, call))
+    if (match_single_call_info (ctx->self, ctx->call_info, call))
         ctx->call_info = NULL;
 }
 
@@ -322,22 +324,23 @@ mm_iface_modem_voice_report_call (MMIfaceModemVoice *self,
     g_assert (call_info->state != MM_CALL_STATE_UNKNOWN);
 
     /* Early debugging of the call state update */
-    mm_dbg ("call at index %u: direction %s, state %s, number %s",
-            call_info->index,
-            mm_call_direction_get_string (call_info->direction),
-            mm_call_state_get_string (call_info->state),
-            call_info->number ? call_info->number : "n/a");
+    mm_obj_dbg (self, "call at index %u: direction %s, state %s, number %s",
+                call_info->index,
+                mm_call_direction_get_string (call_info->direction),
+                mm_call_state_get_string (call_info->state),
+                call_info->number ? call_info->number : "n/a");
 
     g_object_get (MM_BASE_MODEM (self),
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
 
     if (!list) {
-        mm_warn ("Cannot process call state update: missing call list");
+        mm_obj_warn (self, "cannot process call state update: missing call list");
         return;
     }
 
     /* Iterate over all known calls and try to match a known one */
+    ctx.self = self;
     ctx.call_info = call_info;
     mm_call_list_foreach (list, (MMCallListForeachFunc)report_call_foreach, &ctx);
 
@@ -349,13 +352,13 @@ mm_iface_modem_voice_report_call (MMIfaceModemVoice *self,
      * reported a NEW incoming call. If that's not the case, we'll ignore the report. */
     if ((call_info->direction != MM_CALL_DIRECTION_INCOMING) ||
         ((call_info->state != MM_CALL_STATE_WAITING) && (call_info->state != MM_CALL_STATE_RINGING_IN))) {
-        mm_dbg ("unhandled call state update reported: direction: %s, state %s",
-                mm_call_direction_get_string (call_info->direction),
-                mm_call_state_get_string (call_info->state));
+        mm_obj_dbg (self, "unhandled call state update reported: direction: %s, state %s",
+                    mm_call_direction_get_string (call_info->direction),
+                    mm_call_state_get_string (call_info->state));
         goto out;
     }
 
-    mm_dbg ("Creating new incoming call...");
+    mm_obj_dbg (self, "creating new incoming call...");
     call = create_incoming_call (self, call_info->number);
 
     /* Set the state */
@@ -393,7 +396,8 @@ mm_iface_modem_voice_report_call (MMIfaceModemVoice *self,
  */
 
 typedef struct {
-    GList *call_info_list;
+    MMIfaceModemVoice *self;
+    GList             *call_info_list;
 } ReportAllCallsForeachContext;
 
 static void
@@ -413,20 +417,20 @@ report_all_calls_foreach (MMBaseCall                   *call,
         MMCallInfo *call_info = (MMCallInfo *)(l->data);
 
         /* if match found, delete item from list and halt iteration right away */
-        if (match_single_call_info (call_info, call)) {
+        if (match_single_call_info (ctx->self, call_info, call)) {
             ctx->call_info_list = g_list_delete_link (ctx->call_info_list, l);
             return;
         }
     }
 
     /* not found in list! this call is now terminated */
-    mm_dbg ("Call '%s' with direction %s, state %s, number '%s', index %u"
-            " not found in list, terminating",
-            mm_base_call_get_path (call),
-            mm_call_direction_get_string (mm_base_call_get_direction (call)),
-            mm_call_state_get_string (state),
-            mm_base_call_get_number (call),
-            mm_base_call_get_index (call));
+    mm_obj_dbg (ctx->self, "call '%s' with direction %s, state %s, number '%s', index %u"
+                " not found in list, terminating",
+                mm_base_call_get_path (call),
+                mm_call_direction_get_string (mm_base_call_get_direction (call)),
+                mm_call_state_get_string (state),
+                mm_base_call_get_number (call),
+                mm_base_call_get_index (call));
     mm_base_call_change_state (call, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_UNKNOWN);
 }
 
@@ -439,7 +443,7 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
     GList                        *l;
 
     /* Early debugging of the full list of calls */
-    mm_dbg ("Reported %u ongoing calls", g_list_length (call_info_list));
+    mm_obj_dbg (self, "reported %u ongoing calls", g_list_length (call_info_list));
     for (l = call_info_list; l; l = g_list_next (l)) {
         MMCallInfo *call_info = (MMCallInfo *)(l->data);
 
@@ -447,11 +451,11 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
         g_assert (call_info->index != 0);
         g_assert (call_info->state != MM_CALL_STATE_UNKNOWN);
 
-        mm_dbg ("call at index %u: direction %s, state %s, number %s",
-                call_info->index,
-                mm_call_direction_get_string (call_info->direction),
-                mm_call_state_get_string (call_info->state),
-                call_info->number ? call_info->number : "n/a");
+        mm_obj_dbg (self, "call at index %u: direction %s, state %s, number %s",
+                    call_info->index,
+                    mm_call_direction_get_string (call_info->direction),
+                    mm_call_state_get_string (call_info->state),
+                    call_info->number ? call_info->number : "n/a");
     }
 
     /* Retrieve list of known calls */
@@ -459,12 +463,13 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        mm_warn ("Cannot report all calls: missing call list");
+        mm_obj_warn (self, "cannot report all calls: missing call list");
         return;
     }
 
     /* Iterate over all the calls already known to us.
      * Whenever a known call is updated, it will be removed from the call info list */
+    ctx.self = self;
     ctx.call_info_list = g_list_copy (call_info_list);
     mm_call_list_foreach (list, (MMCallListForeachFunc)report_all_calls_foreach, &ctx);
 
@@ -480,9 +485,9 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
             continue;
 
         if (call_info->direction == MM_CALL_DIRECTION_OUTGOING) {
-            mm_warn ("unexpected outgoing call to number '%s' reported in call list: state %s",
-                     call_info->number ? call_info->number : "n/a",
-                     mm_call_state_get_string (call_info->state));
+            mm_obj_warn (self, "unexpected outgoing call to number '%s' reported in call list: state %s",
+                         call_info->number ? call_info->number : "n/a",
+                         mm_call_state_get_string (call_info->state));
             continue;
         }
 
@@ -492,13 +497,13 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
             /* We only expect either RINGING-IN or WAITING states */
             if ((call_info->state != MM_CALL_STATE_RINGING_IN) &&
                 (call_info->state != MM_CALL_STATE_WAITING)) {
-                    mm_warn ("unexpected incoming call to number '%s' reported in call list: state %s",
-                             call_info->number ? call_info->number : "n/a",
-                             mm_call_state_get_string (call_info->state));
+                    mm_obj_warn (self, "unexpected incoming call to number '%s' reported in call list: state %s",
+                                 call_info->number ? call_info->number : "n/a",
+                                 mm_call_state_get_string (call_info->state));
                     continue;
             }
 
-            mm_dbg ("Creating new incoming call...");
+            mm_obj_dbg (self, "creating new incoming call...");
             call = create_incoming_call (self, call_info->number);
 
             /* Set the state and the index */
@@ -515,9 +520,9 @@ mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
             continue;
         }
 
-        mm_warn ("unexpected call to number '%s' reported in call list: state %s, direction unknown",
-                 call_info->number ? call_info->number : "n/a",
-                 mm_call_state_get_string (call_info->state));
+        mm_obj_warn (self, "unexpected call to number '%s' reported in call list: state %s, direction unknown",
+                     call_info->number ? call_info->number : "n/a",
+                     mm_call_state_get_string (call_info->state));
     }
     g_list_free (ctx.call_info_list);
     g_object_unref (list);
@@ -556,7 +561,7 @@ mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        mm_warn ("Cannot report received DTMF: missing call list");
+        mm_obj_warn (self, "cannot report received DTMF: missing call list");
         return;
     }
 
@@ -1839,7 +1844,7 @@ setup_in_call_audio_channel_ready (MMIfaceModemVoice *self,
                                                                                         &ctx->audio_port,
                                                                                         &ctx->audio_format,
                                                                                         &error)) {
-        mm_warn ("Couldn't setup in-call audio channel: %s", error->message);
+        mm_obj_warn (self, "couldn't setup in-call audio channel: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -1858,7 +1863,7 @@ setup_in_call_unsolicited_events_ready (MMIfaceModemVoice *self,
     ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->setup_in_call_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't setup in-call unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't setup in-call unsolicited events: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -1974,7 +1979,7 @@ cleanup_in_call_unsolicited_events_ready (MMIfaceModemVoice *self,
     ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't cleanup in-call unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't cleanup in-call unsolicited events: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -1993,7 +1998,7 @@ cleanup_in_call_audio_channel_ready (MMIfaceModemVoice *self,
     ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->cleanup_in_call_audio_channel_finish (self, res, &error)) {
-        mm_warn ("Couldn't cleanup in-call audio channel: %s", error->message);
+        mm_obj_warn (self, "couldn't cleanup in-call audio channel: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -2154,7 +2159,7 @@ update_audio_settings_in_ongoing_calls (MMIfaceModemVoice *self)
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        mm_warn ("Cannot update audio settings in active calls: missing internal call list");
+        mm_obj_warn (self, "cannot update audio settings in active calls: missing internal call list");
         return;
     }
 
@@ -2209,10 +2214,10 @@ in_call_cleanup_ready (MMIfaceModemVoice *self,
     if (!in_call_cleanup_finish (self, res, &error)) {
         /* ignore cancelled operations */
         if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-            mm_warn ("Cannot cleanup in-call modem state: %s", error->message);
+            mm_obj_warn (self, "cannot cleanup in-call modem state: %s", error->message);
         g_clear_error (&error);
     } else {
-        mm_dbg ("modem is no longer in-call state");
+        mm_obj_dbg (self, "modem is no longer in-call state");
         ctx->in_call_state = FALSE;
         g_clear_object (&ctx->audio_port);
         g_clear_object (&ctx->audio_format);
@@ -2233,10 +2238,10 @@ in_call_setup_ready (MMIfaceModemVoice *self,
     if (!in_call_setup_finish (self, res, &ctx->audio_port, &ctx->audio_format, &error)) {
         /* ignore cancelled operations */
         if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-            mm_warn ("Cannot setup in-call modem state: %s", error->message);
+            mm_obj_warn (self, "cannot setup in-call modem state: %s", error->message);
         g_clear_error (&error);
     } else {
-        mm_dbg ("modem is now in-call state");
+        mm_obj_dbg (self, "modem is now in-call state");
         ctx->in_call_state = TRUE;
         update_audio_settings_in_ongoing_calls (self);
     }
@@ -2258,7 +2263,7 @@ call_list_check_in_call_events (MMIfaceModemVoice *self)
                   MM_IFACE_MODEM_VOICE_CALL_LIST, &list,
                   NULL);
     if (!list) {
-        mm_warn ("Cannot update in-call state: missing internal call list");
+        mm_obj_warn (self, "cannot update in-call state: missing internal call list");
         goto out;
     }
 
@@ -2277,7 +2282,7 @@ call_list_check_in_call_events (MMIfaceModemVoice *self)
         }
 
         /* run setup */
-        mm_dbg ("Setting up in-call state...");
+        mm_obj_dbg (self, "setting up in-call state...");
         ctx->setup_cancellable = g_cancellable_new ();
         in_call_setup (self, ctx->setup_cancellable, (GAsyncReadyCallback) in_call_setup_ready, NULL);
         goto out;
@@ -2296,7 +2301,7 @@ call_list_check_in_call_events (MMIfaceModemVoice *self)
         }
 
         /* run cleanup */
-        mm_dbg ("Cleaning up in-call state...");
+        mm_obj_dbg (self, "cleaning up in-call state...");
         ctx->cleanup_cancellable = g_cancellable_new ();
         in_call_cleanup (self, ctx->cleanup_cancellable, (GAsyncReadyCallback) in_call_cleanup_ready, NULL);
         goto out;
@@ -2406,7 +2411,7 @@ load_call_list_ready (MMIfaceModemVoice *self,
 
     g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish);
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
-        mm_warn ("couldn't load call list: %s", error->message);
+        mm_obj_warn (self, "couldn't load call list: %s", error->message);
         g_error_free (error);
     } else {
         /* Always report the list even if NULL (it would mean no ongoing calls) */
@@ -2458,7 +2463,7 @@ call_list_poll (MMIfaceModemVoice *self)
                   NULL);
 
     if (!list) {
-        mm_warn ("Cannot poll call list: missing internal call list");
+        mm_obj_warn (self, "Cannot poll call list: missing internal call list");
         goto out;
     }
 
@@ -2466,14 +2471,14 @@ call_list_poll (MMIfaceModemVoice *self)
 
     /* If there is at least ONE call being established, we need the call list */
     if (n_calls_establishing > 0) {
-        mm_dbg ("%u calls being established: call list polling required", n_calls_establishing);
+        mm_obj_dbg (self, "%u calls being established: call list polling required", n_calls_establishing);
         ctx->polling_ongoing = TRUE;
         g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list);
         MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list (self,
                                                                    (GAsyncReadyCallback)load_call_list_ready,
                                                                    NULL);
     } else
-        mm_dbg ("no calls being established: call list polling stopped");
+        mm_obj_dbg (self, "no calls being established: call list polling stopped");
 
 out:
     g_clear_object (&list);
@@ -2515,7 +2520,6 @@ call_added (MMCallList        *list,
             const gchar       *call_path,
             MmGdbusModemVoice *skeleton)
 {
-    mm_dbg ("Added call at '%s'", call_path);
     update_call_list (skeleton, list);
     mm_gdbus_modem_voice_emit_call_added (skeleton, call_path);
 }
@@ -2525,7 +2529,6 @@ call_deleted (MMCallList        *list,
               const gchar       *call_path,
               MmGdbusModemVoice *skeleton)
 {
-    mm_dbg ("Deleted call at '%s'", call_path);
     update_call_list (skeleton, list);
     mm_gdbus_modem_voice_emit_call_deleted (skeleton, call_path);
 }
@@ -2752,7 +2755,7 @@ enable_unsolicited_events_ready (MMIfaceModemVoice *self,
 
     /* Not critical! */
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
-        mm_dbg ("Couldn't enable unsolicited events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't enable unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -2885,7 +2888,7 @@ check_support_ready (MMIfaceModemVoice *self,
 
     if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
-            mm_dbg ("Voice support check failed: '%s'", error->message);
+            mm_obj_dbg (self, "voice support check failed: %s", error->message);
             g_error_free (error);
         }
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "Voice not supported");
@@ -2981,7 +2984,7 @@ interface_initialization_step (GTask *task)
                           MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, &periodic_call_list_check_disabled,
                           NULL);
             if (!periodic_call_list_check_disabled) {
-                mm_dbg ("periodic call list polling will be used if supported");
+                mm_obj_dbg (self, "periodic call list polling will be used if supported");
                 g_signal_connect (list,
                                   MM_CALL_ADDED,
                                   G_CALLBACK (setup_call_list_polling),
