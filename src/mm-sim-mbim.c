@@ -26,7 +26,7 @@
 
 #include "mm-error-helpers.h"
 #include "mm-iface-modem.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers-mbim.h"
 #include "mm-sim-mbim.h"
 
@@ -416,7 +416,7 @@ send_pin (MMBaseSim *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("Sending PIN...");
+    mm_obj_dbg (self, "sending PIN...");
     message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PIN1,
                    MBIM_PIN_OPERATION_ENTER,
@@ -514,7 +514,7 @@ send_puk (MMBaseSim *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("Sending PUK...");
+    mm_obj_dbg (self, "sending PUK...");
     message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PUK1,
                    MBIM_PIN_OPERATION_ENTER,
@@ -605,7 +605,7 @@ enable_pin (MMBaseSim *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("%s PIN ...", enabled ? "Enabling" : "Disabling");
+    mm_obj_dbg (self, "%s PIN ...", enabled ? "enabling" : "disabling");
     message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PIN1,
                    enabled ? MBIM_PIN_OPERATION_ENABLE : MBIM_PIN_OPERATION_DISABLE,
@@ -696,7 +696,7 @@ change_pin (MMBaseSim *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("Changing PIN");
+    mm_obj_dbg (self, "changing PIN...");
     message = (mbim_message_pin_set_new (
                    MBIM_PIN_TYPE_PIN1,
                    MBIM_PIN_OPERATION_CHANGE,
