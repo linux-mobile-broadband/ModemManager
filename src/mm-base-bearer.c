@@ -76,6 +76,8 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMBaseBearerPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
+    guint            dbus_id;
+
     /* The modem which owns this BEARER */
     MMBaseModem *modem;
     /* The path where the BEARER object is exported */
@@ -139,10 +141,9 @@ static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON
 void
 mm_base_bearer_export (MMBaseBearer *self)
 {
-    static guint id = 0;
     gchar *path;
 
-    path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "/%d", id++);
+    path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "/%d", self->priv->dbus_id);
     g_object_set (self,
                   MM_BASE_BEARER_PATH, path,
                   NULL);
@@ -1429,10 +1430,16 @@ get_property (GObject *object,
 static void
 mm_base_bearer_init (MMBaseBearer *self)
 {
+    static guint id = 0;
+
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BASE_BEARER,
                                               MMBaseBearerPrivate);
+
+    /* Each bearer is given a unique id to build its own DBus path */
+    self->priv->dbus_id = id++;
+
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
     self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
