@@ -57,6 +57,8 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMBaseSimPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
+    guint            dbus_id;
+
     /* The modem which owns this SIM */
     MMBaseModem *modem;
     /* The path where the SIM object is exported */
@@ -70,10 +72,9 @@ static guint signals[SIGNAL_LAST] = { 0 };
 void
 mm_base_sim_export (MMBaseSim *self)
 {
-    static guint id = 0;
     gchar *path;
 
-    path = g_strdup_printf (MM_DBUS_SIM_PREFIX "/%d", id++);
+    path = g_strdup_printf (MM_DBUS_SIM_PREFIX "/%d", self->priv->dbus_id);
     g_object_set (self,
                   MM_BASE_SIM_PATH, path,
                   NULL);
@@ -1811,8 +1812,13 @@ get_property (GObject *object,
 static void
 mm_base_sim_init (MMBaseSim *self)
 {
+    static guint id = 0;
+
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BASE_SIM, MMBaseSimPrivate);
+
+    /* Each SIM is given a unique id to build its own DBus path */
+    self->priv->dbus_id = id++;
 }
 
 static void
