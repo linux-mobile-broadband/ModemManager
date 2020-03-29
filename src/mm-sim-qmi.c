@@ -25,7 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-sim-qmi.h"
 
 G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
@@ -298,7 +298,7 @@ load_sim_identifier (MMBaseSim           *_self,
     self = MM_SIM_QMI (_self);
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("loading SIM identifier...");
+    mm_obj_dbg (self, "loading SIM identifier...");
     if (!self->priv->dms_uim_deprecated)
         dms_uim_get_iccid (self, task);
     else
@@ -423,7 +423,7 @@ load_imsi (MMBaseSim           *_self,
     self = MM_SIM_QMI (_self);
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("loading IMSI...");
+    mm_obj_dbg (self, "loading IMSI...");
     if (!self->priv->dms_uim_deprecated)
         dms_uim_get_imsi (self, task);
     else
@@ -540,7 +540,7 @@ load_operator_identifier (MMBaseSim           *self,
                             QMI_SERVICE_NAS, &client))
         return;
 
-    mm_dbg ("loading SIM operator identifier...");
+    mm_obj_dbg (self, "loading SIM operator identifier...");
     qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
                                      NULL,
                                      5,
@@ -589,7 +589,7 @@ load_operator_name (MMBaseSim           *self,
                             QMI_SERVICE_NAS, &client))
         return;
 
-    mm_dbg ("loading SIM operator name...");
+    mm_obj_dbg (self, "loading SIM operator name...");
     qmi_client_nas_get_home_network (QMI_CLIENT_NAS (client),
                                      NULL,
                                      5,
@@ -733,7 +733,7 @@ dms_uim_verify_pin (MMSimQmi *self,
         return;
     }
 
-    mm_dbg ("Sending PIN...");
+    mm_obj_dbg (self, "sending PIN...");
     input = qmi_message_dms_uim_verify_pin_input_new ();
     qmi_message_dms_uim_verify_pin_input_set_info (
         input,
@@ -763,7 +763,7 @@ send_pin (MMBaseSim           *_self,
 
     g_task_set_task_data (task, g_strdup (pin), g_free);
 
-    mm_dbg ("Verifying PIN...");
+    mm_obj_dbg (self, "verifying PIN...");
     if (!self->priv->dms_uim_deprecated)
         dms_uim_verify_pin (self, task);
     else
@@ -933,7 +933,7 @@ send_puk (MMBaseSim           *_self,
     ctx->new_pin = g_strdup (new_pin);
     g_task_set_task_data (task, ctx, (GDestroyNotify) unblock_pin_context_free);
 
-    mm_dbg ("Unblocking PIN...");
+    mm_obj_dbg (self, "unblocking PIN...");
     if (!self->priv->dms_uim_deprecated)
         dms_uim_unblock_pin (self, task);
     else
@@ -1103,7 +1103,7 @@ change_pin (MMBaseSim           *_self,
     ctx->new_pin = g_strdup (new_pin);
     g_task_set_task_data (task, ctx, (GDestroyNotify) change_pin_context_free);
 
-    mm_dbg ("Changing PIN...");
+    mm_obj_dbg (self, "changing PIN...");
     if (!self->priv->dms_uim_deprecated)
         dms_uim_change_pin (self, task);
     else
@@ -1272,7 +1272,7 @@ enable_pin (MMBaseSim           *_self,
     ctx->enabled = enabled;
     g_task_set_task_data (task, ctx, (GDestroyNotify) enable_pin_context_free);
 
-    mm_dbg ("%s PIN...", enabled ? "Enabling" : "Disabling");
+    mm_obj_dbg (self, "%s PIN...", enabled ? "enabling" : "disabling");
     if (!self->priv->dms_uim_deprecated)
         dms_uim_enable_pin (self, task);
     else
