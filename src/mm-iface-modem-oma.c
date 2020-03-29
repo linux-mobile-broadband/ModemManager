@@ -19,7 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-oma.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "oma-support-checked-tag"
 #define SUPPORTED_TAG       "oma-supported-tag"
@@ -124,10 +124,9 @@ mm_iface_modem_oma_update_session_state (MMIfaceModemOma *self,
 
     old_session_state = mm_gdbus_modem_oma_get_session_state (skeleton);
     if (old_session_state != new_session_state) {
-        mm_info ("Modem %s: OMA session state changed (%s -> %s)",
-                 g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
-                 mm_oma_session_state_get_string (old_session_state),
-                 mm_oma_session_state_get_string (new_session_state));
+        mm_obj_info (self, "OMA session state changed (%s -> %s)",
+                     mm_oma_session_state_get_string (old_session_state),
+                     mm_oma_session_state_get_string (new_session_state));
 
         /* Flush current change before signaling the state change,
          * so that clients get the proper state already in the
@@ -220,7 +219,7 @@ handle_setup_auth_ready (MMBaseModem *self,
     }
 
     str = mm_oma_feature_build_string_from_mask (ctx->features);
-    mm_dbg ("Setting up OMA features: '%s'", str);
+    mm_obj_dbg (self, "setting up OMA features: '%s'", str);
     g_free (str);
 
     MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->setup (
@@ -342,8 +341,8 @@ handle_start_client_initiated_session_auth_ready (MMBaseModem *self,
         return;
     }
 
-    mm_dbg ("Starting client-initiated OMA session (%s)",
-            mm_oma_session_type_get_string (ctx->session_type));
+    mm_obj_dbg (self, "starting client-initiated OMA session (%s)",
+                mm_oma_session_type_get_string (ctx->session_type));
     MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->start_client_initiated_session (
         ctx->self,
         ctx->session_type,
@@ -501,10 +500,10 @@ handle_accept_network_initiated_session_auth_ready (MMBaseModem *self,
         return;
     }
 
-    mm_dbg ("%s network-initiated OMA session (%s, %u)",
-            ctx->accept ? "Accepting" : "Rejecting",
-            mm_oma_session_type_get_string (ctx->session_type),
-            ctx->session_id);
+    mm_obj_dbg (self, "%s network-initiated OMA session (%s, %u)",
+                ctx->accept ? "accepting" : "rejecting",
+                mm_oma_session_type_get_string (ctx->session_type),
+                ctx->session_id);
     MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->accept_network_initiated_session (
         ctx->self,
         ctx->session_id,
@@ -615,7 +614,7 @@ handle_cancel_session_auth_ready (MMBaseModem *self,
         return;
     }
 
-    mm_dbg ("Cancelling OMA session");
+    mm_obj_dbg (self, "cancelling OMA session");
     MM_IFACE_MODEM_OMA_GET_INTERFACE (ctx->self)->cancel_session (
         ctx->self,
         (GAsyncReadyCallback)cancel_session_ready,
@@ -890,7 +889,7 @@ enable_unsolicited_events_ready (MMIfaceModemOma *self,
 
     /* Not critical! */
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
-        mm_dbg ("Couldn't enable unsolicited events: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't enable unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -1036,7 +1035,7 @@ check_support_ready (MMIfaceModemOma *self,
     if (!MM_IFACE_MODEM_OMA_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
-            mm_dbg ("OMA support check failed: '%s'", error->message);
+            mm_obj_dbg (self, "OMA support check failed: %s", error->message);
             g_error_free (error);
         }
     } else {
