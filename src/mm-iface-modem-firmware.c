@@ -19,7 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-firmware.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*****************************************************************************/
 
@@ -70,7 +70,7 @@ load_current_ready (MMIfaceModemFirmware *self,
             handle_list_context_free (ctx);
             return;
         }
-        mm_dbg ("Couldn't load current firmware image: %s", error->message);
+        mm_obj_dbg (self, "couldn't load current firmware image: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -104,7 +104,7 @@ load_list_ready (MMIfaceModemFirmware *self,
             handle_list_context_free (ctx);
             return;
         }
-        mm_dbg ("Couldn't load firmware image list: %s", error->message);
+        mm_obj_dbg (self, "couldn't load firmware image list: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -380,7 +380,7 @@ load_update_settings_ready (MMIfaceModemFirmware *self,
 
     update_settings = MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE (self)->load_update_settings_finish (self, res, &error);
     if (!update_settings) {
-        mm_dbg ("Couldn't load update settings: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't load update settings: %s", error->message);
         g_error_free (error);
         goto out;
     }
@@ -388,7 +388,7 @@ load_update_settings_ready (MMIfaceModemFirmware *self,
     /* If the plugin didn't specify custom device ids, add the default ones ourselves */
     if (!mm_firmware_update_settings_get_device_ids (update_settings) &&
         !add_generic_device_ids (MM_BASE_MODEM (self), update_settings, &error)) {
-        mm_warn ("Couldn't build device ids: '%s'", error->message);
+        mm_obj_warn (self, "couldn't build device ids: %s", error->message);
         g_error_free (error);
         g_clear_object (&update_settings);
         goto out;
@@ -397,7 +397,7 @@ load_update_settings_ready (MMIfaceModemFirmware *self,
     /* If the plugin didn't specify custom version, add the default one ourselves */
     if (!mm_firmware_update_settings_get_version (update_settings) &&
         !add_generic_version (MM_BASE_MODEM (self), update_settings, &error)) {
-        mm_warn ("Couldn't set version: '%s'", error->message);
+        mm_obj_warn (self, "couldn't set version: %s", error->message);
         g_error_free (error);
         g_clear_object (&update_settings);
         goto out;
