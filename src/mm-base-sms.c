@@ -55,6 +55,8 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMBaseSmsPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
+    guint            dbus_id;
+
     /* The modem which owns this SMS */
     MMBaseModem *modem;
     /* The path where the SMS object is exported */
@@ -651,10 +653,9 @@ handle_send (MMBaseSms *self,
 void
 mm_base_sms_export (MMBaseSms *self)
 {
-    static guint id = 0;
     gchar *path;
 
-    path = g_strdup_printf (MM_DBUS_SMS_PREFIX "/%d", id++);
+    path = g_strdup_printf (MM_DBUS_SMS_PREFIX "/%d", self->priv->dbus_id);
     g_object_set (self,
                   MM_BASE_SMS_PATH, path,
                   NULL);
@@ -1989,10 +1990,15 @@ get_property (GObject *object,
 static void
 mm_base_sms_init (MMBaseSms *self)
 {
+    static guint id = 0;
+
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BASE_SMS, MMBaseSmsPrivate);
     /* Defaults */
     self->priv->max_parts = 1;
+
+    /* Each SMS is given a unique id to build its own DBus path */
+    self->priv->dbus_id = id++;
 }
 
 static void
