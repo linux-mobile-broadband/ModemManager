@@ -19,7 +19,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-signal.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #define SUPPORT_CHECKED_TAG "signal-support-checked-tag"
 #define SUPPORTED_TAG       "signal-supported-tag"
@@ -93,7 +93,7 @@ load_values_ready (MMIfaceModemSignal *self,
             &umts,
             &lte,
             &error)) {
-        mm_warn ("Couldn't load extended signal information: %s", error->message);
+        mm_obj_warn (self, "couldn't load extended signal information: %s", error->message);
         g_error_free (error);
         clear_values (self);
         return;
@@ -103,8 +103,7 @@ load_values_ready (MMIfaceModemSignal *self,
                   MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON, &skeleton,
                   NULL);
     if (!skeleton) {
-        mm_warn ("Cannot update extended signal information: "
-                 "Couldn't get interface skeleton");
+        mm_obj_warn (self, "cannot update extended signal information: couldn't get interface skeleton");
         return;
     }
 
@@ -172,7 +171,7 @@ teardown_refresh_context (MMIfaceModemSignal *self)
     if (G_UNLIKELY (!refresh_context_quark))
         refresh_context_quark  = g_quark_from_static_string (REFRESH_CONTEXT_TAG);
     if (g_object_get_qdata (G_OBJECT (self), refresh_context_quark)) {
-        mm_dbg ("Extended signal information reporting disabled");
+        mm_obj_dbg (self, "extended signal information reporting disabled");
         g_object_set_qdata (G_OBJECT (self), refresh_context_quark, NULL);
     }
 }
@@ -210,14 +209,14 @@ setup_refresh_context (MMIfaceModemSignal *self,
 
     /* User disabling? */
     if (new_rate == 0) {
-        mm_dbg ("Extended signal information reporting disabled (rate: 0 seconds)");
+        mm_obj_dbg (self, "extended signal information reporting disabled (rate: 0 seconds)");
         clear_values (self);
         g_object_set_qdata (G_OBJECT (self), refresh_context_quark, NULL);
         return TRUE;
     }
 
     if (modem_state < MM_MODEM_STATE_ENABLING) {
-        mm_dbg ("Extended signal information reporting disabled (modem not yet enabled)");
+        mm_obj_dbg (self, "extended signal information reporting disabled (modem not yet enabled)");
         return TRUE;
     }
 
@@ -238,7 +237,7 @@ setup_refresh_context (MMIfaceModemSignal *self,
     }
 
     /* Update refresh context */
-    mm_dbg ("Extended signal information reporting enabled (rate: %u seconds)", new_rate);
+    mm_obj_dbg (self, "extended signal information reporting enabled (rate: %u seconds)", new_rate);
     ctx->rate = new_rate;
     if (ctx->timeout_source)
         g_source_remove (ctx->timeout_source);
@@ -402,7 +401,7 @@ check_support_ready (MMIfaceModemSignal *self,
     if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
-            mm_dbg ("Extended signal support check failed: '%s'", error->message);
+            mm_obj_dbg (self, "extended signal support check failed: %s", error->message);
             g_error_free (error);
         }
     } else {
