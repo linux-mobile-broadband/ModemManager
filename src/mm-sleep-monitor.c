@@ -26,7 +26,7 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-utils.h"
 #include "mm-sleep-monitor.h"
 
@@ -57,7 +57,18 @@ enum {
 };
 static guint signals[LAST_SIGNAL] = {0};
 
-G_DEFINE_TYPE (MMSleepMonitor, mm_sleep_monitor, G_TYPE_OBJECT);
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMSleepMonitor, mm_sleep_monitor, G_TYPE_OBJECT, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
+
+/*****************************************************************************/
+
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    return g_strdup ("sleep-monitor");
+}
 
 /********************************************************************/
 
@@ -65,7 +76,7 @@ static gboolean
 drop_inhibitor (MMSleepMonitor *self)
 {
     if (self->inhibit_fd >= 0) {
-        mm_dbg ("[sleep-monitor] dropping systemd sleep inhibitor");
+        mm_obj_dbg (self, "dropping systemd sleep inhibitor");
         close (self->inhibit_fd);
         self->inhibit_fd = -1;
         return TRUE;
@@ -86,15 +97,15 @@ inhibit_done (GObject      *source,
 
     res = g_dbus_proxy_call_with_unix_fd_list_finish (sd_proxy, &fd_list, result, &error);
     if (!res) {
-        mm_warn ("[sleep-monitor] inhibit failed: %s", error->message);
+        mm_obj_warn (self, "inhibit failed: %s", error->message);
         g_error_free (error);
     } else {
         if (!fd_list || g_unix_fd_list_get_length (fd_list) != 1)
-            mm_warn ("[sleep-monitor] didn't get a single fd back");
+            mm_obj_warn (self, "didn't get a single fd back");
 
         self->inhibit_fd = g_unix_fd_list_get (fd_list, 0, NULL);
 
-        mm_dbg ("[sleep-monitor] inhibitor fd is %d", self->inhibit_fd);
+        mm_obj_dbg (self, "inhibitor fd is %d", self->inhibit_fd);
         g_object_unref (fd_list);
         g_variant_unref (res);
     }
@@ -105,7 +116,7 @@ take_inhibitor (MMSleepMonitor *self)
 {
     g_assert (self->inhibit_fd == -1);
 
-    mm_dbg ("[sleep-monitor] taking systemd sleep inhibitor");
+    mm_obj_dbg (self, "taking systemd sleep inhibitor");
     g_dbus_proxy_call_with_unix_fd_list (self->sd_proxy,
                                          "Inhibit",
                                          g_variant_new ("(ssss)",
@@ -135,12 +146,13 @@ signal_cb (GDBusProxy  *proxy,
         return;
 
     g_variant_get (args, "(b)", &is_about_to_suspend);
-    mm_dbg ("[sleep-monitor] received PrepareForSleep signal: %d", is_about_to_suspend);
 
     if (is_about_to_suspend) {
+        mm_obj_info (self, "system is about to suspend");
         g_signal_emit (self, signals[SLEEPING], 0);
         drop_inhibitor (self);
     } else {
+        mm_obj_info (self, "system is resuming");
         take_inhibitor (self);
         g_signal_emit (self, signals[RESUMING], 0);
     }
@@ -175,7 +187,7 @@ on_proxy_acquired (GObject *object,
 
     self->sd_proxy = g_dbus_proxy_new_for_bus_finish (res, &error);
     if (!self->sd_proxy) {
-        mm_warn ("[sleep-monitor] failed to acquire logind proxy: %s", error->message);
+        mm_obj_warn (self, "failed to acquire logind proxy: %s", error->message);
         g_clear_error (&error);
         return;
     }
@@ -213,6 +225,12 @@ finalize (GObject *object)
 
     if (G_OBJECT_CLASS (mm_sleep_monitor_parent_class)->finalize != NULL)
         G_OBJECT_CLASS (mm_sleep_monitor_parent_class)->finalize (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
