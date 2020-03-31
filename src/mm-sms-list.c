@@ -27,9 +27,12 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms-list.h"
 #include "mm-base-sms.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
-G_DEFINE_TYPE (MMSmsList, mm_sms_list, G_TYPE_OBJECT);
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMSmsList, mm_sms_list, G_TYPE_OBJECT, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 enum {
     PROP_0,
@@ -280,8 +283,7 @@ take_multipart (MMSmsList *self,
                             (GCompareFunc)cmp_sms_by_concat_reference);
     if (l) {
         /* Try to take the part */
-        mm_dbg ("Found existing multipart SMS object with reference '%u': adding new part",
-                concat_reference);
+        mm_obj_dbg (self, "found existing multipart SMS object with reference '%u': adding new part", concat_reference);
         return mm_base_sms_multipart_take_part (MM_BASE_SMS (l->data), part, error);
     }
 
@@ -296,9 +298,9 @@ take_multipart (MMSmsList *self,
     if (!sms)
         return FALSE;
 
-    mm_dbg ("Creating new multipart SMS object: need to receive %u parts with reference '%u'",
-            mm_sms_part_get_concat_max (part),
-            concat_reference);
+    mm_obj_dbg (self, "creating new multipart SMS object: need to receive %u parts with reference '%u'",
+                mm_sms_part_get_concat_max (part),
+                concat_reference);
     self->priv->list = g_list_prepend (self->priv->list, sms);
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
                    mm_base_sms_get_path (sms),
@@ -349,29 +351,37 @@ mm_sms_list_take_part (MMSmsList *self,
     /* Did we just get a part of a multi-part SMS? */
     if (mm_sms_part_should_concat (part)) {
         if (mm_sms_part_get_index (part) != SMS_PART_INVALID_INDEX)
-            mm_dbg ("SMS part at '%s/%u' is from a multipart SMS (reference: '%u', sequence: '%u/%u')",
-                    mm_sms_storage_get_string (storage),
-                    mm_sms_part_get_index (part),
-                    mm_sms_part_get_concat_reference (part),
-                    mm_sms_part_get_concat_sequence (part),
-                    mm_sms_part_get_concat_max (part));
+            mm_obj_dbg (self, "SMS part at '%s/%u' is from a multipart SMS (reference: '%u', sequence: '%u/%u')",
+                        mm_sms_storage_get_string (storage),
+                        mm_sms_part_get_index (part),
+                        mm_sms_part_get_concat_reference (part),
+                        mm_sms_part_get_concat_sequence (part),
+                        mm_sms_part_get_concat_max (part));
         else
-            mm_dbg ("SMS part (not stored) is from a multipart SMS (reference: '%u', sequence: '%u/%u')",
-                    mm_sms_part_get_concat_reference (part),
-                    mm_sms_part_get_concat_sequence (part),
-                    mm_sms_part_get_concat_max (part));
+            mm_obj_dbg (self, "SMS part (not stored) is from a multipart SMS (reference: '%u', sequence: '%u/%u')",
+                        mm_sms_part_get_concat_reference (part),
+                        mm_sms_part_get_concat_sequence (part),
+                        mm_sms_part_get_concat_max (part));
 
         return take_multipart (self, part, state, storage, error);
     }
 
     /* Otherwise, we build a whole new single-part MMSms just from this part */
     if (mm_sms_part_get_index (part) != SMS_PART_INVALID_INDEX)
-        mm_dbg ("SMS part at '%s/%u' is from a singlepart SMS",
-                mm_sms_storage_get_string (storage),
-                mm_sms_part_get_index (part));
+        mm_obj_dbg (self, "SMS part at '%s/%u' is from a singlepart SMS",
+                    mm_sms_storage_get_string (storage),
+                    mm_sms_part_get_index (part));
     else
-        mm_dbg ("SMS part (not stored) is from a singlepart SMS");
+        mm_obj_dbg (self, "SMS part (not stored) is from a singlepart SMS");
     return take_singlepart (self, part, state, storage, error);
+}
+
+/*****************************************************************************/
+
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    return g_strdup ("sms-list");
 }
 
 /*****************************************************************************/
@@ -397,6 +407,10 @@ set_property (GObject *object,
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
+        if (self->priv->modem) {
+            /* Set owner ID */
+            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
+        }
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -441,6 +455,12 @@ dispose (GObject *object)
     self->priv->list = NULL;
 
     G_OBJECT_CLASS (mm_sms_list_parent_class)->dispose (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
