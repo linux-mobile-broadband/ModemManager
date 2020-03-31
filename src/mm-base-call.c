@@ -54,6 +54,8 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMBaseCallPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
+    guint            dbus_id;
+
     /* The modem which owns this call */
     MMBaseModem *modem;
     /* The path where the call object is exported */
@@ -856,10 +858,9 @@ handle_send_dtmf (MMBaseCall *self,
 void
 mm_base_call_export (MMBaseCall *self)
 {
-    static guint id = 0;
     gchar *path;
 
-    path = g_strdup_printf (MM_DBUS_CALL_PREFIX "/%d", id++);
+    path = g_strdup_printf (MM_DBUS_CALL_PREFIX "/%d", self->priv->dbus_id);
     g_object_set (self,
                   MM_BASE_CALL_PATH, path,
                   NULL);
@@ -1439,8 +1440,13 @@ get_property (GObject *object,
 static void
 mm_base_call_init (MMBaseCall *self)
 {
+    static guint id = 0;
+
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BASE_CALL, MMBaseCallPrivate);
+
+    /* Each call is given a unique id to build its own DBus path */
+    self->priv->dbus_id = id++;
 }
 
 static void
