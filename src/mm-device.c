@@ -25,9 +25,12 @@
 
 #include "mm-device.h"
 #include "mm-plugin.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
-G_DEFINE_TYPE (MMDevice, mm_device, G_TYPE_OBJECT)
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMDevice, mm_device, G_TYPE_OBJECT, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 enum {
     PROP_0,
@@ -215,10 +218,8 @@ mm_device_ignore_port  (MMDevice       *self,
     probe = device_find_probe_with_device (self, kernel_port, FALSE);
     if (probe) {
         /* Found, remove from list and add to the ignored list */
-        mm_dbg ("[device %s] fully ignoring port '%s/%s' from now on",
-                self->priv->uid,
-                mm_kernel_device_get_subsystem (kernel_port),
-                mm_kernel_device_get_name (kernel_port));
+        mm_obj_dbg (self, "fully ignoring port %s from now on",
+                    mm_kernel_device_get_name (kernel_port));
         self->priv->port_probes = g_list_remove (self->priv->port_probes, probe);
         self->priv->ignored_port_probes = g_list_prepend (self->priv->ignored_port_probes, probe);
     }
@@ -240,7 +241,7 @@ unexport_modem (MMDevice *self)
         g_object_set (self->priv->modem,
                       MM_BASE_MODEM_CONNECTION, NULL,
                       NULL);
-        mm_dbg ("[device %s] unexported modem from path '%s'", self->priv->uid, path);
+        mm_obj_dbg (self, "unexported modem from path '%s'", path);
         g_free (path);
     }
 }
@@ -258,7 +259,7 @@ export_modem (MMDevice *self)
 
     /* If modem not yet valid (not fully initialized), don't export it */
     if (!mm_base_modem_get_valid (self->priv->modem)) {
-        mm_dbg ("[device %s] modem not yet fully initialized", self->priv->uid);
+        mm_obj_dbg (self, "modem not yet fully initialized");
         return;
     }
 
@@ -268,7 +269,7 @@ export_modem (MMDevice *self)
                   NULL);
     if (path) {
         g_free (path);
-        mm_dbg ("[device %s] modem already exported", self->priv->uid);
+        mm_obj_dbg (self, "modem already exported");
         return;
     }
 
@@ -287,14 +288,13 @@ export_modem (MMDevice *self)
     g_dbus_object_manager_server_export (self->priv->object_manager,
                                          G_DBUS_OBJECT_SKELETON (self->priv->modem));
 
-    mm_dbg ("[device %s] exported modem at path '%s'", self->priv->uid, path);
-    mm_dbg ("[device %s]    plugin:  %s", self->priv->uid, mm_base_modem_get_plugin (self->priv->modem));
-    mm_dbg ("[device %s]    vid:pid: 0x%04X:0x%04X",
-            self->priv->uid,
-            (mm_base_modem_get_vendor_id (self->priv->modem) & 0xFFFF),
-            (mm_base_modem_get_product_id (self->priv->modem) & 0xFFFF));
+    mm_obj_dbg (self, " exported modem at path '%s'", path);
+    mm_obj_dbg (self, "    plugin:  %s", mm_base_modem_get_plugin (self->priv->modem));
+    mm_obj_dbg (self, "    vid:pid: 0x%04X:0x%04X",
+                (mm_base_modem_get_vendor_id (self->priv->modem) & 0xFFFF),
+                (mm_base_modem_get_product_id (self->priv->modem) & 0xFFFF));
     if (self->priv->virtual)
-        mm_dbg ("[device %s]    virtual", self->priv->uid);
+        mm_obj_dbg (self, "    virtual");
 
     g_free (path);
 }
@@ -337,12 +337,10 @@ reprobe (MMDevice *self)
     GError *error = NULL;
 
     if (!mm_device_create_modem (self, &error)) {
-        mm_warn ("Could not recreate modem for device '%s': %s",
-                 self->priv->uid,
-                 error ? error->message : "unknown");
+        mm_obj_warn (self, "could not recreate modem: %s", error->message);
         g_error_free (error);
     } else
-        mm_dbg ("Modem recreated for device '%s'", self->priv->uid);
+        mm_obj_dbg (self, "modem recreated");
 
     return G_SOURCE_REMOVE;
 }
@@ -365,7 +363,7 @@ modem_valid (MMBaseModem *modem,
         if (self->priv->modem)
             export_modem (self);
         else
-            mm_dbg ("[device %s] not exporting modem; no longer available", self->priv->uid);
+            mm_obj_dbg (self, "not exporting modem; no longer available");
     }
 }
 
@@ -390,10 +388,9 @@ mm_device_create_modem (MMDevice  *self,
             return FALSE;
         }
 
-        mm_info ("[device %s] creating modem with plugin '%s' and '%u' ports",
-                 self->priv->uid,
-                 mm_plugin_get_name (self->priv->plugin),
-                 g_list_length (self->priv->port_probes));
+        mm_obj_info (self, "creating modem with plugin '%s' and '%u' ports",
+                     mm_plugin_get_name (self->priv->plugin),
+                     g_list_length (self->priv->port_probes));
     } else {
         if (!self->priv->virtual_ports) {
             g_set_error (error,
@@ -403,10 +400,9 @@ mm_device_create_modem (MMDevice  *self,
             return FALSE;
         }
 
-        mm_info ("[device %s] creating virtual modem with plugin '%s' and '%u' ports",
-                 self->priv->uid,
-                 mm_plugin_get_name (self->priv->plugin),
-                 g_strv_length (self->priv->virtual_ports));
+        mm_obj_info (self, "creating virtual modem with plugin '%s' and '%u' ports",
+                     mm_plugin_get_name (self->priv->plugin),
+                     g_strv_length (self->priv->virtual_ports));
     }
 
     self->priv->modem = mm_plugin_create_modem (self->priv->plugin, self, error);
@@ -639,6 +635,17 @@ mm_device_is_virtual (MMDevice *self)
 
 /*****************************************************************************/
 
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    MMDevice *self;
+
+    self = MM_DEVICE (_self);
+    return g_strdup_printf ("device %s", self->priv->uid);
+}
+
+/*****************************************************************************/
+
 MMDevice *
 mm_device_new (const gchar              *uid,
                gboolean                  hotplugged,
@@ -769,6 +776,12 @@ finalize (GObject *object)
     g_strfreev (self->priv->virtual_ports);
 
     G_OBJECT_CLASS (mm_device_parent_class)->finalize (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
