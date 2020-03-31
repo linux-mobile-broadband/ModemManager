@@ -38,7 +38,6 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
     MMSmsPart *part;
     GError *error = NULL;
 
-    mm_dbg (" ");
     part = mm_sms_part_cdma_new_from_pdu (0, hexpdu, NULL, &error);
     g_assert_no_error (error);
     g_assert (part != NULL);
@@ -88,7 +87,6 @@ common_test_invalid_part_from_hexpdu (const gchar *hexpdu)
     MMSmsPart *part;
     GError *error = NULL;
 
-    mm_dbg (" ");
     part = mm_sms_part_cdma_new_from_pdu (0, hexpdu, NULL, &error);
     g_assert (part == NULL);
     /* We don't care for the specific error type */
