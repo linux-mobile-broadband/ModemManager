@@ -190,6 +190,7 @@ store_ready (QmiClientWms *client,
 static void
 sms_store_next_part (GTask *task)
 {
+    MMSmsQmi *self;
     SmsStoreContext *ctx;
     QmiMessageWmsRawWriteInput *input;
     guint8 *pdu = NULL;
@@ -198,6 +199,7 @@ sms_store_next_part (GTask *task)
     GArray *array;
     GError *error = NULL;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     if (!ctx->current) {
@@ -209,7 +211,7 @@ sms_store_next_part (GTask *task)
 
     /* Get PDU */
     if (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data))
-        pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+        pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, self, &error);
     else if (MM_SMS_PART_IS_CDMA ((MMSmsPart *)ctx->current->data))
         pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &error);
 
@@ -384,6 +386,7 @@ send_generic_ready (QmiClientWms *client,
 static void
 sms_send_generic (GTask *task)
 {
+    MMSmsQmi *self;
     SmsSendContext *ctx;
     QmiMessageWmsRawSendInput *input;
     guint8 *pdu = NULL;
@@ -392,11 +395,12 @@ sms_send_generic (GTask *task)
     GArray *array;
     GError *error = NULL;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     /* Get PDU */
     if (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data))
-        pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+        pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, self, &error);
     else if (MM_SMS_PART_IS_CDMA ((MMSmsPart *)ctx->current->data))
         pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &error);
 

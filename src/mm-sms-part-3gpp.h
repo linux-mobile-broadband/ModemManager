@@ -22,31 +22,31 @@
 
 #include "mm-sms-part.h"
 
-MMSmsPart *mm_sms_part_3gpp_new_from_pdu  (guint index,
-                                           const gchar *hexpdu,
-                                           GError **error);
-
-MMSmsPart *mm_sms_part_3gpp_new_from_binary_pdu (guint index,
-                                                 const guint8 *pdu,
-                                                 gsize pdu_len,
-                                                 GError **error);
-
-guint8    *mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
-                                            guint *out_pdulen,
-                                            guint *out_msgstart,
-                                            GError **error);
+MMSmsPart *mm_sms_part_3gpp_new_from_pdu        (guint          index,
+                                                 const gchar   *hexpdu,
+                                                 gpointer       log_object,
+                                                 GError       **error);
+MMSmsPart *mm_sms_part_3gpp_new_from_binary_pdu (guint          index,
+                                                 const guint8  *pdu,
+                                                 gsize          pdu_len,
+                                                 gpointer       log_object,
+                                                 GError       **error);
+guint8    *mm_sms_part_3gpp_get_submit_pdu      (MMSmsPart     *part,
+                                                 guint         *out_pdulen,
+                                                 guint         *out_msgstart,
+                                                 gpointer       log_object,
+                                                 GError       **error);
 
 /* For testcases only */
 
-guint mm_sms_part_3gpp_encode_address (const gchar *address,
-                                       guint8 *buf,
-                                       gsize buflen,
-                                       gboolean is_smsc);
-
-gchar **mm_sms_part_3gpp_util_split_text (const gchar *text,
-                                          MMSmsEncoding *encoding);
-
-GByteArray **mm_sms_part_3gpp_util_split_data (const guint8 *data,
-                                               gsize data_len);
+guint       mm_sms_part_3gpp_encode_address   (const gchar   *address,
+                                               guint8        *buf,
+                                               gsize          buflen,
+                                               gboolean       is_smsc);
+gchar      **mm_sms_part_3gpp_util_split_text (const gchar   *text,
+                                               MMSmsEncoding *encoding,
+                                               gpointer       log_object);
+GByteArray **mm_sms_part_3gpp_util_split_data (const guint8  *data,
+                                               gsize          data_len);
 
 #endif /* MM_SMS_PART_3GPP_H */

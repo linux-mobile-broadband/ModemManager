@@ -240,17 +240,21 @@ sms_encoding_type (int dcs)
 }
 
 static char *
-sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_offset)
+sms_decode_text (const guint8 *text,
+                 int           len,
+                 MMSmsEncoding encoding,
+                 int           bit_offset,
+                 gpointer      log_object)
 {
     char *utf8;
     guint8 *unpacked;
     guint32 unpacked_len;
 
     if (encoding == MM_SMS_ENCODING_GSM7) {
-        mm_dbg ("Converting SMS part text from GSM-7 to UTF-8...");
+        mm_obj_dbg (log_object, "converting SMS part text from GSM-7 to UTF-8...");
         unpacked = mm_charset_gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
         utf8 = (char *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
-        mm_dbg ("   Got UTF-8 text: '%s'", utf8);
+        mm_obj_dbg (log_object, "   got UTF-8 text: '%s'", utf8);
         g_free (unpacked);
     } else if (encoding == MM_SMS_ENCODING_UCS2) {
         /* Despite 3GPP TS 23.038 specifies that Unicode SMS messages are
@@ -266,19 +270,19 @@ sms_decode_text (const guint8 *text, int len, MMSmsEncoding encoding, int bit_of
          * the SMS message in UTF-16BE, and if that fails, fall back to decode
          * in UCS-2BE.
          */
-        mm_dbg ("Converting SMS part text from UTF-16BE to UTF-8...");
+        mm_obj_dbg (log_object, "converting SMS part text from UTF-16BE to UTF-8...");
         utf8 = g_convert ((const gchar *) text, len, "UTF8", "UTF16BE", NULL, NULL, NULL);
         if (!utf8) {
-            mm_dbg ("Converting SMS part text from UCS-2BE to UTF8...");
+            mm_obj_dbg (log_object, "converting SMS part text from UCS-2BE to UTF8...");
             utf8 = g_convert ((const gchar *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
         }
         if (!utf8) {
-            mm_warn ("Couldn't convert SMS part contents from UTF-16BE/UCS-2BE to UTF-8: not decoding any text");
+            mm_obj_warn (log_object, "couldn't convert SMS part contents from UTF-16BE/UCS-2BE to UTF-8: not decoding any text");
             utf8 = g_strdup ("");
         } else
-            mm_dbg ("   Got UTF-8 text: '%s'", utf8);
+            mm_obj_dbg (log_object, "   got UTF-8 text: '%s'", utf8);
     } else {
-        mm_warn ("Unexpected encoding '%s': not decoding any text", mm_sms_encoding_get_string (encoding));
+        mm_obj_warn (log_object, "unexpected encoding: %s; not decoding any text", mm_sms_encoding_get_string (encoding));
         utf8 = g_strdup ("");
     }
 
@@ -343,9 +347,10 @@ validity_to_relative (guint validity)
 }
 
 MMSmsPart *
-mm_sms_part_3gpp_new_from_pdu (guint index,
-                               const gchar *hexpdu,
-                               GError **error)
+mm_sms_part_3gpp_new_from_pdu (guint         index,
+                               const gchar  *hexpdu,
+                               gpointer      log_object,
+                               GError      **error)
 {
     gsize pdu_len;
     guint8 *pdu;
@@ -361,17 +366,18 @@ mm_sms_part_3gpp_new_from_pdu (guint index,
         return NULL;
     }
 
-    part = mm_sms_part_3gpp_new_from_binary_pdu (index, pdu, pdu_len, error);
+    part = mm_sms_part_3gpp_new_from_binary_pdu (index, pdu, pdu_len, log_object, error);
     g_free (pdu);
 
     return part;
 }
 
 MMSmsPart *
-mm_sms_part_3gpp_new_from_binary_pdu (guint index,
-                                      const guint8 *pdu,
-                                      gsize pdu_len,
-                                      GError **error)
+mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
+                                      const guint8  *pdu,
+                                      gsize          pdu_len,
+                                      gpointer       log_object,
+                                      GError       **error)
 {
     MMSmsPart *sms_part;
     guint8 pdu_type;
@@ -392,9 +398,9 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
     sms_part = mm_sms_part_new (index, MM_SMS_PDU_TYPE_UNKNOWN);
 
     if (index != SMS_PART_INVALID_INDEX)
-        mm_dbg ("Parsing PDU (%u)...", index);
+        mm_obj_dbg (log_object, "parsing PDU (%u)...", index);
     else
-        mm_dbg ("Parsing PDU...");
+        mm_obj_dbg (log_object, "parsing PDU...");
 
 #define PDU_SIZE_CHECK(required_size, check_descr_str)                 \
     if (pdu_len < required_size) {                                     \
@@ -421,10 +427,10 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         /* SMSC may not be given in DELIVER PDUs */
         mm_sms_part_take_smsc (sms_part,
                                sms_decode_address (&pdu[1], 2 * (smsc_addr_size_bytes - 1)));
-        mm_dbg ("  SMSC address parsed: '%s'", mm_sms_part_get_smsc (sms_part));
+        mm_obj_dbg (log_object, "  SMSC address parsed: '%s'", mm_sms_part_get_smsc (sms_part));
         offset += smsc_addr_size_bytes;
     } else
-        mm_dbg ("  No SMSC address given");
+        mm_obj_dbg (log_object, "  no SMSC address given");
 
 
     /* ---------------------------------------------------------------------- */
@@ -434,15 +440,15 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
     pdu_type = (pdu[offset] & SMS_TP_MTI_MASK);
     switch (pdu_type) {
     case SMS_TP_MTI_SMS_DELIVER:
-        mm_dbg ("  Deliver type PDU detected");
+        mm_obj_dbg (log_object, "  deliver type PDU detected");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_DELIVER);
         break;
     case SMS_TP_MTI_SMS_SUBMIT:
-        mm_dbg ("  Submit type PDU detected");
+        mm_obj_dbg (log_object, "  submit type PDU detected");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_SUBMIT);
         break;
     case SMS_TP_MTI_SMS_STATUS_REPORT:
-        mm_dbg ("  Status report type PDU detected");
+        mm_obj_dbg (log_object, "  status report type PDU detected");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_STATUS_REPORT);
         break;
     default:
@@ -475,7 +481,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         pdu_type == SMS_TP_MTI_SMS_SUBMIT) {
         PDU_SIZE_CHECK (offset + 1, "cannot read message reference");
 
-        mm_dbg ("  message reference: %u", (guint)pdu[offset]);
+        mm_obj_dbg (log_object, "  message reference: %u", (guint)pdu[offset]);
         mm_sms_part_set_message_reference (sms_part, pdu[offset]);
         offset++;
     }
@@ -495,7 +501,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
     mm_sms_part_take_number (sms_part,
                              sms_decode_address (&pdu[offset],
                                                  tp_addr_size_digits));
-    mm_dbg ("  Number parsed: '%s'", mm_sms_part_get_number (sms_part));
+    mm_obj_dbg (log_object, "  number parsed: %s", mm_sms_part_get_number (sms_part));
     offset += (1 + tp_addr_size_bytes); /* +1 due to the Type of Address byte */
 
     /* ---------------------------------------------------------------------- */
@@ -531,20 +537,20 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         if (validity_format) {
             switch (validity_format) {
             case 0x10:
-                mm_dbg ("  validity available, format relative");
+                mm_obj_dbg (log_object, "  validity available, format relative");
                 mm_sms_part_set_validity_relative (sms_part,
                                                    relative_to_validity (pdu[offset]));
                 offset++;
                 break;
             case 0x08:
                 /* TODO: support enhanced format; GSM 03.40 */
-                mm_dbg ("  validity available, format enhanced (not implemented)");
+                mm_obj_dbg (log_object, "  validity available, format enhanced (not implemented)");
                 /* 7 bytes for enhanced validity */
                 offset += 7;
                 break;
             case 0x18:
                 /* TODO: support absolute format; GSM 03.40 */
-                mm_dbg ("  validity available, format absolute (not implemented)");
+                mm_obj_dbg (log_object, "  validity available, format absolute (not implemented)");
                 /* 7 bytes for absolute validity */
                 offset += 7;
                 break;
@@ -574,7 +580,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         offset += 7;
 
         /* ----- TP-STATUS (1 byte) ------ */
-        mm_dbg ("  delivery state: %u", (guint)pdu[offset]);
+        mm_obj_dbg (log_object, "  delivery state: %u", (guint)pdu[offset]);
         mm_sms_part_set_delivery_state (sms_part, pdu[offset]);
         offset++;
 
@@ -599,7 +605,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
 
     if (tp_pid_offset > 0) {
         PDU_SIZE_CHECK (tp_pid_offset + 1, "cannot read TP-PID");
-        mm_dbg ("  PID: %u", (guint)pdu[tp_pid_offset]);
+        mm_obj_dbg (log_object, "  PID: %u", (guint)pdu[tp_pid_offset]);
     }
 
     /* Grab user data encoding and message class */
@@ -610,17 +616,17 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         user_data_encoding = sms_encoding_type (pdu[tp_dcs_offset]);
         switch (user_data_encoding) {
         case MM_SMS_ENCODING_GSM7:
-            mm_dbg ("  user data encoding is GSM7");
+            mm_obj_dbg (log_object, "  user data encoding is GSM7");
             break;
         case MM_SMS_ENCODING_UCS2:
-            mm_dbg ("  user data encoding is UCS2");
+            mm_obj_dbg (log_object, "  user data encoding is UCS2");
             break;
         case MM_SMS_ENCODING_8BIT:
-            mm_dbg ("  user data encoding is 8bit");
+            mm_obj_dbg (log_object, "  user data encoding is 8bit");
             break;
         case MM_SMS_ENCODING_UNKNOWN:
         default:
-            mm_dbg ("  user data encoding is unknown");
+            mm_obj_dbg (log_object, "  user data encoding is unknown");
             break;
         }
         mm_sms_part_set_encoding (sms_part, user_data_encoding);
@@ -639,13 +645,13 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
 
         PDU_SIZE_CHECK (tp_user_data_len_offset + 1, "cannot read TP-UDL");
         tp_user_data_size_elements = pdu[tp_user_data_len_offset];
-        mm_dbg ("  user data length: %u elements", tp_user_data_size_elements);
+        mm_obj_dbg (log_object, "  user data length: %u elements", tp_user_data_size_elements);
 
         if (user_data_encoding == MM_SMS_ENCODING_GSM7)
             tp_user_data_size_bytes = (7 * (tp_user_data_size_elements + 1 )) / 8;
         else
             tp_user_data_size_bytes = tp_user_data_size_elements;
-        mm_dbg ("  user data length: %u bytes", tp_user_data_size_bytes);
+        mm_obj_dbg (log_object, "  user data length: %u bytes", tp_user_data_size_bytes);
 
         tp_user_data_offset = tp_user_data_len_offset + 1;
         PDU_SIZE_CHECK (tp_user_data_offset + tp_user_data_size_bytes, "cannot read TP-UD");
@@ -722,12 +728,13 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
         case MM_SMS_ENCODING_GSM7:
         case MM_SMS_ENCODING_UCS2:
             /* Otherwise if it's 7-bit or UCS2 we can decode it */
-            mm_dbg ("Decoding SMS text with '%u' elements", tp_user_data_size_elements);
+            mm_obj_dbg (log_object, "decoding SMS text with %u elements", tp_user_data_size_elements);
             mm_sms_part_take_text (sms_part,
                                    sms_decode_text (&pdu[tp_user_data_offset],
                                                     tp_user_data_size_elements,
                                                     user_data_encoding,
-                                                    bit_offset));
+                                                    bit_offset,
+                                                    log_object));
             g_warn_if_fail (mm_sms_part_get_text (sms_part) != NULL);
             break;
 
@@ -737,7 +744,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint index,
             {
                 GByteArray *raw;
 
-                mm_dbg ("Skipping SMS text: Unknown encoding (0x%02X)", user_data_encoding);
+                mm_obj_dbg (log_object, "skipping SMS text: unknown encoding (0x%02X)", user_data_encoding);
 
                 PDU_SIZE_CHECK (tp_user_data_offset + tp_user_data_size_bytes, "cannot read user data");
 
@@ -815,6 +822,7 @@ guint8 *
 mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
                                  guint *out_pdulen,
                                  guint *out_msgstart,
+                                 gpointer log_object,
                                  GError **error)
 {
     guint8 *pdu;
@@ -834,13 +842,13 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         return NULL;
     }
 
-    mm_dbg ("Creating PDU for part...");
+    mm_obj_dbg (log_object, "creating PDU for part...");
 
     /* Build up the PDU */
     pdu = g_malloc0 (PDU_SIZE);
 
     if (mm_sms_part_get_smsc (part)) {
-        mm_dbg ("  adding SMSC to PDU...");
+        mm_obj_dbg (log_object, "  adding SMSC to PDU...");
         len = mm_sms_part_3gpp_encode_address (mm_sms_part_get_smsc (part), pdu, PDU_SIZE, TRUE);
         if (len == 0) {
             g_set_error (error,
@@ -863,13 +871,13 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
 
     /* TP-VP present; format RELATIVE */
     if (mm_sms_part_get_validity_relative (part) > 0) {
-        mm_dbg ("  adding validity to PDU...");
+        mm_obj_dbg (log_object, "  adding validity to PDU...");
         pdu[offset] |= 0x10;
     }
 
     /* Concatenation sequence only found in multipart SMS */
     if (mm_sms_part_get_concat_sequence (part)) {
-        mm_dbg ("  adding UDHI to PDU...");
+        mm_obj_dbg (log_object, "  adding UDHI to PDU...");
         pdu[offset] |= 0x40; /* UDHI */
     }
 
@@ -878,7 +886,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
     if (mm_sms_part_get_delivery_report_request (part) &&
         (!mm_sms_part_get_concat_sequence (part) ||
          mm_sms_part_get_concat_max (part) == mm_sms_part_get_concat_sequence (part))) {
-        mm_dbg ("  requesting delivery report...");
+        mm_obj_dbg (log_object, "  requesting delivery report...");
         pdu[offset] |= 0x20;
     }
 
@@ -910,24 +918,24 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
     pdu[offset] = 0x00;
 
     if (mm_sms_part_get_class (part) >= 0 && mm_sms_part_get_class (part) <= 3) {
-        mm_dbg ("  using class %d...", mm_sms_part_get_class (part));
+        mm_obj_dbg (log_object, "  using class %d...", mm_sms_part_get_class (part));
         pdu[offset] |= SMS_DCS_CLASS_VALID;
         pdu[offset] |= mm_sms_part_get_class (part);
     }
 
     switch (mm_sms_part_get_encoding (part)) {
     case MM_SMS_ENCODING_UCS2:
-        mm_dbg ("  using UCS2 encoding...");
+        mm_obj_dbg (log_object, "  using UCS2 encoding...");
         pdu[offset] |= SMS_DCS_CODING_UCS2;
         break;
     case MM_SMS_ENCODING_GSM7:
-        mm_dbg ("  using GSM7 encoding...");
+        mm_obj_dbg (log_object, "  using GSM7 encoding...");
         pdu[offset] |= SMS_DCS_CODING_DEFAULT;  /* GSM */
         break;
     case MM_SMS_ENCODING_8BIT:
     case MM_SMS_ENCODING_UNKNOWN:
     default:
-        mm_dbg ("  using 8bit encoding...");
+        mm_obj_dbg (log_object, "  using 8bit encoding...");
         pdu[offset] |= SMS_DCS_CODING_8BIT;
         break;
     }
@@ -946,7 +954,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
 
     /* Build UDH */
     if (mm_sms_part_get_concat_sequence (part)) {
-        mm_dbg ("  adding UDH header in PDU... (reference: %u, max: %u, sequence: %u)",
+        mm_obj_dbg (log_object, "  adding UDH header in PDU... (reference: %u, max: %u, sequence: %u)",
                 mm_sms_part_get_concat_reference (part),
                 mm_sms_part_get_concat_max (part),
                 mm_sms_part_get_concat_sequence (part));
@@ -986,9 +994,9 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
          * If we had UDH, add 7 septets
          */
         *udl_ptr = mm_sms_part_get_concat_sequence (part) ? (7 + unlen) : unlen;
-        mm_dbg ("  user data length is '%u' septets (%s UDH)",
-                *udl_ptr,
-                mm_sms_part_get_concat_sequence (part) ? "with" : "without");
+        mm_obj_dbg (log_object, "  user data length is %u septets (%s UDH)",
+                    *udl_ptr,
+                    mm_sms_part_get_concat_sequence (part) ? "with" : "without");
 
         packed = mm_charset_gsm_pack (unpacked, unlen, shift, &packlen);
         g_free (unpacked);
@@ -1022,7 +1030,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
          * If we had UDH, add 6 octets
          */
         *udl_ptr = mm_sms_part_get_concat_sequence (part) ? (6 + array->len) : array->len;
-        mm_dbg ("  user data length is '%u' octets (%s UDH)",
+        mm_obj_dbg (log_object, "  user data length is %u octets (%s UDH)",
                 *udl_ptr,
                 mm_sms_part_get_concat_sequence (part) ? "with" : "without");
 
@@ -1038,7 +1046,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
          * If we had UDH, add 6 octets
          */
         *udl_ptr = mm_sms_part_get_concat_sequence (part) ? (6 + data->len) : data->len;
-        mm_dbg ("  binary user data length is '%u' octets (%s UDH)",
+        mm_obj_dbg (log_object, "  binary user data length is %u octets (%s UDH)",
                 *udl_ptr,
                 mm_sms_part_get_concat_sequence (part) ? "with" : "without");
 
@@ -1057,8 +1065,9 @@ error:
 }
 
 gchar **
-mm_sms_part_3gpp_util_split_text (const gchar *text,
-                                  MMSmsEncoding *encoding)
+mm_sms_part_3gpp_util_split_text (const gchar   *text,
+                                  MMSmsEncoding *encoding,
+                                  gpointer       log_object)
 {
     gchar **out;
     guint n_chunks;
@@ -1132,7 +1141,8 @@ mm_sms_part_3gpp_util_split_text (const gchar *text,
                 out[i] = sms_decode_text (&array->data[j],
                                           MIN (array->len - j, 134),
                                           MM_SMS_ENCODING_UCS2,
-                                          0);
+                                          0,
+                                          log_object);
             }
         }
         g_byte_array_unref (array);

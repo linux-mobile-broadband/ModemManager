@@ -41,7 +41,7 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
     MMSmsPart *part;
     GError *error = NULL;
 
-    part = mm_sms_part_3gpp_new_from_pdu (0, hexpdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (0, hexpdu, NULL, &error);
     g_assert_no_error (error);
     g_assert (part != NULL);
 
@@ -339,7 +339,7 @@ test_pdu_insufficient_data (void)
     };
 
     hexpdu = mm_utils_bin2hexstr (pdu, sizeof (pdu));
-    part = mm_sms_part_3gpp_new_from_pdu (0, hexpdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (0, hexpdu, NULL, &error);
     g_assert (part == NULL);
     /* We don't care for the specific error type */
     g_assert (error != NULL);
@@ -531,7 +531,7 @@ common_test_create_pdu (const gchar *smsc,
         MMSmsEncoding encoding = MM_SMS_ENCODING_UNKNOWN;
 
         /* Detect best encoding */
-        out = mm_sms_part_3gpp_util_split_text (text, &encoding);
+        out = mm_sms_part_3gpp_util_split_text (text, &encoding, NULL);
         g_strfreev (out);
         mm_sms_part_set_text (part, text);
         mm_sms_part_set_encoding (part, encoding);
@@ -544,6 +544,7 @@ common_test_create_pdu (const gchar *smsc,
     pdu = mm_sms_part_3gpp_get_submit_pdu (part,
                                            &len,
                                            &msgstart,
+                                           NULL,
                                            &error);
     mm_sms_part_free (part);
 
@@ -719,7 +720,7 @@ common_test_text_split (const gchar *text,
     MMSmsEncoding out_encoding = MM_SMS_ENCODING_UNKNOWN;
     guint i;
 
-    out = mm_sms_part_3gpp_util_split_text (text, &out_encoding);
+    out = mm_sms_part_3gpp_util_split_text (text, &out_encoding, NULL);
 
     g_assert (out != NULL);
     g_assert (out_encoding != MM_SMS_ENCODING_UNKNOWN);

@@ -6810,7 +6810,7 @@ sms_part_ready (MMBroadbandModem *self,
         return;
     }
 
-    part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, self, &error);
     if (part) {
         mm_obj_dbg (self, "correctly parsed PDU (%d)", ctx->idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
@@ -6925,7 +6925,7 @@ cds_received (MMPortSerialAt *port,
     if (!pdu)
         return;
 
-    part = mm_sms_part_3gpp_new_from_pdu (SMS_PART_INVALID_INDEX, pdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (SMS_PART_INVALID_INDEX, pdu, self, &error);
     if (part) {
         mm_obj_dbg (self, "correctly parsed non-stored PDU");
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
@@ -7355,7 +7355,7 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
         MM3gppPduInfo *info = l->data;
         MMSmsPart *part;
 
-        part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, &error);
+        part = mm_sms_part_3gpp_new_from_pdu (info->index, info->pdu, self, &error);
         if (part) {
             mm_obj_dbg (self, "correctly parsed PDU (%d)", info->index);
             mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),

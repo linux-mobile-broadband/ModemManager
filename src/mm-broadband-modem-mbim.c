@@ -5161,6 +5161,7 @@ add_sms_part (MMBroadbandModemMbim *self,
     part = mm_sms_part_3gpp_new_from_binary_pdu (pdu->message_index,
                                                  pdu->pdu_data,
                                                  pdu->pdu_data_size,
+                                                 self,
                                                  &error);
     if (part) {
         mm_obj_dbg (self, "correctly parsed PDU (%d)", pdu->message_index);

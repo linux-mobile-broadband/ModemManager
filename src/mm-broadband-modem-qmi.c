@@ -5535,6 +5535,7 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
         part = mm_sms_part_3gpp_new_from_binary_pdu (index,
                                                      (guint8 *)data->data,
                                                      data->len,
+                                                     self,
                                                      &error);
         break;
     case QMI_WMS_MESSAGE_FORMAT_MWI:

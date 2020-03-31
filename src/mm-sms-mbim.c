@@ -138,6 +138,7 @@ sms_send_set_ready (MbimDevice *device,
 static void
 sms_send_next_part (GTask *task)
 {
+    MMSmsMbim *self;
     SmsSendContext *ctx;
     MbimMessage *message;
     guint8 *pdu;
@@ -146,7 +147,9 @@ sms_send_next_part (GTask *task)
     GError *error = NULL;
     MbimSmsPduSendRecord send_record;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
+
     if (!ctx->current) {
         /* Done we are */
         g_task_return_boolean (task, TRUE);
@@ -155,7 +158,7 @@ sms_send_next_part (GTask *task)
     }
 
     /* Get PDU */
-    pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, &error);
+    pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, self, &error);
     if (!pdu) {
         g_task_return_error (task, error);
         g_object_unref (task);

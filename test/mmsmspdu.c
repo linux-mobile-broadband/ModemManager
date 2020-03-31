@@ -220,7 +220,7 @@ int main (int argc, char **argv)
         exit (EXIT_FAILURE);
     }
 
-    part = mm_sms_part_3gpp_new_from_pdu (0, pdu, &error);
+    part = mm_sms_part_3gpp_new_from_pdu (0, pdu, NULL, &error);
     if (!part) {
         g_printerr ("error: couldn't parse PDU: %s\n", error->message);
         exit (EXIT_FAILURE);

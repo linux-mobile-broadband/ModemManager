@@ -129,7 +129,7 @@ generate_3gpp_submit_pdus (MMBaseSms *self,
     g_assert (!(text != NULL && data != NULL));
 
     if (text) {
-        split_text = mm_sms_part_3gpp_util_split_text (text, &encoding);
+        split_text = mm_sms_part_3gpp_util_split_text (text, &encoding, self);
         if (!split_text) {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -771,12 +771,13 @@ mm_base_sms_get_parts (MMBaseSms *self)
 /*****************************************************************************/
 
 static gboolean
-sms_get_store_or_send_command (MMSmsPart *part,
-                               gboolean text_or_pdu,   /* TRUE for PDU */
-                               gboolean store_or_send, /* TRUE for send */
-                               gchar **out_cmd,
-                               gchar **out_msg_data,
-                               GError **error)
+sms_get_store_or_send_command (MMBaseSms  *self,
+                               MMSmsPart  *part,
+                               gboolean    text_or_pdu,   /* TRUE for PDU */
+                               gboolean    store_or_send, /* TRUE for send */
+                               gchar     **out_cmd,
+                               gchar     **out_msg_data,
+                               GError    **error)
 {
     g_assert (out_cmd != NULL);
     g_assert (out_msg_data != NULL);
@@ -795,7 +796,7 @@ sms_get_store_or_send_command (MMSmsPart *part,
 
         /* AT+CMGW=<length>[, <stat>]<CR> PDU can be entered. <CTRL-Z>/<ESC> */
 
-        pdu = mm_sms_part_3gpp_get_submit_pdu (part, &pdulen, &msgstart, error);
+        pdu = mm_sms_part_3gpp_get_submit_pdu (part, &pdulen, &msgstart, self, error);
         if (!pdu)
             /* 'error' should already be set */
             return FALSE;
@@ -929,10 +930,12 @@ store_ready (MMBaseModem *modem,
 static void
 sms_store_next_part (GTask *task)
 {
+    MMBaseSms *self;
     SmsStoreContext *ctx;
     gchar *cmd;
     GError *error = NULL;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     if (!ctx->current) {
@@ -944,7 +947,8 @@ sms_store_next_part (GTask *task)
 
     g_clear_pointer (&ctx->msg_data, g_free);
 
-    if (!sms_get_store_or_send_command ((MMSmsPart *)ctx->current->data,
+    if (!sms_get_store_or_send_command (self,
+                                        (MMSmsPart *)ctx->current->data,
                                         ctx->use_pdu_mode,
                                         FALSE,
                                         &cmd,
@@ -1194,10 +1198,12 @@ send_from_storage_ready (MMBaseModem *modem,
 static void
 sms_send_next_part (GTask *task)
 {
+    MMBaseSms *self;
     SmsSendContext *ctx;
     GError *error = NULL;
     gchar *cmd;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
     if (!ctx->current) {
@@ -1225,7 +1231,8 @@ sms_send_next_part (GTask *task)
 
     g_clear_pointer (&ctx->msg_data, g_free);
 
-    if (!sms_get_store_or_send_command ((MMSmsPart *)ctx->current->data,
+    if (!sms_get_store_or_send_command (self,
+                                        (MMSmsPart *)ctx->current->data,
                                         ctx->use_pdu_mode,
                                         TRUE,
                                         &cmd,
