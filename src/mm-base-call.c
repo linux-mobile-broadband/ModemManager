@@ -32,11 +32,14 @@
 #include "mm-iface-modem-voice.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
 
-G_DEFINE_TYPE (MMBaseCall, mm_base_call, MM_GDBUS_TYPE_CALL_SKELETON)
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBaseCall, mm_base_call, MM_GDBUS_TYPE_CALL_SKELETON, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 enum {
     PROP_0,
@@ -94,7 +97,7 @@ static gboolean
 incoming_timeout_cb (MMBaseCall *self)
 {
     self->priv->incoming_timeout = 0;
-    mm_info ("incoming call timed out: no response");
+    mm_obj_info (self, "incoming call timed out: no response");
     mm_base_call_change_state (self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_TERMINATED);
     return G_SOURCE_REMOVE;
 }
@@ -159,7 +162,7 @@ handle_start_ready (MMBaseCall         *self,
     g_clear_object (&ctx->self->priv->start_cancellable);
 
     if (!MM_BASE_CALL_GET_CLASS (self)->start_finish (self, res, &error)) {
-        mm_warn ("Couldn't start call : '%s'", error->message);
+        mm_obj_warn (self, "couldn't start call: %s", error->message);
 
         /* When cancelled via the start cancellable, it's because we got an early in-call error
          * before the call attempt was reported as started. */
@@ -184,7 +187,7 @@ handle_start_ready (MMBaseCall         *self,
         return;
     }
 
-    mm_info ("call is started");
+    mm_obj_info (self, "call is started");
 
     /* If dialing to ringing supported, leave it dialing */
     if (!ctx->self->priv->supports_dialing_to_ringing) {
@@ -226,7 +229,7 @@ handle_start_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_info ("user request to start call");
+    mm_obj_info (ctx->self, "user request to start call");
 
     /* Disallow non-emergency calls when in emergency-only state */
     if (!mm_iface_modem_voice_authorize_outgoing_call (MM_IFACE_MODEM_VOICE (modem), ctx->self, &error)) {
@@ -313,7 +316,7 @@ handle_accept_ready (MMBaseCall *self,
         return;
     }
 
-    mm_info ("call is accepted");
+    mm_obj_info (self, "call is accepted");
 
     if (ctx->self->priv->incoming_timeout) {
         g_source_remove (ctx->self->priv->incoming_timeout);
@@ -350,7 +353,7 @@ handle_accept_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_info ("user request to accept call");
+    mm_obj_info (ctx->self, "user request to accept call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->accept ||
@@ -423,7 +426,7 @@ handle_deflect_ready (MMBaseCall           *self,
         return;
     }
 
-    mm_info ("call is deflected to '%s'", ctx->number);
+    mm_obj_info (self, "call is deflected to '%s'", ctx->number);
     mm_base_call_change_state (ctx->self, MM_CALL_STATE_TERMINATED, MM_CALL_STATE_REASON_DEFLECTED);
     mm_gdbus_call_complete_deflect (MM_GDBUS_CALL (ctx->self), ctx->invocation);
     handle_deflect_context_free (ctx);
@@ -455,7 +458,7 @@ handle_deflect_auth_ready (MMBaseModem          *modem,
         return;
     }
 
-    mm_info ("user request to deflect call");
+    mm_obj_info (ctx->self, "user request to deflect call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->deflect ||
@@ -712,7 +715,7 @@ handle_hangup_auth_ready (MMBaseModem *modem,
         return;
     }
 
-    mm_info ("user request to hangup call");
+    mm_obj_info (ctx->self, "user request to hangup call");
 
     /* Check if we do support doing it */
     if (!MM_BASE_CALL_GET_CLASS (ctx->self)->hangup ||
@@ -897,9 +900,7 @@ call_dbus_export (MMBaseCall *self)
                                            self->priv->connection,
                                            self->priv->path,
                                            &error)) {
-        mm_warn ("couldn't export call at '%s': '%s'",
-                 self->priv->path,
-                 error->message);
+        mm_obj_warn (self, "couldn't export call: %s", error->message);
         g_error_free (error);
     }
 }
@@ -990,10 +991,10 @@ mm_base_call_change_state (MMBaseCall        *self,
     if (old_state == new_state)
         return;
 
-    mm_info ("Call state changed: %s -> %s (%s)",
-             mm_call_state_get_string (old_state),
-             mm_call_state_get_string (new_state),
-             mm_call_state_reason_get_string (reason));
+    mm_obj_info (self, "call state changed: %s -> %s (%s)",
+                 mm_call_state_get_string (old_state),
+                 mm_call_state_get_string (new_state),
+                 mm_call_state_reason_get_string (reason));
 
     /* Setup/cleanup unsolicited events  based on state transitions to/from ACTIVE */
     if (new_state == MM_CALL_STATE_TERMINATED) {
@@ -1236,8 +1237,8 @@ chld_hangup_ready (MMBaseModem  *modem,
 
     mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
-        mm_warn ("couldn't hangup single call with call id '%u': %s",
-                 self->priv->index, error->message);
+        mm_obj_warn (self, "couldn't hangup single call with call id '%u': %s",
+                     self->priv->index, error->message);
         g_error_free (error);
         chup_fallback (task);
         return;
@@ -1287,15 +1288,18 @@ call_send_dtmf_finish (MMBaseCall *self,
 }
 
 static void
-call_send_dtmf_ready (MMBaseModem *modem,
+call_send_dtmf_ready (MMBaseModem  *modem,
                       GAsyncResult *res,
-                      GTask *task)
+                      GTask        *task)
 {
-    GError *error = NULL;
+    MMBaseCall *self;
+    GError     *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     mm_base_modem_at_command_finish (modem, res, &error);
     if (error) {
-        mm_dbg ("Couldn't send_dtmf: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't send dtmf: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1325,6 +1329,17 @@ call_send_dtmf (MMBaseCall *self,
                               task);
 
     g_free (cmd);
+}
+
+/*****************************************************************************/
+
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    MMBaseCall *self;
+
+    self = MM_BASE_CALL (_self);
+    return g_strdup_printf ("call%u", self->priv->dbus_id);
 }
 
 /*****************************************************************************/
@@ -1382,6 +1397,8 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
         if (self->priv->modem) {
+            /* Set owner ID */
+            mm_log_object_set_owner_id (MM_LOG_OBJECT (self), mm_log_object_get_id (MM_LOG_OBJECT (self->priv->modem)));
             /* Bind the modem's connection (which is set when it is exported,
              * and unset when unexported) to the call's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
@@ -1482,6 +1499,12 @@ dispose (GObject *object)
     g_clear_object (&self->priv->modem);
 
     G_OBJECT_CLASS (mm_base_call_parent_class)->dispose (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
