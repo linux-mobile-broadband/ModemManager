@@ -148,7 +148,7 @@ parse_response (MMPortSerial *port,
 
     /* Parse it; returns FALSE if there is nothing we can do with this
      * response yet. */
-    if (!self->priv->response_parser_fn (self->priv->response_parser_user_data, string, &inner_error)) {
+    if (!self->priv->response_parser_fn (self->priv->response_parser_user_data, string, self, &inner_error)) {
         /* Copy what we got back in the response buffer. */
         g_byte_array_append (response, (const guint8 *) string->str, string->len);
         g_string_free (string, TRUE);

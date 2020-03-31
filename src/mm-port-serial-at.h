@@ -53,9 +53,10 @@ typedef enum { /*< underscore_name=mm_port_serial_at_flag >*/
     MM_PORT_SERIAL_AT_FLAG_GPS_CONTROL = 1 << 3,
 } MMPortSerialAtFlag;
 
-typedef gboolean (*MMPortSerialAtResponseParserFn) (gpointer user_data,
-                                                    GString *response,
-                                                    GError **error);
+typedef gboolean (*MMPortSerialAtResponseParserFn) (gpointer   user_data,
+                                                    GString   *response,
+                                                    gpointer   log_object,
+                                                    GError   **error);
 
 typedef void (*MMPortSerialAtUnsolicitedMsgFn) (MMPortSerialAt *port,
                                                 GMatchInfo *match_info,

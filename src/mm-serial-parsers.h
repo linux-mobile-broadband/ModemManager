@@ -24,6 +24,7 @@ void     mm_serial_parser_v1_set_custom_regex     (gpointer data,
                                                    GRegex *error);
 gboolean mm_serial_parser_v1_parse                (gpointer parser,
                                                    GString *response,
+                                                   gpointer log_object,
                                                    GError **error);
 void     mm_serial_parser_v1_destroy              (gpointer parser);
 gboolean mm_serial_parser_v1_is_known_error       (const GError *error);

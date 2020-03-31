@@ -19,7 +19,7 @@
 
 #include "mm-error-helpers.h"
 #include "mm-serial-parsers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /* Clean up the response by removing control characters like <CR><LF> etc */
 static void
@@ -161,9 +161,10 @@ mm_serial_parser_v1_add_filter (gpointer data,
 }
 
 gboolean
-mm_serial_parser_v1_parse (gpointer data,
-                           GString *response,
-                           GError **error)
+mm_serial_parser_v1_parse (gpointer   data,
+                           GString   *response,
+                           gpointer   log_object,
+                           GError   **error)
 {
     MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
     GMatchInfo *match_info;
@@ -188,7 +189,7 @@ mm_serial_parser_v1_parse (gpointer data,
                                   response,
                                   &local_error)) {
         g_assert (local_error != NULL);
-        mm_dbg ("Got response filtered in serial port: %s", local_error->message);
+        mm_obj_dbg (log_object, "response filtered in serial port: %s", local_error->message);
         g_propagate_error (error, local_error);
         response_clean (response);
         return TRUE;
@@ -361,7 +362,7 @@ done:
         response_clean (response);
 
     if (local_error) {
-        mm_dbg ("Got failure code %d: %s", local_error->code, local_error->message);
+        mm_obj_dbg (log_object, "operation failure: %d (%s)", local_error->code, local_error->message);
         g_propagate_error (error, local_error);
     }
 
