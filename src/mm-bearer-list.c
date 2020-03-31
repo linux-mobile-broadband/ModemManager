@@ -268,10 +268,6 @@ MMBearerList *
 mm_bearer_list_new (guint max_bearers,
                     guint max_active_bearers)
 {
-    mm_dbg ("Creating bearer list (max: %u, max active: %u)",
-            max_bearers,
-            max_active_bearers);
-
     /* Create the object */
     return g_object_new  (MM_TYPE_BEARER_LIST,
                           MM_BEARER_LIST_MAX_BEARERS, max_bearers,
