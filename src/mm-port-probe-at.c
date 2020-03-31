@@ -40,8 +40,6 @@ mm_port_probe_response_processor_is_at (const gchar *command,
                                         GError **result_error)
 {
     if (error) {
-        mm_dbg ("Parsing AT got: '%s'", error->message);
-
         /* Timeout errors are the only ones not fatal;
          * they will just go on to the next command. */
         if (g_error_matches (error,
