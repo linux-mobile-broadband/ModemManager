@@ -19,7 +19,7 @@
 
 #include <ModemManager.h>
 #include "mm-errors-types.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-utils.h"
 #include "mm-auth-provider.h"
 
@@ -38,7 +38,10 @@ struct _MMAuthProviderClass {
     GObjectClass parent;
 };
 
-G_DEFINE_TYPE (MMAuthProvider, mm_auth_provider, G_TYPE_OBJECT)
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMAuthProvider, mm_auth_provider, G_TYPE_OBJECT, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 /*****************************************************************************/
 
@@ -163,6 +166,14 @@ mm_auth_provider_authorize (MMAuthProvider        *self,
 
 /*****************************************************************************/
 
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    return g_strdup ("auth-provider");
+}
+
+/*****************************************************************************/
+
 static void
 mm_auth_provider_init (MMAuthProvider *self)
 {
@@ -174,8 +185,8 @@ mm_auth_provider_init (MMAuthProvider *self)
         if (!self->authority) {
             /* NOTE: we failed to create the polkit authority, but we still create
              * our AuthProvider. Every request will fail, though. */
-            mm_warn ("failed to create PolicyKit authority: '%s'",
-                     error ? error->message : "unknown");
+            mm_obj_warn (self, "failed to create PolicyKit authority: '%s'",
+                         error ? error->message : "unknown");
             g_clear_error (&error);
         }
     }
@@ -190,6 +201,12 @@ dispose (GObject *object)
 #endif
 
     G_OBJECT_CLASS (mm_auth_provider_parent_class)->dispose (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
