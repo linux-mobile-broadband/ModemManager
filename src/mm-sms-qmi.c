@@ -213,7 +213,7 @@ sms_store_next_part (GTask *task)
     if (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data))
         pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, self, &error);
     else if (MM_SMS_PART_IS_CDMA ((MMSmsPart *)ctx->current->data))
-        pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &error);
+        pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, self, &error);
 
     if (!pdu) {
         if (error)
@@ -402,7 +402,7 @@ sms_send_generic (GTask *task)
     if (MM_SMS_PART_IS_3GPP ((MMSmsPart *)ctx->current->data))
         pdu = mm_sms_part_3gpp_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &msgstart, self, &error);
     else if (MM_SMS_PART_IS_CDMA ((MMSmsPart *)ctx->current->data))
-        pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, &error);
+        pdu = mm_sms_part_cdma_get_submit_pdu ((MMSmsPart *)ctx->current->data, &pdulen, self, &error);
 
     if (!pdu) {
         if (error)

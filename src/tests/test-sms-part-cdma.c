@@ -39,7 +39,7 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
     GError *error = NULL;
 
     mm_dbg (" ");
-    part = mm_sms_part_cdma_new_from_pdu (0, hexpdu, &error);
+    part = mm_sms_part_cdma_new_from_pdu (0, hexpdu, NULL, &error);
     g_assert_no_error (error);
     g_assert (part != NULL);
 
@@ -89,7 +89,7 @@ common_test_invalid_part_from_hexpdu (const gchar *hexpdu)
     GError *error = NULL;
 
     mm_dbg (" ");
-    part = mm_sms_part_cdma_new_from_pdu (0, hexpdu, &error);
+    part = mm_sms_part_cdma_new_from_pdu (0, hexpdu, NULL, &error);
     g_assert (part == NULL);
     /* We don't care for the specific error type */
     g_assert (error != NULL);
@@ -396,7 +396,7 @@ common_test_create_pdu (MMSmsCdmaTeleserviceId teleservice_id,
         mm_sms_part_take_data (part, data_bytearray);
     }
 
-    pdu = mm_sms_part_cdma_get_submit_pdu (part, &len, &error);
+    pdu = mm_sms_part_cdma_get_submit_pdu (part, &len, NULL, &error);
     mm_sms_part_free (part);
 
     if (g_test_verbose ())

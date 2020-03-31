@@ -24,7 +24,7 @@
 
 #include "mm-charsets.h"
 #include "mm-sms-part-cdma.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*
  * Documentation that you may want to have around:
@@ -312,9 +312,10 @@ cause_code_to_delivery_state (guint8 error_class,
 /*****************************************************************************/
 
 MMSmsPart *
-mm_sms_part_cdma_new_from_pdu (guint index,
-                               const gchar *hexpdu,
-                               GError **error)
+mm_sms_part_cdma_new_from_pdu (guint         index,
+                               const gchar  *hexpdu,
+                               gpointer      log_object,
+                               GError      **error)
 {
     gsize pdu_len;
     guint8 *pdu;
@@ -330,7 +331,7 @@ mm_sms_part_cdma_new_from_pdu (guint index,
         return NULL;
     }
 
-    part = mm_sms_part_cdma_new_from_binary_pdu (index, pdu, pdu_len, error);
+    part = mm_sms_part_cdma_new_from_binary_pdu (index, pdu, pdu_len, log_object, error);
     g_free (pdu);
 
     return part;
@@ -343,16 +344,17 @@ struct Parameter {
 } __attribute__((packed));
 
 static void
-read_teleservice_id (MMSmsPart *sms_part,
-                     const struct Parameter *parameter)
+read_teleservice_id (MMSmsPart              *sms_part,
+                     const struct Parameter *parameter,
+                     gpointer                log_object)
 {
     guint16 teleservice_id;
 
     g_assert (parameter->parameter_id == PARAMETER_ID_TELESERVICE_ID);
 
     if (parameter->parameter_len != 2) {
-        mm_dbg ("        invalid teleservice ID length found (%u != 2): ignoring",
-                parameter->parameter_len);
+        mm_obj_dbg (log_object, "        invalid teleservice ID length found (%u != 2): ignoring",
+                    parameter->parameter_len);
         return;
     }
 
@@ -370,29 +372,30 @@ read_teleservice_id (MMSmsPart *sms_part,
     case MM_SMS_CDMA_TELESERVICE_ID_CATPT:
         break;
     default:
-        mm_dbg ("        invalid teleservice ID found (%u): ignoring", teleservice_id);
+        mm_obj_dbg (log_object, "        invalid teleservice ID found (%u): ignoring", teleservice_id);
         return;
     }
 
-    mm_dbg ("        teleservice ID: %s (%u)",
-            mm_sms_cdma_teleservice_id_get_string (teleservice_id),
-            teleservice_id);
+    mm_obj_dbg (log_object, "        teleservice ID: %s (%u)",
+                mm_sms_cdma_teleservice_id_get_string (teleservice_id),
+                teleservice_id);
 
     mm_sms_part_set_cdma_teleservice_id (sms_part,
                                          (MMSmsCdmaTeleserviceId)teleservice_id);
 }
 
 static void
-read_service_category (MMSmsPart *sms_part,
-                       const struct Parameter *parameter)
+read_service_category (MMSmsPart              *sms_part,
+                       const struct Parameter *parameter,
+                       gpointer                log_object)
 {
     guint16 service_category;
 
     g_assert (parameter->parameter_id == PARAMETER_ID_SERVICE_CATEGORY);
 
     if (parameter->parameter_len != 2) {
-        mm_dbg ("        invalid service category length found (%u != 2): ignoring",
-                parameter->parameter_len);
+        mm_obj_dbg (log_object, "        invalid service category length found (%u != 2): ignoring",
+                    parameter->parameter_len);
         return;
     }
 
@@ -438,20 +441,21 @@ read_service_category (MMSmsPart *sms_part,
     case MM_SMS_CDMA_SERVICE_CATEGORY_CMAS_TEST:
         break;
     default:
-        mm_dbg ("        invalid service category found (%u): ignoring", service_category);
+        mm_obj_dbg (log_object, "        invalid service category found (%u): ignoring", service_category);
         return;
     }
 
-    mm_dbg ("        service category: %s (%u)",
-            mm_sms_cdma_service_category_get_string (service_category),
-            service_category);
+    mm_obj_dbg (log_object, "        service category: %s (%u)",
+                mm_sms_cdma_service_category_get_string (service_category),
+                service_category);
 
     mm_sms_part_set_cdma_service_category (sms_part,
-                                         (MMSmsCdmaServiceCategory)service_category);
+                                           (MMSmsCdmaServiceCategory)service_category);
 }
 
 static guint8
-dtmf_to_ascii (guint8 dtmf)
+dtmf_to_ascii (guint8   dtmf,
+               gpointer log_object)
 {
     static const gchar dtmf_to_ascii_digits[13] = {
         '\0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '*', '#' };
@@ -459,13 +463,14 @@ dtmf_to_ascii (guint8 dtmf)
     if (dtmf > 0 && dtmf < 13)
         return dtmf_to_ascii_digits[dtmf];
 
-    mm_dbg ("        invalid dtmf digit: %u", dtmf);
+    mm_obj_dbg (log_object, "        invalid dtmf digit: %u", dtmf);
     return '\0';
 }
 
 static void
-read_address (MMSmsPart *sms_part,
-              const struct Parameter *parameter)
+read_address (MMSmsPart              *sms_part,
+              const struct Parameter *parameter,
+              gpointer                log_object)
 {
     guint8 digit_mode;
     guint8 number_mode;
@@ -487,9 +492,9 @@ read_address (MMSmsPart *sms_part,
 
 #define PARAMETER_SIZE_CHECK(required_size)                             \
     if (parameter->parameter_len < required_size) {                     \
-        mm_dbg ("        cannot read address, need at least %u bytes (got %u)", \
-                required_size,                                          \
-                parameter->parameter_len);                              \
+        mm_obj_dbg (log_object, "        cannot read address, need at least %u bytes (got %u)", \
+                    required_size,                                      \
+                    parameter->parameter_len);                          \
         return;                                                         \
     }
 
@@ -502,10 +507,10 @@ read_address (MMSmsPart *sms_part,
     g_assert (digit_mode <= 1);
     switch (digit_mode) {
     case DIGIT_MODE_DTMF:
-        mm_dbg ("        digit mode: dtmf");
+        mm_obj_dbg (log_object, "        digit mode: dtmf");
         break;
     case DIGIT_MODE_ASCII:
-        mm_dbg ("        digit mode: ascii");
+        mm_obj_dbg (log_object, "        digit mode: ascii");
         break;
     default:
         g_assert_not_reached ();
@@ -516,10 +521,10 @@ read_address (MMSmsPart *sms_part,
     OFFSETS_UPDATE (1);
     switch (number_mode) {
     case NUMBER_MODE_DIGIT:
-        mm_dbg ("        number mode: digit");
+        mm_obj_dbg (log_object, "        number mode: digit");
         break;
     case NUMBER_MODE_DATA_NETWORK_ADDRESS:
-        mm_dbg ("        number mode: data network address");
+        mm_obj_dbg (log_object, "        number mode: data network address");
         break;
     default:
         g_assert_not_reached ();
@@ -532,25 +537,25 @@ read_address (MMSmsPart *sms_part,
         OFFSETS_UPDATE (3);
         switch (number_type) {
         case NUMBER_TYPE_UNKNOWN:
-            mm_dbg ("        number type: unknown");
+            mm_obj_dbg (log_object, "        number type: unknown");
             break;
         case NUMBER_TYPE_INTERNATIONAL:
-            mm_dbg ("        number type: international");
+            mm_obj_dbg (log_object, "        number type: international");
             break;
         case NUMBER_TYPE_NATIONAL:
-            mm_dbg ("        number type: national");
+            mm_obj_dbg (log_object, "        number type: national");
             break;
         case NUMBER_TYPE_NETWORK_SPECIFIC:
-            mm_dbg ("        number type: specific");
+            mm_obj_dbg (log_object, "        number type: specific");
             break;
         case NUMBER_TYPE_SUBSCRIBER:
-            mm_dbg ("        number type: subscriber");
+            mm_obj_dbg (log_object, "        number type: subscriber");
             break;
         case NUMBER_TYPE_ABBREVIATED:
-            mm_dbg ("        number type: abbreviated");
+            mm_obj_dbg (log_object, "        number type: abbreviated");
             break;
         default:
-            mm_dbg ("        number type unknown (%u)", number_type);
+            mm_obj_dbg (log_object, "        number type unknown (%u)", number_type);
             break;
         }
     } else
@@ -564,22 +569,22 @@ read_address (MMSmsPart *sms_part,
         OFFSETS_UPDATE (4);
         switch (numbering_plan) {
         case NUMBERING_PLAN_UNKNOWN:
-            mm_dbg ("        numbering plan: unknown");
+            mm_obj_dbg (log_object, "        numbering plan: unknown");
             break;
         case NUMBERING_PLAN_ISDN:
-            mm_dbg ("        numbering plan: isdn");
+            mm_obj_dbg (log_object, "        numbering plan: isdn");
             break;
         case NUMBERING_PLAN_DATA:
-            mm_dbg ("        numbering plan: data");
+            mm_obj_dbg (log_object, "        numbering plan: data");
             break;
         case NUMBERING_PLAN_TELEX:
-            mm_dbg ("        numbering plan: telex");
+            mm_obj_dbg (log_object, "        numbering plan: telex");
             break;
         case NUMBERING_PLAN_PRIVATE:
-            mm_dbg ("        numbering plan: private");
+            mm_obj_dbg (log_object, "        numbering plan: private");
             break;
         default:
-            mm_dbg ("        numbering plan unknown (%u)", numbering_plan);
+            mm_obj_dbg (log_object, "        numbering plan unknown (%u)", numbering_plan);
             break;
         }
     } else
@@ -589,7 +594,7 @@ read_address (MMSmsPart *sms_part,
     PARAMETER_SIZE_CHECK (byte_offset + 2);
     num_fields = read_bits (&parameter->parameter_value[byte_offset], bit_offset, 8);
     OFFSETS_UPDATE (8);
-    mm_dbg ("        num fields: %u", num_fields);
+    mm_obj_dbg (log_object, "        num fields: %u", num_fields);
 
     /* Address string */
 
@@ -598,7 +603,7 @@ read_address (MMSmsPart *sms_part,
         PARAMETER_SIZE_CHECK (byte_offset + 1 + ((bit_offset + (num_fields * 4)) / 8));
         number = g_malloc (num_fields + 1);
         for (i = 0; i < num_fields; i++) {
-            number[i] = dtmf_to_ascii (read_bits (&parameter->parameter_value[byte_offset], bit_offset, 4));
+            number[i] = dtmf_to_ascii (read_bits (&parameter->parameter_value[byte_offset], bit_offset, 4), log_object);
             OFFSETS_UPDATE (4);
         }
         number[i] = '\0';
@@ -634,9 +639,9 @@ read_address (MMSmsPart *sms_part,
         }
         number = g_string_free (str, FALSE);
     } else
-        mm_dbg ("        data network address number type unknown (%u)", number_type);
+        mm_obj_dbg (log_object, "        data network address number type unknown (%u)", number_type);
 
-    mm_dbg ("        address: %s", number);
+    mm_obj_dbg (log_object, "        address: %s", number);
 
     mm_sms_part_set_number (sms_part, number);
     g_free (number);
@@ -646,28 +651,30 @@ read_address (MMSmsPart *sms_part,
 }
 
 static void
-read_bearer_reply_option (MMSmsPart *sms_part,
-                          const struct Parameter *parameter)
+read_bearer_reply_option (MMSmsPart              *sms_part,
+                          const struct Parameter *parameter,
+                          gpointer                log_object)
 {
     guint8 sequence;
 
     g_assert (parameter->parameter_id == PARAMETER_ID_BEARER_REPLY_OPTION);
 
     if (parameter->parameter_len != 1) {
-        mm_dbg ("        invalid bearer reply option length found (%u != 1): ignoring",
+        mm_obj_dbg (log_object, "        invalid bearer reply option length found (%u != 1): ignoring",
                 parameter->parameter_len);
         return;
     }
 
     sequence = read_bits (&parameter->parameter_value[0], 0, 6);
-    mm_dbg ("        sequence: %u", sequence);
+    mm_obj_dbg (log_object, "        sequence: %u", sequence);
 
     mm_sms_part_set_message_reference (sms_part, sequence);
 }
 
 static void
-read_cause_codes (MMSmsPart *sms_part,
-                  const struct Parameter *parameter)
+read_cause_codes (MMSmsPart              *sms_part,
+                  const struct Parameter *parameter,
+                  gpointer                log_object)
 {
     guint8 sequence;
     guint8 error_class;
@@ -677,38 +684,39 @@ read_cause_codes (MMSmsPart *sms_part,
     g_assert (parameter->parameter_id == PARAMETER_ID_BEARER_REPLY_OPTION);
 
     if (parameter->parameter_len != 1 && parameter->parameter_len != 2) {
-        mm_dbg ("        invalid cause codes length found (%u): ignoring",
+        mm_obj_dbg (log_object, "        invalid cause codes length found (%u): ignoring",
                 parameter->parameter_len);
         return;
     }
 
     sequence = read_bits (&parameter->parameter_value[0], 0, 6);
-    mm_dbg ("        sequence: %u", sequence);
+    mm_obj_dbg (log_object, "        sequence: %u", sequence);
 
     error_class = read_bits (&parameter->parameter_value[0], 6, 2);
-    mm_dbg ("        error class: %u", error_class);
+    mm_obj_dbg (log_object, "        error class: %u", error_class);
 
     if (error_class != ERROR_CLASS_NO_ERROR) {
         if (parameter->parameter_len != 2) {
-            mm_dbg ("        invalid cause codes length found (%u != 2): ignoring",
+            mm_obj_dbg (log_object, "        invalid cause codes length found (%u != 2): ignoring",
                     parameter->parameter_len);
             return;
         }
         cause_code = parameter->parameter_value[1];
-        mm_dbg ("        cause code: %u", cause_code);
+        mm_obj_dbg (log_object, "        cause code: %u", cause_code);
     } else
         cause_code = 0;
 
     delivery_state = cause_code_to_delivery_state (error_class, cause_code);
-    mm_dbg ("        delivery state: %s", mm_sms_delivery_state_get_string (delivery_state));
+    mm_obj_dbg (log_object, "        delivery state: %s", mm_sms_delivery_state_get_string (delivery_state));
 
     mm_sms_part_set_message_reference (sms_part, sequence);
     mm_sms_part_set_delivery_state (sms_part, delivery_state);
 }
 
 static void
-read_bearer_data_message_identifier (MMSmsPart *sms_part,
-                                     const struct Parameter *subparameter)
+read_bearer_data_message_identifier (MMSmsPart              *sms_part,
+                                     const struct Parameter *subparameter,
+                                     gpointer                log_object)
 {
     guint8 message_type;
     guint16 message_id;
@@ -717,7 +725,7 @@ read_bearer_data_message_identifier (MMSmsPart *sms_part,
     g_assert (subparameter->parameter_id == SUBPARAMETER_ID_MESSAGE_ID);
 
     if (subparameter->parameter_len != 3) {
-        mm_dbg ("        invalid message identifier length found (%u): ignoring",
+        mm_obj_dbg (log_object, "        invalid message identifier length found (%u): ignoring",
                 subparameter->parameter_len);
         return;
     }
@@ -725,49 +733,50 @@ read_bearer_data_message_identifier (MMSmsPart *sms_part,
     message_type = read_bits (&subparameter->parameter_value[0], 0, 4);
     switch (message_type) {
     case TELESERVICE_MESSAGE_TYPE_UNKNOWN:
-        mm_dbg ("            message type: unknown");
+        mm_obj_dbg (log_object, "            message type: unknown");
         break;
     case TELESERVICE_MESSAGE_TYPE_DELIVER:
-        mm_dbg ("            message type: deliver");
+        mm_obj_dbg (log_object, "            message type: deliver");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_CDMA_DELIVER);
         break;
     case TELESERVICE_MESSAGE_TYPE_SUBMIT:
-        mm_dbg ("            message type: submit");
+        mm_obj_dbg (log_object, "            message type: submit");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_CDMA_SUBMIT);
         break;
     case TELESERVICE_MESSAGE_TYPE_CANCELLATION:
-        mm_dbg ("            message type: cancellation");
+        mm_obj_dbg (log_object, "            message type: cancellation");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_CDMA_CANCELLATION);
         break;
     case TELESERVICE_MESSAGE_TYPE_DELIVERY_ACKNOWLEDGEMENT:
-        mm_dbg ("            message type: delivery acknowledgement");
+        mm_obj_dbg (log_object, "            message type: delivery acknowledgement");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_CDMA_DELIVERY_ACKNOWLEDGEMENT);
         break;
     case TELESERVICE_MESSAGE_TYPE_USER_ACKNOWLEDGEMENT:
-        mm_dbg ("            message type: user acknowledgement");
+        mm_obj_dbg (log_object, "            message type: user acknowledgement");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_CDMA_USER_ACKNOWLEDGEMENT);
         break;
     case TELESERVICE_MESSAGE_TYPE_READ_ACKNOWLEDGEMENT:
-        mm_dbg ("            message type: read acknowledgement");
+        mm_obj_dbg (log_object, "            message type: read acknowledgement");
         mm_sms_part_set_pdu_type (sms_part, MM_SMS_PDU_TYPE_CDMA_READ_ACKNOWLEDGEMENT);
         break;
     default:
-        mm_dbg ("            message type unknown (%u)", message_type);
+        mm_obj_dbg (log_object, "            message type unknown (%u)", message_type);
         break;
     }
 
     message_id = ((read_bits (&subparameter->parameter_value[0], 4, 8) << 8) |
                   (read_bits (&subparameter->parameter_value[1], 4, 8)));
     message_id = GUINT16_FROM_BE (message_id);
-    mm_dbg ("            message id: %u", (guint) message_id);
+    mm_obj_dbg (log_object, "            message id: %u", (guint) message_id);
 
     header_ind = read_bits (&subparameter->parameter_value[2], 4, 1);
-    mm_dbg ("            header indicator: %u", header_ind);
+    mm_obj_dbg (log_object, "            header indicator: %u", header_ind);
 }
 
 static void
-read_bearer_data_user_data (MMSmsPart *sms_part,
-                            const struct Parameter *subparameter)
+read_bearer_data_user_data (MMSmsPart              *sms_part,
+                            const struct Parameter *subparameter,
+                            gpointer                log_object)
 {
     guint8 message_encoding;
     guint8 message_type = 0;
@@ -785,7 +794,7 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
 
 #define SUBPARAMETER_SIZE_CHECK(required_size)                             \
     if (subparameter->parameter_len < required_size) {                  \
-        mm_dbg ("        cannot read user data, need at least %u bytes (got %u)", \
+        mm_obj_dbg (log_object, "        cannot read user data, need at least %u bytes (got %u)", \
                 required_size,                                          \
                 subparameter->parameter_len);                           \
         return;                                                         \
@@ -797,21 +806,21 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
     SUBPARAMETER_SIZE_CHECK (1);
     message_encoding = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 5);
     OFFSETS_UPDATE (5);
-    mm_dbg ("            message encoding: %s", encoding_to_string (message_encoding));
+    mm_obj_dbg (log_object, "            message encoding: %s", encoding_to_string (message_encoding));
 
     /* Message type, only if extended protocol message */
     if (message_encoding == ENCODING_EXTENDED_PROTOCOL_MESSAGE) {
         SUBPARAMETER_SIZE_CHECK (2);
         message_type = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 8);
         OFFSETS_UPDATE (8);
-        mm_dbg ("            message type: %u", message_type);
+        mm_obj_dbg (log_object, "            message type: %u", message_type);
     }
 
     /* Number of fields */
     SUBPARAMETER_SIZE_CHECK (byte_offset + 1 + ((bit_offset + 8) / 8));
     num_fields = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 8);
     OFFSETS_UPDATE (8);
-    mm_dbg ("            num fields: %u", num_fields);
+    mm_obj_dbg (log_object, "            num fields: %u", num_fields);
 
     /* Now, process actual text or data */
     switch (message_encoding) {
@@ -828,7 +837,7 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
             OFFSETS_UPDATE (8);
         }
 
-        mm_dbg ("            data: (%u bytes)", num_fields);
+        mm_obj_dbg (log_object, "            data: (%u bytes)", num_fields);
         mm_sms_part_take_data (sms_part, data);
         break;
     }
@@ -846,7 +855,7 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
         }
         text[i] = '\0';
 
-        mm_dbg ("            text: '%s'", text);
+        mm_obj_dbg (log_object, "            text: '%s'", text);
         mm_sms_part_take_text (sms_part, text);
         break;
     }
@@ -867,9 +876,9 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
 
         text = g_convert (latin, -1, "UTF-8", "ISO−8859−1", NULL, NULL, NULL);
         if (!text) {
-            mm_dbg ("            text/data: ignored (latin to UTF-8 conversion error)");
+            mm_obj_dbg (log_object, "            text/data: ignored (latin to UTF-8 conversion error)");
         } else {
-            mm_dbg ("            text: '%s'", text);
+            mm_obj_dbg (log_object, "            text: '%s'", text);
             mm_sms_part_take_text (sms_part, text);
         }
 
@@ -896,9 +905,9 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
 
         text = g_convert (utf16, num_bytes, "UTF-8", "UCS-2BE", NULL, NULL, NULL);
         if (!text) {
-            mm_dbg ("            text/data: ignored (UTF-16 to UTF-8 conversion error)");
+            mm_obj_dbg (log_object, "            text/data: ignored (UTF-16 to UTF-8 conversion error)");
         } else {
-            mm_dbg ("            text: '%s'", text);
+            mm_obj_dbg (log_object, "            text: '%s'", text);
             mm_sms_part_take_text (sms_part, text);
         }
 
@@ -907,7 +916,7 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
     }
 
     default:
-        mm_dbg ("            text/data: ignored (unsupported encoding)");
+        mm_obj_dbg (log_object, "            text/data: ignored (unsupported encoding)");
     }
 
 #undef OFFSETS_UPDATE
@@ -915,16 +924,17 @@ read_bearer_data_user_data (MMSmsPart *sms_part,
 }
 
 static void
-read_bearer_data (MMSmsPart *sms_part,
-                  const struct Parameter *parameter)
+read_bearer_data (MMSmsPart              *sms_part,
+                  const struct Parameter *parameter,
+                  gpointer                log_object)
 {
     guint offset;
 
 #define PARAMETER_SIZE_CHECK(required_size)                             \
     if (parameter->parameter_len < required_size) {                     \
-        mm_dbg ("        cannot read bearer data, need at least %u bytes (got %u)", \
-                required_size,                                          \
-                parameter->parameter_len);                              \
+        mm_obj_dbg (log_object, "        cannot read bearer data, need at least %u bytes (got %u)", \
+                    required_size,                                      \
+                    parameter->parameter_len);                          \
         return;                                                         \
     }
 
@@ -941,81 +951,81 @@ read_bearer_data (MMSmsPart *sms_part,
 
         switch (subparameter->parameter_id) {
         case SUBPARAMETER_ID_MESSAGE_ID:
-            mm_dbg ("        reading message ID...");
-            read_bearer_data_message_identifier (sms_part, subparameter);
+            mm_obj_dbg (log_object, "        reading message ID...");
+            read_bearer_data_message_identifier (sms_part, subparameter, log_object);
             break;
         case SUBPARAMETER_ID_USER_DATA:
-            mm_dbg ("        reading user data...");
-            read_bearer_data_user_data (sms_part, subparameter);
+            mm_obj_dbg (log_object, "        reading user data...");
+            read_bearer_data_user_data (sms_part, subparameter, log_object);
             break;
         case SUBPARAMETER_ID_USER_RESPONSE_CODE:
-            mm_dbg ("        skipping user response code...");
+            mm_obj_dbg (log_object, "        skipping user response code...");
             break;
         case SUBPARAMETER_ID_MESSAGE_CENTER_TIME_STAMP:
-            mm_dbg ("        skipping message center timestamp...");
+            mm_obj_dbg (log_object, "        skipping message center timestamp...");
             break;
         case SUBPARAMETER_ID_VALIDITY_PERIOD_ABSOLUTE:
-            mm_dbg ("        skipping absolute validity period...");
+            mm_obj_dbg (log_object, "        skipping absolute validity period...");
             break;
         case SUBPARAMETER_ID_VALIDITY_PERIOD_RELATIVE:
-            mm_dbg ("        skipping relative validity period...");
+            mm_obj_dbg (log_object, "        skipping relative validity period...");
             break;
         case SUBPARAMETER_ID_DEFERRED_DELIVERY_TIME_ABSOLUTE:
-            mm_dbg ("        skipping absolute deferred delivery time...");
+            mm_obj_dbg (log_object, "        skipping absolute deferred delivery time...");
             break;
         case SUBPARAMETER_ID_DEFERRED_DELIVERY_TIME_RELATIVE:
-            mm_dbg ("        skipping relative deferred delivery time...");
+            mm_obj_dbg (log_object, "        skipping relative deferred delivery time...");
             break;
         case SUBPARAMETER_ID_PRIORITY_INDICATOR:
-            mm_dbg ("        skipping priority indicator...");
+            mm_obj_dbg (log_object, "        skipping priority indicator...");
             break;
         case SUBPARAMETER_ID_PRIVACY_INDICATOR:
-            mm_dbg ("        skipping privacy indicator...");
+            mm_obj_dbg (log_object, "        skipping privacy indicator...");
             break;
         case SUBPARAMETER_ID_REPLY_OPTION:
-            mm_dbg ("        skipping reply option...");
+            mm_obj_dbg (log_object, "        skipping reply option...");
             break;
         case SUBPARAMETER_ID_NUMBER_OF_MESSAGES:
-            mm_dbg ("        skipping number of messages...");
+            mm_obj_dbg (log_object, "        skipping number of messages...");
             break;
         case SUBPARAMETER_ID_ALERT_ON_MESSAGE_DELIVERY:
-            mm_dbg ("        skipping alert on message delivery...");
+            mm_obj_dbg (log_object, "        skipping alert on message delivery...");
             break;
         case SUBPARAMETER_ID_LANGUAGE_INDICATOR:
-            mm_dbg ("        skipping language indicator...");
+            mm_obj_dbg (log_object, "        skipping language indicator...");
             break;
         case SUBPARAMETER_ID_CALL_BACK_NUMBER:
-            mm_dbg ("        skipping call back number...");
+            mm_obj_dbg (log_object, "        skipping call back number...");
             break;
         case SUBPARAMETER_ID_MESSAGE_DISPLAY_MODE:
-            mm_dbg ("        skipping message display mode...");
+            mm_obj_dbg (log_object, "        skipping message display mode...");
             break;
         case SUBPARAMETER_ID_MULTIPLE_ENCODING_USER_DATA:
-            mm_dbg ("        skipping multiple encoding user data...");
+            mm_obj_dbg (log_object, "        skipping multiple encoding user data...");
             break;
         case SUBPARAMETER_ID_MESSAGE_DEPOSIT_INDEX:
-            mm_dbg ("        skipping message deposit index...");
+            mm_obj_dbg (log_object, "        skipping message deposit index...");
             break;
         case SUBPARAMETER_ID_SERVICE_CATEGORY_PROGRAM_DATA:
-            mm_dbg ("        skipping service category program data...");
+            mm_obj_dbg (log_object, "        skipping service category program data...");
             break;
         case SUBPARAMETER_ID_SERVICE_CATEGORY_PROGRAM_RESULT:
-            mm_dbg ("        skipping service category program result...");
+            mm_obj_dbg (log_object, "        skipping service category program result...");
             break;
         case SUBPARAMETER_ID_MESSAGE_STATUS:
-            mm_dbg ("        skipping message status...");
+            mm_obj_dbg (log_object, "        skipping message status...");
             break;
         case SUBPARAMETER_ID_TP_FAILURE_CAUSE:
-            mm_dbg ("        skipping TP failure case...");
+            mm_obj_dbg (log_object, "        skipping TP failure case...");
             break;
         case SUBPARAMETER_ID_ENHANCED_VMN:
-            mm_dbg ("        skipping enhanced vmn...");
+            mm_obj_dbg (log_object, "        skipping enhanced vmn...");
             break;
         case SUBPARAMETER_ID_ENHANCED_VMN_ACK:
-            mm_dbg ("        skipping enhanced vmn ack...");
+            mm_obj_dbg (log_object, "        skipping enhanced vmn ack...");
             break;
         default:
-            mm_dbg ("    unknown subparameter found: '%u' (ignoring)",
+            mm_obj_dbg (log_object, "    unknown subparameter found: '%u' (ignoring)",
                     subparameter->parameter_id);
             break;
         }
@@ -1025,10 +1035,11 @@ read_bearer_data (MMSmsPart *sms_part,
 }
 
 MMSmsPart *
-mm_sms_part_cdma_new_from_binary_pdu (guint index,
-                                      const guint8 *pdu,
-                                      gsize pdu_len,
-                                      GError **error)
+mm_sms_part_cdma_new_from_binary_pdu (guint          index,
+                                      const guint8  *pdu,
+                                      gsize          pdu_len,
+                                      gpointer       log_object,
+                                      GError       **error)
 {
     MMSmsPart *sms_part;
     guint offset;
@@ -1038,9 +1049,9 @@ mm_sms_part_cdma_new_from_binary_pdu (guint index,
     sms_part = mm_sms_part_new (index, MM_SMS_PDU_TYPE_UNKNOWN);
 
     if (index != SMS_PART_INVALID_INDEX)
-        mm_dbg ("Parsing CDMA PDU (%u)...", index);
+        mm_obj_dbg (log_object, "parsing CDMA PDU (%u)...", index);
     else
-        mm_dbg ("Parsing CDMA PDU...");
+        mm_obj_dbg (log_object, "parsing CDMA PDU...");
 
 #define PDU_SIZE_CHECK(required_size, check_descr_str)                 \
     if (pdu_len < required_size) {                                     \
@@ -1088,47 +1099,47 @@ mm_sms_part_cdma_new_from_binary_pdu (guint index,
 
         switch (parameter->parameter_id) {
         case PARAMETER_ID_TELESERVICE_ID:
-            mm_dbg ("    reading teleservice ID...");
-            read_teleservice_id (sms_part, parameter);
+            mm_obj_dbg (log_object, "    reading teleservice ID...");
+            read_teleservice_id (sms_part, parameter, log_object);
             break;
         case PARAMETER_ID_SERVICE_CATEGORY:
-            mm_dbg ("    reading service category...");
-            read_service_category (sms_part, parameter);
+            mm_obj_dbg (log_object, "    reading service category...");
+            read_service_category (sms_part, parameter, log_object);
             break;
         case PARAMETER_ID_ORIGINATING_ADDRESS:
-            mm_dbg ("    reading originating address...");
+            mm_obj_dbg (log_object, "    reading originating address...");
             if (mm_sms_part_get_number (sms_part))
-                mm_dbg ("        cannot read originating address; an address field was already read");
+                mm_obj_dbg (log_object, "        cannot read originating address; an address field was already read");
             else
-                read_address (sms_part, parameter);
+                read_address (sms_part, parameter, log_object);
             break;
         case PARAMETER_ID_ORIGINATING_SUBADDRESS:
-            mm_dbg ("    skipping originating subaddress...");
+            mm_obj_dbg (log_object, "    skipping originating subaddress...");
             break;
         case PARAMETER_ID_DESTINATION_ADDRESS:
-            mm_dbg ("    reading destination address...");
+            mm_obj_dbg (log_object, "    reading destination address...");
             if (mm_sms_part_get_number (sms_part))
-                mm_dbg ("        cannot read destination address; an address field was already read");
+                mm_obj_dbg (log_object, "        cannot read destination address; an address field was already read");
             else
-                read_address (sms_part, parameter);
+                read_address (sms_part, parameter, log_object);
             break;
         case PARAMETER_ID_DESTINATION_SUBADDRESS:
-            mm_dbg ("    skipping destination subaddress...");
+            mm_obj_dbg (log_object, "    skipping destination subaddress...");
             break;
         case PARAMETER_ID_BEARER_REPLY_OPTION:
-            mm_dbg ("    reading bearer reply option...");
-            read_bearer_reply_option (sms_part, parameter);
+            mm_obj_dbg (log_object, "    reading bearer reply option...");
+            read_bearer_reply_option (sms_part, parameter, log_object);
             break;
         case PARAMETER_ID_CAUSE_CODES:
-            mm_dbg ("    reading cause codes...");
-            read_cause_codes (sms_part, parameter);
+            mm_obj_dbg (log_object, "    reading cause codes...");
+            read_cause_codes (sms_part, parameter, log_object);
             break;
         case PARAMETER_ID_BEARER_DATA:
-            mm_dbg ("    reading bearer data...");
-            read_bearer_data (sms_part, parameter);
+            mm_obj_dbg (log_object, "    reading bearer data...");
+            read_bearer_data (sms_part, parameter, log_object);
             break;
         default:
-            mm_dbg ("    unknown parameter found: '%u' (ignoring)",
+            mm_obj_dbg (log_object, "    unknown parameter found: '%u' (ignoring)",
                     parameter->parameter_id);
             break;
         }
@@ -1138,15 +1149,15 @@ mm_sms_part_cdma_new_from_binary_pdu (guint index,
     switch (message_type) {
     case MESSAGE_TYPE_POINT_TO_POINT:
         if (mm_sms_part_get_cdma_teleservice_id (sms_part) == MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN)
-            mm_dbg ("    mandatory parameter missing: teleservice ID not found or invalid in point-to-point message");
+            mm_obj_dbg (log_object, "    mandatory parameter missing: teleservice ID not found or invalid in point-to-point message");
         break;
     case MESSAGE_TYPE_BROADCAST:
         if (mm_sms_part_get_cdma_service_category (sms_part) == MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN)
-            mm_dbg ("    mandatory parameter missing: service category not found or invalid in broadcast message");
+            mm_obj_dbg (log_object, "    mandatory parameter missing: service category not found or invalid in broadcast message");
         break;
     case MESSAGE_TYPE_ACKNOWLEDGE:
         if (mm_sms_part_get_message_reference (sms_part) == 0)
-            mm_dbg ("    mandatory parameter missing: cause codes not found or invalid in acknowledge message");
+            mm_obj_dbg (log_object, "    mandatory parameter missing: cause codes not found or invalid in acknowledge message");
         break;
     default:
         break;
@@ -1197,7 +1208,8 @@ write_bits (guint8 *bytes,
 /*****************************************************************************/
 
 static guint8
-dtmf_from_ascii (guint8 ascii)
+dtmf_from_ascii (guint8   ascii,
+                 gpointer log_object)
 {
     if (ascii >= '1' && ascii <= '9')
         return ascii - '0';
@@ -1208,19 +1220,20 @@ dtmf_from_ascii (guint8 ascii)
     if (ascii == '#')
         return 12;
 
-    mm_dbg ("        invalid ascii digit in dtmf conversion: %c", ascii);
+    mm_obj_dbg (log_object, "        invalid ascii digit in dtmf conversion: %c", ascii);
     return 0;
 }
 
 static gboolean
-write_teleservice_id (MMSmsPart *part,
-                      guint8 *pdu,
-                      guint *absolute_offset,
-                      GError **error)
+write_teleservice_id (MMSmsPart  *part,
+                      guint8     *pdu,
+                      guint      *absolute_offset,
+                      gpointer    log_object,
+                      GError    **error)
 {
     guint16 aux16;
 
-    mm_dbg ("    writing teleservice ID...");
+    mm_obj_dbg (log_object, "    writing teleservice ID...");
 
     if (mm_sms_part_get_cdma_teleservice_id (part) != MM_SMS_CDMA_TELESERVICE_ID_WMT) {
         g_set_error (error,
@@ -1232,9 +1245,9 @@ write_teleservice_id (MMSmsPart *part,
         return FALSE;
     }
 
-    mm_dbg ("        teleservice ID: %s (%u)",
-            mm_sms_cdma_teleservice_id_get_string (MM_SMS_CDMA_TELESERVICE_ID_WMT),
-            MM_SMS_CDMA_TELESERVICE_ID_WMT);
+    mm_obj_dbg (log_object, "        teleservice ID: %s (%u)",
+                mm_sms_cdma_teleservice_id_get_string (MM_SMS_CDMA_TELESERVICE_ID_WMT),
+                MM_SMS_CDMA_TELESERVICE_ID_WMT);
 
     /* Teleservice ID: WMT always */
     pdu[0] = PARAMETER_ID_TELESERVICE_ID;
@@ -1247,10 +1260,11 @@ write_teleservice_id (MMSmsPart *part,
 }
 
 static gboolean
-write_destination_address (MMSmsPart *part,
-                           guint8 *pdu,
-                           guint *absolute_offset,
-                           GError **error)
+write_destination_address (MMSmsPart  *part,
+                           guint8     *pdu,
+                           guint      *absolute_offset,
+                           gpointer    log_object,
+                           GError    **error)
 {
     const gchar *number;
     guint bit_offset;
@@ -1258,7 +1272,7 @@ write_destination_address (MMSmsPart *part,
     guint n_digits;
     guint i;
 
-    mm_dbg ("    writing destination address...");
+    mm_obj_dbg (log_object, "    writing destination address...");
 
 #define OFFSETS_UPDATE(n_bits) do { \
         bit_offset += n_bits;       \
@@ -1278,12 +1292,12 @@ write_destination_address (MMSmsPart *part,
     bit_offset = 0;
 
     /* Digit mode: DTMF always */
-    mm_dbg ("        digit mode: dtmf");
+    mm_obj_dbg (log_object, "        digit mode: dtmf");
     write_bits (&pdu[byte_offset], bit_offset, 1, DIGIT_MODE_DTMF);
     OFFSETS_UPDATE (1);
 
     /* Number mode: DIGIT always */
-    mm_dbg ("        number mode: digit");
+    mm_obj_dbg (log_object, "        number mode: digit");
     write_bits (&pdu[byte_offset], bit_offset, 1, NUMBER_MODE_DIGIT);
     OFFSETS_UPDATE (1);
 
@@ -1298,16 +1312,16 @@ write_destination_address (MMSmsPart *part,
                      n_digits);
         return FALSE;
     }
-    mm_dbg ("        num fields: %u", n_digits);
+    mm_obj_dbg (log_object, "        num fields: %u", n_digits);
     write_bits (&pdu[byte_offset], bit_offset, 8, n_digits);
     OFFSETS_UPDATE (8);
 
     /* Actual DTMF encoded number */
-    mm_dbg ("        address: %s", number);
+    mm_obj_dbg (log_object, "        address: %s", number);
     for (i = 0; i < n_digits; i++) {
         guint8 dtmf;
 
-        dtmf = dtmf_from_ascii (number[i]);
+        dtmf = dtmf_from_ascii (number[i], log_object);
         if (!dtmf) {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -1339,15 +1353,16 @@ write_destination_address (MMSmsPart *part,
 }
 
 static gboolean
-write_bearer_data_message_identifier (MMSmsPart *part,
-                                      guint8 *pdu,
-                                      guint *parameter_offset,
-                                      GError **error)
+write_bearer_data_message_identifier (MMSmsPart  *part,
+                                      guint8     *pdu,
+                                      guint      *parameter_offset,
+                                      gpointer    log_object,
+                                      GError    **error)
 {
     pdu[0] = SUBPARAMETER_ID_MESSAGE_ID;
     pdu[1] = 3; /* subparameter_len, always 3 */
 
-    mm_dbg ("        writing message identifier: submit");
+    mm_obj_dbg (log_object, "        writing message identifier: submit");
 
     /* Message type */
     write_bits (&pdu[2], 0, 4, TELESERVICE_MESSAGE_TYPE_SUBMIT);
@@ -1416,10 +1431,11 @@ decide_best_encoding (const gchar *text,
 }
 
 static gboolean
-write_bearer_data_user_data (MMSmsPart *part,
-                             guint8 *pdu,
-                             guint *parameter_offset,
-                             GError **error)
+write_bearer_data_user_data (MMSmsPart  *part,
+                             guint8     *pdu,
+                             guint      *parameter_offset,
+                             gpointer    log_object,
+                             GError    **error)
 {
     const gchar *text;
     const GByteArray *data;
@@ -1433,7 +1449,7 @@ write_bearer_data_user_data (MMSmsPart *part,
     const GByteArray *aux;
     guint num_bits_per_iter;
 
-    mm_dbg ("        writing user data...");
+    mm_obj_dbg (log_object, "        writing user data...");
 
 #define OFFSETS_UPDATE(n_bits) do { \
         bit_offset += n_bits;       \
@@ -1469,7 +1485,7 @@ write_bearer_data_user_data (MMSmsPart *part,
     }
 
     /* Message encoding*/
-    mm_dbg ("            message encoding: %s", encoding_to_string (encoding));
+    mm_obj_dbg (log_object, "            message encoding: %s", encoding_to_string (encoding));
     write_bits (&pdu[byte_offset], bit_offset, 5, encoding);
     OFFSETS_UPDATE (5);
 
@@ -1484,16 +1500,16 @@ write_bearer_data_user_data (MMSmsPart *part,
                      num_fields);
         return FALSE;
     }
-    mm_dbg ("            num fields: %u", num_fields);
+    mm_obj_dbg (log_object, "            num fields: %u", num_fields);
     write_bits (&pdu[byte_offset], bit_offset, 8, num_fields);
     OFFSETS_UPDATE (8);
 
     /* For ASCII-7, write 7 bits in each iteration; for the remaining ones
      * go byte per byte */
     if (text)
-        mm_dbg ("            text: '%s'", text);
+        mm_obj_dbg (log_object, "            text: '%s'", text);
     else
-        mm_dbg ("            data: (%u bytes)", num_fields);
+        mm_obj_dbg (log_object, "            data: (%u bytes)", num_fields);
     num_bits_per_iter = num_bits_per_field < 8 ? num_bits_per_field : 8;
     for (i = 0; i < aux->len; i++) {
         write_bits (&pdu[byte_offset], bit_offset, num_bits_per_iter, aux->data[i]);
@@ -1522,24 +1538,25 @@ write_bearer_data_user_data (MMSmsPart *part,
 }
 
 static gboolean
-write_bearer_data (MMSmsPart *part,
-                   guint8 *pdu,
-                   guint *absolute_offset,
-                   GError **error)
+write_bearer_data (MMSmsPart  *part,
+                   guint8     *pdu,
+                   guint      *absolute_offset,
+                   gpointer    log_object,
+                   GError    **error)
 {
     GError *inner_error = NULL;
     guint offset = 0;
 
-    mm_dbg ("    writing bearer data...");
+    mm_obj_dbg (log_object, "    writing bearer data...");
 
     pdu[0] = PARAMETER_ID_BEARER_DATA;
     /* Write parameter length at the end */
 
     offset = 2;
-    if (!write_bearer_data_message_identifier (part, &pdu[offset], &offset, &inner_error))
-        mm_dbg ("Error writing message identifier: %s", inner_error->message);
-    else if (!write_bearer_data_user_data (part, &pdu[offset], &offset, &inner_error))
-        mm_dbg ("Error writing user data: %s", inner_error->message);
+    if (!write_bearer_data_message_identifier (part, &pdu[offset], &offset, log_object, &inner_error))
+        mm_obj_dbg (log_object, "error writing message identifier: %s", inner_error->message);
+    else if (!write_bearer_data_user_data (part, &pdu[offset], &offset, log_object, &inner_error))
+        mm_obj_dbg (log_object, "error writing user data: %s", inner_error->message);
 
     if (inner_error) {
         g_propagate_error (error, inner_error);
@@ -1564,9 +1581,10 @@ write_bearer_data (MMSmsPart *part,
 }
 
 guint8 *
-mm_sms_part_cdma_get_submit_pdu (MMSmsPart *part,
-                                 guint *out_pdulen,
-                                 GError **error)
+mm_sms_part_cdma_get_submit_pdu (MMSmsPart  *part,
+                                 guint      *out_pdulen,
+                                 gpointer    log_object,
+                                 GError    **error)
 {
     GError *inner_error = NULL;
     guint offset = 0;
@@ -1584,7 +1602,7 @@ mm_sms_part_cdma_get_submit_pdu (MMSmsPart *part,
         return NULL;
     }
 
-    mm_dbg ("Creating PDU for part...");
+    mm_obj_dbg (log_object, "creating PDU for part...");
 
     /* Current max size estimations:
      *  Message type: 1 byte
@@ -1597,12 +1615,12 @@ mm_sms_part_cdma_get_submit_pdu (MMSmsPart *part,
     /* First byte: SMS message type */
     pdu[offset++] = MESSAGE_TYPE_POINT_TO_POINT;
 
-    if (!write_teleservice_id (part, &pdu[offset], &offset, &inner_error))
-        mm_dbg ("Error writing Teleservice ID: %s", inner_error->message);
-    else if (!write_destination_address (part, &pdu[offset], &offset, &inner_error))
-        mm_dbg ("Error writing destination address: %s", inner_error->message);
-    else if (!write_bearer_data (part, &pdu[offset], &offset, &inner_error))
-        mm_dbg ("Error writing bearer data: %s", inner_error->message);
+    if (!write_teleservice_id (part, &pdu[offset], &offset, log_object, &inner_error))
+        mm_obj_dbg (log_object, "error writing teleservice ID: %s", inner_error->message);
+    else if (!write_destination_address (part, &pdu[offset], &offset, log_object, &inner_error))
+        mm_obj_dbg (log_object, "error writing destination address: %s", inner_error->message);
+    else if (!write_bearer_data (part, &pdu[offset], &offset, log_object, &inner_error))
+        mm_obj_dbg (log_object, "error writing bearer data: %s", inner_error->message);
 
     if (inner_error) {
         g_propagate_error (error, inner_error);

@@ -5527,6 +5527,7 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
         part = mm_sms_part_cdma_new_from_binary_pdu (index,
                                                      (guint8 *)data->data,
                                                      data->len,
+                                                     self,
                                                      &error);
 
         break;
