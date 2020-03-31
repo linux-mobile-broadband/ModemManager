@@ -7,19 +7,19 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
-"PO-Revision-Date: 2018-03-04 20:31+0700\n"
+"POT-Creation-Date: 2020-04-01 08:24+0200\n"
+"PO-Revision-Date: 2020-03-31 18:14+0700\n"
 "Last-Translator: Andika Triwidada <andika@gmail.com>\n"
 "Language-Team: Indonesian <gnome-l10n-id@googlegroups.com>\n"
 "Language: id\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 1.8.11\n"
+"X-Generator: Poedit 2.3\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
-msgstr "Kendalikan daemon Manajer Modem"
+msgstr "Mengendalikan daemon Manajer Modem"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:14
 msgid "System policy prevents controlling the Modem Manager."
@@ -68,14 +68,11 @@ msgstr "Kebijakan sistem mencegah panggilan suara."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Tanyakan waktu jaringan dan informasi zona waktu"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
-msgstr ""
-"Kebijakan sistem mencegah kueri atau pemanfaatan layanan dan informasi "
-"jaringan."
+msgstr "Kebijakan sistem mencegah kuiri informasi waktu jaringan."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
@@ -90,23 +87,23 @@ msgstr ""
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query and utilize network information and services"
-msgstr "Kueri dan manfaatkan layanan dan informasi jaringan"
+msgstr "Kuiri dan manfaatkan layanan dan informasi jaringan"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:77
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
 msgstr ""
-"Kebijakan sistem mencegah kueri atau pemanfaatan layanan dan informasi "
+"Kebijakan sistem mencegah kuiri atau pemanfaatan layanan dan informasi "
 "jaringan."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and manage firmware on a mobile broadband device"
-msgstr "Kueri dan kelola firmware pada suatu peranti data seluler"
+msgstr "Kuiri dan kelola firmware pada suatu peranti data seluler"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:86
 msgid "System policy prevents querying or managing this device's firmware."
-msgstr "Kebijakan sistem mencegah kueri atau pengelolaan firmware peranti ini."
+msgstr "Kebijakan sistem mencegah kuiri atau pengelolaan firmware peranti ini."
 
 #: src/mm-sleep-monitor.c:114
 msgid "ModemManager needs to reset devices"
