@@ -34,7 +34,7 @@
 #include "mm-port-serial-qcdm.h"
 #include "mm-serial-parsers.h"
 #include "mm-private-boxed-types.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-daemon-enums-types.h"
 
 #if defined WITH_QMI
@@ -44,7 +44,10 @@
 # include "mm-broadband-modem-mbim.h"
 #endif
 
-G_DEFINE_TYPE (MMPlugin, mm_plugin, G_TYPE_OBJECT)
+static void log_object_iface_init (MMLogObjectInterface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMPlugin, mm_plugin, G_TYPE_OBJECT, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
 /* Virtual port corresponding to the embedded modem */
 static const gchar *virtual_port[] = {"smd0", NULL};
@@ -234,9 +237,7 @@ apply_pre_probing_filters (MMPlugin       *self,
     /* The plugin may specify that only some subsystems are supported. If that
      * is the case, filter by subsystem */
     if (apply_subsystem_filter (self, port)) {
-        mm_dbg ("(%s) [%s] filtered by subsystem",
-                self->priv->name,
-                mm_kernel_device_get_name (port));
+        mm_obj_dbg (self, "port %s filtered by subsystem", mm_kernel_device_get_name (port));
         return TRUE;
     }
 
@@ -265,9 +266,7 @@ apply_pre_probing_filters (MMPlugin       *self,
 
         /* If error retrieving driver: unsupported */
         if (!drivers) {
-            mm_dbg ("(%s) [%s] filtered as couldn't retrieve drivers",
-                    self->priv->name,
-                    mm_kernel_device_get_name (port));
+            mm_obj_dbg (self, "port %s filtered as couldn't retrieve drivers", mm_kernel_device_get_name (port));
             return TRUE;
         }
 
@@ -286,9 +285,7 @@ apply_pre_probing_filters (MMPlugin       *self,
 
             /* If we didn't match any driver: unsupported */
             if (!found) {
-                mm_dbg ("(%s) [%s] filtered by drivers",
-                        self->priv->name,
-                        mm_kernel_device_get_name (port));
+                mm_obj_dbg (self, "port %s filtered by drivers", mm_kernel_device_get_name (port));
                 return TRUE;
             }
         }
@@ -301,9 +298,7 @@ apply_pre_probing_filters (MMPlugin       *self,
                 for (j = 0; drivers[j]; j++) {
                     /* If we match a forbidden driver: unsupported */
                     if (g_str_equal (drivers[j], self->priv->forbidden_drivers[i])) {
-                        mm_dbg ("(%s) [%s] filtered by forbidden drivers",
-                                self->priv->name,
-                                mm_kernel_device_get_name (port));
+                        mm_obj_dbg (self, "port %s filtered by forbidden drivers", mm_kernel_device_get_name (port));
                         return TRUE;
                     }
                 }
@@ -317,9 +312,7 @@ apply_pre_probing_filters (MMPlugin       *self,
             for (j = 0; drivers[j]; j++) {
                 /* If we match the QMI driver: unsupported */
                 if (g_str_equal (drivers[j], "qmi_wwan")) {
-                    mm_dbg ("(%s) [%s] filtered by implicit QMI driver",
-                            self->priv->name,
-                            mm_kernel_device_get_name (port));
+                    mm_obj_dbg (self, "port %s filtered by implicit QMI driver", mm_kernel_device_get_name (port));
                     return TRUE;
                 }
             }
@@ -332,9 +325,7 @@ apply_pre_probing_filters (MMPlugin       *self,
             for (j = 0; drivers[j]; j++) {
                 /* If we match the MBIM driver: unsupported */
                 if (g_str_equal (drivers[j], "cdc_mbim")) {
-                    mm_dbg ("(%s) [%s] filtered by implicit MBIM driver",
-                            self->priv->name,
-                            mm_kernel_device_get_name (port));
+                    mm_obj_dbg (self, "port %s filtered by implicit MBIM driver", mm_kernel_device_get_name (port));
                     return TRUE;
                 }
             }
@@ -398,9 +389,7 @@ apply_pre_probing_filters (MMPlugin       *self,
           !self->priv->forbidden_product_strings) ||
          g_str_equal (mm_kernel_device_get_subsystem (port), "net") ||
          g_str_has_prefix (mm_kernel_device_get_name (port), "cdc-wdm"))) {
-        mm_dbg ("(%s) [%s] filtered by vendor/product IDs",
-                self->priv->name,
-                mm_kernel_device_get_name (port));
+        mm_obj_dbg (self, "port %s filtered by vendor/product IDs", mm_kernel_device_get_name (port));
         return TRUE;
     }
 
@@ -410,9 +399,7 @@ apply_pre_probing_filters (MMPlugin       *self,
         for (i = 0; self->priv->forbidden_product_ids[i].l; i++) {
             if (vendor == self->priv->forbidden_product_ids[i].l &&
                 product == self->priv->forbidden_product_ids[i].r) {
-                mm_dbg ("(%s) [%s] filtered by forbidden vendor/product IDs",
-                        self->priv->name,
-                        mm_kernel_device_get_name (port));
+                mm_obj_dbg (self, "port %s filtered by forbidden vendor/product IDs", mm_kernel_device_get_name (port));
                 return TRUE;
             }
         }
@@ -451,9 +438,7 @@ apply_pre_probing_filters (MMPlugin       *self,
 
         /* If we didn't match any udev tag: unsupported */
         if (!self->priv->udev_tags[i]) {
-            mm_dbg ("(%s) [%s] filtered by udev tags",
-                    self->priv->name,
-                    mm_kernel_device_get_name (port));
+            mm_obj_dbg (self, "port %s filtered by udev tags", mm_kernel_device_get_name (port));
             return TRUE;
         }
     }
@@ -500,9 +485,7 @@ apply_post_probing_filters (MMPlugin *self,
 
         if (vendor_filtered) {
             if (!self->priv->product_strings) {
-                mm_dbg ("(%s) [%s] filtered by vendor strings",
-                        self->priv->name,
-                        mm_port_probe_get_port_name (probe));
+                mm_obj_dbg (self, "port %s filtered by vendor strings", mm_port_probe_get_port_name (probe));
                 return TRUE;
             }
         } else
@@ -525,9 +508,7 @@ apply_post_probing_filters (MMPlugin *self,
         if (self->priv->product_strings) {
             /* If we didn't get any vendor or product: filtered */
             if (!vendor || !product) {
-                mm_dbg ("(%s) [%s] filtered as no vendor/product strings given",
-                        self->priv->name,
-                        mm_port_probe_get_port_name (probe));
+                mm_obj_dbg (self, "port %s filtered as no vendor/product strings given", mm_port_probe_get_port_name (probe));
                 return TRUE;
             }
             else {
@@ -548,9 +529,7 @@ apply_post_probing_filters (MMPlugin *self,
 
                 /* If we didn't match any product: unsupported */
                 if (!self->priv->product_strings[i].l) {
-                    mm_dbg ("(%s) [%s] filtered by vendor/product strings",
-                            self->priv->name,
-                            mm_port_probe_get_port_name (probe));
+                    mm_obj_dbg (self, "port %s filtered by vendor/product strings", mm_port_probe_get_port_name (probe));
                     return TRUE;
                 }
             }
@@ -570,9 +549,7 @@ apply_post_probing_filters (MMPlugin *self,
                 g_free (casefolded_product);
                 if (found) {
                     /* If we match a forbidden product: unsupported */
-                    mm_dbg ("(%s) [%s] filtered by forbidden vendor/product strings",
-                            self->priv->name,
-                            mm_port_probe_get_port_name (probe));
+                    mm_obj_dbg (self, "port %s filtered by forbidden vendor/product strings", mm_port_probe_get_port_name (probe));
                     return TRUE;
                 }
             }
@@ -586,9 +563,7 @@ apply_post_probing_filters (MMPlugin *self,
     if (self->priv->allowed_icera &&
         !mm_port_probe_is_icera (probe)) {
         /* Unsupported! */
-        mm_dbg ("(%s) [%s] filtered as modem is not icera",
-                self->priv->name,
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "port %s filtered as modem is not icera", mm_port_probe_get_port_name (probe));
         return TRUE;
     }
 
@@ -597,9 +572,7 @@ apply_post_probing_filters (MMPlugin *self,
     if (self->priv->forbidden_icera &&
         mm_port_probe_is_icera (probe)) {
         /* Unsupported! */
-        mm_dbg ("(%s) [%s] filtered as modem is icera",
-                self->priv->name,
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "port %s filtered as modem is icera", mm_port_probe_get_port_name (probe));
         return TRUE;
     }
 
@@ -608,9 +581,7 @@ apply_post_probing_filters (MMPlugin *self,
     if (self->priv->allowed_xmm &&
         !mm_port_probe_is_xmm (probe)) {
         /* Unsupported! */
-        mm_dbg ("(%s) [%s] filtered as modem is not XMM",
-                self->priv->name,
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "port %s filtered as modem is not XMM", mm_port_probe_get_port_name (probe));
         return TRUE;
     }
 
@@ -619,9 +590,7 @@ apply_post_probing_filters (MMPlugin *self,
     if (self->priv->forbidden_xmm &&
         mm_port_probe_is_xmm (probe)) {
         /* Unsupported! */
-        mm_dbg ("(%s) [%s] filtered as modem is XMM",
-                self->priv->name,
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "port %s filtered as modem is XMM", mm_port_probe_get_port_name (probe));
         return TRUE;
     }
 
@@ -782,8 +751,7 @@ mm_plugin_supports_port (MMPlugin            *self,
 
     /* Before launching any probing, check if the port is a net device. */
     if (g_str_equal (mm_kernel_device_get_subsystem (port), "net")) {
-        mm_dbg ("(%s) [%s] probing deferred until result suggested",
-                self->priv->name, mm_kernel_device_get_name (port));
+        mm_obj_dbg (self, "probing of port %s deferred until result suggested", mm_kernel_device_get_name (port));
         g_task_return_int (task, MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED);
         g_object_unref (task);
         return;
@@ -835,10 +803,9 @@ mm_plugin_supports_port (MMPlugin            *self,
     if (self->priv->single_at &&
         mm_port_probe_list_has_at_port (mm_device_peek_port_probe_list (device)) &&
         !mm_port_probe_is_at (probe)) {
-        mm_dbg ("(%s) [%s] not setting up AT probing tasks: "
-                "modem already has the expected single AT port",
-                self->priv->name,
-                mm_kernel_device_get_name (port));
+        mm_obj_dbg (self, "not setting up AT probing tasks in port %s: "
+                    "modem already has the expected single AT port",
+                    mm_kernel_device_get_name (port));
 
         /* Assuming it won't be an AT port. We still run the probe anyway, in
          * case we need to check for other port types (e.g. QCDM) */
@@ -856,10 +823,9 @@ mm_plugin_supports_port (MMPlugin            *self,
 
     /* Launch the probe */
     probe_list_str = mm_port_probe_flag_build_string_from_mask (ctx->flags);
-    mm_dbg ("(%s) [%s] probe required: '%s'",
-            self->priv->name,
-            mm_kernel_device_get_name (port),
-            probe_list_str);
+    mm_obj_dbg (self, "probes required for port %s: '%s'",
+                mm_kernel_device_get_name (port),
+                probe_list_str);
     g_free (probe_list_str);
 
     mm_port_probe_run (probe,
@@ -972,7 +938,7 @@ mm_plugin_create_modem (MMPlugin  *self,
 
             /* Ports that are explicitly blacklisted will be grabbed as ignored */
             if (mm_port_probe_is_ignored (probe)) {
-                mm_dbg ("(%s/%s): port is blacklisted", subsys, name);
+                mm_obj_dbg (self, "port %s is blacklisted", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }
@@ -982,7 +948,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                 port_type == MM_PORT_TYPE_NET &&
                 g_strcmp0 (driver, "qmi_wwan") != 0) {
                 /* Non-QMI net ports are ignored in QMI modems */
-                mm_dbg ("(%s/%s): ignoring non-QMI net port in QMI modem", subsys, name);
+                mm_obj_dbg (self, "ignoring non-QMI net port %s in QMI modem", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }
@@ -991,7 +957,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                 port_type == MM_PORT_TYPE_NET &&
                 g_strcmp0 (driver, "qmi_wwan") == 0) {
                 /* QMI net ports are ignored in non-QMI modems */
-                mm_dbg ("(%s/%s): ignoring QMI net port in non-QMI modem", subsys, name);
+                mm_obj_dbg (self, "ignoring QMI net port %s in non-QMI modem", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }
@@ -999,7 +965,7 @@ mm_plugin_create_modem (MMPlugin  *self,
             if (port_type == MM_PORT_TYPE_NET &&
                 g_strcmp0 (driver, "qmi_wwan") == 0) {
                 /* QMI net ports are ignored if QMI support not built */
-                mm_dbg ("(%s/%s): ignoring QMI net port as QMI support isn't available", subsys, name);
+                mm_obj_dbg (self, "ignoring QMI net port %s as QMI support isn't available", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }
@@ -1010,7 +976,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                 port_type == MM_PORT_TYPE_NET &&
                 g_strcmp0 (driver, "cdc_mbim") != 0) {
                 /* Non-MBIM net ports are ignored in MBIM modems */
-                mm_dbg ("(%s/%s): ignoring non-MBIM net port in MBIM modem", subsys, name);
+                mm_obj_dbg (self, "ignoring non-MBIM net port %s in MBIM modem", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }
@@ -1019,14 +985,14 @@ mm_plugin_create_modem (MMPlugin  *self,
                 port_type == MM_PORT_TYPE_NET &&
                 g_strcmp0 (driver, "cdc_mbim") == 0) {
                 /* MBIM net ports are ignored in non-MBIM modems */
-                mm_dbg ("(%s/%s): ignoring MBIM net port in non-MBIM modem", subsys, name);
+                mm_obj_dbg (self, "ignoring MBIM net port %s in non-MBIM modem", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }
 #else
             if (port_type == MM_PORT_TYPE_NET &&
                 g_strcmp0 (driver, "cdc_mbim") == 0) {
-                mm_dbg ("(%s/%s): ignoring MBIM net port as MBIM support isn't available", subsys, name);
+                mm_obj_dbg (self, "ignoring MBIM net port %s as MBIM support isn't available", name);
                 force_ignored = TRUE;
                 goto grab_port;
             }
@@ -1053,9 +1019,7 @@ mm_plugin_create_modem (MMPlugin  *self,
 
         next:
             if (!grabbed) {
-                mm_warn ("Could not grab port (%s/%s): '%s'",
-                         subsys, name,
-                         inner_error ? inner_error->message : "unknown error");
+                mm_obj_warn (self, "could not grab port %s: %s", name, inner_error ? inner_error->message : "unknown error");
                 g_clear_error (&inner_error);
             }
         }
@@ -1077,18 +1041,18 @@ mm_plugin_create_modem (MMPlugin  *self,
              * installed yet). */
             kernel_device = mm_kernel_device_generic_new_with_rules (properties, NULL, &inner_error);
             if (!kernel_device) {
-                mm_warn ("Could not grab port (virtual/%s): '%s'",
-                         virtual_ports[i],
-                         inner_error ? inner_error->message : "unknown error");
+                mm_obj_warn (self, "could not create generic device for virtual port %s: %s",
+                             virtual_ports[i],
+                             inner_error ? inner_error->message : "unknown error");
                 g_clear_error (&inner_error);
             } else if (!mm_base_modem_grab_port (modem,
                                                  kernel_device,
                                                  MM_PORT_TYPE_AT,
                                                  MM_PORT_SERIAL_AT_FLAG_NONE,
                                                  &inner_error)) {
-                mm_warn ("Could not grab port (virtual/%s): '%s'",
-                         virtual_ports[i],
-                         inner_error ? inner_error->message : "unknown error");
+                mm_obj_warn (self, "could not grab virtual port %s: %s",
+                             virtual_ports[i],
+                             inner_error ? inner_error->message : "unknown error");
                 g_clear_error (&inner_error);
             }
 
@@ -1103,6 +1067,19 @@ mm_plugin_create_modem (MMPlugin  *self,
         g_clear_object (&modem);
 
     return modem;
+}
+
+/*****************************************************************************/
+
+static gchar *
+log_object_build_id (MMLogObject *_self)
+{
+    MMPlugin         *self;
+    g_autofree gchar *plugin_name_lowercase;
+
+    self = MM_PLUGIN (_self);
+    plugin_name_lowercase = g_ascii_strdown (self->priv->name, -1);
+    return g_strdup_printf ("plugin/%s", plugin_name_lowercase);
 }
 
 /*****************************************************************************/
@@ -1364,6 +1341,12 @@ finalize (GObject *object)
 #undef _g_boxed_free0
 
     G_OBJECT_CLASS (mm_plugin_parent_class)->finalize (object);
+}
+
+static void
+log_object_iface_init (MMLogObjectInterface *iface)
+{
+    iface->build_id = log_object_build_id;
 }
 
 static void
