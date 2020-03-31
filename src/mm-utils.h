@@ -20,7 +20,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*****************************************************************************/
 
@@ -32,7 +32,7 @@
     _singleton_instance_weak_ref_cb (gpointer data,                     \
                                      GObject *where_the_object_was)     \
     {                                                                   \
-        mm_dbg ("disposing %s singleton (%p)", G_STRINGIFY (TYPE), singleton_instance); \
+        mm_obj_dbg (singleton_instance, "singleton disposed");          \
         singleton_instance = NULL;                                      \
     }                                                                   \
     static inline void                                                  \
@@ -47,7 +47,7 @@
     {                                                                   \
         if (singleton_instance) {                                       \
             if (G_OBJECT (singleton_instance)->ref_count > 1)           \
-                mm_dbg ("disown %s singleton (%p)", G_STRINGIFY (TYPE), singleton_instance); \
+                mm_obj_dbg (singleton_instance, "singleton disowned");  \
             g_object_unref (singleton_instance);                        \
         }                                                               \
     }
@@ -70,9 +70,9 @@
             g_assert (!_already_created || (MM_DEFINE_SINGLETON_ALLOW_MULTIPLE));        \
             _already_created = TRUE;                                                     \
             singleton_instance = (g_object_new (GTYPE, ##__VA_ARGS__, NULL));            \
-            g_assert (singleton_instance);                                               \
-            mm_singleton_instance_weak_ref_register ();                                  \
-            mm_dbg ("create %s singleton (%p)", G_STRINGIFY (TYPE), singleton_instance); \
+            g_assert (singleton_instance);                              \
+            mm_singleton_instance_weak_ref_register ();                 \
+            mm_obj_dbg (singleton_instance, "singleton created");       \
         }                                                               \
         return singleton_instance;                                      \
     }                                                                   \
