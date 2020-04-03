@@ -2440,7 +2440,7 @@ test_cgdcont_test_results (const gchar *desc,
 
     g_debug ("Testing %s +CGDCONT test response...", desc);
 
-    results = mm_3gpp_parse_cgdcont_test_response (reply, &error);
+    results = mm_3gpp_parse_cgdcont_test_response (reply, NULL, &error);
     g_assert (results);
     g_assert_no_error (error);
     g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
@@ -2859,7 +2859,7 @@ test_cid_selection (void)
 
         test = &cid_selection_tests[i];
 
-        context_format_list = test->cgdcont_test ? mm_3gpp_parse_cgdcont_test_response (test->cgdcont_test, NULL) : NULL;
+        context_format_list = test->cgdcont_test ? mm_3gpp_parse_cgdcont_test_response (test->cgdcont_test, NULL, NULL) : NULL;
         context_list = test->cgdcont_query ? mm_3gpp_parse_cgdcont_read_response (test->cgdcont_query, NULL) : NULL;
 
         cid = mm_3gpp_select_best_cid (test->apn, test->ip_family,

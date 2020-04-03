@@ -1906,7 +1906,7 @@ supported_ip_families_cgdcont_test_ready (MMBaseModem *self,
     if (response) {
         GList *formats, *l;
 
-        formats = mm_3gpp_parse_cgdcont_test_response (response, &error);
+        formats = mm_3gpp_parse_cgdcont_test_response (response, self, &error);
         for (l = formats; l; l = g_list_next (l))
             mask |= ((MM3gppPdpContextFormat *)(l->data))->pdp_type;
 

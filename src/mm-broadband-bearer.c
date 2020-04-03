@@ -828,7 +828,7 @@ cgdcont_test_ready (MMBaseModem  *modem,
         goto out;
     }
 
-    ctx->context_format_list = mm_3gpp_parse_cgdcont_test_response (response, &error);
+    ctx->context_format_list = mm_3gpp_parse_cgdcont_test_response (response, self, &error);
     if (error) {
         mm_obj_dbg (self, "error parsing +CGDCONT test response: %s", error->message);
         g_clear_error (&error);

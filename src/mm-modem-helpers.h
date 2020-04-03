@@ -184,8 +184,9 @@ typedef struct {
     MMBearerIpFamily pdp_type;
 } MM3gppPdpContextFormat;
 void mm_3gpp_pdp_context_format_list_free (GList *pdp_format_list);
-GList *mm_3gpp_parse_cgdcont_test_response (const gchar *reply,
-                                            GError **error);
+GList *mm_3gpp_parse_cgdcont_test_response (const gchar  *reply,
+                                            gpointer      log_object,
+                                            GError      **error);
 
 /* AT+CGDCONT? (PDP context query) response parser */
 typedef struct {

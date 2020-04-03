@@ -1688,8 +1688,9 @@ mm_3gpp_pdp_context_format_list_free (GList *pdp_format_list)
 }
 
 GList *
-mm_3gpp_parse_cgdcont_test_response (const gchar *response,
-                                     GError **error)
+mm_3gpp_parse_cgdcont_test_response (const gchar  *response,
+                                     gpointer      log_object,
+                                     GError      **error)
 {
     GRegex *r;
     GMatchInfo *match_info;
@@ -1717,11 +1718,11 @@ mm_3gpp_parse_cgdcont_test_response (const gchar *response,
         pdp_type_str = mm_get_string_unquoted_from_match_info (match_info, 3);
         pdp_type = mm_3gpp_get_ip_family_from_pdp_type (pdp_type_str);
         if (pdp_type == MM_BEARER_IP_FAMILY_NONE)
-            mm_dbg ("Unhandled PDP type in CGDCONT=? reply: '%s'", pdp_type_str);
+            mm_obj_dbg (log_object, "unhandled PDP type in CGDCONT=? reply: '%s'", pdp_type_str);
         else {
             /* Read min CID */
             if (!mm_get_uint_from_match_info (match_info, 1, &min_cid))
-                mm_warn ("Invalid min CID in CGDCONT=? reply for PDP type '%s'", pdp_type_str);
+                mm_obj_warn (log_object, "invalid min CID in CGDCONT=? reply for PDP type '%s'", pdp_type_str);
             else {
                 MM3gppPdpContextFormat *format;
 
@@ -1746,7 +1747,7 @@ mm_3gpp_parse_cgdcont_test_response (const gchar *response,
     g_regex_unref (r);
 
     if (inner_error) {
-        mm_warn ("Unexpected error matching +CGDCONT response: '%s'", inner_error->message);
+        mm_obj_warn (log_object, "unexpected error matching +CGDCONT response: '%s'", inner_error->message);
         g_error_free (inner_error);
     }
 
