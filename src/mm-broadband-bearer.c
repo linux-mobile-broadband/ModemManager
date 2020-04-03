@@ -718,6 +718,7 @@ cid_selection_3gpp_select_context (GTask *task)
                                         ctx->ip_family,
                                         ctx->context_list,
                                         ctx->context_format_list,
+                                        self,
                                         &ctx->cid_reused,
                                         &ctx->cid_overwritten);
 

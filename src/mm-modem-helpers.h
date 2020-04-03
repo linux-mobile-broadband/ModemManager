@@ -202,8 +202,9 @@ guint mm_3gpp_select_best_cid (const gchar      *apn,
                                MMBearerIpFamily  ip_family,
                                GList            *context_list,
                                GList            *context_format_list,
-                               gboolean         *cid_reused,
-                               gboolean         *cid_overwritten);
+                               gpointer          log_object,
+                               gboolean         *out_cid_reused,
+                               gboolean         *out_cid_overwritten);
 
 /* AT+CGACT? (active PDP context query) response parser */
 typedef struct {

@@ -2864,6 +2864,7 @@ test_cid_selection (void)
 
         cid = mm_3gpp_select_best_cid (test->apn, test->ip_family,
                                        context_list, context_format_list,
+                                       NULL,
                                        &cid_reused, &cid_overwritten);
 
         g_assert_cmpuint (cid, ==, test->expected_cid);

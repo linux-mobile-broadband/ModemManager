@@ -1567,8 +1567,9 @@ mm_3gpp_select_best_cid (const gchar      *apn,
                          MMBearerIpFamily  ip_family,
                          GList            *context_list,
                          GList            *context_format_list,
-                         gboolean         *cid_reused,
-                         gboolean         *cid_overwritten)
+                         gpointer          log_object,
+                         gboolean         *out_cid_reused,
+                         gboolean         *out_cid_overwritten)
 {
     GList *l;
     guint  prev_cid = 0;
@@ -1579,9 +1580,12 @@ mm_3gpp_select_best_cid (const gchar      *apn,
     guint  blank_cid = 0;
     gchar *ip_family_str;
 
+    g_assert (out_cid_reused);
+    g_assert (out_cid_overwritten);
+
     ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-    mm_dbg ("Looking for best CID matching APN '%s' and PDP type '%s'...",
-            apn, ip_family_str);
+    mm_obj_dbg (log_object, "looking for best CID matching APN '%s' and PDP type '%s'...",
+                apn, ip_family_str);
     g_free (ip_family_str);
 
     /* Look for the exact PDP context we want */
@@ -1622,17 +1626,17 @@ mm_3gpp_select_best_cid (const gchar      *apn,
 
     /* Always prefer an exact match */
     if (exact_cid) {
-        mm_dbg ("Found exact context at CID %u", exact_cid);
-        *cid_reused = TRUE;
-        *cid_overwritten = FALSE;
+        mm_obj_dbg (log_object, "found exact context at CID %u", exact_cid);
+        *out_cid_reused = TRUE;
+        *out_cid_overwritten = FALSE;
         return exact_cid;
     }
 
     /* Try to use an unused CID detected in between the already defined contexts */
     if (unused_cid) {
-        mm_dbg ("Found unused context at CID %u", unused_cid);
-        *cid_reused = FALSE;
-        *cid_overwritten = FALSE;
+        mm_obj_dbg (log_object, "found unused context at CID %u", unused_cid);
+        *out_cid_reused = FALSE;
+        *out_cid_overwritten = FALSE;
         return unused_cid;
     }
 
@@ -1640,32 +1644,32 @@ mm_3gpp_select_best_cid (const gchar      *apn,
      * CID, then we can use the next available CID because it's an unused one. */
     max_allowed_cid = find_max_allowed_cid (context_format_list, ip_family);
     if (max_cid && (max_cid < max_allowed_cid)) {
-        mm_dbg ("Found unused context at CID %u (<%u)", max_cid + 1, max_allowed_cid);
-        *cid_reused = FALSE;
-        *cid_overwritten = FALSE;
+        mm_obj_dbg (log_object, "found unused context at CID %u (<%u)", max_cid + 1, max_allowed_cid);
+        *out_cid_reused = FALSE;
+        *out_cid_overwritten = FALSE;
         return (max_cid + 1);
     }
 
     /* Rewrite a context defined with no APN, if any */
     if (blank_cid) {
-        mm_dbg ("Rewriting context with empty APN at CID %u", blank_cid);
-        *cid_reused = FALSE;
-        *cid_overwritten = TRUE;
+        mm_obj_dbg (log_object, "rewriting context with empty APN at CID %u", blank_cid);
+        *out_cid_reused = FALSE;
+        *out_cid_overwritten = TRUE;
         return blank_cid;
     }
 
     /* Rewrite the last existing one found */
     if (max_cid) {
-        mm_dbg ("Rewriting last context detected at CID %u", max_cid);
-        *cid_reused = FALSE;
-        *cid_overwritten = TRUE;
+        mm_obj_dbg (log_object, "rewriting last context detected at CID %u", max_cid);
+        *out_cid_reused = FALSE;
+        *out_cid_overwritten = TRUE;
         return max_cid;
     }
 
     /* Otherwise, just fallback to CID=1 */
-    mm_dbg ("Falling back to CID 1");
-    *cid_reused = FALSE;
-    *cid_overwritten = TRUE;
+    mm_obj_dbg (log_object, "falling back to CID 1");
+    *out_cid_reused = FALSE;
+    *out_cid_overwritten = TRUE;
     return 1;
 }
 
