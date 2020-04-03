@@ -128,6 +128,7 @@ typedef enum { /*< underscore_name=mm_flow_control >*/
 } MMFlowControl;
 
 MMFlowControl mm_parse_ifc_test_response (const gchar  *response,
+                                          gpointer      log_object,
                                           GError      **error);
 
 MMFlowControl mm_flow_control_from_string (const gchar  *str,

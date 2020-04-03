@@ -705,7 +705,8 @@ mm_3gpp_call_info_list_free (GList *call_info_list)
 
 static MMFlowControl
 flow_control_array_to_mask (GArray      *array,
-                            const gchar *item)
+                            const gchar *item,
+                            gpointer     log_object)
 {
     MMFlowControl mask = MM_FLOW_CONTROL_UNKNOWN;
     guint         i;
@@ -716,15 +717,15 @@ flow_control_array_to_mask (GArray      *array,
         mode = g_array_index (array, guint, i);
         switch (mode) {
             case 0:
-                mm_dbg ("%s supports no flow control", item);
+                mm_obj_dbg (log_object, "%s supports no flow control", item);
                 mask |= MM_FLOW_CONTROL_NONE;
                 break;
             case 1:
-                mm_dbg ("%s supports XON/XOFF flow control", item);
+                mm_obj_dbg (log_object, "%s supports XON/XOFF flow control", item);
                 mask |= MM_FLOW_CONTROL_XON_XOFF;
                 break;
             case 2:
-                mm_dbg ("%s supports RTS/CTS flow control", item);
+                mm_obj_dbg (log_object, "%s supports RTS/CTS flow control", item);
                 mask |= MM_FLOW_CONTROL_RTS_CTS;
                 break;
             default:
@@ -739,6 +740,7 @@ static MMFlowControl
 flow_control_match_info_to_mask (GMatchInfo   *match_info,
                                  guint         index,
                                  const gchar  *item,
+                                 gpointer      log_object,
                                  GError      **error)
 {
     MMFlowControl  mask  = MM_FLOW_CONTROL_UNKNOWN;
@@ -756,7 +758,7 @@ flow_control_match_info_to_mask (GMatchInfo   *match_info,
         goto out;
     }
 
-    if ((mask = flow_control_array_to_mask (array, item)) == MM_FLOW_CONTROL_UNKNOWN) {
+    if ((mask = flow_control_array_to_mask (array, item, log_object)) == MM_FLOW_CONTROL_UNKNOWN) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "No known %s flow control method given", item);
         goto out;
@@ -771,6 +773,7 @@ out:
 
 MMFlowControl
 mm_parse_ifc_test_response (const gchar  *response,
+                            gpointer      log_object,
                             GError      **error)
 {
     GRegex        *r;
@@ -793,11 +796,11 @@ mm_parse_ifc_test_response (const gchar  *response,
     }
 
     /* Parse TE flow control methods */
-    if ((te_mask = flow_control_match_info_to_mask (match_info, 1, "TE", &inner_error)) == MM_FLOW_CONTROL_UNKNOWN)
+    if ((te_mask = flow_control_match_info_to_mask (match_info, 1, "TE", log_object, &inner_error)) == MM_FLOW_CONTROL_UNKNOWN)
         goto out;
 
     /* Parse TA flow control methods */
-    if ((ta_mask = flow_control_match_info_to_mask (match_info, 2, "TA", &inner_error)) == MM_FLOW_CONTROL_UNKNOWN)
+    if ((ta_mask = flow_control_match_info_to_mask (match_info, 2, "TA", log_object, &inner_error)) == MM_FLOW_CONTROL_UNKNOWN)
         goto out;
 
     /* Only those methods in both TA and TE will be the ones we report */

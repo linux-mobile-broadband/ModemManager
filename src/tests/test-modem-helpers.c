@@ -37,7 +37,7 @@ test_ifc_response (const gchar         *str,
     MMFlowControl  mask;
     GError        *error = NULL;
 
-    mask = mm_parse_ifc_test_response (str, &error);
+    mask = mm_parse_ifc_test_response (str, NULL, &error);
     g_assert_no_error (error);
     g_assert_cmpuint (mask, ==, expected);
 }

@@ -3851,7 +3851,7 @@ ifc_test_ready (MMBaseModem  *_self,
         goto out;
 
     /* Parse response */
-    flow_control_supported = mm_parse_ifc_test_response (response, &error);
+    flow_control_supported = mm_parse_ifc_test_response (response, self, &error);
     if (flow_control_supported == MM_FLOW_CONTROL_UNKNOWN)
         goto out;
     flow_control_supported_str = mm_flow_control_build_string_from_mask (flow_control_supported);
