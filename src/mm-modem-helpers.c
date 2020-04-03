@@ -31,7 +31,7 @@
 #include "mm-sms-part.h"
 #include "mm-modem-helpers.h"
 #include "mm-helper-enums-types.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*****************************************************************************/
 
@@ -254,8 +254,9 @@ mm_find_bit_set (gulong number)
 /*****************************************************************************/
 
 gchar *
-mm_create_device_identifier (guint vid,
-                             guint pid,
+mm_create_device_identifier (guint        vid,
+                             guint        pid,
+                             gpointer     log_object,
                              const gchar *ati,
                              const gchar *ati1,
                              const gchar *gsn,
@@ -263,9 +264,11 @@ mm_create_device_identifier (guint vid,
                              const gchar *model,
                              const gchar *manf)
 {
-    GString *devid, *msg = NULL;
-    GChecksum *sum;
-    gchar *p, *ret = NULL;
+    g_autoptr(GString) devid = NULL;
+    g_autoptr(GString) msg = NULL;
+    g_autoptr(GChecksum) sum = NULL;
+    const gchar *ret;
+    gchar *p = NULL;
     gchar str_vid[10], str_pid[10];
 
     /* Build up the device identifier */
@@ -286,14 +289,11 @@ mm_create_device_identifier (guint vid,
     if (manf)
         g_string_append (devid, manf);
 
-    if (!strlen (devid->str)) {
-        g_string_free (devid, TRUE);
+    if (!strlen (devid->str))
         return NULL;
-    }
 
     p = devid->str;
     msg = g_string_sized_new (strlen (devid->str) + 17);
-
     sum = g_checksum_new (G_CHECKSUM_SHA1);
 
     if (vid) {
@@ -315,15 +315,10 @@ mm_create_device_identifier (guint vid,
         }
         p++;
     }
-    ret = g_strdup (g_checksum_get_string (sum));
-    g_checksum_free (sum);
 
-    mm_dbg ("Device ID source '%s'", msg->str);
-    mm_dbg ("Device ID '%s'", ret);
-    g_string_free (msg, TRUE);
-    g_string_free (devid, TRUE);
-
-    return ret;
+    ret = g_checksum_get_string (sum);
+    mm_obj_dbg (log_object, "device identifier built: %s -> %s", msg->str, ret);
+    return g_strdup (ret);
 }
 
 /*****************************************************************************/

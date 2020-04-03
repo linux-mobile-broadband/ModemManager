@@ -1911,6 +1911,7 @@ test_devid_item (void *f, gpointer d)
     g_debug ("%s... ", item->desc);
     devid = mm_create_device_identifier (item->vid,
                                          item->pid,
+                                         NULL,
                                          item->ati,
                                          item->ati1,
                                          item->gsn,

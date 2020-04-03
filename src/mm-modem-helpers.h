@@ -59,8 +59,9 @@ GArray *mm_parse_uint_list (const gchar  *str,
 guint mm_count_bits_set (gulong number);
 guint mm_find_bit_set   (gulong number);
 
-gchar *mm_create_device_identifier (guint vid,
-                                    guint pid,
+gchar *mm_create_device_identifier (guint        vid,
+                                    guint        pid,
+                                    gpointer     log_object,
                                     const gchar *ati,
                                     const gchar *ati1,
                                     const gchar *gsn,

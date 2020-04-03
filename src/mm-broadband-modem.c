@@ -11760,6 +11760,7 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
     return (mm_create_device_identifier (
                 mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
                 mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
+                self,
                 ati,
                 ati1,
                 mm_gdbus_modem_get_equipment_identifier (
