@@ -162,6 +162,7 @@ typedef struct {
 void mm_3gpp_network_info_list_free (GList *info_list);
 GList *mm_3gpp_parse_cops_test_response (const gchar     *reply,
                                          MMModemCharset   cur_charset,
+                                         gpointer         log_object,
                                          GError         **error);
 
 /* AT+COPS? (current operator) response parser */

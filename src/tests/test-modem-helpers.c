@@ -486,7 +486,7 @@ test_cops_results (const gchar *desc,
 
     g_debug ("Testing %s +COPS response...", desc);
 
-    results = mm_3gpp_parse_cops_test_response (reply, cur_charset, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, cur_charset, NULL, &error);
     g_assert (results);
     g_assert_no_error (error);
     g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
@@ -916,7 +916,7 @@ test_cops_response_gsm_invalid (void *f, gpointer d)
     GList *results;
     GError *error = NULL;
 
-    results = mm_3gpp_parse_cops_test_response (reply, MM_MODEM_CHARSET_GSM, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, MM_MODEM_CHARSET_GSM, NULL, &error);
     g_assert (results == NULL);
     g_assert_no_error (error);
 }
@@ -928,7 +928,7 @@ test_cops_response_umts_invalid (void *f, gpointer d)
    GList *results;
     GError *error = NULL;
 
-    results = mm_3gpp_parse_cops_test_response (reply, MM_MODEM_CHARSET_GSM, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, MM_MODEM_CHARSET_GSM, NULL, &error);
     g_assert (results == NULL);
     g_assert_no_error (error);
 }

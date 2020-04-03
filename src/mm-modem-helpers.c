@@ -1243,14 +1243,15 @@ get_mm_access_tech_from_etsi_access_tech (guint act)
 }
 
 static MMModem3gppNetworkAvailability
-parse_network_status (const gchar *str)
+parse_network_status (const gchar *str,
+                      gpointer     log_object)
 {
     /* Expecting a value between '0' and '3' inclusive */
     if (!str ||
         strlen (str) != 1 ||
         str[0] < '0' ||
         str[0] > '3') {
-        mm_warn ("Cannot parse network status: '%s'", str);
+        mm_obj_warn (log_object, "cannot parse network status value '%s'", str);
         return MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN;
     }
 
@@ -1258,14 +1259,15 @@ parse_network_status (const gchar *str)
 }
 
 static MMModemAccessTechnology
-parse_access_tech (const gchar *str)
+parse_access_tech (const gchar *str,
+                   gpointer     log_object)
 {
     /* Recognized access technologies are between '0' and '7' inclusive... */
     if (!str ||
         strlen (str) != 1 ||
         str[0] < '0' ||
         str[0] > '7') {
-        mm_warn ("Cannot parse access tech: '%s'", str);
+        mm_obj_warn (log_object, "cannot parse access technology value '%s'", str);
         return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     }
 
@@ -1275,13 +1277,13 @@ parse_access_tech (const gchar *str)
 GList *
 mm_3gpp_parse_cops_test_response (const gchar     *reply,
                                   MMModemCharset   cur_charset,
+                                  gpointer         log_object,
                                   GError         **error)
 {
     GRegex *r;
     GList *info_list = NULL;
     GMatchInfo *match_info;
     gboolean umts_format = TRUE;
-    GError *inner_error = NULL;
 
     g_return_val_if_fail (reply != NULL, NULL);
     if (error)
@@ -1310,15 +1312,8 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
      *       +COPS: (2,"","T-Mobile","31026",0),(1,"AT&T","AT&T","310410"),0)
      */
 
-    r = g_regex_new ("\\((\\d),\"([^\"\\)]*)\",([^,\\)]*),([^,\\)]*)[\\)]?,(\\d)\\)", G_REGEX_UNGREEDY, 0, &inner_error);
-    if (inner_error) {
-        mm_err ("Invalid regular expression: %s", inner_error->message);
-        g_error_free (inner_error);
-        g_set_error_literal (error,
-                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Could not parse scan results");
-        return NULL;
-    }
+    r = g_regex_new ("\\((\\d),\"([^\"\\)]*)\",([^,\\)]*),([^,\\)]*)[\\)]?,(\\d)\\)", G_REGEX_UNGREEDY, 0, NULL);
+    g_assert (r);
 
     /* If we didn't get any hits, try the pre-UMTS format match */
     if (!g_regex_match (r, reply, 0, &match_info)) {
@@ -1339,15 +1334,8 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
          *       +COPS: (2,"T - Mobile",,"31026"),(1,"Einstein PCS",,"31064"),(1,"Cingular",,"31041"),,(0,1,3),(0,2)
          */
 
-        r = g_regex_new ("\\((\\d),([^,\\)]*),([^,\\)]*),([^\\)]*)\\)", G_REGEX_UNGREEDY, 0, &inner_error);
-        if (inner_error) {
-            mm_err ("Invalid regular expression: %s", inner_error->message);
-            g_error_free (inner_error);
-            g_set_error_literal (error,
-                                 MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Could not parse scan results");
-            return NULL;
-        }
+        r = g_regex_new ("\\((\\d),([^,\\)]*),([^,\\)]*),([^\\)]*)\\)", G_REGEX_UNGREEDY, 0, NULL);
+        g_assert (r);
 
         g_regex_match (r, reply, 0, &match_info);
         umts_format = FALSE;
@@ -1362,7 +1350,7 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
         info = g_new0 (MM3gppNetworkInfo, 1);
 
         tmp = mm_get_string_unquoted_from_match_info (match_info, 1);
-        info->status = parse_network_status (tmp);
+        info->status = parse_network_status (tmp, log_object);
         g_free (tmp);
 
         info->operator_long = mm_get_string_unquoted_from_match_info (match_info, 2);
@@ -1380,7 +1368,7 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
                mm_get_string_unquoted_from_match_info (match_info, 5) :
                NULL);
         info->access_tech = (tmp ?
-                             parse_access_tech (tmp) :
+                             parse_access_tech (tmp, log_object) :
                              MM_MODEM_ACCESS_TECHNOLOGY_GSM);
         g_free (tmp);
 
@@ -1402,17 +1390,15 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
         }
 
         if (valid) {
-            gchar *access_tech_str;
+            g_autofree gchar *access_tech_str = NULL;
 
             access_tech_str = mm_modem_access_technology_build_string_from_mask (info->access_tech);
-            mm_dbg ("Found network '%s' ('%s','%s'); availability: %s, access tech: %s",
-                    info->operator_code,
-                    info->operator_short ? info->operator_short : "no short name",
-                    info->operator_long ? info->operator_long : "no long name",
-                    mm_modem_3gpp_network_availability_get_string (info->status),
-                    access_tech_str);
-            g_free (access_tech_str);
-
+            mm_obj_dbg (log_object, "found network '%s' ('%s','%s'); availability: %s, access tech: %s",
+                        info->operator_code,
+                        info->operator_short ? info->operator_short : "no short name",
+                        info->operator_long ? info->operator_long : "no long name",
+                        mm_modem_3gpp_network_availability_get_string (info->status),
+                        access_tech_str);
             info_list = g_list_prepend (info_list, info);
         }
         else

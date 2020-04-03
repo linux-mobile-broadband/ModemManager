@@ -4710,7 +4710,7 @@ modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
     if (!result)
         return NULL;
 
-    return mm_3gpp_parse_cops_test_response (result, MM_BROADBAND_MODEM (self)->priv->modem_current_charset, error);
+    return mm_3gpp_parse_cops_test_response (result, MM_BROADBAND_MODEM (self)->priv->modem_current_charset, self, error);
 }
 
 static void
