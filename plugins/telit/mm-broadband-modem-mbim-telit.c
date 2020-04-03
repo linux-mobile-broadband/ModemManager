@@ -102,7 +102,7 @@ load_supported_modes_ready (MMIfaceModem *self,
 
     /* Filter out those unsupported modes */
     combinations = mm_telit_build_modes_list();
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, self);
     g_array_unref (all);
     g_array_unref (combinations);
 

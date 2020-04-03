@@ -176,7 +176,7 @@ supported_ms_classes_query_ready (MMBaseModem  *self,
     g_array_append_val (combinations, mode);
 
     /* Filter out those unsupported modes */
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, self);
     g_array_unref (all);
     g_array_unref (combinations);
 

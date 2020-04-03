@@ -172,6 +172,7 @@ static const MMModemMode xmm_modes[] = {
 
 gboolean
 mm_xmm_parse_xact_test_response (const gchar  *response,
+                                 gpointer      logger,
                                  GArray      **modes_out,
                                  GArray      **bands_out,
                                  GError      **error)
@@ -318,7 +319,7 @@ mm_xmm_parse_xact_test_response (const gchar  *response,
     all_modes = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
     g_array_append_val (all_modes, all);
 
-    filtered = mm_filter_supported_modes (all_modes, modes);
+    filtered = mm_filter_supported_modes (all_modes, modes, logger);
     if (!filtered || filtered->len == 0) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                    "Empty supported mode list after frequency band filtering");

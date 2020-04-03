@@ -154,6 +154,7 @@ xact_test_ready (MMBaseModem  *self,
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response ||
         !mm_xmm_parse_xact_test_response (response,
+                                          self,
                                           &priv->supported_modes,
                                           &priv->supported_bands,
                                           &error))

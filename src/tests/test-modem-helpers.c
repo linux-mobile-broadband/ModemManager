@@ -3423,7 +3423,7 @@ test_supported_mode_filter (void *f, gpointer d)
 
     /* Only 2G supported */
     all = build_mode_all (MM_MODEM_MODE_2G);
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, NULL);
     g_assert_cmpuint (filtered->len, ==, 1);
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE));
     g_array_unref (filtered);
@@ -3431,7 +3431,7 @@ test_supported_mode_filter (void *f, gpointer d)
 
     /* Only 3G supported */
     all = build_mode_all (MM_MODEM_MODE_3G);
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, NULL);
     g_assert_cmpuint (filtered->len, ==, 1);
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));
     g_array_unref (filtered);
@@ -3439,7 +3439,7 @@ test_supported_mode_filter (void *f, gpointer d)
 
     /* 2G and 3G supported */
     all = build_mode_all (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, NULL);
     g_assert_cmpuint (filtered->len, ==, 3);
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE));
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));
@@ -3449,7 +3449,7 @@ test_supported_mode_filter (void *f, gpointer d)
 
     /* 3G and 4G supported */
     all = build_mode_all (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, NULL);
     g_assert_cmpuint (filtered->len, ==, 3);
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE));
@@ -3459,7 +3459,7 @@ test_supported_mode_filter (void *f, gpointer d)
 
     /* 2G, 3G and 4G supported */
     all = build_mode_all (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, NULL);
     g_assert_cmpuint (filtered->len, ==, 6);
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE));
     g_assert (find_mode_combination (filtered, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE));

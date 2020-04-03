@@ -1624,7 +1624,7 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
     }
 
     /* Filter out unsupported modes */
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, self);
     g_array_unref (all);
     g_array_unref (combinations);
 

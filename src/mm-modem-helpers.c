@@ -418,7 +418,8 @@ mm_new_iso8601_time (guint year,
 
 GArray *
 mm_filter_supported_modes (const GArray *all,
-                           const GArray *supported_combinations)
+                           const GArray *supported_combinations,
+                           gpointer      log_object)
 {
     MMModemModeCombination all_item;
     guint i;
@@ -428,6 +429,9 @@ mm_filter_supported_modes (const GArray *all,
     g_return_val_if_fail (all != NULL, NULL);
     g_return_val_if_fail (all->len == 1, NULL);
     g_return_val_if_fail (supported_combinations != NULL, NULL);
+
+    mm_obj_dbg (log_object, "filtering %u supported mode combinations with %u modes",
+                supported_combinations->len, all->len);
 
     all_item = g_array_index (all, MMModemModeCombination, 0);
     g_return_val_if_fail (all_item.allowed != MM_MODEM_MODE_NONE, NULL);
@@ -450,13 +454,16 @@ mm_filter_supported_modes (const GArray *all,
     }
 
     if (filtered_combinations->len == 0)
-        mm_warn ("All supported mode combinations were filtered out.");
+        mm_obj_warn (log_object, "all supported mode combinations were filtered out");
 
     /* Add default entry with the generic mask including all items */
     if (!all_item_added) {
-        mm_dbg ("Adding an explicit item with all supported modes allowed");
+        mm_obj_dbg (log_object, "adding an explicit item with all supported modes allowed");
         g_array_append_val (filtered_combinations, all_item);
     }
+
+    mm_obj_dbg (log_object, "device supports %u different mode combinations",
+                filtered_combinations->len);
 
     return filtered_combinations;
 }

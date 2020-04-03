@@ -21,6 +21,7 @@
 
 /* AT+XACT=? response parser */
 gboolean mm_xmm_parse_xact_test_response (const gchar  *response,
+                                          gpointer      logger,
                                           GArray      **modes_out,
                                           GArray      **bands_out,
                                           GError      **error);

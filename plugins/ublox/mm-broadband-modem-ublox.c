@@ -690,7 +690,7 @@ load_supported_modes_finish (MMIfaceModem  *self,
     if (!(combinations = mm_ublox_parse_urat_test_response (response, error)))
         return FALSE;
 
-    if (!(combinations = mm_ublox_filter_supported_modes (mm_iface_modem_get_model (self), combinations, error)))
+    if (!(combinations = mm_ublox_filter_supported_modes (mm_iface_modem_get_model (self), combinations, self, error)))
         return FALSE;
 
     /* Decide and store which combination to apply when ANY requested */

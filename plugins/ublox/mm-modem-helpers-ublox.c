@@ -980,6 +980,7 @@ supported_modes_per_model (const gchar *model)
 GArray *
 mm_ublox_filter_supported_modes (const gchar  *model,
                                  GArray       *combinations,
+                                 gpointer      logger,
                                  GError      **error)
 {
     MMModemModeCombination mode;
@@ -1002,7 +1003,7 @@ mm_ublox_filter_supported_modes (const gchar  *model,
 
     all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
     g_array_append_val (all, mode);
-    filtered = mm_filter_supported_modes (all, combinations);
+    filtered = mm_filter_supported_modes (all, combinations, logger);
     g_array_unref (all);
     g_array_unref (combinations);
 

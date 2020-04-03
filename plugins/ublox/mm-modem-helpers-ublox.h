@@ -115,6 +115,7 @@ gboolean mm_ublox_get_support_config (const gchar         *model,
 
 GArray *mm_ublox_filter_supported_modes (const gchar  *model,
                                          GArray       *combinations,
+                                         gpointer      logger,
                                          GError      **error);
 
 /*****************************************************************************/

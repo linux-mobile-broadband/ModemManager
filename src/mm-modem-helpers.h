@@ -84,7 +84,8 @@ gchar *mm_new_iso8601_time (guint year,
                             gint offset_minutes);
 
 GArray *mm_filter_supported_modes (const GArray *all,
-                                   const GArray *supported_combinations);
+                                   const GArray *supported_combinations,
+                                   gpointer      log_object);
 
 GArray *mm_filter_supported_capabilities (MMModemCapability all,
                                           const GArray *supported_combinations);

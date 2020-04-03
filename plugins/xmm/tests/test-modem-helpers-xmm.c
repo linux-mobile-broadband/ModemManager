@@ -45,7 +45,7 @@ validate_xact_test_response (const gchar                  *response,
     gboolean  ret;
     guint     i;
 
-    ret = mm_xmm_parse_xact_test_response (response, &modes, &bands, &error);
+    ret = mm_xmm_parse_xact_test_response (response, NULL, &modes, &bands, &error);
     g_assert_no_error (error);
     g_assert (ret);
 

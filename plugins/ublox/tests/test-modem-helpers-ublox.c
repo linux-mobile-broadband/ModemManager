@@ -294,7 +294,7 @@ compare_combinations (const gchar                  *response,
     g_assert_no_error (error);
     g_assert (combinations);
 
-    combinations = mm_ublox_filter_supported_modes (model, combinations, &error);
+    combinations = mm_ublox_filter_supported_modes (model, combinations, NULL, &error);
     g_assert_no_error (error);
     g_assert (combinations);
 
