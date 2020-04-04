@@ -4561,7 +4561,7 @@ ussd_encode (const gchar  *command,
              guint32      *scheme,
              GError      **error)
 {
-    GByteArray *array;
+    g_autoptr(GByteArray) array = NULL;
 
     if (mm_charset_can_convert_to (command, MM_MODEM_CHARSET_GSM)) {
         guint8  *gsm;
@@ -4581,12 +4581,13 @@ ussd_encode (const gchar  *command,
 
         array = g_byte_array_new_take (packed, packed_len);
     } else {
+        g_autoptr(GError) inner_error = NULL;
+
         *scheme = MM_MODEM_GSM_USSD_SCHEME_UCS2;
         array = g_byte_array_sized_new (strlen (command) * 2);
-        if (!mm_modem_charset_byte_array_append (array, command, FALSE, MM_MODEM_CHARSET_UCS2)) {
+        if (!mm_modem_charset_byte_array_append (array, command, FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                         "Failed to encode USSD command in UCS2 charset");
-            g_byte_array_unref (array);
+                         "Failed to encode USSD command in UCS2 charset: %s", inner_error->message);
             return NULL;
         }
     }
@@ -4594,11 +4595,10 @@ ussd_encode (const gchar  *command,
     if (array->len > 160) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                      "Failed to encode USSD command: encoded data too long (%u > 160)", array->len);
-        g_byte_array_unref (array);
         return NULL;
     }
 
-    return array;
+    return g_steal_pointer (&array);
 }
 
 static gchar *

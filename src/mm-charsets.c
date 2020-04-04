@@ -112,29 +112,26 @@ charset_iconv_from (MMModemCharset charset)
 }
 
 gboolean
-mm_modem_charset_byte_array_append (GByteArray *array,
-                                    const char *utf8,
-                                    gboolean quoted,
-                                    MMModemCharset charset)
+mm_modem_charset_byte_array_append (GByteArray      *array,
+                                    const gchar     *utf8,
+                                    gboolean         quoted,
+                                    MMModemCharset   charset,
+                                    GError         **error)
 {
-    const char *iconv_to;
-    char *converted;
-    GError *error = NULL;
-    gsize written = 0;
+    g_autofree gchar *converted = NULL;
+    const gchar      *iconv_to;
+    gsize             written = 0;
 
     g_return_val_if_fail (array != NULL, FALSE);
     g_return_val_if_fail (utf8 != NULL, FALSE);
 
     iconv_to = charset_iconv_to (charset);
-    g_return_val_if_fail (iconv_to != NULL, FALSE);
+    g_assert (iconv_to);
 
-    converted = g_convert (utf8, -1, iconv_to, "UTF-8", NULL, &written, &error);
+    converted = g_convert (utf8, -1, iconv_to, "UTF-8", NULL, &written, error);
     if (!converted) {
-        if (error) {
-            mm_warn ("failed to convert '%s' to %s character set: (%d) %s",
-                     utf8, iconv_to, error->code, error->message);
-            g_error_free (error);
-        }
+        g_prefix_error (error, "Failed to convert '%s' to %s character set",
+                        utf8, iconv_to);
         return FALSE;
     }
 
@@ -144,7 +141,6 @@ mm_modem_charset_byte_array_append (GByteArray *array,
     if (quoted)
         g_byte_array_append (array, (const guint8 *) "\"", 1);
 
-    g_free (converted);
     return TRUE;
 }
 

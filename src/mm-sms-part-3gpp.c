@@ -1013,16 +1013,16 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         g_free (packed);
         offset += packlen;
     } else if (mm_sms_part_get_encoding (part) == MM_SMS_ENCODING_UCS2) {
-        GByteArray *array;
+        g_autoptr(GByteArray) array = NULL;
+        g_autoptr(GError)     inner_error = NULL;
 
         /* Try to guess a good value for the array */
         array = g_byte_array_sized_new (strlen (mm_sms_part_get_text (part)) * 2);
-        if (!mm_modem_charset_byte_array_append (array, mm_sms_part_get_text (part), FALSE, MM_MODEM_CHARSET_UCS2)) {
-            g_byte_array_free (array, TRUE);
-            g_set_error_literal (error,
-                                 MM_MESSAGE_ERROR,
-                                 MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
-                                 "Failed to convert message text to UCS2");
+        if (!mm_modem_charset_byte_array_append (array, mm_sms_part_get_text (part), FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
+            g_set_error (error,
+                         MM_MESSAGE_ERROR,
+                         MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
+                         "Failed to convert message text to UCS2: %s", inner_error->message);
             goto error;
         }
 
@@ -1031,12 +1031,11 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
          */
         *udl_ptr = mm_sms_part_get_concat_sequence (part) ? (6 + array->len) : array->len;
         mm_obj_dbg (log_object, "  user data length is %u octets (%s UDH)",
-                *udl_ptr,
-                mm_sms_part_get_concat_sequence (part) ? "with" : "without");
+                    *udl_ptr,
+                    mm_sms_part_get_concat_sequence (part) ? "with" : "without");
 
         memcpy (&pdu[offset], array->data, array->len);
         offset += array->len;
-        g_byte_array_free (array, TRUE);
     } else if (mm_sms_part_get_encoding (part) == MM_SMS_ENCODING_8BIT) {
         const GByteArray *data;
 
@@ -1102,7 +1101,8 @@ mm_sms_part_3gpp_util_split_text (const gchar   *text,
     /* Check if we can do GSM encoding */
     if (!mm_charset_can_convert_to (text, MM_MODEM_CHARSET_GSM)) {
         /* If cannot do it in GSM encoding, do it in UCS-2 */
-        GByteArray *array;
+        g_autoptr(GByteArray) array = NULL;
+        g_autoptr(GError) error = NULL;
 
         *encoding = MM_SMS_ENCODING_UCS2;
 
@@ -1112,8 +1112,9 @@ mm_sms_part_3gpp_util_split_text (const gchar   *text,
         if (!mm_modem_charset_byte_array_append (array,
                                                  text,
                                                  FALSE,
-                                                 MM_MODEM_CHARSET_UCS2)) {
-            g_byte_array_unref (array);
+                                                 MM_MODEM_CHARSET_UCS2,
+                                                 &error)) {
+            mm_obj_warn (log_object, "failed to append UCS2: %s", error->message);
             return NULL;
         }
 
@@ -1145,7 +1146,6 @@ mm_sms_part_3gpp_util_split_text (const gchar   *text,
                                           log_object);
             }
         }
-        g_byte_array_unref (array);
     } else {
         /* Do it with GSM encoding */
         *encoding = MM_SMS_ENCODING_GSM7;

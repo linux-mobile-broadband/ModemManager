@@ -5800,14 +5800,14 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *_self,
 /* USSD Encode/Decode (3GPP/USSD interface) */
 
 static gchar *
-modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
-                        const gchar *command,
-                        guint *scheme,
-                        GError **error)
+modem_3gpp_ussd_encode (MMIfaceModem3gppUssd  *self,
+                        const gchar           *command,
+                        guint                 *scheme,
+                        GError               **error)
 {
-    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
-    GByteArray *ussd_command;
-    gchar *hex = NULL;
+    MMBroadbandModem      *broadband = MM_BROADBAND_MODEM (self);
+    gchar                 *hex = NULL;
+    g_autoptr(GByteArray)  ussd_command = NULL;
 
     ussd_command = g_byte_array_new ();
 
@@ -5816,7 +5816,8 @@ modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
     if (mm_modem_charset_byte_array_append (ussd_command,
                                             command,
                                             FALSE,
-                                            broadband->priv->modem_current_charset)) {
+                                            broadband->priv->modem_current_charset,
+                                            NULL)) {
         /* The scheme value does NOT represent the encoding used to encode the string
          * we're giving. This scheme reflects the encoding that the modem should use when
          * sending the data out to the network. We're hardcoding this to GSM-7 because
@@ -5826,8 +5827,6 @@ modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
         /* convert to hex representation */
         hex = mm_utils_bin2hexstr (ussd_command->data, ussd_command->len);
     }
-
-    g_byte_array_free (ussd_command, TRUE);
 
     return hex;
 }

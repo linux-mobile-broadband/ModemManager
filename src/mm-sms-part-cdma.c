@@ -1377,14 +1377,16 @@ write_bearer_data_message_identifier (MMSmsPart  *part,
 
 static void
 decide_best_encoding (const gchar *text,
+                      gpointer     log_object,
                       GByteArray **out,
-                      guint *num_fields,
-                      guint *num_bits_per_field,
-                      Encoding *encoding)
+                      guint       *num_fields,
+                      guint       *num_bits_per_field,
+                      Encoding    *encoding)
 {
     guint ascii_unsupported = 0;
     guint i;
     guint len;
+    g_autoptr(GError) error = NULL;
 
     len = strlen (text);
 
@@ -1409,10 +1411,12 @@ decide_best_encoding (const gchar *text,
     /* Check if we can do Latin encoding */
     if (mm_charset_can_convert_to (text, MM_MODEM_CHARSET_8859_1)) {
         *out = g_byte_array_sized_new (len);
-        mm_modem_charset_byte_array_append (*out,
-                                            text,
-                                            FALSE,
-                                            MM_MODEM_CHARSET_8859_1);
+        if (!mm_modem_charset_byte_array_append (*out,
+                                                 text,
+                                                 FALSE,
+                                                 MM_MODEM_CHARSET_8859_1,
+                                                 &error))
+            mm_obj_warn (log_object, "failed to convert to latin encoding: %s", error->message);
         *num_fields = (*out)->len;
         *num_bits_per_field = 8;
         *encoding = ENCODING_LATIN;
@@ -1421,10 +1425,12 @@ decide_best_encoding (const gchar *text,
 
     /* If no Latin and no ASCII, default to UTF-16 */
     *out = g_byte_array_sized_new (len * 2);
-    mm_modem_charset_byte_array_append (*out,
-                                        text,
-                                        FALSE,
-                                        MM_MODEM_CHARSET_UCS2);
+    if (!mm_modem_charset_byte_array_append (*out,
+                                             text,
+                                             FALSE,
+                                             MM_MODEM_CHARSET_UCS2,
+                                             &error))
+        mm_obj_warn (log_object, "failed to convert to UTF-16 encoding: %s", error->message);
     *num_fields = (*out)->len / 2;
     *num_bits_per_field = 16;
     *encoding = ENCODING_UNICODE;
@@ -1472,6 +1478,7 @@ write_bearer_data_user_data (MMSmsPart  *part,
     /* Text or Data */
     if (text) {
         decide_best_encoding (text,
+                              log_object,
                               &converted,
                               &num_fields,
                               &num_bits_per_field,
