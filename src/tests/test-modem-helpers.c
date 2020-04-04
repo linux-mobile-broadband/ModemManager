@@ -2901,10 +2901,12 @@ test_cpms_response_cinterion (void *f, gpointer d)
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
+    GError *error = NULL;
 
     g_debug ("Testing Cinterion +CPMS=? response...");
 
-    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3, &error));
+    g_assert_no_error (error);
     g_assert_cmpuint (mem1->len, ==, 2);
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_ME));
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_MT));
@@ -2929,10 +2931,12 @@ test_cpms_response_huawei_mu609 (void *f, gpointer d)
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
+    GError *error = NULL;
 
     g_debug ("Testing Huawei MU609 +CPMS=? response...");
 
-    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3, &error));
+    g_assert_no_error (error);
     g_assert_cmpuint (mem1->len, ==, 1);
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_ME));
     g_assert_cmpuint (mem2->len, ==, 1);
@@ -2953,10 +2957,12 @@ test_cpms_response_nokia_c6 (void *f, gpointer d)
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
+    GError *error = NULL;
 
     g_debug ("Testing Nokia C6 response...");
 
-    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3, &error));
+    g_assert_no_error (error);
     g_assert_cmpuint (mem1->len, ==, 0);
     g_assert_cmpuint (mem2->len, ==, 0);
     g_assert_cmpuint (mem3->len, ==, 0);
@@ -2978,10 +2984,12 @@ test_cpms_response_mixed (void *f, gpointer d)
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
+    GError *error = NULL;
 
     g_debug ("Testing mixed +CPMS=? response...");
 
-    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3, &error));
+    g_assert_no_error (error);
     g_assert_cmpuint (mem1->len, ==, 2);
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_ME));
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_MT));
@@ -3003,10 +3011,12 @@ test_cpms_response_mixed_spaces (void *f, gpointer d)
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
+    GError *error = NULL;
 
     g_debug ("Testing mixed +CPMS=? response with spaces...");
 
-    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3, &error));
+    g_assert_no_error (error);
     g_assert_cmpuint (mem1->len, ==, 2);
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_ME));
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_MT));
@@ -3032,10 +3042,12 @@ test_cpms_response_empty_fields (void *f, gpointer d)
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
+    GError *error = NULL;
 
     g_debug ("Testing mixed +CPMS=? response...");
 
-    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3, &error));
+    g_assert_no_error (error);
     g_assert_cmpuint (mem1->len, ==, 0);
     g_assert_cmpuint (mem2->len, ==, 0);
     g_assert_cmpuint (mem3->len, ==, 0);

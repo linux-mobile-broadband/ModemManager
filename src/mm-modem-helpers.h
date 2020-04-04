@@ -234,10 +234,11 @@ gboolean mm_3gpp_parse_cmgf_test_response (const gchar *reply,
                                            GError **error);
 
 /* AT+CPMS=? (Preferred SMS storage) response parser */
-gboolean mm_3gpp_parse_cpms_test_response (const gchar *reply,
-                                           GArray **mem1,
-                                           GArray **mem2,
-                                           GArray **mem3);
+gboolean mm_3gpp_parse_cpms_test_response (const gchar  *reply,
+                                           GArray      **mem1,
+                                           GArray      **mem2,
+                                           GArray      **mem3,
+                                           GError      **error);
 
 /* AT+CPMS? (Current SMS storage) response parser */
 gboolean mm_3gpp_parse_cpms_query_response (const gchar *reply,

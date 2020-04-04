@@ -2942,17 +2942,18 @@ storage_from_str (const gchar *str)
 }
 
 gboolean
-mm_3gpp_parse_cpms_test_response (const gchar *reply,
-                                  GArray **mem1,
-                                  GArray **mem2,
-                                  GArray **mem3)
+mm_3gpp_parse_cpms_test_response (const gchar  *reply,
+                                  GArray      **mem1,
+                                  GArray      **mem2,
+                                  GArray      **mem3,
+                                  GError      **error)
 {
-    GRegex *r;
-    gchar **split;
     guint i;
-    GArray *tmp1 = NULL;
-    GArray *tmp2 = NULL;
-    GArray *tmp3 = NULL;
+    g_autoptr(GRegex) r = NULL;
+    g_autoptr(GArray) tmp1 = NULL;
+    g_autoptr(GArray) tmp2 = NULL;
+    g_autoptr(GArray) tmp3 = NULL;
+    g_auto(GStrv)     split = NULL;
 
     g_assert (mem1 != NULL);
     g_assert (mem2 != NULL);
@@ -2965,9 +2966,9 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
         return FALSE;
 
     if (g_strv_length (split) != N_EXPECTED_GROUPS) {
-        mm_warn ("Cannot parse +CPMS test response: invalid number of groups (%u != %u)",
-                 g_strv_length (split), N_EXPECTED_GROUPS);
-        g_strfreev (split);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Cannot parse +CPMS test response: invalid number of groups (%u != %u)",
+                     g_strv_length (split), N_EXPECTED_GROUPS);
         return FALSE;
     }
 
@@ -3010,29 +3011,20 @@ mm_3gpp_parse_cpms_test_response (const gchar *reply,
             g_assert_not_reached ();
     }
 
-    g_strfreev (split);
-    g_regex_unref (r);
-
-    g_warn_if_fail (tmp1 != NULL);
-    g_warn_if_fail (tmp2 != NULL);
-    g_warn_if_fail (tmp3 != NULL);
-
     /* Only return TRUE if all sets have been parsed correctly
      * (even if the arrays may be empty) */
     if (tmp1 && tmp2 && tmp3) {
-        *mem1 = tmp1;
-        *mem2 = tmp2;
-        *mem3 = tmp3;
+        *mem1 = g_steal_pointer (&tmp1);
+        *mem2 = g_steal_pointer (&tmp2);
+        *mem3 = g_steal_pointer (&tmp3);
         return TRUE;
     }
 
-    /* Otherwise, cleanup and return FALSE */
-    if (tmp1)
-        g_array_unref (tmp1);
-    if (tmp2)
-        g_array_unref (tmp2);
-    if (tmp3)
-        g_array_unref (tmp3);
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "Cannot parse +CPMS test response: mem1 %s, mem2 %s, mem3 %s",
+                 tmp1 ? "yes" : "no",
+                 tmp2 ? "yes" : "no",
+                 tmp3 ? "yes" : "no");
     return FALSE;
 }
 

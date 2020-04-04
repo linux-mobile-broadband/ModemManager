@@ -6298,13 +6298,10 @@ cpms_format_check_ready (MMBroadbandModem *self,
     if (!mm_3gpp_parse_cpms_test_response (response,
                                            &result->mem1,
                                            &result->mem2,
-                                           &result->mem3)) {
+                                           &result->mem3,
+                                           &error)) {
         supported_storages_result_free (result);
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't parse supported storages reply: '%s'",
-                                 response);
+        g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
