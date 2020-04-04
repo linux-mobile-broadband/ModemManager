@@ -35,7 +35,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-iface-modem-messaging.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-altair-lte.h"
 #include "mm-serial-parsers.h"
@@ -50,7 +50,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemAltairLte, mm_broadband_modem_altair_lte
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init))
 
 struct _MMBroadbandModemAltairLtePrivate {
     /* Regex for SIM refresh notifications */
@@ -165,7 +165,6 @@ load_unlock_retries_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -234,8 +233,6 @@ load_current_capabilities (MMIfaceModem *self,
 {
     GTask *task;
 
-    mm_dbg ("Loading (Altair LTE) current capabilities...");
-
     task = g_task_new (self, NULL, callback, user_data);
     /* This modem is LTE only.*/
     g_task_return_int (task, MM_MODEM_CAPABILITY_LTE);
@@ -266,7 +263,6 @@ load_supported_bands_done (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query supported bands: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -279,7 +275,6 @@ load_supported_bands_done (MMIfaceModem *self,
 
     bands = mm_altair_parse_bands_response (response);
     if (!bands) {
-        mm_dbg ("Failed to parse supported bands response");
         g_task_return_new_error (
             task,
             MM_CORE_ERROR,
@@ -335,7 +330,6 @@ load_current_bands_done (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query current bands: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -348,7 +342,6 @@ load_current_bands_done (MMIfaceModem *self,
 
     bands = mm_altair_parse_bands_response (response);
     if (!bands) {
-        mm_dbg ("Failed to parse current bands response");
         g_task_return_new_error (
             task,
             MM_CORE_ERROR,
@@ -455,7 +448,7 @@ run_registration_checks_subscription_state_ready (MMIfaceModem3gpp *self,
     at_response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!at_response) {
         g_assert (error);
-        mm_warn ("AT+CEER failed: %s", error->message);
+        mm_obj_warn (self, "AT+CEER failed: %s", error->message);
         g_error_free (error);
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -465,7 +458,7 @@ run_registration_checks_subscription_state_ready (MMIfaceModem3gpp *self,
     ceer_response = mm_altair_parse_ceer_response (at_response, &error);
     if (!ceer_response) {
         g_assert (error);
-        mm_warn ("Failed to parse AT+CEER response: %s", error->message);
+        mm_obj_warn (self, "Failed to parse AT+CEER response: %s", error->message);
         g_error_free (error);
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -473,10 +466,10 @@ run_registration_checks_subscription_state_ready (MMIfaceModem3gpp *self,
     }
 
     if (g_strcmp0 ("EPS_AND_NON_EPS_SERVICES_NOT_ALLOWED", ceer_response) == 0) {
-        mm_dbg ("Registration failed due to unprovisioned SIM.");
+        mm_obj_dbg (self, "registration failed due to unprovisioned SIM");
         simulate_unprovisioned_subscription_pco_update (MM_BROADBAND_MODEM_ALTAIR_LTE (self));
     } else {
-        mm_dbg ("Failed to find a better reason for registration failure.");
+        mm_obj_dbg (self, "failed to find a better reason for registration failure");
     }
 
     g_task_return_boolean (task, TRUE);
@@ -501,7 +494,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
         return;
     }
 
-    mm_dbg ("Checking if SIM is unprovisioned (ignoring registration state).");
+    mm_obj_dbg (self, "checking if SIM is unprovisioned (ignoring registration state)");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CEER",
                               6,
@@ -593,11 +586,10 @@ altair_reregister_ready (MMBaseModem *self,
                          GAsyncResult *res,
                          gpointer user_data)
 {
-    if (!mm_base_modem_at_command_finish (self, res, NULL)) {
-        mm_dbg ("Failed to reregister modem");
-    } else {
-        mm_dbg ("Modem reregistered successfully");
-    }
+    if (!mm_base_modem_at_command_finish (self, res, NULL))
+        mm_obj_dbg (self, "failed to reregister modem");
+    else
+        mm_obj_dbg (self, "modem reregistered successfully");
     MM_BROADBAND_MODEM_ALTAIR_LTE (self)->priv->sim_refresh_detach_in_progress = FALSE;
 }
 
@@ -607,12 +599,12 @@ altair_deregister_ready (MMBaseModem *self,
                          gpointer user_data)
 {
     if (!mm_base_modem_at_command_finish (self, res, NULL)) {
-        mm_dbg ("Deregister modem failed");
+        mm_obj_dbg (self, "deregister modem failed");
         MM_BROADBAND_MODEM_ALTAIR_LTE (self)->priv->sim_refresh_detach_in_progress = FALSE;
         return;
     }
 
-    mm_dbg ("Deregistered modem, now reregistering");
+    mm_obj_dbg (self, "deregistered modem, now reregistering");
 
     /* Register */
     mm_base_modem_at_command (
@@ -634,7 +626,7 @@ altair_load_own_numbers_ready (MMIfaceModem *iface_modem,
 
     str_list = MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish (MM_IFACE_MODEM (self), res, &error);
     if (error) {
-        mm_warn ("Couldn't reload Own Numbers: '%s'", error->message);
+        mm_obj_warn (self, "Couldn't reload Own Numbers: '%s'", error->message);
         g_error_free (error);
     }
     if (str_list) {
@@ -647,7 +639,7 @@ altair_load_own_numbers_ready (MMIfaceModem *iface_modem,
     self->priv->sim_refresh_detach_in_progress = TRUE;
 
     /* Deregister */
-    mm_dbg ("Reregistering modem");
+    mm_obj_dbg (self, "reregistering modem");
     mm_base_modem_at_command (
         MM_BASE_MODEM (self),
         "%CMATT=0",
@@ -660,7 +652,7 @@ altair_load_own_numbers_ready (MMIfaceModem *iface_modem,
 static gboolean
 altair_sim_refresh_timer_expired (MMBroadbandModemAltairLte *self)
 {
-    mm_dbg ("No more SIM refreshes, reloading Own Numbers and reregistering modem");
+    mm_obj_dbg (self, "no more SIM refreshes, reloading own numbers and reregistering modem");
 
     g_assert (MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers);
     g_assert (MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish);
@@ -678,7 +670,7 @@ altair_sim_refresh_changed (MMPortSerialAt *port,
                             GMatchInfo *match_info,
                             MMBroadbandModemAltairLte *self)
 {
-    mm_dbg ("Received SIM refresh notification");
+    mm_obj_dbg (self, "received SIM refresh notification");
     if (self->priv->sim_refresh_timer_id) {
         g_source_remove (self->priv->sim_refresh_timer_id);
     }
@@ -716,7 +708,7 @@ altair_statcm_changed (MMPortSerialAt *port,
 
     mm_get_int_from_match_info (match_info, 1, &pdn_event);
 
-    mm_dbg ("altair_statcm_changed %d", pdn_event);
+    mm_obj_dbg (self, "altair PDN event detected: %d", pdn_event);
 
     /* Currently we only care about bearer disconnection */
 
@@ -1046,7 +1038,6 @@ modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
                                            error))
         return NULL;
 
-    mm_dbg ("loaded Operator Code: %s", operator_code);
     return operator_code;
 }
 
@@ -1055,8 +1046,6 @@ modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    mm_dbg ("loading Operator Code...");
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+COPS=3,2",
                               6,
@@ -1096,8 +1085,6 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
         return NULL;
 
     mm_3gpp_normalize_operator (&operator_name, MM_MODEM_CHARSET_UNKNOWN);
-    if (operator_name)
-        mm_dbg ("loaded Operator Name: %s", operator_name);
     return operator_name;
 }
 
@@ -1106,8 +1093,6 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
                                GAsyncReadyCallback callback,
                                gpointer user_data)
 {
-    mm_dbg ("Loading Operator Name...");
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+COPS=3,0",
                               6,
@@ -1133,15 +1118,14 @@ altair_pco_info_changed (MMPortSerialAt *port,
 {
     const gchar *pco_info;
     MMPco *pco;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     pco_info = g_match_info_fetch (match_info, 0);
 
-    mm_dbg ("Parsing vendor PCO info: %s", pco_info);
+    mm_obj_dbg (self, "parsing vendor PCO info: %s", pco_info);
     pco = mm_altair_parse_vendor_pco_info (pco_info, &error);
     if (error) {
-        mm_warn ("Error parsing vendor PCO info: %s", error->message);
-        g_error_free (error);
+        mm_obj_warn (self, "error parsing vendor PCO info: %s", error->message);
         return;
     }
 

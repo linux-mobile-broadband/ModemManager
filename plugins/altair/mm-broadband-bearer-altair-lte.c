@@ -76,13 +76,10 @@ connect_3gpp_connect_ready (MMBaseModem *modem,
 
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
-        mm_warn ("connect failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
-
-    mm_dbg ("Connected");
 
     ctx = g_task_get_task_data (task);
 
@@ -111,7 +108,7 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
 
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
-        mm_warn ("setting APN failed: %s", error->message);
+        g_prefix_error (&error, "setting APN failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -119,7 +116,6 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
 
     ctx = g_task_get_task_data (task);
 
-    mm_dbg ("APN set - connecting bearer");
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    "%DPDNACT=1",
@@ -168,7 +164,7 @@ connect_3gpp (MMBroadbandBearer *self,
      * refresh.
      * */
     if (mm_broadband_modem_altair_lte_is_sim_refresh_detach_in_progress (modem)) {
-        mm_dbg ("Detached from network to process SIM refresh, failing connect request");
+        mm_obj_dbg (self, "detached from network to process SIM refresh, failing connect request");
         g_task_report_new_error (self,
                                  callback,
                                  user_data,
@@ -251,13 +247,10 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
     GError *error = NULL;
 
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (!result) {
-        mm_warn ("Disconnect failed: %s", error->message);
+    if (!result)
         g_task_return_error (task, error);
-    }
     else
         g_task_return_boolean (task, TRUE);
-
     g_object_unref (task);
 }
 
