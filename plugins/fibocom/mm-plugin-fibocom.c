@@ -19,7 +19,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-plugin-fibocom.h"
 #include "mm-broadband-modem.h"
 #include "mm-broadband-modem-xmm.h"
@@ -48,14 +48,14 @@ create_modem (MMPlugin     *self,
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
         if (mm_port_probe_list_is_xmm (probes)) {
-            mm_dbg ("MBIM-powered XMM-based Fibocom modem found...");
+            mm_obj_dbg (self, "MBIM-powered XMM-based Fibocom modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_new (uid,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
                                                                    vendor,
                                                                    product));
         }
-        mm_dbg ("MBIM-powered Fibocom modem found...");
+        mm_obj_dbg (self, "MBIM-powered Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
                                                            mm_plugin_get_name (self),
@@ -65,7 +65,7 @@ create_modem (MMPlugin     *self,
 #endif
 
     if (mm_port_probe_list_is_xmm (probes)) {
-        mm_dbg ("XMM-based Fibocom modem found...");
+        mm_obj_dbg (self, "XMM-based Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_xmm_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -73,7 +73,7 @@ create_modem (MMPlugin     *self,
                                                           product));
     }
 
-    mm_dbg ("Fibocom modem found...");
+    mm_obj_dbg (self, "Fibocom modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
                                                   drivers,
                                                   mm_plugin_get_name (self),
