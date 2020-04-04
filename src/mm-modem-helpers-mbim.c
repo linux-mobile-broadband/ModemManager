@@ -17,7 +17,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-enums-types.h"
 #include "mm-errors-types.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*****************************************************************************/
 
@@ -367,6 +367,7 @@ mm_bearer_allowed_auth_from_mbim_auth_protocol (MbimAuthProtocol auth_protocol)
 
 MbimAuthProtocol
 mm_bearer_allowed_auth_to_mbim_auth_protocol (MMBearerAllowedAuth   bearer_auth,
+                                              gpointer              log_object,
                                               GError              **error)
 {
     gchar *str;
@@ -374,7 +375,7 @@ mm_bearer_allowed_auth_to_mbim_auth_protocol (MMBearerAllowedAuth   bearer_auth,
     /* NOTE: the input is a BITMASK, so we try to find a "best match" */
 
     if (bearer_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-        mm_dbg ("Using default (PAP) authentication method");
+        mm_obj_dbg (log_object, "using default (PAP) authentication method");
         return MBIM_AUTH_PROTOCOL_PAP;
     }
     if (bearer_auth & MM_BEARER_ALLOWED_AUTH_PAP)

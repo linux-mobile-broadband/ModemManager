@@ -964,7 +964,7 @@ connect_context_step (GTask *task)
             MMBearerAllowedAuth bearer_auth;
 
             bearer_auth = mm_bearer_properties_get_allowed_auth (ctx->properties);
-            auth = mm_bearer_allowed_auth_to_mbim_auth_protocol (bearer_auth, &error);
+            auth = mm_bearer_allowed_auth_to_mbim_auth_protocol (bearer_auth, self, &error);
             if (error) {
                 g_task_return_error (task, error);
                 g_object_unref (task);

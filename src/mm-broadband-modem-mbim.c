@@ -2830,7 +2830,7 @@ before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
         if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN)
             configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
         else {
-            configurations[i]->auth_protocol = mm_bearer_allowed_auth_to_mbim_auth_protocol (auth, &error);
+            configurations[i]->auth_protocol = mm_bearer_allowed_auth_to_mbim_auth_protocol (auth, self, &error);
             if (error) {
                 configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
                 mm_obj_warn (self, "unexpected auth settings requested: %s", error->message);
