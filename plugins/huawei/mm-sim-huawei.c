@@ -25,7 +25,6 @@
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
-#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
 
@@ -105,7 +104,6 @@ load_sim_identifier (MMBaseSim *self,
                   MM_BASE_SIM_MODEM, &modem,
                   NULL);
 
-    mm_dbg ("loading (Huawei) SIM identifier...");
     mm_base_modem_at_command (
         modem,
         "^ICCID?",

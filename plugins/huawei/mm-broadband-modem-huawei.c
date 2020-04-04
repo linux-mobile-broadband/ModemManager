@@ -31,7 +31,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
@@ -245,7 +245,7 @@ run_sysinfo_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        mm_dbg ("^SYSINFO failed: %s", error->message);
+        mm_obj_dbg (self, "^SYSINFO failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -262,7 +262,7 @@ run_sysinfo_ready (MMBaseModem *self,
                                            &result->sys_submode_valid,
                                            &result->sys_submode,
                                            &error)) {
-        mm_dbg ("^SYSINFO parsing failed: %s", error->message);
+        mm_obj_dbg (self, "^SYSINFO parsing failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         g_free (result);
@@ -300,14 +300,14 @@ run_sysinfoex_ready (MMBaseModem *_self,
         /* First time we try, we fallback to ^SYSINFO */
         if (self->priv->sysinfoex_support == FEATURE_SUPPORT_UNKNOWN) {
             self->priv->sysinfoex_support = FEATURE_NOT_SUPPORTED;
-            mm_dbg ("^SYSINFOEX failed: %s, assuming unsupported", error->message);
+            mm_obj_dbg (self, "^SYSINFOEX failed: %s, assuming unsupported", error->message);
             g_error_free (error);
             run_sysinfo (self, task);
             return;
         }
 
         /* Otherwise, propagate error */
-        mm_dbg ("^SYSINFOEX failed: %s", error->message);
+        mm_obj_dbg (self, "^SYSINFOEX failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -326,7 +326,7 @@ run_sysinfoex_ready (MMBaseModem *_self,
                                              &result->sys_mode,
                                              &result->sys_submode,
                                              &error)) {
-        mm_dbg ("^SYSINFOEX parsing failed: %s", error->message);
+        mm_obj_dbg (self, "^SYSINFOEX parsing failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         g_free (result);
@@ -571,7 +571,6 @@ load_access_technologies_finish (MMIfaceModem *self,
                                  guint *mask,
                                  GError **error)
 {
-    gchar *str;
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     gboolean extended = FALSE;
     guint srv_status = 0;
@@ -605,10 +604,6 @@ load_access_technologies_finish (MMIfaceModem *self,
                    huawei_sysinfo_mode_to_act (sys_mode));
     }
 
-    str = mm_modem_access_technology_build_string_from_mask (act);
-    mm_dbg ("Access Technology: '%s'", str);
-    g_free (str);
-
     *access_technologies = act;
     *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
     return TRUE;
@@ -619,7 +614,6 @@ load_access_technologies (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    mm_dbg ("loading access technology (huawei)...");
     sysinfo (MM_BROADBAND_MODEM_HUAWEI (self), callback, user_data);
 }
 
@@ -698,7 +692,6 @@ load_unlock_retries (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    mm_dbg ("loading unlock retries (huawei)...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^CPIN?",
                               3,
@@ -872,7 +865,6 @@ load_current_bands (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    mm_dbg ("loading current bands (huawei)...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SYSCFG?",
                               3,
@@ -973,9 +965,9 @@ syscfg_test_ready (MMBroadbandModemHuawei *self,
          * string to get parsed. Ugly, ugly, blame Huawei.
          */
         if (response[0])
-            self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (response, &error);
+            self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (response, self, &error);
         else {
-            self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (MM_HUAWEI_DEFAULT_SYSCFG_FMT, NULL);
+            self->priv->syscfg_supported_modes = mm_huawei_parse_syscfg_test (MM_HUAWEI_DEFAULT_SYSCFG_FMT, self, NULL);
             g_assert (self->priv->syscfg_supported_modes != NULL);
         }
     }
@@ -1006,7 +998,7 @@ syscfg_test_ready (MMBroadbandModemHuawei *self,
                                combinations,
                                (GDestroyNotify)g_array_unref);
     } else {
-        mm_dbg ("Error while checking ^SYSCFG format: %s", error->message);
+        mm_obj_dbg (self, "error while checking ^SYSCFG format: %s", error->message);
         /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
         if (!g_error_matches (error,
                               MM_MOBILE_EQUIPMENT_ERROR,
@@ -1062,7 +1054,7 @@ syscfgex_test_ready (MMBroadbandModemHuawei *self,
 
     /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
     if (error) {
-        mm_dbg ("Error while checking ^SYSCFGEX format: %s", error->message);
+        mm_obj_dbg (self, "error while checking ^SYSCFGEX format: %s", error->message);
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN)) {
@@ -1094,7 +1086,7 @@ prefmode_test_ready (MMBroadbandModemHuawei *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (response)
-        self->priv->prefmode_supported_modes = mm_huawei_parse_prefmode_test (response, &error);
+        self->priv->prefmode_supported_modes = mm_huawei_parse_prefmode_test (response, self, &error);
 
     if (self->priv->prefmode_supported_modes) {
         MMModemModeCombination mode;
@@ -1122,7 +1114,7 @@ prefmode_test_ready (MMBroadbandModemHuawei *self,
                                combinations,
                                (GDestroyNotify)g_array_unref);
     } else {
-        mm_dbg ("Error while checking ^PREFMODE format: %s", error->message);
+        mm_obj_dbg (self, "error while checking ^PREFMODE format: %s", error->message);
         /* If SIM-PIN error, don't mark as feature unsupported; we'll retry later */
         if (!g_error_matches (error,
                               MM_MOBILE_EQUIPMENT_ERROR,
@@ -1280,8 +1272,6 @@ load_current_modes (MMIfaceModem *_self,
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
     GTask *task;
-
-    mm_dbg ("loading current modes (huawei)...");
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1498,8 +1488,6 @@ set_current_modes (MMIfaceModem *_self,
     GTask *task;
     GError *error = NULL;
 
-    mm_dbg ("setting current modes (huawei)...");
-
     task = g_task_new (self, NULL, callback, user_data);
 
     if (self->priv->syscfgex_support == FEATURE_SUPPORTED)
@@ -1540,7 +1528,6 @@ huawei_signal_changed (MMPortSerialAt *port,
         quality = MM_CLAMP_HIGH (quality, 31) * 100 / 31;
     }
 
-    mm_dbg ("3GPP signal quality: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
@@ -1571,7 +1558,7 @@ huawei_mode_changed (MMPortSerialAt *port,
             (act < MM_MODEM_ACCESS_TECHNOLOGY_GSM ||
              act > MM_MODEM_ACCESS_TECHNOLOGY_EDGE)) {
             str = mm_modem_access_technology_build_string_from_mask (act);
-            mm_warn ("Unexpected access technology (%s) in GSM/GPRS mode", str);
+            mm_obj_warn (self, "unexpected access technology (%s) in GSM/GPRS mode", str);
             g_free (str);
             act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         }
@@ -1584,7 +1571,7 @@ huawei_mode_changed (MMPortSerialAt *port,
             (act < MM_MODEM_ACCESS_TECHNOLOGY_UMTS ||
              act > MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS)) {
             str = mm_modem_access_technology_build_string_from_mask (act);
-            mm_warn ("Unexpected access technology (%s) in WCDMA mode", str);
+            mm_obj_warn (self, "unexpected access technology (%s) in WCDMA mode", str);
             g_free (str);
             act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         }
@@ -1596,7 +1583,7 @@ huawei_mode_changed (MMPortSerialAt *port,
         if (act != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN &&
             act != MM_MODEM_ACCESS_TECHNOLOGY_1XRTT) {
             str = mm_modem_access_technology_build_string_from_mask (act);
-            mm_warn ("Unexpected access technology (%s) in CDMA mode", str);
+            mm_obj_warn (self, "unexpected access technology (%s) in CDMA mode", str);
             g_free (str);
             act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         }
@@ -1611,7 +1598,7 @@ huawei_mode_changed (MMPortSerialAt *port,
             (act < MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 ||
              act > MM_MODEM_ACCESS_TECHNOLOGY_EVDOB)) {
             str = mm_modem_access_technology_build_string_from_mask (act);
-            mm_warn ("Unexpected access technology (%s) in EVDO mode", str);
+            mm_obj_warn (self, "unexpected access technology (%s) in EVDO mode", str);
             g_free (str);
             act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
         }
@@ -1625,13 +1612,9 @@ huawei_mode_changed (MMPortSerialAt *port,
         break;
 
     default:
-        mm_warn ("Unexpected mode change value reported: '%d'", a);
+        mm_obj_warn (self, "unexpected mode change value reported: '%d'", a);
         return;
     }
-
-    str = mm_modem_access_technology_build_string_from_mask (act);
-    mm_dbg ("Access Technology: '%s'", str);
-    g_free (str);
 
     mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self), act, mask);
 }
@@ -1645,10 +1628,9 @@ huawei_status_changed (MMPortSerialAt *port,
     gint n1, n2, n3, n4, n5, n6, n7;
 
     str = g_match_info_fetch (match_info, 1);
-    if (sscanf (str, "%x,%x,%x,%x,%x,%x,%x", &n1, &n2, &n3, &n4, &n5, &n6, &n7)) {
-        mm_dbg ("Duration: %d Up: %d Kbps Down: %d Kbps Total: %d Total: %d\n",
-                n1, n2 * 8 / 1000, n3  * 8 / 1000, n4 / 1024, n5 / 1024);
-    }
+    if (sscanf (str, "%x,%x,%x,%x,%x,%x,%x", &n1, &n2, &n3, &n4, &n5, &n6, &n7))
+        mm_obj_dbg (self, "duration: %d up: %d Kbps down: %d Kbps total: %d total: %d\n",
+                    n1, n2 * 8 / 1000, n3  * 8 / 1000, n4 / 1024, n5 / 1024);
     g_free (str);
 }
 
@@ -1693,19 +1675,19 @@ huawei_ndisstat_changed (MMPortSerialAt *port,
                                                &ndisstat_result.ipv6_available,
                                                &ndisstat_result.ipv6_connected,
                                                &error)) {
-        mm_dbg ("Ignore invalid ^NDISSTAT unsolicited message: '%s' (error %s)",
-                str, error->message);
+        mm_obj_dbg (self, "ignored invalid ^NDISSTAT unsolicited message '%s': %s",
+                    str, error->message);
         g_error_free (error);
         g_free (str);
         return;
     }
     g_free (str);
 
-    mm_dbg ("NDIS status: IPv4 %s, IPv6 %s",
-            ndisstat_result.ipv4_available ?
-            (ndisstat_result.ipv4_connected ? "connected" : "disconnected") : "not available",
-            ndisstat_result.ipv6_available ?
-            (ndisstat_result.ipv6_connected ? "connected" : "disconnected") : "not available");
+    mm_obj_dbg (self, "NDIS status: IPv4 %s, IPv6 %s",
+                ndisstat_result.ipv4_available ?
+                (ndisstat_result.ipv4_connected ? "connected" : "disconnected") : "not available",
+                ndisstat_result.ipv6_available ?
+                (ndisstat_result.ipv6_connected ? "connected" : "disconnected") : "not available");
 
     /* If empty bearer list, nothing else to do */
     g_object_get (self,
@@ -1805,7 +1787,7 @@ huawei_hcsq_changed (MMPortSerialAt *port,
                                         &value4,
                                         &value5,
                                         &error)) {
-        mm_dbg ("Ignored invalid ^HCSQ message: %s (error %s)", str, error->message);
+        mm_obj_dbg (self, "ignored invalid ^HCSQ message '%s': %s", str, error->message);
         g_error_free (error);
         g_free (str);
         return;
@@ -2180,7 +2162,7 @@ create_bearer_for_net_port (GTask *task)
 
     switch (self->priv->ndisdup_support) {
     case FEATURE_NOT_SUPPORTED:
-        mm_dbg ("^NDISDUP not supported, creating default bearer...");
+        mm_obj_dbg (self, "^NDISDUP not supported, creating default bearer...");
         mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
                                  properties,
                                  NULL, /* cancellable */
@@ -2188,7 +2170,7 @@ create_bearer_for_net_port (GTask *task)
                                  task);
         return;
     case FEATURE_SUPPORTED:
-        mm_dbg ("^NDISDUP supported, creating huawei bearer...");
+        mm_obj_dbg (self, "^NDISDUP supported, creating huawei bearer...");
         mm_broadband_bearer_huawei_new (MM_BROADBAND_MODEM_HUAWEI (self),
                                         properties,
                                         NULL, /* cancellable */
@@ -2212,7 +2194,7 @@ peek_port_at_for_data (MMBroadbandModemHuawei *self,
     g_warn_if_fail (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET);
     net_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (port));
     if (!net_port_parent_path) {
-        mm_warn ("(%s) no parent path for net port", mm_port_get_device (port));
+        mm_obj_warn (self, "no parent path for net port %s", mm_port_get_device (port));
         return NULL;
     }
 
@@ -2245,8 +2227,7 @@ mm_broadband_modem_huawei_peek_port_at_for_data (MMBroadbandModemHuawei *self,
 
     found = peek_port_at_for_data (self, port);
     if (!found)
-        mm_warn ("Couldn't find associated cdc-wdm port for 'net/%s'",
-                 mm_port_get_device (port));
+        mm_obj_warn (self, "couldn't find associated cdc-wdm port for %s", mm_port_get_device (port));
     return found;
 }
 
@@ -2261,22 +2242,21 @@ ensure_ndisdup_support_checked (MMBroadbandModemHuawei *self,
     /* First, check for devices which support NDISDUP on any AT port. These
      * devices are tagged by udev */
     if (mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_HUAWEI_NDISDUP_SUPPORTED")) {
-        mm_dbg ("This device (%s) can support ndisdup feature", mm_port_get_device (port));
+        mm_obj_dbg (self, "^NDISDUP is supported");
         self->priv->ndisdup_support = FEATURE_SUPPORTED;
     }
     /* Then, look for devices which have both a net port and a cdc-wdm
      * AT-capable port. We assume that these devices allow NDISDUP only
      * when issued in the cdc-wdm port. */
     else if (peek_port_at_for_data (self, port)) {
-        mm_dbg ("This device (%s) can support ndisdup feature on non-serial AT port",
-                mm_port_get_device (port));
+        mm_obj_dbg (self, "^NDISDUP is supported on non-serial AT port");
         self->priv->ndisdup_support = FEATURE_SUPPORTED;
     }
 
     if (self->priv->ndisdup_support != FEATURE_SUPPORT_UNKNOWN)
         return;
 
-    mm_dbg ("This device (%s) can not support ndisdup feature", mm_port_get_device (port));
+    mm_obj_dbg (self, "^NDISDUP is not supported");
     self->priv->ndisdup_support = FEATURE_NOT_SUPPORTED;
 }
 
@@ -2299,7 +2279,7 @@ huawei_modem_create_bearer (MMIfaceModem *self,
         return;
     }
 
-    mm_dbg ("Creating default bearer...");
+    mm_obj_dbg (self, "creating default bearer...");
     mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
                              properties,
                              NULL, /* cancellable */
@@ -2380,7 +2360,7 @@ huawei_1x_signal_changed (MMPortSerialAt *port,
         return;
 
     quality = MM_CLAMP_HIGH (quality, 100);
-    mm_dbg ("1X signal quality: %u", quality);
+    mm_obj_dbg (self, "1X signal quality: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
@@ -2395,7 +2375,7 @@ huawei_evdo_signal_changed (MMPortSerialAt *port,
         return;
 
     quality = MM_CLAMP_HIGH (quality, 100);
-    mm_dbg ("EVDO signal quality: %u", quality);
+    mm_obj_dbg (self, "EVDO signal quality: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
@@ -2487,7 +2467,6 @@ modem_load_signal_quality (MMIfaceModem *self,
     MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     const char *command = "^CSQLVL";
 
-    mm_dbg ("loading signal quality...");
     task = g_task_new (self, NULL, callback, user_data);
 
     /* 3GPP modems can just run parent's signal quality loading */
@@ -2838,7 +2817,7 @@ registration_state_sysinfo_ready (MMBroadbandModemHuawei *self,
 
         if (!cdma1x && !evdo) {
             /* Say we're registered to something even though sysmode parsing failed */
-            mm_dbg ("Assuming registered at least in CDMA1x");
+            mm_obj_dbg (self, "assuming registered at least in CDMA1x");
             ctx->state.detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
         }
     }
@@ -2911,7 +2890,7 @@ cvoice_check_ready (MMBaseModem  *_self,
                                           &self->priv->audio_bits,
                                           &error)) {
         self->priv->cvoice_support = FEATURE_NOT_SUPPORTED;
-        mm_dbg ("Huawei-specific CVOICE is unsupported: %s", error->message);
+        mm_obj_dbg (self, "Huawei-specific CVOICE is unsupported: %s", error->message);
         g_clear_error (&error);
 
         /* Now check generic support */
@@ -2921,7 +2900,7 @@ cvoice_check_ready (MMBaseModem  *_self,
         return;
     }
 
-    mm_dbg ("Huawei-specific CVOICE is supported");
+    mm_obj_dbg (self, "Huawei-specific CVOICE is supported");
     self->priv->cvoice_support = FEATURE_SUPPORTED;
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -3097,23 +3076,23 @@ orig_received (MMPortSerialAt         *port,
     guint      aux       = 0;
 
     if (!mm_get_uint_from_match_info (match_info, 2, &aux)) {
-        mm_warn ("couldn't parse call type from ^ORIG");
+        mm_obj_warn (self, "couldn't parse call type from ^ORIG");
         return;
     }
     if (aux != HUAWEI_CALL_TYPE_VOICE && aux != HUAWEI_CALL_TYPE_EMERGENCY) {
-        mm_dbg ("ignored ^ORIG for non-voice call");
+        mm_obj_dbg (self, "ignored ^ORIG for non-voice call");
         return;
     }
 
     if (!mm_get_uint_from_match_info (match_info, 1, &aux)) {
-        mm_warn ("couldn't parse call index from ^ORIG");
+        mm_obj_warn (self, "couldn't parse call index from ^ORIG");
         return;
     }
     call_info.index     = aux;
     call_info.state     = MM_CALL_STATE_DIALING;
     call_info.direction = MM_CALL_DIRECTION_OUTGOING;
 
-    mm_dbg ("call %u state updated: dialing", call_info.index);
+    mm_obj_dbg (self, "call %u state updated: dialing", call_info.index);
 
     mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
 }
@@ -3127,14 +3106,14 @@ conf_received (MMPortSerialAt         *port,
     guint      aux       = 0;
 
     if (!mm_get_uint_from_match_info (match_info, 1, &aux)) {
-        mm_warn ("couldn't parse call index from ^CONF");
+        mm_obj_warn (self, "couldn't parse call index from ^CONF");
         return;
     }
     call_info.index     = aux;
     call_info.state     = MM_CALL_STATE_RINGING_OUT;
     call_info.direction = MM_CALL_DIRECTION_OUTGOING;
 
-    mm_dbg ("call %u state updated: ringing-out", call_info.index);
+    mm_obj_dbg (self, "call %u state updated: ringing-out", call_info.index);
 
     mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
 }
@@ -3148,14 +3127,14 @@ conn_received (MMPortSerialAt         *port,
     guint      aux       = 0;
 
     if (!mm_get_uint_from_match_info (match_info, 1, &aux)) {
-        mm_warn ("couldn't parse call index from ^CONN");
+        mm_obj_warn (self, "couldn't parse call index from ^CONN");
         return;
     }
     call_info.index     = aux;
     call_info.state     = MM_CALL_STATE_ACTIVE;
     call_info.direction = MM_CALL_DIRECTION_UNKNOWN;
 
-    mm_dbg ("call %u state updated: active", aux);
+    mm_obj_dbg (self, "call %u state updated: active", aux);
 
     mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
 }
@@ -3170,20 +3149,20 @@ cend_received (MMPortSerialAt         *port,
 
     /* only index is mandatory */
     if (!mm_get_uint_from_match_info (match_info, 1, &aux)) {
-        mm_warn ("couldn't parse call index from ^CEND");
+        mm_obj_warn (self, "couldn't parse call index from ^CEND");
         return;
     }
     call_info.index = aux;
     call_info.state = MM_CALL_STATE_TERMINATED;
     call_info.direction = MM_CALL_DIRECTION_UNKNOWN;
 
-    mm_dbg ("call %u state updated: terminated", call_info.index);
+    mm_obj_dbg (self, "call %u state updated: terminated", call_info.index);
     if (mm_get_uint_from_match_info (match_info, 2, &aux))
-        mm_dbg ("  call duration: %u seconds", aux);
+        mm_obj_dbg (self, "  call duration: %u seconds", aux);
     if (mm_get_uint_from_match_info (match_info, 3, &aux))
-        mm_dbg ("  end status code: %u", aux);
+        mm_obj_dbg (self, "  end status code: %u", aux);
     if (mm_get_uint_from_match_info (match_info, 4, &aux))
-        mm_dbg ("  call control cause: %u", aux);
+        mm_obj_dbg (self, "  call control cause: %u", aux);
 
     mm_iface_modem_voice_report_call (MM_IFACE_MODEM_VOICE (self), &call_info);
 }
@@ -3196,7 +3175,7 @@ ddtmf_received (MMPortSerialAt         *port,
     gchar *dtmf;
 
     dtmf = g_match_info_fetch (match_info, 1);
-    mm_dbg ("received DTMF: %s", dtmf);
+    mm_obj_dbg (self, "received DTMF: %s", dtmf);
     /* call index unknown */
     mm_iface_modem_voice_received_dtmf (MM_IFACE_MODEM_VOICE (self), 0, dtmf);
     g_free (dtmf);
@@ -3582,8 +3561,8 @@ enable_disable_unsolicited_rfswitch_event_handler (MMBroadbandModemHuawei *self,
 
     ports = mm_broadband_modem_huawei_get_at_port_list (self);
 
-    mm_dbg ("%s ^RFSWITCH unsolicited event handler",
-            enable ? "Enable" : "Disable");
+    mm_obj_dbg (self, "%s ^RFSWITCH unsolicited event handler",
+                enable ? "enable" : "disable");
 
     for (l = ports; l; l = g_list_next (l)) {
         MMPortSerialAt *port = MM_PORT_SERIAL_AT (l->data);
@@ -3639,17 +3618,17 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
         response = mm_strip_tag (response, "^RFSWITCH:");
         if (sscanf (response, "%d", &sw_state) != 1 ||
             (sw_state != 0 && sw_state != 1)) {
-            mm_warn ("Couldn't parse ^RFSWITCH response: '%s'", response);
+            mm_obj_warn (self, "couldn't parse ^RFSWITCH response '%s'", response);
             error = g_error_new (MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
-                                 "Couldn't parse ^RFSWITCH response: '%s'",
+                                 "Couldn't parse ^RFSWITCH response '%s'",
                                  response);
         }
     }
 
     if (self->priv->rfswitch_support == FEATURE_SUPPORT_UNKNOWN) {
         if (error) {
-            mm_dbg ("The device does not support ^RFSWITCH");
+            mm_obj_dbg (self, "^RFSWITCH is not supported");
             self->priv->rfswitch_support = FEATURE_NOT_SUPPORTED;
             g_error_free (error);
             /* Fall back to parent's load_power_state */
@@ -3659,7 +3638,7 @@ huawei_rfswitch_check_ready (MMBaseModem *_self,
             return;
         }
 
-        mm_dbg ("The device supports ^RFSWITCH");
+        mm_obj_dbg (self, "^RFSWITCH is supported");
         self->priv->rfswitch_support = FEATURE_SUPPORTED;
     }
 
@@ -4304,7 +4283,7 @@ hcsq_get_ready (MMBaseModem *_self,
      * be updated.
      */
     if (!mm_base_modem_at_command_finish (_self, res, &error)) {
-        mm_dbg ("^HCSQ failed: %s", error->message);
+        mm_obj_dbg (self, "^HCSQ failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -4329,8 +4308,6 @@ signal_load_values (MMIfaceModemSignal *_self,
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
     GTask *task;
-
-    mm_dbg ("loading extended signal information...");
 
     task = g_task_new (self, cancellable, callback, user_data);
 

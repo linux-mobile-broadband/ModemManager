@@ -27,7 +27,7 @@
 #include <ModemManager.h>
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer-huawei.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
 #include "mm-daemon-enums-types.h"
@@ -175,7 +175,7 @@ connect_dhcp_check_ready (MMBaseModem *modem,
             g_free (strarr[0]);
             g_free (strarr[1]);
         } else {
-            mm_dbg ("Unexpected response to ^DHCP command: %s", error->message);
+            mm_obj_dbg (self, "unexpected response to ^DHCP command: %s", error->message);
         }
     }
 
@@ -233,8 +233,8 @@ connect_ndisstatqry_check_ready (MMBaseModem *modem,
                                                &ipv6_connected,
                                                &error)) {
         ctx->failed_ndisstatqry_count++;
-        mm_dbg ("Unexpected response to ^NDISSTATQRY command: %s (Attempts so far: %u)",
-                error->message, ctx->failed_ndisstatqry_count);
+        mm_obj_dbg (self, "unexpected response to ^NDISSTATQRY command: %s (%u attempts so far)",
+                    error->message, ctx->failed_ndisstatqry_count);
         g_error_free (error);
     }
 
@@ -358,8 +358,7 @@ connect_3gpp_context_step (GTask *task)
 
             ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (self));
             ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-            mm_dbg ("No specific IP family requested, defaulting to %s",
-                    ip_family_str);
+            mm_obj_dbg (self, "no specific IP family requested, defaulting to %s", ip_family_str);
             g_free (ip_family_str);
         }
 
@@ -633,8 +632,8 @@ disconnect_ndisstatqry_check_ready (MMBaseModem *modem,
                                                &ipv6_connected,
                                                &error)) {
         ctx->failed_ndisstatqry_count++;
-        mm_dbg ("Unexpected response to ^NDISSTATQRY command: %s (Attempts so far: %u)",
-                error->message, ctx->failed_ndisstatqry_count);
+        mm_obj_dbg (self, "unexpected response to ^NDISSTATQRY command: %s (%u attempts so far)",
+                    error->message, ctx->failed_ndisstatqry_count);
         g_error_free (error);
     }
 
@@ -808,8 +807,7 @@ disconnect_3gpp (MMBroadbandBearer *_self,
 static gboolean
 network_disconnect_3gpp_delayed (MMBroadbandBearerHuawei *self)
 {
-    mm_dbg ("Disconnect bearer '%s' on network request.",
-            mm_base_bearer_get_path (MM_BASE_BEARER (self)));
+    mm_obj_dbg (self, "disconnect bearer on network request");
 
     self->priv->network_disconnect_pending_id = 0;
     mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
@@ -833,8 +831,7 @@ report_connection_status (MMBaseBearer *bearer,
     if (self->priv->connect_pending || self->priv->disconnect_pending)
         return;
 
-    mm_dbg ("Received spontaneous ^NDISSTAT (%s)",
-            mm_bearer_connection_status_get_string (status));
+    mm_obj_dbg (self, "received spontaneous ^NDISSTAT (%s)", mm_bearer_connection_status_get_string (status));
 
     /* Ignore 'CONNECTED' */
     if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED)
@@ -848,8 +845,7 @@ report_connection_status (MMBaseBearer *bearer,
          * bearer_report_connection_status for details. */
         if (mm_base_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED &&
             self->priv->network_disconnect_pending_id == 0) {
-            mm_dbg ("Delay network-initiated disconnection of bearer '%s'",
-                    mm_base_bearer_get_path (MM_BASE_BEARER (self)));
+            mm_obj_dbg (self, "delay network-initiated disconnection of bearer");
             self->priv->network_disconnect_pending_id = (g_timeout_add_seconds (
                                                              4,
                                                              (GSourceFunc) network_disconnect_3gpp_delayed,

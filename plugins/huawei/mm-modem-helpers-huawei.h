@@ -70,8 +70,9 @@ typedef struct {
     MMModemMode preferred;
 } MMHuaweiPrefmodeCombination;
 
-GArray *mm_huawei_parse_prefmode_test (const gchar *response,
-                                       GError **error);
+GArray *mm_huawei_parse_prefmode_test (const gchar  *response,
+                                       gpointer      log_object,
+                                       GError      **error);
 
 /*****************************************************************************/
 /* ^PREFMODE response parser */
@@ -94,8 +95,9 @@ typedef struct {
     MMModemMode preferred;
 } MMHuaweiSyscfgCombination;
 
-GArray *mm_huawei_parse_syscfg_test (const gchar *response,
-                                     GError **error);
+GArray *mm_huawei_parse_syscfg_test (const gchar  *response,
+                                     gpointer      log_object,
+                                     GError      **error);
 
 /*****************************************************************************/
 /* ^SYSCFG response parser */

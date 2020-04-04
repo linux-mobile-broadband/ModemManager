@@ -22,7 +22,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
 
@@ -429,8 +429,9 @@ mode_from_prefmode (guint huawei_mode,
 }
 
 GArray *
-mm_huawei_parse_prefmode_test (const gchar *response,
-                               GError **error)
+mm_huawei_parse_prefmode_test (const gchar  *response,
+                               gpointer      log_object,
+                               GError      **error)
 {
     gchar **split;
     guint i;
@@ -461,12 +462,12 @@ mm_huawei_parse_prefmode_test (const gchar *response,
             continue;
 
         if (!mm_get_uint_from_str (split[i], &val)) {
-            mm_dbg ("Error parsing ^PREFMODE value: %s", split[i]);
+            mm_obj_dbg (log_object, "error parsing ^PREFMODE value '%s'", split[i]);
             continue;
         }
 
         if (!mode_from_prefmode (val, &preferred, &inner_error)) {
-            mm_dbg ("Unhandled ^PREFMODE: %s", inner_error->message);
+            mm_obj_dbg (log_object, "unhandled ^PREFMODE value: %s", inner_error->message);
             g_error_free (inner_error);
             continue;
         }
@@ -708,9 +709,10 @@ mode_from_syscfg (guint huawei_mode,
 }
 
 static GArray *
-parse_syscfg_modes (const gchar *modes_str,
-                    const gchar *acqorder_str,
-                    GError **error)
+parse_syscfg_modes (const gchar  *modes_str,
+                    const gchar  *acqorder_str,
+                    gpointer      log_object,
+                    GError      **error)
 {
     GArray *out;
     gchar **split;
@@ -720,7 +722,7 @@ parse_syscfg_modes (const gchar *modes_str,
 
     /* Start parsing acquisition order */
     if (!sscanf (acqorder_str, "%d-%d", &min_acqorder, &max_acqorder))
-        mm_dbg ("Error parsing ^SYSCFG acquisition order range (%s)", acqorder_str);
+        mm_obj_dbg (log_object, "error parsing ^SYSCFG acquisition order range '%s'", acqorder_str);
 
     /* Just in case, we default to supporting only auto */
     if (max_acqorder < min_acqorder) {
@@ -741,13 +743,13 @@ parse_syscfg_modes (const gchar *modes_str,
         MMHuaweiSyscfgCombination combination;
 
         if (!mm_get_uint_from_str (mm_strip_quotes (split[i]), &val)) {
-            mm_dbg ("Error parsing ^SYSCFG mode value: %s", split[i]);
+            mm_obj_dbg (log_object, "error parsing ^SYSCFG mode value: %s", split[i]);
             continue;
         }
 
         if (!mode_from_syscfg (val, &allowed, &inner_error)) {
             if (inner_error) {
-                mm_dbg ("Unhandled ^SYSCFG: %s", inner_error->message);
+                mm_obj_dbg (log_object, "unhandled ^SYSCFG: %s", inner_error->message);
                 g_error_free (inner_error);
             }
             continue;
@@ -808,8 +810,9 @@ parse_syscfg_modes (const gchar *modes_str,
 }
 
 GArray *
-mm_huawei_parse_syscfg_test (const gchar *response,
-                             GError **error)
+mm_huawei_parse_syscfg_test (const gchar  *response,
+                             gpointer      log_object,
+                             GError      **error)
 {
     gchar **split;
     GError *inner_error = NULL;
@@ -846,7 +849,7 @@ mm_huawei_parse_syscfg_test (const gchar *response,
     }
 
     /* Parse supported mode combinations */
-    out = parse_syscfg_modes (split[0], split[1], &inner_error);
+    out = parse_syscfg_modes (split[0], split[1], log_object, &inner_error);
 
     g_strfreev (split);
 

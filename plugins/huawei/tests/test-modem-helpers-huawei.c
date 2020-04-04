@@ -22,7 +22,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
 
@@ -386,27 +386,21 @@ test_prefmode (void)
                 n_expected_combinations++;
         }
 
-        combinations = mm_huawei_parse_prefmode_test (prefmode_tests[i].str, &error);
+        combinations = mm_huawei_parse_prefmode_test (prefmode_tests[i].str, NULL, &error);
         g_assert_no_error (error);
         g_assert (combinations != NULL);
         g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiPrefmodeCombination *single;
-            gchar *allowed_str;
-            gchar *preferred_str;
+            g_autofree gchar *allowed_str = NULL;
+            g_autofree gchar *preferred_str = NULL;
 
             single = &g_array_index (combinations, MMHuaweiPrefmodeCombination, j);
             allowed_str = mm_modem_mode_build_string_from_mask (single->allowed);
             preferred_str = mm_modem_mode_build_string_from_mask (single->preferred);
-            mm_dbg ("Test[%u], Combination[%u]: %u, \"%s\", \"%s\"",
-                    i,
-                    j,
-                    single->prefmode,
-                    allowed_str,
-                    preferred_str);
-            g_free (allowed_str);
-            g_free (preferred_str);
+            mm_obj_dbg (NULL, "test[%u], combination[%u]: %u, \"%s\", \"%s\"",
+                        i, j, single->prefmode, allowed_str, preferred_str);
         }
 
         for (j = 0; j < combinations->len; j++) {
@@ -472,7 +466,7 @@ test_prefmode_response (void)
         const MMHuaweiPrefmodeCombination *found;
         GError *error = NULL;
 
-        combinations = mm_huawei_parse_prefmode_test (prefmode_response_tests[i].format, NULL);
+        combinations = mm_huawei_parse_prefmode_test (prefmode_response_tests[i].format, NULL, NULL);
         g_assert (combinations != NULL);
 
         found = mm_huawei_parse_prefmode_response (prefmode_response_tests[i].str,
@@ -622,28 +616,21 @@ test_syscfg (void)
                 n_expected_combinations++;
         }
 
-        combinations = mm_huawei_parse_syscfg_test (syscfg_tests[i].str, &error);
+        combinations = mm_huawei_parse_syscfg_test (syscfg_tests[i].str, NULL, &error);
         g_assert_no_error (error);
         g_assert (combinations != NULL);
         g_assert_cmpuint (combinations->len, ==, n_expected_combinations);
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgCombination *single;
-            gchar *allowed_str;
-            gchar *preferred_str;
+            g_autofree gchar *allowed_str = NULL;
+            g_autofree gchar *preferred_str = NULL;
 
             single = &g_array_index (combinations, MMHuaweiSyscfgCombination, j);
             allowed_str = mm_modem_mode_build_string_from_mask (single->allowed);
             preferred_str = mm_modem_mode_build_string_from_mask (single->preferred);
-            mm_dbg ("Test[%u], Combination[%u]: %u, %u, \"%s\", \"%s\"",
-                    i,
-                    j,
-                    single->mode,
-                    single->acqorder,
-                    allowed_str,
-                    preferred_str);
-            g_free (allowed_str);
-            g_free (preferred_str);
+            mm_obj_dbg (NULL, "test[%u], combination[%u]: %u, %u, \"%s\", \"%s\"",
+                        i, j, single->mode, single->acqorder, allowed_str, preferred_str);
         }
 
         for (j = 0; j < combinations->len; j++) {
@@ -736,7 +723,7 @@ test_syscfg_response (void)
         const MMHuaweiSyscfgCombination *found;
         GError *error = NULL;
 
-        combinations = mm_huawei_parse_syscfg_test (syscfg_response_tests[i].format, NULL);
+        combinations = mm_huawei_parse_syscfg_test (syscfg_response_tests[i].format, NULL, NULL);
         g_assert (combinations != NULL);
 
         found = mm_huawei_parse_syscfg_response (syscfg_response_tests[i].str,
@@ -896,20 +883,14 @@ test_syscfgex (void)
 
         for (j = 0; j < combinations->len; j++) {
             MMHuaweiSyscfgexCombination *single;
-            gchar *allowed_str;
-            gchar *preferred_str;
+            g_autofree gchar *allowed_str = NULL;
+            g_autofree gchar *preferred_str = NULL;
 
             single = &g_array_index (combinations, MMHuaweiSyscfgexCombination, j);
             allowed_str = mm_modem_mode_build_string_from_mask (single->allowed);
             preferred_str = mm_modem_mode_build_string_from_mask (single->preferred);
-            mm_dbg ("Test[%u], Combination[%u]: \"%s\", \"%s\", \"%s\"",
-                    i,
-                    j,
-                    single->mode_str,
-                    allowed_str,
-                    preferred_str);
-            g_free (allowed_str);
-            g_free (preferred_str);
+            mm_obj_dbg (NULL, "test[%u], combination[%u]: \"%s\", \"%s\", \"%s\"",
+                        i, j, single->mode_str, allowed_str, preferred_str);
         }
 
         for (j = 0; j < combinations->len; j++) {
