@@ -22,7 +22,7 @@
 #include "mm-modem-helpers-qmi.h"
 #include "mm-modem-helpers.h"
 #include "mm-enums-types.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*****************************************************************************/
 
@@ -217,8 +217,9 @@ static const DmsBandsMap dms_bands_map [] = {
 };
 
 static void
-dms_add_qmi_bands (GArray *mm_bands,
-                   QmiDmsBandCapability qmi_bands)
+dms_add_qmi_bands (GArray               *mm_bands,
+                   QmiDmsBandCapability  qmi_bands,
+                   gpointer              log_object)
 {
     static QmiDmsBandCapability qmi_bands_expected = 0;
     QmiDmsBandCapability not_expected;
@@ -236,11 +237,10 @@ dms_add_qmi_bands (GArray *mm_bands,
     /* Log about the bands that cannot be represented in ModemManager */
     not_expected = ((qmi_bands_expected ^ qmi_bands) & qmi_bands);
     if (not_expected) {
-        gchar *aux;
+        g_autofree gchar *aux = NULL;
 
         aux = qmi_dms_band_capability_build_string_from_mask (not_expected);
-        mm_dbg ("Cannot add the following bands: '%s'", aux);
-        g_free (aux);
+        mm_obj_dbg (log_object, "cannot add the following bands: '%s'", aux);
     }
 
     /* And add the expected ones */
@@ -314,8 +314,9 @@ dms_add_qmi_lte_bands (GArray *mm_bands,
 }
 
 static void
-dms_add_extended_qmi_lte_bands (GArray *mm_bands,
-                                GArray *extended_qmi_bands)
+dms_add_extended_qmi_lte_bands (GArray   *mm_bands,
+                                GArray   *extended_qmi_bands,
+                                gpointer  log_object)
 {
     guint i;
 
@@ -334,7 +335,7 @@ dms_add_extended_qmi_lte_bands (GArray *mm_bands,
          * MM_MODEM_BAND_EUTRAN_71 = 101
          */
         if (val < 1 || val > 71)
-            mm_dbg ("Unexpected LTE band supported by module: EUTRAN %u", val);
+            mm_obj_dbg (log_object, "unexpected LTE band supported by module: EUTRAN %u", val);
         else {
             MMModemBand band;
 
@@ -345,17 +346,18 @@ dms_add_extended_qmi_lte_bands (GArray *mm_bands,
 }
 
 GArray *
-mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability qmi_bands,
-                                           QmiDmsLteBandCapability qmi_lte_bands,
-                                           GArray *extended_qmi_lte_bands)
+mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability     qmi_bands,
+                                           QmiDmsLteBandCapability  qmi_lte_bands,
+                                           GArray                  *extended_qmi_lte_bands,
+                                           gpointer                 log_object)
 {
     GArray *mm_bands;
 
     mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
-    dms_add_qmi_bands (mm_bands, qmi_bands);
+    dms_add_qmi_bands (mm_bands, qmi_bands, log_object);
 
     if (extended_qmi_lte_bands)
-        dms_add_extended_qmi_lte_bands (mm_bands, extended_qmi_lte_bands);
+        dms_add_extended_qmi_lte_bands (mm_bands, extended_qmi_lte_bands, log_object);
     else
         dms_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
 
@@ -421,8 +423,9 @@ static const NasBandsMap nas_bands_map [] = {
 };
 
 static void
-nas_add_qmi_bands (GArray *mm_bands,
-                   QmiNasBandPreference qmi_bands)
+nas_add_qmi_bands (GArray               *mm_bands,
+                   QmiNasBandPreference  qmi_bands,
+                   gpointer              log_object)
 {
     static QmiNasBandPreference qmi_bands_expected = 0;
     QmiNasBandPreference not_expected;
@@ -440,11 +443,10 @@ nas_add_qmi_bands (GArray *mm_bands,
     /* Log about the bands that cannot be represented in ModemManager */
     not_expected = ((qmi_bands_expected ^ qmi_bands) & qmi_bands);
     if (not_expected) {
-        gchar *aux;
+        g_autofree gchar *aux = NULL;
 
         aux = qmi_nas_band_preference_build_string_from_mask (not_expected);
-        mm_dbg ("Cannot add the following bands: '%s'", aux);
-        g_free (aux);
+        mm_obj_dbg (log_object, "cannot add the following bands: '%s'", aux);
     }
 
     /* And add the expected ones */
@@ -518,9 +520,10 @@ nas_add_qmi_lte_bands (GArray *mm_bands,
 }
 
 static void
-nas_add_extended_qmi_lte_bands (GArray *mm_bands,
+nas_add_extended_qmi_lte_bands (GArray        *mm_bands,
                                 const guint64 *extended_qmi_lte_bands,
-                                guint extended_qmi_lte_bands_size)
+                                guint          extended_qmi_lte_bands_size,
+                                gpointer       log_object)
 {
     guint i;
 
@@ -542,7 +545,7 @@ nas_add_extended_qmi_lte_bands (GArray *mm_bands,
              * MM_MODEM_BAND_EUTRAN_71 = 101
              */
             if (val < 1 || val > 71)
-                mm_dbg ("Unexpected LTE band supported by module: EUTRAN %u", val);
+                mm_obj_dbg (log_object, "unexpected LTE band supported by module: EUTRAN %u", val);
             else {
                 MMModemBand band;
 
@@ -554,18 +557,19 @@ nas_add_extended_qmi_lte_bands (GArray *mm_bands,
 }
 
 GArray *
-mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
-                                         QmiNasLteBandPreference qmi_lte_bands,
-                                         const guint64 *extended_qmi_lte_bands,
-                                         guint extended_qmi_lte_bands_size)
+mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference     qmi_bands,
+                                         QmiNasLteBandPreference  qmi_lte_bands,
+                                         const guint64           *extended_qmi_lte_bands,
+                                         guint                    extended_qmi_lte_bands_size,
+                                         gpointer                 log_object)
 {
     GArray *mm_bands;
 
     mm_bands = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
-    nas_add_qmi_bands (mm_bands, qmi_bands);
+    nas_add_qmi_bands (mm_bands, qmi_bands, log_object);
 
     if (extended_qmi_lte_bands && extended_qmi_lte_bands_size)
-        nas_add_extended_qmi_lte_bands (mm_bands, extended_qmi_lte_bands, extended_qmi_lte_bands_size);
+        nas_add_extended_qmi_lte_bands (mm_bands, extended_qmi_lte_bands, extended_qmi_lte_bands_size, log_object);
     else
         nas_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
 
@@ -573,11 +577,12 @@ mm_modem_bands_from_qmi_band_preference (QmiNasBandPreference qmi_bands,
 }
 
 void
-mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
-                                       QmiNasBandPreference *qmi_bands,
+mm_modem_bands_to_qmi_band_preference (GArray                  *mm_bands,
+                                       QmiNasBandPreference    *qmi_bands,
                                        QmiNasLteBandPreference *qmi_lte_bands,
-                                       guint64 *extended_qmi_lte_bands,
-                                       guint extended_qmi_lte_bands_size)
+                                       guint64                 *extended_qmi_lte_bands,
+                                       guint                    extended_qmi_lte_bands_size,
+                                       gpointer                 log_object)
 {
     guint i;
 
@@ -618,8 +623,8 @@ mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
                 }
 
                 if (j == G_N_ELEMENTS (nas_lte_bands_map))
-                    mm_dbg ("Cannot add the following LTE band: '%s'",
-                            mm_modem_band_get_string (band));
+                    mm_obj_dbg (log_object, "cannot add the following LTE band: '%s'",
+                                mm_modem_band_get_string (band));
             }
         } else {
             /* Add non-LTE band preference */
@@ -633,8 +638,8 @@ mm_modem_bands_to_qmi_band_preference (GArray *mm_bands,
             }
 
             if (j == G_N_ELEMENTS (nas_bands_map))
-                mm_dbg ("Cannot add the following band: '%s'",
-                        mm_modem_band_get_string (band));
+                mm_obj_dbg (log_object, "cannot add the following band: '%s'",
+                            mm_modem_band_get_string (band));
         }
     }
 }

@@ -1679,7 +1679,7 @@ dms_get_band_capabilities_ready (QmiClientDms *client,
         &extended_qmi_lte_bands,
         NULL);
 
-    mm_bands = mm_modem_bands_from_qmi_band_capabilities (qmi_bands, qmi_lte_bands, extended_qmi_lte_bands);
+    mm_bands = mm_modem_bands_from_qmi_band_capabilities (qmi_bands, qmi_lte_bands, extended_qmi_lte_bands, self);
     if (mm_bands->len == 0) {
         g_clear_pointer (&mm_bands, g_array_unref);
         error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -1787,7 +1787,8 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
     mm_bands = mm_modem_bands_from_qmi_band_preference (band_preference_mask,
                                                         lte_band_preference_mask,
                                                         extended_lte_band_preference_size ? extended_lte_band_preference : NULL,
-                                                        extended_lte_band_preference_size);
+                                                        extended_lte_band_preference_size,
+                                                        self);
 
     if (mm_bands->len == 0) {
         g_clear_pointer (&mm_bands, g_array_unref);
@@ -1902,7 +1903,8 @@ mm_shared_qmi_set_current_bands (MMIfaceModem        *self,
                                            &qmi_bands,
                                            &qmi_lte_bands,
                                            priv->feature_extended_lte_band_preference == FEATURE_SUPPORTED ? extended_qmi_lte_bands : NULL,
-                                           G_N_ELEMENTS (extended_qmi_lte_bands));
+                                           G_N_ELEMENTS (extended_qmi_lte_bands),
+                                           self);
 
     input = qmi_message_nas_set_system_selection_preference_input_new ();
     qmi_message_nas_set_system_selection_preference_input_set_band_preference (input, qmi_bands, NULL);
