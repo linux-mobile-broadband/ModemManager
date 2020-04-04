@@ -897,7 +897,7 @@ load_current_capabilities_step (GTask *task)
     case LOAD_CURRENT_CAPABILITIES_STEP_LAST:
         g_assert (priv->feature_nas_technology_preference       != FEATURE_UNKNOWN);
         g_assert (priv->feature_nas_system_selection_preference != FEATURE_UNKNOWN);
-        priv->current_capabilities = mm_modem_capability_from_qmi_capabilities_context (&ctx->capabilities_context);
+        priv->current_capabilities = mm_modem_capability_from_qmi_capabilities_context (&ctx->capabilities_context, self);
         g_task_return_int (task, priv->current_capabilities);
         g_object_unref (task);
         return;

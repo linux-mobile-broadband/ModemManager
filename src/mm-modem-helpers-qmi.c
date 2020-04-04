@@ -1456,13 +1456,14 @@ mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth)
  * as there would be no capability switching support.
  */
 MMModemCapability
-mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx)
+mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx,
+                                                   gpointer                  log_object)
 {
     MMModemCapability tmp = MM_MODEM_CAPABILITY_NONE;
-    gchar *nas_ssp_mode_preference_str;
-    gchar *nas_tp_str;
-    gchar *dms_capabilities_str;
-    gchar *tmp_str;
+    g_autofree gchar *nas_ssp_mode_preference_str = NULL;
+    g_autofree gchar *nas_tp_str = NULL;
+    g_autofree gchar *dms_capabilities_str = NULL;
+    g_autofree gchar *tmp_str = NULL;
 
     /* If not a multimode device, we're done */
 #define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
@@ -1494,18 +1495,15 @@ mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx
     nas_tp_str = qmi_nas_radio_technology_preference_build_string_from_mask (ctx->nas_tp_mask);
     dms_capabilities_str = mm_modem_capability_build_string_from_mask (ctx->dms_capabilities);
     tmp_str = mm_modem_capability_build_string_from_mask (tmp);
-    mm_dbg ("Current capabilities built: '%s'\n"
-            "  SSP mode preference: '%s'\n"
-            "  TP: '%s'\n"
-            "  DMS Capabilities: '%s'",
-            tmp_str,
-            nas_ssp_mode_preference_str ? nas_ssp_mode_preference_str : "unknown",
-            nas_tp_str ? nas_tp_str : "unknown",
-            dms_capabilities_str);
-    g_free (nas_ssp_mode_preference_str);
-    g_free (nas_tp_str);
-    g_free (dms_capabilities_str);
-    g_free (tmp_str);
+    mm_obj_dbg (log_object,
+                "Current capabilities built: '%s'\n"
+                "  SSP mode preference: '%s'\n"
+                "  TP: '%s'\n"
+                "  DMS Capabilities: '%s'",
+                tmp_str,
+                nas_ssp_mode_preference_str ? nas_ssp_mode_preference_str : "unknown",
+                nas_tp_str ? nas_tp_str : "unknown",
+                dms_capabilities_str);
 
     return tmp;
 }

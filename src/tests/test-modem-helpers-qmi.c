@@ -31,7 +31,7 @@ test_capabilities_expected (MMQmiCapabilitiesContext *ctx,
     gchar *expected_str;
     gchar *built_str;
 
-    built = mm_modem_capability_from_qmi_capabilities_context (ctx);
+    built = mm_modem_capability_from_qmi_capabilities_context (ctx, NULL);
 
     expected_str = mm_modem_capability_build_string_from_mask (expected);
     built_str = mm_modem_capability_build_string_from_mask (built);

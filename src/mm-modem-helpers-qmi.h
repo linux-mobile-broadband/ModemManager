@@ -143,7 +143,8 @@ typedef struct {
     MMModemCapability dms_capabilities;
 } MMQmiCapabilitiesContext;
 
-MMModemCapability mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx);
+MMModemCapability mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx,
+                                                                     gpointer                  log_object);
 
 /*****************************************************************************/
 /* QMI unique id manipulation */
