@@ -470,34 +470,6 @@ mm_filter_supported_modes (const GArray *all,
 
 /*****************************************************************************/
 
-GArray *
-mm_filter_supported_capabilities (MMModemCapability all,
-                                  const GArray *supported_combinations)
-{
-    guint i;
-    GArray *filtered_combinations;
-
-    g_return_val_if_fail (all != MM_MODEM_CAPABILITY_NONE, NULL);
-    g_return_val_if_fail (supported_combinations != NULL, NULL);
-
-    /* We will filter out all combinations which have modes not listed in 'all' */
-    filtered_combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), supported_combinations->len);
-    for (i = 0; i < supported_combinations->len; i++) {
-        MMModemCapability capability;
-
-        capability = g_array_index (supported_combinations, MMModemCapability, i);
-        if (!(capability & ~all))
-            g_array_append_val (filtered_combinations, capability);
-    }
-
-    if (filtered_combinations->len == 0)
-        mm_warn ("All supported capability combinations were filtered out.");
-
-    return filtered_combinations;
-}
-
-/*****************************************************************************/
-
 static const gchar bcd_chars[] = "0123456789\0\0\0\0\0\0";
 
 gchar *
