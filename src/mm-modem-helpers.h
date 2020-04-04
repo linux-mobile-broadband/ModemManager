@@ -415,6 +415,7 @@ gboolean  mm_3gpp_parse_cemode_query_response (const gchar                    *r
 
 /* CCWA service query response parser */
 gboolean mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
+                                                    gpointer      log_object,
                                                     gboolean     *status,
                                                     GError      **error);
 

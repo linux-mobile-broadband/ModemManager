@@ -4133,7 +4133,7 @@ common_test_ccwa_response (const gchar *response,
     GError   *error = NULL;
     gboolean  result;
 
-    result = mm_3gpp_parse_ccwa_service_query_response (response, &status, &error);
+    result = mm_3gpp_parse_ccwa_service_query_response (response, NULL, &status, &error);
 
     if (expected_error) {
         g_assert (!result);

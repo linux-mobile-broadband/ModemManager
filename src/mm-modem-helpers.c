@@ -2846,6 +2846,7 @@ mm_3gpp_parse_cemode_query_response (const gchar                    *response,
 
 gboolean
 mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
+                                           gpointer      log_object,
                                            gboolean     *status,
                                            GError      **error)
 {
@@ -2881,10 +2882,10 @@ mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
         guint class;
 
         if (!mm_get_uint_from_match_info (match_info, 2, &class))
-            mm_warn ("couldn't parse class from +CCWA line");
+            mm_obj_warn (log_object, "couldn't parse class from +CCWA line");
         else if (class == 1 || class == 255) {
             if (!mm_get_uint_from_match_info (match_info, 1, &st))
-                mm_warn ("couldn't parse status from +CCWA line");
+                mm_obj_warn (log_object, "couldn't parse status from +CCWA line");
             else {
                 class_1_status = st;
                 break;

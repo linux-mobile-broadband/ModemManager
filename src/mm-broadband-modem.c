@@ -8311,7 +8311,7 @@ modem_voice_call_waiting_query_finish (MMIfaceModemVoice  *self,
     if (!response)
         return FALSE;
 
-    return mm_3gpp_parse_ccwa_service_query_response (response, status, error);
+    return mm_3gpp_parse_ccwa_service_query_response (response, self, status, error);
 }
 
 static void
