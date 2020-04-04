@@ -19,7 +19,6 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
 #include "mm-broadband-modem.h"
 #include "mm-plugin-haier.h"
 
