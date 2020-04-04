@@ -24,9 +24,11 @@
 /*****************************************************************************/
 /* QMI/DMS to MM translations */
 
-MMModemCapability mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network);
+MMModemCapability mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network,
+                                                                gpointer             log_object);
 
-MMModemMode mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network);
+MMModemMode mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network,
+                                                    gpointer             log_object);
 
 MMModemLock mm_modem_lock_from_qmi_uim_pin_status (QmiDmsUimPinStatus status,
                                                        gboolean pin1);

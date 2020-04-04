@@ -761,7 +761,7 @@ load_current_capabilities_get_capabilities_ready (QmiClientDms *client,
 
     for (i = 0; i < radio_interface_list->len; i++)
         ctx->capabilities_context.dms_capabilities |=
-            mm_modem_capability_from_qmi_radio_interface (g_array_index (radio_interface_list, QmiDmsRadioInterface, i));
+            mm_modem_capability_from_qmi_radio_interface (g_array_index (radio_interface_list, QmiDmsRadioInterface, i), self);
 
 out:
     if (output)
@@ -997,7 +997,7 @@ mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
     /* Build mask with all supported capabilities */
     mask = MM_MODEM_CAPABILITY_NONE;
     for (i = 0; i < priv->supported_radio_interfaces->len; i++)
-        mask |= mm_modem_capability_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i));
+        mask |= mm_modem_capability_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i), self);
 
     supported_combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 3);
 
@@ -1541,7 +1541,7 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
     /* Build all, based on the supported radio interfaces */
     mask_all = MM_MODEM_MODE_NONE;
     for (i = 0; i < priv->supported_radio_interfaces->len; i++)
-        mask_all |= mm_modem_mode_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i));
+        mask_all |= mm_modem_mode_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i), self);
     mode.allowed = mask_all;
     mode.preferred = MM_MODEM_MODE_NONE;
     all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);

@@ -27,7 +27,8 @@
 /*****************************************************************************/
 
 MMModemCapability
-mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network)
+mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network,
+                                              gpointer             log_object)
 {
     switch (network) {
     case QMI_DMS_RADIO_INTERFACE_CDMA20001X:
@@ -42,8 +43,7 @@ mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network)
         return MM_MODEM_CAPABILITY_LTE;
     case QMI_DMS_RADIO_INTERFACE_5GNR:
     default:
-        mm_warn ("Unhandled QMI radio interface (%u)",
-                 (guint)network);
+        mm_obj_warn (log_object, "unhandled QMI radio interface '%u'", (guint)network);
         return MM_MODEM_CAPABILITY_NONE;
     }
 }
@@ -51,7 +51,8 @@ mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network)
 /*****************************************************************************/
 
 MMModemMode
-mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network)
+mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network,
+                                        gpointer             log_object)
 {
     switch (network) {
     case QMI_DMS_RADIO_INTERFACE_CDMA20001X:
@@ -66,8 +67,7 @@ mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network)
         return MM_MODEM_MODE_4G;
     case QMI_DMS_RADIO_INTERFACE_5GNR:
     default:
-        mm_warn ("Unhandled QMI radio interface (%u)",
-                 (guint)network);
+        mm_obj_warn (log_object, "unhandled QMI radio interface '%u'", (guint)network);
         return MM_MODEM_MODE_NONE;
     }
 }
