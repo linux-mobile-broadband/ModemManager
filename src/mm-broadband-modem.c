@@ -4565,6 +4565,7 @@ registration_state_changed (MMPortSerialAt *port,
     GError *error = NULL;
 
     if (!mm_3gpp_parse_creg_response (match_info,
+                                      self,
                                       &state,
                                       &lac,
                                       &cell_id,
@@ -4968,6 +4969,7 @@ registration_status_check_ready (MMBroadbandModem *self,
     lac = 0;
     cid = 0;
     parsed = mm_3gpp_parse_creg_response (match_info,
+                                          self,
                                           &state,
                                           &lac,
                                           &cid,

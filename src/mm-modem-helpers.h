@@ -217,14 +217,15 @@ GList *mm_3gpp_parse_cgact_read_response (const gchar *reply,
                                           GError **error);
 
 /* CREG/CGREG response/unsolicited message parser */
-gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
-                                      MMModem3gppRegistrationState *out_reg_state,
-                                      gulong *out_lac,
-                                      gulong *out_ci,
-                                      MMModemAccessTechnology *out_act,
-                                      gboolean *out_cgreg,
-                                      gboolean *out_cereg,
-                                      GError **error);
+gboolean mm_3gpp_parse_creg_response (GMatchInfo                    *info,
+                                      gpointer                       log_object,
+                                      MMModem3gppRegistrationState  *out_reg_state,
+                                      gulong                        *out_lac,
+                                      gulong                        *out_ci,
+                                      MMModemAccessTechnology       *out_act,
+                                      gboolean                      *out_cgreg,
+                                      gboolean                      *out_cereg,
+                                      GError                       **error);
 
 /* AT+CMGF=? (SMS message format) response parser */
 gboolean mm_3gpp_parse_cmgf_test_response (const gchar *reply,

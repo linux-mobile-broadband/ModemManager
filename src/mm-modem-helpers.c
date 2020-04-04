@@ -1942,14 +1942,15 @@ item_is_lac_not_stat (GMatchInfo *info, guint32 item)
 }
 
 gboolean
-mm_3gpp_parse_creg_response (GMatchInfo *info,
-                             MMModem3gppRegistrationState *out_reg_state,
-                             gulong *out_lac,
-                             gulong *out_ci,
-                             MMModemAccessTechnology *out_act,
-                             gboolean *out_cgreg,
-                             gboolean *out_cereg,
-                             GError **error)
+mm_3gpp_parse_creg_response (GMatchInfo                    *info,
+                             gpointer                       log_object,
+                             MMModem3gppRegistrationState  *out_reg_state,
+                             gulong                        *out_lac,
+                             gulong                        *out_ci,
+                             MMModemAccessTechnology       *out_act,
+                             gboolean                      *out_cgreg,
+                             gboolean                      *out_cereg,
+                             GError                       **error)
 {
     gboolean success = FALSE, foo;
     gint n_matches, act = -1;
@@ -2057,7 +2058,7 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
 
     /* 'roaming (csfb not preferred)' is the last valid state */
     if (stat > MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING_CSFB_NOT_PREFERRED) {
-        mm_warn ("Registration State '%lu' is unknown", stat);
+        mm_obj_warn (log_object, "unknown registration state value '%lu'", stat);
         stat = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     }
 
