@@ -25,7 +25,7 @@
 
 #include "ModemManager.h"
 #include "mm-serial-parsers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
@@ -38,7 +38,7 @@ static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemAnydata, mm_broadband_modem_anydata, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init))
 
 /*****************************************************************************/
 /* Detailed registration state (CDMA interface) */
@@ -119,7 +119,7 @@ hstate_ready (MMIfaceModemCdma *self,
                 results->detailed_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             default:
-                mm_warn ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
+                mm_obj_warn (self, "unknown *HSTATE (%d); assuming no service", val);
                 /* fall through */
             case 0:  /* NO SERVICE */
             case 1:  /* ACQUISITION */
@@ -186,7 +186,7 @@ state_ready (MMIfaceModemCdma *self,
                 results->detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             default:
-                mm_warn ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
+                mm_obj_warn (self, "unknown *HSTATE (%d); assuming no service", val);
                 /* fall through */
             case 0:  /* NO SERVICE */
                 break;
