@@ -26,7 +26,7 @@
 #include <libmm-glib.h>
 
 #include "mm-plugin-foxconn.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-broadband-modem.h"
 
 #if defined WITH_QMI
@@ -55,7 +55,7 @@ create_modem (MMPlugin     *self,
 {
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered Foxconn-branded modem found...");
+        mm_obj_dbg (self, "QMI-powered Foxconn-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -68,7 +68,7 @@ create_modem (MMPlugin     *self,
     if (mm_port_probe_list_has_mbim_port (probes)) {
         /* Specific implementation for the T77W968 */
         if (product == 0xe0b4 || product == 0xe0b5) {
-            mm_dbg ("MBIM-powered T77W968 modem found...");
+            mm_obj_dbg (self, "MBIM-powered T77W968 modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_foxconn_t77w968_new (uid,
 									  drivers,
 									  mm_plugin_get_name (self),
@@ -76,7 +76,7 @@ create_modem (MMPlugin     *self,
 									  product));
         }
 
-        mm_dbg ("MBIM-powered Foxconn-branded modem found...");
+        mm_obj_dbg (self, "MBIM-powered Foxconn-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
                                                            mm_plugin_get_name (self),
@@ -85,7 +85,7 @@ create_modem (MMPlugin     *self,
     }
 #endif
 
-    mm_dbg ("Foxconn-branded generic modem found...");
+    mm_obj_dbg (self, "Foxconn-branded generic modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
                                                   drivers,
                                                   mm_plugin_get_name (self),
