@@ -1,0 +1,117 @@
+# Russian translation for ModemManager.
+# Copyright (C) 2020 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Артемий Судаков <finziyr@yandex.ru>, 2020.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
+"POT-Creation-Date: 2020-04-05 09:45+0200\n"
+"PO-Revision-Date: 2020-04-04 21:26+0300\n"
+"Last-Translator: Артемий Судаков <finziyr@yandex.ru>\n"
+"Language-Team: Russian <gnome-cyr@gnome.org>\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"X-Generator: Poedit 2.3\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Настроить сервис Modem Manager"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "Системная политика не позволяет управлять Modem Manager'ом."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Разблокировка и управление мобильным широкополосным устройством"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Системная политика предотвращает разблокировку или управление мобильным "
+"широкополосным устройством."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Добавить, изменить и удалить мобильные широкополосные контакты"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Системная политика запрещает добавление, изменение или удаление контактов "
+"этого устройства."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Отправить, сохранить, изменить и удалить текстовые сообщения"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Системная политика запрещает отправку или манипулирование текстовыми "
+"сообщениями этого устройства."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr ""
+"Принимать входящие голосовые звонки или начать исходящие голосовые звонки."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Системная политика запрещает голосовые звонки."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr "Запрос информации о времени и часовых поясах в сети"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid "System policy prevents querying network time information."
+msgstr "Системная политика запрещает запрашивать информацию о времени в сети."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"Включить и просмотреть географическое местоположение и информацию о "
+"местоположении"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Системная политика запрещает включение или просмотр информации о "
+"географическом местоположении."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and utilize network information and services"
+msgstr "Запрос, использование сетевой информации и услуг"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Системная политика не позволяет запрашивать или использовать сетевую "
+"информацию и сервисы."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Запрос и управление прошивкой на мобильном широкополосном устройстве"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Системная политика не позволяет запрашивать или управлять прошивкой этого "
+"устройства."
+
+#: src/mm-sleep-monitor.c:114
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager'у необходимо перезагрузить устройства"
