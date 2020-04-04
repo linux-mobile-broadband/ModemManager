@@ -3331,6 +3331,7 @@ mm_3gpp_build_cmer_set_request (MM3gppCmerMode mode,
 
 gboolean
 mm_3gpp_parse_cmer_test_response (const gchar     *response,
+                                  gpointer         log_object,
                                   MM3gppCmerMode  *out_supported_modes,
                                   MM3gppCmerInd   *out_supported_inds,
                                   GError         **error)
@@ -3385,7 +3386,7 @@ mm_3gpp_parse_cmer_test_response (const gchar     *response,
         if (mode_val <= 3)
             supported_modes |= (MM3gppCmerMode) (1 << mode_val);
         else
-            mm_dbg ("Unknown +CMER mode reported: %u", mode_val);
+            mm_obj_dbg (log_object, "unknown +CMER mode reported: %u", mode_val);
     }
 
     for (i = 0; i < array_supported_inds->len; i++) {
@@ -3395,7 +3396,7 @@ mm_3gpp_parse_cmer_test_response (const gchar     *response,
         if (ind_val <= 2)
             supported_inds |= (MM3gppCmerInd) (1 << ind_val);
         else
-            mm_dbg ("Unknown +CMER ind reported: %u", ind_val);
+            mm_obj_dbg (log_object, "unknown +CMER ind reported: %u", ind_val);
     }
 
     if (out_supported_modes)

@@ -3244,7 +3244,7 @@ cmer_format_check_ready (MMBroadbandModem *self,
     gchar          *aux;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error || !mm_3gpp_parse_cmer_test_response (result, &supported_modes, &supported_inds, &error)) {
+    if (error || !mm_3gpp_parse_cmer_test_response (result, self, &supported_modes, &supported_inds, &error)) {
         mm_obj_dbg (self, "+CMER check failed: %s", error->message);
         mm_obj_dbg (self, "generic indications are unsupported");
         g_error_free (error);

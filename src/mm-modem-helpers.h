@@ -285,6 +285,7 @@ typedef enum { /*< underscore_name=mm_3gpp_cmer_ind >*/
 gchar    *mm_3gpp_build_cmer_set_request   (MM3gppCmerMode   mode,
                                             MM3gppCmerInd    ind);
 gboolean  mm_3gpp_parse_cmer_test_response (const gchar     *reply,
+                                            gpointer         log_object,
                                             MM3gppCmerMode  *supported_modes,
                                             MM3gppCmerInd   *supported_inds,
                                             GError         **error);

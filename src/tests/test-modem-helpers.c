@@ -1938,7 +1938,7 @@ test_cmer_response (const gchar    *str,
     MM3gppCmerInd   inds = MM_3GPP_CMER_IND_NONE;
     GError         *error = NULL;
 
-    ret = mm_3gpp_parse_cmer_test_response (str, &modes, &inds, &error);
+    ret = mm_3gpp_parse_cmer_test_response (str, NULL, &modes, &inds, &error);
     g_assert_no_error (error);
     g_assert (ret);
 
