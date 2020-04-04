@@ -483,8 +483,11 @@ ier_query_ready (MMBaseModem  *modem,
                  GAsyncResult *res,
                  GTask        *task)
 {
-    const gchar *response;
-    GError      *activation_error = NULL;
+    MMBroadbandBearerIcera *self;
+    const gchar            *response;
+    GError                 *activation_error = NULL;
+
+    self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_full_finish (modem, res, NULL);
     if (response) {
@@ -497,8 +500,7 @@ ier_query_ready (MMBaseModem  *modem,
              * 33 - Requested service option not subscribed
              */
             if (nw_activation_err == 27 || nw_activation_err == 33)
-                activation_error = mm_mobile_equipment_error_for_code (
-                    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED);
+                activation_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED, self);
         }
     }
 

@@ -29,7 +29,8 @@ typedef struct {
 /* --- Connection errors --- */
 
 GError *
-mm_connection_error_for_code (MMConnectionError code)
+mm_connection_error_for_code (MMConnectionError code,
+                              gpointer          log_object)
 {
     const gchar *msg;
 
@@ -51,7 +52,7 @@ mm_connection_error_for_code (MMConnectionError code)
         break;
 
     default:
-        mm_dbg ("Invalid connection error code: %u", code);
+        mm_obj_dbg (log_object, "invalid connection error code: %u", code);
         /* uhm... make something up (yes, ok, lie!). */
         code = MM_CONNECTION_ERROR_NO_CARRIER;
         msg = "No carrier";
@@ -149,7 +150,8 @@ static ErrorTable me_errors[] = {
 };
 
 GError *
-mm_mobile_equipment_error_for_code (MMMobileEquipmentError code)
+mm_mobile_equipment_error_for_code (MMMobileEquipmentError code,
+                                    gpointer               log_object)
 {
     guint i;
 
@@ -162,14 +164,15 @@ mm_mobile_equipment_error_for_code (MMMobileEquipmentError code)
     }
 
     /* Not found? Then, default */
-    mm_dbg ("Invalid mobile equipment error code: %u", (guint)code);
+    mm_obj_dbg (log_object, "invalid mobile equipment error code: %u", (guint)code);
     return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                         MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
                         "Unknown error");
 }
 
 GError *
-mm_mobile_equipment_error_for_string (const gchar *str)
+mm_mobile_equipment_error_for_string (const gchar *str,
+                                      gpointer     log_object)
 {
     MMMobileEquipmentError code = MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN;
     const gchar *msg = NULL;
@@ -198,7 +201,7 @@ mm_mobile_equipment_error_for_string (const gchar *str)
 
     /* Not found? Then, default */
     if (!msg) {
-        mm_dbg ("Invalid mobile equipment error string: '%s' (%s)", str, buf);
+        mm_obj_dbg (log_object, "invalid mobile equipment error string: '%s' (%s)", str, buf);
         code = MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN;
         msg = "Unknown error";
     }
@@ -236,7 +239,8 @@ static ErrorTable msg_errors[] = {
 };
 
 GError *
-mm_message_error_for_code (MMMessageError code)
+mm_message_error_for_code (MMMessageError code,
+                           gpointer       log_object)
 {
     guint i;
 
@@ -249,14 +253,15 @@ mm_message_error_for_code (MMMessageError code)
     }
 
     /* Not found? Then, default */
-    mm_dbg ("Invalid message error code: %u", (guint)code);
+    mm_obj_dbg (log_object, "invalid message error code: %u", (guint)code);
     return g_error_new (MM_MESSAGE_ERROR,
                         MM_MESSAGE_ERROR_UNKNOWN,
                         "Unknown error");
 }
 
 GError *
-mm_message_error_for_string (const gchar *str)
+mm_message_error_for_string (const gchar *str,
+                             gpointer     log_object)
 {
     MMMessageError code = MM_MESSAGE_ERROR_UNKNOWN;
     const gchar *msg = NULL;
@@ -285,7 +290,7 @@ mm_message_error_for_string (const gchar *str)
 
     /* Not found? Then, default */
     if (!msg) {
-        mm_dbg ("Invalid message error string: '%s' (%s)", str, buf);
+        mm_obj_dbg (log_object, "invalid message error string: '%s' (%s)", str, buf);
         code = MM_MESSAGE_ERROR_UNKNOWN;
         msg = "Unknown error";
     }

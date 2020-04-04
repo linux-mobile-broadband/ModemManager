@@ -995,12 +995,12 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
              * The MC7710 may use this while the SIM is not ready yet. */
             break;
         case MBIM_SUBSCRIBER_READY_STATE_BAD_SIM:
-            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
+            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG, self);
             break;
         case MBIM_SUBSCRIBER_READY_STATE_FAILURE:
         case MBIM_SUBSCRIBER_READY_STATE_NOT_ACTIVATED:
         default:
-            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE);
+            error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE, self);
             break;
         }
     }
@@ -1020,7 +1020,7 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
         /* All retries consumed? issue error */
         if (ctx->last_attempt) {
             if (ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)
-                g_task_return_error (task, mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED));
+                g_task_return_error (task, mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED, self));
             else
                 g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                          "Error waiting for SIM to get initialized");

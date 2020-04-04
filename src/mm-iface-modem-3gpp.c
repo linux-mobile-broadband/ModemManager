@@ -311,7 +311,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
         mm_obj_dbg (self, "registration denied");
         register_in_network_context_complete_failed (
             task,
-            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_NOT_ALLOWED));
+            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_NOT_ALLOWED, self));
         return;
     }
 
@@ -333,7 +333,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
         mm_obj_dbg (self, "3GPP registration check timed out");
         register_in_network_context_complete_failed (
             task,
-            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
+            mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT, self));
         return;
     }
 

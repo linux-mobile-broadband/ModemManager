@@ -23,10 +23,10 @@
 #include <ModemManager.h>
 #include <libmm-glib.h>
 
-GError *mm_connection_error_for_code         (MMConnectionError code);
-GError *mm_mobile_equipment_error_for_code   (MMMobileEquipmentError code);
-GError *mm_mobile_equipment_error_for_string (const gchar *str);
-GError *mm_message_error_for_code            (MMMessageError code);
-GError *mm_message_error_for_string          (const gchar *str);
+GError *mm_connection_error_for_code         (MMConnectionError       code, gpointer log_object);
+GError *mm_mobile_equipment_error_for_code   (MMMobileEquipmentError  code, gpointer log_object);
+GError *mm_mobile_equipment_error_for_string (const gchar            *str,  gpointer log_object);
+GError *mm_message_error_for_code            (MMMessageError          code, gpointer log_object);
+GError *mm_message_error_for_string          (const gchar            *str,  gpointer log_object);
 
 #endif /* MM_ERROR_HELPERS_H */

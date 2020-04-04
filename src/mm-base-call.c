@@ -169,7 +169,7 @@ handle_start_ready (MMBaseCall         *self,
         if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED) ||
             g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_CANCELLED)) {
             g_clear_error (&error);
-            error = mm_connection_error_for_code (MM_CONNECTION_ERROR_NO_DIALTONE);
+            error = mm_connection_error_for_code (MM_CONNECTION_ERROR_NO_DIALTONE, self);
         }
 
         /* Convert errors into call state updates */

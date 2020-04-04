@@ -9682,7 +9682,7 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
         mm_iface_modem_cdma_update_access_technologies (
             MM_IFACE_MODEM_CDMA (self),
             MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-        error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT);
+        error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT, self);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;

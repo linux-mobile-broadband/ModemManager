@@ -239,7 +239,7 @@ mm_serial_parser_v1_parse (gpointer   data,
         if (found) {
             str = g_match_info_fetch (match_info, 1);
             g_assert (str);
-            local_error = mm_mobile_equipment_error_for_code (atoi (str));
+            local_error = mm_mobile_equipment_error_for_code (atoi (str), log_object);
             goto done;
         }
         g_match_info_free (match_info);
@@ -252,7 +252,7 @@ mm_serial_parser_v1_parse (gpointer   data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_mobile_equipment_error_for_code (atoi (str));
+        local_error = mm_mobile_equipment_error_for_code (atoi (str), log_object);
         goto done;
     }
     g_match_info_free (match_info);
@@ -264,7 +264,7 @@ mm_serial_parser_v1_parse (gpointer   data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_message_error_for_code (atoi (str));
+        local_error = mm_message_error_for_code (atoi (str), log_object);
         goto done;
     }
     g_match_info_free (match_info);
@@ -276,7 +276,7 @@ mm_serial_parser_v1_parse (gpointer   data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_mobile_equipment_error_for_string (str);
+        local_error = mm_mobile_equipment_error_for_string (str, log_object);
         goto done;
     }
     g_match_info_free (match_info);
@@ -288,7 +288,7 @@ mm_serial_parser_v1_parse (gpointer   data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_message_error_for_string (str);
+        local_error = mm_message_error_for_string (str, log_object);
         goto done;
     }
     g_match_info_free (match_info);
@@ -300,7 +300,7 @@ mm_serial_parser_v1_parse (gpointer   data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
+        local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN, log_object);
         goto done;
     }
     g_match_info_free (match_info);
@@ -310,7 +310,7 @@ mm_serial_parser_v1_parse (gpointer   data,
                                 response->str, response->len,
                                 0, 0, &match_info, NULL);
     if (found) {
-        local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
+        local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN, log_object);
         goto done;
     }
     g_match_info_free (match_info);
@@ -338,7 +338,7 @@ mm_serial_parser_v1_parse (gpointer   data,
             code = MM_CONNECTION_ERROR_NO_CARRIER;
         }
 
-        local_error = mm_connection_error_for_code (code);
+        local_error = mm_connection_error_for_code (code, log_object);
         goto done;
     }
     g_match_info_free (match_info);

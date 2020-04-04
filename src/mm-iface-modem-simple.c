@@ -164,7 +164,7 @@ check_next_registration (GTask *task)
     /* No more tries of anything */
     g_task_return_error (
         task,
-        mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
+        mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT, self));
     g_object_unref (task);
 }
 

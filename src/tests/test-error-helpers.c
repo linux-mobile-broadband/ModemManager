@@ -38,7 +38,7 @@
                                                                             \
           enum_value = g_enum_get_value (enum_class, i);                    \
           if (enum_value) {                                                 \
-              error = mm_## ERROR_SMALL ## _for_code ((MM##ERROR_CAMEL)i);  \
+              error = mm_## ERROR_SMALL ## _for_code ((MM##ERROR_CAMEL)i, NULL); \
               g_assert_error (error, MM_ ## ERROR_CAPS, i);                 \
               g_error_free (error);                                         \
           }                                                                 \
