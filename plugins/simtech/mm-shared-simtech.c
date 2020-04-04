@@ -781,7 +781,7 @@ clcc_urc_received (MMPortSerialAt  *port,
 
     full = g_match_info_fetch (match_info, 0);
 
-    if (!mm_simtech_parse_clcc_list (full, &call_info_list, &error)) {
+    if (!mm_simtech_parse_clcc_list (full, self, &call_info_list, &error)) {
         mm_warn ("couldn't parse +CLCC list in URC: %s", error->message);
         g_error_free (error);
     } else

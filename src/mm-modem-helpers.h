@@ -106,6 +106,7 @@ typedef struct {
     gchar           *number; /* optional */
 } MMCallInfo;
 gboolean mm_3gpp_parse_clcc_response (const gchar  *str,
+                                      gpointer      log_object,
                                       GList       **out_list,
                                       GError      **error);
 void     mm_3gpp_call_info_list_free (GList        *call_info_list);

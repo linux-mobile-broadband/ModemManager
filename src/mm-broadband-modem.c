@@ -7560,7 +7560,7 @@ modem_voice_load_call_list_finish (MMIfaceModemVoice  *self,
 }
 
 static void
-clcc_ready (MMBaseModem  *modem,
+clcc_ready (MMBaseModem  *self,
             GAsyncResult *res,
             GTask        *task)
 {
@@ -7568,8 +7568,8 @@ clcc_ready (MMBaseModem  *modem,
     GError      *error = NULL;
     GList       *call_info_list = NULL;
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
-    if (!response || !mm_3gpp_parse_clcc_response (response, &call_info_list, &error))
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response || !mm_3gpp_parse_clcc_response (response, self, &call_info_list, &error))
         g_task_return_error (task, error);
     else
         g_task_return_pointer (task, call_info_list, (GDestroyNotify)mm_3gpp_call_info_list_free);

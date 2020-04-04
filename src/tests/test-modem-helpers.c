@@ -4190,7 +4190,7 @@ common_test_clcc_response (const gchar      *str,
     GList      *call_info_list = NULL;
     GList      *l;
 
-    result = mm_3gpp_parse_clcc_response (str, &call_info_list, &error);
+    result = mm_3gpp_parse_clcc_response (str, NULL, &call_info_list, &error);
     g_assert_no_error (error);
     g_assert (result);
 

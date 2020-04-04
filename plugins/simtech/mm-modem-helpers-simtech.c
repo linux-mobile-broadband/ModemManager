@@ -79,13 +79,14 @@ mm_simtech_get_clcc_urc_regex (void)
 
 gboolean
 mm_simtech_parse_clcc_list (const gchar *str,
+                            gpointer     log_object,
                             GList      **out_list,
                             GError     **error)
 {
     /* Parse the URC contents as a plain +CLCC response, but make sure to skip first
      * EOL in the string because the plain +CLCC response would never have that.
      */
-    return mm_3gpp_parse_clcc_response (mm_strip_tag (str, "\r\n"), out_list, error);
+    return mm_3gpp_parse_clcc_response (mm_strip_tag (str, "\r\n"), log_object, out_list, error);
 }
 
 void

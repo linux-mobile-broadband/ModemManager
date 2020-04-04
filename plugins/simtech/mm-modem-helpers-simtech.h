@@ -32,6 +32,7 @@ gboolean mm_simtech_parse_clcc_test (const gchar  *response,
 
 GRegex   *mm_simtech_get_clcc_urc_regex  (void);
 gboolean  mm_simtech_parse_clcc_list     (const gchar *str,
+                                          gpointer     log_object,
                                           GList      **out_list,
                                           GError     **error);
 void      mm_simtech_call_info_list_free (GList       *call_info_list);

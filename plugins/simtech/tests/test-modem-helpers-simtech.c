@@ -52,7 +52,7 @@ common_test_clcc_urc (const gchar      *urc,
     str = g_match_info_fetch (match_info, 0);
     g_assert (str);
 
-    result = mm_simtech_parse_clcc_list (str, &call_info_list, &error);
+    result = mm_simtech_parse_clcc_list (str, NULL, &call_info_list, &error);
     g_assert_no_error (error);
     g_assert (result);
 

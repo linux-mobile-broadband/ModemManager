@@ -560,6 +560,7 @@ call_info_free (MMCallInfo *info)
 
 gboolean
 mm_3gpp_parse_clcc_response (const gchar  *str,
+                             gpointer      log_object,
                              GList       **out_list,
                              GError      **error)
 {
@@ -623,20 +624,20 @@ mm_3gpp_parse_clcc_response (const gchar  *str,
         call_info = g_slice_new0 (MMCallInfo);
 
         if (!mm_get_uint_from_match_info (match_info, 1, &call_info->index)) {
-            mm_warn ("couldn't parse call index from +CLCC line");
+            mm_obj_warn (log_object, "couldn't parse call index from +CLCC line");
             goto next;
         }
 
         if (!mm_get_uint_from_match_info (match_info, 2, &aux) ||
             (aux >= G_N_ELEMENTS (call_direction))) {
-            mm_warn ("couldn't parse call direction from +CLCC line");
+            mm_obj_warn (log_object, "couldn't parse call direction from +CLCC line");
             goto next;
         }
         call_info->direction = call_direction[aux];
 
         if (!mm_get_uint_from_match_info (match_info, 3, &aux) ||
             (aux >= G_N_ELEMENTS (call_state))) {
-            mm_warn ("couldn't parse call state from +CLCC line");
+            mm_obj_warn (log_object, "couldn't parse call state from +CLCC line");
             goto next;
         }
         call_info->state = call_state[aux];
