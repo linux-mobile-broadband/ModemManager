@@ -617,6 +617,7 @@ test_xcesq_response_to_signal (void)
         MMSignal *lte  = NULL;
 
         success = mm_xmm_xcesq_response_to_signal_info (xcesq_response_tests[i].str,
+                                                        NULL,
                                                         &gsm, &umts, &lte,
                                                         &error);
         g_assert_no_error (error);

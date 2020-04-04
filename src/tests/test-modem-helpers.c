@@ -3910,6 +3910,7 @@ test_cesq_response_to_signal (void)
         MMSignal *lte  = NULL;
 
         success = mm_3gpp_cesq_response_to_signal_info (cesq_response_tests[i].str,
+                                                        NULL,
                                                         &gsm, &umts, &lte,
                                                         &error);
         g_assert_no_error (error);

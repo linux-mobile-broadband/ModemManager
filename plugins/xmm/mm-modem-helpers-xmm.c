@@ -716,6 +716,7 @@ rssnr_level_to_rssnr (gint     rssnr_level,
 
 gboolean
 mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
+                                      gpointer      log_object,
                                       MMSignal    **out_gsm,
                                       MMSignal    **out_umts,
                                       MMSignal    **out_lte,
@@ -746,7 +747,7 @@ mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
         return FALSE;
 
     /* GERAN RSSI */
-    if (mm_3gpp_rxlev_to_rssi (rxlev, &rssi)) {
+    if (mm_3gpp_rxlev_to_rssi (rxlev, log_object, &rssi)) {
         gsm = mm_signal_new ();
         mm_signal_set_rssi (gsm, rssi);
     }
@@ -754,13 +755,13 @@ mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
     /* ignore BER */
 
     /* UMTS RSCP */
-    if (mm_3gpp_rscp_level_to_rscp (rscp_level, &rscp)) {
+    if (mm_3gpp_rscp_level_to_rscp (rscp_level, log_object, &rscp)) {
         umts = mm_signal_new ();
         mm_signal_set_rscp (umts, rscp);
     }
 
     /* UMTS EcIo (assumed EcN0) */
-    if (mm_3gpp_ecn0_level_to_ecio (ecn0_level, &ecio)) {
+    if (mm_3gpp_ecn0_level_to_ecio (ecn0_level, log_object, &ecio)) {
         if (!umts)
             umts = mm_signal_new ();
         mm_signal_set_ecio (umts, ecio);
@@ -772,13 +773,13 @@ mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
     }
 
     /* LTE RSRQ */
-    if (mm_3gpp_rsrq_level_to_rsrq (rsrq_level, &rsrq)) {
+    if (mm_3gpp_rsrq_level_to_rsrq (rsrq_level, log_object, &rsrq)) {
         lte = mm_signal_new ();
         mm_signal_set_rsrq (lte, rsrq);
     }
 
     /* LTE RSRP */
-    if (mm_3gpp_rsrp_level_to_rsrp (rsrp_level, &rsrp)) {
+    if (mm_3gpp_rsrp_level_to_rsrp (rsrp_level, log_object, &rsrp)) {
         if (!lte)
             lte = mm_signal_new ();
         mm_signal_set_rsrp (lte, rsrp);

@@ -765,7 +765,7 @@ mm_shared_xmm_signal_load_values_finish (MMIfaceModemSignal  *self,
     const gchar *response;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!response || !mm_xmm_xcesq_response_to_signal_info (response, gsm, umts, lte, error))
+    if (!response || !mm_xmm_xcesq_response_to_signal_info (response, self, gsm, umts, lte, error))
         return FALSE;
 
     if (cdma)
