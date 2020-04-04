@@ -31,7 +31,7 @@
 #include "mm-plugin-generic.h"
 #include "mm-broadband-modem.h"
 #include "mm-serial-parsers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
@@ -59,7 +59,7 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered generic modem found...");
+        mm_obj_dbg (self, "QMI-powered generic modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -70,7 +70,7 @@ create_modem (MMPlugin *self,
 
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
-        mm_dbg ("MBIM-powered generic modem found...");
+        mm_obj_dbg (self, "MBIM-powered generic modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
                                                            mm_plugin_get_name (self),
