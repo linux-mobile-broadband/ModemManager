@@ -36,7 +36,7 @@
 #include "mm-broadband-modem-telit.h"
 #include "mm-broadband-modem-xmm.h"
 #include "mm-common-telit.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
@@ -170,7 +170,7 @@ response_ready (MMPortSerialAt *port,
     if (error) {
         /* Non-timeout error, jump to next command */
         if (!g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            mm_dbg ("(Dell) Error probing AT port: %s", error->message);
+            mm_obj_dbg (probe, "error probing AT port: %s", error->message);
             g_error_free (error);
             custom_init_step_next_command (task);
             return;
@@ -250,8 +250,7 @@ custom_init_step (GTask *task)
 
     /* If cancelled, end without error right away */
     if (g_cancellable_is_cancelled (g_task_get_cancellable (task))) {
-        mm_dbg ("(Dell) no need to keep on running custom init in (%s)",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "no need to keep on running custom init: cancelled");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -260,8 +259,7 @@ custom_init_step (GTask *task)
 #if defined WITH_QMI
     /* If device has a QMI port, don't run anything else, as we don't care */
     if (mm_port_probe_list_has_qmi_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (probe)))) {
-        mm_dbg ("(Dell) no need to run custom init in (%s): device has QMI port",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "no need to run custom init: device has QMI port");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -271,8 +269,7 @@ custom_init_step (GTask *task)
 #if defined WITH_MBIM
     /* If device has a MBIM port, don't run anything else, as we don't care */
     if (mm_port_probe_list_has_mbim_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (probe)))) {
-        mm_dbg ("(Dell) no need to run custom init in (%s): device has MBIM port",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "no need to run custom init: device has MBIM port");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -280,8 +277,7 @@ custom_init_step (GTask *task)
 #endif
 
     if (ctx->timeouts >= MAX_PORT_PROBE_TIMEOUTS) {
-        mm_dbg ("(Dell) couldn't detect real manufacturer in (%s): too many timeouts",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "couldn't detect real manufacturer: too many timeouts");
         mm_port_probe_set_result_at (probe, FALSE);
         goto out;
     }
@@ -326,8 +322,7 @@ custom_init_step (GTask *task)
         return;
     }
 
-    mm_dbg ("(Dell) couldn't detect real manufacturer in (%s): all retries consumed",
-            mm_port_get_device (MM_PORT (ctx->port)));
+    mm_obj_dbg (probe, "couldn't detect real manufacturer: all retries consumed");
 out:
     /* Finish custom_init */
     g_task_return_boolean (task, TRUE);
@@ -387,7 +382,7 @@ create_modem (MMPlugin *self,
 
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered Dell-branded modem found...");
+        mm_obj_dbg (self, "QMI-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -400,7 +395,7 @@ create_modem (MMPlugin *self,
     if (mm_port_probe_list_has_mbim_port (probes)) {
         /* Specific implementation for the DW5821e */
         if (vendor == 0x413c && (product == 0x81d7 || product == 0x81e0)) {
-            mm_dbg ("MBIM-powered DW5821e (T77W968) modem found...");
+            mm_obj_dbg (self, "MBIM-powered DW5821e (T77W968) modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_foxconn_t77w968_new (uid,
                                                                           drivers,
                                                                           mm_plugin_get_name (self),
@@ -409,7 +404,7 @@ create_modem (MMPlugin *self,
         }
 
         if (mm_port_probe_list_is_xmm (probes)) {
-            mm_dbg ("MBIM-powered XMM-based modem found...");
+            mm_obj_dbg (self, "MBIM-powered XMM-based modem found...");
             return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_new (uid,
                                                                    drivers,
                                                                    mm_plugin_get_name (self),
@@ -417,7 +412,7 @@ create_modem (MMPlugin *self,
                                                                    product));
         }
 
-        mm_dbg ("MBIM-powered Dell-branded modem found...");
+        mm_obj_dbg (self, "MBIM-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
                                                            mm_plugin_get_name (self),
@@ -427,7 +422,7 @@ create_modem (MMPlugin *self,
 #endif
 
     if (port_probe_list_has_manufacturer_port (probes, DELL_MANUFACTURER_NOVATEL)) {
-        mm_dbg ("Novatel-powered Dell-branded modem found...");
+        mm_obj_dbg (self, "Novatel-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_novatel_new (uid,
                                                               drivers,
                                                               mm_plugin_get_name (self),
@@ -436,7 +431,7 @@ create_modem (MMPlugin *self,
     }
 
     if (port_probe_list_has_manufacturer_port (probes, DELL_MANUFACTURER_SIERRA)) {
-        mm_dbg ("Sierra-powered Dell-branded modem found...");
+        mm_obj_dbg (self, "Sierra-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_sierra_new (uid,
                                                              drivers,
                                                              mm_plugin_get_name (self),
@@ -445,7 +440,7 @@ create_modem (MMPlugin *self,
     }
 
     if (port_probe_list_has_manufacturer_port (probes, DELL_MANUFACTURER_TELIT)) {
-        mm_dbg ("Telit-powered Dell-branded modem found...");
+        mm_obj_dbg (self, "Telit-powered Dell-branded modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_telit_new (uid,
                                                             drivers,
                                                             mm_plugin_get_name (self),
@@ -454,7 +449,7 @@ create_modem (MMPlugin *self,
     }
 
     if (mm_port_probe_list_is_xmm (probes)) {
-        mm_dbg ("XMM-based modem found...");
+        mm_obj_dbg (self, "XMM-based modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_xmm_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -462,7 +457,7 @@ create_modem (MMPlugin *self,
                                                           product));
     }
 
-    mm_dbg ("Dell-branded generic modem found...");
+    mm_obj_dbg (self, "Dell-branded generic modem found...");
     return MM_BASE_MODEM (mm_broadband_modem_new (uid,
                                                   drivers,
                                                   mm_plugin_get_name (self),
