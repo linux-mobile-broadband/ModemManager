@@ -76,6 +76,7 @@ gboolean mm_cinterion_parse_sind_response (const gchar *response,
 
 MMBearerConnectionStatus mm_cinterion_parse_swwan_response (const gchar  *response,
                                                             guint         swwan_index,
+                                                            gpointer      log_object,
                                                             GError      **error);
 
 /*****************************************************************************/
@@ -88,7 +89,8 @@ gboolean mm_cinterion_parse_smong_response (const gchar              *response,
 /*****************************************************************************/
 /* ^SIND psinfo helper */
 
-MMModemAccessTechnology mm_cinterion_get_access_technology_from_sind_psinfo (guint val);
+MMModemAccessTechnology mm_cinterion_get_access_technology_from_sind_psinfo (guint    val,
+                                                                             gpointer log_object);
 
 /*****************************************************************************/
 /* ^SLCC URC helpers */
@@ -97,6 +99,7 @@ GRegex *mm_cinterion_get_slcc_regex (void);
 
 /* MMCallInfo list management */
 gboolean mm_cinterion_parse_slcc_list     (const gchar  *str,
+                                           gpointer      log_object,
                                            GList       **out_list,
                                            GError      **error);
 void     mm_cinterion_call_info_list_free (GList        *call_info_list);

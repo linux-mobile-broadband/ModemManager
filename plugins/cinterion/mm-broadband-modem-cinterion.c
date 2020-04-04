@@ -28,7 +28,7 @@
 #include "ModemManager.h"
 #include "mm-modem-helpers.h"
 #include "mm-serial-parsers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -256,7 +256,7 @@ cnmi_format_check_ready (MMBaseModem  *_self,
                                        &self->priv->cnmi_supported_ds,
                                        &self->priv->cnmi_supported_bfr,
                                        &error)) {
-        mm_warn ("error reading SMS setup: %s", error->message);
+        mm_obj_warn (self, "error reading SMS setup: %s", error->message);
         g_error_free (error);
     }
 
@@ -333,13 +333,10 @@ sleep_ready (MMBaseModem  *self,
              GAsyncResult *res,
              GTask        *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
-        /* Ignore errors */
-        mm_dbg ("Couldn't send power down command: '%s'", error->message);
-        g_error_free (error);
-    }
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
+        mm_obj_dbg (self, "couldn't send power down command: %s", error->message);
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -374,14 +371,13 @@ supported_functionality_status_query_ready (MMBaseModem  *_self,
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar               *response;
-    GError                    *error = NULL;
+    g_autoptr(GError)          error = NULL;
 
     g_assert (self->priv->sleep_mode_cmd == NULL);
 
     response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response) {
-        mm_warn ("Couldn't query supported functionality status: '%s'", error->message);
-        g_error_free (error);
+        mm_obj_warn (self, "couldn't query supported functionality status: %s", error->message);
         self->priv->sleep_mode_cmd = g_strdup ("");
     } else {
         /* We need to get which power-off command to use to put the modem in low
@@ -395,13 +391,13 @@ supported_functionality_status_query_ready (MMBaseModem  *_self,
          * not found, report warning and don't use any.
          */
         if (strstr (response, "4") != NULL) {
-            mm_dbg ("Device supports CFUN=4 sleep mode");
+            mm_obj_dbg (self, "device supports CFUN=4 sleep mode");
             self->priv->sleep_mode_cmd = g_strdup ("+CFUN=4");
         } else if (strstr (response, "7") != NULL) {
-            mm_dbg ("Device supports CFUN=7 sleep mode");
+            mm_obj_dbg (self, "device supports CFUN=7 sleep mode");
             self->priv->sleep_mode_cmd = g_strdup ("+CFUN=7");
         } else {
-            mm_warn ("Unknown functionality mode to go into sleep mode");
+            mm_obj_warn (self, "unknown functionality mode to go into sleep mode");
             self->priv->sleep_mode_cmd = g_strdup ("");
         }
     }
@@ -684,12 +680,10 @@ parent_disable_unsolicited_events_ready (MMIfaceModem3gpp *self,
                                          GAsyncResult     *res,
                                          GTask            *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (!iface_modem_3gpp_parent->disable_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't disable parent 3GPP unsolicited events: %s", error->message);
-        g_error_free (error);
-    }
+    if (!iface_modem_3gpp_parent->disable_unsolicited_events_finish (self, res, &error))
+        mm_obj_warn (self, "couldn't disable parent 3GPP unsolicited events: %s", error->message);
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -710,12 +704,10 @@ sind_psinfo_disable_ready (MMBaseModem  *self,
                            GAsyncResult *res,
                            GTask        *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_warn ("Couldn't disable ^SIND psinfo notifications: %s", error->message);
-        g_error_free (error);
-    }
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        mm_obj_warn (self, "Couldn't disable ^SIND psinfo notifications: %s", error->message);
 
     parent_disable_unsolicited_messages (task);
 }
@@ -763,7 +755,7 @@ sind_psinfo_enable_ready (MMBaseModem  *_self,
                           GTask        *task)
 {
     MMBroadbandModemCinterion *self;
-    GError                    *error = NULL;
+    g_autoptr(GError)          error = NULL;
     const gchar               *response;
     guint                      mode;
     guint                      val;
@@ -771,20 +763,18 @@ sind_psinfo_enable_ready (MMBaseModem  *_self,
     self = MM_BROADBAND_MODEM_CINTERION (_self);
     if (!(response = mm_base_modem_at_command_finish (_self, res, &error))) {
         self->priv->sind_psinfo_support = FEATURE_NOT_SUPPORTED;
-        mm_warn ("Couldn't enable ^SIND psinfo notifications: %s", error->message);
-        g_error_free (error);
+        mm_obj_warn (self, "couldn't enable ^SIND psinfo notifications: %s", error->message);
     } else if (!mm_cinterion_parse_sind_response (response, NULL, &mode, &val, &error)) {
         self->priv->sind_psinfo_support = FEATURE_NOT_SUPPORTED;
-        mm_warn ("Couldn't parse ^SIND psinfo response: %s", error->message);
-        g_error_free (error);
+        mm_obj_warn (self, "couldn't parse ^SIND psinfo response: %s", error->message);
     } else {
         /* Flag ^SIND psinfo supported so that we don't poll */
         self->priv->sind_psinfo_support = FEATURE_SUPPORTED;
 
         /* Report initial access technology gathered right away */
-        mm_dbg ("Reporting initial access technologies...");
+        mm_obj_dbg (self, "reporting initial access technologies...");
         mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                   mm_cinterion_get_access_technology_from_sind_psinfo (val),
+                                                   mm_cinterion_get_access_technology_from_sind_psinfo (val, self),
                                                    MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
     }
 
@@ -798,14 +788,12 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *_self,
                                         GTask            *task)
 {
     MMBroadbandModemCinterion *self;
-    GError                    *error = NULL;
+    g_autoptr(GError)          error = NULL;
 
     self = MM_BROADBAND_MODEM_CINTERION (_self);
 
-    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (_self, res, &error)) {
-        mm_warn ("Couldn't enable parent 3GPP unsolicited events: %s", error->message);
-        g_error_free (error);
-    }
+    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (_self, res, &error))
+        mm_obj_warn (self, "couldn't enable parent 3GPP unsolicited events: %s", error->message);
 
     if (self->priv->sind_psinfo_support != FEATURE_NOT_SUPPORTED) {
         /* Enable access technology update reporting */
@@ -851,12 +839,12 @@ sind_ciev_received (MMPortSerialAt            *port,
 
     indicator = mm_get_string_unquoted_from_match_info (match_info, 1);
     if (!mm_get_uint_from_match_info (match_info, 2, &val))
-        mm_dbg ("couldn't parse indicator '%s' value", indicator);
+        mm_obj_dbg (self, "couldn't parse indicator '%s' value", indicator);
     else {
-        mm_dbg ("received indicator '%s' update: %u", indicator, val);
+        mm_obj_dbg (self, "received indicator '%s' update: %u", indicator, val);
         if (g_strcmp0 (indicator, "psinfo") == 0) {
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       mm_cinterion_get_access_technology_from_sind_psinfo (val),
+                                                       mm_cinterion_get_access_technology_from_sind_psinfo (val, self),
                                                        MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
         }
     }
@@ -1467,23 +1455,22 @@ spic_ready (MMBaseModem  *self,
 {
     LoadUnlockRetriesContext *ctx;
     const gchar              *response;
-    GError                   *error = NULL;
+    g_autoptr(GError)         error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response) {
-        mm_dbg ("Couldn't load retry count for lock '%s': %s",
-                mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock),
-                error->message);
-        g_error_free (error);
+        mm_obj_dbg (self, "Couldn't load retry count for lock '%s': %s",
+                    mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock),
+                    error->message);
     } else {
         guint val;
 
         response = mm_strip_tag (response, "^SPIC:");
         if (!mm_get_uint_from_str (response, &val))
-            mm_dbg ("Couldn't parse retry count value for lock '%s'",
-                    mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock));
+            mm_obj_dbg (self, "couldn't parse retry count value for lock '%s'",
+                        mm_modem_lock_get_string (unlock_retries_map[ctx->i].lock));
         else
             mm_unlock_retries_set (ctx->retries, unlock_retries_map[ctx->i].lock, val);
     }
@@ -1698,7 +1685,7 @@ common_create_bearer (GTask *task)
 
     switch (self->priv->swwan_support) {
     case FEATURE_NOT_SUPPORTED:
-        mm_dbg ("^SWWAN not supported, creating default bearer...");
+        mm_obj_dbg (self, "^SWWAN not supported, creating default bearer...");
         mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
                                  g_task_get_task_data (task),
                                  NULL, /* cancellable */
@@ -1706,7 +1693,7 @@ common_create_bearer (GTask *task)
                                  task);
         return;
     case FEATURE_SUPPORTED:
-        mm_dbg ("^SWWAN supported, creating cinterion bearer...");
+        mm_obj_dbg (self, "^SWWAN supported, creating cinterion bearer...");
         mm_broadband_bearer_cinterion_new (MM_BROADBAND_MODEM_CINTERION (self),
                                            g_task_get_task_data (task),
                                            NULL, /* cancellable */
@@ -1729,10 +1716,10 @@ swwan_test_ready (MMBaseModem  *_self,
     /* Fetch the result to the SWWAN test. If no response given (error triggered),
      * assume unsupported */
     if (!mm_base_modem_at_command_finish (_self, res, NULL)) {
-        mm_dbg ("SWWAN unsupported");
+        mm_obj_dbg (self, "SWWAN unsupported");
         self->priv->swwan_support = FEATURE_NOT_SUPPORTED;
     } else {
-        mm_dbg ("SWWAN supported");
+        mm_obj_dbg (self, "SWWAN supported");
         self->priv->swwan_support = FEATURE_SUPPORTED;
     }
 
@@ -1762,13 +1749,13 @@ cinterion_modem_create_bearer (MMIfaceModem        *_self,
     /* If we don't have a data port, don't even bother checking for ^SWWAN
      * support. */
     if (!mm_base_modem_peek_best_data_port (MM_BASE_MODEM (self), MM_PORT_TYPE_NET)) {
-        mm_dbg ("skipping ^SWWAN check as no data port is available");
+        mm_obj_dbg (self, "skipping ^SWWAN check as no data port is available");
         self->priv->swwan_support = FEATURE_NOT_SUPPORTED;
         common_create_bearer (task);
         return;
     }
 
-    mm_dbg ("checking ^SWWAN support...");
+    mm_obj_dbg (self, "checking ^SWWAN support...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SWWAN=?",
                               6,

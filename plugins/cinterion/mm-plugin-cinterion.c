@@ -29,7 +29,7 @@
 
 #include "mm-plugin-cinterion.h"
 #include "mm-broadband-modem-cinterion.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi-cinterion.h"
@@ -115,7 +115,7 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered Cinterion modem found...");
+        mm_obj_dbg (self, "QMI-powered Cinterion modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_cinterion_new (uid,
                                                                     drivers,
                                                                     mm_plugin_get_name (self),
@@ -143,14 +143,14 @@ grab_port (MMPlugin *self,
     ptype = mm_port_probe_get_port_type (probe);
 
     if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_APP_PORT)) {
-        mm_dbg ("(%s/%s)' Port flagged as primary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "port '%s/%s' flagged as primary",
+                    mm_port_probe_get_port_subsys (probe),
+                    mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
     } else if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_MODEM_PORT)) {
-        mm_dbg ("(%s/%s)' Port flagged as PPP",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
+        mm_obj_dbg (self, "port '%s/%s' flagged as PPP",
+                    mm_port_probe_get_port_subsys (probe),
+                    mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
     }
 

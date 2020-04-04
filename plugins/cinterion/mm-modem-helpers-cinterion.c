@@ -24,7 +24,7 @@
 #include "ModemManager.h"
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-charsets.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers-cinterion.h"
@@ -500,6 +500,7 @@ enum {
 MMBearerConnectionStatus
 mm_cinterion_parse_swwan_response (const gchar  *response,
                                    guint         cid,
+                                   gpointer      log_object,
                                    GError      **error)
 {
     GRegex                   *r;
@@ -531,9 +532,9 @@ mm_cinterion_parse_swwan_response (const gchar  *response,
         guint read_cid;
 
         if (!mm_get_uint_from_match_info (match_info, 1, &read_cid))
-            mm_warn ("Couldn't read cid in ^SWWAN response: '%s'", response);
+            mm_obj_warn (log_object, "couldn't read cid in ^SWWAN response: %s", response);
         else if (!mm_get_uint_from_match_info (match_info, 2, &read_state))
-            mm_warn ("Couldn't read state in ^SWWAN response: '%s'", response);
+            mm_obj_warn (log_object, "couldn't read state in ^SWWAN response: %s", response);
         else if (read_cid == cid) {
             if (read_state == MM_SWWAN_STATE_CONNECTED) {
                 status = MM_BEARER_CONNECTION_STATUS_CONNECTED;
@@ -543,7 +544,7 @@ mm_cinterion_parse_swwan_response (const gchar  *response,
                 status = MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
                 break;
             }
-            mm_warn ("Invalid state read in ^SWWAN response: %u", read_state);
+            mm_obj_warn (log_object, "invalid state read in ^SWWAN response: %u", read_state);
             break;
         }
         g_match_info_next (match_info, &inner_error);
@@ -640,7 +641,8 @@ mm_cinterion_parse_smong_response (const gchar              *response,
 /* ^SIND psinfo helper */
 
 MMModemAccessTechnology
-mm_cinterion_get_access_technology_from_sind_psinfo (guint val)
+mm_cinterion_get_access_technology_from_sind_psinfo (guint    val,
+                                                     gpointer log_object)
 {
     switch (val) {
     case 0:
@@ -664,7 +666,7 @@ mm_cinterion_get_access_technology_from_sind_psinfo (guint val)
     case 17:
         return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
     default:
-        mm_dbg ("Unable to identify access technology from psinfo reported value: %u", val);
+        mm_obj_dbg (log_object, "unable to identify access technology from psinfo reported value: %u", val);
         return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     }
 }
@@ -694,6 +696,7 @@ cinterion_call_info_free (MMCallInfo *info)
 
 gboolean
 mm_cinterion_parse_slcc_list (const gchar *str,
+                              gpointer     log_object,
                               GList      **out_list,
                               GError     **error)
 {
@@ -747,20 +750,20 @@ mm_cinterion_parse_slcc_list (const gchar *str,
         call_info = g_slice_new0 (MMCallInfo);
 
         if (!mm_get_uint_from_match_info (match_info, 1, &call_info->index)) {
-            mm_warn ("couldn't parse call index from ^SLCC line");
+            mm_obj_warn (log_object, "couldn't parse call index from ^SLCC line");
             goto next;
         }
 
         if (!mm_get_uint_from_match_info (match_info, 2, &aux) ||
             (aux >= G_N_ELEMENTS (cinterion_call_direction))) {
-            mm_warn ("couldn't parse call direction from ^SLCC line");
+            mm_obj_warn (log_object, "couldn't parse call direction from ^SLCC line");
             goto next;
         }
         call_info->direction = cinterion_call_direction[aux];
 
         if (!mm_get_uint_from_match_info (match_info, 3, &aux) ||
             (aux >= G_N_ELEMENTS (cinterion_call_state))) {
-            mm_warn ("couldn't parse call state from ^SLCC line");
+            mm_obj_warn (log_object, "couldn't parse call state from ^SLCC line");
             goto next;
         }
         call_info->state = cinterion_call_state[aux];

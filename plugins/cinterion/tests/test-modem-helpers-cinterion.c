@@ -565,7 +565,7 @@ test_swwan_pls8 (void)
 
         /* Query for the expected items (CIDs 2 and 3) */
         for (j = 0; j < SWWAN_TEST_MAX_CIDS; j++) {
-            read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, swwan_tests[i].expected_items[j].cid, &error);
+            read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, swwan_tests[i].expected_items[j].cid, NULL, &error);
             if (swwan_tests[i].expected_items[j].state == MM_BEARER_CONNECTION_STATUS_UNKNOWN) {
                 g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
                 g_clear_error (&error);
@@ -576,7 +576,7 @@ test_swwan_pls8 (void)
 
         /* Query for a CID which isn't replied (e.g. 12) */
         if (!swwan_tests[i].skip_test_other_cids) {
-            read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, 12, &error);
+            read_state = mm_cinterion_parse_swwan_response (swwan_tests[i].response, 12, NULL, &error);
             g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
             g_assert_cmpint (read_state, ==, MM_BEARER_CONNECTION_STATUS_UNKNOWN);
             g_clear_error (&error);
@@ -584,7 +584,7 @@ test_swwan_pls8 (void)
     }
 
     /* Additional tests for errors */
-    read_state = mm_cinterion_parse_swwan_response ("^GARBAGE", 2, &error);
+    read_state = mm_cinterion_parse_swwan_response ("^GARBAGE", 2, NULL, &error);
     g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
     g_assert_cmpint (read_state, ==, MM_BEARER_CONNECTION_STATUS_UNKNOWN);
     g_clear_error (&error);
@@ -695,7 +695,7 @@ common_test_slcc_urc (const gchar               *urc,
     str = g_match_info_fetch (match_info, 0);
     g_assert (str);
 
-    result = mm_cinterion_parse_slcc_list (str, &call_info_list, &error);
+    result = mm_cinterion_parse_slcc_list (str, NULL, &call_info_list, &error);
     g_assert_no_error (error);
     g_assert (result);
 
