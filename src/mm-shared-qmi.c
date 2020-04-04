@@ -1192,7 +1192,7 @@ set_current_modes_system_selection_preference (GTask *task)
         if (mm_iface_modem_is_3gpp (self) && ((ctx->allowed & (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G))) {
             QmiNasGsmWcdmaAcquisitionOrderPreference order;
 
-            order = mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (ctx->preferred);
+            order = mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (ctx->preferred, self);
             qmi_message_nas_set_system_selection_preference_input_set_gsm_wcdma_acquisition_order_preference (input, order, NULL);
         }
     }
@@ -1371,11 +1371,14 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
                                                       GAsyncResult *res,
                                                       GTask        *task)
 {
+    MMSharedQmi                                     *self;
     LoadCurrentModesResult                          *result = NULL;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError                                          *error = NULL;
     QmiNasRatModePreference                          mode_preference_mask = 0;
     MMModemMode                                      allowed;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output || !qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
@@ -1416,7 +1419,7 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
                 output,
                 &gsm_or_wcdma,
                 NULL))
-            result->preferred = mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (gsm_or_wcdma);
+            result->preferred = mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (gsm_or_wcdma, self);
     }
     /* Otherwise, rely on the acquisition order array TLV */
     else {

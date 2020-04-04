@@ -1257,7 +1257,8 @@ mm_modem_capability_from_qmi_band_preference (QmiNasBandPreference qmi)
 /*****************************************************************************/
 
 MMModemMode
-mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi)
+mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi,
+                                                               gpointer                                 log_object)
 {
     switch (qmi) {
     case QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_AUTOMATIC:
@@ -1267,16 +1268,17 @@ mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcq
     case QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_WCDMA:
         return MM_MODEM_MODE_3G;
     default:
-        mm_dbg ("Unknown acquisition order preference: '%s'",
-                qmi_nas_gsm_wcdma_acquisition_order_preference_get_string (qmi));
+        mm_obj_dbg (log_object, "unknown acquisition order preference: '%s'",
+                    qmi_nas_gsm_wcdma_acquisition_order_preference_get_string (qmi));
         return MM_MODEM_MODE_NONE;
     }
 }
 
 QmiNasGsmWcdmaAcquisitionOrderPreference
-mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode)
+mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode,
+                                                             gpointer    log_object)
 {
-    gchar *str;
+    g_autofree gchar *str = NULL;
 
     /* mode is not a mask in this case, only a value */
 
@@ -1295,8 +1297,7 @@ mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode)
     }
 
     str = mm_modem_mode_build_string_from_mask (mode);
-    mm_dbg ("Unhandled modem mode: '%s'", str);
-    g_free (str);
+    mm_obj_dbg (log_object, "unhandled modem mode: '%s'", str);
 
     return QMI_NAS_GSM_WCDMA_ACQUISITION_ORDER_PREFERENCE_AUTOMATIC;
 }

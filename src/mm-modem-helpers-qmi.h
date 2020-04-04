@@ -75,8 +75,10 @@ QmiNasRadioTechnologyPreference mm_modem_capability_to_qmi_radio_technology_pref
 
 MMModemCapability mm_modem_capability_from_qmi_band_preference (QmiNasBandPreference qmi);
 
-MMModemMode mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi);
-QmiNasGsmWcdmaAcquisitionOrderPreference mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode);
+MMModemMode mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (QmiNasGsmWcdmaAcquisitionOrderPreference qmi,
+                                                                           gpointer                                 log_object);
+QmiNasGsmWcdmaAcquisitionOrderPreference mm_modem_mode_to_qmi_gsm_wcdma_acquisition_order_preference (MMModemMode mode,
+                                                                                                      gpointer    log_object);
 
 GArray *mm_modem_bands_from_qmi_rf_band_information_array (GArray *info_array);
 
