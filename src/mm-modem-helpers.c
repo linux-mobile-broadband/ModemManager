@@ -1803,9 +1803,7 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
 
             str = mm_get_string_unquoted_from_match_info (match_info, 2);
             ip_family = mm_3gpp_get_ip_family_from_pdp_type (str);
-            if (ip_family == MM_BEARER_IP_FAMILY_NONE)
-                mm_dbg ("Ignoring PDP context type: '%s'", str);
-            else {
+            if (ip_family != MM_BEARER_IP_FAMILY_NONE) {
                 MM3gppPdpContext *pdp;
 
                 pdp = g_slice_new0 (MM3gppPdpContext);
