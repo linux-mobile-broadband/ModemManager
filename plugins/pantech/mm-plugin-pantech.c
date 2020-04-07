@@ -19,7 +19,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-plugin-pantech.h"
 #include "mm-broadband-modem-pantech.h"
 
@@ -85,7 +85,7 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered Pantech modem found...");
+        mm_obj_dbg (self, "QMI-powered Pantech modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),

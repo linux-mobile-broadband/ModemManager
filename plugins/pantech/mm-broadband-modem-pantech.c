@@ -24,7 +24,6 @@
 #include "ModemManager.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
-#include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-broadband-modem-pantech.h"
 #include "mm-sim-pantech.h"
