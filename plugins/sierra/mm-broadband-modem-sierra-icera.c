@@ -27,7 +27,7 @@
 #include "mm-broadband-modem-sierra-icera.h"
 #include "mm-iface-modem.h"
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-common-sierra.h"
 #include "mm-broadband-bearer-sierra.h"
 
@@ -74,7 +74,7 @@ modem_create_bearer (MMIfaceModem *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("Creating Sierra bearer...");
+    mm_obj_dbg (self, "creating sierra bearer...");
     mm_broadband_bearer_sierra_new (MM_BROADBAND_MODEM (self),
                                     properties,
                                     TRUE, /* is_icera */

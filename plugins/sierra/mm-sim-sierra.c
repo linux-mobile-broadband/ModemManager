@@ -25,7 +25,6 @@
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
-#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
 
@@ -96,7 +95,6 @@ load_sim_identifier (MMBaseSim *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_dbg ("loading (Sierra) SIM identifier...");
     mm_base_modem_at_command (
         modem,
         "!ICCID?",

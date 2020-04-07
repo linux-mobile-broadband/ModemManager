@@ -29,7 +29,7 @@
 
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer-sierra.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-sierra.h"
 
@@ -327,7 +327,7 @@ dial_3gpp_context_step (GTask *task)
             allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
             if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
-                mm_dbg ("Not using authentication");
+                mm_obj_dbg (self, "not using authentication");
                 if (self->priv->is_icera)
                     command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
                 else
@@ -338,13 +338,13 @@ dial_3gpp_context_step (GTask *task)
                 guint sierra_auth;
 
                 if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-                    mm_dbg ("Using default (PAP) authentication method");
+                    mm_obj_dbg (self, "using default (PAP) authentication method");
                     sierra_auth = 1;
                 } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
-                    mm_dbg ("Using PAP authentication method");
+                    mm_obj_dbg (self, "using PAP authentication method");
                     sierra_auth = 1;
                 } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
-                    mm_dbg ("Using CHAP authentication method");
+                    mm_obj_dbg (self, "using CHAP authentication method");
                     sierra_auth = 2;
                 } else {
                     gchar *str;
@@ -479,13 +479,13 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
 
 static void
 parent_disconnect_3gpp_ready (MMBroadbandBearer *self,
-                              GAsyncResult *res,
-                              GTask *task)
+                              GAsyncResult      *res,
+                              GTask             *task)
 {
     GError *error = NULL;
 
     if (!MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_sierra_parent_class)->disconnect_3gpp_finish (self, res, &error)) {
-        mm_dbg ("Parent disconnection failed (not fatal): %s", error->message);
+        mm_obj_dbg (self, "parent disconnection failed (not fatal): %s", error->message);
         g_error_free (error);
     }
 
@@ -494,16 +494,19 @@ parent_disconnect_3gpp_ready (MMBroadbandBearer *self,
 }
 
 static void
-disconnect_scact_ready (MMBaseModem *modem,
+disconnect_scact_ready (MMBaseModem  *modem,
                         GAsyncResult *res,
-                        GTask *task)
+                        GTask        *task)
 {
-    GError *error = NULL;
+    MMBroadbandBearerSierra *self;
+    GError                  *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     /* Ignore errors for now */
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        mm_dbg ("Disconnection failed (not fatal): %s", error->message);
+        mm_obj_dbg (self, "disconnection failed (not fatal): %s", error->message);
         g_error_free (error);
     }
 

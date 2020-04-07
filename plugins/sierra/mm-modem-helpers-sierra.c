@@ -16,7 +16,6 @@
 #include <glib.h>
 #include <string.h>
 
-#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-sierra.h"
 

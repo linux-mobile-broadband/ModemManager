@@ -160,7 +160,7 @@ gcap_ready (MMPortSerialAt *port,
          * on the APP1 port or not.
          */
         if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
-            mm_dbg ("Sierra: APP1 PPP OK '%s'", response);
+            mm_obj_dbg (probe, "(Sierra) APP1 PPP OK '%s'", response);
             g_object_set_data (G_OBJECT (probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
         }
     } else if (strstr (response, "APP2") ||
@@ -183,24 +183,24 @@ out:
 static void
 sierra_custom_init_step (GTask *task)
 {
+    MMPortProbe             *probe;
     SierraCustomInitContext *ctx;
-    GCancellable *cancellable;
+    GCancellable            *cancellable;
 
-    ctx = g_task_get_task_data (task);
+    probe       = g_task_get_source_object (task);
+    ctx         = g_task_get_task_data (task);
     cancellable = g_task_get_cancellable (task);
 
     /* If cancelled, end */
     if (g_cancellable_is_cancelled (cancellable)) {
-        mm_dbg ("(Sierra) no need to keep on running custom init in '%s'",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "(Sierra) no need to keep on running custom init");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
 
     if (ctx->retries == 0) {
-        mm_dbg ("(Sierra) Couldn't get port type hints from '%s'",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "(Sierra) couldn't get port type hints");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -328,8 +328,8 @@ mm_common_sierra_modem_power_up (MMIfaceModem *self,
         return;
     }
 
-    mm_warn ("Not in full functionality status, power-up command is needed. "
-             "Note that it may reboot the modem.");
+    mm_obj_warn (self, "not in full functionality status, power-up command is needed");
+    mm_obj_warn (self, "device may be rebooted");
 
     /* Try to go to full functionality mode without rebooting the system.
      * Works well if we previously switched off the power with CFUN=4

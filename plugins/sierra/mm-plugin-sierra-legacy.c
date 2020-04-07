@@ -22,7 +22,6 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
 #include "mm-plugin-sierra-legacy.h"
 #include "mm-common-sierra.h"
 #include "mm-broadband-modem-sierra.h"
