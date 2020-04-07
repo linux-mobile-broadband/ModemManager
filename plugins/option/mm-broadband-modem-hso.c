@@ -25,7 +25,7 @@
 
 #include "ModemManager.h"
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -111,7 +111,7 @@ modem_create_bearer (MMIfaceModem *self,
 
     if (mm_bearer_properties_get_ip_type (properties) &
         (MM_BEARER_IP_FAMILY_IPV6 | MM_BEARER_IP_FAMILY_IPV4V6)) {
-        mm_dbg ("Creating generic bearer (IPv6 requested)...");
+        mm_obj_dbg (self, "creating generic bearer (IPv6 requested)...");
         mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
                                  properties,
                                  NULL, /* cancellable */
@@ -120,7 +120,7 @@ modem_create_bearer (MMIfaceModem *self,
         return;
     }
 
-    mm_dbg ("Creating HSO bearer...");
+    mm_obj_dbg (self, "creating HSO bearer...");
     mm_broadband_bearer_hso_new (MM_BROADBAND_MODEM_HSO (self),
                                  properties,
                                  NULL, /* cancellable */
@@ -150,7 +150,6 @@ load_unlock_retries_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;

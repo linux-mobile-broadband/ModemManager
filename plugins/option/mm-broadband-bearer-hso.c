@@ -30,7 +30,7 @@
 
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer-hso.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-daemon-enums-types.h"
 
@@ -380,14 +380,13 @@ activate_ready (MMBaseModem          *modem,
     Dial3gppContext *ctx;
     GError          *error = NULL;
 
-    task = self->priv->connect_pending;
-    self->priv->connect_pending = NULL;
+    task = g_steal_pointer (&self->priv->connect_pending);
 
     /* Try to recover the connection task. If none found, it means the
      * task was already completed and we have nothing else to do.
      * But note that we won't take owneship of the task yet! */
     if (!task) {
-        mm_dbg ("Connection context was finished already by an unsolicited message");
+        mm_obj_dbg (self, "connection context was finished already by an unsolicited message");
         /* Run _finish() to finalize the async call, even if we don't care
          * about the result */
         mm_base_modem_at_command_full_finish (modem, res, NULL);
@@ -517,7 +516,7 @@ authenticate (GTask *task)
 
     /* Both user and password are required; otherwise firmware returns an error */
     if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
-        mm_dbg ("Not using authentication");
+        mm_obj_dbg (self, "not using authentication");
         command = g_strdup_printf ("%s=%d,0",
                                    auth_commands[ctx->auth_idx],
                                    ctx->cid);
@@ -527,13 +526,13 @@ authenticate (GTask *task)
         guint  hso_auth;
 
         if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-            mm_dbg ("Using default (PAP) authentication method");
+            mm_obj_dbg (self, "using default (PAP) authentication method");
             hso_auth = 1;
         } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
-            mm_dbg ("Using PAP authentication method");
+            mm_obj_dbg (self, "using PAP authentication method");
             hso_auth = 1;
         } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
-            mm_dbg ("Using CHAP authentication method");
+            mm_obj_dbg (self, "using CHAP authentication method");
             hso_auth = 2;
         } else {
             gchar *str;
@@ -639,16 +638,19 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
 }
 
 static void
-disconnect_owancall_ready (MMBaseModem *modem,
+disconnect_owancall_ready (MMBaseModem  *modem,
                            GAsyncResult *res,
-                           GTask *task)
+                           GTask        *task)
 {
-    GError *error = NULL;
+    MMBroadbandBearerHso *self;
+    GError               *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     /* Ignore errors for now */
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        mm_dbg ("Disconnection failed (not fatal): %s", error->message);
+        mm_obj_dbg (self, "disconnection failed (not fatal): %s", error->message);
         g_error_free (error);
     }
 
@@ -711,8 +713,8 @@ report_connection_status (MMBaseBearer             *_self,
         return;
     }
 
-    mm_dbg ("Received spontaneous _OWANCALL (%s)",
-            mm_bearer_connection_status_get_string (status));
+    mm_obj_dbg (self, "received spontaneous _OWANCALL (%s)",
+                mm_bearer_connection_status_get_string (status));
 
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
         /* If no connection attempt on-going, make sure we mark ourselves as
