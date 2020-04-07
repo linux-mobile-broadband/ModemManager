@@ -21,7 +21,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-voice.h"
 #include "mm-iface-modem-location.h"
@@ -177,7 +177,7 @@ probe_gps_features (GTask *task)
     sources = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
     if (priv->cgps_support == FEATURE_SUPPORTED) {
-        mm_dbg ("GPS commands supported: GPS capabilities enabled");
+        mm_obj_dbg (self, "GPS commands supported: GPS capabilities enabled");
 
         /* We only flag as supported by this implementation those sources not already
          * supported by the parent implementation */
@@ -196,7 +196,7 @@ probe_gps_features (GTask *task)
                                               self,
                                               NULL);
     } else
-        mm_dbg ("No GPS command supported: no GPS capabilities");
+        mm_obj_dbg (self, "no GPS command supported: no GPS capabilities");
 
     g_task_return_int (task, (gssize) sources);
     g_object_unref (task);
@@ -222,7 +222,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     /* Now our own check. If we don't have any GPS port, we're done */
     if (!mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
-        mm_dbg ("No GPS data port found: no GPS capabilities");
+        mm_obj_dbg (self, "no GPS data port found: no GPS capabilities");
         g_task_return_int (task, sources);
         g_object_unref (task);
         return;
@@ -542,9 +542,9 @@ clcc_command_ready (MMBaseModem  *self,
     ctx = g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_dbg ("Couldn't %s +CLCC reporting: '%s'",
-                ctx->enable ? "enable" : "disable",
-                error->message);
+        mm_obj_dbg (self, "couldn't %s +CLCC reporting: '%s'",
+                    ctx->enable ? "enable" : "disable",
+                    error->message);
         g_error_free (error);
     }
 
@@ -572,13 +572,13 @@ run_voice_enable_disable_unsolicited_events (GTask *task)
     }
 
     if (!ctx->clcc_primary_done && ctx->primary) {
-        mm_dbg ("%s +CLCC extended list of current calls reporting in primary port...",
-                ctx->enable ? "Enabling" : "Disabling");
+        mm_obj_dbg (self, "%s +CLCC extended list of current calls reporting in primary port...",
+                    ctx->enable ? "enabling" : "disabling");
         ctx->clcc_primary_done = TRUE;
         port = ctx->primary;
     } else if (!ctx->clcc_secondary_done && ctx->secondary) {
-        mm_dbg ("%s +CLCC extended list of current calls reporting in secondary port...",
-                ctx->enable ? "Enabling" : "Disabling");
+        mm_obj_dbg (self, "%s +CLCC extended list of current calls reporting in secondary port...",
+                    ctx->enable ? "enabling" : "disabling");
         ctx->clcc_secondary_done = TRUE;
         port = ctx->secondary;
     }
@@ -647,7 +647,7 @@ parent_voice_disable_unsolicited_events_ready (MMIfaceModemVoice *self,
     priv = get_private (MM_SHARED_SIMTECH (self));
 
     if (!priv->iface_modem_voice_parent->disable_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't disable parent voice unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't disable parent voice unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -664,7 +664,7 @@ voice_disable_unsolicited_events_ready (MMSharedSimtech *self,
     GError  *error = NULL;
 
     if (!common_voice_enable_disable_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't disable Simtech-specific voice unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't disable Simtech-specific voice unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -715,7 +715,7 @@ voice_enable_unsolicited_events_ready (MMSharedSimtech *self,
     GError *error = NULL;
 
     if (!common_voice_enable_disable_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't enable Simtech-specific voice unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't enable Simtech-specific voice unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -734,7 +734,7 @@ parent_voice_enable_unsolicited_events_ready (MMIfaceModemVoice *self,
     priv = get_private (MM_SHARED_SIMTECH (self));
 
     if (!priv->iface_modem_voice_parent->enable_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't enable parent voice unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't enable parent voice unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -782,7 +782,7 @@ clcc_urc_received (MMPortSerialAt  *port,
     full = g_match_info_fetch (match_info, 0);
 
     if (!mm_simtech_parse_clcc_list (full, self, &call_info_list, &error)) {
-        mm_warn ("couldn't parse +CLCC list in URC: %s", error->message);
+        mm_obj_warn (self, "couldn't parse +CLCC list in URC: %s", error->message);
         g_error_free (error);
     } else
         mm_iface_modem_voice_report_all_calls (MM_IFACE_MODEM_VOICE (self), call_info_list);
@@ -800,12 +800,12 @@ missed_call_urc_received (MMPortSerialAt  *port,
     gchar  *details = NULL;
 
     if (!mm_simtech_parse_missed_call_urc (match_info, &details, &error)) {
-        mm_warn ("couldn't parse missed call URC: %s", error->message);
+        mm_obj_warn (self, "couldn't parse missed call URC: %s", error->message);
         g_error_free (error);
         return;
     }
 
-    mm_dbg ("missed call reported: %s", details);
+    mm_obj_dbg (self, "missed call reported: %s", details);
     g_free (details);
 }
 
@@ -819,22 +819,22 @@ voice_call_urc_received (MMPortSerialAt  *port,
     guint     duration = 0;
 
     if (!mm_simtech_parse_voice_call_urc (match_info, &start_or_stop, &duration, &error)) {
-        mm_warn ("couldn't parse VOICE CALL URC: %s", error->message);
+        mm_obj_warn (self, "couldn't parse voice call URC: %s", error->message);
         g_error_free (error);
         return;
     }
 
     if (start_or_stop) {
-        mm_dbg ("voice call started");
+        mm_obj_dbg (self, "voice call started");
         return;
     }
 
     if (duration) {
-        mm_dbg ("voice call finished (duration: %us)", duration);
+        mm_obj_dbg (self, "voice call finished (duration: %us)", duration);
         return;
     }
 
-    mm_dbg ("voice call finished");
+    mm_obj_dbg (self, "voice call finished");
 }
 
 static void
@@ -842,13 +842,12 @@ cring_urc_received (MMPortSerialAt  *port,
                     GMatchInfo      *info,
                     MMSharedSimtech *self)
 {
-    MMCallInfo  call_info;
-    gchar      *str;
+    MMCallInfo        call_info;
+    g_autofree gchar *str = NULL;
 
     /* We could have "VOICE" or "DATA". Now consider only "VOICE" */
     str = mm_get_string_unquoted_from_match_info (info, 1);
-    mm_dbg ("Ringing (%s)", str);
-    g_free (str);
+    mm_obj_dbg (self, "ringing (%s)", str);
 
     call_info.index     = 0;
     call_info.direction = MM_CALL_DIRECTION_INCOMING;
@@ -863,13 +862,12 @@ rxdtmf_urc_received (MMPortSerialAt  *port,
                      GMatchInfo      *match_info,
                      MMSharedSimtech *self)
 {
-    gchar *dtmf;
+    g_autofree gchar *dtmf = NULL;
 
     dtmf = g_match_info_fetch (match_info, 1);
-    mm_dbg ("Received DTMF: %s", dtmf);
+    mm_obj_dbg (self, "received DTMF: %s", dtmf);
     /* call index unknown */
     mm_iface_modem_voice_received_dtmf (MM_IFACE_MODEM_VOICE (self), 0, dtmf);
-    g_free (dtmf);
 }
 
 static void
@@ -944,7 +942,7 @@ parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
     priv = get_private (MM_SHARED_SIMTECH (self));
 
     if (!priv->iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't cleanup parent voice unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't cleanup parent voice unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -999,7 +997,7 @@ parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
     priv = get_private (MM_SHARED_SIMTECH (self));
 
     if (!priv->iface_modem_voice_parent->setup_unsolicited_events_finish (self, res, &error)) {
-        mm_warn ("Couldn't setup parent voice unsolicited events: %s", error->message);
+        mm_obj_warn (self, "couldn't setup parent voice unsolicited events: %s", error->message);
         g_error_free (error);
     }
 
@@ -1150,7 +1148,7 @@ cpcmreg_format_check_ready (MMBroadbandModem *self,
 
     priv->cpcmreg_support = (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL) ?
                              FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
-    mm_dbg ("modem %s USB audio control", (priv->cpcmreg_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
+    mm_obj_dbg (self, "modem %s USB audio control", (priv->cpcmreg_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -1170,12 +1168,12 @@ clcc_format_check_ready (MMBroadbandModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
     if (response && !mm_simtech_parse_clcc_test (response, &clcc_urc_supported, &error)) {
-        mm_dbg ("failed checking CLCC URC support: %s", error->message);
+        mm_obj_dbg (self, "failed checking CLCC URC support: %s", error->message);
         g_clear_error (&error);
     }
 
     priv->clcc_urc_support = (clcc_urc_supported ? FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
-    mm_dbg ("modem %s +CLCC URCs", (priv->clcc_urc_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
+    mm_obj_dbg (self, "modem %s +CLCC URCs", (priv->clcc_urc_support == FEATURE_SUPPORTED) ? "supports" : "doesn't support");
 
     /* If +CLCC URC supported we won't need polling in the parent */
     g_object_set (self,

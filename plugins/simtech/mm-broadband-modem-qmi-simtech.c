@@ -22,7 +22,6 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
-#include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-voice.h"

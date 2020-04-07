@@ -28,7 +28,7 @@
 
 #include "ModemManager.h"
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -261,7 +261,7 @@ autocsq_set_enabled_ready (MMBaseModem  *self,
     ctx = g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_dbg ("Couldn't enable automatic signal quality reporting: %s", error->message);
+        mm_obj_dbg (self, "couldn't enable automatic signal quality reporting: %s", error->message);
         g_error_free (error);
     } else
         csq_urcs_enabled = TRUE;
@@ -309,7 +309,7 @@ cnsmod_set_enabled_ready (MMBaseModem  *self,
     ctx = g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_dbg ("Couldn't enable automatic access technology reporting: %s", error->message);
+        mm_obj_dbg (self, "couldn't enable automatic access technology reporting: %s", error->message);
         g_error_free (error);
     } else
         cnsmod_urcs_enabled = TRUE;
@@ -525,7 +525,7 @@ cnsmod_set_disabled_ready (MMBaseModem  *self,
     ctx = g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_dbg ("Couldn't disable automatic access technology reporting: %s", error->message);
+        mm_obj_dbg (self, "couldn't disable automatic access technology reporting: %s", error->message);
         g_error_free (error);
     }
 
@@ -545,7 +545,7 @@ autocsq_set_disabled_ready (MMBaseModem  *self,
     ctx = g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_dbg ("Couldn't disable automatic signal quality reporting: %s", error->message);
+        mm_obj_dbg (self, "couldn't disable automatic signal quality reporting: %s", error->message);
         g_error_free (error);
     }
 
