@@ -29,7 +29,6 @@
 #include "mm-plugin-iridium.h"
 #include "mm-broadband-modem-iridium.h"
 #include "mm-private-boxed-types.h"
-#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginIridium, mm_plugin_iridium, MM_TYPE_PLUGIN)
 

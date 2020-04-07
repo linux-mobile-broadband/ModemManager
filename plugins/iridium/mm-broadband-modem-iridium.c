@@ -23,7 +23,7 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
@@ -41,7 +41,7 @@ static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init))
 
 /*****************************************************************************/
 /* Operator Code loading (3GPP interface) */
@@ -296,7 +296,7 @@ create_bearer (MMIfaceModem *self,
     MMBaseBearer *bearer;
     GTask *task;
 
-    mm_dbg ("Creating Iridium bearer...");
+    mm_obj_dbg (self, "creating Iridium bearer...");
     bearer = mm_bearer_iridium_new (MM_BROADBAND_MODEM_IRIDIUM (self),
                                     properties);
     task = g_task_new (self, NULL, callback, user_data);
@@ -325,7 +325,7 @@ setup_ports (MMBroadbandModem *self)
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_iridium_parent_class)->setup_ports (self);
 
     /* Set 9600 baudrate by default in the AT port */
-    mm_dbg ("Baudrate will be set to 9600 bps...");
+    mm_obj_dbg (self, "baudrate will be set to 9600 bps...");
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     if (!primary)
         return;
