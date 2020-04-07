@@ -21,7 +21,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-plugin-longcheer.h"
 #include "mm-broadband-modem-longcheer.h"
@@ -58,18 +58,18 @@ static void longcheer_custom_init_step (GTask *task);
 
 static void
 gmr_ready (MMPortSerialAt *port,
-           GAsyncResult *res,
-           GTask *task)
+           GAsyncResult   *res,
+           GTask          *task)
 {
+    MMPortProbe *probe;
     const gchar *p;
     const gchar *response;
-    GError *error = NULL;
 
-    response = mm_port_serial_at_command_finish (port, res, &error);
-    if (error) {
-        g_error_free (error);
+    probe = g_task_get_source_object (task);
 
-        /* Just retry... */
+    response = mm_port_serial_at_command_finish (port, res, NULL);
+    if (!response) {
+        mm_obj_dbg (probe, "(Longcheer) retrying custom init step...");
         longcheer_custom_init_step (task);
         return;
     }
@@ -88,7 +88,7 @@ gmr_ready (MMPortSerialAt *port,
                                  MM_CORE_ERROR_UNSUPPORTED,
                                  "X200 cannot be supported with the Longcheer plugin");
     } else {
-        mm_dbg ("(Longcheer) device is not a X200");
+        mm_obj_dbg (probe, "(Longcheer) device is not a X200");
         g_task_return_boolean (task, TRUE);
     }
     g_object_unref (task);
@@ -97,16 +97,17 @@ gmr_ready (MMPortSerialAt *port,
 static void
 longcheer_custom_init_step (GTask *task)
 {
+    MMPortProbe                *probe;
     LongcheerCustomInitContext *ctx;
-    GCancellable *cancellable;
+    GCancellable               *cancellable;
 
-    ctx = g_task_get_task_data (task);
+    probe       = g_task_get_source_object (task);
+    ctx         = g_task_get_task_data (task);
     cancellable = g_task_get_cancellable (task);
 
     /* If cancelled, end */
     if (g_cancellable_is_cancelled (cancellable)) {
-        mm_dbg ("(Longcheer) no need to keep on running custom init in (%s)",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "(Longcheer) no need to keep on running custom init");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
