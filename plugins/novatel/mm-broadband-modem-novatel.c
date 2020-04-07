@@ -35,7 +35,7 @@
 #include "mm-modem-helpers.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/result.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
@@ -413,7 +413,7 @@ nw_snapshot_old_ready (MMPortSerialQcdm *port,
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         /* Just ignore the error and complete with the input info */
-        mm_dbg ("Couldn't run QCDM Novatel Modem MSM6500 snapshot: '%s'", error->message);
+        g_prefix_error (&error, "Couldn't run QCDM Novatel Modem MSM6500 snapshot: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -423,7 +423,7 @@ nw_snapshot_old_ready (MMPortSerialQcdm *port,
     result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const gchar *) response->data, response->len, NULL);
     g_byte_array_unref (response);
     if (!result) {
-        mm_dbg ("Failed to get QCDM Novatel Modem MSM6500 snapshot: %s", error->message);
+        g_prefix_error (&error, "Failed to get QCDM Novatel Modem MSM6500 snapshot: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -439,18 +439,21 @@ nw_snapshot_old_ready (MMPortSerialQcdm *port,
 
 static void
 nw_snapshot_new_ready (MMPortSerialQcdm *port,
-                       GAsyncResult *res,
-                       GTask *task)
+                       GAsyncResult     *res,
+                       GTask            *task)
 {
-    QcdmResult *result;
-    GByteArray *nwsnap;
-    GError *error = NULL;
-    GByteArray *response;
-    guint8 hdr_revision = QCDM_HDR_REV_UNKNOWN;
+    MMBroadbandModemNovatel *self;
+    QcdmResult              *result;
+    GByteArray              *nwsnap;
+    GError                  *error = NULL;
+    GByteArray              *response;
+    guint8                   hdr_revision = QCDM_HDR_REV_UNKNOWN;
+
+    self = g_task_get_source_object (task);
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
-        mm_dbg ("Couldn't run QCDM Novatel Modem MSM6800 snapshot: '%s'", error->message);
+        g_prefix_error (&error, "couldn't run QCDM Novatel Modem MSM6800 snapshot: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -469,7 +472,7 @@ nw_snapshot_new_ready (MMPortSerialQcdm *port,
         return;
     }
 
-    mm_dbg ("Failed to get QCDM Novatel Modem MSM6800 snapshot.");
+    mm_obj_dbg (self, "failed to get QCDM Novatel Modem MSM6800 snapshot");
 
     /* Try for MSM6500 */
     nwsnap = g_byte_array_sized_new (25);
@@ -498,9 +501,7 @@ get_evdo_version (MMBaseModem *self,
 
     port = mm_base_modem_get_port_qcdm (self);
     if (!port) {
-        error = g_error_new (MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "No available QCDM port.");
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "No available QCDM port");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -508,7 +509,7 @@ get_evdo_version (MMBaseModem *self,
     g_task_set_task_data (task, port, (GDestroyNotify) close_and_unref_port);
 
     if (!mm_port_serial_open (MM_PORT_SERIAL (port), &error)) {
-        g_prefix_error (&error, "Couldn't open QCDM port: ");
+        g_prefix_error (&error, "couldn't open QCDM port: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -543,24 +544,24 @@ modem_load_access_technologies_finish (MMIfaceModem *self,
                                        guint *mask,
                                        GError **error)
 {
-    GTask *task = G_TASK (res);
-    AccessTechContext *ctx = g_task_get_task_data (task);
+    AccessTechContext *ctx;
 
-    if (!g_task_propagate_boolean (task, error))
+    if (!g_task_propagate_boolean (G_TASK (res), error))
         return FALSE;
 
     /* Update access technology with specific EVDO revision from QCDM if we have them */
+    ctx = g_task_get_task_data (G_TASK (res));
     if (ctx->act & MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK) {
         if (ctx->hdr_revision == QCDM_HDR_REV_0) {
-            mm_dbg ("Novatel Modem Snapshot EVDO revision: 0");
+            mm_obj_dbg (self, "novatel modem snapshot EVDO revision: 0");
             ctx->act &= ~MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
             ctx->act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
         } else if (ctx->hdr_revision == QCDM_HDR_REV_A) {
-            mm_dbg ("Novatel Modem Snapshot EVDO revision: A");
+            mm_obj_dbg (self, "novatel modem snapshot EVDO revision: A");
             ctx->act &= ~MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
             ctx->act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
         } else
-            mm_dbg ("Novatel Modem Snapshot EVDO revision: %d (unknown)", ctx->hdr_revision);
+            mm_obj_dbg (self, "novatel modem snapshot EVDO revision: %d (unknown)", ctx->hdr_revision);
     }
 
     *access_technologies = ctx->act;
@@ -820,7 +821,6 @@ modem_load_signal_quality (MMIfaceModem *self,
 {
     GTask *task;
 
-    mm_dbg ("loading signal quality...");
     task = g_task_new (self, NULL, callback, user_data);
 
     /* 3GPP modems can just run parent's signal quality loading */
@@ -865,7 +865,7 @@ qcmipgetp_ready (MMBaseModem  *self,
     if (!response)
         g_task_return_error (task, error);
     else {
-        mm_dbg ("Current profile information retrieved: %s", response);
+        mm_obj_dbg (self, "current profile information retrieved: %s", response);
         g_task_return_boolean (task, TRUE);
     }
     g_object_unref (task);
@@ -1044,14 +1044,14 @@ cdma_activation_step (GTask *task)
 
     switch (ctx->step) {
     case CDMA_ACTIVATION_STEP_FIRST:
-        mm_dbg ("Launching manual activation...");
+        mm_obj_dbg (self, "launching manual activation...");
         ctx->step++;
         /* fall-through */
 
     case CDMA_ACTIVATION_STEP_REQUEST_ACTIVATION: {
         gchar *command;
 
-        mm_info ("Activation step [1/5]: setting up activation details");
+        mm_obj_info (self, "activation step [1/5]: setting up activation details");
         command = g_strdup_printf ("$NWACTIVATION=%s,%s,%s",
                                    mm_cdma_manual_activation_properties_get_spc (ctx->properties),
                                    mm_cdma_manual_activation_properties_get_mdn (ctx->properties),
@@ -1067,7 +1067,7 @@ cdma_activation_step (GTask *task)
     }
 
     case CDMA_ACTIVATION_STEP_OTA_UPDATE:
-        mm_info ("Activation step [2/5]: starting OTA activation");
+        mm_obj_info (self, "activation step [2/5]: starting OTA activation");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+IOTA=1",
                                   20,
@@ -1077,7 +1077,7 @@ cdma_activation_step (GTask *task)
         return;
 
     case CDMA_ACTIVATION_STEP_PRL_UPDATE:
-        mm_info ("Activation step [3/5]: starting PRL update");
+        mm_obj_info (self, "activation step [3/5]: starting PRL update");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+IOTA=2",
                                   20,
@@ -1087,7 +1087,7 @@ cdma_activation_step (GTask *task)
         return;
 
     case CDMA_ACTIVATION_STEP_WAIT_UNTIL_FINISHED:
-        mm_info ("Activation step [4/5]: checking activation process status");
+        mm_obj_info (self, "activation step [4/5]: checking activation process status");
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "+IOTA?",
                                   20,
@@ -1097,7 +1097,7 @@ cdma_activation_step (GTask *task)
         return;
 
     case CDMA_ACTIVATION_STEP_LAST:
-        mm_info ("Activation step [5/5]: activation process finished");
+        mm_obj_info (self, "activation step [5/5]: activation process finished");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -1253,18 +1253,22 @@ parse_modem_eri (DetailedRegistrationStateContext *ctx, QcdmResult *result)
 
 static void
 reg_eri_6500_cb (MMPortSerialQcdm *port,
-                 GAsyncResult *res,
-                 GTask *task)
+                 GAsyncResult     *res,
+                 GTask            *task)
 {
-    DetailedRegistrationStateContext *ctx = g_task_get_task_data (task);
-    GError *error = NULL;
-    GByteArray *response;
-    QcdmResult *result;
+    MMBroadbandModemNovatel          *self;
+    DetailedRegistrationStateContext *ctx;
+    GError                           *error = NULL;
+    GByteArray                       *response;
+    QcdmResult                       *result;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         /* Just ignore the error and complete with the input info */
-        mm_dbg ("Couldn't run QCDM MSM6500 ERI: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't run QCDM MSM6500 ERI: %s", error->message);
         g_error_free (error);
         goto done;
     }
@@ -1286,16 +1290,20 @@ reg_eri_6800_cb (MMPortSerialQcdm *port,
                  GAsyncResult *res,
                  GTask *task)
 {
-    DetailedRegistrationStateContext *ctx = g_task_get_task_data (task);
-    GError *error = NULL;
-    GByteArray *response;
-    GByteArray *nweri;
-    QcdmResult *result;
+    MMBroadbandModemNovatel          *self;
+    DetailedRegistrationStateContext *ctx;
+    GError                           *error = NULL;
+    GByteArray                       *response;
+    GByteArray                       *nweri;
+    QcdmResult                       *result;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mm_port_serial_qcdm_command_finish (port, res, &error);
     if (error) {
         /* Just ignore the error and complete with the input info */
-        mm_dbg ("Couldn't run QCDM MSM6800 ERI: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't run QCDM MSM6800 ERI: %s", error->message);
         g_error_free (error);
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -1350,7 +1358,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
     ctx->port = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
     if (!ctx->port) {
         /* Ignore errors and use non-detailed registration state */
-        mm_dbg ("No available QCDM port.");
+        mm_obj_dbg (self, "no available QCDM port");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -1358,7 +1366,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
 
     if (!mm_port_serial_open (MM_PORT_SERIAL (ctx->port), &error)) {
         /* Ignore errors and use non-detailed registration state */
-        mm_dbg ("Couldn't open QCDM port: %s", error->message);
+        mm_obj_dbg (self, "couldn't open QCDM port: %s", error->message);
         g_error_free (error);
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);

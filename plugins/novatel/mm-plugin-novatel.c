@@ -31,7 +31,7 @@
 #include "mm-common-novatel.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem-novatel.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 #if defined WITH_QMI
 #include "mm-broadband-modem-qmi.h"
@@ -55,7 +55,7 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered Novatel modem found...");
+        mm_obj_dbg (self, "QMI-powered Novatel modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),

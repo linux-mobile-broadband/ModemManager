@@ -31,7 +31,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-messaging.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-serial-parsers.h"
 
@@ -256,7 +256,6 @@ load_own_numbers (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    mm_dbg ("loading (Novatel LTE) own numbers...");
     mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
         own_numbers_commands,
@@ -365,7 +364,6 @@ load_current_bands_done (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query supported bands: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -424,7 +422,6 @@ load_unlock_retries_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -499,7 +496,6 @@ load_access_technologies_ready (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query access technology: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -598,7 +594,7 @@ scan_networks (MMIfaceModem3gpp *self,
     GTask *task;
     MMModemAccessTechnology access_tech;
 
-    mm_dbg ("scanning for networks (Novatel LTE)...");
+    mm_obj_dbg (self, "scanning for networks (Novatel LTE)...");
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -608,17 +604,16 @@ scan_networks (MMIfaceModem3gpp *self,
      */
     access_tech = mm_iface_modem_get_access_technologies (MM_IFACE_MODEM (self));
     if (access_tech & MM_MODEM_ACCESS_TECHNOLOGY_LTE) {
-        gchar *access_tech_string;
+        g_autofree gchar *access_tech_string = NULL;
 
         access_tech_string = mm_modem_access_technology_build_string_from_mask (access_tech);
-        mm_warn ("Couldn't scan for networks with access technologies: %s", access_tech_string);
+        mm_obj_warn (self, "couldn't scan for networks with access technologies: %s", access_tech_string);
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_UNSUPPORTED,
                                  "Couldn't scan for networks with access technologies: %s",
                                  access_tech_string);
         g_object_unref (task);
-        g_free (access_tech_string);
         return;
     }
 

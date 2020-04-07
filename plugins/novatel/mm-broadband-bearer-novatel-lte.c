@@ -30,7 +30,7 @@
 
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer-novatel-lte.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 
 #define QMISTATUS_TAG "$NWQMISTATUS:"
@@ -176,32 +176,36 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
                               GAsyncResult *res,
                               GTask *task)
 {
+    MMBroadbandBearerNovatelLte *self;
     DetailedConnectContext *ctx;
     const gchar *result;
     gchar *normalized_result;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     if (g_task_return_error_if_cancelled (task)) {
         g_object_unref (task);
         return;
     }
 
-    ctx = g_task_get_task_data (task);
-
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
-        mm_warn ("QMI connection status failed: %s", error->message);
         if (!g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
             g_task_return_error (task, error);
             g_object_unref (task);
             return;
         }
+        mm_obj_dbg (self, "connection status failed: %s; will retry", error->message);
         g_error_free (error);
-        result = "Unknown error";
-    } else if (is_qmistatus_connected (result)) {
+        goto retry;
+    }
+
+    if (is_qmistatus_connected (result)) {
         MMBearerIpConfig *config;
 
-        mm_dbg("Connected");
+        mm_obj_dbg (self, "connected");
         config = mm_bearer_ip_config_new ();
         mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
         g_task_return_pointer (
@@ -211,17 +215,18 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
         g_object_unref (task);
         g_object_unref (config);
         return;
-    } else if (is_qmistatus_call_failed (result)) {
-        /* Don't retry if the call failed */
+    }
+
+    /* Don't retry if the call failed */
+    if (is_qmistatus_call_failed (result)) {
+        mm_obj_dbg (self, "not retrying: call failed");
         ctx->retries = 0;
     }
 
-    mm_dbg ("Error: '%s'", result);
-
+retry:
     if (ctx->retries > 0) {
         ctx->retries--;
-        mm_dbg ("Retrying status check in a second. %d retries left.",
-                ctx->retries);
+        mm_obj_dbg (self, "retrying status check in a second: %d retries left", ctx->retries);
         g_timeout_add_seconds (1, (GSourceFunc)connect_3gpp_qmistatus, task);
         return;
     }
@@ -268,7 +273,6 @@ connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
 
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (!result) {
-        mm_warn ("QMI connection failed: %s", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -381,27 +385,30 @@ disconnect_3gpp_finish (MMBroadbandBearer *self,
 static gboolean disconnect_3gpp_qmistatus (GTask *task);
 
 static void
-disconnect_3gpp_status_ready (MMBaseModem *modem,
+disconnect_3gpp_status_ready (MMBaseModem  *modem,
                               GAsyncResult *res,
-                              GTask *task)
+                              GTask        *task)
 {
-    DetailedDisconnectContext *ctx;
-    const gchar *result;
-    GError *error = NULL;
-    gboolean is_connected = FALSE;
+    MMBroadbandBearerNovatelLte *self;
+    DetailedDisconnectContext   *ctx;
+    const gchar                 *result;
+    GError                      *error = NULL;
+    gboolean                     is_connected = FALSE;
+
+    self = g_task_get_source_object (task);
 
     result = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (result) {
-        mm_dbg ("QMI connection status: %s", result);
+        mm_obj_dbg (self, "QMI connection status: %s", result);
         if (is_qmistatus_disconnected (result)) {
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
-        } else if (is_qmistatus_connected (result)) {
-            is_connected = TRUE;
         }
+        if (is_qmistatus_connected (result))
+            is_connected = TRUE;
     } else {
-        mm_dbg ("QMI connection status failed: %s", error->message);
+        mm_obj_dbg (self, "QMI connection status failed: %s", error->message);
         g_error_free (error);
         result = "Unknown error";
     }
@@ -410,8 +417,7 @@ disconnect_3gpp_status_ready (MMBaseModem *modem,
 
     if (ctx->retries > 0) {
         ctx->retries--;
-        mm_dbg ("Retrying status check in a second. %d retries left.",
-                ctx->retries);
+        mm_obj_dbg (self, "retrying status check in a second: %d retries left", ctx->retries);
         g_timeout_add_seconds (1, (GSourceFunc)disconnect_3gpp_qmistatus, task);
         return;
     }
@@ -457,15 +463,18 @@ disconnect_3gpp_qmistatus (GTask *task)
 
 
 static void
-disconnect_3gpp_check_status (MMBaseModem *modem,
+disconnect_3gpp_check_status (MMBaseModem  *modem,
                               GAsyncResult *res,
-                              GTask *task)
+                              GTask        *task)
 {
-    GError *error = NULL;
+    MMBroadbandBearerNovatelLte *self;
+    GError                      *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        mm_dbg("Disconnection error: %s", error->message);
+        mm_obj_dbg (self, "disconnection error: %s", error->message);
         g_error_free (error);
     }
 

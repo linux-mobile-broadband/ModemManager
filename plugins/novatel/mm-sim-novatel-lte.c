@@ -23,7 +23,6 @@
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
-#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
 
@@ -172,7 +171,6 @@ load_imsi (MMBaseSim *self,
                   MM_BASE_SIM_MODEM, &modem,
                   NULL);
 
-    mm_dbg ("loading (Novatel LTE) IMSI...");
     mm_base_modem_at_command (
         modem,
         "+CRSM=176,28423,0,0,9",

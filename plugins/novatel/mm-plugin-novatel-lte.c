@@ -26,7 +26,6 @@
 #include "mm-plugin-novatel-lte.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem-novatel-lte.h"
-#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginNovatelLte, mm_plugin_novatel_lte, MM_TYPE_PLUGIN)
 

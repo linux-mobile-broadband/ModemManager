@@ -14,7 +14,7 @@
  */
 
 #include "mm-common-novatel.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*****************************************************************************/
 /* Custom init */
@@ -44,30 +44,27 @@ static void custom_init_step (GTask *task);
 
 static void
 nwdmat_ready (MMPortSerialAt *port,
-              GAsyncResult *res,
-              GTask* task)
+              GAsyncResult   *res,
+              GTask          *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError)  error = NULL;
+    MMPortProbe       *probe;
+
+    probe = g_task_get_source_object (task);
 
     mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
-        if (g_error_matches (error,
-                             MM_SERIAL_ERROR,
-                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
+        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             custom_init_step (task);
-            goto out;
+            return;
         }
 
-        mm_dbg ("(Novatel) Error flipping secondary ports to AT mode: %s", error->message);
+        mm_obj_dbg (probe, "(Novatel) Error flipping secondary ports to AT mode: %s", error->message);
     }
 
     /* Finish custom_init */
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-
-out:
-    if (error)
-        g_error_free (error);
 }
 
 static gboolean
@@ -81,24 +78,21 @@ static void
 custom_init_step (GTask *task)
 {
     CustomInitContext *ctx;
-    MMPortProbe *probe;
+    MMPortProbe       *probe;
 
-    ctx = g_task_get_task_data (task);
+    probe = g_task_get_source_object (task);
+    ctx   = g_task_get_task_data (task);
 
     /* If cancelled, end */
     if (g_task_return_error_if_cancelled (task)) {
-        mm_dbg ("(Novatel) no need to keep on running custom init in (%s)",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "(Novatel) no need to keep on running custom init");
         g_object_unref (task);
         return;
     }
 
-    probe = g_task_get_source_object (task);
-
     /* If device has a QMI port, don't run $NWDMAT */
     if (mm_port_probe_list_has_qmi_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (probe)))) {
-        mm_dbg ("(Novatel) no need to run custom init in (%s): device has QMI port",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "(Novatel) no need to run custom init: device has QMI port");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -124,8 +118,7 @@ custom_init_step (GTask *task)
     }
 
     /* Finish custom_init */
-    mm_dbg ("(Novatel) couldn't flip secondary port to AT in (%s): all retries consumed",
-            mm_port_get_device (MM_PORT (ctx->port)));
+    mm_obj_dbg (probe, "(Novatel) couldn't flip secondary port to AT: all retries consumed");
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
