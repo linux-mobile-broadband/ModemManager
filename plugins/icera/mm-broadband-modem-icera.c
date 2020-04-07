@@ -25,7 +25,7 @@
 
 #include "ModemManager.h"
 #include "mm-serial-parsers.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
@@ -71,38 +71,38 @@ struct _MMBroadbandModemIceraPrivate {
 /* Load supported modes (Modem interface) */
 
 static void
-add_supported_mode (GArray **combinations,
-                    guint mode)
+add_supported_mode (MMBroadbandModemIcera  *self,
+                    GArray                **combinations,
+                    guint                   mode)
 {
     MMModemModeCombination combination;
 
     switch (mode) {
     case 0:
-        mm_dbg ("Modem supports 2G-only mode");
+        mm_obj_dbg (self, "2G-only mode supported");
         combination.allowed = MM_MODEM_MODE_2G;
         combination.preferred = MM_MODEM_MODE_NONE;
         break;
     case 1:
-        mm_dbg ("Modem supports 3G-only mode");
+        mm_obj_dbg (self, "3G-only mode supported");
         combination.allowed = MM_MODEM_MODE_3G;
         combination.preferred = MM_MODEM_MODE_NONE;
         break;
     case 2:
-        mm_dbg ("Modem supports 2G/3G mode with 2G preferred");
+        mm_obj_dbg (self, "2G/3G mode with 2G preferred supported");
         combination.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
         combination.preferred = MM_MODEM_MODE_2G;
         break;
     case 3:
-        mm_dbg ("Modem supports 2G/3G mode with 3G preferred");
+        mm_obj_dbg (self, "2G/3G mode with 3G preferred supported");
         combination.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
         combination.preferred = MM_MODEM_MODE_3G;
         break;
     case 5:
-        mm_dbg ("Modem supports 'any', but not explicitly listing it");
         /* Any, no need to add it to the list */
         return;
     default:
-        mm_warn ("Unsupported Icera mode found: %u", mode);
+        mm_obj_warn (self, "unsupported mode found in %%IPSYS=?: %u", mode);
         return;
     }
 
@@ -182,18 +182,18 @@ load_supported_modes_finish (MMIfaceModem *self,
                 guint j;
 
                 for (j = modefirst; j <= modelast; j++)
-                    add_supported_mode (&combinations, j);
+                    add_supported_mode (MM_BROADBAND_MODEM_ICERA (self), &combinations, j);
             } else
-                mm_warn ("Couldn't parse mode interval (%s) in %%IPSYS=? response", split[i]);
+                mm_obj_warn (self, "couldn't parse mode interval in %%IPSYS=? response: %s", split[i]);
             g_free (first);
         } else {
             guint mode;
 
             /* Add single */
             if (mm_get_uint_from_str (split[i], &mode))
-                add_supported_mode (&combinations, mode);
+                add_supported_mode (MM_BROADBAND_MODEM_ICERA (self), &combinations, mode);
             else
-                mm_warn ("Couldn't parse mode (%s) in %%IPSYS=? response", split[i]);
+                mm_obj_warn (self, "couldn't parse mode in %%IPSYS=? response: %s", split[i]);
         }
     }
 
@@ -441,7 +441,7 @@ ipdpact_received (MMPortSerialAt *port,
         ctx.status = MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED;
         break;
     default:
-        mm_warn ("Unknown Icera connect status %d", status);
+        mm_obj_warn (self, "unknown %%IPDPACT connect status %d", status);
         break;
     }
 
@@ -614,10 +614,9 @@ nwstate_query_ready (MMBroadbandModemIcera *self,
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
-        mm_dbg ("Couldn't query access technology: '%s'", error->message);
+    if (error)
         g_task_return_error (task, error);
-    } else {
+    else {
         /*
          * The unsolicited message handler will already have run and
          * removed the NWSTATE response, so we use the result from there.
@@ -1022,7 +1021,6 @@ load_unlock_retries_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1260,7 +1258,6 @@ load_supported_bands_get_current_bands_ready (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query current bands: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1346,7 +1343,6 @@ load_current_bands_ready (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query current bands: '%s'", error->message);
         g_task_return_error (task, error);
     } else {
         /* Parse bands from Icera response into MM band numbers */
@@ -1413,7 +1409,6 @@ set_current_bands_next (MMIfaceModem *self,
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error)) {
-        mm_dbg ("Couldn't set current bands: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1448,15 +1443,15 @@ set_one_band (MMIfaceModem *self,
 
     /* Note that ffs() returning 2 corresponds to 1 << 1, not 1 << 2 */
     band--;
-    mm_dbg("1. enablebits %x disablebits %x band %d enable %d",
-           ctx->enablebits, ctx->disablebits, band, enable);
+    mm_obj_dbg (self, "preparing %%IPBM command (1/2): enablebits %x, disablebits %x, band %d, enable %d",
+                ctx->enablebits, ctx->disablebits, band, enable);
 
     if (enable)
         ctx->enablebits &= ~(1 << band);
     else
         ctx->disablebits &= ~(1 << band);
-    mm_dbg("2. enablebits %x disablebits %x",
-           ctx->enablebits, ctx->disablebits);
+    mm_obj_dbg (self, "preparing %%IPBM command (2/2): enablebits %x, disablebits %x",
+                ctx->enablebits, ctx->disablebits);
 
     command = g_strdup_printf ("%%IPBM=\"%s\",%d",
                                modem_bands[band].name,

@@ -29,7 +29,7 @@
 
 #include "mm-broadband-bearer-icera.h"
 #include "mm-base-modem-at.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
 #include "mm-daemon-enums-types.h"
@@ -299,37 +299,39 @@ disconnect_ipdpact_ready (MMBaseModem *modem,
                           GAsyncResult *res,
                           MMBroadbandBearerIcera *self)
 {
-    GTask *task;
     GError *error = NULL;
+    GTask  *task;
 
     /* Try to recover the disconnection task. If none found, it means the
      * task was already completed and we have nothing else to do. */
-    task = self->priv->disconnect_pending;
-
-    /* Balance refcount with the extra ref we passed to command_full() */
-    g_object_unref (self);
+    task = g_steal_pointer (&self->priv->disconnect_pending);
 
     if (!task) {
-        mm_dbg ("Disconnection context was finished already by an unsolicited message");
-
+        mm_obj_dbg (self, "disconnection context was finished already by an unsolicited message");
         /* Run _finish() to finalize the async call, even if we don't care
-         * the result */
+         * about the result */
         mm_base_modem_at_command_full_finish (modem, res, NULL);
-        return;
+        goto out;
     }
 
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        self->priv->disconnect_pending = NULL;
         g_task_return_error (task, error);
         g_object_unref (task);
-        return;
+        goto out;
     }
+
+    /* Track again */
+    self->priv->disconnect_pending = task;
 
     /* Set a 60-second disconnection-failure timeout */
     self->priv->disconnect_pending_id = g_timeout_add_seconds (60,
                                                                (GSourceFunc)disconnect_3gpp_timed_out_cb,
                                                                self);
+
+out:
+    /* Balance refcount with the extra ref we passed to command_full() */
+    g_object_unref (self);
 }
 
 static void
@@ -596,13 +598,12 @@ activate_ready (MMBaseModem            *modem,
     Dial3gppContext *ctx;
     GError          *error = NULL;
 
-    task = self->priv->connect_pending;
-    self->priv->connect_pending = NULL;
+    task = g_steal_pointer (&self->priv->connect_pending);
 
     /* Try to recover the connection context. If none found, it means the
      * context was already completed and we have nothing else to do. */
     if (!task) {
-        mm_dbg ("Connection context was finished already by an unsolicited message");
+        mm_obj_dbg (self, "connection context was finished already by an unsolicited message");
         /* Run _finish() to finalize the async call, even if we don't care
          * the result */
         mm_base_modem_at_command_full_finish (modem, res, NULL);
@@ -672,7 +673,7 @@ authenticate_ready (MMBaseModem  *modem,
          * error ["a profile (CID) is currently active"] if a connect
          * is attempted too soon after a disconnect. */
         if (++ctx->authentication_retries < 3) {
-            mm_dbg ("Authentication failed: '%s'; retrying...", error->message);
+            mm_obj_dbg (self, "authentication failed: %s; retrying...", error->message);
             g_error_free (error);
             g_timeout_add_seconds (1, (GSourceFunc)retry_authentication_cb, task);
             return;
@@ -725,7 +726,7 @@ authenticate (GTask *task)
 
     /* Both user and password are required; otherwise firmware returns an error */
     if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
-        mm_dbg ("Not using authentication");
+        mm_obj_dbg (self, "not using authentication");
         command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
     } else {
         gchar *quoted_user;
@@ -733,13 +734,13 @@ authenticate (GTask *task)
         guint  icera_auth;
 
         if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-            mm_dbg ("Using default (PAP) authentication method");
+            mm_obj_dbg (self, "using default (PAP) authentication method");
             icera_auth = 1;
         } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
-            mm_dbg ("Using PAP authentication method");
+            mm_obj_dbg (self, "using PAP authentication method");
             icera_auth = 1;
         } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
-            mm_dbg ("Using CHAP authentication method");
+            mm_obj_dbg (self, "using CHAP authentication method");
             icera_auth = 2;
         } else {
             gchar *str;
@@ -881,8 +882,7 @@ report_connection_status (MMBaseBearer             *_self,
         return;
     }
 
-    mm_dbg ("Received spontaneous %%IPDPACT (%s)",
-            mm_bearer_connection_status_get_string (status));
+    mm_obj_dbg (self, "received spontaneous %%IPDPACT (%s)", mm_bearer_connection_status_get_string (status));
 
     /* Received a random 'DISCONNECTED'...*/
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED ||
