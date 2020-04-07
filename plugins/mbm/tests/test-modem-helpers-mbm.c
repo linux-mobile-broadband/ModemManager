@@ -179,7 +179,7 @@ test_cfun_test (void)
         gboolean success;
         GError *error = NULL;
 
-        success = mm_mbm_parse_cfun_test (cfun_tests[i].str, &mask, &error);
+        success = mm_mbm_parse_cfun_test (cfun_tests[i].str, NULL, &mask, &error);
         g_assert_no_error (error);
         g_assert (success);
         g_assert_cmpuint (mask, ==, cfun_tests[i].expected_mask);

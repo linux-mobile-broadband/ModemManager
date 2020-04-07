@@ -24,7 +24,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-base-modem-at.h"
 #include "mm-sim-mbm.h"
 
@@ -93,9 +93,11 @@ cpin_query_cb (GTask *task)
 static void
 wait_for_unlocked_status (GTask *task)
 {
+    MMSimMbm          *self;
     SendPinPukContext *ctx;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     /* Oops... :/ */
     if (ctx->retries == 0) {
@@ -109,7 +111,7 @@ wait_for_unlocked_status (GTask *task)
 
     /* Check status */
     ctx->retries--;
-    mm_dbg ("Scheduling lock state check...");
+    mm_obj_dbg (self, "scheduling lock state check...");
     g_timeout_add_seconds (1, (GSourceFunc)cpin_query_cb, task);
 }
 

@@ -38,7 +38,7 @@
 
 #include "mm-base-modem-at.h"
 #include "mm-broadband-bearer-mbm.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-mbm.h"
 #include "mm-daemon-enums-types.h"
@@ -180,11 +180,10 @@ connect_poll_ready (MMBaseModem          *modem,
     const gchar     *response;
     guint            state;
 
-    task = self->priv->connect_pending;
-    self->priv->connect_pending = NULL;
+    task = g_steal_pointer (&self->priv->connect_pending);
 
     if (!task) {
-        mm_dbg ("Connection context was finished already by an unsolicited message");
+        mm_obj_dbg (self, "connection context was finished already by an unsolicited message");
         /* Run _finish() to finalize the async call, even if we don't care
          * the result */
         mm_base_modem_at_command_full_finish (modem, res, NULL);
@@ -219,8 +218,7 @@ connect_poll_cb (MMBroadbandBearerMbm *self)
     GTask           *task;
     Dial3gppContext *ctx;
 
-    task = self->priv->connect_pending;
-    self->priv->connect_pending = NULL;
+    task = g_steal_pointer (&self->priv->connect_pending);
 
     g_assert (task);
     ctx = g_task_get_task_data (task);
@@ -269,11 +267,10 @@ activate_ready (MMBaseModem          *modem,
 
     /* Try to recover the connection context. If none found, it means the
      * context was already completed and we have nothing else to do. */
-    task = self->priv->connect_pending;
-    self->priv->connect_pending = NULL;
+    task = g_steal_pointer (&self->priv->connect_pending);
 
     if (!task) {
-        mm_dbg ("Connection context was finished already by an unsolicited message");
+        mm_obj_dbg (self, "connection context was finished already by an unsolicited message");
         /* Run _finish() to finalize the async call, even if we don't care
          * the result */
         mm_base_modem_at_command_full_finish (modem, res, NULL);
@@ -391,7 +388,7 @@ authenticate (GTask *task)
         return;
     }
 
-    mm_dbg ("Authentication not needed");
+    mm_obj_dbg (self, "authentication not needed");
     activate (task);
 }
 
@@ -602,11 +599,8 @@ process_pending_disconnect_attempt (MMBroadbandBearerMbm     *self,
     DisconnectContext *ctx;
 
     /* Recover disconnection task */
-    task = self->priv->disconnect_pending;
-    self->priv->disconnect_pending = NULL;
-    g_assert (task != NULL);
-
-    ctx = g_task_get_task_data (task);
+    task = g_steal_pointer (&self->priv->disconnect_pending);
+    ctx  = g_task_get_task_data (task);
 
     if (ctx->poll_id) {
         g_source_remove (ctx->poll_id);
@@ -615,7 +609,7 @@ process_pending_disconnect_attempt (MMBroadbandBearerMbm     *self,
 
     /* Received 'DISCONNECTED' during a disconnection attempt? */
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
-        mm_dbg ("Connection disconnect indicated by an unsolicited message");
+        mm_obj_dbg (self, "connection disconnect indicated by an unsolicited message");
         g_task_return_boolean (task, TRUE);
     } else {
         /* Otherwise, report error */
@@ -638,11 +632,10 @@ disconnect_poll_ready (MMBaseModem          *modem,
     const gchar       *response;
     guint              state;
 
-    task = self->priv->disconnect_pending;
-    self->priv->disconnect_pending = NULL;
+    task = g_steal_pointer (&self->priv->disconnect_pending);
 
     if (!task) {
-        mm_dbg ("Disconnection context was finished already by an unsolicited message");
+        mm_obj_dbg (self, "disconnection context was finished already by an unsolicited message");
         /* Run _finish() to finalize the async call, even if we don't care
          * the result */
         mm_base_modem_at_command_full_finish (modem, res, NULL);
@@ -722,8 +715,7 @@ disconnect_enap_ready (MMBaseModem          *modem,
     GTask             *task;
     GError            *error = NULL;
 
-    task = self->priv->disconnect_pending;
-    self->priv->disconnect_pending = NULL;
+    task = g_steal_pointer (&self->priv->disconnect_pending);
 
     /* Try to recover the disconnection context. If none found, it means the
      * context was already completed and we have nothing else to do. */
@@ -737,7 +729,7 @@ disconnect_enap_ready (MMBaseModem          *modem,
     /* Ignore errors for now */
     mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
-        mm_dbg ("Disconnection failed (not fatal): %s", error->message);
+        mm_obj_dbg (self, "disconnection failed (not fatal): %s", error->message);
         g_error_free (error);
     }
 
@@ -815,8 +807,8 @@ report_connection_status (MMBaseBearer             *_self,
         return;
     }
 
-    mm_dbg ("Received spontaneous E2NAP (%s)",
-            mm_bearer_connection_status_get_string (status));
+    mm_obj_dbg (self, "received spontaneous E2NAP (%s)",
+                mm_bearer_connection_status_get_string (status));
 
     /* Received a random 'DISCONNECTED'...*/
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED ||

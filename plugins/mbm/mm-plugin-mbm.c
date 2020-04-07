@@ -23,7 +23,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-plugin-mbm.h"
 #include "mm-broadband-modem-mbm.h"
 
@@ -49,7 +49,7 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
-        mm_dbg ("MBIM-powered Ericsson modem found...");
+        mm_obj_dbg (self, "MBIM-powered Ericsson modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
                                                            mm_plugin_get_name (self),

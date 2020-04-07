@@ -34,9 +34,10 @@ typedef enum {
 
 /* AT+CFUN=? test parser
  * Returns a bitmask, bit index set for the supported modes reported */
-gboolean mm_mbm_parse_cfun_test (const gchar *response,
-                                 guint32 *supported_mask,
-                                 GError **error);
+gboolean mm_mbm_parse_cfun_test (const gchar  *response,
+                                 gpointer      log_object,
+                                 guint32      *supported_mask,
+                                 GError      **error);
 
 /* AT+CFUN? response parsers */
 gboolean mm_mbm_parse_cfun_query_power_state   (const gchar        *response,

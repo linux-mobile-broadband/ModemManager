@@ -31,7 +31,7 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-bearer-list.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
@@ -115,7 +115,7 @@ modem_create_bearer (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    mm_dbg ("Creating MBM bearer...");
+    mm_obj_dbg (self, "creating MBM bearer...");
     mm_broadband_bearer_mbm_new (MM_BROADBAND_MODEM_MBM (self),
                                  properties,
                                  NULL, /* cancellable */
@@ -196,7 +196,7 @@ load_supported_modes_finish (MMIfaceModem *_self,
     if (!response)
         return FALSE;
 
-    if (!mm_mbm_parse_cfun_test (response, &mask, error))
+    if (!mm_mbm_parse_cfun_test (response, self, &mask, error))
         return FALSE;
 
     /* Build list of combinations */
@@ -448,7 +448,7 @@ emrdy_ready (MMBaseModem *self,
         if (g_error_matches (error,
                              MM_SERIAL_ERROR,
                              MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
-            mm_warn ("timed out waiting for EMRDY response.");
+            mm_obj_warn (self, "timed out waiting for EMRDY response");
         else
             MM_BROADBAND_MODEM_MBM (self)->priv->have_emrdy = TRUE;
         g_error_free (error);
@@ -635,7 +635,7 @@ factory_reset (MMIfaceModem *self,
                GAsyncReadyCallback callback,
                gpointer user_data)
 {
-    mm_dbg ("Ignoring factory reset code: '%s'", code);
+    mm_obj_dbg (self, "ignoring user-provided factory reset code: '%s'", code);
 
     mm_base_modem_at_sequence (MM_BASE_MODEM (self),
                                factory_reset_sequence,
@@ -695,7 +695,6 @@ load_unlock_retries (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
-    mm_dbg ("loading unlock retries (mbm)...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "*EPIN?",
                               10,
@@ -734,19 +733,19 @@ e2nap_received (MMPortSerialAt *port,
 
     switch (state) {
     case MBM_E2NAP_DISCONNECTED:
-        mm_dbg ("disconnected");
+        mm_obj_dbg (self, "disconnected");
         ctx.status = MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
         break;
     case MBM_E2NAP_CONNECTED:
-        mm_dbg ("connected");
+        mm_obj_dbg (self, "connected");
         ctx.status = MM_BEARER_CONNECTION_STATUS_CONNECTED;
         break;
     case MBM_E2NAP_CONNECTING:
-        mm_dbg ("connecting");
+        mm_obj_dbg (self, "connecting");
         break;
     default:
         /* Should not happen */
-        mm_dbg ("unhandled E2NAP state %d", state);
+        mm_obj_dbg (self, "unhandled E2NAP state %d", state);
     }
 
     /* If unknown status, don't try to report anything */

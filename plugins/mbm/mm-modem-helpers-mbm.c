@@ -169,21 +169,22 @@ done:
 #define CFUN_TAG "+CFUN:"
 
 static void
-add_supported_mode (guint32 *mask,
-                    guint mode)
+add_supported_mode (guint     mode,
+                    gpointer  log_object,
+                    guint32  *mask)
 {
     g_assert (mask);
-
     if (mode >= 32)
-        mm_warn ("Ignored unexpected mode in +CFUN match: %d", mode);
+        mm_obj_warn (log_object, "ignored unexpected mode in +CFUN match: %d", mode);
     else
         *mask |= (1 << mode);
 }
 
 gboolean
 mm_mbm_parse_cfun_test (const gchar *response,
-                        guint32 *supported_mask,
-                        GError **error)
+                        gpointer     log_object,
+                        guint32     *supported_mask,
+                        GError     **error)
 {
     gchar **groups;
     guint32 mask = 0;
@@ -236,20 +237,20 @@ mm_mbm_parse_cfun_test (const gchar *response,
                     last_str = separator + 1;
 
                     if (!mm_get_uint_from_str (first_str, &first))
-                        mm_warn ("Couldn't match range start: '%s'", first_str);
+                        mm_obj_warn (log_object, "couldn't match range start: '%s'", first_str);
                     else if (!mm_get_uint_from_str (last_str, &last))
-                        mm_warn ("Couldn't match range stop: '%s'", last_str);
+                        mm_obj_warn (log_object, "couldn't match range stop: '%s'", last_str);
                     else if (first >= last)
-                        mm_warn ("Couldn't match range: wrong first '%s' and last '%s' items", first_str, last_str);
+                        mm_obj_warn (log_object, "couldn't match range: wrong first '%s' and last '%s' items", first_str, last_str);
                     else {
                         for (mode = first; mode <= last; mode++)
-                            add_supported_mode (&mask, mode);
+                            add_supported_mode (mode, log_object, &mask);
                     }
                 } else {
                     if (!mm_get_uint_from_str (supported_modes[i], &mode))
-                        mm_warn ("Couldn't match mode: '%s'", supported_modes[i]);
+                        mm_obj_warn (log_object, "couldn't match mode: '%s'", supported_modes[i]);
                     else
-                        add_supported_mode (&mask, mode);
+                        add_supported_mode (mode, log_object, &mask);
                 }
             }
 
