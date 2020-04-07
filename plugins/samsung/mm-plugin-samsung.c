@@ -27,7 +27,6 @@
 #include "mm-plugin-samsung.h"
 #include "mm-private-boxed-types.h"
 #include "mm-broadband-modem-samsung.h"
-#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginSamsung, mm_plugin_samsung, MM_TYPE_PLUGIN)
 

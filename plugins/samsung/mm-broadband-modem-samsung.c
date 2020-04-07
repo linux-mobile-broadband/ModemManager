@@ -28,9 +28,8 @@
 #include "mm-broadband-modem-samsung.h"
 #include "mm-broadband-bearer-icera.h"
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
 
-G_DEFINE_TYPE (MMBroadbandModemSamsung, mm_broadband_modem_samsung, MM_TYPE_BROADBAND_MODEM_ICERA);
+G_DEFINE_TYPE (MMBroadbandModemSamsung, mm_broadband_modem_samsung, MM_TYPE_BROADBAND_MODEM_ICERA)
 
 /*****************************************************************************/
 /* Setup ports (Broadband modem class) */
