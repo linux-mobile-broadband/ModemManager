@@ -23,7 +23,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 #include "mm-base-modem.h"
@@ -63,7 +63,7 @@ initialize_alternate_3g_band (MMSharedTelit *self,
     /* Lookup for the tag specifying that we're using the alternate 3G band mapping */
     priv->alternate_3g_bands = mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_TELIT_BND_ALTERNATE");
     if (priv->alternate_3g_bands)
-        mm_dbg ("Telit modem using alternate 3G band mask setup");
+        mm_obj_dbg (self, "telit modem using alternate 3G band mask setup");
 }
 
 static Private *
@@ -197,6 +197,7 @@ mm_shared_telit_load_supported_bands_ready (MMBaseModem  *self,
                                                   mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
                                                   mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
                                                   priv->alternate_3g_bands,
+                                                  self,
                                                   &error);
         if (!bands)
             g_task_return_error (task, error);
@@ -256,6 +257,7 @@ mm_shared_telit_load_current_bands_ready (MMBaseModem  *self,
                                                    mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
                                                    mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
                                                    priv->alternate_3g_bands,
+                                                   self,
                                                    &error);
         if (!bands)
             g_task_return_error (task, error);

@@ -170,6 +170,7 @@ test_parse_supported_bands_response (void)
                                                   supported_band_mapping_tests[i].modem_is_3g,
                                                   supported_band_mapping_tests[i].modem_is_4g,
                                                   supported_band_mapping_tests[i].modem_alternate_3g_bands,
+                                                  NULL,
                                                   &error);
         g_assert_no_error (error);
         g_assert (bands);
@@ -278,6 +279,7 @@ test_parse_current_bands_response (void)
                                                    current_band_mapping_tests[i].modem_is_3g,
                                                    current_band_mapping_tests[i].modem_is_4g,
                                                    current_band_mapping_tests[i].modem_alternate_3g_bands,
+                                                   NULL,
                                                    &error);
         g_assert_no_error (error);
         g_assert (bands);

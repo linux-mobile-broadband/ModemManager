@@ -22,7 +22,7 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-base-modem-at.h"
@@ -30,8 +30,8 @@
 #include "mm-modem-helpers-telit.h"
 #include "mm-shared-telit.h"
 
-static void iface_modem_init          (MMIfaceModem         *iface);
-static void shared_telit_init         (MMSharedTelit        *iface);
+static void iface_modem_init  (MMIfaceModem  *iface);
+static void shared_telit_init (MMSharedTelit *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimTelit, mm_broadband_modem_mbim_telit, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -65,7 +65,7 @@ load_supported_modes_ready (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        mm_dbg ("Generic query of supported 3GPP networks with WS46=? failed: '%s'", error->message);
+        g_prefix_error (&error, "ceneric query of supported 3GPP networks with WS46=? failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -73,23 +73,22 @@ load_supported_modes_ready (MMIfaceModem *self,
 
     modes = mm_3gpp_parse_ws46_test_response (response, &error);
     if (!modes) {
-        mm_dbg ("Parsing WS46=? response failed: '%s'", error->message);
+        g_prefix_error (&error, "parsing WS46=? response failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
     for (i = 0; i < modes->len; i++) {
-        MMModemMode  mode;
-        gchar       *str;
+        MMModemMode       mode;
+        g_autofree gchar *str = NULL;
 
         mode = g_array_index (modes, MMModemMode, i);
 
         modes_mask |= mode;
 
         str = mm_modem_mode_build_string_from_mask (mode);
-        mm_dbg ("Device allows (3GPP) mode combination: %s", str);
-        g_free (str);
+        mm_obj_dbg (self, "device allows (3GPP) mode combination: %s", str);
     }
 
     g_array_unref (modes);
@@ -116,8 +115,6 @@ load_supported_modes (MMIfaceModem *self,
                       gpointer user_data)
 {
     GTask *task;
-
-    mm_dbg ("loading Telit mbim supported modes...");
 
     task = g_task_new (self, NULL, callback, user_data);
     mm_base_modem_at_command (MM_BASE_MODEM (self),

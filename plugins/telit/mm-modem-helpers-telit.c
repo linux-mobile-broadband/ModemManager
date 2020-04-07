@@ -23,7 +23,7 @@
 #define _LIBMM_INSIDE_MMCLI
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-telit.h"
 
@@ -375,6 +375,7 @@ mm_telit_build_bnd_request (GArray    *bands_array,
 
 static gboolean
 telit_get_2g_mm_bands (GMatchInfo  *match_info,
+                       gpointer     log_object,
                        GArray     **bands,
                        GError     **error)
 {
@@ -406,7 +407,7 @@ telit_get_2g_mm_bands (GMatchInfo  *match_info,
                     *bands = g_array_append_val (*bands, j);
             }
         } else
-            mm_dbg ("unhandled telit 2G band value configuration: %u", value);
+            mm_obj_dbg (log_object, "unhandled telit 2G band value configuration: %u", value);
     }
 
 out:
@@ -422,8 +423,9 @@ out:
 
 static gboolean
 telit_get_3g_mm_bands (GMatchInfo  *match_info,
-                       GArray     **bands,
+                       gpointer     log_object,
                        gboolean     modem_alternate_3g_bands,
+                       GArray     **bands,
                        GError     **error)
 {
     GError        *inner_error = NULL;
@@ -472,7 +474,7 @@ telit_get_3g_mm_bands (GMatchInfo  *match_info,
                     *bands = g_array_append_val (*bands, j);
             }
         } else
-            mm_dbg ("unhandled telit 3G band value configuration: %u", value);
+            mm_obj_dbg (log_object, "unhandled telit 3G band value configuration: %u", value);
     }
 
 out:
@@ -542,6 +544,7 @@ common_parse_bnd_response (const gchar    *response,
                            gboolean        modem_is_4g,
                            gboolean        modem_alternate_3g_bands,
                            LoadBandsType   load_type,
+                           gpointer        log_object,
                            GError        **error)
 {
     GError     *inner_error = NULL;
@@ -571,10 +574,10 @@ common_parse_bnd_response (const gchar    *response,
 
     bands = g_array_new (TRUE, TRUE, sizeof (MMModemBand));
 
-    if (modem_is_2g && !telit_get_2g_mm_bands (match_info, &bands, &inner_error))
+    if (modem_is_2g && !telit_get_2g_mm_bands (match_info, log_object, &bands, &inner_error))
         goto out;
 
-    if (modem_is_3g && !telit_get_3g_mm_bands (match_info, &bands, modem_alternate_3g_bands, &inner_error))
+    if (modem_is_3g && !telit_get_3g_mm_bands (match_info, log_object, modem_alternate_3g_bands, &bands, &inner_error))
         goto out;
 
     if (modem_is_4g && !telit_get_4g_mm_bands (match_info, &bands, &inner_error))
@@ -599,12 +602,14 @@ mm_telit_parse_bnd_query_response (const gchar  *response,
                                    gboolean      modem_is_3g,
                                    gboolean      modem_is_4g,
                                    gboolean      modem_alternate_3g_bands,
+                                   gpointer      log_object,
                                    GError      **error)
 {
     return common_parse_bnd_response (response,
                                       modem_is_2g, modem_is_3g, modem_is_4g,
                                       modem_alternate_3g_bands,
                                       LOAD_BANDS_TYPE_CURRENT,
+                                      log_object,
                                       error);
 }
 
@@ -614,12 +619,14 @@ mm_telit_parse_bnd_test_response (const gchar  *response,
                                   gboolean      modem_is_3g,
                                   gboolean      modem_is_4g,
                                   gboolean      modem_alternate_3g_bands,
+                                  gpointer      log_object,
                                   GError      **error)
 {
     return common_parse_bnd_response (response,
                                       modem_is_2g, modem_is_3g, modem_is_4g,
                                       modem_alternate_3g_bands,
                                       LOAD_BANDS_TYPE_SUPPORTED,
+                                      log_object,
                                       error);
 }
 

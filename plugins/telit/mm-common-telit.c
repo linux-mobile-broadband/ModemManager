@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include "mm-common-telit.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 
 /*****************************************************************************/
 
@@ -55,19 +55,19 @@ telit_grab_port (MMPlugin *self,
 
         usbif = mm_kernel_device_get_property_as_int_hex (port, "ID_USB_INTERFACE_NUM");
         if (usbif == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT))) {
-            mm_dbg ("telit: AT port '%s/%s' flagged as primary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
+            mm_obj_dbg (self, "AT port '%s/%s' flagged as primary",
+                        mm_port_probe_get_port_subsys (probe),
+                        mm_port_probe_get_port_name (probe));
             pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
         } else if (usbif == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_TELIT_AUX_PORT))) {
-            mm_dbg ("telit: AT port '%s/%s' flagged as secondary",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
+            mm_obj_dbg (self, "AT port '%s/%s' flagged as secondary",
+                        mm_port_probe_get_port_subsys (probe),
+                        mm_port_probe_get_port_name (probe));
             pflags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
         } else if (usbif == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_TELIT_NMEA_PORT))) {
-            mm_dbg ("telit: port '%s/%s' flagged as NMEA",
-                mm_port_probe_get_port_subsys (probe),
-                mm_port_probe_get_port_name (probe));
+            mm_obj_dbg (self, "port '%s/%s' flagged as NMEA",
+                        mm_port_probe_get_port_subsys (probe),
+                        mm_port_probe_get_port_name (probe));
             ptype = MM_PORT_TYPE_GPS;
         } else
             ptype = MM_PORT_TYPE_IGNORED;
@@ -101,7 +101,8 @@ telit_custom_init_finish (MMPortProbe *probe,
 static void telit_custom_init_step (GTask *task);
 
 static gboolean
-cache_port_mode (MMDevice *device,
+cache_port_mode (MMPortProbe *probe,
+                 MMDevice    *device,
                  const gchar *reply)
 {
     GRegex *r = NULL;
@@ -119,7 +120,7 @@ cache_port_mode (MMDevice *device,
         goto out;
 
     if (!mm_get_uint_from_match_info (match_info, 2, &portcfg_current)) {
-        mm_dbg ("telit: unrecognized #PORTCFG <active> value");
+        mm_obj_dbg (probe, "unrecognized #PORTCFG <active> value");
         goto out;
     }
 
@@ -168,8 +169,8 @@ out:
     g_match_info_free (match_info);
     g_regex_unref (r);
     if (error != NULL) {
-      mm_dbg ("telit: error while matching: %s", error->message);
-      g_error_free (error);
+        mm_obj_dbg (probe, "error while matching #PORTCFG: %s", error->message);
+        g_error_free (error);
     }
     return ret;
 }
@@ -189,8 +190,7 @@ getportcfg_ready (MMPortSerialAt *port,
 
     response = mm_port_serial_at_command_finish (port, res, &error);
     if (error) {
-        mm_dbg ("telit: couldn't get port mode: '%s'",
-                error->message);
+        mm_obj_dbg (probe, "couldn't get telit port mode: '%s'", error->message);
 
         /* If ERROR or COMMAND NOT SUPPORT occur then do not retry the
          * command.
@@ -206,8 +206,8 @@ getportcfg_ready (MMPortSerialAt *port,
 
         /* Results are cached in the parent device object */
         if (g_object_get_data (G_OBJECT (device), TAG_GETPORTCFG_SUPPORTED) == NULL) {
-            mm_dbg ("telit: retrieving port mode layout");
-            if (cache_port_mode (device, response)) {
+            mm_obj_dbg (probe, "retrieving telit port mode layout");
+            if (cache_port_mode (probe, device, response)) {
                 g_object_set_data (G_OBJECT (device), TAG_GETPORTCFG_SUPPORTED, GUINT_TO_POINTER (TRUE));
                 ctx->getportcfg_done = TRUE;
             }
@@ -242,8 +242,7 @@ telit_custom_init_step (GTask *task)
 
     /* If cancelled, end */
     if (g_cancellable_is_cancelled (g_task_get_cancellable (task))) {
-        mm_dbg ("telit: no need to keep on running custom init in (%s)",
-                mm_port_get_device (MM_PORT (ctx->port)));
+        mm_obj_dbg (probe, "no need to keep on running custom init");
         goto out;
     }
 

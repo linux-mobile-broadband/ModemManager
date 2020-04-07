@@ -22,7 +22,7 @@
 #include <libmm-glib.h>
 
 #include "mm-port-enums-types.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-plugin-telit.h"
 #include "mm-common-telit.h"
@@ -55,7 +55,7 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered Telit modem found...");
+        mm_obj_dbg (self, "QMI-powered Telit modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -66,7 +66,7 @@ create_modem (MMPlugin *self,
 
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
-        mm_dbg ("MBIM-powered Telit modem found...");
+        mm_obj_dbg (self, "MBIM-powered Telit modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_telit_new (uid,
                                                                  drivers,
                                                                  mm_plugin_get_name (self),
