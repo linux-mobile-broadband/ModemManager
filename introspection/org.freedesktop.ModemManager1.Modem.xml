@@ -146,7 +146,12 @@
         SetCurrentCapabilities:
         @capabilities: Bitmask of <link linkend="MMModemCapability">MMModemCapability</link> values, to specify the capabilities to use.
 
-        Set the capabilities of the device. A restart of the modem may be required.
+        Set the capabilities of the device.
+
+        The given bitmask should be supported by the modem, as specified in the
+        #org.freedesktop.ModemManager1.Modem.Modem:SupportedCapabilities property.
+
+        This command may power-cycle the device.
     -->
     <method name="SetCurrentCapabilities">
       <arg name="capabilities" type="u" direction="in" />
@@ -230,12 +235,16 @@
         SupportedCapabilities:
 
         List of <link linkend="MMModemCapability">MMModemCapability</link>
-        values, specifying the combinations of generic family of access
+        bitmasks, specifying the combinations of generic family of access
         technologies the modem supports.
 
-        If the modem doesn't allow changing the current capabilities, a single entry with
-        <link linkend="MM-MODEM-CAPABILITY-ANY:CAPS"><constant>MM_MODEM_CAPABILITY_ANY</constant></link>
-        will be given.
+        If the modem doesn't allow changing the current capabilities, the
+        list will report one single entry with the same bitmask as in
+        #org.freedesktop.ModemManager1.Modem.Modem:CurrentCapabilities.
+
+        Only multimode devices implementing both 3GPP (GSM/UMTS/LTE/5GNR) and
+        3GPP2 (CDMA/EVDO) specs will report more than one combination of
+        capabilities.
     -->
     <property name="SupportedCapabilities" type="au" access="read" />
 
@@ -243,8 +252,11 @@
         CurrentCapabilities:
 
         Bitmask of <link linkend="MMModemCapability">MMModemCapability</link>
-        values, specifying the  generic family of access technologies the modem
-        currently supports without a firmware reload or reinitialization.
+        values, specifying the currently used generic family of access
+        technologies.
+
+        This bitmask will be one of the ones listed in
+        #org.freedesktop.ModemManager1.Modem.Modem:SupportedCapabilities.
     -->
     <property name="CurrentCapabilities" type="u" access="read" />
 

@@ -126,7 +126,6 @@ MMModemCapability *mm_common_capability_combinations_variant_to_array  (GVariant
 GVariant          *mm_common_capability_combinations_array_to_variant  (const MMModemCapability *capabilities,
                                                                         guint n_capabilities);
 GVariant          *mm_common_capability_combinations_garray_to_variant (GArray *array);
-GVariant          *mm_common_build_capability_combinations_any         (void);
 GVariant          *mm_common_build_capability_combinations_none        (void);
 
 GArray                              *mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *variant);

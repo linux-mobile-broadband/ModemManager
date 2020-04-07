@@ -538,17 +538,6 @@ mm_common_build_capability_combinations_none (void)
     return g_variant_builder_end (&builder);
 }
 
-GVariant *
-mm_common_build_capability_combinations_any (void)
-{
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
-    g_variant_builder_add_value (&builder,
-                                 g_variant_new_uint32 (MM_MODEM_CAPABILITY_ANY));
-    return g_variant_builder_end (&builder);
-}
-
 void
 mm_common_get_bands_from_string (const gchar *str,
                                  MMModemBand **bands,
