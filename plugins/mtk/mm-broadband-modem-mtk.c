@@ -24,7 +24,7 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
@@ -77,7 +77,6 @@ load_unlock_retries_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Couldn't query unlock retries: '%s'", error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -190,7 +189,6 @@ get_supported_modes_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
-        mm_dbg ("Fail to get response");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -382,7 +380,7 @@ load_current_modes_finish (MMIfaceModem *self,
             break;
         default:
             result = FALSE;
-            mm_dbg ("Not supported allowed mode %d", erat_mode);
+            mm_obj_dbg (self, "unsupported allowed mode reported in +ERAT: %d", erat_mode);
             goto done;
     }
 
@@ -401,7 +399,7 @@ load_current_modes_finish (MMIfaceModem *self,
             break;
         default:
             result = FALSE;
-            mm_dbg ("Not supported preferred mode %d", erat_pref);
+            mm_obj_dbg (self, "unsupported preferred mode %d", erat_pref);
             goto done;
     }
 
@@ -547,7 +545,7 @@ mtk_80_signal_changed (MMPortSerialAt *port,
     else
         quality = MM_CLAMP_HIGH (quality, 31) * 100 / 31;
 
-    mm_dbg ("6280 signal quality URC received: quality = %u", quality);
+    mm_obj_dbg (self, "6280 signal quality URC received: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
@@ -566,7 +564,7 @@ mtk_90_2g_signal_changed (MMPortSerialAt *port,
     else
         quality = MM_CLAMP_HIGH (quality, 63) * 100 / 63;
 
-    mm_dbg ("2G signal quality URC received: quality = %u", quality);
+    mm_obj_dbg (self, "2G signal quality URC received: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
@@ -582,7 +580,7 @@ mtk_90_3g_signal_changed (MMPortSerialAt *port,
 
     quality = MM_CLAMP_HIGH (quality, 96) * 100 / 96;
 
-    mm_dbg ("3G signal quality URC received: quality = %u", quality);
+    mm_obj_dbg (self, "3G signal quality URC received: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
@@ -598,7 +596,7 @@ mtk_90_4g_signal_changed (MMPortSerialAt *port,
 
     quality = MM_CLAMP_HIGH (quality, 97) * 100 / 97;
 
-    mm_dbg ("4G signal quality URC received: quality = %u", quality);
+    mm_obj_dbg (self, "4G signal quality URC received: %u", quality);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 

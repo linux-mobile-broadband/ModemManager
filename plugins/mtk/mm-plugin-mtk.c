@@ -21,7 +21,6 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
 #include "mm-plugin-mtk.h"
 #include "mm-broadband-modem-mtk.h"
 
