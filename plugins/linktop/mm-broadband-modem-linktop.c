@@ -28,7 +28,6 @@
 
 #include "ModemManager.h"
 #include "mm-serial-parsers.h"
-#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-base-modem-at.h"

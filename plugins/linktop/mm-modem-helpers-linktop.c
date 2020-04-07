@@ -15,7 +15,6 @@
  * Copyright (C) 2016 Aleksander Morgado <aleksander@aleksander.es>
  */
 
-#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-linktop.h"
 
