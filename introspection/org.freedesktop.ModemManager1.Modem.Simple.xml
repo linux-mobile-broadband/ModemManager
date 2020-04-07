@@ -156,7 +156,7 @@
               unsigned integer values (signature <literal>"au"</literal>).
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"access-technology"</literal></term>
+          <varlistentry><term><literal>"access-technologies"</literal></term>
             <listitem>
               A <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link> value,
               given only when registered, as an unsigned integer value
