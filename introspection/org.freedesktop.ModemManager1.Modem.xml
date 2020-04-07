@@ -55,7 +55,7 @@
 
     <!--
         CreateBearer:
-        @properties: List of properties to assign to the bearer after creating it.
+        @properties: Dictionary of properties needed to get the bearer connected.
         @path: On success, the object path of the newly created bearer.
 
         Create a new packet data bearer using the given characteristics.
