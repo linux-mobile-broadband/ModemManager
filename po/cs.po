@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
+"POT-Creation-Date: 2020-04-08 16:23+0200\n"
 "PO-Revision-Date: 2017-10-21 15:32+0200\n"
 "Last-Translator: Marek Černocký <marek@manet.cz>\n"
 "Language-Team: čeština <gnome-cs-list@gnome.org>\n"
@@ -114,6 +114,6 @@ msgstr ""
 "Systémová zásada brání v dotázání na firmware nebo brání v jeho správě na "
 "tomto zařízení."
 
-#: src/mm-sleep-monitor.c:114
+#: src/mm-sleep-monitor.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "Správa modemů potřebuje resetovat zařízení"

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
+"POT-Creation-Date: 2020-04-08 16:23+0200\n"
 "PO-Revision-Date: 2014-01-06 21:23+0100\n"
 "Last-Translator: Mario Blättermann <mario.blaettermann@gmail.com>\n"
 "Language-Team: German <debian-l10n-german@lists.debian.org>\n"
@@ -115,6 +115,6 @@ msgstr ""
 "Die Systemrichtlinien verhindern die Abfrage oder Verwaltung der Firmware "
 "dieses Gerätes."
 
-#: src/mm-sleep-monitor.c:114
+#: src/mm-sleep-monitor.c:125
 msgid "ModemManager needs to reset devices"
 msgstr ""

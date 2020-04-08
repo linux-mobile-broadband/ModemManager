@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
+"POT-Creation-Date: 2020-04-08 16:23+0200\n"
 "PO-Revision-Date: 2018-08-18 16:17+0200\n"
 "Last-Translator: Claude Paroz <claude@2xlibre.net>\n"
 "Language-Team: French <gnomefr@traduc.org>\n"
@@ -111,6 +111,6 @@ msgstr ""
 "La politique système empêche l’interrogation et la gestion du matériel de ce "
 "périphérique."
 
-#: src/mm-sleep-monitor.c:114
+#: src/mm-sleep-monitor.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager a besoin de réinitialiser les périphériques"

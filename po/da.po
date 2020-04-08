@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
+"POT-Creation-Date: 2020-04-08 16:23+0200\n"
 "PO-Revision-Date: 2019-02-10 16:46+0200\n"
 "Last-Translator: scootergrisen\n"
 "Language-Team: Danish\n"
@@ -107,6 +107,6 @@ msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "Systempolitikken forhindrer forespørgsel og håndtering af enhedens firmware."
 
-#: src/mm-sleep-monitor.c:114
+#: src/mm-sleep-monitor.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager har brug for at nulstille enhederne"

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
+"POT-Creation-Date: 2020-04-08 16:23+0200\n"
 "PO-Revision-Date: 2019-05-03 00:10+0800\n"
 "Last-Translator: 王滋涵 <i@wi24rd.ml>\n"
 "Language-Team: Chinese (China) <i18n-zh@googlegroups.com>\n"
@@ -97,6 +97,6 @@ msgstr "在移动宽带设备上查询和管理固件"
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr "系统策略禁止在移动宽带设备上查询和管理固件。"
 
-#: src/mm-sleep-monitor.c:114
+#: src/mm-sleep-monitor.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "调制解调器管理器需要重置设备"

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2020-04-01 08:24+0200\n"
+"POT-Creation-Date: 2020-04-08 16:23+0200\n"
 "PO-Revision-Date: 2020-03-31 18:14+0700\n"
 "Last-Translator: Andika Triwidada <andika@gmail.com>\n"
 "Language-Team: Indonesian <gnome-l10n-id@googlegroups.com>\n"
@@ -105,6 +105,6 @@ msgstr "Kuiri dan kelola firmware pada suatu peranti data seluler"
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr "Kebijakan sistem mencegah kuiri atau pengelolaan firmware peranti ini."
 
-#: src/mm-sleep-monitor.c:114
+#: src/mm-sleep-monitor.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager perlu mereset peranti"

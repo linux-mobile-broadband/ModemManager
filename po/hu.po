@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: modemmanager master\n"
 "Report-Msgid-Bugs-To: modemmanager-devel@lists.freedesktop.org\n"
-"POT-Creation-Date: 2019-09-25 12:48+0200\n"
+"POT-Creation-Date: 2020-04-08 16:23+0200\n"
 "PO-Revision-Date: 2017-09-26 22:02+0000\n"
 "Last-Translator: Gabor Kelemen <kelemeng@openscope.org>\n"
 "Language-Team: Hungarian <hu@li.org>\n"
@@ -110,6 +110,6 @@ msgstr ""
 "A rendszer lekérdezése és használata lehetővé a firmware lekérdezését és "
 "kezelését az eszközön."
 
-#: src/mm-sleep-monitor.c:114
+#: src/mm-sleep-monitor.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "A Modemkezelőnek alapállapotba kell állítania eszközöket"
