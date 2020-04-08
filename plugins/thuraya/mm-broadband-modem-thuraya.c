@@ -24,7 +24,6 @@
 #include <ctype.h>
 
 #include "ModemManager.h"
-#include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
@@ -185,13 +184,10 @@ cpms_format_check_ready (MMBaseModem  *self,
     if (!mm_thuraya_3gpp_parse_cpms_test_response (response,
                                                    &result->mem1,
                                                    &result->mem2,
-                                                   &result->mem3)) {
+                                                   &result->mem3,
+                                                   &error)) {
         supported_storages_result_free (result);
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't parse supported storages reply: '%s'",
-                                 response);
+        g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }

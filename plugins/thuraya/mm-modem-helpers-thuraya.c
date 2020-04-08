@@ -47,29 +47,33 @@ storage_from_str (const gchar *str)
 }
 
 gboolean
-mm_thuraya_3gpp_parse_cpms_test_response (const gchar *reply,
-                                          GArray **mem1,
-                                          GArray **mem2,
-                                          GArray **mem3)
+mm_thuraya_3gpp_parse_cpms_test_response (const gchar  *reply,
+                                          GArray      **mem1,
+                                          GArray      **mem2,
+                                          GArray      **mem3,
+                                          GError      **error)
 {
 #define N_EXPECTED_GROUPS 3
 
-    GRegex *r;
-    gchar **split;
-    gchar **splitp;
-    const gchar *splita[N_EXPECTED_GROUPS];
-    guint i;
-    GArray *tmp1 = NULL;
-    GArray *tmp2 = NULL;
-    GArray *tmp3 = NULL;
+    gchar            **splitp;
+    const gchar       *splita[N_EXPECTED_GROUPS];
+    guint              i;
+    g_auto(GStrv)      split = NULL;
+    g_autoptr(GRegex)  r = NULL;
+    g_autoptr(GArray)  tmp1 = NULL;
+    g_autoptr(GArray)  tmp2 = NULL;
+    g_autoptr(GArray)  tmp3 = NULL;
 
     g_assert (mem1 != NULL);
     g_assert (mem2 != NULL);
     g_assert (mem3 != NULL);
 
     split = g_strsplit (mm_strip_tag (reply, "+CPMS:"), " ", -1);
-    if (!split)
+    if (!split) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't split +CPMS response");
         return FALSE;
+    }
 
     /* remove empty strings, and count non-empty strings */
     i = 0;
@@ -82,9 +86,9 @@ mm_thuraya_3gpp_parse_cpms_test_response (const gchar *reply,
     }
 
     if (i != N_EXPECTED_GROUPS) {
-        mm_warn ("Cannot parse +CPMS test response: invalid number of groups (%u != %u)",
-                 i, N_EXPECTED_GROUPS);
-        g_strfreev (split);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't parse +CPMS response: invalid number of groups (%u != %u)",
+                     i, N_EXPECTED_GROUPS);
         return FALSE;
     }
 
@@ -92,8 +96,8 @@ mm_thuraya_3gpp_parse_cpms_test_response (const gchar *reply,
     g_assert (r);
 
     for (i = 0; i < N_EXPECTED_GROUPS; i++) {
-        GMatchInfo *match_info = NULL;
-        GArray *array;
+        g_autoptr(GMatchInfo)  match_info = NULL;
+        GArray                *array;
 
         /* We always return a valid array, even if it may be empty */
         array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
@@ -101,7 +105,7 @@ mm_thuraya_3gpp_parse_cpms_test_response (const gchar *reply,
         /* Got a range group to match */
         if (g_regex_match (r, splita[i], 0, &match_info)) {
             while (g_match_info_matches (match_info)) {
-                gchar *str;
+                g_autofree gchar *str = NULL;
 
                 str = g_match_info_fetch (match_info, 1);
                 if (str) {
@@ -109,13 +113,11 @@ mm_thuraya_3gpp_parse_cpms_test_response (const gchar *reply,
 
                     storage = storage_from_str (str);
                     g_array_append_val (array, storage);
-                    g_free (str);
                 }
 
                 g_match_info_next (match_info, NULL);
             }
         }
-        g_match_info_free (match_info);
 
         if (!tmp1)
             tmp1 = array;
@@ -127,30 +129,20 @@ mm_thuraya_3gpp_parse_cpms_test_response (const gchar *reply,
             g_assert_not_reached ();
     }
 
-    g_strfreev (split);
-    g_regex_unref (r);
-
-    g_warn_if_fail (tmp1 != NULL);
-    g_warn_if_fail (tmp2 != NULL);
-    g_warn_if_fail (tmp3 != NULL);
-
     /* Only return TRUE if all sets have been parsed correctly
      * (even if the arrays may be empty) */
     if (tmp1 && tmp2 && tmp3) {
-        *mem1 = tmp1;
-        *mem2 = tmp2;
-        *mem3 = tmp3;
+        *mem1 = g_steal_pointer (&tmp1);
+        *mem2 = g_steal_pointer (&tmp2);
+        *mem3 = g_steal_pointer (&tmp3);
         return TRUE;
     }
 
     /* Otherwise, cleanup and return FALSE */
-    if (tmp1)
-        g_array_unref (tmp1);
-    if (tmp2)
-        g_array_unref (tmp2);
-    if (tmp3)
-        g_array_unref (tmp3);
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "Couldn't parse +CPMS response: not all groups detected (mem1 %s, mem2 %s, mem3 %s)",
+                 tmp1 ? "yes" : "no",
+                 tmp2 ? "yes" : "no",
+                 tmp3 ? "yes" : "no");
     return FALSE;
 }
-
-/*****************************************************************************/

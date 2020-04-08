@@ -55,10 +55,12 @@ test_cpms_response_thuraya (void *f, gpointer d)
     GArray *mem1 = NULL;
     GArray *mem2 = NULL;
     GArray *mem3 = NULL;
+    GError *error = NULL;
 
     g_debug ("Testing thuraya +CPMS=? response...");
 
-    g_assert (mm_thuraya_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_thuraya_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3, &error));
+    g_assert_no_error (error);
     g_assert_cmpuint (mem1->len, ==, 5);
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_MT));
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_SM));
