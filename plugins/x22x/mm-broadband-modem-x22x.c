@@ -300,7 +300,6 @@ load_access_technologies (MMIfaceModem *self,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    mm_dbg ("loading access technology (x22x)...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+SSND?",
                               3,
