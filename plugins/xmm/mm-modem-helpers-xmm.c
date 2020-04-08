@@ -172,7 +172,7 @@ static const MMModemMode xmm_modes[] = {
 
 gboolean
 mm_xmm_parse_xact_test_response (const gchar  *response,
-                                 gpointer      logger,
+                                 gpointer      log_object,
                                  GArray      **modes_out,
                                  GArray      **bands_out,
                                  GError      **error)
@@ -232,7 +232,7 @@ mm_xmm_parse_xact_test_response (const gchar  *response,
         supported_value = g_array_index (supported, guint, i);
 
         if (supported_value >= G_N_ELEMENTS (xmm_modes)) {
-            mm_warn ("Unexpected AcT supported value: %u", supported_value);
+            mm_obj_warn (log_object, "unexpected AcT supported value: %u", supported_value);
             continue;
         }
 
@@ -252,12 +252,12 @@ mm_xmm_parse_xact_test_response (const gchar  *response,
 
             preferred_value = g_array_index (preferred, guint, j);
             if (preferred_value >= G_N_ELEMENTS (xmm_modes)) {
-                mm_warn ("Unexpected AcT preferred value: %u", preferred_value);
+                mm_obj_warn (log_object, "unexpected AcT preferred value: %u", preferred_value);
                 continue;
             }
             combination.preferred = xmm_modes[preferred_value];
             if (mm_count_bits_set (combination.preferred) != 1) {
-                mm_warn ("AcT preferred value should be a single AcT: %u", preferred_value);
+                mm_obj_warn (log_object, "AcT preferred value should be a single AcT: %u", preferred_value);
                 continue;
             }
             if (!(combination.allowed & combination.preferred))
@@ -284,7 +284,7 @@ mm_xmm_parse_xact_test_response (const gchar  *response,
         guint       num;
 
         if (!mm_get_uint_from_str (split[i], &num)) {
-            mm_warn ("Unexpected band value: %s", split[i]);
+            mm_obj_warn (log_object, "unexpected band value: %s", split[i]);
             continue;
         }
 
@@ -293,7 +293,7 @@ mm_xmm_parse_xact_test_response (const gchar  *response,
 
         band = xact_num_to_band (num);
         if (band == MM_MODEM_BAND_UNKNOWN) {
-            mm_warn ("Unsupported band value: %s", split[i]);
+            mm_obj_warn (log_object, "unsupported band value: %s", split[i]);
             continue;
         }
 
@@ -319,7 +319,7 @@ mm_xmm_parse_xact_test_response (const gchar  *response,
     all_modes = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
     g_array_append_val (all_modes, all);
 
-    filtered = mm_filter_supported_modes (all_modes, modes, logger);
+    filtered = mm_filter_supported_modes (all_modes, modes, log_object);
     if (!filtered || filtered->len == 0) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                    "Empty supported mode list after frequency band filtering");
@@ -697,8 +697,9 @@ out:
 }
 
 static gboolean
-rssnr_level_to_rssnr (gint     rssnr_level,
-                      gdouble *out_rssnr)
+rssnr_level_to_rssnr (gint      rssnr_level,
+                      gpointer  log_object,
+                      gdouble  *out_rssnr)
 {
     if (rssnr_level <= 100 &&
         rssnr_level >= -100) {
@@ -707,7 +708,7 @@ rssnr_level_to_rssnr (gint     rssnr_level,
     }
 
     if (rssnr_level != 255)
-        mm_warn ("unexpected RSSNR level: %u", rssnr_level);
+        mm_obj_warn (log_object, "unexpected RSSNR level: %u", rssnr_level);
     return FALSE;
 }
 
@@ -786,7 +787,7 @@ mm_xmm_xcesq_response_to_signal_info (const gchar  *response,
     }
 
     /* LTE RSSNR */
-    if (rssnr_level_to_rssnr (rssnr_level, &rssnr)) {
+    if (rssnr_level_to_rssnr (rssnr_level, log_object, &rssnr)) {
         if (!lte)
             lte = mm_signal_new ();
         mm_signal_set_snr (lte, rssnr);

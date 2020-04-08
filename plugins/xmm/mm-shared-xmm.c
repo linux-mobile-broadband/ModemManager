@@ -22,7 +22,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-signal.h"
 #include "mm-iface-modem-location.h"
@@ -420,7 +420,8 @@ xact_set_bands_ready (MMBaseModem  *self,
 }
 
 static gchar *
-validate_and_build_command_set_current_bands (const GArray *bands_array,
+validate_and_build_command_set_current_bands (MMSharedXmm  *self,
+                                              const GArray *bands_array,
                                               const GArray *supported_modes,
                                               MMModemMode   allowed_modes,
                                               GError      **error)
@@ -445,11 +446,10 @@ validate_and_build_command_set_current_bands (const GArray *bands_array,
          */
         unapplied = mm_xmm_get_modem_mode_any (supported_modes) & ~(allowed_modes);
         if (unapplied != MM_MODEM_MODE_NONE) {
-            gchar *str;
+            g_autofree gchar *str = NULL;
 
             str = mm_modem_mode_build_string_from_mask (unapplied);
-            mm_warn ("Automatic band selection not applied to non-current modes %s", str);
-            g_free (str);
+            mm_obj_warn (self, "automatic band selection not applied to non-current modes %s", str);
         }
 
         /* Nothing else to validate, go build the command right away */
@@ -550,7 +550,8 @@ mm_shared_xmm_set_current_bands (MMIfaceModem        *self,
         goto out;
     }
 
-    command = validate_and_build_command_set_current_bands (bands_array,
+    command = validate_and_build_command_set_current_bands (MM_SHARED_XMM (self),
+                                                            bands_array,
                                                             priv->supported_modes,
                                                             priv->allowed_modes,
                                                             &error);
@@ -840,28 +841,28 @@ xlcslsr_test_ready (MMBaseModem  *self,
                                              &loc_response_type_nmea_supported,
                                              &gnss_type_gps_glonass_supported,
                                              &error)) {
-        mm_dbg ("XLCSLSR based GPS control unsupported: %s", error->message);
+        mm_obj_dbg (self, "XLCSLSR based GPS control unsupported: %s", error->message);
         g_clear_error (&error);
     } else if (!transport_protocol_invalid_supported ||
                !standalone_position_mode_supported ||
                !loc_response_type_nmea_supported ||
                !gnss_type_gps_glonass_supported) {
-        mm_dbg ("XLCSLSR based GPS control unsupported: protocol invalid %s, standalone %s, nmea %s, gps/glonass %s",
-                transport_protocol_invalid_supported ? "supported" : "unsupported",
-                standalone_position_mode_supported   ? "supported" : "unsupported",
-                loc_response_type_nmea_supported     ? "supported" : "unsupported",
-                gnss_type_gps_glonass_supported      ? "supported" : "unsupported");
+        mm_obj_dbg (self, "XLCSLSR based GPS control unsupported: protocol invalid %s, standalone %s, nmea %s, gps/glonass %s",
+                    transport_protocol_invalid_supported ? "supported" : "unsupported",
+                    standalone_position_mode_supported   ? "supported" : "unsupported",
+                    loc_response_type_nmea_supported     ? "supported" : "unsupported",
+                    gnss_type_gps_glonass_supported      ? "supported" : "unsupported");
     } else {
-        mm_dbg ("XLCSLSR based GPS control supported");
+        mm_obj_dbg (self, "XLCSLSR based GPS control supported");
         priv->supported_sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
 
         if (transport_protocol_supl_supported && ms_assisted_based_position_mode_supported) {
-            mm_dbg ("XLCSLSR based A-GPS control supported");
+            mm_obj_dbg (self, "XLCSLSR based A-GPS control supported");
             priv->supported_sources |= (MM_MODEM_LOCATION_SOURCE_AGPS_MSA | MM_MODEM_LOCATION_SOURCE_AGPS_MSB);
         } else {
-            mm_dbg ("XLCSLSR based A-GPS control unsupported: protocol supl %s, ms assisted/based %s",
-                    transport_protocol_supl_supported         ? "supported" : "unsupported",
-                    ms_assisted_based_position_mode_supported ? "supported" : "unsupported");
+            mm_obj_dbg (self, "XLCSLSR based A-GPS control unsupported: protocol supl %s, ms assisted/based %s",
+                        transport_protocol_supl_supported         ? "supported" : "unsupported",
+                        ms_assisted_based_position_mode_supported ? "supported" : "unsupported");
         }
 
         sources |= priv->supported_sources;
@@ -903,7 +904,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
 
     /* If parent already supports GPS sources, we won't do anything else */
     if (sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        mm_dbg ("No need to run XLCSLSR based location gathering");
+        mm_obj_dbg (self, "no need to run XLCSLSR based location gathering");
         g_task_return_int (task, sources);
         g_object_unref (task);
         return;
