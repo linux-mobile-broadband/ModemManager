@@ -51,7 +51,7 @@ test_enable_disable (TestFixture *fixture)
     /* Set the test profile */
     test_fixture_set_profile (fixture,
                               "test-enable-disable",
-                              "Generic",
+                              "generic",
                               (const gchar *const *)ports);
 
     /* Wait and get the modem object */

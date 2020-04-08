@@ -64,8 +64,9 @@ static const gchar *virtual_port[] = {"smd0", NULL};
 
 
 struct _MMPluginPrivate {
-    gchar *name;
+    gchar      *name;
     GHashTable *tasks;
+    gboolean    is_generic;
 
     /* Pre-probing filters */
     gchar **subsystems;
@@ -107,6 +108,7 @@ struct _MMPluginPrivate {
 enum {
     PROP_0,
     PROP_NAME,
+    PROP_IS_GENERIC,
     PROP_ALLOWED_SUBSYSTEMS,
     PROP_ALLOWED_DRIVERS,
     PROP_FORBIDDEN_DRIVERS,
@@ -154,6 +156,12 @@ const mm_uint16_pair *
 mm_plugin_get_allowed_product_ids (MMPlugin *self)
 {
     return self->priv->product_ids;
+}
+
+gboolean
+mm_plugin_is_generic (MMPlugin *self)
+{
+    return self->priv->is_generic;
 }
 
 /*****************************************************************************/
@@ -1110,6 +1118,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->name = g_value_dup_string (value);
         break;
+    case PROP_IS_GENERIC:
+        /* Construct only */
+        self->priv->is_generic = g_value_get_boolean (value);
+        break;
     case PROP_ALLOWED_SUBSYSTEMS:
         /* Construct only */
         self->priv->subsystems = g_value_dup_boxed (value);
@@ -1231,6 +1243,9 @@ get_property (GObject *object,
     switch (prop_id) {
     case PROP_NAME:
         g_value_set_string (value, self->priv->name);
+        break;
+    case PROP_IS_GENERIC:
+        g_value_set_boolean (value, self->priv->is_generic);
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
         g_value_set_boxed (value, self->priv->subsystems);
@@ -1368,6 +1383,14 @@ mm_plugin_class_init (MMPluginClass *klass)
                               "Name",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_IS_GENERIC,
+         g_param_spec_boolean (MM_PLUGIN_IS_GENERIC,
+                               "Generic",
+                               "Whether the plugin is the generic one",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_SUBSYSTEMS,

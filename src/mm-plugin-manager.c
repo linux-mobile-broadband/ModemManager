@@ -363,7 +363,7 @@ port_context_set_suggestion (PortContext *port_context,
         return;
 
     /* The GENERIC plugin is NEVER suggested to others */
-    if (g_str_equal (mm_plugin_get_name (suggested_plugin), MM_PLUGIN_GENERIC_NAME))
+    if (mm_plugin_is_generic (suggested_plugin))
         return;
 
     /* If the plugin has MM_PLUGIN_FORBIDDEN_ICERA set, we do *not* suggest
@@ -974,10 +974,10 @@ device_context_set_best_plugin (DeviceContext *device_context,
      * one and now we're reporting a more specific one, use the new one.
      */
     if (!device_context->best_plugin ||
-        (g_str_equal (mm_plugin_get_name (device_context->best_plugin), MM_PLUGIN_GENERIC_NAME) &&
+        (mm_plugin_is_generic (device_context->best_plugin) &&
          device_context->best_plugin != best_plugin)) {
         /* Only log best plugin if it's not the generic one */
-        if (!g_str_equal (mm_plugin_get_name (best_plugin), MM_PLUGIN_GENERIC_NAME))
+        if (!mm_plugin_is_generic (best_plugin))
             mm_obj_dbg (self, "task %s: found best plugin: %s",
                         port_context->name, mm_plugin_get_name (best_plugin));
         /* Store and suggest this plugin also to other port probes */
@@ -1170,10 +1170,8 @@ device_context_run_port_context (DeviceContext *device_context,
 
     /* If we got one already set in the device context, it will be the first one,
      * unless it is the generic plugin */
-    if (device_context->best_plugin &&
-        !g_str_equal (mm_plugin_get_name (device_context->best_plugin), MM_PLUGIN_GENERIC_NAME)) {
+    if (device_context->best_plugin && !mm_plugin_is_generic (device_context->best_plugin))
         suggested = device_context->best_plugin;
-    }
 
     port_context_run (self,
                       port_context,
@@ -1805,11 +1803,12 @@ load_plugins (MMPluginManager *self,
         if (!plugin)
             continue;
 
-        if (g_str_equal (mm_plugin_get_name (plugin), MM_PLUGIN_GENERIC_NAME))
-            /* Generic plugin */
-            self->priv->generic = plugin;
-        else
-            /* Vendor specific plugin */
+        if (mm_plugin_is_generic (plugin)) {
+            if (self->priv->generic)
+                mm_obj_warn (self, "cannot register more than one generic plugin");
+            else
+                self->priv->generic = plugin;
+        } else
             self->priv->plugins = g_list_append (self->priv->plugins, plugin);
 
         /* Register plugin whitelist rules in filter, if any */

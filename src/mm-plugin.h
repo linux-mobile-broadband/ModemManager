@@ -27,7 +27,6 @@
 #include "mm-device.h"
 #include "mm-kernel-device.h"
 
-#define MM_PLUGIN_GENERIC_NAME "Generic"
 #define MM_PLUGIN_MAJOR_VERSION 4
 #define MM_PLUGIN_MINOR_VERSION 0
 
@@ -48,6 +47,7 @@
 #define MM_PLUGIN_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN, MMPluginClass))
 
 #define MM_PLUGIN_NAME                      "name"
+#define MM_PLUGIN_IS_GENERIC                "is-generic"
 #define MM_PLUGIN_ALLOWED_SUBSYSTEMS        "allowed-subsystems"
 #define MM_PLUGIN_ALLOWED_DRIVERS           "allowed-drivers"
 #define MM_PLUGIN_FORBIDDEN_DRIVERS         "forbidden-drivers"
@@ -127,6 +127,7 @@ GType mm_plugin_get_type (void);
 const gchar           *mm_plugin_get_name                (MMPlugin *self);
 const gchar          **mm_plugin_get_allowed_udev_tags   (MMPlugin *self);
 const mm_uint16_pair  *mm_plugin_get_allowed_product_ids (MMPlugin *self);
+gboolean               mm_plugin_is_generic              (MMPlugin *self);
 
 /* This method will run all pre-probing filters, to see if we can discard this
  * plugin from the probing logic as soon as possible. */
