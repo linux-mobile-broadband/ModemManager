@@ -21,7 +21,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-plugin-zte.h"
 #include "mm-broadband-modem-zte.h"
 #include "mm-broadband-modem-zte-icera.h"
@@ -70,7 +70,7 @@ create_modem (MMPlugin *self,
 {
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
-        mm_dbg ("QMI-powered ZTE modem found...");
+        mm_obj_dbg (self, "QMI-powered ZTE modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_qmi_new (uid,
                                                           drivers,
                                                           mm_plugin_get_name (self),
@@ -81,7 +81,7 @@ create_modem (MMPlugin *self,
 
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
-        mm_dbg ("MBIM-powered ZTE modem found...");
+        mm_obj_dbg (self, "MBIM-powered ZTE modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
                                                            drivers,
                                                            mm_plugin_get_name (self),
@@ -126,7 +126,7 @@ grab_port (MMPlugin *self,
     }
 
     if (mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_ZTE_ICERA_DHCP")) {
-        mm_dbg ("ZTE: Icera-based modem will use DHCP");
+        mm_obj_dbg (self, "ZTE: Icera-based modem will use DHCP");
         g_object_set (modem,
                       MM_BROADBAND_MODEM_ICERA_DEFAULT_IP_METHOD, MM_BEARER_IP_METHOD_DHCP,
                       NULL);

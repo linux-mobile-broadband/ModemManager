@@ -29,7 +29,6 @@
 #include "mm-common-zte.h"
 #include "mm-broadband-modem-zte-icera.h"
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
 
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
