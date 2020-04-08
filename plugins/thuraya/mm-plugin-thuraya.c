@@ -31,7 +31,6 @@
 #include "mm-broadband-modem.h"
 #include "mm-broadband-modem-thuraya.h"
 #include "mm-private-boxed-types.h"
-#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginThuraya, mm_plugin_thuraya, MM_TYPE_PLUGIN)
 
