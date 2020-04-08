@@ -27,7 +27,6 @@
 
 #include "mm-broadband-modem-via.h"
 #include "mm-plugin-via.h"
-#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginVia, mm_plugin_via, MM_TYPE_PLUGIN)
 

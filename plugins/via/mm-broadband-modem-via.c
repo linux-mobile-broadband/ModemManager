@@ -24,7 +24,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
@@ -199,7 +199,7 @@ sysinfo_ready (MMBaseModem  *self,
     /* Try to parse the results */
     g_regex_match (r, response, 0, &match_info);
     if (g_match_info_get_match_count (match_info) < 6) {
-        mm_warn ("Via: failed to parse ^SYSINFO response: '%s'", response);
+        mm_obj_warn (self, "failed to parse ^SYSINFO response: '%s'", response);
         goto out;
     }
 
@@ -232,7 +232,7 @@ sysinfo_ready (MMBaseModem  *self,
         }
     } else {
         /* Say we're registered to something even though sysmode parsing failed */
-        mm_dbg ("SYSMODE parsing failed: assuming registered at least in CDMA1x");
+        mm_obj_dbg (self, "SYSMODE parsing failed: assuming registered at least in CDMA1x");
         results->detailed_cdma1x_state = reg_state;
     }
 
@@ -282,7 +282,7 @@ handle_evdo_quality_change (MMPortSerialAt *port,
 
     if (mm_get_uint_from_match_info (match_info, 1, &quality)) {
         quality = MM_CLAMP_HIGH (quality, 100);
-        mm_dbg ("EVDO signal quality: %u", quality);
+        mm_obj_dbg (self, "EVDO signal quality: %u", quality);
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
     }
 }
