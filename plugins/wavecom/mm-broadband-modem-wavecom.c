@@ -27,7 +27,7 @@
 #include <libmm-glib.h>
 
 #include "ModemManager.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
@@ -341,7 +341,7 @@ current_ms_class_ready (MMBaseModem  *self,
     if (strncmp (response,
                  WAVECOM_MS_CLASS_A_IDSTR,
                  strlen (WAVECOM_MS_CLASS_A_IDSTR)) == 0) {
-        mm_dbg ("Modem configured as a Class A mobile station");
+        mm_obj_dbg (self, "configured as a Class A mobile station");
         /* For 3G devices, query WWSM status */
         mm_base_modem_at_command (self,
                                   "+WWSM?",
@@ -358,19 +358,19 @@ current_ms_class_ready (MMBaseModem  *self,
     if (strncmp (response,
                  WAVECOM_MS_CLASS_B_IDSTR,
                  strlen (WAVECOM_MS_CLASS_B_IDSTR)) == 0) {
-        mm_dbg ("Modem configured as a Class B mobile station");
+        mm_obj_dbg (self, "configured as a Class B mobile station");
         result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS);
         result.preferred = MM_MODEM_MODE_2G;
     } else if (strncmp (response,
                         WAVECOM_MS_CLASS_CG_IDSTR,
                         strlen (WAVECOM_MS_CLASS_CG_IDSTR)) == 0) {
-        mm_dbg ("Modem configured as a Class CG mobile station");
+        mm_obj_dbg (self, "configured as a Class CG mobile station");
         result.allowed = MM_MODEM_MODE_2G;
         result.preferred = MM_MODEM_MODE_NONE;
     } else if (strncmp (response,
                         WAVECOM_MS_CLASS_CC_IDSTR,
                         strlen (WAVECOM_MS_CLASS_CC_IDSTR)) == 0) {
-        mm_dbg ("Modem configured as a Class CC mobile station");
+        mm_obj_dbg (self, "configured as a Class CC mobile station");
         result.allowed = MM_MODEM_MODE_CS;
         result.preferred = MM_MODEM_MODE_NONE;
     }
@@ -812,7 +812,6 @@ set_bands_3g (GTask  *task,
         return;
     }
 
-    mm_dbg ("Setting new bands to use: '%s'", bands_string);
     cmd = g_strdup_printf ("+WMBS=\"%u\",1", wavecom_band);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
@@ -885,7 +884,6 @@ set_bands_2g (GTask  *task,
         return;
     }
 
-    mm_dbg ("Setting new bands to use: '%s'", bands_string);
     cmd = g_strdup_printf ("+WMBS=%c,1", wavecom_band);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
@@ -1090,7 +1088,7 @@ cops_ready (MMBaseModem  *self,
         return;
     }
 
-    mm_dbg ("Device is already in automatic registration mode, not requesting it again");
+    mm_obj_dbg (self, "device is already in automatic registration mode, not requesting it again");
 
 out:
     if (error)
@@ -1181,8 +1179,8 @@ modem_power_up (MMIfaceModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    mm_warn ("Not in full functionality status, power-up command is needed. "
-             "Note that it may reboot the modem.");
+    mm_obj_warn (self, "not in full functionality status, power-up command is needed");
+    mm_obj_warn (self, "the device maybe rebooted");
 
     /* Try to go to full functionality mode without rebooting the system.
      * Works well if we previously switched off the power with CFUN=4
@@ -1258,7 +1256,7 @@ setup_ports (MMBroadbandModem *self)
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_wavecom_parent_class)->setup_ports (self);
 
     /* Set 9600 baudrate by default in the AT port */
-    mm_dbg ("Baudrate will be set to 9600 bps...");
+    mm_obj_dbg (self, "baudrate will be set to 9600 bps...");
     primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
     if (!primary)
         return;
