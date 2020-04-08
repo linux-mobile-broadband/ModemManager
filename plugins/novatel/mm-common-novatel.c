@@ -59,7 +59,7 @@ nwdmat_ready (MMPortSerialAt *port,
             return;
         }
 
-        mm_obj_dbg (probe, "(Novatel) Error flipping secondary ports to AT mode: %s", error->message);
+        mm_obj_dbg (probe, "error flipping secondary ports to AT mode: %s", error->message);
     }
 
     /* Finish custom_init */
@@ -85,14 +85,14 @@ custom_init_step (GTask *task)
 
     /* If cancelled, end */
     if (g_task_return_error_if_cancelled (task)) {
-        mm_obj_dbg (probe, "(Novatel) no need to keep on running custom init");
+        mm_obj_dbg (probe, "no need to keep on running custom init");
         g_object_unref (task);
         return;
     }
 
     /* If device has a QMI port, don't run $NWDMAT */
     if (mm_port_probe_list_has_qmi_port (mm_device_peek_port_probe_list (mm_port_probe_peek_device (probe)))) {
-        mm_obj_dbg (probe, "(Novatel) no need to run custom init: device has QMI port");
+        mm_obj_dbg (probe, "no need to run custom init: device has QMI port");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -118,7 +118,7 @@ custom_init_step (GTask *task)
     }
 
     /* Finish custom_init */
-    mm_obj_dbg (probe, "(Novatel) couldn't flip secondary port to AT: all retries consumed");
+    mm_obj_dbg (probe, "couldn't flip secondary port to AT: all retries consumed");
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }

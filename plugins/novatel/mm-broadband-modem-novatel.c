@@ -553,15 +553,15 @@ modem_load_access_technologies_finish (MMIfaceModem *self,
     ctx = g_task_get_task_data (G_TASK (res));
     if (ctx->act & MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK) {
         if (ctx->hdr_revision == QCDM_HDR_REV_0) {
-            mm_obj_dbg (self, "novatel modem snapshot EVDO revision: 0");
+            mm_obj_dbg (self, "modem snapshot EVDO revision: 0");
             ctx->act &= ~MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
             ctx->act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
         } else if (ctx->hdr_revision == QCDM_HDR_REV_A) {
-            mm_obj_dbg (self, "novatel modem snapshot EVDO revision: A");
+            mm_obj_dbg (self, "modem snapshot EVDO revision: A");
             ctx->act &= ~MM_IFACE_MODEM_CDMA_ALL_EVDO_ACCESS_TECHNOLOGIES_MASK;
             ctx->act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
         } else
-            mm_obj_dbg (self, "novatel modem snapshot EVDO revision: %d (unknown)", ctx->hdr_revision);
+            mm_obj_dbg (self, "modem snapshot EVDO revision: %d (unknown)", ctx->hdr_revision);
     }
 
     *access_technologies = ctx->act;

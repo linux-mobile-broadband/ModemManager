@@ -69,7 +69,7 @@ gmr_ready (MMPortSerialAt *port,
 
     response = mm_port_serial_at_command_finish (port, res, NULL);
     if (!response) {
-        mm_obj_dbg (probe, "(Longcheer) retrying custom init step...");
+        mm_obj_dbg (probe, "retrying custom init step...");
         longcheer_custom_init_step (task);
         return;
     }
@@ -88,7 +88,7 @@ gmr_ready (MMPortSerialAt *port,
                                  MM_CORE_ERROR_UNSUPPORTED,
                                  "X200 cannot be supported with the Longcheer plugin");
     } else {
-        mm_obj_dbg (probe, "(Longcheer) device is not a X200");
+        mm_obj_dbg (probe, "device is not a X200");
         g_task_return_boolean (task, TRUE);
     }
     g_object_unref (task);
@@ -107,7 +107,7 @@ longcheer_custom_init_step (GTask *task)
 
     /* If cancelled, end */
     if (g_cancellable_is_cancelled (cancellable)) {
-        mm_obj_dbg (probe, "(Longcheer) no need to keep on running custom init");
+        mm_obj_dbg (probe, "no need to keep on running custom init");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;

@@ -2890,7 +2890,7 @@ cvoice_check_ready (MMBaseModem  *_self,
                                           &self->priv->audio_bits,
                                           &error)) {
         self->priv->cvoice_support = FEATURE_NOT_SUPPORTED;
-        mm_obj_dbg (self, "Huawei-specific CVOICE is unsupported: %s", error->message);
+        mm_obj_dbg (self, "CVOICE is unsupported: %s", error->message);
         g_clear_error (&error);
 
         /* Now check generic support */
@@ -2900,7 +2900,7 @@ cvoice_check_ready (MMBaseModem  *_self,
         return;
     }
 
-    mm_obj_dbg (self, "Huawei-specific CVOICE is supported");
+    mm_obj_dbg (self, "CVOICE is supported");
     self->priv->cvoice_support = FEATURE_SUPPORTED;
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);

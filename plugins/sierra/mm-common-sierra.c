@@ -160,7 +160,7 @@ gcap_ready (MMPortSerialAt *port,
          * on the APP1 port or not.
          */
         if (getenv ("MM_SIERRA_APP1_PPP_OK")) {
-            mm_obj_dbg (probe, "(Sierra) APP1 PPP OK '%s'", response);
+            mm_obj_dbg (probe, "APP1 PPP OK '%s'", response);
             g_object_set_data (G_OBJECT (probe), TAG_SIERRA_APP1_PPP_OK, GUINT_TO_POINTER (TRUE));
         }
     } else if (strstr (response, "APP2") ||
@@ -193,14 +193,14 @@ sierra_custom_init_step (GTask *task)
 
     /* If cancelled, end */
     if (g_cancellable_is_cancelled (cancellable)) {
-        mm_obj_dbg (probe, "(Sierra) no need to keep on running custom init");
+        mm_obj_dbg (probe, "no need to keep on running custom init");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
 
     if (ctx->retries == 0) {
-        mm_obj_dbg (probe, "(Sierra) couldn't get port type hints");
+        mm_obj_dbg (probe, "couldn't get port type hints");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;

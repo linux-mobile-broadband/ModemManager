@@ -152,7 +152,7 @@ getportmode_ready (MMPortSerialAt *port,
         MMDevice *device;
         guint     n_cached_port_modes = 0;
 
-        mm_obj_dbg (probe, "(Huawei) port mode layout retrieved");
+        mm_obj_dbg (probe, "port mode layout retrieved");
 
         /* Results are cached in the parent device object */
         device = mm_port_probe_peek_device (probe);
@@ -200,10 +200,10 @@ curc_ready (MMPortSerialAt *port,
                              MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
             goto out;
 
-        mm_obj_dbg (probe, "(Huawei) couldn't turn off unsolicited messages in secondary ports: %s", error->message);
+        mm_obj_dbg (probe, "couldn't turn off unsolicited messages in secondary ports: %s", error->message);
     }
 
-    mm_obj_dbg (probe, "(Huawei) unsolicited messages in secondary ports turned off");
+    mm_obj_dbg (probe, "unsolicited messages in secondary ports turned off");
 
     ctx->curc_done = TRUE;
 
@@ -245,9 +245,9 @@ try_next_usbif (MMPortProbe *probe,
     if (closest == G_MAXUINT) {
         /* No more ttys to try! Just return something */
         closest = 0;
-        mm_obj_dbg (probe, "(Huawei) no more ports to run initial probing");
+        mm_obj_dbg (probe, "no more ports to run initial probing");
     } else
-        mm_obj_dbg (probe, "(Huawei) will try initial probing with interface '%d' instead", closest);
+        mm_obj_dbg (probe, "will try initial probing with interface '%d' instead", closest);
 
     fi_ctx->first_usbif = closest;
 }
@@ -265,7 +265,7 @@ huawei_custom_init_step (GTask *task)
 
     /* If cancelled, end */
     if (g_task_return_error_if_cancelled (task)) {
-        mm_obj_dbg (probe, "(Huawei) no need to keep on running custom init");
+        mm_obj_dbg (probe, "no need to keep on running custom init");
         g_object_unref (task);
         return;
     }
@@ -571,7 +571,7 @@ grab_port (MMPlugin *self,
         gchar *str;
 
         str = mm_port_serial_at_flag_build_string_from_mask (pflags);
-        mm_obj_dbg (self, "(%s/%s) huawei port will have AT flags '%s'",
+        mm_obj_dbg (self, "(%s/%s) port will have AT flags '%s'",
                     mm_port_probe_get_port_subsys (probe),
                     mm_port_probe_get_port_name (probe),
                     str);

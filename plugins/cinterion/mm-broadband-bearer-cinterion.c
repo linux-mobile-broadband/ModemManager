@@ -402,7 +402,7 @@ dial_3gpp_context_step (GTask *task)
 
         command = build_auth_string (self, mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)), ctx->cid);
         if (command) {
-            mm_obj_dbg (self, "cinterion dial step %u/%u: authenticating...", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
+            mm_obj_dbg (self, "dial step %u/%u: authenticating...", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
             /* Send SGAUTH write, if User & Pass are provided.
              * advance to next state by callback */
             mm_base_modem_at_command_full (ctx->modem,
@@ -418,14 +418,14 @@ dial_3gpp_context_step (GTask *task)
             return;
         }
 
-        mm_obj_dbg (self, "cinterion dial step %u/%u: authentication not required", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
+        mm_obj_dbg (self, "dial step %u/%u: authentication not required", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
         ctx->step++;
     } /* fall through */
 
     case DIAL_3GPP_CONTEXT_STEP_START_SWWAN: {
         gchar *command;
 
-        mm_obj_dbg (self, "cinterion dial step %u/%u: starting SWWAN interface %u connection...",
+        mm_obj_dbg (self, "dial step %u/%u: starting SWWAN interface %u connection...",
                     ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         command = g_strdup_printf ("^SWWAN=1,%u,%u",
                                    ctx->cid,
@@ -444,7 +444,7 @@ dial_3gpp_context_step (GTask *task)
     }
 
     case DIAL_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION:
-        mm_obj_dbg (self, "cinterion dial step %u/%u: checking SWWAN interface %u status...",
+        mm_obj_dbg (self, "dial step %u/%u: checking SWWAN interface %u status...",
                     ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         load_connection_status_by_cid (ctx->self,
                                        ctx->cid,
@@ -453,7 +453,7 @@ dial_3gpp_context_step (GTask *task)
         return;
 
     case DIAL_3GPP_CONTEXT_STEP_LAST:
-        mm_obj_dbg (self, "cinterion dial step %u/%u: finished", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
+        mm_obj_dbg (self, "dial step %u/%u: finished", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
         g_task_return_pointer (task, g_object_ref (ctx->data), g_object_unref);
         g_object_unref (task);
         return;
@@ -625,7 +625,7 @@ disconnect_3gpp_context_step (GTask *task)
 
         command = g_strdup_printf ("^SWWAN=0,%u,%u",
                                    ctx->cid, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
-        mm_obj_dbg (self, "cinterion disconnect step %u/%u: disconnecting PDP CID %u...",
+        mm_obj_dbg (self, "disconnect step %u/%u: disconnecting PDP CID %u...",
                     ctx->step, DISCONNECT_3GPP_CONTEXT_STEP_LAST, ctx->cid);
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
@@ -641,7 +641,7 @@ disconnect_3gpp_context_step (GTask *task)
     }
 
     case DISCONNECT_3GPP_CONTEXT_STEP_CONNECTION_STATUS:
-        mm_obj_dbg (self, "cinterion disconnect step %u/%u: checking SWWAN interface %u status...",
+        mm_obj_dbg (self, "disconnect step %u/%u: checking SWWAN interface %u status...",
                     ctx->step, DISCONNECT_3GPP_CONTEXT_STEP_LAST,
                     usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         load_connection_status_by_cid (MM_BROADBAND_BEARER_CINTERION (ctx->self),
@@ -651,7 +651,7 @@ disconnect_3gpp_context_step (GTask *task)
          return;
 
     case DISCONNECT_3GPP_CONTEXT_STEP_LAST:
-        mm_obj_dbg (self, "cinterion disconnect step %u/%u: finished",
+        mm_obj_dbg (self, "disconnect step %u/%u: finished",
                     ctx->step, DISCONNECT_3GPP_CONTEXT_STEP_LAST);
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);

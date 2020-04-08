@@ -417,7 +417,7 @@ test_cedata_ready (MMBaseModem  *modem,
         self->priv->cedata = FEATURE_SUPPORTED;
     else
         self->priv->cedata = FEATURE_UNSUPPORTED;
-    mm_obj_dbg (self, "u-blox: +UCEDATA command%s available",
+    mm_obj_dbg (self, "+UCEDATA command%s available",
                 (self->priv->cedata == FEATURE_SUPPORTED) ? "" : " not");
 
     activate_3gpp (task);
@@ -439,7 +439,7 @@ test_cedata (GTask *task)
         return;
     }
 
-    mm_obj_dbg (self, "u-blox: checking availability of +UCEDATA command...");
+    mm_obj_dbg (self, "checking availability of +UCEDATA command...");
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
                               "+UCEDATA=?",
                               3,

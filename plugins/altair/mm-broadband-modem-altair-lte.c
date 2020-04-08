@@ -708,7 +708,7 @@ altair_statcm_changed (MMPortSerialAt *port,
 
     mm_get_int_from_match_info (match_info, 1, &pdn_event);
 
-    mm_obj_dbg (self, "altair PDN event detected: %d", pdn_event);
+    mm_obj_dbg (self, "PDN event detected: %d", pdn_event);
 
     /* Currently we only care about bearer disconnection */
 
