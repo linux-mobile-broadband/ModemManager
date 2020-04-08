@@ -43,7 +43,7 @@ static MMBaseManager *manager;
 static gboolean
 quit_cb (gpointer user_data)
 {
-    mm_info ("Caught signal, shutting down...");
+    mm_info ("caught signal, shutting down...");
 
     if (manager)
         g_object_set (manager, MM_BASE_MANAGER_CONNECTION, NULL, NULL);
@@ -60,14 +60,14 @@ quit_cb (gpointer user_data)
 static void
 sleeping_cb (MMSleepMonitor *sleep_monitor)
 {
-    mm_dbg ("Removing devices... (sleeping)");
+    mm_dbg ("removing devices... (sleeping)");
     mm_base_manager_shutdown (manager, FALSE);
 }
 
 static void
 resuming_cb (MMSleepMonitor *sleep_monitor)
 {
-    mm_dbg ("Re-scanning (resuming)");
+    mm_dbg ("re-scanning (resuming)");
     mm_base_manager_start (manager, FALSE);
 }
 
@@ -80,7 +80,7 @@ bus_acquired_cb (GDBusConnection *connection,
 {
     GError *error = NULL;
 
-    mm_dbg ("Bus acquired, creating manager...");
+    mm_dbg ("bus acquired, creating manager...");
 
     /* Create Manager object */
     g_assert (!manager);
@@ -92,7 +92,7 @@ bus_acquired_cb (GDBusConnection *connection,
                                    mm_context_get_test_enable (),
                                    &error);
     if (!manager) {
-        mm_warn ("Could not create manager: %s", error->message);
+        mm_warn ("could not create manager: %s", error->message);
         g_error_free (error);
         g_main_loop_quit (loop);
         return;
@@ -104,7 +104,7 @@ name_acquired_cb (GDBusConnection *connection,
                   const gchar *name,
                   gpointer user_data)
 {
-    mm_dbg ("Service name '%s' was acquired", name);
+    mm_dbg ("service name '%s' was acquired", name);
 
     /* Launch automatic scan for devices */
     g_assert (manager);
@@ -119,10 +119,9 @@ name_lost_cb (GDBusConnection *connection,
     /* Note that we're not allowing replacement, so once the name acquired, the
      * process won't lose it. */
     if (!name)
-        mm_warn ("Could not get the system bus. Make sure "
-                 "the message bus daemon is running!");
+        mm_warn ("could not get the system bus; make sure the message bus daemon is running!");
     else
-        mm_warn ("Could not acquire the '%s' service name", name);
+        mm_warn ("could not acquire the '%s' service name", name);
 
     if (manager)
         g_object_set (manager, MM_BASE_MANAGER_CONNECTION, NULL, NULL);
@@ -156,8 +155,8 @@ int
 main (int argc, char *argv[])
 {
     GMainLoop *inner;
-    GError *err = NULL;
-    guint name_id;
+    GError    *error = NULL;
+    guint      name_id;
 
     /* Setup application context */
     mm_context_init (argc, argv);
@@ -167,9 +166,9 @@ main (int argc, char *argv[])
                        mm_context_get_log_journal (),
                        mm_context_get_log_timestamps (),
                        mm_context_get_log_relative_timestamps (),
-                       &err)) {
-        g_warning ("Failed to set up logging: %s", err->message);
-        g_error_free (err);
+                       &error)) {
+        g_warning ("failed to set up logging: %s", error->message);
+        g_error_free (error);
         exit (1);
     }
 
@@ -228,8 +227,7 @@ main (int argc, char *argv[])
         }
 
         if (mm_base_manager_num_modems (manager))
-            mm_warn ("Disabling modems took too long, "
-                     "shutting down with '%u' modems around",
+            mm_warn ("disabling modems took too long, shutting down with %u modems around",
                      mm_base_manager_num_modems (manager));
 
         g_object_unref (manager);
