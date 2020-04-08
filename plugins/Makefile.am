@@ -128,6 +128,9 @@ libhelpers_icera_la_SOURCES = \
 	icera/mm-modem-helpers-icera.c \
 	icera/mm-modem-helpers-icera.h \
 	$(NULL)
+libhelpers_icera_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"shared-icera\" \
+	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-icera
 test_modem_helpers_icera_SOURCES = \
@@ -150,7 +153,10 @@ libmm_shared_icera_la_SOURCES = \
 	icera/mm-broadband-bearer-icera.h \
 	icera/mm-broadband-bearer-icera.c \
 	$(NULL)
-libmm_shared_icera_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_icera_la_CPPFLAGS = \
+	$(SHARED_COMMON_COMPILER_FLAGS)
+	-DMM_MODULE_NAME=\"shared-icera\" \
+	$(NULL)
 libmm_shared_icera_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 libmm_shared_icera_la_LIBADD = \
 	$(builddir)/libhelpers-icera.la \
@@ -170,6 +176,9 @@ noinst_LTLIBRARIES += libhelpers-sierra.la
 libhelpers_sierra_la_SOURCES = \
 	sierra/mm-modem-helpers-sierra.c \
 	sierra/mm-modem-helpers-sierra.h \
+	$(NULL)
+libhelpers_sierra_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"shared-sierra\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-sierra
@@ -197,7 +206,10 @@ libmm_shared_sierra_la_SOURCES = \
 	sierra/mm-broadband-modem-sierra.c  \
 	sierra/mm-broadband-modem-sierra.h  \
 	$(NULL)
-libmm_shared_sierra_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_sierra_la_CPPFLAGS = \
+	$(SHARED_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"shared-sierra\" \
+	$(NULL)
 libmm_shared_sierra_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 libmm_shared_sierra_la_LIBADD = \
 	$(builddir)/libhelpers-sierra.la \
@@ -241,7 +253,10 @@ libmm_shared_novatel_la_SOURCES = \
 	novatel/mm-broadband-modem-novatel.c \
 	novatel/mm-broadband-modem-novatel.h \
 	$(NULL)
-libmm_shared_novatel_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_novatel_la_CPPFLAGS = \
+	$(SHARED_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"shared-novatel\" \
+	$(NULL)
 libmm_shared_novatel_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 
 NOVATEL_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/novatel
@@ -258,6 +273,9 @@ noinst_LTLIBRARIES += libhelpers-xmm.la
 libhelpers_xmm_la_SOURCES = \
 	xmm/mm-modem-helpers-xmm.c \
 	xmm/mm-modem-helpers-xmm.h \
+	$(NULL)
+libhelpers_xmm_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"shared-xmm\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-xmm
@@ -289,7 +307,10 @@ libmm_shared_xmm_la_SOURCES += \
 	$(NULL)
 endif
 
-libmm_shared_xmm_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_xmm_la_CPPFLAGS = \
+	$(SHARED_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"shared-xmm\" \
+	$(NULL)
 libmm_shared_xmm_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 libmm_shared_xmm_la_LIBADD = \
 	$(builddir)/libhelpers-xmm.la \
@@ -340,6 +361,7 @@ libhelpers_telit_la_SOURCES = \
 	telit/mm-modem-helpers-telit.h \
 	$(NULL)
 libhelpers_telit_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"shared-telit\" \
 	-I$(top_srcdir)/plugins/telit \
 	-I$(top_builddir)/plugins/telit \
 	$(NULL)
@@ -383,6 +405,7 @@ libmm_shared_telit_la_CPPFLAGS = \
 	-I$(top_srcdir)/plugins/telit \
 	-I$(top_builddir)/plugins/telit \
 	$(SHARED_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"shared-telit\" \
 	$(NULL)
 libmm_shared_telit_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 libmm_shared_telit_la_LIBADD = \
@@ -409,7 +432,10 @@ libmm_shared_foxconn_la_SOURCES = \
 	foxconn/mm-broadband-modem-foxconn-t77w968.c \
 	foxconn/mm-broadband-modem-foxconn-t77w968.h \
 	$(NULL)
-libmm_shared_foxconn_la_CPPFLAGS = $(SHARED_COMMON_COMPILER_FLAGS)
+libmm_shared_foxconn_la_CPPFLAGS = \
+	$(SHARED_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"shared-foxconn\" \
+	$(NULL)
 libmm_shared_foxconn_la_LDFLAGS = $(SHARED_COMMON_LINKER_FLAGS)
 
 FOXCONN_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/foxconn
@@ -427,7 +453,10 @@ libmm_plugin_generic_la_SOURCES = \
 	generic/mm-plugin-generic.c \
 	generic/mm-plugin-generic.h \
 	$(NULL)
-libmm_plugin_generic_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_generic_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"generic\" \
+	$(NULL)
 libmm_plugin_generic_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 noinst_PROGRAMS += test-service-generic
@@ -450,6 +479,9 @@ noinst_LTLIBRARIES += libhelpers-altair-lte.la
 libhelpers_altair_lte_la_SOURCES = \
 	altair/mm-modem-helpers-altair-lte.c \
 	altair/mm-modem-helpers-altair-lte.h \
+	$(NULL)
+libhelpers_altair_lte_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"altair-lte\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-altair-lte
@@ -474,9 +506,12 @@ libmm_plugin_altair_lte_la_SOURCES = \
 	altair/mm-broadband-bearer-altair-lte.c \
 	altair/mm-broadband-bearer-altair-lte.h \
 	$(NULL)
-libmm_plugin_altair_lte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_altair_lte_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_altair_lte_la_LIBADD   = $(builddir)/libhelpers-altair-lte.la
+libmm_plugin_altair_lte_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"altair-lte\" \
+	$(NULL)
+libmm_plugin_altair_lte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_altair_lte_la_LIBADD = $(builddir)/libhelpers-altair-lte.la
 
 endif
 
@@ -493,8 +528,11 @@ libmm_plugin_anydata_la_SOURCES = \
 	anydata/mm-broadband-modem-anydata.h \
 	anydata/mm-broadband-modem-anydata.c \
 	$(NULL)
-libmm_plugin_anydata_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_anydata_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_anydata_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"anydata\" \
+	$(NULL)
+libmm_plugin_anydata_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -508,6 +546,9 @@ noinst_LTLIBRARIES += libhelpers-cinterion.la
 libhelpers_cinterion_la_SOURCES = \
 	cinterion/mm-modem-helpers-cinterion.c \
 	cinterion/mm-modem-helpers-cinterion.h \
+	$(NULL)
+libhelpers_cinterion_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"cinterion\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-cinterion
@@ -540,9 +581,12 @@ libmm_plugin_cinterion_la_SOURCES += \
 	cinterion/mm-broadband-modem-qmi-cinterion.h \
 	$(NULL)
 endif
-libmm_plugin_cinterion_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_cinterion_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_cinterion_la_LIBADD   = $(builddir)/libhelpers-cinterion.la
+libmm_plugin_cinterion_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"cinterion\" \
+	$(NULL)
+libmm_plugin_cinterion_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_cinterion_la_LIBADD = $(builddir)/libhelpers-cinterion.la
 
 dist_udevrules_DATA += cinterion/77-mm-cinterion-port-types.rules
 
@@ -569,6 +613,7 @@ libmm_plugin_dell_la_CPPFLAGS = \
 	$(TELIT_COMMON_COMPILER_FLAGS) \
 	$(XMM_COMMON_COMPILER_FLAGS) \
 	$(FOXCONN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"dell\" \
 	$(NULL)
 libmm_plugin_dell_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
@@ -591,8 +636,11 @@ libmm_plugin_dlink_la_SOURCES = \
 	dlink/mm-plugin-dlink.c \
 	dlink/mm-plugin-dlink.h \
 	$(NULL)
-libmm_plugin_dlink_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_dlink_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_dlink_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"d-link\" \
+	$(NULL)
+libmm_plugin_dlink_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += dlink/77-mm-dlink-port-types.rules
 
@@ -611,8 +659,12 @@ libmm_plugin_fibocom_la_SOURCES = \
 	fibocom/mm-plugin-fibocom.c \
 	fibocom/mm-plugin-fibocom.h \
 	$(NULL)
-libmm_plugin_fibocom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(XMM_COMMON_COMPILER_FLAGS)
-libmm_plugin_fibocom_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_fibocom_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(XMM_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"fibocom\" \
+	$(NULL)
+libmm_plugin_fibocom_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += fibocom/77-mm-fibocom-port-types.rules
 
@@ -631,8 +683,12 @@ libmm_plugin_foxconn_la_SOURCES = \
 	foxconn/mm-plugin-foxconn.c \
 	foxconn/mm-plugin-foxconn.h \
 	$(NULL)
-libmm_plugin_foxconn_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(FOXCONN_COMMON_COMPILER_FLAGS)
-libmm_plugin_foxconn_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_foxconn_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(FOXCONN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"foxconn\" \
+	$(NULL)
+libmm_plugin_foxconn_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += foxconn/77-mm-foxconn-port-types.rules
 
@@ -656,8 +712,11 @@ libmm_plugin_haier_la_SOURCES = \
 	haier/mm-plugin-haier.c \
 	haier/mm-plugin-haier.h \
 	$(NULL)
-libmm_plugin_haier_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_haier_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_haier_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"haier\" \
+	$(NULL)
+libmm_plugin_haier_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += haier/77-mm-haier-port-types.rules
 
@@ -675,6 +734,9 @@ noinst_LTLIBRARIES += libhelpers-huawei.la
 libhelpers_huawei_la_SOURCES = \
 	huawei/mm-modem-helpers-huawei.c \
 	huawei/mm-modem-helpers-huawei.h \
+	$(NULL)
+libhelpers_huawei_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"huawei\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-huawei
@@ -701,9 +763,12 @@ libmm_plugin_huawei_la_SOURCES = \
 	huawei/mm-broadband-bearer-huawei.c \
 	huawei/mm-broadband-bearer-huawei.h \
 	$(NULL)
-libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_huawei_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_huawei_la_LIBADD   = $(builddir)/libhelpers-huawei.la
+libmm_plugin_huawei_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"huawei\" \
+	$(NULL)
+libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_huawei_la_LIBADD = $(builddir)/libhelpers-huawei.la
 
 dist_udevrules_DATA += huawei/77-mm-huawei-net-port-types.rules
 
@@ -728,8 +793,11 @@ libmm_plugin_iridium_la_SOURCES = \
 	iridium/mm-sim-iridium.c \
 	iridium/mm-sim-iridium.h \
 	$(NULL)
-libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_iridium_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_iridium_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"iridium\" \
+	$(NULL)
+libmm_plugin_iridium_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -743,6 +811,9 @@ noinst_LTLIBRARIES += libhelpers-linktop.la
 libhelpers_linktop_la_SOURCES = \
 	linktop/mm-modem-helpers-linktop.c \
 	linktop/mm-modem-helpers-linktop.h \
+	$(NULL)
+libhelpers_linktop_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"linktop\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-linktop
@@ -765,9 +836,12 @@ libmm_plugin_linktop_la_SOURCES = \
 	linktop/mm-broadband-modem-linktop.h \
 	linktop/mm-broadband-modem-linktop.c \
 	$(NULL)
-libmm_plugin_linktop_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_linktop_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_linktop_la_LIBADD   = $(builddir)/libhelpers-linktop.la
+libmm_plugin_linktop_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"linktop\" \
+	$(NULL)
+libmm_plugin_linktop_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_linktop_la_LIBADD = $(builddir)/libhelpers-linktop.la
 
 endif
 
@@ -784,8 +858,11 @@ libmm_plugin_longcheer_la_SOURCES = \
 	longcheer/mm-broadband-modem-longcheer.h \
 	longcheer/mm-broadband-modem-longcheer.c \
 	$(NULL)
-libmm_plugin_longcheer_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_longcheer_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_longcheer_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"longcheer\" \
+	$(NULL)
+libmm_plugin_longcheer_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += longcheer/77-mm-longcheer-port-types.rules
 
@@ -803,6 +880,9 @@ noinst_LTLIBRARIES += libhelpers-mbm.la
 libhelpers_mbm_la_SOURCES = \
 	mbm/mm-modem-helpers-mbm.c \
 	mbm/mm-modem-helpers-mbm.h \
+	$(NULL)
+libhelpers_mbm_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"ericsson-mbm\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-mbm
@@ -829,9 +909,12 @@ libmm_plugin_ericsson_mbm_la_SOURCES = \
 	mbm/mm-plugin-mbm.c \
 	mbm/mm-plugin-mbm.h \
 	$(NULL)
-libmm_plugin_ericsson_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_ericsson_mbm_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_ericsson_mbm_la_LIBADD   = $(builddir)/libhelpers-mbm.la
+libmm_plugin_ericsson_mbm_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"ericsson-mbm\" \
+	$(NULL)
+libmm_plugin_ericsson_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_ericsson_mbm_la_LIBADD = $(builddir)/libhelpers-mbm.la
 
 dist_udevrules_DATA += mbm/77-mm-ericsson-mbm.rules
 
@@ -852,8 +935,11 @@ libmm_plugin_motorola_la_SOURCES = \
 	motorola/mm-broadband-modem-motorola.c \
 	motorola/mm-broadband-modem-motorola.h \
 	$(NULL)
-libmm_plugin_motorola_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_motorola_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_motorola_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"motorola\" \
+	$(NULL)
+libmm_plugin_motorola_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -870,8 +956,11 @@ libmm_plugin_mtk_la_SOURCES = \
 	mtk/mm-broadband-modem-mtk.h \
 	mtk/mm-broadband-modem-mtk.c \
 	$(NULL)
-libmm_plugin_mtk_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_mtk_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_mtk_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"mtk\" \
+	$(NULL)
+libmm_plugin_mtk_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += mtk/77-mm-mtk-port-types.rules
 
@@ -894,8 +983,10 @@ libmm_plugin_nokia_la_SOURCES = \
 	nokia/mm-broadband-modem-nokia.c \
 	nokia/mm-broadband-modem-nokia.h \
 	$(NULL)
-libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_nokia_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"nokia\" \
+	$(NULL)
+libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -910,8 +1001,12 @@ libmm_plugin_nokia_icera_la_SOURCES = \
 	nokia/mm-plugin-nokia-icera.c \
 	nokia/mm-plugin-nokia-icera.h \
 	$(NULL)
-libmm_plugin_nokia_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
-libmm_plugin_nokia_icera_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_nokia_icera_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(ICERA_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"nokia-icera\" \
+	$(NULL)
+libmm_plugin_nokia_icera_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 
@@ -930,8 +1025,12 @@ libmm_plugin_novatel_la_SOURCES = \
 	novatel/mm-plugin-novatel.c \
 	novatel/mm-plugin-novatel.h \
 	$(NULL)
-libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(NOVATEL_COMMON_COMPILER_FLAGS)
-libmm_plugin_novatel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_novatel_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(NOVATEL_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"novatel\" \
+	$(NULL)
+libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -952,8 +1051,11 @@ libmm_plugin_novatel_lte_la_SOURCES = \
 	novatel/mm-sim-novatel-lte.c \
 	novatel/mm-sim-novatel-lte.h \
 	$(NULL)
-libmm_plugin_novatel_lte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_novatel_lte_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_novatel_lte_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"novatel-lte\" \
+	$(NULL)
+libmm_plugin_novatel_lte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -968,8 +1070,12 @@ libmm_plugin_option_la_SOURCES = \
 	option/mm-plugin-option.c \
 	option/mm-plugin-option.h \
 	$(NULL)
-libmm_plugin_option_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(OPTION_COMMON_COMPILER_FLAGS)
-libmm_plugin_option_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_option_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(OPTION_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"option\" \
+	$(NULL)
+libmm_plugin_option_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -988,8 +1094,12 @@ libmm_plugin_option_hso_la_SOURCES = \
 	option/mm-broadband-modem-hso.c \
 	option/mm-broadband-modem-hso.h \
 	$(NULL)
-libmm_plugin_option_hso_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(OPTION_COMMON_COMPILER_FLAGS)
-libmm_plugin_option_hso_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_option_hso_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(OPTION_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"option-hso\" \
+	$(NULL)
+libmm_plugin_option_hso_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -1008,8 +1118,11 @@ libmm_plugin_pantech_la_SOURCES = \
 	pantech/mm-broadband-modem-pantech.c \
 	pantech/mm-broadband-modem-pantech.h \
 	$(NULL)
-libmm_plugin_pantech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_pantech_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_pantech_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"pantech\" \
+	$(NULL)
+libmm_plugin_pantech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -1036,8 +1149,11 @@ libmm_plugin_quectel_la_SOURCES += \
 	quectel/mm-broadband-modem-qmi-quectel.h \
 	$(NULL)
 endif
-libmm_plugin_quectel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_quectel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_quectel_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"quectel\" \
+	$(NULL)
+libmm_plugin_quectel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -1054,7 +1170,11 @@ libmm_plugin_samsung_la_SOURCES = \
 	samsung/mm-broadband-modem-samsung.c \
 	samsung/mm-broadband-modem-samsung.h \
 	$(NULL)
-libmm_plugin_samsung_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
+libmm_plugin_samsung_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(ICERA_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"samsumg\" \
+	$(NULL)
 libmm_plugin_samsung_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
@@ -1072,8 +1192,13 @@ libmm_plugin_sierra_legacy_la_SOURCES = \
 	sierra/mm-broadband-modem-sierra-icera.c \
 	sierra/mm-broadband-modem-sierra-icera.h \
 	$(NULL)
-libmm_plugin_sierra_legacy_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS) $(SIERRA_COMMON_COMPILER_FLAGS)
-libmm_plugin_sierra_legacy_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_sierra_legacy_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(ICERA_COMMON_COMPILER_FLAGS) \
+	$(SIERRA_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"sierra-legacy\" \
+	$(NULL)
+libmm_plugin_sierra_legacy_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -1090,8 +1215,11 @@ libmm_plugin_sierra_la_SOURCES = \
 	sierra/mm-plugin-sierra.c \
 	sierra/mm-plugin-sierra.h \
 	$(NULL)
-libmm_plugin_sierra_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_sierra_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_sierra_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"sierra\" \
+	$(NULL)
+libmm_plugin_sierra_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -1105,6 +1233,9 @@ noinst_LTLIBRARIES += libhelpers-simtech.la
 libhelpers_simtech_la_SOURCES = \
 	simtech/mm-modem-helpers-simtech.c \
 	simtech/mm-modem-helpers-simtech.h \
+	$(NULL)
+libhelpers_simtech_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"simtech\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-simtech
@@ -1135,9 +1266,12 @@ libmm_plugin_simtech_la_SOURCES += \
 	simtech/mm-broadband-modem-qmi-simtech.h \
 	$(NULL)
 endif
-libmm_plugin_simtech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_simtech_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_simtech_la_LIBADD   = $(builddir)/libhelpers-simtech.la
+libmm_plugin_simtech_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"simtech\" \
+	$(NULL)
+libmm_plugin_simtech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_simtech_la_LIBADD = $(builddir)/libhelpers-simtech.la
 
 dist_udevrules_DATA += simtech/77-mm-simtech-port-types.rules
 
@@ -1156,8 +1290,12 @@ libmm_plugin_telit_la_SOURCES = \
 	telit/mm-plugin-telit.c \
 	telit/mm-plugin-telit.h \
 	$(NULL)
-libmm_plugin_telit_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(TELIT_COMMON_COMPILER_FLAGS)
-libmm_plugin_telit_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_telit_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(TELIT_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"telit\" \
+	$(NULL)
+libmm_plugin_telit_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += telit/77-mm-telit-port-types.rules
 
@@ -1175,6 +1313,9 @@ noinst_LTLIBRARIES += libhelpers-thuraya.la
 libhelpers_thuraya_la_SOURCES = \
 	thuraya/mm-modem-helpers-thuraya.c \
 	thuraya/mm-modem-helpers-thuraya.h \
+	$(NULL)
+libhelpers_thuraya_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"thuraya\" \
 	$(NULL)
 
 noinst_PROGRAMS += test-modem-helpers-thuraya
@@ -1198,9 +1339,12 @@ libmm_plugin_thuraya_la_SOURCES = \
 	thuraya/mm-broadband-modem-thuraya.c \
 	thuraya/mm-broadband-modem-thuraya.h \
 	$(NULL)
-libmm_plugin_thuraya_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_thuraya_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_thuraya_la_LIBADD   = $(builddir)/libhelpers-thuraya.la
+libmm_plugin_thuraya_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"thuraya\" \
+	$(NULL)
+libmm_plugin_thuraya_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_thuraya_la_LIBADD = $(builddir)/libhelpers-thuraya.la
 
 endif
 
@@ -1215,8 +1359,11 @@ libmm_plugin_tplink_la_SOURCES = \
 	tplink/mm-plugin-tplink.c \
 	tplink/mm-plugin-tplink.h \
 	$(NULL)
-libmm_plugin_tplink_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_tplink_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_tplink_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"tp-link\" \
+	$(NULL)
+libmm_plugin_tplink_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += tplink/77-mm-tplink-port-types.rules
 
@@ -1272,7 +1419,10 @@ libhelpers_ublox_la_SOURCES = \
 
 nodist_libhelpers_ublox_la_SOURCES = $(UBLOX_ENUMS_GENERATED)
 
-libhelpers_ublox_la_CPPFLAGS = $(PLUGIN_UBLOX_COMPILER_FLAGS)
+libhelpers_ublox_la_CPPFLAGS = \
+	$(PLUGIN_UBLOX_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"u-blox\" \
+	$(NULL)
 
 BUILT_SOURCES += $(UBLOX_ENUMS_GENERATED)
 CLEANFILES    += $(UBLOX_ENUMS_GENERATED)
@@ -1303,9 +1453,13 @@ libmm_plugin_ublox_la_SOURCES = \
 	ublox/mm-sim-ublox.c \
 	ublox/mm-sim-ublox.h \
 	$(NULL)
-libmm_plugin_ublox_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(PLUGIN_UBLOX_COMPILER_FLAGS)
-libmm_plugin_ublox_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
-libmm_plugin_ublox_la_LIBADD   = $(builddir)/libhelpers-ublox.la
+libmm_plugin_ublox_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(PLUGIN_UBLOX_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"u-blox\" \
+	$(NULL)
+libmm_plugin_ublox_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_ublox_la_LIBADD = $(builddir)/libhelpers-ublox.la
 
 endif
 
@@ -1322,8 +1476,11 @@ libmm_plugin_via_la_SOURCES = \
 	via/mm-broadband-modem-via.c \
 	via/mm-broadband-modem-via.h \
 	$(NULL)
-libmm_plugin_via_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_via_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_via_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"via\" \
+	$(NULL)
+libmm_plugin_via_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -1340,8 +1497,11 @@ libmm_plugin_wavecom_la_SOURCES = \
 	wavecom/mm-broadband-modem-wavecom.c \
 	wavecom/mm-broadband-modem-wavecom.h \
 	$(NULL)
-libmm_plugin_wavecom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_wavecom_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_wavecom_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"wavecom\" \
+	$(NULL)
+libmm_plugin_wavecom_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 endif
 
@@ -1358,8 +1518,11 @@ libmm_plugin_x22x_la_SOURCES = \
 	x22x/mm-broadband-modem-x22x.h \
 	x22x/mm-broadband-modem-x22x.c \
 	$(NULL)
-libmm_plugin_x22x_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-libmm_plugin_x22x_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_x22x_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"x22x\" \
+	$(NULL)
+libmm_plugin_x22x_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += x22x/77-mm-x22x-port-types.rules
 
@@ -1384,8 +1547,12 @@ libmm_plugin_zte_la_SOURCES = \
 	zte/mm-broadband-modem-zte-icera.h \
 	zte/mm-broadband-modem-zte-icera.c \
 	$(NULL)
-libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS) $(ICERA_COMMON_COMPILER_FLAGS)
-libmm_plugin_zte_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_zte_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(ICERA_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"zte\" \
+	$(NULL)
+libmm_plugin_zte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += zte/77-mm-zte-port-types.rules
 

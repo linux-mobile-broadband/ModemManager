@@ -203,6 +203,7 @@ log_backend_systemd_journal (const char *loc,
 
 void
 _mm_log (gpointer     obj,
+         const gchar *module,
          const gchar *loc,
          const gchar *func,
          MMLogLevel   level,
@@ -248,6 +249,8 @@ _mm_log (gpointer     obj,
 
     if (obj)
         g_string_append_printf (msgbuf, "[%s] ", mm_log_object_get_id (MM_LOG_OBJECT (obj)));
+    if (module)
+        g_string_append_printf (msgbuf, "(%s) ", module);
 
     va_start (args, fmt);
     g_string_append_vprintf (msgbuf, fmt, args);

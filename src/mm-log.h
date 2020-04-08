@@ -27,10 +27,14 @@ typedef enum {
     MM_LOG_LEVEL_DEBUG = 0x00000008
 } MMLogLevel;
 
-#define mm_obj_err(obj, ...)  _mm_log (obj, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_ERR,   ## __VA_ARGS__ )
-#define mm_obj_warn(obj, ...) _mm_log (obj, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_WARN,  ## __VA_ARGS__ )
-#define mm_obj_info(obj, ...) _mm_log (obj, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_INFO,  ## __VA_ARGS__ )
-#define mm_obj_dbg(obj, ...)  _mm_log (obj, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_DEBUG, ## __VA_ARGS__ )
+#if !defined MM_MODULE_NAME
+# define MM_MODULE_NAME (const gchar *)NULL
+#endif
+
+#define mm_obj_err(obj, ...)  _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_ERR,   ## __VA_ARGS__ )
+#define mm_obj_warn(obj, ...) _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_WARN,  ## __VA_ARGS__ )
+#define mm_obj_info(obj, ...) _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_INFO,  ## __VA_ARGS__ )
+#define mm_obj_dbg(obj, ...)  _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_DEBUG, ## __VA_ARGS__ )
 
 #define mm_err(...)  mm_obj_err  (NULL, ## __VA_ARGS__ )
 #define mm_warn(...) mm_obj_warn (NULL, ## __VA_ARGS__ )
@@ -38,11 +42,12 @@ typedef enum {
 #define mm_dbg(...)  mm_obj_dbg  (NULL, ## __VA_ARGS__ )
 
 void _mm_log (gpointer     obj,
+              const gchar *module,
               const gchar *loc,
               const gchar *func,
               MMLogLevel   level,
               const gchar *fmt,
-              ...)  __attribute__((__format__ (__printf__, 5, 6)));
+              ...)  __attribute__((__format__ (__printf__, 6, 7)));
 
 gboolean mm_log_set_level (const char *level, GError **error);
 
