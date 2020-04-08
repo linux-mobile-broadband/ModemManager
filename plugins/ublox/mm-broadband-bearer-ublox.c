@@ -28,7 +28,7 @@
 
 #include "mm-broadband-bearer-ublox.h"
 #include "mm-base-modem-at.h"
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-ublox-enums-types.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-ublox.h"
@@ -56,14 +56,12 @@ struct _MMBroadbandBearerUbloxPrivate {
 /* Common connection context and task */
 
 typedef struct {
-    MMBroadbandBearerUblox *self;
-    MMBroadbandModem       *modem;
-    MMPortSerialAt         *primary;
-    MMPort                 *data;
-    guint                   cid;
-    gboolean                auth_required;
-    /* For IPv4 settings */
-    MMBearerIpConfig       *ip_config;
+    MMBroadbandModem *modem;
+    MMPortSerialAt   *primary;
+    MMPort           *data;
+    guint             cid;
+    gboolean          auth_required;
+    MMBearerIpConfig *ip_config; /* For IPv4 settings */
 } CommonConnectContext;
 
 static void
@@ -73,7 +71,6 @@ common_connect_context_free (CommonConnectContext *ctx)
         g_object_unref (ctx->ip_config);
     if (ctx->data)
         g_object_unref (ctx->data);
-    g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->primary);
     g_slice_free (CommonConnectContext, ctx);
@@ -93,7 +90,6 @@ common_connect_task_new (MMBroadbandBearerUblox  *self,
     GTask                *task;
 
     ctx = g_slice_new0 (CommonConnectContext);
-    ctx->self    = g_object_ref (self);
     ctx->modem   = g_object_ref (modem);
     ctx->primary = g_object_ref (primary);
     ctx->cid     = cid;
@@ -152,7 +148,7 @@ complete_get_ip_config_3gpp (GTask *task)
 {
     CommonConnectContext *ctx;
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    ctx = g_task_get_task_data (task);
     g_assert (mm_bearer_ip_config_get_method (ctx->ip_config) != MM_BEARER_IP_METHOD_UNKNOWN);
     g_task_return_pointer (task,
                            mm_bearer_connect_result_new (ctx->data, ctx->ip_config, NULL),
@@ -165,14 +161,16 @@ cgcontrdp_ready (MMBaseModem  *modem,
                  GAsyncResult *res,
                  GTask        *task)
 {
-    const gchar          *response;
-    GError               *error = NULL;
-    CommonConnectContext *ctx;
-    gchar                *local_address = NULL;
-    gchar                *subnet = NULL;
-    gchar                *dns_addresses[3] = { NULL, NULL, NULL };
+    MMBroadbandBearerUblox *self;
+    const gchar            *response;
+    GError                 *error = NULL;
+    CommonConnectContext   *ctx;
+    gchar                  *local_address = NULL;
+    gchar                  *subnet = NULL;
+    gchar                  *dns_addresses[3] = { NULL, NULL, NULL };
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response || !mm_3gpp_parse_cgcontrdp_response (response,
@@ -190,14 +188,14 @@ cgcontrdp_ready (MMBaseModem  *modem,
         return;
     }
 
-    mm_dbg ("IPv4 address retrieved: %s", local_address);
+    mm_obj_dbg (self, "IPv4 address retrieved: %s", local_address);
     mm_bearer_ip_config_set_address (ctx->ip_config, local_address);
-    mm_dbg ("IPv4 subnet retrieved: %s", subnet);
+    mm_obj_dbg (self, "IPv4 subnet retrieved: %s", subnet);
     mm_bearer_ip_config_set_prefix (ctx->ip_config, mm_netmask_to_cidr (subnet));
     if (dns_addresses[0])
-        mm_dbg ("Primary DNS retrieved: %s", dns_addresses[0]);
+        mm_obj_dbg (self, "primary DNS retrieved: %s", dns_addresses[0]);
     if (dns_addresses[1])
-        mm_dbg ("Secondary DNS retrieved: %s", dns_addresses[1]);
+        mm_obj_dbg (self, "secondary DNS retrieved: %s", dns_addresses[1]);
     mm_bearer_ip_config_set_dns (ctx->ip_config, (const gchar **) dns_addresses);
 
     g_free (local_address);
@@ -205,7 +203,7 @@ cgcontrdp_ready (MMBaseModem  *modem,
     g_free (dns_addresses[0]);
     g_free (dns_addresses[1]);
 
-    mm_dbg ("finished IP settings retrieval for PDP context #%u...", ctx->cid);
+    mm_obj_dbg (self, "finished IP settings retrieval for PDP context #%u...", ctx->cid);
 
     complete_get_ip_config_3gpp (task);
 }
@@ -215,13 +213,15 @@ uipaddr_ready (MMBaseModem  *modem,
                GAsyncResult *res,
                GTask        *task)
 {
-    const gchar          *response;
-    gchar                *cmd;
-    GError               *error = NULL;
-    CommonConnectContext *ctx;
-    gchar                *gw_ipv4_address = NULL;
+    MMBroadbandBearerUblox *self;
+    const gchar            *response;
+    gchar                  *cmd;
+    GError                 *error = NULL;
+    CommonConnectContext   *ctx;
+    gchar                  *gw_ipv4_address = NULL;
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response || !mm_ublox_parse_uipaddr_response (response,
@@ -237,12 +237,12 @@ uipaddr_ready (MMBaseModem  *modem,
         return;
     }
 
-    mm_dbg ("IPv4 gateway address retrieved: %s", gw_ipv4_address);
+    mm_obj_dbg (self, "IPv4 gateway address retrieved: %s", gw_ipv4_address);
     mm_bearer_ip_config_set_gateway (ctx->ip_config, gw_ipv4_address);
     g_free (gw_ipv4_address);
 
     cmd = g_strdup_printf ("+CGCONTRDP=%u", ctx->cid);
-    mm_dbg ("gathering IP and DNS information for PDP context #%u...", ctx->cid);
+    mm_obj_dbg (self, "gathering IP and DNS information for PDP context #%u...", ctx->cid);
     mm_base_modem_at_command (MM_BASE_MODEM (modem),
                               cmd,
                               10,
@@ -253,7 +253,7 @@ uipaddr_ready (MMBaseModem  *modem,
 }
 
 static void
-get_ip_config_3gpp (MMBroadbandBearer   *self,
+get_ip_config_3gpp (MMBroadbandBearer   *_self,
                     MMBroadbandModem    *modem,
                     MMPortSerialAt      *primary,
                     MMPortSerialAt      *secondary,
@@ -263,8 +263,9 @@ get_ip_config_3gpp (MMBroadbandBearer   *self,
                     GAsyncReadyCallback  callback,
                     gpointer             user_data)
 {
-    GTask                *task;
-    CommonConnectContext *ctx;
+    MMBroadbandBearerUblox *self = MM_BROADBAND_BEARER_UBLOX (_self);
+    GTask                  *task;
+    CommonConnectContext   *ctx;
 
     if (!(task = common_connect_task_new (MM_BROADBAND_BEARER_UBLOX (self),
                                           MM_BROADBAND_MODEM (modem),
@@ -276,20 +277,20 @@ get_ip_config_3gpp (MMBroadbandBearer   *self,
                                           user_data)))
         return;
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    ctx = g_task_get_task_data (task);
     ctx->ip_config = mm_bearer_ip_config_new ();
 
     /* If we're in BRIDGE mode, we need to ask for static IP addressing details:
      *  - AT+UIPADDR=[CID] will give us the default gateway address.
      *  - +CGCONTRDP?[CID] will give us the IP address, subnet and DNS addresses.
      */
-    if (ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_BRIDGE) {
+    if (self->priv->mode == MM_UBLOX_NETWORKING_MODE_BRIDGE) {
         gchar *cmd;
 
         mm_bearer_ip_config_set_method (ctx->ip_config, MM_BEARER_IP_METHOD_STATIC);
 
         cmd = g_strdup_printf ("+UIPADDR=%u", cid);
-        mm_dbg ("gathering gateway information for PDP context #%u...", cid);
+        mm_obj_dbg (self, "gathering gateway information for PDP context #%u...", cid);
         mm_base_modem_at_command (MM_BASE_MODEM (modem),
                                   cmd,
                                   10,
@@ -302,7 +303,7 @@ get_ip_config_3gpp (MMBroadbandBearer   *self,
 
     /* If we're in ROUTER networking mode, we just need to request DHCP on the
      * network interface. Early return with that result. */
-    if (ctx->self->priv->mode == MM_UBLOX_NETWORKING_MODE_ROUTER) {
+    if (self->priv->mode == MM_UBLOX_NETWORKING_MODE_ROUTER) {
         mm_bearer_ip_config_set_method (ctx->ip_config, MM_BEARER_IP_METHOD_DHCP);
         complete_get_ip_config_3gpp (task);
         return;
@@ -332,7 +333,7 @@ cedata_activate_ready (MMBaseModem            *modem,
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response) {
-        mm_warn ("ECM data connection attempt failed: %s", error->message);
+        mm_obj_warn (self, "ECM data connection attempt failed: %s", error->message);
         mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
                                                  MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
         g_error_free (error);
@@ -350,7 +351,7 @@ cgact_activate_ready (MMBaseModem  *modem,
     GError               *error = NULL;
     CommonConnectContext *ctx;
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    ctx = g_task_get_task_data (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response)
@@ -363,40 +364,42 @@ cgact_activate_ready (MMBaseModem  *modem,
 static void
 activate_3gpp (GTask *task)
 {
-    CommonConnectContext *ctx;
-    gchar                *cmd;
+    MMBroadbandBearerUblox *self;
+    CommonConnectContext   *ctx;
+    g_autofree gchar       *cmd = NULL;
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
-    if (ctx->self->priv->profile == MM_UBLOX_USB_PROFILE_ECM &&
-        ctx->self->priv->cedata == FEATURE_SUPPORTED) {
-        /* SARA-U2xx and LISA-U20x only expose one CDC-ECM interface. Hence,
-           the fixed 0 as the interface index here. When we see modems with
-           multiple interfaces, this needs to be revisited. */
+    /* SARA-U2xx and LISA-U20x only expose one CDC-ECM interface. Hence,
+     * the fixed 0 as the interface index here. When we see modems with
+     * multiple interfaces, this needs to be revisited. */
+    if (self->priv->profile == MM_UBLOX_USB_PROFILE_ECM && self->priv->cedata == FEATURE_SUPPORTED) {
         cmd = g_strdup_printf ("+UCEDATA=%u,0", ctx->cid);
-        mm_dbg ("establishing ECM data connection for PDP context #%u...", ctx->cid);
+        mm_obj_dbg (self, "establishing ECM data connection for PDP context #%u...", ctx->cid);
         mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
                                   cmd,
                                   180,
                                   FALSE,
                                   (GAsyncReadyCallback) cedata_activate_ready,
-                                  g_object_ref (ctx->self));
+                                  g_object_ref (self));
+
         /* We'll mark the task done here since the modem expects the DHCP
            discover packet while +UCEDATA runs. If the command fails, we'll
            mark the bearer disconnected later in the callback. */
         g_task_return_pointer (task, g_object_ref (ctx->data), g_object_unref);
         g_object_unref (task);
-   } else {
-        cmd = g_strdup_printf ("+CGACT=1,%u", ctx->cid);
-        mm_dbg ("activating PDP context #%u...", ctx->cid);
-        mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
-                                  cmd,
-                                  120,
-                                  FALSE,
-                                  (GAsyncReadyCallback) cgact_activate_ready,
-                                  task);
-    }
-    g_free (cmd);
+        return;
+   }
+
+    cmd = g_strdup_printf ("+CGACT=1,%u", ctx->cid);
+    mm_obj_dbg (self, "activating PDP context #%u...", ctx->cid);
+    mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
+                              cmd,
+                              120,
+                              FALSE,
+                              (GAsyncReadyCallback) cgact_activate_ready,
+                              task);
 }
 
 static void
@@ -404,18 +407,18 @@ test_cedata_ready (MMBaseModem  *modem,
                    GAsyncResult *res,
                    GTask        *task)
 {
-    CommonConnectContext *ctx;
-    const gchar         *response;
+    MMBroadbandBearerUblox *self;
+    const gchar            *response;
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, NULL);
     if (response)
-        ctx->self->priv->cedata = FEATURE_SUPPORTED;
+        self->priv->cedata = FEATURE_SUPPORTED;
     else
-        ctx->self->priv->cedata = FEATURE_UNSUPPORTED;
-    mm_dbg ("u-blox: +UCEDATA command%s available",
-        (ctx->self->priv->cedata == FEATURE_SUPPORTED) ? "" : " not");
+        self->priv->cedata = FEATURE_UNSUPPORTED;
+    mm_obj_dbg (self, "u-blox: +UCEDATA command%s available",
+                (self->priv->cedata == FEATURE_SUPPORTED) ? "" : " not");
 
     activate_3gpp (task);
 }
@@ -423,19 +426,20 @@ test_cedata_ready (MMBaseModem  *modem,
 static void
 test_cedata (GTask *task)
 {
-    CommonConnectContext *ctx;
+    MMBroadbandBearerUblox *self;
+    CommonConnectContext   *ctx;
 
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     /* We don't need to test for +UCEDATA if we're not using CDC-ECM or if we
        have tested before. Instead, we jump right to the activation. */
-    if (ctx->self->priv->profile != MM_UBLOX_USB_PROFILE_ECM ||
-        ctx->self->priv->cedata != FEATURE_SUPPORT_UNKNOWN) {
+    if (self->priv->profile != MM_UBLOX_USB_PROFILE_ECM || self->priv->cedata != FEATURE_SUPPORT_UNKNOWN) {
         activate_3gpp (task);
         return;
     }
 
-    mm_dbg ("u-blox: checking availability of +UCEDATA command...");
+    mm_obj_dbg (self, "u-blox: checking availability of +UCEDATA command...");
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
                               "+UCEDATA=?",
                               3,
@@ -456,7 +460,7 @@ uauthreq_ready (MMBaseModem  *modem,
     if (!response) {
         CommonConnectContext *ctx;
 
-        ctx = (CommonConnectContext *) g_task_get_task_data (task);
+        ctx = g_task_get_task_data (task);
         /* If authentication required and the +UAUTHREQ failed, abort */
         if (ctx->auth_required) {
             g_task_return_error (task, error);
@@ -475,23 +479,23 @@ authenticate_3gpp (GTask *task)
 {
     MMBroadbandBearerUblox *self;
     CommonConnectContext   *ctx;
-    gchar                  *cmd = NULL;
+    g_autofree gchar       *cmd = NULL;
     MMBearerAllowedAuth     allowed_auth;
     gint                    ublox_auth = -1;
 
     self = g_task_get_source_object (task);
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    ctx  = g_task_get_task_data (task);
 
-    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
     if (!ctx->auth_required) {
-        mm_dbg ("Not using authentication");
+        mm_obj_dbg (self, "not using authentication");
         ublox_auth = 0;
         goto out;
     }
 
     if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN || allowed_auth == (MM_BEARER_ALLOWED_AUTH_PAP | MM_BEARER_ALLOWED_AUTH_CHAP)) {
-        mm_dbg ("Using automatic authentication method");
+        mm_obj_dbg (self, "using automatic authentication method");
         if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_AUTO)
             ublox_auth = 3;
         else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_PAP)
@@ -501,34 +505,33 @@ authenticate_3gpp (GTask *task)
         else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_NONE)
             ublox_auth = 0;
     } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
-        mm_dbg ("Using PAP authentication method");
+        mm_obj_dbg (self, "using PAP authentication method");
         ublox_auth = 1;
     } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
-        mm_dbg ("Using CHAP authentication method");
+        mm_obj_dbg (self, "using CHAP authentication method");
         ublox_auth = 2;
     }
 
 out:
 
     if (ublox_auth < 0) {
-        gchar *str;
+        g_autofree gchar *str = NULL;
 
         str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Cannot use any of the specified authentication methods (%s)", str);
         g_object_unref (task);
-        g_free (str);
         return;
     }
 
     if (ublox_auth > 0) {
-        const gchar *user;
-        const gchar *password;
-        gchar       *quoted_user;
-        gchar       *quoted_password;
+        const gchar      *user;
+        const gchar      *password;
+        g_autofree gchar *quoted_user = NULL;
+        g_autofree gchar *quoted_password = NULL;
 
-        user     = mm_bearer_properties_get_user     (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-        password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+        user     = mm_bearer_properties_get_user     (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+        password = mm_bearer_properties_get_password (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
         quoted_user     = mm_port_serial_at_quote_string (user);
         quoted_password = mm_port_serial_at_quote_string (password);
@@ -538,20 +541,16 @@ out:
                                ublox_auth,
                                quoted_user,
                                quoted_password);
-
-        g_free (quoted_user);
-        g_free (quoted_password);
     } else
         cmd = g_strdup_printf ("+UAUTHREQ=%u,0,\"\",\"\"", ctx->cid);
 
-    mm_dbg ("setting up authentication preferences in PDP context #%u...", ctx->cid);
+    mm_obj_dbg (self, "setting up authentication preferences in PDP context #%u...", ctx->cid);
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
                               cmd,
                               10,
                               FALSE,
                               (GAsyncReadyCallback) uauthreq_ready,
                               task);
-    g_free (cmd);
 }
 
 static void
@@ -569,12 +568,12 @@ uauthreq_test_ready (MMBaseModem  *modem,
     if (!response)
         goto out;
 
-    self->priv->allowed_auths = mm_ublox_parse_uauthreq_test (response, &error);
+    self->priv->allowed_auths = mm_ublox_parse_uauthreq_test (response, self, &error);
 out:
     if (error) {
         CommonConnectContext *ctx;
 
-        ctx = (CommonConnectContext *) g_task_get_task_data (task);
+        ctx = g_task_get_task_data (task);
         /* If authentication required and the +UAUTHREQ test failed, abort */
         if (ctx->auth_required) {
             g_task_return_error (task, error);
@@ -601,11 +600,11 @@ check_supported_authentication_methods (GTask *task)
     MMBearerAllowedAuth     allowed_auth;
 
     self = g_task_get_source_object (task);
-    ctx = (CommonConnectContext *) g_task_get_task_data (task);
+    ctx  = g_task_get_task_data (task);
 
-    user         = mm_bearer_properties_get_user         (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-    password     = mm_bearer_properties_get_password     (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
-    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
+    user         = mm_bearer_properties_get_user         (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    password     = mm_bearer_properties_get_password     (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
     /* Flag whether authentication is required. If it isn't, we won't fail
      * connection attempt if the +UAUTHREQ command fails */
@@ -617,7 +616,7 @@ check_supported_authentication_methods (GTask *task)
         return;
     }
 
-    mm_dbg ("checking supported authentication methods...");
+    mm_obj_dbg (self, "checking supported authentication methods...");
     mm_base_modem_at_command (MM_BASE_MODEM (ctx->modem),
                               "+UAUTHREQ=?",
                               10,
@@ -666,8 +665,11 @@ cgact_deactivate_ready (MMBaseModem  *modem,
                         GAsyncResult *res,
                         GTask        *task)
 {
-    const gchar *response;
-    GError      *error = NULL;
+    MMBroadbandBearerUblox *self;
+    const gchar            *response;
+    GError                 *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
     if (!response) {
@@ -693,7 +695,7 @@ cgact_deactivate_ready (MMBaseModem  *modem,
             return;
         }
 
-        mm_dbg ("ignored error when disconnecting last LTE bearer: %s", error->message);
+        mm_obj_dbg (self, "ignored error when disconnecting last LTE bearer: %s", error->message);
         g_clear_error (&error);
     }
 
@@ -711,8 +713,8 @@ disconnect_3gpp  (MMBroadbandBearer   *self,
                   GAsyncReadyCallback  callback,
                   gpointer             user_data)
 {
-    GTask *task;
-    gchar *cmd;
+    GTask            *task;
+    g_autofree gchar *cmd = NULL;
 
     if (!(task = common_connect_task_new (MM_BROADBAND_BEARER_UBLOX (self),
                                           MM_BROADBAND_MODEM (modem),
@@ -725,14 +727,13 @@ disconnect_3gpp  (MMBroadbandBearer   *self,
         return;
 
     cmd = g_strdup_printf ("+CGACT=0,%u", cid);
-    mm_dbg ("deactivating PDP context #%u...", cid);
+    mm_obj_dbg (self, "deactivating PDP context #%u...", cid);
     mm_base_modem_at_command (MM_BASE_MODEM (modem),
                               cmd,
                               120,
                               FALSE,
                               (GAsyncReadyCallback) cgact_deactivate_ready,
                               task);
-    g_free (cmd);
 }
 
 /*****************************************************************************/

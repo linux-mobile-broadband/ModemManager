@@ -101,6 +101,7 @@ gboolean mm_ublox_parse_cfun_response (const gchar        *response,
 /* URAT=? response parser */
 
 GArray *mm_ublox_parse_urat_test_response (const gchar  *response,
+                                           gpointer      log_object,
                                            GError      **error);
 
 /*****************************************************************************/
@@ -122,6 +123,7 @@ GArray *mm_ublox_filter_supported_modes (const gchar  *model,
 /* Model-based supported bands loading */
 
 GArray *mm_ublox_get_supported_bands (const gchar *model,
+                                      gpointer     log_object,
                                       GError     **error);
 
 /*****************************************************************************/
@@ -129,6 +131,7 @@ GArray *mm_ublox_get_supported_bands (const gchar *model,
 
 GArray *mm_ublox_parse_ubandsel_response (const gchar  *response,
                                           const gchar  *model,
+                                          gpointer      log_object,
                                           GError      **error);
 
 /*****************************************************************************/
@@ -148,6 +151,7 @@ GArray *mm_ublox_parse_uact_response (const gchar  *response,
 /* UACT=? test parser */
 
 gboolean mm_ublox_parse_uact_test (const gchar  *response,
+                                   gpointer      log_object,
                                    GArray      **bands_2g,
                                    GArray      **bands_3g,
                                    GArray      **bands_4g,
@@ -168,6 +172,7 @@ MMModemMode mm_ublox_get_modem_mode_any (const GArray *combinations);
 /* URAT? response parser */
 
 gboolean mm_ublox_parse_urat_read_response (const gchar  *response,
+                                            gpointer      log_object,
                                             MMModemMode  *out_allowed,
                                             MMModemMode  *out_preferred,
                                             GError      **error);
@@ -191,6 +196,7 @@ typedef enum { /*< underscore_name=mm_ublox_bearer_allowed_auth >*/
 } MMUbloxBearerAllowedAuth;
 
 MMUbloxBearerAllowedAuth mm_ublox_parse_uauthreq_test (const char  *response,
+                                                       gpointer     log_object,
                                                        GError     **error);
 
 /*****************************************************************************/

@@ -365,6 +365,7 @@ static const MMModemMode ublox_combinations[] = {
 
 GArray *
 mm_ublox_parse_urat_test_response (const gchar  *response,
+                                   gpointer      log_object,
                                    GError      **error)
 {
     GArray *combinations = NULL;
@@ -415,7 +416,7 @@ mm_ublox_parse_urat_test_response (const gchar  *response,
 
         selected_value = g_array_index (selected, guint, i);
         if (selected_value >= G_N_ELEMENTS (ublox_combinations)) {
-            mm_warn ("Unexpected AcT value: %u", selected_value);
+            mm_obj_warn (log_object, "unexpected AcT value: %u", selected_value);
             continue;
         }
 
@@ -435,12 +436,12 @@ mm_ublox_parse_urat_test_response (const gchar  *response,
 
             preferred_value = g_array_index (preferred, guint, j);
             if (preferred_value >= G_N_ELEMENTS (ublox_combinations)) {
-                mm_warn ("Unexpected AcT preferred value: %u", preferred_value);
+                mm_obj_warn (log_object, "unexpected AcT preferred value: %u", preferred_value);
                 continue;
             }
             combination.preferred = ublox_combinations[preferred_value];
             if (mm_count_bits_set (combination.preferred) != 1) {
-                mm_warn ("AcT preferred value should be a single AcT: %u", preferred_value);
+                mm_obj_warn (log_object, "AcT preferred value should be a single AcT: %u", preferred_value);
                 continue;
             }
             if (!(combination.allowed & combination.preferred))
@@ -1023,6 +1024,7 @@ mm_ublox_filter_supported_modes (const gchar  *model,
 
 GArray *
 mm_ublox_get_supported_bands (const gchar  *model,
+                              gpointer      log_object,
                               GError      **error)
 {
     MMModemMode  mode;
@@ -1034,13 +1036,13 @@ mm_ublox_get_supported_bands (const gchar  *model,
 
     for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
         if (g_str_has_prefix (model, band_configuration[i].model)) {
-            mm_dbg("Found Model (Supported Bands): %s", band_configuration[i].model);
+            mm_obj_dbg (log_object, "known supported bands found for model: %s", band_configuration[i].model);
             break;
         }
     }
 
     if (i == G_N_ELEMENTS (band_configuration)) {
-        mm_warn ("Unknown model name given: %s", model);
+        mm_obj_warn (log_object, "unknown model name given when looking for supported bands: %s", model);
         return NULL;
     }
 
@@ -1175,19 +1177,22 @@ static void
 append_bands (GArray      *bands,
               guint        ubandsel_value,
               MMModemMode  mode,
-              const gchar *model)
+              const gchar *model,
+              gpointer     log_object)
 {
     guint i, j, k, x;
     MMModemBand band;
 
     /* Find Modem Model Index in band_configuration */
     for (i = 0; i < G_N_ELEMENTS (band_configuration); i++) {
-        if (g_str_has_prefix (model, band_configuration[i].model))
+        if (g_str_has_prefix (model, band_configuration[i].model)) {
+            mm_obj_dbg (log_object, "known bands found for model: %s", band_configuration[i].model);
             break;
+        }
     }
 
     if (i == G_N_ELEMENTS (band_configuration)) {
-        mm_warn ("Unknown Modem Model given: %s", model);
+        mm_obj_warn (log_object, "unknown model name given when looking for bands: %s", model);
         return;
     }
 
@@ -1242,6 +1247,7 @@ append_bands (GArray      *bands,
 GArray *
 mm_ublox_parse_ubandsel_response (const gchar  *response,
                                   const gchar  *model,
+                                  gpointer      log_object,
                                   GError      **error)
 {
     GArray      *array_values = NULL;
@@ -1270,7 +1276,7 @@ mm_ublox_parse_ubandsel_response (const gchar  *response,
     mode = supported_modes_per_model (model);
     array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
     for (i = 0; i < array_values->len; i++)
-        append_bands (array, g_array_index (array_values, guint, i), mode, model);
+        append_bands (array, g_array_index (array_values, guint, i), mode, model, log_object);
 
     if (!array->len) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -1591,7 +1597,8 @@ mm_ublox_parse_uact_response (const gchar  *response,
 
 static GArray *
 parse_bands_from_string (const gchar *str,
-                         const gchar *group)
+                         const gchar *group,
+                         gpointer     log_object)
 {
     GArray *bands = NULL;
     GError *inner_error = NULL;
@@ -1603,12 +1610,12 @@ parse_bands_from_string (const gchar *str,
 
         bands = uact_num_array_to_band_array (nums);
         tmpstr = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
-        mm_dbg ("modem reports support for %s bands: %s", group, tmpstr);
+        mm_obj_dbg (log_object, "modem reports support for %s bands: %s", group, tmpstr);
         g_free (tmpstr);
 
         g_array_unref (nums);
     } else if (inner_error) {
-        mm_warn ("couldn't parse list of supported %s bands: %s", group, inner_error->message);
+        mm_obj_warn (log_object, "couldn't parse list of supported %s bands: %s", group, inner_error->message);
         g_clear_error (&inner_error);
     }
 
@@ -1617,6 +1624,7 @@ parse_bands_from_string (const gchar *str,
 
 gboolean
 mm_ublox_parse_uact_test (const gchar  *response,
+                          gpointer      log_object,
                           GArray      **bands2g_out,
                           GArray      **bands3g_out,
                           GArray      **bands4g_out,
@@ -1669,9 +1677,9 @@ mm_ublox_parse_uact_test (const gchar  *response,
         goto out;
     }
 
-    bands2g = parse_bands_from_string (bands2g_str, "2G");
-    bands3g = parse_bands_from_string (bands3g_str, "3G");
-    bands4g = parse_bands_from_string (bands4g_str, "4G");
+    bands2g = parse_bands_from_string (bands2g_str, "2G", log_object);
+    bands3g = parse_bands_from_string (bands3g_str, "3G", log_object);
+    bands4g = parse_bands_from_string (bands4g_str, "4G", log_object);
 
     if (!bands2g->len && !bands3g->len && !bands4g->len) {
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -1745,6 +1753,7 @@ mm_ublox_build_uact_set_command (GArray  *bands,
 
 gboolean
 mm_ublox_parse_urat_read_response (const gchar  *response,
+                                   gpointer      log_object,
                                    MMModemMode  *out_allowed,
                                    MMModemMode  *out_preferred,
                                    GError      **error)
@@ -1783,7 +1792,7 @@ mm_ublox_parse_urat_read_response (const gchar  *response,
         }
         allowed = ublox_combinations[value];
         allowed_str = mm_modem_mode_build_string_from_mask (allowed);
-        mm_dbg ("current allowed modes retrieved: %s", allowed_str);
+        mm_obj_dbg (log_object, "current allowed modes retrieved: %s", allowed_str);
 
         /* Preferred item is optional */
         if (mm_get_uint_from_match_info (match_info, 2, &value)) {
@@ -1794,7 +1803,7 @@ mm_ublox_parse_urat_read_response (const gchar  *response,
             }
             preferred = ublox_combinations[value];
             preferred_str = mm_modem_mode_build_string_from_mask (preferred);
-            mm_dbg ("current preferred modes retrieved: %s", preferred_str);
+            mm_obj_dbg (log_object, "current preferred modes retrieved: %s", preferred_str);
             if (mm_count_bits_set (preferred) != 1) {
                 inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                            "AcT preferred value should be a single AcT: %s", preferred_str);
@@ -1884,6 +1893,7 @@ mm_ublox_build_urat_set_command (MMModemMode   allowed,
 
 MMUbloxBearerAllowedAuth
 mm_ublox_parse_uauthreq_test (const char  *response,
+                              gpointer     log_object,
                               GError     **error)
 {
     MMUbloxBearerAllowedAuth   mask = MM_UBLOX_BEARER_ALLOWED_AUTH_UNKNOWN;
@@ -1931,7 +1941,7 @@ mm_ublox_parse_uauthreq_test (const char  *response,
                     mask |= MM_UBLOX_BEARER_ALLOWED_AUTH_AUTO;
                     break;
                 default:
-                    mm_warn ("Unexpected +UAUTHREQ value: %u", val);
+                    mm_obj_warn (log_object, "unexpected +UAUTHREQ value: %u", val);
                     break;
             }
         }

@@ -290,7 +290,7 @@ compare_combinations (const gchar                  *response,
     GError *error = NULL;
     guint i;
 
-    combinations = mm_ublox_parse_urat_test_response (response, &error);
+    combinations = mm_ublox_parse_urat_test_response (response, NULL, &error);
     g_assert_no_error (error);
     g_assert (combinations);
 
@@ -461,7 +461,7 @@ test_urat_read_response (void)
         GError      *error = NULL;
         gboolean     success;
 
-        success = mm_ublox_parse_urat_read_response (urat_tests[i].response,
+        success = mm_ublox_parse_urat_read_response (urat_tests[i].response, NULL,
                                                      &allowed, &preferred, &error);
         g_assert_no_error (error);
         g_assert (success);
@@ -498,7 +498,7 @@ common_validate_ubandsel_response (const gchar       *str,
     GError *error = NULL;
     GArray *bands;
 
-    bands = mm_ublox_parse_ubandsel_response (str, model, &error);
+    bands = mm_ublox_parse_ubandsel_response (str, model, NULL, &error);
     g_assert_no_error (error);
     g_assert (bands);
 
@@ -701,7 +701,7 @@ common_validate_uact_test (const gchar       *str,
     GArray   *bands_3g = NULL;
     GArray   *bands_4g = NULL;
 
-    result = mm_ublox_parse_uact_test (str, &bands_2g, &bands_3g, &bands_4g, &error);
+    result = mm_ublox_parse_uact_test (str, NULL, &bands_2g, &bands_3g, &bands_4g, &error);
     g_assert_no_error (error);
     g_assert (result);
 
@@ -858,7 +858,7 @@ common_validate_uauthreq_test (const gchar              *str,
     GError                   *error = NULL;
     MMUbloxBearerAllowedAuth  allowed_auths;
 
-    allowed_auths = mm_ublox_parse_uauthreq_test (str, &error);
+    allowed_auths = mm_ublox_parse_uauthreq_test (str, NULL, &error);
     g_assert_no_error (error);
     g_assert_cmpuint (allowed_auths, ==, expected_allowed_auths);
 }

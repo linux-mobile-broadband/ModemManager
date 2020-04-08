@@ -19,7 +19,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-log.h"
+#include "mm-log-object.h"
 #include "mm-serial-parsers.h"
 #include "mm-broadband-modem-ublox.h"
 #include "mm-plugin-ublox.h"
@@ -88,9 +88,7 @@ ready_timeout (GTask *task)
     mm_port_serial_at_add_unsolicited_msg_handler (ctx->port, ctx->ready_regex,
                                                    NULL, NULL, NULL);
 
-    mm_dbg ("(%s/%s) timed out waiting for READY unsolicited message",
-            mm_port_probe_get_port_subsys (probe),
-            mm_port_probe_get_port_name   (probe));
+    mm_obj_dbg (probe, "timed out waiting for READY unsolicited message");
 
     /* not an error really, we didn't probe anything yet, that's all */
     g_task_return_boolean (task, TRUE);
@@ -113,9 +111,7 @@ ready_received (MMPortSerialAt   *port,
     g_source_remove (ctx->timeout_id);
     ctx->timeout_id = 0;
 
-    mm_dbg ("(%s/%s) READY received: port is AT",
-            mm_port_probe_get_port_subsys (probe),
-            mm_port_probe_get_port_name   (probe));
+    mm_obj_dbg (probe, "received READY: port is AT");
 
     /* Flag as an AT port right away */
     mm_port_probe_set_result_at (probe, TRUE);
@@ -133,9 +129,7 @@ wait_for_ready (GTask *task)
     ctx   = g_task_get_task_data     (task);
     probe = g_task_get_source_object (task);
 
-    mm_dbg ("(%s/%s) waiting for READY unsolicited message...",
-            mm_port_probe_get_port_subsys (probe),
-            mm_port_probe_get_port_name   (probe));
+    mm_obj_dbg (probe, "waiting for READY unsolicited message...");
 
     /* Configure a regex on the TTY, so that we stop the custom init
      * as soon as +READY URC is received */
@@ -145,10 +139,7 @@ wait_for_ready (GTask *task)
                                                    task,
                                                    NULL);
 
-    mm_dbg ("(%s/%s) waiting %d seconds for init timeout",
-            mm_port_probe_get_port_subsys (probe),
-            mm_port_probe_get_port_name   (probe),
-            ctx->wait_timeout_secs);
+    mm_obj_dbg (probe, "waiting %d seconds for init timeout", ctx->wait_timeout_secs);
 
     /* Otherwise, let the custom init timeout in some seconds. */
     ctx->timeout_id = g_timeout_add_seconds (ctx->wait_timeout_secs, (GSourceFunc) ready_timeout, task);
@@ -160,7 +151,7 @@ quick_at_ready (MMPortSerialAt *port,
                 GTask          *task)
 {
     MMPortProbe       *probe;
-    GError            *error = NULL;
+    g_autoptr(GError)  error = NULL;
 
     probe = g_task_get_source_object (task);
 
@@ -169,28 +160,21 @@ quick_at_ready (MMPortSerialAt *port,
         /* On a timeout error, wait for READY URC */
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             wait_for_ready (task);
-            goto out;
+            return;
         }
         /* On an unknown error, make it fatal */
         if (!mm_serial_parser_v1_is_known_error (error)) {
-            mm_warn ("(%s/%s) custom port initialization logic failed: %s",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name   (probe),
-                    error->message);
-            goto out_complete;
+            mm_obj_warn (probe, "custom port initialization logic failed: %s", error->message);
+            goto out;
         }
     }
 
-    mm_dbg ("(%s/%s) port is AT",
-            mm_port_probe_get_port_subsys (probe),
-            mm_port_probe_get_port_name   (probe));
+    mm_obj_dbg (probe, "port is AT");
     mm_port_probe_set_result_at (probe, TRUE);
 
-out_complete:
+out:
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-out:
-    g_clear_error (&error);
 }
 
 static void
