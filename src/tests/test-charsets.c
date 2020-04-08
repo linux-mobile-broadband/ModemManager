@@ -18,7 +18,7 @@
 #include <locale.h>
 
 #include "mm-modem-helpers.h"
-#include "mm-log.h"
+#include "mm-log-test.h"
 
 static void
 common_test_gsm7 (const gchar *in_utf8)
@@ -406,27 +406,6 @@ test_charset_can_covert_to (void)
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_PCCP437) == charset_can_convert_to_test[i].to_pccp437);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_PCDN)    == charset_can_convert_to_test[i].to_pcdn);
     }
-}
-
-void
-_mm_log (gpointer obj,
-         const char *loc,
-         const char *func,
-         guint32 level,
-         const char *fmt,
-         ...)
-{
-    va_list args;
-    gchar *msg;
-
-    if (!g_test_verbose ())
-        return;
-
-    va_start (args, fmt);
-    msg = g_strdup_vprintf (fmt, args);
-    va_end (args);
-    g_print ("%s\n", msg);
-    g_free (msg);
 }
 
 int main (int argc, char **argv)

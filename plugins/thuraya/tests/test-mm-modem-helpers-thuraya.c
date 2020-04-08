@@ -24,7 +24,7 @@
 
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-thuraya.h"
-#include "mm-log.h"
+#include "mm-log-test.h"
 
 /*****************************************************************************/
 /* Test CPMS response */
@@ -86,27 +86,6 @@ test_cpms_response_thuraya (void *f, gpointer d)
 }
 
 /*****************************************************************************/
-
-void
-_mm_log (gpointer obj,
-         const char *loc,
-         const char *func,
-         guint32 level,
-         const char *fmt,
-         ...)
-{
-    va_list args;
-    gchar *msg;
-
-    if (!g_test_verbose ())
-        return;
-
-    va_start (args, fmt);
-    msg = g_strdup_vprintf (fmt, args);
-    va_end (args);
-    g_print ("%s\n", msg);
-    g_free (msg);
-}
 
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (GTestFixtureFunc) t, NULL)
 

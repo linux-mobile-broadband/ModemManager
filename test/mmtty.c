@@ -23,7 +23,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
-#include <mm-log.h>
+#include <mm-log-test.h>
 #include <mm-port-serial.h>
 #include <mm-port-serial-at.h>
 #include <mm-serial-parsers.h>
@@ -81,27 +81,6 @@ signals_handler (int signum)
                     "cancelling the main loop...\n");
         g_main_loop_quit (loop);
     }
-}
-
-void
-_mm_log (gpointer obj,
-         const char *loc,
-         const char *func,
-         guint32 level,
-         const char *fmt,
-         ...)
-{
-    va_list args;
-    gchar *msg;
-
-    if (!verbose_flag)
-        return;
-
-    va_start (args, fmt);
-    msg = g_strdup_vprintf (fmt, args);
-    va_end (args);
-    g_print ("%s\n", msg);
-    g_free (msg);
 }
 
 static void

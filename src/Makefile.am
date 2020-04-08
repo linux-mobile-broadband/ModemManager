@@ -101,6 +101,7 @@ libhelpers_la_SOURCES = \
 	mm-log-object.c \
 	mm-log.c \
 	mm-log.h \
+	mm-log-test.h \
 	mm-error-helpers.c \
 	mm-error-helpers.h \
 	mm-modem-helpers.c \

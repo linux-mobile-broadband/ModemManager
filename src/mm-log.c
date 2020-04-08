@@ -202,11 +202,11 @@ log_backend_systemd_journal (const char *loc,
 #endif
 
 void
-_mm_log (gpointer    obj,
-         const char *loc,
-         const char *func,
-         MMLogLevel level,
-         const char *fmt,
+_mm_log (gpointer     obj,
+         const gchar *loc,
+         const gchar *func,
+         MMLogLevel   level,
+         const gchar *fmt,
          ...)
 {
     va_list args;

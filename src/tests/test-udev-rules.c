@@ -23,7 +23,7 @@
 #include <libmm-glib.h>
 
 #include "mm-kernel-device-generic-rules.h"
-#include "mm-log.h"
+#include "mm-log-test.h"
 
 /************************************************************/
 
@@ -42,27 +42,6 @@ test_load_cleanup_core (void)
 }
 
 /************************************************************/
-
-void
-_mm_log (gpointer obj,
-         const char *loc,
-         const char *func,
-         guint32 level,
-         const char *fmt,
-         ...)
-{
-    va_list args;
-    gchar *msg;
-
-    if (!g_test_verbose ())
-        return;
-
-    va_start (args, fmt);
-    msg = g_strdup_vprintf (fmt, args);
-    va_end (args);
-    g_print ("%s\n", msg);
-    g_free (msg);
-}
 
 int main (int argc, char **argv)
 {

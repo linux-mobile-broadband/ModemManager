@@ -37,11 +37,11 @@ typedef enum {
 #define mm_info(...) mm_obj_info (NULL, ## __VA_ARGS__ )
 #define mm_dbg(...)  mm_obj_dbg  (NULL, ## __VA_ARGS__ )
 
-void _mm_log (gpointer    obj,
-              const char *loc,
-              const char *func,
-              MMLogLevel level,
-              const char *fmt,
+void _mm_log (gpointer     obj,
+              const gchar *loc,
+              const gchar *func,
+              MMLogLevel   level,
+              const gchar *fmt,
               ...)  __attribute__((__format__ (__printf__, 5, 6)));
 
 gboolean mm_log_set_level (const char *level, GError **error);

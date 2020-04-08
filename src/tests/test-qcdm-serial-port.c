@@ -34,7 +34,7 @@
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/com.h"
 #include "libqcdm/src/errors.h"
-#include "mm-log.h"
+#include "mm-log-test.h"
 
 typedef struct {
     int master;
@@ -435,27 +435,6 @@ test_pty_cleanup (TestData *d)
             close (d->slave);
         memset (d, 0, sizeof (*d));
     }
-}
-
-void
-_mm_log (gpointer obj,
-         const char *loc,
-         const char *func,
-         guint32 level,
-         const char *fmt,
-         ...)
-{
-    va_list args;
-    gchar *msg;
-
-    if (!g_test_verbose ())
-        return;
-
-    va_start (args, fmt);
-    msg = g_strdup_vprintf (fmt, args);
-    va_end (args);
-    g_print ("%s\n", msg);
-    g_free (msg);
 }
 
 typedef void (*TCFunc) (TestData *, gconstpointer);
