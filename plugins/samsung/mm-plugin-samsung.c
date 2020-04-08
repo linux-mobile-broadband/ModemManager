@@ -60,7 +60,7 @@ mm_plugin_create (void)
                                                { 0, 0 } };
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_SAMSUNG,
-                      MM_PLUGIN_NAME,                "Samsung",
+                      MM_PLUGIN_NAME,                MM_MODULE_NAME,
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,  subsystems,
                       MM_PLUGIN_ALLOWED_PRODUCT_IDS, products,
                       MM_PLUGIN_ALLOWED_AT,          TRUE,

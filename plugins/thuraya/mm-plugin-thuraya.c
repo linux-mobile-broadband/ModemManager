@@ -63,10 +63,10 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_THURAYA,
-                      MM_PLUGIN_NAME,                    "Thuraya",
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,      subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS,      vendor_ids,
-                      MM_PLUGIN_ALLOWED_AT,              TRUE,
+                      MM_PLUGIN_NAME,               MM_MODULE_NAME,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_ALLOWED_AT,         TRUE,
                       NULL));
 }
 

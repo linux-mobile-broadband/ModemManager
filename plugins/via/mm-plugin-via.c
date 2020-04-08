@@ -61,7 +61,7 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_VIA,
-                      MM_PLUGIN_NAME,                    "Via CBP7",
+                      MM_PLUGIN_NAME,                    MM_MODULE_NAME,
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS,      subsystems,
                       MM_PLUGIN_ALLOWED_PRODUCT_STRINGS, product_strings,
                       MM_PLUGIN_ALLOWED_AT,              TRUE,

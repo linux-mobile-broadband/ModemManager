@@ -176,7 +176,7 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_HSO,
-                      MM_PLUGIN_NAME,               "Option High-Speed",
+                      MM_PLUGIN_NAME,               MM_MODULE_NAME,
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_DRIVERS,    drivers,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,

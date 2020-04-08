@@ -66,7 +66,7 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_NOKIA_ICERA,
-                      MM_PLUGIN_NAME,               "Nokia (Icera)",
+                      MM_PLUGIN_NAME,               MM_MODULE_NAME,
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
                       MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
