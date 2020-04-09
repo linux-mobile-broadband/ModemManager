@@ -93,6 +93,10 @@ struct _MMBroadbandModemQmiPrivate {
     /* New devices may not support the legacy DMS UIM commands */
     gboolean dms_uim_deprecated;
 
+    /* Whether autoconnect disabling needs to be checked up during
+     * the device enabling */
+    gboolean autoconnect_checked;
+
     /* 3GPP/CDMA registration helpers */
     gchar *current_operator_id;
     gchar *current_operator_description;
@@ -8393,39 +8397,178 @@ signal_load_values (MMIfaceModemSignal *self,
 /*****************************************************************************/
 /* First enabling step */
 
+typedef struct {
+    MMPortQmi    *qmi;
+    QmiClientWds *wds;
+} EnablingStartedContext;
+
+static void
+enabling_started_context_free (EnablingStartedContext *ctx)
+{
+    if (ctx->wds) {
+        mm_port_qmi_release_client (ctx->qmi, QMI_SERVICE_WDS, MM_PORT_QMI_FLAG_DEFAULT);
+        g_clear_object (&ctx->wds);
+    }
+    g_clear_object (&ctx->qmi);
+    g_slice_free (EnablingStartedContext, ctx);
+}
+
 static gboolean
-enabling_started_finish (MMBroadbandModem *self,
-                         GAsyncResult *res,
-                         GError **error)
+enabling_started_finish (MMBroadbandModem  *self,
+                         GAsyncResult      *res,
+                         GError           **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-parent_enabling_started_ready (MMBroadbandModem *self,
-                               GAsyncResult *res,
-                               GTask *task)
+wds_set_autoconnect_settings_ready (QmiClientWds *client,
+                                    GAsyncResult *res,
+                                    GTask        *task)
 {
-    GError *error = NULL;
+    MMBroadbandModemQmi *self;
+    g_autoptr(GError)    error = NULL;
+    g_autoptr(QmiMessageWdsSetAutoconnectSettingsOutput) output = NULL;
 
-    if (!MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->enabling_started_finish (
-            self,
-            res,
-            &error)) {
-        /* Don't treat this as fatal. Parent enabling may fail if it cannot grab a primary
-         * AT port, which isn't really an issue in QMI-based modems */
-        mm_obj_dbg (self, "couldn't start parent enabling: %s", error->message);
-        g_error_free (error);
-    }
+    self = g_task_get_source_object (task);
 
+    output = qmi_client_wds_set_autoconnect_settings_finish (client, res, &error);
+    if (!output || !qmi_message_wds_set_autoconnect_settings_output_get_result (output, &error))
+        mm_obj_warn (self, "failed disabling autoconnect: %s", error->message);
+    else
+        mm_obj_info (self, "autoconnect explicitly disabled");
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
 static void
-enabling_started (MMBroadbandModem *self,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+wds_get_autoconnect_settings_ready (QmiClientWds *client,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    MMBroadbandModemQmi      *self;
+    QmiWdsAutoconnectSetting  autoconnect_setting;
+    g_autoptr(GError)         error = NULL;
+    g_autoptr(QmiMessageWdsSetAutoconnectSettingsInput)  input  = NULL;
+    g_autoptr(QmiMessageWdsGetAutoconnectSettingsOutput) output = NULL;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_wds_get_autoconnect_settings_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_wds_get_autoconnect_settings_output_get_result (output, &error) ||
+        !qmi_message_wds_get_autoconnect_settings_output_get_status (output, &autoconnect_setting, &error)) {
+        mm_obj_warn (self, "failed checking whether autoconnect is disabled or not: %s", error->message);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    if (autoconnect_setting != QMI_WDS_AUTOCONNECT_SETTING_ENABLED) {
+        mm_obj_dbg (self, "autoconnect is already disabled");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "need to explicitly disable autoconnect");
+    input = qmi_message_wds_set_autoconnect_settings_input_new ();
+    qmi_message_wds_set_autoconnect_settings_input_set_status (input, QMI_WDS_AUTOCONNECT_SETTING_DISABLED, NULL);
+    qmi_client_wds_set_autoconnect_settings (client,
+                                             input,
+                                             10,
+                                             NULL,
+                                             (GAsyncReadyCallback) wds_set_autoconnect_settings_ready,
+                                             task);
+}
+
+static void
+enabling_wds_client_ready (MMPortQmi    *qmi,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    MMBroadbandModemQmi    *self;
+    EnablingStartedContext *ctx;
+    g_autoptr(GError)       error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (!mm_port_qmi_allocate_client_finish (qmi, res, &error)) {
+        mm_obj_warn (self, "cannot check whether autoconnect is disabled or not: "
+                     "couldn't allocate client for WDS service: %s", error->message);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->wds = QMI_CLIENT_WDS (mm_port_qmi_get_client (ctx->qmi,
+                                                       QMI_SERVICE_WDS,
+                                                       MM_PORT_QMI_FLAG_DEFAULT));
+
+    qmi_client_wds_get_autoconnect_settings (ctx->wds,
+                                             NULL,
+                                             5,
+                                             NULL,
+                                             (GAsyncReadyCallback) wds_get_autoconnect_settings_ready,
+                                             task);
+}
+
+static void
+parent_enabling_started_ready (MMBroadbandModem *_self,
+                               GAsyncResult     *res,
+                               GTask            *task)
+{
+    MMBroadbandModemQmi    *self = MM_BROADBAND_MODEM_QMI (_self);
+    EnablingStartedContext *ctx;
+    g_autoptr(GError)       error = NULL;
+
+    if (!MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_parent_class)->enabling_started_finish (_self, res, &error)) {
+        /* Don't treat this as fatal. Parent enabling may fail if it cannot grab a primary
+         * AT port, which isn't really an issue in QMI-based modems */
+        mm_obj_dbg (self, "couldn't start parent enabling: %s", error->message);
+    }
+
+    /* If the autoconnect check has already been done, we're finished */
+    if (self->priv->autoconnect_checked) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    /* The connection logic doesn't work properly when the device is already set
+     * to autoconnect, so automatically disable autoconnect ourselves. */
+    mm_obj_dbg (self, "need to check whether autoconnect is disabled or not...");
+    self->priv->autoconnect_checked = TRUE;
+
+    /* Setup context */
+    ctx = g_slice_new0 (EnablingStartedContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_started_context_free);
+
+    /* Keep a full port reference around */
+    ctx->qmi = mm_base_modem_get_port_qmi (MM_BASE_MODEM (self));
+    if (!ctx->qmi) {
+        mm_obj_warn (self, "cannot check whether autoconnect is disabled or not: couldn't peek QMI port");
+        /* not fatal, just assume autoconnect is disabled */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    /* By default there is no generic WDS client preallocated in the QMI port,
+     * so explicitly allocate one ourselves */
+    mm_port_qmi_allocate_client (ctx->qmi,
+                                 QMI_SERVICE_WDS,
+                                 MM_PORT_QMI_FLAG_DEFAULT,
+                                 NULL,
+                                 (GAsyncReadyCallback)enabling_wds_client_ready,
+                                 task);
+}
+
+static void
+enabling_started (MMBroadbandModem    *self,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
 {
     GTask *task;
 
