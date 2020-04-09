@@ -2604,6 +2604,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     MMModemAccessTechnology mm_access_technologies;
     MMModem3gppRegistrationState mm_cs_registration_state;
     MMModem3gppRegistrationState mm_ps_registration_state;
+    gboolean operator_updated = FALSE;
 
     if (response_output)
         qmi_message_nas_get_serving_system_output_get_serving_system (
@@ -2649,6 +2650,8 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         MMModem3gppRegistrationState reg_state_3gpp;
 
         mm_obj_dbg (self, "no 3GPP info given...");
+        if (self->priv->current_operator_id || self->priv->current_operator_description)
+            operator_updated = TRUE;
         g_free (self->priv->current_operator_id);
         self->priv->current_operator_id = NULL;
         g_free (self->priv->current_operator_description);
@@ -2663,6 +2666,10 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
         mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0, 0);
+        /* request to reload operator info explicitly, so that the new
+         * operator name and code is propagated to the DBus interface */
+        if (operator_updated)
+            mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
         return;
     }
 
@@ -2702,23 +2709,28 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
              &mnc,
              &description,
              NULL))) {
-        /* When we don't have information about leading PCS digit, guess best */
-        g_free (self->priv->current_operator_id);
-        if (mnc >= 100)
-            self->priv->current_operator_id =
-                g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
-                                 mcc,
-                                 mnc);
-        else
-            self->priv->current_operator_id =
-                g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT,
-                                 mcc,
-                                 mnc);
+        gchar *new_operator_id;
 
-        g_clear_pointer (&self->priv->current_operator_description, g_free);
-        /* Some Telit modems apparently sometimes report non-UTF8 characters */
-        if (g_utf8_validate (description, -1, NULL))
-            self->priv->current_operator_description = g_strdup (description);
+        /* When we don't have information about leading PCS digit, guess best */
+        if (mnc >= 100)
+            new_operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT, mcc, mnc);
+        else
+            new_operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.2" G_GUINT16_FORMAT, mcc, mnc);
+
+        if (!self->priv->current_operator_id || !g_str_equal (self->priv->current_operator_id, new_operator_id)) {
+            operator_updated = TRUE;
+            g_free (self->priv->current_operator_id);
+            self->priv->current_operator_id = new_operator_id;
+        } else
+            g_free (new_operator_id);
+
+        if (!self->priv->current_operator_description || !g_str_equal (self->priv->current_operator_description, description)) {
+            operator_updated = TRUE;
+            g_clear_pointer (&self->priv->current_operator_description, g_free);
+            /* Some Telit modems apparently sometimes report non-UTF8 characters */
+            if (g_utf8_validate (description, -1, NULL))
+                self->priv->current_operator_description = g_strdup (description);
+        }
     }
 
     /* If MNC comes with PCS digit, we must make sure the additional
@@ -2738,11 +2750,15 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
               &has_pcs_digit,
               NULL))) &&
         has_pcs_digit) {
-        g_free (self->priv->current_operator_id);
-        self->priv->current_operator_id =
-            g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT,
-                             mcc,
-                             mnc);
+        gchar *new_operator_id;
+
+        new_operator_id = g_strdup_printf ("%.3" G_GUINT16_FORMAT "%.3" G_GUINT16_FORMAT, mcc, mnc);
+        if (!self->priv->current_operator_id || !g_str_equal (self->priv->current_operator_id, new_operator_id)) {
+            operator_updated = TRUE;
+            g_free (self->priv->current_operator_id);
+            self->priv->current_operator_id = new_operator_id;
+        } else
+            g_free (new_operator_id);
     }
 
     /* Report new registration states */
@@ -2767,6 +2783,11 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     /* Only update info in the interface if we get something */
     if (cid && (lac || tac))
         mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
+
+    /* request to reload operator info explicitly, so that the new
+     * operator name and code is propagated to the DBus interface */
+    if (operator_updated)
+        mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
 
     /* Note: don't update access technologies with the ones retrieved here; they
      * are not really the 'current' access technologies */
