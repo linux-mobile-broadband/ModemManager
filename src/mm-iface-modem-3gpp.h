@@ -48,7 +48,8 @@
      MM_MODEM_ACCESS_TECHNOLOGY_HSUPA |                     \
      MM_MODEM_ACCESS_TECHNOLOGY_HSPA |                      \
      MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS |                 \
-     MM_MODEM_ACCESS_TECHNOLOGY_LTE)
+     MM_MODEM_ACCESS_TECHNOLOGY_LTE |                       \
+     MM_MODEM_ACCESS_TECHNOLOGY_5GNR)
 
 typedef struct _MMIfaceModem3gpp MMIfaceModem3gpp;
 

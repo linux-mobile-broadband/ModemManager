@@ -2636,7 +2636,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
 
     /* Only process 3GPP info.
      * Seen the case already where 'selected_network' gives UNKNOWN but we still
-     * have valid LTE info around. */
+     * have valid LTE/5GNR info around. */
     if (selected_network == QMI_NAS_NETWORK_TYPE_3GPP ||
         (selected_network == QMI_NAS_NETWORK_TYPE_UNKNOWN &&
          (mm_access_technologies & MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK))) {
