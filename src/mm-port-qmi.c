@@ -41,22 +41,36 @@ struct _MMPortQmiPrivate {
 
 /*****************************************************************************/
 
-QmiClient *
-mm_port_qmi_peek_client (MMPortQmi *self,
-                         QmiService service,
-                         MMPortQmiFlag flag)
+static QmiClient *
+lookup_client (MMPortQmi     *self,
+               QmiService     service,
+               MMPortQmiFlag  flag,
+               gboolean       steal)
 {
     GList *l;
 
     for (l = self->priv->services; l; l = g_list_next (l)) {
         ServiceInfo *info = l->data;
 
-        if (info->service == service &&
-            info->flag == flag)
-            return info->client;
+        if (info->service == service && info->flag == flag) {
+            QmiClient *found;
+
+            found = info->client;
+            if (steal)
+                self->priv->services = g_list_delete_link (self->priv->services, l);
+            return found;
+        }
     }
 
     return NULL;
+}
+
+QmiClient *
+mm_port_qmi_peek_client (MMPortQmi *self,
+                         QmiService service,
+                         MMPortQmiFlag flag)
+{
+    return lookup_client (self, service, flag, FALSE);
 }
 
 QmiClient *
@@ -78,6 +92,30 @@ mm_port_qmi_peek_device (MMPortQmi *self)
     g_return_val_if_fail (MM_IS_PORT_QMI (self), NULL);
 
     return self->priv->qmi_device;
+}
+
+/*****************************************************************************/
+
+void
+mm_port_qmi_release_client (MMPortQmi     *self,
+                            QmiService     service,
+                            MMPortQmiFlag  flag)
+{
+    QmiClient *client;
+
+    if (!self->priv->qmi_device)
+        return;
+
+    client = lookup_client (self, service, flag, TRUE);
+    if (!client)
+        return;
+
+    mm_obj_dbg (self, "explicitly releasing client for service '%s'...", qmi_service_get_string (service));
+    qmi_device_release_client (self->priv->qmi_device,
+                               client,
+                               QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
+                               3, NULL, NULL, NULL);
+    g_object_unref (client);
 }
 
 /*****************************************************************************/

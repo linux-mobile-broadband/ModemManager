@@ -80,6 +80,10 @@ gboolean mm_port_qmi_allocate_client_finish (MMPortQmi *self,
                                              GAsyncResult *res,
                                              GError **error);
 
+void     mm_port_qmi_release_client         (MMPortQmi     *self,
+                                             QmiService     service,
+                                             MMPortQmiFlag  flag);
+
 QmiClient *mm_port_qmi_peek_client (MMPortQmi *self,
                                     QmiService service,
                                     MMPortQmiFlag flag);
