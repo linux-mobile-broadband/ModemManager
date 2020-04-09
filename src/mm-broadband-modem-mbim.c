@@ -2960,6 +2960,7 @@ update_registration_info (MMBroadbandModemMbim *self,
                           gchar *operator_name_take)
 {
     MMModem3gppRegistrationState reg_state;
+    gboolean                     operator_updated = FALSE;
 
     reg_state = mm_modem_3gpp_registration_state_from_mbim_register_state (state);
 
@@ -2969,6 +2970,7 @@ update_registration_info (MMBroadbandModemMbim *self,
             g_str_equal (self->priv->current_operator_id, operator_id_take)) {
             g_free (operator_id_take);
         } else {
+            operator_updated = TRUE;
             g_free (self->priv->current_operator_id);
             self->priv->current_operator_id = operator_id_take;
         }
@@ -2977,10 +2979,13 @@ update_registration_info (MMBroadbandModemMbim *self,
             g_str_equal (self->priv->current_operator_name, operator_name_take)) {
             g_free (operator_name_take);
         } else {
+            operator_updated = TRUE;
             g_free (self->priv->current_operator_name);
             self->priv->current_operator_name = operator_name_take;
         }
     } else {
+        if (self->priv->current_operator_id || self->priv->current_operator_name)
+            operator_updated = TRUE;
         g_clear_pointer (&self->priv->current_operator_id, g_free);
         g_clear_pointer (&self->priv->current_operator_name, g_free);
         g_free (operator_id_take);
@@ -2993,6 +2998,11 @@ update_registration_info (MMBroadbandModemMbim *self,
 
     self->priv->available_data_classes = available_data_classes;
     update_access_technologies (self);
+
+    /* request to reload operator info explicitly, so that the new
+     * operator name and code is propagated to the DBus interface */
+    if (operator_updated)
+        mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
 }
 
 static void
