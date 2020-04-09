@@ -237,8 +237,9 @@
 
         The network may decide to use different settings during the actual device attach
         procedure, e.g. if the device is roaming or no explicit settings were requested,
-        so the properties shown in the #org.freedesktop.ModemManager1.Modem.Modem3gpp.InitialEpsBearer:InitialEpsBearer
-        may be totally different.
+        so the values shown in the
+        #org.freedesktop.ModemManager1.Modem.Modem3gpp:InitialEpsBearer
+        bearer object may be totally different.
 
         This is a read-only property, updating these settings should be done using the
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp.SetInitialEpsBearerSettings">SetInitialEpsBearerSettings()</link>
