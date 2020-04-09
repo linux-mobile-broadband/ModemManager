@@ -36,10 +36,14 @@ typedef enum {
 #define mm_obj_info(obj, ...) _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_INFO,  ## __VA_ARGS__ )
 #define mm_obj_dbg(obj, ...)  _mm_log (obj, MM_MODULE_NAME, G_STRLOC, G_STRFUNC, MM_LOG_LEVEL_DEBUG, ## __VA_ARGS__ )
 
-#define mm_err(...)  mm_obj_err  (NULL, ## __VA_ARGS__ )
-#define mm_warn(...) mm_obj_warn (NULL, ## __VA_ARGS__ )
-#define mm_info(...) mm_obj_info (NULL, ## __VA_ARGS__ )
-#define mm_dbg(...)  mm_obj_dbg  (NULL, ## __VA_ARGS__ )
+/* only allow using non-object logging API if explicitly requested
+ * (e.g. in the main daemon source) */
+#if defined MM_LOG_NO_OBJECT
+# define mm_err(...)  mm_obj_err  (NULL, ## __VA_ARGS__ )
+# define mm_warn(...) mm_obj_warn (NULL, ## __VA_ARGS__ )
+# define mm_info(...) mm_obj_info (NULL, ## __VA_ARGS__ )
+# define mm_dbg(...)  mm_obj_dbg  (NULL, ## __VA_ARGS__ )
+#endif
 
 void _mm_log (gpointer     obj,
               const gchar *module,

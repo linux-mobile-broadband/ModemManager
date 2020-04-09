@@ -26,8 +26,9 @@
 
 #include "ModemManager.h"
 
-#include "mm-base-manager.h"
+#define MM_LOG_NO_OBJECT
 #include "mm-log.h"
+#include "mm-base-manager.h"
 #include "mm-context.h"
 
 #if defined WITH_SYSTEMD_SUSPEND_RESUME
