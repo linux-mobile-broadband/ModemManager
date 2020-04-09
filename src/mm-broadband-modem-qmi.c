@@ -2726,10 +2726,8 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
 
         if (!self->priv->current_operator_description || !g_str_equal (self->priv->current_operator_description, description)) {
             operator_updated = TRUE;
-            g_clear_pointer (&self->priv->current_operator_description, g_free);
-            /* Some Telit modems apparently sometimes report non-UTF8 characters */
-            if (g_utf8_validate (description, -1, NULL))
-                self->priv->current_operator_description = g_strdup (description);
+            g_free (self->priv->current_operator_description);
+            self->priv->current_operator_description = g_strdup (description);
         }
     }
 
