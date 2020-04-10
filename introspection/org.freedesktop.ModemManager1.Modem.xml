@@ -191,7 +191,8 @@
        Send an arbitrary AT command to a modem and get the response.
 
        Note that using this interface call is only allowed when running
-       ModemManager in debug mode.
+       ModemManager in debug mode or if the project was built using
+       the <literal>with-at-command-via-dbus</literal> configure option.
       -->
     <method name="Command">
       <arg name="cmd"      type="s" direction="in"  />
