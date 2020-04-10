@@ -149,7 +149,7 @@
         Set the capabilities of the device.
 
         The given bitmask should be supported by the modem, as specified in the
-        #org.freedesktop.ModemManager1.Modem.Modem:SupportedCapabilities property.
+        #org.freedesktop.ModemManager1.Modem:SupportedCapabilities property.
 
         This command may power-cycle the device.
     -->
@@ -240,7 +240,7 @@
 
         If the modem doesn't allow changing the current capabilities, the
         list will report one single entry with the same bitmask as in
-        #org.freedesktop.ModemManager1.Modem.Modem:CurrentCapabilities.
+        #org.freedesktop.ModemManager1.Modem:CurrentCapabilities.
 
         Only multimode devices implementing both 3GPP (GSM/UMTS/LTE/5GNR) and
         3GPP2 (CDMA/EVDO) specs will report more than one combination of
@@ -256,7 +256,7 @@
         technologies.
 
         This bitmask will be one of the ones listed in
-        #org.freedesktop.ModemManager1.Modem.Modem:SupportedCapabilities.
+        #org.freedesktop.ModemManager1.Modem:SupportedCapabilities.
     -->
     <property name="CurrentCapabilities" type="u" access="read" />
 
