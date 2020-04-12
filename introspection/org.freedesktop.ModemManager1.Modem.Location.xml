@@ -168,9 +168,16 @@
         gathering is enabled. If the modem supports multiple location types it
         may return more than one here.
 
-        Note that if the device was told not to emit updated location
-        information when location information gathering was initially enabled,
-        this property may not return any location information for security reasons.
+        For security reasons, the location information updates via this
+        property are disabled by default. Users can use this property to monitor
+        location updates only if the location signals are enabled with
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.Setup">Setup()</link>,
+        but considering that enabling the location signals would allow all users
+        to receive property updates as well, not just the process that enabled them.
+        For a finer grained access control, the user can use the
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.GetLocation">GetLocation()</link>
+        method instead, which may require the client to authenticate itself on every
+        call.
 
         This dictionary is composed of a
         <link linkend="MMModemLocationSource">MMModemLocationSource</link>
