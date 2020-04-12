@@ -104,13 +104,19 @@
         InjectAssistanceData:
         @data: assistance data to be injected to the GNSS module.
 
-        Inject assistance data to the GNSS module.
-        The data files should be downloaded using external means from the URLs specified in
-        the <link linkend="AssistanceDataServers">AssistanceDataServers</link> property.
+        Inject assistance data to the GNSS module, which will allow it to have a more
+        accurate positioning information.
 
-        The user does not need to specify the assistance data type being given.
+        The data files should be downloaded using external means from the URLs specified in
+        the <link linkend="AssistanceDataServers">AssistanceDataServers</link> property. The
+        user does not need to specify the assistance data type being given.
 
         There is no maximum @data size limit specified, default DBus system bus limits apply.
+
+        This method may be used when the device does not have a mobile network connection by
+        itself, and therefore it cannot use any A-GPS server to improve the accuracy of the
+        position. In this case, the user can instead download the assistance data files using
+        a WiFi or LAN network, and inject them to the GNSS engine manually.
     -->
     <method name="InjectAssistanceData">
       <arg name="data" type="ay" direction="in">
