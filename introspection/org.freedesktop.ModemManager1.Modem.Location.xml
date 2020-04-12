@@ -33,18 +33,26 @@
         @signal_location: Flag to control whether the device emits signals with the new location information. This argument is ignored when disabling location information gathering.
 
         Configure the location sources to use when gathering location
-        information. Also enable or disable location information gathering.
+        information. Adding new location sources may require to enable them
+        in the device (e.g. the GNSS engine will need to be started explicitly
+        if a GPS source is requested by the user). In the same way, removing
+        location sources may require to disable them in the device (e.g. when
+        no GPS sources are requested by the user, the GNSS engine will need
+        to be stopped explicitly).
+
         This method may require the client to authenticate itself.
 
-        When signals are emitted, any client application (including malicious
-        ones!) can listen for location updates unless D-Bus permissions restrict
-        these signals from certain users. If further security is desired, the
+        When location signaling is enabled by the user, any client application (including
+        malicious ones!) would be able to use the #org.freedesktop.ModemManager1.Modem.Location:Location
+        property to receive location updates. If further security is desired, the
         @signal_location argument can be set to %FALSE to disable location
         updates via D-Bus signals and require applications to call
-        authenticated APIs (like
-        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.GetLocation">GetLocation()</link>
-        ) to get
-        location information.
+        authenticated APIs (like <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.GetLocation">GetLocation()</link>)
+        to get the location information.
+
+        By default location signaling is disabled, and therefore the
+        #org.freedesktop.ModemManager1.Modem.Location:Location property will not
+        be usable until explicitly enabled by the user.
 
         The optional
         <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSA:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSA</link>
