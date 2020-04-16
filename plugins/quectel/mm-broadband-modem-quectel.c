@@ -19,10 +19,12 @@
 #include "mm-shared-quectel.h"
 #include "mm-iface-modem-firmware.h"
 
+static void iface_modem_init          (MMIfaceModem *iface);
 static void shared_quectel_init       (MMSharedQuectel      *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQuectel, mm_broadband_modem_quectel, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_QUECTEL, shared_quectel_init))
 
@@ -54,6 +56,13 @@ iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 static void
 mm_broadband_modem_quectel_init (MMBroadbandModemQuectel *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->setup_sim_hot_swap = mm_shared_quectel_setup_sim_hot_swap;
+    iface->setup_sim_hot_swap_finish = mm_shared_quectel_setup_sim_hot_swap_finish;
 }
 
 static void

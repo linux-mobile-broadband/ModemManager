@@ -45,5 +45,11 @@ void                      mm_shared_quectel_firmware_load_update_settings       
 MMFirmwareUpdateSettings *mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
                                                                                   GAsyncResult          *res,
                                                                                   GError               **error);
+void                      mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem *self,
+                                                                GAsyncReadyCallback callback,
+                                                                gpointer user_data);
+gboolean                  mm_shared_quectel_setup_sim_hot_swap_finish (MMIfaceModem *self,
+                                                                       GAsyncResult *res,
+                                                                       GError **error);
 
 #endif  /* MM_SHARED_QUECTEL_H */
