@@ -126,6 +126,12 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean oma_unsolicited_events_setup;
     guint oma_event_report_indication_id;
 
+    /* 3GPP USSD helpers */
+    guint ussd_indication_id;
+    gboolean ussd_unsolicited_events_enabled;
+    gboolean ussd_unsolicited_events_setup;
+    GTask *pending_ussd_action;
+
     /* Firmware helpers */
     gboolean firmware_list_preloaded;
     GList *firmware_list;
@@ -7129,6 +7135,499 @@ oma_enable_unsolicited_events (MMIfaceModemOma *self,
 }
 
 /*****************************************************************************/
+/* Check support (3GPP USSD interface) */
+
+static gboolean
+modem_3gpp_ussd_check_support_finish (MMIfaceModem3gppUssd  *self,
+                                      GAsyncResult          *res,
+                                      GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_3gpp_ussd_check_support (MMIfaceModem3gppUssd *self,
+                               GAsyncReadyCallback   callback,
+                               gpointer              user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* If we have support for the Voice client, USSD is supported */
+    if (!mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                    QMI_SERVICE_VOICE,
+                                    MM_PORT_QMI_FLAG_DEFAULT,
+                                    NULL)) {
+        mm_obj_dbg (self, "USSD capabilities not supported");
+        g_task_return_boolean (task, FALSE);
+    } else {
+        mm_obj_dbg (self, "USSD capabilities supported");
+        g_task_return_boolean (task, TRUE);
+    }
+
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* USSD indications */
+
+static void
+process_ussd_message (MMBroadbandModemQmi *self,
+                      QmiVoiceUserAction   user_action,
+                      gchar               *utf8_take,
+                      GError              *error_take)
+{
+    MMModem3gppUssdSessionState  ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE;
+    g_autoptr(GTask)             task = NULL;
+    g_autofree gchar            *utf8 = utf8_take;
+    g_autoptr(GError)            error = error_take;
+
+    task = g_steal_pointer (&self->priv->pending_ussd_action);
+
+    if (error) {
+        g_assert (!utf8);
+        if (task)
+            g_task_return_error (task, g_steal_pointer (&error));
+        else
+            mm_obj_dbg (self, "USSD operation failed: %s", error->message);
+        return;
+    }
+
+    switch (user_action) {
+        case QMI_VOICE_USER_ACTION_NOT_REQUIRED:
+            /* no response, or a response to user's request? */
+            if (!utf8 || task)
+                break;
+            /* Network-initiated USSD-Notify */
+            mm_iface_modem_3gpp_ussd_update_network_notification (MM_IFACE_MODEM_3GPP_USSD (self), utf8);
+            g_clear_pointer (&utf8, g_free);
+            break;
+        case QMI_VOICE_USER_ACTION_REQUIRED:
+            /* further action required */
+            ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE;
+            /* no response, or a response to user's request? */
+            if (!utf8 || task)
+                break;
+            /* Network-initiated USSD-Request */
+            mm_iface_modem_3gpp_ussd_update_network_request (MM_IFACE_MODEM_3GPP_USSD (self), utf8);
+            g_clear_pointer (&utf8, g_free);
+            break;
+        case QMI_VOICE_USER_ACTION_UNKNOWN:
+        default:
+            /* Not an indication */
+            break;
+    }
+
+    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self), ussd_state);
+
+    if (!task) {
+        if (utf8)
+            mm_obj_dbg (self, "ignoring unprocessed USSD message: %s", utf8);
+        return;
+    }
+
+    /* Complete the pending action, if any */
+    if (utf8)
+        g_task_return_pointer (task, g_steal_pointer (&utf8), g_free);
+    else
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "USSD action response not processed correctly");
+}
+
+static void
+ussd_indication_cb (QmiClientVoice               *client,
+                    QmiIndicationVoiceUssdOutput *output,
+                    MMBroadbandModemQmi          *self)
+{
+    QmiVoiceUserAction  user_action = QMI_VOICE_USER_ACTION_UNKNOWN;
+    GArray             *uss_data_utf16 = NULL;
+    gchar              *utf8 = NULL;
+    GError             *error = NULL;
+
+    qmi_indication_voice_ussd_output_get_user_action (output, &user_action, NULL);
+    if (qmi_indication_voice_ussd_output_get_uss_data_utf16 (output, &uss_data_utf16, NULL) && uss_data_utf16)
+        /* always prefer the data field in UTF-16 */
+        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF8", "UTF16LE", NULL, NULL, &error);
+
+    process_ussd_message (self, user_action, utf8, error);
+}
+
+/*****************************************************************************/
+/* Setup/cleanup unsolicited events */
+
+static gboolean
+common_3gpp_ussd_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gppUssd  *self,
+                                                          GAsyncResult          *res,
+                                                          GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+common_3gpp_ussd_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
+                                                   gboolean             setup,
+                                                   GAsyncReadyCallback  callback,
+                                                   gpointer             user_data)
+{
+    GTask     *task;
+    QmiClient *client = NULL;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_VOICE, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (setup == self->priv->ussd_unsolicited_events_setup) {
+        mm_obj_dbg (self, "USSD unsolicited events already %s; skipping",
+                    setup ? "setup" : "cleanup");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+    self->priv->ussd_unsolicited_events_setup = setup;
+
+    if (setup) {
+        g_assert (self->priv->ussd_indication_id == 0);
+        self->priv->ussd_indication_id =
+            g_signal_connect (client,
+                              "ussd",
+                              G_CALLBACK (ussd_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->ussd_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->ussd_indication_id);
+        self->priv->ussd_indication_id = 0;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_ussd_setup_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                          GAsyncReadyCallback   callback,
+                                          gpointer              user_data)
+{
+    common_3gpp_ussd_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), TRUE, callback, user_data);
+}
+
+static void
+modem_3gpp_ussd_cleanup_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                            GAsyncReadyCallback   callback,
+                                            gpointer              user_data)
+{
+    common_3gpp_ussd_setup_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Enable/disable unsolicited events */
+
+static gboolean
+common_3gpp_ussd_enable_disable_unsolicited_events_finish (MMIfaceModem3gppUssd  *self,
+                                                           GAsyncResult          *res,
+                                                           GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+voice_indication_register_ready (QmiClientVoice *client,
+                                 GAsyncResult   *res,
+                                 GTask          *task)
+{
+    g_autoptr(QmiMessageVoiceIndicationRegisterOutput) output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_voice_indication_register_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_voice_indication_register_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't register voice USSD indications: ");
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_3gpp_ussd_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
+                                                    gboolean             enable,
+                                                    GAsyncReadyCallback  callback,
+                                                    gpointer             user_data)
+{
+    g_autoptr(QmiMessageVoiceIndicationRegisterInput) input = NULL;
+    GTask     *task;
+    QmiClient *client;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_VOICE, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (enable == self->priv->ussd_unsolicited_events_enabled) {
+        mm_obj_dbg (self, "USSD unsolicited events already %s; skipping",
+                    enable ? "enabled" : "disabled");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+    self->priv->ussd_unsolicited_events_enabled = enable;
+
+    input = qmi_message_voice_indication_register_input_new ();
+    qmi_message_voice_indication_register_input_set_ussd_notification_events (input, enable, NULL);
+    qmi_client_voice_indication_register (QMI_CLIENT_VOICE (client),
+                                          input,
+                                          10,
+                                          NULL,
+                                          (GAsyncReadyCallback) voice_indication_register_ready,
+                                          task);
+}
+
+static void
+modem_3gpp_ussd_enable_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                           GAsyncReadyCallback   callback,
+                                           gpointer              user_data)
+{
+    common_3gpp_ussd_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), TRUE, callback, user_data);
+}
+
+static void
+modem_3gpp_ussd_disable_unsolicited_events (MMIfaceModem3gppUssd *self,
+                                            GAsyncReadyCallback   callback,
+                                            gpointer              user_data)
+{
+    common_3gpp_ussd_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Send command (3GPP/USSD interface) */
+
+static GArray *
+ussd_encode (const gchar                  *command,
+             QmiVoiceUssDataCodingScheme  *scheme,
+             GError                      **error)
+{
+    gsize                 command_len;
+    g_autoptr(GByteArray) barray = NULL;
+    g_autoptr(GError)     inner_error = NULL;
+
+    command_len = strlen (command);
+
+    if (g_str_is_ascii (command)) {
+        *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_ASCII;
+        return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, command_len), command, command_len);
+    }
+
+    barray = g_byte_array_sized_new (strlen (command) * 2);
+    if (!mm_modem_charset_byte_array_append (barray, command, FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Failed to encode USSD command in UCS2 charset: %s", inner_error->message);
+        return NULL;
+    }
+
+    *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_UCS2;
+    return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, barray->len), barray->data, barray->len);
+}
+
+static gchar *
+modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd  *self,
+                             GAsyncResult          *res,
+                             GError               **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+voice_answer_ussd_ready (QmiClientVoice      *client,
+                         GAsyncResult        *res,
+                         MMBroadbandModemQmi *self)
+{
+    g_autoptr(QmiMessageVoiceAnswerUssdOutput) output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_voice_answer_ussd_finish (client, res, &error);
+    if (!output)
+        g_prefix_error (&error, "QMI operation failed: ");
+    else if (!qmi_message_voice_answer_ussd_output_get_result (output, &error))
+        g_prefix_error (&error, "Couldn't answer USSD operation: ");
+
+    process_ussd_message (self, QMI_VOICE_USER_ACTION_UNKNOWN, error ? NULL : g_strdup (""), error);
+
+    /* balance out the full reference we received */
+    g_object_unref (self);
+}
+
+static void
+voice_originate_ussd_ready (QmiClientVoice      *client,
+                            GAsyncResult        *res,
+                            MMBroadbandModemQmi *self)
+{
+    g_autoptr(QmiMessageVoiceOriginateUssdOutput) output = NULL;
+    GError *error = NULL;
+    GArray *uss_data_utf16 = NULL;
+    gchar  *utf8 = NULL;
+
+    output = qmi_client_voice_originate_ussd_finish (client, res, &error);
+    if (!output)
+        g_prefix_error (&error, "QMI operation failed: ");
+    else if (!qmi_message_voice_originate_ussd_output_get_result (output, &error))
+        g_prefix_error (&error, "Couldn't originate USSD operation: ");
+    else if (qmi_message_voice_originate_ussd_output_get_uss_data_utf16 (output, &uss_data_utf16, NULL) && uss_data_utf16)
+        /* always prefer the data field in UTF-16 */
+        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF8", "UTF16LE", NULL, NULL, &error);
+
+    process_ussd_message (self, QMI_VOICE_USER_ACTION_UNKNOWN, utf8, error);
+
+    /* balance out the full reference we received */
+    g_object_unref (self);
+}
+
+static void
+modem_3gpp_ussd_send (MMIfaceModem3gppUssd *_self,
+                      const gchar          *command,
+                      GAsyncReadyCallback   callback,
+                      gpointer              user_data)
+{
+    MMBroadbandModemQmi         *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask                       *task;
+    QmiClient                   *client;
+    QmiVoiceUssDataCodingScheme  scheme;
+    g_autoptr(GArray)            encoded = NULL;
+    GError                      *error = NULL;
+    MMModem3gppUssdSessionState  state;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_VOICE, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Fail if there is an ongoing operation already */
+    if (self->priv->pending_ussd_action) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS,
+                                 "there is already an ongoing USSD operation");
+        g_object_unref (task);
+        return;
+    }
+
+    encoded = ussd_encode (command, &scheme, &error);
+    if (!encoded) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    state = mm_iface_modem_3gpp_ussd_get_state (MM_IFACE_MODEM_3GPP_USSD (self));
+
+    /* Cache the action, as it may be completed via URCs */
+    self->priv->pending_ussd_action = task;
+    mm_iface_modem_3gpp_ussd_update_state (_self, MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE);
+
+    switch (state) {
+        case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE: {
+            g_autoptr(QmiMessageVoiceOriginateUssdInput) input = NULL;
+
+            input = qmi_message_voice_originate_ussd_input_new ();
+            qmi_message_voice_originate_ussd_input_set_uss_data (input, scheme, encoded, NULL);
+            qmi_client_voice_originate_ussd (QMI_CLIENT_VOICE (client), input, 100, NULL,
+                                             (GAsyncReadyCallback) voice_originate_ussd_ready,
+                                             g_object_ref (self)); /* full reference! */
+            return;
+        }
+        case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE: {
+            g_autoptr(QmiMessageVoiceAnswerUssdInput) input = NULL;
+
+            input = qmi_message_voice_answer_ussd_input_new ();
+            qmi_message_voice_answer_ussd_input_set_uss_data (input, scheme, encoded, NULL);
+            qmi_client_voice_answer_ussd (QMI_CLIENT_VOICE (client), input, 100, NULL,
+                                          (GAsyncReadyCallback) voice_answer_ussd_ready,
+                                          g_object_ref (self)); /* full reference! */
+            return;
+        }
+        case MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN:
+        case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
+        default:
+            g_assert_not_reached ();
+            return;
+    }
+}
+
+/*****************************************************************************/
+/* Cancel USSD (3GPP/USSD interface) */
+
+static gboolean
+modem_3gpp_ussd_cancel_finish (MMIfaceModem3gppUssd  *self,
+                               GAsyncResult          *res,
+                               GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+voice_cancel_ussd_ready (QmiClientVoice *client,
+                         GAsyncResult   *res,
+                         GTask          *task)
+{
+    g_autoptr(QmiMessageVoiceCancelUssdOutput) output = NULL;
+    MMBroadbandModemQmi *self;
+    GTask               *pending_task;
+    GError              *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_voice_cancel_ussd_finish (client, res, &error);
+    if (!output)
+        g_prefix_error (&error, "QMI operation failed: ");
+    else if (!qmi_message_voice_cancel_ussd_output_get_result (output, &error))
+        g_prefix_error (&error, "Couldn't cancel USSD operation: ");
+
+    /* Complete the pending action, regardless of the operation result */
+    pending_task = g_steal_pointer (&self->priv->pending_ussd_action);
+    if (pending_task) {
+        g_task_return_new_error (pending_task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                                 "USSD session was cancelled");
+        g_object_unref (pending_task);
+    }
+
+    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
+                                           MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *_self,
+                        GAsyncReadyCallback   callback,
+                        gpointer              user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    GTask               *task;
+    QmiClient           *client;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_VOICE, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    qmi_client_voice_cancel_ussd (QMI_CLIENT_VOICE (client), NULL, 100, NULL,
+                                  (GAsyncReadyCallback) voice_cancel_ussd_ready,
+                                  task);
+}
+
+/*****************************************************************************/
 /* Check firmware support (Firmware interface) */
 
 typedef struct {
@@ -8611,6 +9110,7 @@ static const QmiService qmi_services[] = {
     QMI_SERVICE_UIM,
     QMI_SERVICE_LOC,
     QMI_SERVICE_PDC,
+    QMI_SERVICE_VOICE,
 };
 
 typedef struct {
@@ -9056,9 +9556,20 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
 {
-    /* Assume we don't have USSD support */
-    iface->check_support = NULL;
-    iface->check_support_finish = NULL;
+    iface->check_support = modem_3gpp_ussd_check_support;
+    iface->check_support_finish = modem_3gpp_ussd_check_support_finish;
+    iface->setup_unsolicited_events = modem_3gpp_ussd_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = common_3gpp_ussd_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_ussd_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = common_3gpp_ussd_setup_cleanup_unsolicited_events_finish;
+    iface->enable_unsolicited_events = modem_3gpp_ussd_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = common_3gpp_ussd_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_3gpp_ussd_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = common_3gpp_ussd_enable_disable_unsolicited_events_finish;
+    iface->send = modem_3gpp_ussd_send;
+    iface->send_finish = modem_3gpp_ussd_send_finish;
+    iface->cancel = modem_3gpp_ussd_cancel;
+    iface->cancel_finish = modem_3gpp_ussd_cancel_finish;
 }
 
 static void
