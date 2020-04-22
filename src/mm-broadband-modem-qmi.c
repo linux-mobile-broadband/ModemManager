@@ -7184,11 +7184,14 @@ ussd_encode (const gchar                  *command,
     command_len = strlen (command);
 
     if (g_str_is_ascii (command)) {
+        barray = g_byte_array_sized_new (command_len);
+        g_byte_array_append (barray, (const guint8 *)command, command_len);
+
         *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_ASCII;
-        return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, command_len), command, command_len);
+        return (GArray *) g_steal_pointer (&barray);
     }
 
-    barray = g_byte_array_sized_new (strlen (command) * 2);
+    barray = g_byte_array_sized_new (command_len * 2);
     if (!mm_modem_charset_byte_array_append (barray, command, FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                      "Failed to encode USSD command in UCS2 charset: %s", inner_error->message);
@@ -7196,7 +7199,7 @@ ussd_encode (const gchar                  *command,
     }
 
     *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_UCS2;
-    return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, barray->len), barray->data, barray->len);
+    return (GArray *) g_steal_pointer (&barray);
 }
 
 static gchar *
