@@ -7170,6 +7170,62 @@ modem_3gpp_ussd_check_support (MMIfaceModem3gppUssd *self,
 }
 
 /*****************************************************************************/
+/* USSD encode/decode helpers */
+
+static GArray *
+ussd_encode (const gchar                  *command,
+             QmiVoiceUssDataCodingScheme  *scheme,
+             GError                      **error)
+{
+    gsize                 command_len;
+    g_autoptr(GByteArray) barray = NULL;
+    g_autoptr(GError)     inner_error = NULL;
+
+    command_len = strlen (command);
+
+    if (g_str_is_ascii (command)) {
+        *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_ASCII;
+        return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, command_len), command, command_len);
+    }
+
+    barray = g_byte_array_sized_new (strlen (command) * 2);
+    if (!mm_modem_charset_byte_array_append (barray, command, FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Failed to encode USSD command in UCS2 charset: %s", inner_error->message);
+        return NULL;
+    }
+
+    *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_UCS2;
+    return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, barray->len), barray->data, barray->len);
+}
+
+static gchar *
+ussd_decode (QmiVoiceUssDataCodingScheme   scheme,
+             GArray                       *data,
+             GError                      **error)
+{
+    gchar *decoded = NULL;
+
+    if (scheme == QMI_VOICE_USS_DATA_CODING_SCHEME_ASCII) {
+        decoded = g_strndup ((const gchar *) data->data, data->len);
+        if (!decoded)
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                         "Error decoding USSD command in 0x%04x scheme (ASCII charset)",
+                         scheme);
+    } else if (scheme == QMI_VOICE_USS_DATA_CODING_SCHEME_UCS2) {
+        decoded = mm_modem_charset_byte_array_to_utf8 ((GByteArray *) data, MM_MODEM_CHARSET_UCS2);
+        if (!decoded)
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                         "Error decoding USSD command in 0x%04x scheme (UCS2 charset)",
+                         scheme);
+    } else
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Failed to decode USSD command in unsupported 0x%04x scheme", scheme);
+
+    return decoded;
+}
+
+/*****************************************************************************/
 /* USSD indications */
 
 static void
@@ -7240,15 +7296,17 @@ ussd_indication_cb (QmiClientVoice               *client,
                     QmiIndicationVoiceUssdOutput *output,
                     MMBroadbandModemQmi          *self)
 {
-    QmiVoiceUserAction  user_action = QMI_VOICE_USER_ACTION_UNKNOWN;
-    GArray             *uss_data_utf16 = NULL;
-    gchar              *utf8 = NULL;
-    GError             *error = NULL;
+    QmiVoiceUserAction           user_action = QMI_VOICE_USER_ACTION_UNKNOWN;
+    QmiVoiceUssDataCodingScheme  scheme;
+    GArray                      *uss_data = NULL;
+    gchar                       *utf8 = NULL;
+    GError                      *error = NULL;
 
     qmi_indication_voice_ussd_output_get_user_action (output, &user_action, NULL);
-    if (qmi_indication_voice_ussd_output_get_uss_data_utf16 (output, &uss_data_utf16, NULL) && uss_data_utf16)
-        /* always prefer the data field in UTF-16 */
-        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF-8", "UTF16-LE", NULL, NULL, &error);
+    if (qmi_indication_voice_ussd_output_get_uss_data_utf16 (output, &uss_data, NULL) && uss_data)
+        utf8 = g_convert ((const gchar *) uss_data->data, (2 * uss_data->len), "UTF-8", "UTF16-LE", NULL, NULL, &error);
+    else if (qmi_indication_voice_ussd_output_get_uss_data (output, &scheme, &uss_data, NULL) && uss_data)
+        utf8 = ussd_decode(scheme, uss_data, &error);
 
     process_ussd_message (self, user_action, utf8, error);
 }
@@ -7408,33 +7466,6 @@ modem_3gpp_ussd_disable_unsolicited_events (MMIfaceModem3gppUssd *self,
 /*****************************************************************************/
 /* Send command (3GPP/USSD interface) */
 
-static GArray *
-ussd_encode (const gchar                  *command,
-             QmiVoiceUssDataCodingScheme  *scheme,
-             GError                      **error)
-{
-    gsize                 command_len;
-    g_autoptr(GByteArray) barray = NULL;
-    g_autoptr(GError)     inner_error = NULL;
-
-    command_len = strlen (command);
-
-    if (g_str_is_ascii (command)) {
-        *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_ASCII;
-        return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, command_len), command, command_len);
-    }
-
-    barray = g_byte_array_sized_new (strlen (command) * 2);
-    if (!mm_modem_charset_byte_array_append (barray, command, FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                     "Failed to encode USSD command in UCS2 charset: %s", inner_error->message);
-        return NULL;
-    }
-
-    *scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_UCS2;
-    return g_array_append_vals (g_array_sized_new (FALSE, FALSE, 1, barray->len), barray->data, barray->len);
-}
-
 static gchar *
 modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd  *self,
                              GAsyncResult          *res,
@@ -7469,18 +7500,20 @@ voice_originate_ussd_ready (QmiClientVoice      *client,
                             MMBroadbandModemQmi *self)
 {
     g_autoptr(QmiMessageVoiceOriginateUssdOutput) output = NULL;
-    GError *error = NULL;
-    GArray *uss_data_utf16 = NULL;
-    gchar  *utf8 = NULL;
+    QmiVoiceUssDataCodingScheme  scheme;
+    GError                      *error = NULL;
+    GArray                      *uss_data = NULL;
+    gchar                       *utf8 = NULL;
 
     output = qmi_client_voice_originate_ussd_finish (client, res, &error);
     if (!output)
         g_prefix_error (&error, "QMI operation failed: ");
     else if (!qmi_message_voice_originate_ussd_output_get_result (output, &error))
         g_prefix_error (&error, "Couldn't originate USSD operation: ");
-    else if (qmi_message_voice_originate_ussd_output_get_uss_data_utf16 (output, &uss_data_utf16, NULL) && uss_data_utf16)
-        /* always prefer the data field in UTF-16 */
-        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF-8", "UTF-16LE", NULL, NULL, &error);
+    else if (qmi_message_voice_originate_ussd_output_get_uss_data_utf16 (output, &uss_data, NULL) && uss_data)
+        utf8 = g_convert ((const gchar *) uss_data->data, (2 * uss_data->len), "UTF-8", "UTF-16LE", NULL, NULL, &error);
+    else if (qmi_message_voice_originate_ussd_output_get_uss_data (output, &scheme, &uss_data, NULL) && uss_data)
+        utf8 = ussd_decode (scheme, uss_data, &error);
 
     process_ussd_message (self, QMI_VOICE_USER_ACTION_UNKNOWN, utf8, error);
 
