@@ -7248,7 +7248,7 @@ ussd_indication_cb (QmiClientVoice               *client,
     qmi_indication_voice_ussd_output_get_user_action (output, &user_action, NULL);
     if (qmi_indication_voice_ussd_output_get_uss_data_utf16 (output, &uss_data_utf16, NULL) && uss_data_utf16)
         /* always prefer the data field in UTF-16 */
-        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF8", "UTF16LE", NULL, NULL, &error);
+        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF-8", "UTF16-LE", NULL, NULL, &error);
 
     process_ussd_message (self, user_action, utf8, error);
 }
@@ -7480,7 +7480,7 @@ voice_originate_ussd_ready (QmiClientVoice      *client,
         g_prefix_error (&error, "Couldn't originate USSD operation: ");
     else if (qmi_message_voice_originate_ussd_output_get_uss_data_utf16 (output, &uss_data_utf16, NULL) && uss_data_utf16)
         /* always prefer the data field in UTF-16 */
-        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF8", "UTF16LE", NULL, NULL, &error);
+        utf8 = g_convert ((const gchar *) uss_data_utf16->data, (2 * uss_data_utf16->len), "UTF-8", "UTF-16LE", NULL, NULL, &error);
 
     process_ussd_message (self, QMI_VOICE_USER_ACTION_UNKNOWN, utf8, error);
 
