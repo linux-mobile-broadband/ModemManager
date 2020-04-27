@@ -1353,7 +1353,7 @@ mm_huawei_parse_hcsq_response (const gchar *response,
     gboolean ret = FALSE;
     char *s;
 
-    r = g_regex_new ("\\^HCSQ:\\s*\"([a-zA-Z]*)\",(\\d+),?(\\d+)?,?(\\d+)?,?(\\d+)?,?(\\d+)?$", 0, 0, NULL);
+    r = g_regex_new ("\\^HCSQ:\\s*\"?([a-zA-Z]*)\"?,(\\d+),?(\\d+)?,?(\\d+)?,?(\\d+)?,?(\\d+)?$", 0, 0, NULL);
     g_assert (r != NULL);
 
     if (!g_regex_match_full (r, response, -1, 0, 0, &match_info, &match_error)) {
