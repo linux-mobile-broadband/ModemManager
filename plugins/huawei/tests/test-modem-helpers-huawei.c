@@ -1220,11 +1220,13 @@ typedef struct {
 } HcsqTest;
 
 static const HcsqTest hcsq_tests[] = {
-    { "^HCSQ:\"LTE\",30,19,66,0\r\n",  TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_LTE,     30, 19,  66, 0, 0 },
-    { "^HCSQ: \"WCDMA\",30,30,58\r\n", TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_UMTS,    30, 30,  58, 0, 0 },
-    { "^HCSQ: \"GSM\",36,255\r\n",     TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_GSM,     36, 255,  0, 0, 0 },
-    { "^HCSQ: \"NOSERVICE\"\r\n",      FALSE, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,  0,   0,  0, 0, 0 },
-    { NULL,                            FALSE, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,  0,   0,  0, 0, 0 }
+    { "^HCSQ:\"LTE\",30,19,66,0\r\n",  TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_LTE,     30, 19,   66,  0, 0 },
+    { "^HCSQ: \"WCDMA\",30,30,58\r\n", TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_UMTS,    30, 30,   58,  0, 0 },
+    { "^HCSQ: \"GSM\",36,255\r\n",     TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_GSM,     36, 255,   0,  0, 0 },
+    { "^HCSQ: LTE,33,40,135,11\r\n",   TRUE,  MM_MODEM_ACCESS_TECHNOLOGY_LTE,     33,  40, 135, 11, 0 },
+    { "^HCSQ: \"NOSERVICE\"\r\n",      FALSE, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,  0,   0,   0,  0, 0 },
+    { "^HCSQ: NOSERVICE\r\n",          FALSE, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,  0,   0,   0,  0, 0 },
+    { NULL,                            FALSE, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,  0,   0,   0,  0, 0 }
 };
 
 static void
