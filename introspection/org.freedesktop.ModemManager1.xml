@@ -9,7 +9,7 @@
    Copyright (C) 2011-2013 Lanedo GmbH
 -->
 
-<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+<node name="/org/freedesktop/ModemManager1" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
 
   <!--
       org.freedesktop.ModemManager1:
