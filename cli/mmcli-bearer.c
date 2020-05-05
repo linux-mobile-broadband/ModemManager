@@ -159,24 +159,27 @@ print_bearer_info (MMBearer *bearer)
         const gchar *user = NULL;
         const gchar *password = NULL;
         const gchar *rm_protocol = NULL;
+        gchar       *allowed_auth_str = NULL;
 
         if (properties) {
-            apn           = mm_bearer_properties_get_apn (properties);
-            ip_family_str = (properties ? mm_bearer_ip_family_build_string_from_mask (mm_bearer_properties_get_ip_type (properties)) : NULL);
-            user          = mm_bearer_properties_get_user (properties);
-            password      = mm_bearer_properties_get_password (properties);
+            apn              = mm_bearer_properties_get_apn (properties);
+            ip_family_str    = (properties ? mm_bearer_ip_family_build_string_from_mask (mm_bearer_properties_get_ip_type (properties)) : NULL);
+            allowed_auth_str = (properties ? mm_bearer_allowed_auth_build_string_from_mask (mm_bearer_properties_get_allowed_auth (properties)) : NULL);
+            user             = mm_bearer_properties_get_user (properties);
+            password         = mm_bearer_properties_get_password (properties);
             if (mm_bearer_get_bearer_type (bearer) != MM_BEARER_TYPE_DEFAULT_ATTACH) {
                 roaming     = mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden";
                 rm_protocol = mm_modem_cdma_rm_protocol_get_string (mm_bearer_properties_get_rm_protocol (properties));
             }
         }
 
-        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_APN,         apn);
-        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_ROAMING,     roaming);
-        mmcli_output_string_take (MMC_F_BEARER_PROPERTIES_IP_TYPE,     ip_family_str);
-        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_USER,        user);
-        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_PASSWORD,    password);
-        mmcli_output_string      (MMC_F_BEARER_PROPERTIES_RM_PROTOCOL, rm_protocol);
+        mmcli_output_string           (MMC_F_BEARER_PROPERTIES_APN,          apn);
+        mmcli_output_string           (MMC_F_BEARER_PROPERTIES_ROAMING,      roaming);
+        mmcli_output_string_take      (MMC_F_BEARER_PROPERTIES_IP_TYPE,      ip_family_str);
+        mmcli_output_string           (MMC_F_BEARER_PROPERTIES_USER,         user);
+        mmcli_output_string           (MMC_F_BEARER_PROPERTIES_PASSWORD,     password);
+        mmcli_output_string           (MMC_F_BEARER_PROPERTIES_RM_PROTOCOL,  rm_protocol);
+        mmcli_output_string_list_take (MMC_F_BEARER_PROPERTIES_ALLOWED_AUTH, allowed_auth_str);
     }
 
     /* IPv4 config */
