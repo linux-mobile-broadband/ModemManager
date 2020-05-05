@@ -207,6 +207,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_BEARER_PROPERTIES_APN]             = { "bearer.properties.apn",                           "apn",                      MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_ROAMING]         = { "bearer.properties.roaming",                       "roaming",                  MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_IP_TYPE]         = { "bearer.properties.ip-type",                       "ip type",                  MMC_S_BEARER_PROPERTIES,       },
+    [MMC_F_BEARER_PROPERTIES_ALLOWED_AUTH]    = { "bearer.properties.allowed-auth",                  "allowed-auth",             MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_USER]            = { "bearer.properties.user",                          "user",                     MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_PASSWORD]        = { "bearer.properties.password",                      "password",                 MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_NUMBER]          = { "bearer.properties.number",                        "number",                   MMC_S_BEARER_PROPERTIES,       },
