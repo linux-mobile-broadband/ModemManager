@@ -542,7 +542,7 @@ start_network_ready (QmiClientWds *client,
     GError *error = NULL;
     QmiMessageWdsStartNetworkOutput *output;
 
-    self = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
     g_assert (ctx->running_ipv4 || ctx->running_ipv6);
