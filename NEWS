@@ -1,4 +1,27 @@
 
+ModemManager 1.12.10
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * mmcli:
+   ** Add missing 'allowed-auth' bearer property in the output.
+   ** Remove non-existent --list-bearers option from manpage.
+
+ * introspection:
+   ** Use the correct node name for the ModemManager1 object.
+
+ * Modem interface:
+   ** Allow Command() while in Failed state.
+
+ * MBIM:
+   ** Fix segfault when loading capabilities.
+
+ * Plugins:
+   ** huawei: updated HCSQ regex to match unquoted response.
+
+
 ModemManager 1.12.8
 -------------------------------------------
 This is a new bugfix release of ModemManager.
