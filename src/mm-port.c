@@ -114,7 +114,7 @@ log_object_build_id (MMLogObject *_self)
     self = MM_PORT (_self);
     return g_strdup_printf ("%s/%s",
                             mm_port_get_device (self),
-                            mm_modem_port_type_get_string (mm_port_get_port_type (self)));
+                            mm_port_type_get_string (mm_port_get_port_type (self)));
 }
 
 /*****************************************************************************/
