@@ -448,6 +448,7 @@ MM_ENABLE_ALL_PLUGINS
 MM_ENABLE_PLUGIN([generic])
 MM_ENABLE_PLUGIN([altair-lte])
 MM_ENABLE_PLUGIN([anydata])
+MM_ENABLE_PLUGIN([broadmobi])
 MM_ENABLE_PLUGIN([cinterion])
 MM_ENABLE_PLUGIN([dell],
                  [with_shared_sierra,
@@ -592,6 +593,7 @@ echo "
       generic:                 ${enable_plugin_generic}
       altair lte:              ${enable_plugin_altair_lte}
       anydata:                 ${enable_plugin_anydata}
+      broadmobi:               ${enable_plugin_broadmobi}
       cinterion:               ${enable_plugin_cinterion}
       dell:                    ${enable_plugin_dell}
       dlink:                   ${enable_plugin_dlink}

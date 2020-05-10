@@ -537,6 +537,29 @@ libmm_plugin_anydata_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 endif
 
 ################################################################################
+# plugin: broadmobi
+################################################################################
+
+if ENABLE_PLUGIN_BROADMOBI
+
+pkglib_LTLIBRARIES += libmm-plugin-broadmobi.la
+libmm_plugin_broadmobi_la_SOURCES = \
+	broadmobi/mm-plugin-broadmobi.c \
+	broadmobi/mm-plugin-broadmobi.h \
+	$(NULL)
+libmm_plugin_broadmobi_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"broadmobi\" \
+	$(NULL)
+libmm_plugin_broadmobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+dist_udevrules_DATA += broadmobi/77-mm-broadmobi-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_BROADMOBI=\"${srcdir}/broadmobi\"
+
+endif
+
+################################################################################
 # plugin: cinterion (previously siemens)
 ################################################################################
 

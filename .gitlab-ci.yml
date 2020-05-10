@@ -83,9 +83,9 @@ build-single-plugins:
     - make install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
-    - for plugin in generic altair-lte anydata cinterion dell dlink
-                    fibocom foxconn haier huawei iridium linktop
-                    longcheer mbm motorola mtk nokia nokia-icera
+    - for plugin in generic altair-lte anydata broadmobi cinterion
+                    dell dlink fibocom foxconn haier huawei iridium
+                    linktop longcheer mbm motorola mtk nokia nokia-icera
                     novatel novatel-lte option option-hso pantech
                     quectel samsung sierra-legacy sierra simtech
                     telit thuraya tplink ublox via wavecom x22x zte; do
