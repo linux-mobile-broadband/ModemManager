@@ -42,7 +42,7 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="06", ENV{
 
 # LE910C1 with default usb cfg
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
