@@ -46,6 +46,9 @@ AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
 
+AC_CHECK_PROG(XSLTPROC_CHECK,xsltproc,yes)
+AS_IF([test x"$XSLTPROC_CHECK" != x"yes"], [AC_MSG_ERROR([Please install xsltproc before configuring.])])
+
 dnl Initialize libtool
 LT_PREREQ([2.2])
 LT_INIT([disable-static])
