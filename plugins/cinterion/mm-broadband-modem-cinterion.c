@@ -40,6 +40,7 @@
 #include "mm-modem-helpers-cinterion.h"
 #include "mm-shared-cinterion.h"
 #include "mm-broadband-bearer-cinterion.h"
+#include "mm-iface-modem-signal.h"
 
 static void iface_modem_init           (MMIfaceModem          *iface);
 static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
@@ -47,6 +48,7 @@ static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_location_init  (MMIfaceModemLocation  *iface);
 static void iface_modem_voice_init     (MMIfaceModemVoice     *iface);
 static void iface_modem_time_init      (MMIfaceModemTime      *iface);
+static void iface_modem_signal_init    (MMIfaceModemSignal    *iface);
 static void shared_cinterion_init      (MMSharedCinterion     *iface);
 
 static MMIfaceModem         *iface_modem_parent;
@@ -54,6 +56,7 @@ static MMIfaceModem3gpp     *iface_modem_3gpp_parent;
 static MMIfaceModemLocation *iface_modem_location_parent;
 static MMIfaceModemVoice    *iface_modem_voice_parent;
 static MMIfaceModemTime     *iface_modem_time_parent;
+static MMIfaceModemSignal   *iface_modem_signal_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -62,6 +65,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_CINTERION, shared_cinterion_init))
 
 typedef enum {
@@ -90,6 +94,7 @@ struct _MMBroadbandModemCinterionPrivate {
     /* Flags for feature support checks */
     FeatureSupport swwan_support;
     FeatureSupport sind_psinfo_support;
+    FeatureSupport smoni_support;
 };
 
 /*****************************************************************************/
@@ -1793,6 +1798,7 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
     /* Initialize private variables */
     self->priv->sind_psinfo_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->swwan_support       = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->smoni_support       = FEATURE_SUPPORT_UNKNOWN;
 
     self->priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV:\\s*([a-z]+),(\\d+)\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -1957,4 +1963,134 @@ mm_broadband_modem_cinterion_class_init (MMBroadbandModemCinterionClass *klass)
 
     /* Virtual methods */
     object_class->finalize = finalize;
+}
+
+/*****************************************************************************/
+/* Check support (Signal interface) */
+
+static gboolean
+signal_check_support_finish  (MMIfaceModemSignal  *self,
+                              GAsyncResult        *res,
+                              GError             **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parent_signal_check_support_ready (MMIfaceModemSignal *self,
+                                   GAsyncResult       *res,
+                                   GTask              *task)
+{
+    gboolean parent_supported;
+
+    parent_supported = iface_modem_signal_parent->check_support_finish (self, res, NULL);
+    g_task_return_boolean (task, parent_supported);
+    g_object_unref (task);
+}
+
+static void
+check_smoni_support (MMBaseModem  *_self,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+
+    /* Fetch the result to the SMONI test. If no response given (error triggered), assume unsupported */
+    if (mm_base_modem_at_command_finish (_self, res, NULL)) {
+        mm_obj_dbg (self, "SMONI supported");
+        self->priv->smoni_support = FEATURE_SUPPORTED;
+        g_task_return_boolean (task, TRUE); // otherwise the whole interface is not available
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "SMONI unsupported");
+    self->priv->smoni_support = FEATURE_NOT_SUPPORTED;
+
+    /* Otherwise, check if the parent CESQ-based implementation works */
+    g_assert (iface_modem_signal_parent->check_support && iface_modem_signal_parent->check_support_finish);
+    iface_modem_signal_parent->check_support (g_task_get_task_data (task),
+                                              (GAsyncReadyCallback)parent_signal_check_support_ready,
+                                              task);
+}
+
+static void
+signal_check_support (MMIfaceModemSignal  *_self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+
+    GTask *task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, _self, NULL);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SMONI=?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) check_smoni_support,
+                              task);
+}
+
+/*****************************************************************************/
+/* Load extended signal information (Signal interface) */
+
+static gboolean
+signal_load_values_finish (MMIfaceModemSignal  *_self,
+                           GAsyncResult        *res,
+                           MMSignal           **cdma,
+                           MMSignal           **evdo,
+                           MMSignal           **gsm,
+                           MMSignal           **umts,
+                           MMSignal           **lte,
+                           GError             **error)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    const gchar *response;
+
+    if (self->priv->smoni_support == FEATURE_NOT_SUPPORTED)
+        return iface_modem_signal_parent->load_values_finish (_self, res, cdma, evdo, gsm, umts, lte, error);
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (_self), res, error);
+    if (!response || !mm_cinterion_smoni_response_to_signal_info (response, gsm, umts, lte, error))
+        return FALSE;
+
+    if (cdma)
+        *cdma = NULL;
+    if (evdo)
+        *evdo = NULL;
+
+    return TRUE;
+}
+
+static void
+signal_load_values (MMIfaceModemSignal  *_self,
+                    GCancellable        *cancellable,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    if (self->priv->smoni_support == FEATURE_SUPPORTED) {
+        mm_base_modem_at_command (MM_BASE_MODEM (_self),
+                                  "^SMONI",
+                                  3,
+                                  FALSE,
+                                  callback,
+                                  user_data);
+        return;
+    }
+
+    /* ^SMONI not supported, fallback to the parent */
+    iface_modem_signal_parent->load_values (_self, cancellable, callback, user_data);
+}
+
+static void
+iface_modem_signal_init (MMIfaceModemSignal *iface)
+{
+    iface_modem_signal_parent   = g_type_interface_peek_parent (iface);
+
+    iface->check_support        = signal_check_support;
+    iface->check_support_finish = signal_check_support_finish;
+    iface->load_values          = signal_load_values;
+    iface->load_values_finish   = signal_load_values_finish;
 }

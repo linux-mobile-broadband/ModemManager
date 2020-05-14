@@ -20,10 +20,14 @@
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
+#include <math.h>
 
 #include "mm-log-test.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-cinterion.h"
+
+#define g_assert_cmpfloat_tolerance(val1, val2, tolerance)  \
+    g_assert_cmpfloat (fabs (val1 - val2), <, tolerance)
 
 /*****************************************************************************/
 /* Test ^SCFG test responses */
@@ -857,6 +861,244 @@ test_ctzu_urc_full (void)
 }
 
 /*****************************************************************************/
+/* Test ^SMONI responses */
+
+typedef struct {
+    const gchar            *str;
+    MMCinterionSmoniTech    tech;
+    gdouble                 rssi;
+    gdouble                 ecn0;
+    gdouble                 rscp;
+    gdouble                 rsrp;
+    gdouble                 rsrq;
+} SMoniResponseTest;
+
+static const SMoniResponseTest smoni_response_tests[] = {
+    {
+        .str       = "^SMONI: 2G,71,-61,262,02,0143,83BA,33,33,3,6,G,NOCONN",
+        .tech      = MM_CINTERION_SMONI_2G,
+        .rssi      = -61.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 2G,SEARCH,SEARCH",
+        .tech      = MM_CINTERION_SMONI_NO_TECH,
+        .rssi      = 0.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 2G,673,-89,262,07,4EED,A500,16,16,7,4,G,5,-107,LIMSRV",
+        .tech      = MM_CINTERION_SMONI_2G,
+        .rssi      =  -89.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 2G,673,-80,262,07,4EED,A500,35,35,7,4,G,643,4,0,-80,0,S_FR",
+        .tech      = MM_CINTERION_SMONI_2G,
+        .rssi      = -80.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 3G,10564,296,-7.5,-79,262,02,0143,00228FF,-92,-78,NOCONN",
+        .tech      = MM_CINTERION_SMONI_3G,
+        .rssi      = 0.0,
+        .ecn0      = -7.5,
+        .rscp      = -79.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 3G,SEARCH,SEARCH",
+        .tech      = MM_CINTERION_SMONI_NO_TECH,
+        .rssi      = 0.0,
+        .ecn0      = 0,
+        .rscp      = 0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 3G,10564,96,-6.5,-77,262,02,0143,00228FF,-92,-78,LIMSRV",
+        .tech      = MM_CINTERION_SMONI_3G,
+        .rssi      =  0.0,
+        .ecn0      = -6.5,
+        .rscp      = -77.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 3G,10737,131,-5,-93,260,01,7D3D,C80BC9A,--,--,----,---,-,-5,-93,0,01,06",
+        .tech      = MM_CINTERION_SMONI_3G,
+        .rssi      = 0.0,
+        .ecn0      = -5.0,
+        .rscp      = -93.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 4G,6300,20,10,10,FDD,262,02,BF75,0345103,350,33,-94,-7,NOCONN",
+        .tech      = MM_CINTERION_SMONI_4G,
+        .rssi      = 0.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = -94.0,
+        .rsrq      = -7.0
+    },
+    {
+        .str       = "^SMONI: 4G,SEARCH",
+        .tech      = MM_CINTERION_SMONI_NO_TECH,
+        .rssi      = 0.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = 0.0,
+        .rsrq      = 0.0
+    },
+    {
+        .str       = "^SMONI: 4G,6300,20,10,10,FDD,262,02,BF75,0345103,350,33,-90,-6,LIMSRV",
+        .tech      = MM_CINTERION_SMONI_4G,
+        .rssi      = 0.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = -90.0,
+        .rsrq      = -6.0
+    },
+    {
+        .str       = "^SMONI: 4G,6300,20,10,10,FDD,262,02,BF75,0345103,350,90,-101,-7,CONN",
+        .tech      = MM_CINTERION_SMONI_4G,
+        .rssi      = 0.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = -101.0,
+        .rsrq      = -7.0
+    },
+    {
+        .str       = "^SMONI: 4G,2850,7,20,20,FDD,262,02,C096,027430F,275,11,-114,-9,NOCONN",
+        .tech      = MM_CINTERION_SMONI_4G,
+        .rssi      = 0.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = -114.0,
+        .rsrq      = -9.0
+    },
+    {
+        .str       = "^SMONI: 4G,2850,7,20,20,FDD,262,02,C096,027430F,275,-,-113,-8,CONN",
+        .tech      = MM_CINTERION_SMONI_4G,
+        .rssi      = 0.0,
+        .ecn0      = 0.0,
+        .rscp      = 0.0,
+        .rsrp      = -113.0,
+        .rsrq      = -8.0
+    }
+};
+
+static void
+test_smoni_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (smoni_response_tests); i++) {
+        GError                 *error = NULL;
+        gboolean                success;
+        MMCinterionSmoniTech    tech = MM_CINTERION_SMONI_NO_TECH;
+        gdouble                 rssi = MM_SIGNAL_UNKNOWN;
+        gdouble                 ecn0 = MM_SIGNAL_UNKNOWN;
+        gdouble                 rscp = MM_SIGNAL_UNKNOWN;
+        gdouble                 rsrp = MM_SIGNAL_UNKNOWN;
+        gdouble                 rsrq = MM_SIGNAL_UNKNOWN;
+
+        success = mm_cinterion_parse_smoni_query_response (smoni_response_tests[i].str,
+                                                            &tech, &rssi,
+                                                            &ecn0, &rscp,
+                                                            &rsrp, &rsrq,
+                                                            &error);
+        g_assert_no_error (error);
+        g_assert (success);
+
+        g_assert_cmpuint (smoni_response_tests[i].tech,      ==, tech);
+        switch (smoni_response_tests[i].tech) {
+        case MM_CINTERION_SMONI_2G:
+            g_assert_cmpfloat_tolerance (rssi, smoni_response_tests[i].rssi, 0.1);
+            break;
+        case MM_CINTERION_SMONI_3G:
+            g_assert_cmpfloat_tolerance (ecn0, smoni_response_tests[i].ecn0, 0.1);
+            g_assert_cmpfloat_tolerance (rscp, smoni_response_tests[i].rscp, 0.1);
+            break;
+        case MM_CINTERION_SMONI_4G:
+            g_assert_cmpfloat_tolerance (rsrp, smoni_response_tests[i].rsrp, 0.1);
+            g_assert_cmpfloat_tolerance (rsrq, smoni_response_tests[i].rsrq, 0.1);
+            break;
+        case MM_CINTERION_SMONI_NO_TECH:
+        default:
+            break;
+        }
+    }
+}
+
+static void
+test_smoni_response_to_signal (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (smoni_response_tests); i++) {
+        GError   *error = NULL;
+        gboolean  success;
+        MMSignal *gsm  = NULL;
+        MMSignal *umts = NULL;
+        MMSignal *lte  = NULL;
+
+        success = mm_cinterion_smoni_response_to_signal_info (smoni_response_tests[i].str,
+                                                              &gsm, &umts, &lte,
+                                                              &error);
+        g_assert_no_error (error);
+        g_assert (success);
+
+        switch (smoni_response_tests[i].tech) {
+        case MM_CINTERION_SMONI_2G:
+            g_assert (gsm);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rssi (gsm), smoni_response_tests[i].rssi, 0.1);
+            g_object_unref (gsm);
+            g_assert (!umts);
+            g_assert (!lte);
+            break;
+        case MM_CINTERION_SMONI_3G:
+            g_assert (umts);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rscp (umts), smoni_response_tests[i].rscp, 0.1);
+            g_assert_cmpfloat_tolerance (mm_signal_get_ecio (umts), smoni_response_tests[i].ecn0, 0.1);
+            g_object_unref (umts);
+            g_assert (!gsm);
+            g_assert (!lte);
+            break;
+        case MM_CINTERION_SMONI_4G:
+            g_assert (lte);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rsrp (lte), smoni_response_tests[i].rsrp, 0.1);
+            g_assert_cmpfloat_tolerance (mm_signal_get_rsrq (lte), smoni_response_tests[i].rsrq, 0.1);
+            g_object_unref (lte);
+            g_assert (!gsm);
+            g_assert (!umts);
+            break;
+        case MM_CINTERION_SMONI_NO_TECH:
+        default:
+            g_assert (!gsm);
+            g_assert (!umts);
+            g_assert (!lte);
+            break;
+        }
+    }
+}
+
+
+/*****************************************************************************/
 
 int main (int argc, char **argv)
 {
@@ -881,6 +1123,8 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/slcc/urc/complex",        test_slcc_urc_complex);
     g_test_add_func ("/MM/cinterion/ctzu/urc/simple",         test_ctzu_urc_simple);
     g_test_add_func ("/MM/cinterion/ctzu/urc/full",           test_ctzu_urc_full);
+    g_test_add_func ("/MM/cinterion/smoni/query_response",    test_smoni_response);
+    g_test_add_func ("/MM/cinterion/smoni/query_response_to_signal", test_smoni_response_to_signal);
 
     return g_test_run ();
 }

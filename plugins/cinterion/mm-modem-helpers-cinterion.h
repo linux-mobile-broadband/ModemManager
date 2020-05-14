@@ -113,4 +113,29 @@ gboolean  mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
                                        MMNetworkTimezone **tzp,
                                        GError            **error);
 
+/*****************************************************************************/
+/* ^SMONI helper */
+
+typedef enum { /*< underscore_name=mm_modem_port_type >*/
+    MM_CINTERION_SMONI_NO_TECH = 0,
+    MM_CINTERION_SMONI_2G      = 2,
+    MM_CINTERION_SMONI_3G      = 3,
+    MM_CINTERION_SMONI_4G      = 4,
+} MMCinterionSmoniTech;
+
+gboolean mm_cinterion_parse_smoni_query_response (const gchar           *response,
+                                                  MMCinterionSmoniTech  *out_tech,
+                                                  gdouble               *out_rssi,
+                                                  gdouble               *out_ecn0,
+                                                  gdouble               *out_rscp,
+                                                  gdouble               *out_rsrp,
+                                                  gdouble               *out_rsrq,
+                                                  GError               **error);
+
+gboolean mm_cinterion_smoni_response_to_signal_info (const gchar  *response,
+                                                     MMSignal    **out_gsm,
+                                                     MMSignal    **out_umts,
+                                                     MMSignal    **out_lte,
+                                                     GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */

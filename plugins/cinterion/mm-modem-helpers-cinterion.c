@@ -869,3 +869,247 @@ mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
 
     return TRUE;
 }
+
+/*****************************************************************************/
+/* ^SMONI response parser */
+
+gboolean
+mm_cinterion_parse_smoni_query_response (const gchar           *response,
+                                         MMCinterionSmoniTech  *out_tech,
+                                         gdouble               *out_rssi,
+                                         gdouble               *out_ecn0,
+                                         gdouble               *out_rscp,
+                                         gdouble               *out_rsrp,
+                                         gdouble               *out_rsrq,
+                                         GError               **error)
+{
+    g_autoptr(GRegex)        r = NULL;
+    g_autoptr(GRegex)        pre = NULL;
+    g_autoptr(GMatchInfo)    match_info = NULL;
+    g_autoptr(GMatchInfo)    match_info_pre = NULL;
+    GError                  *inner_error = NULL;
+    MMCinterionSmoniTech     tech = MM_CINTERION_SMONI_NO_TECH;
+    gdouble                  rssi = -G_MAXDOUBLE;
+    gdouble                  ecn0 = -G_MAXDOUBLE;
+    gdouble                  rscp = -G_MAXDOUBLE;
+    gdouble                  rsrq = -G_MAXDOUBLE;
+    gdouble                  rsrp = -G_MAXDOUBLE;
+    gboolean                 success = FALSE;
+
+    g_assert(out_tech);
+    g_assert(out_rssi);
+    g_assert(out_ecn0);
+    g_assert(out_rscp);
+    g_assert(out_rsrp);
+    g_assert(out_rsrq);
+    g_assert(out_rssi);
+
+    /* Possible Responses:
+     * 2G
+     * ^SMONI: 2G,ARFCN,BCCH,MCC,MNC,LAC,cell,C1,C2,NCC,BCC,GPRS,Conn_state                                     // registered
+     * ^SMONI: 2G,ARFCN,BCCH,MCC,MNC,LAC,cell,C1,C2,NCC,BCC,GPRS,ARFCN,TS,timAdv,dBm,Q,ChMod                    // searching
+     * ^SMONI: 2G,ARFCN,BCCH,MCC,MNC,LAC,cell,C1,C2,NCC,BCC,GPRS,PWR,RXLev,ARFCN,TS,timAdv,dBm,Q,ChMod          // limsrv
+     * ^SMONI: 2G,ARFCN,BCCH,MCC,MNC,LAC,cell,C1,C2,NCC,BCC,GPRS,ARFCN,TS,timAdv,dBm,Q,ChMod                    // dedicated channel
+     *
+     * ^SMONI: 2G,71,-61,262,02,0143,83BA,33,33,3,6,G,NOCONN
+     *               ^^^
+     * ^SMONI: 2G,SEARCH,SEARCH
+     * ^SMONI: 2G,673,-89,262,07,4EED,A500,16,16,7,4,G,5,-107,LIMSRV
+     *                ^^^                                ^^^^ RXLev dBm
+     * ^SMONI: 2G,673,-80,262,07,4EED,A500,35,35,7,4,G,643,4,0,-80,0,S_FR
+     *                ^^^                                      ^^^ dBm: Receiving level of the traffic channel carrier in dBm
+     *  BCCH: Receiving level of the BCCH carrier in dBm (level is limited from -110dBm to -47dBm)
+     *   -> rssi for 2G, directly without mm_3gpp_rxlev_to_rssi
+     *
+     *
+     * 3G
+     * ^SMONI: 3G,UARFCN,PSC,EC/n0,RSCP,MCC,MNC,LAC,cell,SQual,SRxLev,,Conn_state",
+     * ^SMONI: 3G,UARFCN,PSC,EC/n0,RSCP,MCC,MNC,LAC,cell,SQual,SRxLev,PhysCh, SF,Slot,EC/n0,RSCP,ComMod,HSUPA,HSDPA",
+     * ^SMONI: 3G,UARFCN,PSC,EC/n0,RSCP,MCC,MNC,LAC,cell,SQual,SRxLev,PhysCh, SF,Slot,EC/n0,RSCP,ComMod,HSUPA,HSDPA",
+     * ^SMONI: 3G,UARFCN,PSC,EC/n0,RSCP,MCC,MNC,LAC,cell,SQual,SRxLev,PhysCh, SF,Slot,EC/n0,RSCP,ComMod,HSUPA,HSDPA",
+     *
+     * ^SMONI: 3G,10564,296,-7.5,-79,262,02,0143,00228FF,-92,-78,NOCONN
+     *                      ^^^^ ^^^
+     * ^SMONI: 3G,SEARCH,SEARCH
+     * ^SMONI: 3G,10564,96,-7.5,-79,262,02,0143,00228FF,-92,-78,LIMSRV
+     *                     ^^^^ ^^^
+     * ^SMONI: 3G,10737,131,-5,-93,260,01,7D3D,C80BC9A,--,--,----,---,-,-5,-93,0,01,06
+     *                      ^^ ^^^
+     *   RSCP: Received Signal Code Power in dBm -> no need for mm_3gpp_rscp_level_to_rscp
+     *   EC/n0: EC/n0   Carrier to noise ratio in dB = measured Ec/Io value in dB. Please refer to 3GPP 25.133, section 9.1.2.3, Table 9.9 for details on the mapping from EC/n0 to EC/Io.
+     *     -> direct value, without need for mm_3gpp_ecn0_level_to_ecio
+     *
+     *
+     * 4G
+     * ^SMONI: 4G,EARFCN,Band,DL bandwidth,UL bandwidth,Mode,MCC,MNC,TAC,Global Cell ID,Physical Cell ID,Srxlev,RSRP,RSRQ,Conn_state
+     * ^SMONI: 4G,EARFCN,Band,DL bandwidth,UL bandwidth,Mode,MCC,MNC,TAC,Global Cell ID,Physical Cell ID,Srxlev,RSRP,RSRQ,Conn_state
+     * ^SMONI: 4G,EARFCN,Band,DL bandwidth,UL bandwidth,Mode,MCC,MNC,TAC,Global Cell ID,Physical Cell ID,Srxlev,RSRP,RSRQ,Conn_state
+     * ^SMONI: 4G,EARFCN,Band,DL bandwidth,UL bandwidth,Mode,MCC,MNC,TAC,Global Cell ID,Physical Cell ID,TX_power,RSRP,RSRQ,Conn_state
+     *
+     * ^SMONI: 4G,6300,20,10,10,FDD,262,02,BF75,0345103,350,33,-94,-7,NOCONN
+     *                                                         ^^^ ^^
+     * ^SMONI: 4G,SEARCH
+     * ^SMONI: 4G,6300,20,10,10,FDD,262,02,BF75,0345103,350,33,-94,-7,LIMSRV
+     *                                                         ^^^ ^^
+     * ^SMONI: 4G,6300,20,10,10,FDD,262,02,BF75,0345103,350,90,-94,-7,CONN
+     *                                                         ^^^ ^^
+     *  RSRP    Reference Signal Received Power (see 3GPP 36.214 Section 5.1.1.) -> directly the value without mm_3gpp_rsrq_level_to_rsrp
+     *  RSRQ    Reference Signal Received Quality (see 3GPP 36.214 Section 5.1.2.) -> directly the value without mm_3gpp_rsrq_level_to_rsrq
+     */
+    if (g_regex_match_simple ("\\^SMONI:\\s*[234]G,SEARCH", response, 0, 0)) {
+        success = TRUE;
+        goto out;
+    }
+    pre = g_regex_new ("\\^SMONI:\\s*([234])", 0, 0, NULL);
+    g_assert (pre != NULL);
+    g_regex_match_full (pre, response, strlen (response), 0, 0, &match_info_pre, &inner_error);
+    if (!inner_error && g_match_info_matches (match_info_pre)) {
+        if (!mm_get_uint_from_match_info (match_info_pre, 1, &tech)) {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read tech");
+            goto out;
+        }
+        #define FLOAT "([-+]?[0-9]+\\.?[0-9]*)"
+        switch (tech) {
+        case MM_CINTERION_SMONI_2G:
+            r = g_regex_new ("\\^SMONI:\\s*2G,(\\d+),"FLOAT, 0, 0, NULL);
+            g_assert (r != NULL);
+            g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+            if (!inner_error && g_match_info_matches (match_info)) {
+                /* skip ARFCN */
+                if (!mm_get_double_from_match_info (match_info, 2, &rssi)) {
+                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read BCCH=rssi");
+                    goto out;
+                }
+            }
+            break;
+        case MM_CINTERION_SMONI_3G:
+            r = g_regex_new ("\\^SMONI:\\s*3G,(\\d+),(\\d+),"FLOAT","FLOAT, 0, 0, NULL);
+            g_assert (r != NULL);
+            g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+            if (!inner_error && g_match_info_matches (match_info)) {
+                /* skip UARFCN */
+                /* skip PSC (Primary scrambling code) */
+                if (!mm_get_double_from_match_info (match_info, 3, &ecn0)) {
+                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read EcN0");
+                    goto out;
+                }
+                if (!mm_get_double_from_match_info (match_info, 4, &rscp)) {
+                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSCP");
+                    goto out;
+                }
+            }
+            break;
+        case MM_CINTERION_SMONI_4G:
+            r = g_regex_new ("\\^SMONI:\\s*4G,(\\d+),(\\d+),(\\d+),(\\d+),(\\w+),(\\d+),(\\d+),(\\w+),(\\w+),(\\d+),([^,]*),"FLOAT","FLOAT, 0, 0, NULL);
+            g_assert (r != NULL);
+            g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+            if (!inner_error && g_match_info_matches (match_info)) {
+                /* skip EARFCN */
+                /* skip Band */
+                /* skip DL bandwidth */
+                /* skip UL bandwidth */
+                /* skip Mode */
+                /* skip MCC */
+                /* skip MNC */
+                /* skip TAC */
+                /* skip Global Cell ID */
+                /* skip Physical Cell ID */
+                /* skip Srxlev/TX_power */
+                if (!mm_get_double_from_match_info (match_info, 12, &rsrp)) {
+                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSRQ");
+                    goto out;
+                }
+                if (!mm_get_double_from_match_info (match_info, 13, &rsrq)) {
+                    inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't read RSRP");
+                    goto out;
+                }
+            }
+            break;
+        case MM_CINTERION_SMONI_NO_TECH:
+        default:
+            goto out;
+        }
+        #undef FLOAT
+        success = TRUE;
+    }
+
+out:
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (!success) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't parse ^SMONI response: %s", response);
+        return FALSE;
+    }
+
+    *out_tech = tech;
+    *out_rssi = rssi;
+    *out_rscp = rscp;
+    *out_ecn0 = ecn0;
+    *out_rsrq = rsrq;
+    *out_rsrp = rsrp;
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Get extended signal information */
+
+gboolean
+mm_cinterion_smoni_response_to_signal_info (const gchar  *response,
+                                            MMSignal    **out_gsm,
+                                            MMSignal    **out_umts,
+                                            MMSignal    **out_lte,
+                                            GError      **error)
+{
+    MMCinterionSmoniTech    tech    = MM_CINTERION_SMONI_NO_TECH;
+    gdouble                 rssi    = MM_SIGNAL_UNKNOWN;
+    gdouble                 ecn0    = MM_SIGNAL_UNKNOWN;
+    gdouble                 rscp    = MM_SIGNAL_UNKNOWN;
+    gdouble                 rsrq    = MM_SIGNAL_UNKNOWN;
+    gdouble                 rsrp    = MM_SIGNAL_UNKNOWN;
+    MMSignal               *gsm     = NULL;
+    MMSignal               *umts    = NULL;
+    MMSignal               *lte     = NULL;
+
+    if (!mm_cinterion_parse_smoni_query_response (response,
+                                                  &tech, &rssi,
+                                                  &ecn0, &rscp,
+                                                  &rsrp, &rsrq,
+                                                  error))
+        return FALSE;
+
+    switch (tech) {
+    case MM_CINTERION_SMONI_2G:
+        gsm = mm_signal_new ();
+        mm_signal_set_rssi (gsm, rssi);
+        break;
+    case MM_CINTERION_SMONI_3G:
+        umts = mm_signal_new ();
+        mm_signal_set_rscp (umts, rscp);
+        mm_signal_set_ecio (umts, ecn0); /* UMTS EcIo (assumed EcN0) */
+        break;
+    case MM_CINTERION_SMONI_4G:
+        lte = mm_signal_new ();
+        mm_signal_set_rsrp (lte, rsrp);
+        mm_signal_set_rsrq (lte, rsrq);
+        break;
+    case MM_CINTERION_SMONI_NO_TECH: /* not registered, searching */
+        break; /* no error case */
+    default: /* should not happen, so if it does, error */
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't build detailed signal info");
+        return FALSE;
+    }
+
+    if (out_gsm)
+        *out_gsm = gsm;
+    if (out_umts)
+        *out_umts = umts;
+    if (out_lte)
+        *out_lte = lte;
+
+    return TRUE;
+}
