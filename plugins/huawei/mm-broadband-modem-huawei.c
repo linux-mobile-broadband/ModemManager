@@ -2227,7 +2227,7 @@ mm_broadband_modem_huawei_peek_port_at_for_data (MMBroadbandModemHuawei *self,
 
     found = peek_port_at_for_data (self, port);
     if (!found)
-        mm_obj_warn (self, "couldn't find associated cdc-wdm port for %s", mm_port_get_device (port));
+        mm_obj_dbg (self, "couldn't find associated cdc-wdm port for %s", mm_port_get_device (port));
     return found;
 }
 
