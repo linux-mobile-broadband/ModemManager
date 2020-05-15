@@ -651,7 +651,6 @@ disconnect_ndisdup_ready (MMBaseModem *modem,
 {
     GTask *task;
     Disconnect3gppContext *ctx;
-    GError *error = NULL;
 
     task = self->priv->disconnect_pending;
     g_assert (task != NULL);
@@ -661,13 +660,11 @@ disconnect_ndisdup_ready (MMBaseModem *modem,
     /* Balance refcount */
     g_object_unref (self);
 
-    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        /* Clear task */
-        self->priv->disconnect_pending = NULL;
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
+    /* Running NDISDUP=1,0 on an already disconnected bearer/context will
+     * return ERROR! Ignore errors in the NDISDUP disconnection command,
+     * because we're anyway going to check the bearer/context status
+     * afterwards.  */
+    mm_base_modem_at_command_full_finish (modem, res, NULL);
 
     /* Go to next step */
     ctx->step++;
