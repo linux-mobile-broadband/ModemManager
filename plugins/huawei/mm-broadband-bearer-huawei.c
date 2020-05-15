@@ -37,8 +37,6 @@ G_DEFINE_TYPE (MMBroadbandBearerHuawei, mm_broadband_bearer_huawei, MM_TYPE_BROA
 struct _MMBroadbandBearerHuaweiPrivate {
     gpointer connect_pending;
     gpointer disconnect_pending;
-    /* Tag for the post task for network-initiated disconnect */
-    guint network_disconnect_pending_id;
 };
 
 /*****************************************************************************/
@@ -341,11 +339,6 @@ connect_3gpp_context_step (GTask *task)
         g_object_unref (task);
         return;
     }
-
-    /* Network-initiated disconnect should not be outstanding at this point,
-     * because it interferes with the connect attempt.
-     */
-    g_assert (self->priv->network_disconnect_pending_id == 0);
 
     switch (ctx->step) {
     case CONNECT_3GPP_CONTEXT_STEP_FIRST: {
@@ -694,15 +687,6 @@ disconnect_3gpp_context_step (GTask *task)
     case DISCONNECT_3GPP_CONTEXT_STEP_FIRST:
         /* Store the task */
         self->priv->disconnect_pending = task;
-
-        /* We ignore any pending network-initiated disconnection in order to prevent it
-         * from interfering with the client-initiated disconnection, as we would like to
-         * proceed with the latter anyway. */
-        if (self->priv->network_disconnect_pending_id != 0) {
-            g_source_remove (self->priv->network_disconnect_pending_id);
-            self->priv->network_disconnect_pending_id = 0;
-        }
-
         ctx->step++;
         /* fall through */
 
@@ -804,17 +788,6 @@ disconnect_3gpp (MMBroadbandBearer *_self,
 
 /*****************************************************************************/
 
-static gboolean
-network_disconnect_3gpp_delayed (MMBroadbandBearerHuawei *self)
-{
-    mm_obj_dbg (self, "disconnect bearer on network request");
-
-    self->priv->network_disconnect_pending_id = 0;
-    mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
-                                             MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
-    return G_SOURCE_REMOVE;
-}
-
 static void
 report_connection_status (MMBaseBearer *bearer,
                           MMBearerConnectionStatus status)
@@ -836,23 +809,6 @@ report_connection_status (MMBaseBearer *bearer,
     /* Ignore 'CONNECTED' */
     if (status == MM_BEARER_CONNECTION_STATUS_CONNECTED)
         return;
-
-    /* We already use ^NDISSTATQRY? to poll the connection status, so only
-     * handle network-initiated disconnection here. */
-    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTING) {
-        /* MM_BEARER_CONNECTION_STATUS_DISCONNECTING is used to indicate that the
-         * reporting of disconnection should be delayed. See MMBroadbandModemHuawei's
-         * bearer_report_connection_status for details. */
-        if (mm_base_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED &&
-            self->priv->network_disconnect_pending_id == 0) {
-            mm_obj_dbg (self, "delay network-initiated disconnection of bearer");
-            self->priv->network_disconnect_pending_id = (g_timeout_add_seconds (
-                                                             4,
-                                                             (GSourceFunc) network_disconnect_3gpp_delayed,
-                                                             self));
-        }
-        return;
-    }
 
     /* Report disconnected right away */
     MM_BASE_BEARER_CLASS (mm_broadband_bearer_huawei_parent_class)->report_connection_status (
@@ -880,19 +836,6 @@ mm_broadband_bearer_huawei_new_finish (GAsyncResult *res,
     mm_base_bearer_export (MM_BASE_BEARER (bearer));
 
     return MM_BASE_BEARER (bearer);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMBroadbandBearerHuawei *self = MM_BROADBAND_BEARER_HUAWEI (object);
-
-    if (self->priv->network_disconnect_pending_id != 0) {
-        g_source_remove (self->priv->network_disconnect_pending_id);
-        self->priv->network_disconnect_pending_id = 0;
-    }
-
-    G_OBJECT_CLASS (mm_broadband_bearer_huawei_parent_class)->dispose (object);
 }
 
 void
@@ -930,8 +873,6 @@ mm_broadband_bearer_huawei_class_init (MMBroadbandBearerHuaweiClass *klass)
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerHuaweiPrivate));
-
-    object_class->dispose = dispose;
 
     base_bearer_class->report_connection_status = report_connection_status;
     base_bearer_class->load_connection_status = NULL;
