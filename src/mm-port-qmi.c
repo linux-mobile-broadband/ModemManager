@@ -56,8 +56,10 @@ lookup_client (MMPortQmi     *self,
             QmiClient *found;
 
             found = info->client;
-            if (steal)
+            if (steal) {
                 self->priv->services = g_list_delete_link (self->priv->services, l);
+                g_free (info);
+            }
             return found;
         }
     }
