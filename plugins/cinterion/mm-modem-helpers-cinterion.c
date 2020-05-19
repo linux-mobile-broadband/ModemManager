@@ -896,13 +896,13 @@ mm_cinterion_parse_smoni_query_response (const gchar           *response,
     gdouble                  rsrp = -G_MAXDOUBLE;
     gboolean                 success = FALSE;
 
-    g_assert(out_tech);
-    g_assert(out_rssi);
-    g_assert(out_ecn0);
-    g_assert(out_rscp);
-    g_assert(out_rsrp);
-    g_assert(out_rsrq);
-    g_assert(out_rssi);
+    g_assert (out_tech);
+    g_assert (out_rssi);
+    g_assert (out_ecn0);
+    g_assert (out_rscp);
+    g_assert (out_rsrp);
+    g_assert (out_rsrq);
+    g_assert (out_rssi);
 
     /* Possible Responses:
      * 2G
