@@ -509,7 +509,7 @@ validate_and_build_command_set_current_bands (MMSharedXmm  *self,
     if (unapplied_bands->len > 0) {
         gchar *str;
 
-        str = mm_common_build_bands_string ((const MMModemBand *)unapplied_bands->data, unapplied_bands->len);
+        str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)unapplied_bands->data, unapplied_bands->len);
         inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                                    "Cannot update bands for modes not currently allowed: %s", str);
         g_free (str);
