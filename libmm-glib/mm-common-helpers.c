@@ -1565,7 +1565,7 @@ mm_get_double_from_str (const gchar *str,
         return FALSE;
 
     errno = 0;
-    num = strtod (str, NULL);
+    num = g_ascii_strtod (str, NULL);
     if (!errno) {
         *out = num;
         return TRUE;
