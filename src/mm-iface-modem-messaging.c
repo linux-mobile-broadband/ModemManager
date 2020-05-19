@@ -1151,11 +1151,11 @@ load_supported_storages_ready (MMIfaceModemMessaging *self,
         skip_unknown_storages (storage_ctx->supported_mem2);
         skip_unknown_storages (storage_ctx->supported_mem3);
 
-        mem1 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem1->data,
+        mem1 = mm_common_build_sms_storages_string ((MMSmsStorage *)(gpointer)storage_ctx->supported_mem1->data,
                                                     storage_ctx->supported_mem1->len);
-        mem2 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem2->data,
+        mem2 = mm_common_build_sms_storages_string ((MMSmsStorage *)(gpointer)storage_ctx->supported_mem2->data,
                                                     storage_ctx->supported_mem2->len);
-        mem3 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem3->data,
+        mem3 = mm_common_build_sms_storages_string ((MMSmsStorage *)(gpointer)storage_ctx->supported_mem3->data,
                                                     storage_ctx->supported_mem3->len);
 
         mm_obj_dbg (self, "supported storages loaded:");
