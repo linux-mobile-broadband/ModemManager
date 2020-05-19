@@ -253,7 +253,7 @@ mm_telit_build_bnd_request (GArray    *bands_array,
         if (flag2g == -1) {
             gchar *bands_str;
 
-            bands_str = mm_common_build_bands_string ((const MMModemBand *)(bands_array->data), bands_array->len);
+            bands_str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)(bands_array->data), bands_array->len);
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                          "Couldn't find matching 2G bands Telit value for band combination: '%s'", bands_str);
             g_free (bands_str);
@@ -272,7 +272,7 @@ mm_telit_build_bnd_request (GArray    *bands_array,
         if (flag3g == -1) {
             gchar *bands_str;
 
-            bands_str = mm_common_build_bands_string ((const MMModemBand *)(bands_array->data), bands_array->len);
+            bands_str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)(bands_array->data), bands_array->len);
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                          "Couldn't find matching 3G bands Telit value for band combination: '%s'", bands_str);
             g_free (bands_str);
