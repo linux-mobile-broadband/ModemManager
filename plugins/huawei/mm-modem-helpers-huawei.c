@@ -163,6 +163,7 @@ match_info_to_ip4_addr (GMatchInfo *match_info,
     gchar buf[9];
     gsize len, bin_len;
     gboolean success = FALSE;
+    guint32 aux;
 
     s = g_match_info_fetch (match_info, match_index);
     g_return_val_if_fail (s != NULL, FALSE);
@@ -190,7 +191,8 @@ match_info_to_ip4_addr (GMatchInfo *match_info,
     if (!bin || bin_len != 4)
         goto done;
 
-    *out_addr = GUINT32_SWAP_LE_BE (*((guint32 *) bin));
+    memcpy (&aux, bin, 4);
+    *out_addr = GUINT32_SWAP_LE_BE (aux);
     success = TRUE;
 
 done:
