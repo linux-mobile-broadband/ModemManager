@@ -797,7 +797,7 @@ set_bands_3g (GTask  *task,
         }
     }
 
-    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array_final->data,
+    bands_string = mm_common_build_bands_string ((MMModemBand *)(gpointer)bands_array_final->data,
                                                  bands_array_final->len);
     g_array_unref (bands_array_final);
 
@@ -869,7 +869,7 @@ set_bands_2g (GTask  *task,
         g_array_unref (supported_combination);
     }
 
-    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array_final->data,
+    bands_string = mm_common_build_bands_string ((MMModemBand *)(gpointer)bands_array_final->data,
                                                  bands_array_final->len);
     g_array_unref (bands_array_final);
 
