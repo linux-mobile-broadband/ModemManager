@@ -53,9 +53,9 @@ common_test_scfg (const gchar *response,
     mm_common_bands_garray_sort (bands);
     mm_common_bands_garray_sort (expected_bands);
 
-    expected_bands_str = mm_common_build_bands_string ((const MMModemBand *)expected_bands->data,
+    expected_bands_str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)expected_bands->data,
                                                        expected_bands->len);
-    bands_str = mm_common_build_bands_string ((const MMModemBand *)bands->data,
+    bands_str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)bands->data,
                                               bands->len);
 
     /* Instead of comparing the array one by one, compare the strings built from the mask
@@ -206,9 +206,9 @@ common_test_scfg_response (const gchar *response,
     mm_common_bands_garray_sort (bands);
     mm_common_bands_garray_sort (expected_bands);
 
-    expected_bands_str = mm_common_build_bands_string ((const MMModemBand *)expected_bands->data,
+    expected_bands_str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)expected_bands->data,
                                                        expected_bands->len);
-    bands_str = mm_common_build_bands_string ((const MMModemBand *)bands->data,
+    bands_str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)bands->data,
                                               bands->len);
 
     /* Instead of comparing the array one by one, compare the strings built from the mask
