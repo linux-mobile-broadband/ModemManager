@@ -913,7 +913,7 @@ set_current_bands (MMIfaceModem *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
+    bands_string = mm_common_build_bands_string ((MMModemBand *)(gpointer)bands_array->data,
                                                  bands_array->len);
 
     if (!bands_array_to_huawei (bands_array, &huawei_band)) {
