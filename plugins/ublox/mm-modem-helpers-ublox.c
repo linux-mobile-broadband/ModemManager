@@ -1609,7 +1609,7 @@ parse_bands_from_string (const gchar *str,
         gchar *tmpstr;
 
         bands = uact_num_array_to_band_array (nums);
-        tmpstr = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
+        tmpstr = mm_common_build_bands_string ((MMModemBand *)(gpointer)(bands->data), bands->len);
         mm_obj_dbg (log_object, "modem reports support for %s bands: %s", group, tmpstr);
         g_free (tmpstr);
 
