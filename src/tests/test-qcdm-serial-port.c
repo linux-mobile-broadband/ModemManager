@@ -54,7 +54,7 @@ wait_for_child (TestData *d, guint32 timeout)
         status = 0;
         ret = waitpid (d->child, &status, WNOHANG);
         g_get_current_time (&now);
-        if (d->child && (now.tv_sec - start.tv_sec > timeout)) {
+        if (d->child && (now.tv_sec - start.tv_sec > (glong)timeout)) {
             /* Kill it */
             if (g_test_verbose ())
                 g_message ("Killing running child process %d", d->child);
