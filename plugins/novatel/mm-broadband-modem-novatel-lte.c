@@ -223,25 +223,25 @@ response_processor_nwmdn_ignore_at_errors (MMBaseModem *self,
                                            GVariant **result,
                                            GError **result_error)
 {
-    GArray *array;
-    GStrv own_numbers;
-    gchar *mdn;
+    g_auto(GStrv)  own_numbers = NULL;
+    GPtrArray     *array;
+    gchar         *mdn;
 
     if (error) {
         /* Ignore AT errors (ie, ERROR or CMx ERROR) */
         if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
             *result_error = g_error_copy (error);
-
         return FALSE;
     }
 
     mdn = g_strdup (mm_strip_tag (response, "$NWMDN:"));
-    array = g_array_new (TRUE, TRUE, sizeof (gchar *));
-    g_array_append_val (array, mdn);
-    own_numbers = (GStrv) g_array_free (array, FALSE);
+
+    array = g_ptr_array_new ();
+    g_ptr_array_add (array, mdn);
+    g_ptr_array_add (array, NULL);
+    own_numbers = (GStrv) g_ptr_array_free (array, FALSE);
 
     *result = g_variant_new_strv ((const gchar *const *) own_numbers, -1);
-    g_strfreev (own_numbers);
     return TRUE;
 }
 
