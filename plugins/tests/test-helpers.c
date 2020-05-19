@@ -38,12 +38,12 @@ mm_test_helpers_compare_bands (GArray            *bands,
 
     g_assert (bands);
     mm_common_bands_garray_sort (bands);
-    bands_str = mm_common_build_bands_string ((MMModemBand *)(bands->data), bands->len);
+    bands_str = mm_common_build_bands_string ((MMModemBand *)(gpointer)(bands->data), bands->len);
 
     expected_bands_array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_expected_bands);
     g_array_append_vals (expected_bands_array, expected_bands, n_expected_bands);
     mm_common_bands_garray_sort (expected_bands_array);
-    expected_bands_str = mm_common_build_bands_string ((MMModemBand *)(expected_bands_array->data), expected_bands_array->len);
+    expected_bands_str = mm_common_build_bands_string ((MMModemBand *)(gpointer)(expected_bands_array->data), expected_bands_array->len);
     g_array_unref (expected_bands_array);
 
     g_assert_cmpstr (bands_str, ==, expected_bands_str);
