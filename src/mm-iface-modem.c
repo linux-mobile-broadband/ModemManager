@@ -2355,8 +2355,8 @@ after_set_load_current_bands_ready (MMIfaceModem *self,
             goto out;
         }
 
-        requested_str = mm_common_build_bands_string ((MMModemBand *)requested_bands->data, requested_bands->len);
-        current_str   = mm_common_build_bands_string ((MMModemBand *)current_bands->data, current_bands->len);
+        requested_str = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)requested_bands->data, requested_bands->len);
+        current_str   = mm_common_build_bands_string ((const MMModemBand *)(gconstpointer)current_bands->data, current_bands->len);
         error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "reloaded current bands (%s) different to the requested ones (%s)",
                              current_str, requested_str);
@@ -2471,7 +2471,7 @@ validate_bands (const GArray *supported_bands_array,
                     gchar *supported_bands_str;
 
                     supported_bands_str = (mm_common_build_bands_string (
-                                               (const MMModemBand *)supported_bands_array->data,
+                                               (const MMModemBand *)(gconstpointer)supported_bands_array->data,
                                                supported_bands_array->len));
                     g_set_error (error,
                                  MM_CORE_ERROR,
@@ -2532,8 +2532,7 @@ mm_iface_modem_set_current_bands (MMIfaceModem *self,
         return;
     }
 
-    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array->data,
-                                                 bands_array->len);
+    bands_string = mm_common_build_bands_string ((const MMModemBand *)(gpointer)bands_array->data, bands_array->len);
 
     /* Get list of supported bands */
     ctx->supported_bands_array = (mm_common_bands_variant_to_garray (
