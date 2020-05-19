@@ -406,7 +406,7 @@ mm_cinterion_build_band (GArray *bands,
     if (band == 0) {
         gchar *bands_string;
 
-        bands_string = mm_common_build_bands_string ((MMModemBand *)bands->data, bands->len);
+        bands_string = mm_common_build_bands_string ((MMModemBand *)(gpointer)bands->data, bands->len);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
