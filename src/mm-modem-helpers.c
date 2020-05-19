@@ -3172,9 +3172,9 @@ mm_3gpp_parse_clck_write_response (const gchar *reply,
 GStrv
 mm_3gpp_parse_cnum_exec_response (const gchar *reply)
 {
-    GArray *array = NULL;
-    GRegex *r;
-    GMatchInfo *match_info;
+    g_autoptr(GPtrArray)  array = NULL;
+    g_autoptr(GRegex)     r = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
 
     /* Empty strings also return NULL list */
     if (!reply || !reply[0])
@@ -3184,26 +3184,22 @@ mm_3gpp_parse_cnum_exec_response (const gchar *reply)
                      G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
+    array = g_ptr_array_new ();
     g_regex_match (r, reply, 0, &match_info);
     while (g_match_info_matches (match_info)) {
-        gchar *number;
+        g_autofree gchar *number = NULL;
 
         number = g_match_info_fetch_named (match_info, "num");
-
-        if (number && number[0]) {
-            if (!array)
-                array = g_array_new (TRUE, TRUE, sizeof (gchar *));
-            g_array_append_val (array, number);
-        } else
-            g_free (number);
-
+        if (number && number[0])
+            g_ptr_array_add (array, g_steal_pointer (&number));
         g_match_info_next (match_info, NULL);
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
+    if (!array->len)
+        return NULL;
 
-    return (array ? (GStrv) g_array_free (array, FALSE) : NULL);
+    g_ptr_array_add (array, NULL);
+    return (GStrv) g_ptr_array_free (g_steal_pointer (&array), FALSE);
 }
 
 /*************************************************************************/
