@@ -2638,7 +2638,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
     else
         qmi_indication_nas_serving_system_output_get_data_service_capability (indication_output, &data_service_capabilities, NULL);
 
-    if (data_service_capabilities)
+    if (data_service_capabilities && data_service_capabilities->len > 0)
         mm_access_technologies =
             mm_modem_access_technologies_from_qmi_data_capability_array (data_service_capabilities);
     else
