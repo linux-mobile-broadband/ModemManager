@@ -2419,11 +2419,13 @@ load_call_list_ready (MMIfaceModemVoice *self,
         mm_3gpp_call_info_list_free (call_info_list);
     }
 
-    /* setup the polling again */
-    g_assert (!ctx->polling_id);
-    ctx->polling_id = g_timeout_add_seconds (CALL_LIST_POLLING_TIMEOUT_SECS,
-                                             (GSourceFunc) call_list_poll,
-                                             self);
+    /* setup the polling again, but only if it hasn't been done already while
+     * we reported calls (e.g. a new incoming call may have been detected that
+     * also triggers the poll setup) */
+    if (!ctx->polling_id)
+        ctx->polling_id = g_timeout_add_seconds (CALL_LIST_POLLING_TIMEOUT_SECS,
+                                                 (GSourceFunc) call_list_poll,
+                                                 self);
 }
 
 static void
