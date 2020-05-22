@@ -128,6 +128,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *ecclist_regex;
     GRegex *ltersrp_regex;
     GRegex *cschannelinfo_regex;
+    GRegex *ccallstate_regex;
     GRegex *eons_regex;
 
     FeatureSupport ndisdup_support;
@@ -4406,6 +4407,10 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             NULL, NULL, NULL);
         mm_port_serial_at_add_unsolicited_msg_handler (
             port,
+            self->priv->ccallstate_regex,
+            NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
             self->priv->eons_regex,
             NULL, NULL, NULL);
     }
@@ -4541,6 +4546,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->cschannelinfo_regex = g_regex_new ("\\r\\n\\^CSCHANNELINFO:.+\\r\\n",
                                                     G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->ccallstate_regex = g_regex_new ("\\r\\n\\^CCALLSTATE:.+\\r\\n",
+                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->eons_regex = g_regex_new ("\\r\\n\\^EONS:.+\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
@@ -4600,6 +4607,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->ecclist_regex);
     g_regex_unref (self->priv->ltersrp_regex);
     g_regex_unref (self->priv->cschannelinfo_regex);
+    g_regex_unref (self->priv->ccallstate_regex);
     g_regex_unref (self->priv->eons_regex);
 
     if (self->priv->syscfg_supported_modes)
