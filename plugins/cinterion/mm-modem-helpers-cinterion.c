@@ -33,14 +33,14 @@
 /* Setup relationship between the 3G band bitmask in the modem and the bitmask
  * in ModemManager. */
 typedef struct {
-    guint32 cinterion_band_flag;
+    guint32     cinterion_band_flag;
     MMModemBand mm_band;
 } CinterionBand;
 
 typedef struct {
     MMCinterionRbBlock cinterion_band_block;
-    guint32 cinterion_band_flag;
-    MMModemBand mm_band;
+    guint32            cinterion_band_flag;
+    MMModemBand        mm_band;
 } CinterionBandEx;
 
 /* Table checked in PLS8-X/E/J/V/US, HC25 & PHS8 references. The table includes 2/3/4G
@@ -75,26 +75,26 @@ static const CinterionBand cinterion_bands[] = {
 };
 
 static const CinterionBandEx cinterion_bands_ex[] = {
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000001, MM_MODEM_BAND_EGSM },
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000002, MM_MODEM_BAND_DCS },
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000004, MM_MODEM_BAND_G850 },
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000008, MM_MODEM_BAND_PCS },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000001, MM_MODEM_BAND_UTRAN_1 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000002, MM_MODEM_BAND_UTRAN_2 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000004, MM_MODEM_BAND_UTRAN_3 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000008, MM_MODEM_BAND_UTRAN_4 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000010, MM_MODEM_BAND_UTRAN_5 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000020, MM_MODEM_BAND_UTRAN_6 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000080, MM_MODEM_BAND_UTRAN_8 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000100, MM_MODEM_BAND_UTRAN_9 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00040000, MM_MODEM_BAND_UTRAN_19 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000001, MM_MODEM_BAND_EUTRAN_1 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000002, MM_MODEM_BAND_EUTRAN_2 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000004, MM_MODEM_BAND_EUTRAN_3 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000008, MM_MODEM_BAND_EUTRAN_4 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000010, MM_MODEM_BAND_EUTRAN_5 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000040, MM_MODEM_BAND_EUTRAN_7 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000080, MM_MODEM_BAND_EUTRAN_8 },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000001, MM_MODEM_BAND_EGSM      },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000002, MM_MODEM_BAND_DCS       },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000004, MM_MODEM_BAND_G850      },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000008, MM_MODEM_BAND_PCS       },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000001, MM_MODEM_BAND_UTRAN_1   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000002, MM_MODEM_BAND_UTRAN_2   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000004, MM_MODEM_BAND_UTRAN_3   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000008, MM_MODEM_BAND_UTRAN_4   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000010, MM_MODEM_BAND_UTRAN_5   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000020, MM_MODEM_BAND_UTRAN_6   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000080, MM_MODEM_BAND_UTRAN_8   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000100, MM_MODEM_BAND_UTRAN_9   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00040000, MM_MODEM_BAND_UTRAN_19  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000001, MM_MODEM_BAND_EUTRAN_1  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000002, MM_MODEM_BAND_EUTRAN_2  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000004, MM_MODEM_BAND_EUTRAN_3  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000008, MM_MODEM_BAND_EUTRAN_4  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000010, MM_MODEM_BAND_EUTRAN_5  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000040, MM_MODEM_BAND_EUTRAN_7  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000080, MM_MODEM_BAND_EUTRAN_8  },
     { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000800, MM_MODEM_BAND_EUTRAN_12 },
     { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00001000, MM_MODEM_BAND_EUTRAN_13 },
     { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00010000, MM_MODEM_BAND_EUTRAN_17 },
@@ -111,24 +111,24 @@ static const CinterionBandEx cinterion_bands_ex[] = {
 };
 
 static const CinterionBandEx cinterion_bands_imt[] = {
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000004, MM_MODEM_BAND_EGSM },
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000010, MM_MODEM_BAND_DCS },
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000020, MM_MODEM_BAND_PCS },
-    { MM_CINTERION_RB_BLOCK_GSM,      0x00000040, MM_MODEM_BAND_G850 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000001, MM_MODEM_BAND_UTRAN_1 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000002, MM_MODEM_BAND_UTRAN_2 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000008, MM_MODEM_BAND_UTRAN_4 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000010, MM_MODEM_BAND_UTRAN_5 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000080, MM_MODEM_BAND_UTRAN_8 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000100, MM_MODEM_BAND_UTRAN_9 },
-    { MM_CINTERION_RB_BLOCK_UMTS,     0x00040000, MM_MODEM_BAND_UTRAN_19 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000001, MM_MODEM_BAND_EUTRAN_1 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000002, MM_MODEM_BAND_EUTRAN_2 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000004, MM_MODEM_BAND_EUTRAN_3 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000008, MM_MODEM_BAND_EUTRAN_4 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000010, MM_MODEM_BAND_EUTRAN_5 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000040, MM_MODEM_BAND_EUTRAN_7 },
-    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000080, MM_MODEM_BAND_EUTRAN_8 },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000004, MM_MODEM_BAND_EGSM      },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000010, MM_MODEM_BAND_DCS       },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000020, MM_MODEM_BAND_PCS       },
+    { MM_CINTERION_RB_BLOCK_GSM,      0x00000040, MM_MODEM_BAND_G850      },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000001, MM_MODEM_BAND_UTRAN_1   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000002, MM_MODEM_BAND_UTRAN_2   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000008, MM_MODEM_BAND_UTRAN_4   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000010, MM_MODEM_BAND_UTRAN_5   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000080, MM_MODEM_BAND_UTRAN_8   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00000100, MM_MODEM_BAND_UTRAN_9   },
+    { MM_CINTERION_RB_BLOCK_UMTS,     0x00040000, MM_MODEM_BAND_UTRAN_19  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000001, MM_MODEM_BAND_EUTRAN_1  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000002, MM_MODEM_BAND_EUTRAN_2  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000004, MM_MODEM_BAND_EUTRAN_3  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000008, MM_MODEM_BAND_EUTRAN_4  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000010, MM_MODEM_BAND_EUTRAN_5  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000040, MM_MODEM_BAND_EUTRAN_7  },
+    { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000080, MM_MODEM_BAND_EUTRAN_8  },
     { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00000800, MM_MODEM_BAND_EUTRAN_12 },
     { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00020000, MM_MODEM_BAND_EUTRAN_18 },
     { MM_CINTERION_RB_BLOCK_LTE_LOW,  0x00040000, MM_MODEM_BAND_EUTRAN_19 },
@@ -191,9 +191,9 @@ parse_bands (guint                      bandlist,
              MMCinterionRbBlock         block,
              MMCinterionModemFamily     modem_family)
 {
-    guint i;
+    guint                  i;
     const CinterionBandEx *ref_bands;
-    guint nb_ref_bands;
+    guint                  nb_ref_bands;
 
     if (!bandlist)
         return;
@@ -216,9 +216,9 @@ parse_bands (guint                      bandlist,
 }
 
 static guint
-take_and_convert_from_matched_string (gchar                    *str,
-                                      MMModemCharset            charset,
-                                      MMCinterionModemFamily    modem_family)
+take_and_convert_from_matched_string (gchar                  *str,
+                                      MMModemCharset          charset,
+                                      MMCinterionModemFamily  modem_family)
 {
     guint val = 0;
 
@@ -235,19 +235,19 @@ take_and_convert_from_matched_string (gchar                    *str,
 }
 
 gboolean
-mm_cinterion_parse_scfg_test (const gchar *response,
-                              MMCinterionModemFamily modem_family,
-                              MMModemCharset charset,
-                              GArray **supported_bands,
-                              MMCinterionRadioBandFormat *format,
-                              GError **error)
+mm_cinterion_parse_scfg_test (const gchar                 *response,
+                              MMCinterionModemFamily       modem_family,
+                              MMModemCharset               charset,
+                              GArray                     **supported_bands,
+                              MMCinterionRadioBandFormat  *format,
+                              GError                     **error)
 {
-    g_autoptr(GRegex) r1 = NULL;
-    g_autoptr(GMatchInfo) match_info1 = NULL;
-    g_autoptr(GRegex) r2 = NULL;
-    g_autoptr(GMatchInfo) match_info2 = NULL;
-    GError *inner_error = NULL;
-    GArray *bands = NULL;
+    g_autoptr(GRegex)      r1 = NULL;
+    g_autoptr(GMatchInfo)  match_info1 = NULL;
+    g_autoptr(GRegex)      r2 = NULL;
+    g_autoptr(GMatchInfo)  match_info2 = NULL;
+    GError                *inner_error = NULL;
+    GArray                *bands = NULL;
 
     g_assert (format);
 
@@ -265,7 +265,7 @@ mm_cinterion_parse_scfg_test (const gchar *response,
         goto finish;
     if (g_match_info_matches (match_info1)) {
         g_autofree gchar *maxbandstr = NULL;
-        guint maxband = 0;
+        guint             maxband = 0;
 
         *format = MM_CINTERION_RADIO_BAND_FORMAT_SINGLE;
 
@@ -304,7 +304,7 @@ mm_cinterion_parse_scfg_test (const gchar *response,
         goto finish;
     while (g_match_info_matches (match_info2)) {
         g_autofree gchar *techstr = NULL;
-        guint maxband;
+        guint             maxband;
 
         *format = MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE;
 
@@ -333,7 +333,8 @@ mm_cinterion_parse_scfg_test (const gchar *response,
     }
 
 finish:
-    if (!bands && !inner_error) /* set error only if not already given */
+    /* set error only if not already given */
+    if (!bands && !inner_error)
         inner_error = g_error_new (MM_CORE_ERROR,
                                    MM_CORE_ERROR_FAILED,
                                    "No valid bands found in ^SCFG=? response");
@@ -397,10 +398,10 @@ mm_cinterion_parse_scfg_response (const gchar                  *response,
                                   MMCinterionRadioBandFormat    format,
                                   GError                      **error)
 {
-    g_autoptr(GRegex) r = NULL;
-    g_autoptr(GMatchInfo) match_info = NULL;
-    GError *inner_error = NULL;
-    GArray *bands = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    GArray                *bands = NULL;
 
     if (!response) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
@@ -441,7 +442,7 @@ mm_cinterion_parse_scfg_response (const gchar                  *response,
                 }
             }
         }
-    } else { /* format == MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE */
+    } else if (format == MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE) {
         r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band/([234]G)\",\"?([0-9A-Fa-fx]*)\"?,?\"?([0-9A-Fa-fx]*)?\"?",
                          0, 0, NULL);
         g_assert (r != NULL);
@@ -476,10 +477,12 @@ mm_cinterion_parse_scfg_response (const gchar                  *response,
 
             g_match_info_next (match_info, NULL);
         }
-    }
+    } else
+        g_assert_not_reached ();
 
 finish:
-    if (!bands && !inner_error) /* set error only if not already given */
+    /* set error only if not already given */
+    if (!bands && !inner_error)
         inner_error = g_error_new (MM_CORE_ERROR,
                                    MM_CORE_ERROR_FAILED,
                                    "No valid bands found in ^SCFG response");
