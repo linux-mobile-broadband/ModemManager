@@ -79,7 +79,7 @@ struct _MMBroadbandModemCinterionPrivate {
     gchar *sleep_mode_cmd;
 
     /* Cached supported bands in Cinterion format */
-    guint supported_bands[MM_CINTERION_RB_BLOCK_N];
+    guint supported_bands;
 
     /* Cached supported modes for SMS setup */
     GArray *cnmi_supported_mode;
@@ -95,13 +95,6 @@ struct _MMBroadbandModemCinterionPrivate {
     FeatureSupport swwan_support;
     FeatureSupport sind_psinfo_support;
     FeatureSupport smoni_support;
-
-    /* Flags for model-based behaviors */
-    MMCinterionModemFamily modem_family;
-    MMCinterionRadioBandFormat rb_format;
-
-    /* Command sequence */
-    MMBaseModemAtCommandAlloc *cmds;
 };
 
 /*****************************************************************************/
@@ -1157,61 +1150,27 @@ scfg_test_ready (MMBaseModem  *_self,
     response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response ||
         !mm_cinterion_parse_scfg_test (response,
-                                       self->priv->modem_family,
                                        mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
                                        &bands,
-                                       &self->priv->rb_format,
                                        &error))
         g_task_return_error (task, error);
     else {
-        if (!mm_cinterion_build_band (bands,
-                                      NULL,
-                                      FALSE,
-                                      self->priv->rb_format,
-                                      self->priv->modem_family,
-                                      self->priv->supported_bands,
-                                      &error))
-            g_task_return_error (task, error);
-        else
-            g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+        mm_cinterion_build_band (bands, 0, FALSE, &self->priv->supported_bands, NULL);
+        g_assert (self->priv->supported_bands != 0);
+        g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
     }
     g_object_unref (task);
 }
 
 static void
-load_supported_bands (MMIfaceModem        *_self,
+load_supported_bands (MMIfaceModem        *self,
                       GAsyncReadyCallback  callback,
                       gpointer             user_data)
 {
-    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
-    GTask          *task;
-    MMPort         *primary;
-    MMKernelDevice *port;
-    const gchar    *family = NULL;
+    GTask *task;
 
-    /* Lookup for the tag specifying which modem family the current device belongs */
-    primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
-    port = mm_port_peek_kernel_device (primary);
-    family = mm_kernel_device_get_global_property (port, "ID_MM_CINTERION_MODEM_FAMILY");
-
-    /* if the property is not set, default family */
-    self->priv->modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT;
-
-    /* set used family also in the string for mm_obj_dbg */
-    if (!family)
-        family = "default";
-
-    if (g_ascii_strcasecmp (family, "imt") == 0)
-        self->priv->modem_family = MM_CINTERION_MODEM_FAMILY_IMT;
-    else if (g_ascii_strcasecmp (family, "default") != 0) {
-        mm_obj_dbg (self, "cinterion modem family '%s' unknown", family);
-        family = "default";
-    }
-
-    mm_obj_dbg (self, "Using cinterion %s modem family", family);
-
-    task = g_task_new (_self, NULL, callback, user_data);
-    mm_base_modem_at_command (MM_BASE_MODEM (_self),
+    task = g_task_new (self, NULL, callback, user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "AT^SCFG=?",
                               3,
                               FALSE,
@@ -1231,22 +1190,19 @@ load_current_bands_finish (MMIfaceModem  *self,
 }
 
 static void
-get_band_ready (MMBaseModem  *_self,
+get_band_ready (MMBaseModem  *self,
                 GAsyncResult *res,
                 GTask        *task)
 {
-    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar *response;
     GError      *error = NULL;
     GArray      *bands = NULL;
 
-    response = mm_base_modem_at_command_finish (_self, res, &error);
+    response = mm_base_modem_at_command_finish (self, res, &error);
     if (!response ||
         !mm_cinterion_parse_scfg_response (response,
-                                           self->priv->modem_family,
                                            mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
                                            &bands,
-                                           self->priv->rb_format,
                                            &error))
         g_task_return_error (task, error);
     else
@@ -1264,7 +1220,7 @@ load_current_bands (MMIfaceModem        *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "AT^SCFG?",
+                              "AT^SCFG=\"Radio/Band\"",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)get_band_ready,
@@ -1297,100 +1253,43 @@ scfg_set_ready (MMBaseModem  *self,
 }
 
 static void
-scfg_set_ready_sequence (MMBaseModem  *_self,
-                         GAsyncResult *res,
-                         GTask        *task)
-{
-    GError *error = NULL;
-    gpointer ctx = NULL;
-    guint i;
-    MMBroadbandModemCinterion *self;
-
-    self = g_task_get_source_object (task);
-    for (i = 0; self->priv->cmds[i].command; i++)
-        mm_base_modem_at_command_alloc_clear (&self->priv->cmds[i]);
-    g_free(self->priv->cmds);
-    self->priv->cmds = NULL;
-
-    mm_base_modem_at_sequence_finish (_self, res, &ctx, &error);
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-static void
 set_bands_3g (GTask  *task,
               GArray *bands_array)
 {
     MMBroadbandModemCinterion *self;
     GError                    *error = NULL;
-    guint                      band[MM_CINTERION_RB_BLOCK_N] = { 0 };
+    guint                      band = 0;
+    gchar                     *cmd;
 
     self = g_task_get_source_object (task);
 
     if (!mm_cinterion_build_band (bands_array,
                                   self->priv->supported_bands,
                                   FALSE, /* 2G and 3G */
-                                  self->priv->rb_format,
-                                  self->priv->modem_family,
-                                  band,
+                                  &band,
                                   &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    if (self->priv->rb_format == MM_CINTERION_RADIO_BAND_FORMAT_SINGLE) {
-        g_autofree gchar *cmd = NULL;
-
-        /* Following the setup:
-         *  AT^SCFG="Radion/Band",<rba>
-         * We will set the preferred band equal to the allowed band, so that we force
-         * the modem to connect at that specific frequency only. Note that we will be
-         * passing a number here!
-         *
-         * The optional <rbe> field is set to 1, so that changes take effect
-         * immediately.
-         */
-        cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u,1", band[MM_CINTERION_RB_BLOCK_LEGACY]);
-        mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                  cmd,
-                                  15,
-                                  FALSE,
-                                  (GAsyncReadyCallback)scfg_set_ready,
-                                  task);
-    } else { /* self->priv->rb_format == MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE */
-        if (self->priv->modem_family == MM_CINTERION_MODEM_FAMILY_IMT) {
-            g_autofree gchar *bandstr2G = NULL;
-            g_autofree gchar *bandstr3G = NULL;
-            g_autofree gchar *bandstr4G = NULL;
-
-            bandstr2G = g_strdup_printf ("0x%08X", band[MM_CINTERION_RB_BLOCK_GSM]);
-            bandstr3G = g_strdup_printf ("0x%08X", band[MM_CINTERION_RB_BLOCK_UMTS]);
-            bandstr4G = g_strdup_printf ("0x%08X", band[MM_CINTERION_RB_BLOCK_LTE_LOW]);
-            bandstr2G = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr2G);
-            bandstr3G = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr3G);
-            bandstr4G = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr4G);
-            self->priv->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
-            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%s\"", bandstr2G);
-            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%s\"", bandstr3G);
-            self->priv->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%s\"", bandstr4G);
-            self->priv->cmds[0].timeout = self->priv->cmds[1].timeout = self->priv->cmds[2].timeout = 60;
-        } else {
-            self->priv->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
-            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_GSM]);
-            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_UMTS]);
-            self->priv->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%08x\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_LTE_LOW], band[MM_CINTERION_RB_BLOCK_LTE_HIGH]);
-            self->priv->cmds[0].timeout = self->priv->cmds[1].timeout = self->priv->cmds[2].timeout = 15;
-        }
-
-        mm_base_modem_at_sequence (MM_BASE_MODEM (self),
-                                   (const MMBaseModemAtCommand *)self->priv->cmds,
-                                   NULL,
-                                   NULL,
-                                   (GAsyncReadyCallback)scfg_set_ready_sequence,
-                                   task);
-    }
-
+    /* Following the setup:
+     *  AT^SCFG="Radion/Band",<rba>
+     * We will set the preferred band equal to the allowed band, so that we force
+     * the modem to connect at that specific frequency only. Note that we will be
+     * passing a number here!
+     *
+     * The optional <rbe> field is set to 1, so that changes take effect
+     * immediately.
+     */
+    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u,1", band);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              15,
+                              FALSE,
+                              (GAsyncReadyCallback)scfg_set_ready,
+                              task);
+    g_free (cmd);
 }
 
 static void
@@ -1399,7 +1298,7 @@ set_bands_2g (GTask  *task,
 {
     MMBroadbandModemCinterion *self;
     GError                    *error = NULL;
-    guint                      band[MM_CINTERION_RB_BLOCK_N] = { 0 };
+    guint                      band = 0;
     gchar                     *cmd;
     gchar                     *bandstr;
 
@@ -1408,9 +1307,7 @@ set_bands_2g (GTask  *task,
     if (!mm_cinterion_build_band (bands_array,
                                   self->priv->supported_bands,
                                   TRUE, /* 2G only */
-                                  MM_CINTERION_RADIO_BAND_FORMAT_SINGLE,
-                                  0,
-                                  band,
+                                  &band,
                                   &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1418,7 +1315,7 @@ set_bands_2g (GTask  *task,
     }
 
     /* Build string with the value, in the proper charset */
-    bandstr = g_strdup_printf ("%u", band[MM_CINTERION_RB_BLOCK_LEGACY]);
+    bandstr = g_strdup_printf ("%u", band);
     bandstr = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr);
     if (!bandstr) {
         g_task_return_new_error (task,

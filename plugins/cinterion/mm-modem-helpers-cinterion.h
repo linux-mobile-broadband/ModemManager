@@ -26,51 +26,21 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-typedef enum {
-    MM_CINTERION_MODEM_FAMILY_DEFAULT  = 0,
-    MM_CINTERION_MODEM_FAMILY_IMT      = 1,
-} MMCinterionModemFamily;
-
-typedef enum {
-    MM_CINTERION_RADIO_BAND_FORMAT_SINGLE = 0,
-    MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE  = 1,
-} MMCinterionRadioBandFormat;
-
-typedef enum {
-    MM_CINTERION_RB_BLOCK_LEGACY   = 0,
-    MM_CINTERION_RB_BLOCK_GSM      = 0,
-    MM_CINTERION_RB_BLOCK_UMTS     = 1,
-    MM_CINTERION_RB_BLOCK_LTE_LOW  = 2,
-    MM_CINTERION_RB_BLOCK_LTE_HIGH = 3,
-    MM_CINTERION_RB_BLOCK_N        = 4
-} MMCinterionRbBlock;
-
-typedef enum {
-    MM_CINTERION_RADIO_GEN_NONE    = 0,
-    MM_CINTERION_RADIO_GEN_2G      = 2,
-    MM_CINTERION_RADIO_GEN_3G      = 3,
-    MM_CINTERION_RADIO_GEN_4G      = 4,
-} MMCinterionRadioGen;
-
 /*****************************************************************************/
 /* ^SCFG test parser */
 
-gboolean mm_cinterion_parse_scfg_test (const gchar                   *response,
-                                       MMCinterionModemFamily         modem_family,
-                                       MMModemCharset                 charset,
-                                       GArray                       **supported_bands,
-                                       MMCinterionRadioBandFormat    *format,
-                                       GError                       **error);
+gboolean mm_cinterion_parse_scfg_test (const gchar *response,
+                                       MMModemCharset charset,
+                                       GArray **supported_bands,
+                                       GError **error);
 
 /*****************************************************************************/
 /* ^SCFG response parser */
 
-gboolean mm_cinterion_parse_scfg_response (const gchar                   *response,
-                                           MMCinterionModemFamily         modem_family,
-                                           MMModemCharset                 charset,
-                                           GArray                       **bands,
-                                           MMCinterionRadioBandFormat     format,
-                                           GError                       **error);
+gboolean mm_cinterion_parse_scfg_response (const gchar *response,
+                                           MMModemCharset charset,
+                                           GArray **bands,
+                                           GError **error);
 
 /*****************************************************************************/
 /* +CNMI test parser */
@@ -86,13 +56,11 @@ gboolean mm_cinterion_parse_cnmi_test (const gchar *response,
 /*****************************************************************************/
 /* Build Cinterion-specific band value */
 
-gboolean mm_cinterion_build_band (GArray                       *bands,
-                                  guint                        *supported,
-                                  gboolean                      only_2g,
-                                  MMCinterionRadioBandFormat    format,
-                                  MMCinterionModemFamily        modem_family,
-                                  guint                        *out_band,
-                                  GError                      **error);
+gboolean mm_cinterion_build_band (GArray *bands,
+                                  guint supported,
+                                  gboolean only_2g,
+                                  guint *out_band,
+                                  GError **error);
 
 /*****************************************************************************/
 /* Single ^SIND response parser */
@@ -148,8 +116,15 @@ gboolean  mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
 /*****************************************************************************/
 /* ^SMONI helper */
 
+typedef enum { /*< underscore_name=mm_modem_port_type >*/
+    MM_CINTERION_SMONI_NO_TECH = 0,
+    MM_CINTERION_SMONI_2G      = 2,
+    MM_CINTERION_SMONI_3G      = 3,
+    MM_CINTERION_SMONI_4G      = 4,
+} MMCinterionSmoniTech;
+
 gboolean mm_cinterion_parse_smoni_query_response (const gchar           *response,
-                                                  MMCinterionRadioGen   *out_tech,
+                                                  MMCinterionSmoniTech  *out_tech,
                                                   gdouble               *out_rssi,
                                                   gdouble               *out_ecn0,
                                                   gdouble               *out_rscp,

@@ -20,8 +20,6 @@ ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="0061", ENV{.MM_USBIFNUM}=="04", ENV{
 ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="0061", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="0061", ENV{.MM_USBIFNUM}=="08", ENV{ID_MM_PORT_IGNORE}="1"
 
-# PLS62 family non-mbim enumeration uses alternate settings for 2G band management
-ATTRS{idVendor}=="1e2d", ATTRS{idProduct}=="005b", ENV{ID_MM_CINTERION_MODEM_FAMILY}="imt"
 # PLS62 family non-mbim enumeration
 #  ttyACM0 (if #0): AT port
 #  ttyACM1 (if #2): AT port
