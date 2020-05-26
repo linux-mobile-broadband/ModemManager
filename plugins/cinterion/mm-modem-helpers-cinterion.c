@@ -225,7 +225,7 @@ take_and_convert_from_matched_string (gchar                  *str,
     if (!str)
         return 0;
 
-    if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT && charset == MM_MODEM_CHARSET_UCS2)
+    if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT)
         str = mm_charset_take_and_convert_to_utf8 (str, charset);
 
     mm_get_uint_from_hex_str (str, &val);
