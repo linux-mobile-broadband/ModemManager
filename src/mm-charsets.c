@@ -458,7 +458,8 @@ mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm, guint32 len)
             g_byte_array_append (utf8, (guint8 *) "?", 1);
     }
 
-    g_byte_array_append (utf8, (guint8 *) "\0", 1);  /* NULL terminator */
+    /* Always make sure returned string is NUL terminated */
+    g_byte_array_append (utf8, (guint8 *) "\0", 1);
     return g_byte_array_free (utf8, FALSE);
 }
 
@@ -471,7 +472,6 @@ mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len)
     int i = 0;
 
     g_return_val_if_fail (utf8 != NULL, NULL);
-    g_return_val_if_fail (out_len != NULL, NULL);
     g_return_val_if_fail (g_utf8_validate (utf8, -1, NULL), NULL);
 
     /* worst case initial length */
@@ -480,7 +480,8 @@ mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len)
     if (*utf8 == 0x00) {
         /* Zero-length string */
         g_byte_array_append (gsm, (guint8 *) "\0", 1);
-        *out_len = 0;
+        if (out_len)
+            *out_len = 0;
         return g_byte_array_free (gsm, FALSE);
     }
 
@@ -501,7 +502,12 @@ mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len)
         i++;
     }
 
-    *out_len = gsm->len;
+    /* Output length doesn't consider terminating NUL byte */
+    if (out_len)
+        *out_len = gsm->len;
+
+    /* Always make sure returned string is NUL terminated */
+    g_byte_array_append (gsm, (guint8 *) "\0", 1);
     return g_byte_array_free (gsm, FALSE);
 }
 
@@ -757,6 +763,10 @@ mm_charset_take_and_convert_to_utf8 (gchar *str, MMModemCharset charset)
         break;
 
     case MM_MODEM_CHARSET_GSM:
+        utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 ((const guint8 *) str, strlen (str));
+        g_free (str);
+        break;
+
     case MM_MODEM_CHARSET_8859_1:
     case MM_MODEM_CHARSET_PCCP437:
     case MM_MODEM_CHARSET_PCDN: {
@@ -881,6 +891,10 @@ mm_utf8_take_and_convert_to_charset (gchar *str,
         break;
 
     case MM_MODEM_CHARSET_GSM:
+        encoded = (gchar *) mm_charset_utf8_to_unpacked_gsm (str, NULL);
+        g_free (str);
+        break;
+
     case MM_MODEM_CHARSET_8859_1:
     case MM_MODEM_CHARSET_PCCP437:
     case MM_MODEM_CHARSET_PCDN: {

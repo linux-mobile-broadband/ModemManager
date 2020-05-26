@@ -350,6 +350,19 @@ test_take_convert_ucs2_bad_ascii2 (void)
     g_assert (converted == NULL);
 }
 
+static void
+test_take_convert_gsm_utf8 (void)
+{
+    gchar *src, *converted, *utf8;
+
+    src = g_strdup ("T-Mobile");
+    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_GSM);
+    g_assert_cmpstr (converted, ==, "T-Mobile");
+    utf8 = mm_utf8_take_and_convert_to_charset (converted, MM_MODEM_CHARSET_GSM);
+    g_assert_cmpstr (utf8, ==, "T-Mobile");
+    g_free (utf8);
+}
+
 struct charset_can_convert_to_test_s {
     const char *utf8;
     gboolean    to_gsm;
@@ -432,6 +445,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/charsets/take-convert/ucs2/hex",         test_take_convert_ucs2_hex_utf8);
     g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii",   test_take_convert_ucs2_bad_ascii);
     g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii-2", test_take_convert_ucs2_bad_ascii2);
+    g_test_add_func ("/MM/charsets/take-convert/gsm",              test_take_convert_gsm_utf8);
 
     g_test_add_func ("/MM/charsets/can-convert-to", test_charset_can_covert_to);
 
