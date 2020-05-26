@@ -316,13 +316,15 @@ test_gsm7_pack_7_chars_offset (void)
 static void
 test_take_convert_ucs2_hex_utf8 (void)
 {
-    gchar *src, *converted;
+    gchar *src, *converted, *utf8;
 
     /* Ensure hex-encoded UCS-2 works */
     src = g_strdup ("0054002d004d006f00620069006c0065");
     converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
     g_assert_cmpstr (converted, ==, "T-Mobile");
-    g_free (converted);
+    utf8 = mm_utf8_take_and_convert_to_charset (converted, MM_MODEM_CHARSET_UCS2);
+    g_assert_cmpstr (utf8, ==, "0054002D004D006F00620069006C0065");
+    g_free (utf8);
 }
 
 static void
@@ -346,6 +348,19 @@ test_take_convert_ucs2_bad_ascii2 (void)
     src = g_strdup ("\241\255\254\250\244\234");
     converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
     g_assert (converted == NULL);
+}
+
+static void
+test_take_convert_gsm_utf8 (void)
+{
+    gchar *src, *converted, *utf8;
+
+    src = g_strdup ("T-Mobile");
+    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_GSM);
+    g_assert_cmpstr (converted, ==, "T-Mobile");
+    utf8 = mm_utf8_take_and_convert_to_charset (converted, MM_MODEM_CHARSET_GSM);
+    g_assert_cmpstr (utf8, ==, "T-Mobile");
+    g_free (utf8);
 }
 
 struct charset_can_convert_to_test_s {
@@ -430,6 +445,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/charsets/take-convert/ucs2/hex",         test_take_convert_ucs2_hex_utf8);
     g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii",   test_take_convert_ucs2_bad_ascii);
     g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii-2", test_take_convert_ucs2_bad_ascii2);
+    g_test_add_func ("/MM/charsets/take-convert/gsm",              test_take_convert_gsm_utf8);
 
     g_test_add_func ("/MM/charsets/can-convert-to", test_charset_can_covert_to);
 
