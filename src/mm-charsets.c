@@ -877,8 +877,6 @@ mm_utf8_take_and_convert_to_charset (gchar *str,
         break;
 
     case MM_MODEM_CHARSET_HEX:
-        /* FIXME: What encoding is this? */
-        g_warn_if_reached ();
         encoded = str;
         break;
 
