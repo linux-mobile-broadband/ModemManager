@@ -316,13 +316,15 @@ test_gsm7_pack_7_chars_offset (void)
 static void
 test_take_convert_ucs2_hex_utf8 (void)
 {
-    gchar *src, *converted;
+    gchar *src, *converted, *utf8;
 
     /* Ensure hex-encoded UCS-2 works */
     src = g_strdup ("0054002d004d006f00620069006c0065");
     converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
     g_assert_cmpstr (converted, ==, "T-Mobile");
-    g_free (converted);
+    utf8 = mm_utf8_take_and_convert_to_charset (converted, MM_MODEM_CHARSET_UCS2);
+    g_assert_cmpstr (utf8, ==, "0054002D004D006F00620069006C0065");
+    g_free (utf8);
 }
 
 static void
