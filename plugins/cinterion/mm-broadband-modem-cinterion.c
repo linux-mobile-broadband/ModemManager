@@ -95,6 +95,7 @@ struct _MMBroadbandModemCinterionPrivate {
     FeatureSupport swwan_support;
     FeatureSupport sind_psinfo_support;
     FeatureSupport smoni_support;
+    FeatureSupport sind_simstatus_support;
 
     /* Flags for model-based behaviors */
     MMCinterionModemFamily modem_family;
@@ -774,15 +775,14 @@ sind_psinfo_enable_ready (MMBaseModem  *_self,
 
     self = MM_BROADBAND_MODEM_CINTERION (_self);
     if (!(response = mm_base_modem_at_command_finish (_self, res, &error))) {
+        /* something went wrong, disable indicator */
         self->priv->sind_psinfo_support = FEATURE_NOT_SUPPORTED;
         mm_obj_warn (self, "couldn't enable ^SIND psinfo notifications: %s", error->message);
     } else if (!mm_cinterion_parse_sind_response (response, NULL, &mode, &val, &error)) {
+        /* problem with parsing, disable indicator */
         self->priv->sind_psinfo_support = FEATURE_NOT_SUPPORTED;
         mm_obj_warn (self, "couldn't parse ^SIND psinfo response: %s", error->message);
     } else {
-        /* Flag ^SIND psinfo supported so that we don't poll */
-        self->priv->sind_psinfo_support = FEATURE_SUPPORTED;
-
         /* Report initial access technology gathered right away */
         mm_obj_dbg (self, "reporting initial access technologies...");
         mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
@@ -807,7 +807,7 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *_self,
     if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (_self, res, &error))
         mm_obj_warn (self, "couldn't enable parent 3GPP unsolicited events: %s", error->message);
 
-    if (self->priv->sind_psinfo_support != FEATURE_NOT_SUPPORTED) {
+    if (self->priv->sind_psinfo_support == FEATURE_SUPPORTED) {
         /* Enable access technology update reporting */
         mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "AT^SIND=\"psinfo\",1",
@@ -1708,8 +1708,8 @@ after_sim_unlock_context_step (GTask *task)
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    if (ctx->retries == 0) {
-        /* Too much wait, go on anyway */
+    /* if not supported or too much wait, skip */
+    if (self->priv->sind_simstatus_support != FEATURE_SUPPORTED || ctx->retries == 0) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -1726,6 +1726,40 @@ after_sim_unlock_context_step (GTask *task)
 }
 
 static void
+sind_indicators_ready (MMBaseModem  *_self,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMBroadbandModemCinterion *self;
+    g_autoptr(GError)          error = NULL;
+    const gchar               *response;
+
+    self = MM_BROADBAND_MODEM_CINTERION (_self);
+    if (!(response = mm_base_modem_at_command_finish (_self, res, &error))) {
+        self->priv->sind_psinfo_support = FEATURE_NOT_SUPPORTED;
+        mm_obj_dbg (self, "psinfo support? no");
+
+        self->priv->sind_simstatus_support = FEATURE_NOT_SUPPORTED;
+        mm_obj_dbg (self, "simstatus support? no");
+
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+
+        return;
+    }
+
+    if (g_regex_match_simple ("\\(\\s*psinfo\\s*,", response, 0, 0))
+        self->priv->sind_psinfo_support = FEATURE_SUPPORTED;
+    mm_obj_dbg (self, "psinfo support? %s", self->priv->sind_psinfo_support == FEATURE_SUPPORTED ? "yes":"no");
+
+    if (g_regex_match_simple ("\\(\\s*simstatus\\s*,", response, 0, 0))
+        self->priv->sind_simstatus_support = FEATURE_SUPPORTED;
+    mm_obj_dbg (self, "simstatus support? %s", self->priv->sind_simstatus_support == FEATURE_SUPPORTED ? "yes":"no");
+
+    after_sim_unlock_context_step (task);
+}
+
+static void
 after_sim_unlock (MMIfaceModem        *self,
                   GAsyncReadyCallback  callback,
                   gpointer             user_data)
@@ -1738,7 +1772,13 @@ after_sim_unlock (MMIfaceModem        *self,
     ctx->retries = MAX_AFTER_SIM_UNLOCK_RETRIES;
     g_task_set_task_data (task, ctx, g_free);
 
-    after_sim_unlock_context_step (task);
+    /* check which indicators are available */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "AT^SIND=?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)sind_indicators_ready,
+                              task);
 }
 
 /*****************************************************************************/
@@ -1899,9 +1939,10 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
                                               MMBroadbandModemCinterionPrivate);
 
     /* Initialize private variables */
-    self->priv->sind_psinfo_support = FEATURE_SUPPORT_UNKNOWN;
-    self->priv->swwan_support       = FEATURE_SUPPORT_UNKNOWN;
-    self->priv->smoni_support       = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->sind_psinfo_support    = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->swwan_support          = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->smoni_support          = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->sind_simstatus_support = FEATURE_SUPPORT_UNKNOWN;
 
     self->priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV:\\s*([a-z]+),(\\d+)\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
