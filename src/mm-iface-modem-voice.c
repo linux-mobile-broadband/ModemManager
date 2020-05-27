@@ -1861,7 +1861,7 @@ in_call_setup_context_step (GTask *task)
                 self,
                 (GAsyncReadyCallback) setup_in_call_unsolicited_events_ready,
                 task);
-            break;
+            return;
         }
         ctx->step++;
         /* fall-through */
@@ -1872,7 +1872,7 @@ in_call_setup_context_step (GTask *task)
                 self,
                 (GAsyncReadyCallback) setup_in_call_audio_channel_ready,
                 task);
-            break;
+            return;
         }
         ctx->step++;
         /* fall-through */
@@ -1991,7 +1991,7 @@ in_call_cleanup_context_step (GTask *task)
                 self,
                 (GAsyncReadyCallback) cleanup_in_call_audio_channel_ready,
                 task);
-            break;
+            return;
         }
         ctx->step++;
         /* fall-through */
@@ -2002,7 +2002,7 @@ in_call_cleanup_context_step (GTask *task)
                 self,
                 (GAsyncReadyCallback) cleanup_in_call_unsolicited_events_ready,
                 task);
-            break;
+            return;
         }
         ctx->step++;
         /* fall-through */
