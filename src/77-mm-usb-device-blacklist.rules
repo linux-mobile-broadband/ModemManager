@@ -208,4 +208,8 @@ ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="f013", ENV{ID_MM_TTY_BLACKLIST}="1"
 # All devices from Prusa Research
 ATTRS{idVendor}=="2c99", ENV{ID_MM_TTY_BLACKLIST}="1"
 
+# USB-CEC adapters
+ATTRS{idVendor}=="2548", ATTRS{idProduct}=="1001", ENV{ID_MM_TTY_BLACKLIST}="1"
+ATTRS{idVendor}=="2548", ATTRS{idProduct}=="1002", ENV{ID_MM_TTY_BLACKLIST}="1"
+
 LABEL="mm_usb_device_blacklist_end"
