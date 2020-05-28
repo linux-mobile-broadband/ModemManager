@@ -1377,8 +1377,8 @@ set_bands_3g (GTask  *task,
             self->priv->cmds[0].timeout = self->priv->cmds[1].timeout = self->priv->cmds[2].timeout = 60;
         } else {
             self->priv->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
-            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_GSM]);
-            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_UMTS]);
+            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%08x\",,1", band[MM_CINTERION_RB_BLOCK_GSM]);
+            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%08x\",,1", band[MM_CINTERION_RB_BLOCK_UMTS]);
             self->priv->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%08x\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_LTE_LOW], band[MM_CINTERION_RB_BLOCK_LTE_HIGH]);
             self->priv->cmds[0].timeout = self->priv->cmds[1].timeout = self->priv->cmds[2].timeout = 15;
         }
