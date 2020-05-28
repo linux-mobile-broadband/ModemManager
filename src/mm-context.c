@@ -38,7 +38,7 @@
 static gboolean      help_flag;
 static gboolean      version_flag;
 static gboolean      debug;
-static MMFilterRule  filter_policy = MM_FILTER_POLICY_DEFAULT;
+static MMFilterRule  filter_policy = MM_FILTER_POLICY_LEGACY;
 static gboolean      no_auto_scan = NO_AUTO_SCAN_DEFAULT;
 static const gchar  *initial_kernel_events;
 
@@ -48,8 +48,8 @@ filter_policy_option_arg (const gchar  *option_name,
                           gpointer      data,
                           GError      **error)
 {
-    if (!g_ascii_strcasecmp (value, "default")) {
-        filter_policy = MM_FILTER_POLICY_DEFAULT;
+    if (!g_ascii_strcasecmp (value, "legacy")) {
+        filter_policy = MM_FILTER_POLICY_LEGACY;
         return TRUE;
     }
 
@@ -77,7 +77,7 @@ filter_policy_option_arg (const gchar  *option_name,
 static const GOptionEntry entries[] = {
     {
         "filter-policy", 0, 0, G_OPTION_ARG_CALLBACK, filter_policy_option_arg,
-        "Filter policy: one of DEFAULT, WHITELIST-ONLY, STRICT, PARANOID",
+        "Filter policy: one of LEGACY, WHITELIST-ONLY, STRICT, PARANOID",
         "[POLICY]"
     },
     {

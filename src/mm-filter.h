@@ -80,9 +80,9 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_TTY_WITH_NET          | \
      MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)
 
-/* This is the default ModemManager policy that tries to automatically probe
+/* This is the legacy ModemManager policy that tries to automatically probe
  * device ports unless they're blacklisted in some way or another. */
-#define MM_FILTER_POLICY_DEFAULT           \
+#define MM_FILTER_POLICY_LEGACY            \
     (MM_FILTER_RULE_EXPLICIT_WHITELIST   | \
      MM_FILTER_RULE_EXPLICIT_BLACKLIST   | \
      MM_FILTER_RULE_VIRTUAL              | \
