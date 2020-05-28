@@ -38,7 +38,7 @@
 static gboolean      help_flag;
 static gboolean      version_flag;
 static gboolean      debug;
-static MMFilterRule  filter_policy = MM_FILTER_POLICY_LEGACY;
+static MMFilterRule  filter_policy = MM_FILTER_POLICY_STRICT;
 static gboolean      no_auto_scan = NO_AUTO_SCAN_DEFAULT;
 static const gchar  *initial_kernel_events;
 
