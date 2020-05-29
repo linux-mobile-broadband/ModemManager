@@ -1811,6 +1811,7 @@ huawei_hcsq_changed (MMPortSerialAt *port,
         g_free (str);
         return;
     }
+    g_free (str);
 
     detailed_signal_clear (&self->priv->detailed_signal);
 
