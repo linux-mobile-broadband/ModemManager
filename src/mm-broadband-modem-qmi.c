@@ -8429,6 +8429,8 @@ firmware_change_current (MMIfaceModemFirmware *_self,
 
     input = qmi_message_dms_set_firmware_preference_input_new ();
     qmi_message_dms_set_firmware_preference_input_set_list (input, array, NULL);
+    g_array_unref (array);
+
     qmi_client_dms_set_firmware_preference (
         QMI_CLIENT_DMS (client),
         input,
