@@ -76,10 +76,13 @@ load_current_ready (MMIfaceModemFirmware *self,
 
     /* Build array of dicts */
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("aa{sv}"));
-    for (l = ctx->list; l; l = g_list_next (l))
-        g_variant_builder_add_value (
-            &builder,
-            mm_firmware_properties_get_dictionary (MM_FIRMWARE_PROPERTIES (l->data)));
+    for (l = ctx->list; l; l = g_list_next (l)) {
+        GVariant *dict;
+
+        dict = mm_firmware_properties_get_dictionary (MM_FIRMWARE_PROPERTIES (l->data));
+        g_variant_builder_add_value (&builder, dict);
+        g_variant_unref (dict);
+    }
 
     mm_gdbus_modem_firmware_complete_list (
         ctx->skeleton,
