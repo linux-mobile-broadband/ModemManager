@@ -3866,6 +3866,230 @@ loc_location_nmea_indication_cb (QmiClientLoc               *client,
 }
 
 /*****************************************************************************/
+/* Location: internal helper: setup minimum required NMEA traces */
+
+typedef struct {
+    QmiClientLoc *client;
+    guint         timeout_id;
+    gulong        indication_id;
+} SetupRequiredNmeaTracesContext;
+
+static void
+setup_required_nmea_traces_cleanup_action (SetupRequiredNmeaTracesContext *ctx)
+{
+    if (ctx->indication_id) {
+        g_signal_handler_disconnect (ctx->client, ctx->indication_id);
+        ctx->indication_id = 0;
+    }
+    if (ctx->timeout_id) {
+        g_source_remove (ctx->timeout_id);
+        ctx->timeout_id = 0;
+    }
+}
+
+static void
+setup_required_nmea_traces_context_free (SetupRequiredNmeaTracesContext *ctx)
+{
+    setup_required_nmea_traces_cleanup_action (ctx);
+    g_clear_object (&ctx->client);
+    g_slice_free (SetupRequiredNmeaTracesContext, ctx);
+}
+
+static gboolean
+setup_required_nmea_traces_finish (MMSharedQmi   *self,
+                                   GAsyncResult  *res,
+                                   GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static gboolean
+setup_required_nmea_traces_timeout (GTask *task)
+{
+    SetupRequiredNmeaTracesContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    g_assert (ctx->timeout_id);
+    setup_required_nmea_traces_cleanup_action (ctx);
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                             "Operation timed out");
+    g_object_unref (task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+loc_set_nmea_types_indication_cb (QmiClientLoc                       *client,
+                                  QmiIndicationLocSetNmeaTypesOutput *output,
+                                  GTask                              *task)
+{
+    SetupRequiredNmeaTracesContext *ctx;
+    QmiLocIndicationStatus          status;
+    GError                         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+    g_assert (ctx->indication_id);
+    setup_required_nmea_traces_cleanup_action (ctx);
+
+    if (!qmi_indication_loc_set_nmea_types_output_get_indication_status (output, &status, &error) ||
+        !mm_error_from_qmi_loc_indication_status (status, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+loc_set_nmea_types_ready (QmiClientLoc *client,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    SetupRequiredNmeaTracesContext             *ctx;
+    GError                                     *error = NULL;
+    g_autoptr(QmiMessageLocSetNmeaTypesOutput)  output = NULL;
+
+    output = qmi_client_loc_set_nmea_types_finish (client, res, &error);
+    if (!output || !qmi_message_loc_set_nmea_types_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* The task ownership is shared between signal and timeout; the one which is
+     * scheduled first will cancel the other. */
+    ctx = g_task_get_task_data (task);
+    g_assert (!ctx->indication_id);
+    ctx->indication_id = g_signal_connect (ctx->client,
+                                           "set-nmea-types",
+                                           G_CALLBACK (loc_set_nmea_types_indication_cb),
+                                           task);
+    g_assert (!ctx->timeout_id);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)setup_required_nmea_traces_timeout,
+                                             task);
+}
+
+static void
+loc_get_nmea_types_indication_cb (QmiClientLoc                       *client,
+                                  QmiIndicationLocGetNmeaTypesOutput *output,
+                                  GTask                              *task)
+{
+    SetupRequiredNmeaTracesContext            *ctx;
+    QmiLocIndicationStatus                     status;
+    QmiLocNmeaType                             nmea_types_mask = 0;
+    QmiLocNmeaType                             desired_nmea_types_mask = (QMI_LOC_NMEA_TYPE_GGA | QMI_LOC_NMEA_TYPE_GSA | QMI_LOC_NMEA_TYPE_GSV);
+    GError                                    *error = NULL;
+    g_autoptr(QmiMessageLocSetNmeaTypesInput)  input = NULL;
+
+    ctx = g_task_get_task_data (task);
+    g_assert (ctx->indication_id);
+    setup_required_nmea_traces_cleanup_action (ctx);
+
+    if (!qmi_indication_loc_get_nmea_types_output_get_indication_status (output, &status, &error) ||
+        !mm_error_from_qmi_loc_indication_status (status, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_indication_loc_get_nmea_types_output_get_nmea_types (output, &nmea_types_mask, NULL);
+
+    /* If the configured NMEA types already include GGA, GSV and GSA, we're fine. For raw
+     * GPS sources GGA is the only required one, the other two are given for completeness */
+    if ((nmea_types_mask & desired_nmea_types_mask) == desired_nmea_types_mask) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    input = qmi_message_loc_set_nmea_types_input_new ();
+    qmi_message_loc_set_nmea_types_input_set_nmea_types (input, (nmea_types_mask | desired_nmea_types_mask), NULL);
+    qmi_client_loc_set_nmea_types (ctx->client,
+                                   input,
+                                   10,
+                                   NULL,
+                                   (GAsyncReadyCallback)loc_set_nmea_types_ready,
+                                   task);
+}
+
+static void
+loc_get_nmea_types_ready (QmiClientLoc *client,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    SetupRequiredNmeaTracesContext             *ctx;
+    GError                                     *error = NULL;
+    g_autoptr(QmiMessageLocGetNmeaTypesOutput)  output = NULL;
+
+    output = qmi_client_loc_get_nmea_types_finish (client, res, &error);
+    if (!output || !qmi_message_loc_get_nmea_types_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* The task ownership is shared between signal and timeout; the one which is
+     * scheduled first will cancel the other. */
+    ctx = g_task_get_task_data (task);
+    g_assert (!ctx->indication_id);
+    ctx->indication_id = g_signal_connect (ctx->client,
+                                           "get-nmea-types",
+                                           G_CALLBACK (loc_get_nmea_types_indication_cb),
+                                           task);
+    g_assert (!ctx->timeout_id);
+    ctx->timeout_id = g_timeout_add_seconds (10,
+                                             (GSourceFunc)setup_required_nmea_traces_timeout,
+                                             task);
+}
+
+static void
+setup_required_nmea_traces (MMSharedQmi         *self,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+    QmiClient *client;
+    GTask     *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* If using PDS, no further setup required */
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_PDS,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        NULL);
+    if (client) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Otherwise LOC */
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_LOC,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        NULL);
+    if (client) {
+        SetupRequiredNmeaTracesContext *ctx;
+
+        ctx = g_slice_new0 (SetupRequiredNmeaTracesContext);
+        ctx->client = g_object_ref (client);
+        g_task_set_task_data (task, ctx, (GDestroyNotify)setup_required_nmea_traces_context_free);
+
+        qmi_client_loc_get_nmea_types (ctx->client,
+                                       NULL,
+                                       10,
+                                       NULL,
+                                       (GAsyncReadyCallback)loc_get_nmea_types_ready,
+                                       task);
+        return;
+    }
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Couldn't find any PDS/LOC client");
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
 /* Location: internal helper: start gps engine */
 
 static gboolean
@@ -4751,6 +4975,22 @@ start_gps_engine_ready (MMSharedQmi  *self,
 }
 
 static void
+setup_required_nmea_traces_ready (MMSharedQmi  *self,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    g_autoptr(GError) error = NULL;
+
+    /* don't treat this error as fatal */
+    if (!setup_required_nmea_traces_finish (self, res, &error))
+        mm_obj_warn (self, "couldn't setup required NMEA traces: %s", error->message);
+
+    start_gps_engine (self,
+                      (GAsyncReadyCallback)start_gps_engine_ready,
+                      task);
+}
+
+static void
 set_gps_operation_mode_agps_ready (MMSharedQmi  *self,
                                    GAsyncResult *res,
                                    GTask        *task)
@@ -4822,11 +5062,11 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
         return;
     }
 
-    /* Only start GPS engine if not done already */
+    /* Only setup NMEA traces and start GPS engine if not done already */
     if (!(priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW))) {
-        start_gps_engine (self,
-                          (GAsyncReadyCallback)start_gps_engine_ready,
-                          task);
+        setup_required_nmea_traces (self,
+                                    (GAsyncReadyCallback)setup_required_nmea_traces_ready,
+                                    task);
         return;
     }
 
