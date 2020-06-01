@@ -39,7 +39,7 @@ build-no-mbim:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-mbim-qmux
+    - ./configure --prefix=/usr --disable-mbim-qmux --enable-collection=basic
     - make
     - make install
     - popd
@@ -78,7 +78,7 @@ build-single-plugins:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --enable-mbim-qmux
+    - ./configure --prefix=/usr --enable-mbim-qmux --enable-collection=basic
     - make
     - make install
     - popd
@@ -115,7 +115,7 @@ build-default:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --enable-mbim-qmux
+    - ./configure --prefix=/usr --enable-mbim-qmux --enable-collection=basic
     - make
     - make install
     - popd
