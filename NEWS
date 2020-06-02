@@ -118,6 +118,7 @@ The most important features and changes in this release are the following:
    ** fibocom: added support for QMI based devices like the FM150.
    ** ublox: ignore error when disconnecting last LTE bearer.
    ** ublox: implement support to enable and detect +UUDTMF URCs.
+   ** ublox: added blacklist rules for GPS modules in the plugin itself.
    ** sierra: implement manual and automatic CDMA activation.
    ** novatel: implement manual and automatic CDMA activation.
 
