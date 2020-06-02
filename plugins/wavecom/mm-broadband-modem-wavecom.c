@@ -851,8 +851,10 @@ set_bands_2g (GTask  *task,
         g_array_append_vals (supported_combination, bands_2g[i].mm_bands, bands_2g[i].n_mm_bands);
 
         /* Check if the given array is exactly one of the supported combinations */
-        if (mm_common_bands_garray_cmp (bands_array_final, supported_combination))
+        if (mm_common_bands_garray_cmp (bands_array_final, supported_combination)) {
             wavecom_band = bands_2g[i].wavecom_band;
+            break;
+        }
     }
 
     if (wavecom_band == '\0') {
