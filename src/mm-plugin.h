@@ -126,6 +126,7 @@ GType mm_plugin_get_type (void);
 
 const gchar           *mm_plugin_get_name                (MMPlugin *self);
 const gchar          **mm_plugin_get_allowed_udev_tags   (MMPlugin *self);
+const guint16         *mm_plugin_get_allowed_vendor_ids  (MMPlugin *self);
 const mm_uint16_pair  *mm_plugin_get_allowed_product_ids (MMPlugin *self);
 gboolean               mm_plugin_is_generic              (MMPlugin *self);
 

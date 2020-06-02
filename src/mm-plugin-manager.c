@@ -1617,6 +1617,21 @@ register_plugin_whitelist_tags (MMPluginManager *self,
 }
 
 static void
+register_plugin_whitelist_vendor_ids (MMPluginManager *self,
+                                       MMPlugin        *plugin)
+{
+    const guint16 *vendor_ids;
+    guint          i;
+
+    if (!mm_filter_check_rule_enabled (self->priv->filter, MM_FILTER_RULE_PLUGIN_WHITELIST))
+        return;
+
+    vendor_ids = mm_plugin_get_allowed_vendor_ids (plugin);
+    for (i = 0; vendor_ids && vendor_ids[i]; i++)
+        mm_filter_register_plugin_whitelist_vendor_id (self->priv->filter, vendor_ids[i]);
+}
+
+static void
 register_plugin_whitelist_product_ids (MMPluginManager *self,
                                        MMPlugin        *plugin)
 {
@@ -1812,7 +1827,8 @@ load_plugins (MMPluginManager *self,
             self->priv->plugins = g_list_append (self->priv->plugins, plugin);
 
         /* Register plugin whitelist rules in filter, if any */
-        register_plugin_whitelist_tags (self, plugin);
+        register_plugin_whitelist_tags        (self, plugin);
+        register_plugin_whitelist_vendor_ids  (self, plugin);
         register_plugin_whitelist_product_ids (self, plugin);
     }
 

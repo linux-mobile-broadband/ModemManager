@@ -39,6 +39,7 @@ enum {
 struct _MMFilterPrivate {
     MMFilterRule  enabled_rules;
     GList        *plugin_whitelist_tags;
+    GArray       *plugin_whitelist_vendor_ids;
     GArray       *plugin_whitelist_product_ids;
 };
 
@@ -52,6 +53,27 @@ mm_filter_register_plugin_whitelist_tag (MMFilter    *self,
         mm_obj_dbg (self, "registered plugin whitelist tag: %s", tag);
         self->priv->plugin_whitelist_tags = g_list_prepend (self->priv->plugin_whitelist_tags, g_strdup (tag));
     }
+}
+
+void
+mm_filter_register_plugin_whitelist_vendor_id (MMFilter *self,
+                                               guint16   vid)
+{
+    guint i;
+
+    if (!self->priv->plugin_whitelist_vendor_ids)
+        self->priv->plugin_whitelist_vendor_ids = g_array_sized_new (FALSE, FALSE, sizeof (guint16), 64);
+
+    for (i = 0; i < self->priv->plugin_whitelist_vendor_ids->len; i++) {
+        guint16 item;
+
+        item = g_array_index (self->priv->plugin_whitelist_vendor_ids, guint16, i);
+        if (item == vid)
+            return;
+    }
+
+    g_array_append_val (self->priv->plugin_whitelist_vendor_ids, vid);
+    mm_obj_dbg (self, "registered plugin whitelist vendor id: %04x", vid);
 }
 
 void
@@ -136,6 +158,20 @@ mm_filter_port (MMFilter        *self,
                 item = &g_array_index (self->priv->plugin_whitelist_product_ids, mm_uint16_pair, i);
                 if (item->l == vid && item->r == pid) {
                     mm_obj_dbg (self, "(%s/%s) port allowed: device is whitelisted by plugin (vid/pid)", subsystem, name);
+                    return TRUE;
+                }
+            }
+        }
+
+        if (vid && self->priv->plugin_whitelist_vendor_ids) {
+            guint i;
+
+            for (i = 0; i < self->priv->plugin_whitelist_vendor_ids->len; i++) {
+                guint16 item;
+
+                item = g_array_index (self->priv->plugin_whitelist_vendor_ids, guint16, i);
+                if (item == vid) {
+                    mm_obj_dbg (self, "(%s/%s) port allowed: device is whitelisted by plugin (vid)", subsystem, name);
                     return TRUE;
                 }
             }
@@ -483,6 +519,7 @@ finalize (GObject *object)
 {
     MMFilter *self = MM_FILTER (object);
 
+    g_clear_pointer (&self->priv->plugin_whitelist_vendor_ids, g_array_unref);
     g_clear_pointer (&self->priv->plugin_whitelist_product_ids, g_array_unref);
     g_list_free_full (self->priv->plugin_whitelist_tags, g_free);
 

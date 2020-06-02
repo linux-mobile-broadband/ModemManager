@@ -145,6 +145,8 @@ gboolean mm_filter_device_and_port (MMFilter       *self,
 
 void     mm_filter_register_plugin_whitelist_tag        (MMFilter    *self,
                                                          const gchar *tag);
+void     mm_filter_register_plugin_whitelist_vendor_id  (MMFilter    *self,
+                                                         guint16      vid);
 void     mm_filter_register_plugin_whitelist_product_id (MMFilter    *self,
                                                          guint16      vid,
                                                          guint16      pid);

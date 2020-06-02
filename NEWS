@@ -44,6 +44,10 @@ The most important features and changes in this release are the following:
    port probing mechanism uses its own heuristics to guess whether a given TTY
    is owned by a modem or not.
 
+ * Added a new implicit whitelist rules applicable in 'STRICT' filter mode, so
+   that all devices with a USB vid matching one of the vids allowed by the
+   different installed plugins are implicitly allowed.
+
  * Updated daemon logging so that we always prefix the messages with a string
    identifying which modem the log refers to, making it easy to grep logs for
    one specific device if the system has more than one.

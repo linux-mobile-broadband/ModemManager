@@ -152,6 +152,12 @@ mm_plugin_get_allowed_udev_tags (MMPlugin *self)
     return (const gchar **) self->priv->udev_tags;
 }
 
+const guint16 *
+mm_plugin_get_allowed_vendor_ids (MMPlugin *self)
+{
+    return self->priv->vendor_ids;
+}
+
 const mm_uint16_pair *
 mm_plugin_get_allowed_product_ids (MMPlugin *self)
 {
