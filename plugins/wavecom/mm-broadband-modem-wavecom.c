@@ -325,7 +325,7 @@ current_ms_class_ready (MMBaseModem  *self,
                         GAsyncResult *res,
                         GTask        *task)
 {
-    LoadCurrentModesResult  result;
+    LoadCurrentModesResult *result;
     const gchar            *response;
     GError                 *error = NULL;
 
@@ -352,37 +352,39 @@ current_ms_class_ready (MMBaseModem  *self,
         return;
     }
 
-    result.allowed = MM_MODEM_MODE_NONE;
-    result.preferred = MM_MODEM_MODE_NONE;
+    result = g_new0 (LoadCurrentModesResult, 1);
+    result->allowed = MM_MODEM_MODE_NONE;
+    result->preferred = MM_MODEM_MODE_NONE;
 
     if (strncmp (response,
                  WAVECOM_MS_CLASS_B_IDSTR,
                  strlen (WAVECOM_MS_CLASS_B_IDSTR)) == 0) {
         mm_obj_dbg (self, "configured as a Class B mobile station");
-        result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS);
-        result.preferred = MM_MODEM_MODE_2G;
+        result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS);
+        result->preferred = MM_MODEM_MODE_2G;
     } else if (strncmp (response,
                         WAVECOM_MS_CLASS_CG_IDSTR,
                         strlen (WAVECOM_MS_CLASS_CG_IDSTR)) == 0) {
         mm_obj_dbg (self, "configured as a Class CG mobile station");
-        result.allowed = MM_MODEM_MODE_2G;
-        result.preferred = MM_MODEM_MODE_NONE;
+        result->allowed = MM_MODEM_MODE_2G;
+        result->preferred = MM_MODEM_MODE_NONE;
     } else if (strncmp (response,
                         WAVECOM_MS_CLASS_CC_IDSTR,
                         strlen (WAVECOM_MS_CLASS_CC_IDSTR)) == 0) {
         mm_obj_dbg (self, "configured as a Class CC mobile station");
-        result.allowed = MM_MODEM_MODE_CS;
-        result.preferred = MM_MODEM_MODE_NONE;
+        result->allowed = MM_MODEM_MODE_CS;
+        result->preferred = MM_MODEM_MODE_NONE;
     }
 
-    if (result.allowed == MM_MODEM_MODE_NONE)
+    if (result->allowed == MM_MODEM_MODE_NONE) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "Unknown mobile station class: '%s'",
                                  response);
-    else
-        g_task_return_boolean (task, TRUE);
+        g_free (result);
+    } else
+        g_task_return_pointer (task, result, g_free);
     g_object_unref (task);
 }
 
