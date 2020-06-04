@@ -22,6 +22,14 @@ The following notes are directed to package maintainers:
       errors), --enable-compile-warnings=no (to disable all the extra warnings
       enabled by default) or --disable-Werror (to unconditionally make all
       compiler warnings non-fatal).
+   ** Users can now preselect which plugins to build and install during
+      configure, with the --enable-plugin-[PLUGIN-NAME] options. The user can
+      also build and install all except for some, just by using the
+      --enable-all-plugins option followed by --disable-plugin-[PLUGIN-NAME].
+      By default all plugins are enabled, so all of them built and installed.
+      This new set of options are useful for users building custom systems
+      where they already know what kind of devices they're going to have, it
+      isn't recommended for standard distributions.
 
 The only updates in the public API are the following:
 
