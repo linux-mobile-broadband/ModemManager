@@ -78,7 +78,7 @@ The most important features and changes in this release are the following:
  * MBIM:
    ** Update carrier code if registration changes from one roaming operator to
       another.
-   ** Implement reset in Intel-based devices.
+   ** Implement reset in Intel-based and Qualcomm-based devices.
    ** Avoid LTE attach config/status if unsupported.
    ** Updated to make sure all allocated QMI CIDs are released during shutdown.
 
