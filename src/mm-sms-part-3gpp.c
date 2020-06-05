@@ -271,10 +271,10 @@ sms_decode_text (const guint8 *text,
          * in UCS-2BE.
          */
         mm_obj_dbg (log_object, "converting SMS part text from UTF-16BE to UTF-8...");
-        utf8 = g_convert ((const gchar *) text, len, "UTF8", "UTF16BE", NULL, NULL, NULL);
+        utf8 = g_convert ((const gchar *) text, len, "UTF-8", "UTF-16BE", NULL, NULL, NULL);
         if (!utf8) {
-            mm_obj_dbg (log_object, "converting SMS part text from UCS-2BE to UTF8...");
-            utf8 = g_convert ((const gchar *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
+            mm_obj_dbg (log_object, "converting SMS part text from UCS-2BE to UTF-8...");
+            utf8 = g_convert ((const gchar *) text, len, "UTF-8", "UCS-2BE", NULL, NULL, NULL);
         }
         if (!utf8) {
             mm_obj_warn (log_object, "couldn't convert SMS part contents from UTF-16BE/UCS-2BE to UTF-8: not decoding any text");
