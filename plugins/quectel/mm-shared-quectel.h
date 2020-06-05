@@ -25,6 +25,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-firmware.h"
+#include "mm-iface-modem-location.h"
 
 #define MM_TYPE_SHARED_QUECTEL               (mm_shared_quectel_get_type ())
 #define MM_SHARED_QUECTEL(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_QUECTEL, MMSharedQuectel))
@@ -35,6 +36,7 @@ typedef struct _MMSharedQuectel MMSharedQuectel;
 
 struct _MMSharedQuectel {
     GTypeInterface g_iface;
+    MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedQuectel *self);
 };
 
 GType mm_shared_quectel_get_type (void);
@@ -42,14 +44,48 @@ GType mm_shared_quectel_get_type (void);
 void                      mm_shared_quectel_firmware_load_update_settings        (MMIfaceModemFirmware  *self,
                                                                                   GAsyncReadyCallback    callback,
                                                                                   gpointer               user_data);
+
 MMFirmwareUpdateSettings *mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
                                                                                   GAsyncResult          *res,
                                                                                   GError               **error);
+
 void                      mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem *self,
                                                                 GAsyncReadyCallback callback,
                                                                 gpointer user_data);
+
 gboolean                  mm_shared_quectel_setup_sim_hot_swap_finish (MMIfaceModem *self,
                                                                        GAsyncResult *res,
                                                                        GError **error);
 
+void
+mm_shared_quectel_location_load_capabilities (MMIfaceModemLocation *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+
+MMModemLocationSource
+mm_shared_quectel_location_load_capabilities_finish (MMIfaceModemLocation *self,
+                                   GAsyncResult *res,
+                                   GError **error);
+
+void
+mm_shared_quectel_enable_location_gathering (MMIfaceModemLocation *self,
+                           MMModemLocationSource source,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+
+gboolean
+mm_shared_quectel_enable_location_gathering_finish (MMIfaceModemLocation *self,
+                                   GAsyncResult *res,
+                                   GError **error);
+
+void
+mm_shared_quectel_disable_location_gathering (MMIfaceModemLocation *_self,
+                            MMModemLocationSource source,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+
+gboolean
+mm_shared_quectel_disable_location_gathering_finish (MMIfaceModemLocation *self,
+                                   GAsyncResult *res,
+                                   GError **error);
 #endif  /* MM_SHARED_QUECTEL_H */
