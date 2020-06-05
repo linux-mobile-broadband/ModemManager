@@ -1087,6 +1087,49 @@ dump_output_list_keyvalue (MmcF field)
 /******************************************************************************/
 /* JSON-friendly output */
 
+static gchar *
+json_strescape (const gchar *str)
+{
+    const gchar *p;
+    const gchar *end;
+    GString *output;
+    gsize len;
+
+    len = strlen (str);
+    end = str + len;
+    output = g_string_sized_new (len);
+
+    for (p = str; p < end; p++) {
+        if (*p == '\\' || *p == '"') {
+            g_string_append_c (output, '\\');
+            g_string_append_c (output, *p);
+        } else if ((*p > 0 && *p < 0x1f) || *p == 0x7f) {
+            switch (*p) {
+                case '\b':
+                    g_string_append (output, "\\b");
+                    break;
+                case '\f':
+                    g_string_append (output, "\\f");
+                    break;
+                case '\n':
+                    g_string_append (output, "\\n");
+                    break;
+                case '\r':
+                    g_string_append (output, "\\r");
+                    break;
+                case '\t':
+                    g_string_append (output, "\\t");
+                    break;
+                default:
+                    g_string_append_printf (output, "\\u00%02x", (guint)*p);
+                    break;
+            }
+        } else
+            g_string_append_c (output, *p);
+    }
+    return g_string_free (output, FALSE);
+}
+
 static gint
 list_sort_by_keys (const OutputItem *item_a,
                    const OutputItem *item_b)
@@ -1146,7 +1189,7 @@ dump_output_json (void)
             gchar            *escaped = NULL;
 
             if (single->value)
-                escaped = g_strescape (single->value, "\v");
+                escaped = json_strescape (single->value);
 
             g_print ("\"%s\":\"%s\"", current_path[cur_dlen], escaped ? escaped : "--");
             g_free (escaped);
@@ -1160,7 +1203,7 @@ dump_output_json (void)
             for (i = 0; i < n; i++) {
                 gchar *escaped;
 
-                escaped = g_strescape (multiple->values[i], "\v");
+                escaped = json_strescape (multiple->values[i]);
                 g_print("\"%s\"", escaped);
                 if (i < n - 1)
                     g_print(",");
