@@ -10421,9 +10421,13 @@ schedule_initial_registration_checks (MMBroadbandModem *self)
 /*****************************************************************************/
 
 typedef enum {
+    /* When user requests a disable operation, the process starts here */
     DISABLING_STEP_FIRST,
     DISABLING_STEP_WAIT_FOR_FINAL_STATE,
     DISABLING_STEP_DISCONNECT_BEARERS,
+    /* When the disabling is launched due to a failed enable, the process
+     * starts here */
+    DISABLING_STEP_FIRST_AFTER_ENABLE_FAILED,
     DISABLING_STEP_IFACE_SIMPLE,
     DISABLING_STEP_IFACE_FIRMWARE,
     DISABLING_STEP_IFACE_VOICE,
@@ -10441,9 +10445,10 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
-    DisablingStep step;
-    MMModemState previous_state;
-    gboolean disabled;
+    gboolean          state_updates;
+    DisablingStep     step;
+    MMModemState      previous_state;
+    gboolean          disabled;
 } DisablingContext;
 
 static void disabling_step (GTask *task);
@@ -10459,15 +10464,18 @@ disabling_context_free (DisablingContext *ctx)
         g_error_free (error);
     }
 
-    if (ctx->disabled)
-        mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
-                                     MM_MODEM_STATE_DISABLED,
-                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
-    else if (ctx->previous_state != MM_MODEM_STATE_DISABLED) {
-        /* Fallback to previous state */
-        mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
-                                     ctx->previous_state,
-                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+    /* Only perform state updates if we're asked to do so */
+    if (ctx->state_updates) {
+        if (ctx->disabled)
+            mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                         MM_MODEM_STATE_DISABLED,
+                                         MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+        else if (ctx->previous_state != MM_MODEM_STATE_DISABLED) {
+            /* Fallback to previous state */
+            mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                         ctx->previous_state,
+                                         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+        }
     }
 
     g_object_unref (ctx->self);
@@ -10475,42 +10483,34 @@ disabling_context_free (DisablingContext *ctx)
 }
 
 static gboolean
-disable_finish (MMBaseModem *self,
-               GAsyncResult *res,
-               GError **error)
+common_disable_finish (MMBroadbandModem  *self,
+                       GAsyncResult      *res,
+                       GError           **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 #undef INTERFACE_DISABLE_READY_FN
-#define INTERFACE_DISABLE_READY_FN(NAME,TYPE,FATAL_ERRORS)              \
-    static void                                                         \
-    NAME##_disable_ready (MMBroadbandModem *self,                       \
-                          GAsyncResult *result,                         \
-                          GTask *task)                                  \
-    {                                                                   \
-        DisablingContext *ctx;                                          \
-        GError *error = NULL;                                           \
-                                                                        \
-        if (!mm_##NAME##_disable_finish (TYPE (self),                   \
-                                         result,                        \
-                                         &error)) {                     \
-            if (FATAL_ERRORS) {                                         \
-                g_task_return_error (task, error);                      \
-                g_object_unref (task);                                  \
-                return;                                                 \
-            }                                                           \
-                                                                        \
-            mm_obj_dbg (self, "couldn't disable interface: %s",         \
-                        error->message);                                \
-            g_error_free (error);                                       \
-            return;                                                     \
-        }                                                               \
-                                                                        \
-        /* Go on to next step */                                        \
-        ctx = g_task_get_task_data (task);                              \
-        ctx->step++;                                                    \
-        disabling_step (task);                                          \
+#define INTERFACE_DISABLE_READY_FN(NAME,TYPE,WARN_ERRORS)                             \
+    static void                                                                       \
+    NAME##_disable_ready (MMBroadbandModem *self,                                     \
+                          GAsyncResult     *result,                                   \
+                          GTask            *task)                                     \
+    {                                                                                 \
+        DisablingContext  *ctx;                                                       \
+        g_autoptr(GError)  error = NULL;                                              \
+                                                                                      \
+        if (!mm_##NAME##_disable_finish (TYPE (self), result, &error)) {              \
+            if (WARN_ERRORS)                                                          \
+                mm_obj_warn (self, "couldn't disable interface: %s", error->message); \
+            else                                                                      \
+                mm_obj_dbg (self, "couldn't disable interface: %s", error->message);  \
+        }                                                                             \
+                                                                                      \
+        /* Go on to next step */                                                      \
+        ctx = g_task_get_task_data (task);                                            \
+        ctx->step++;                                                                  \
+        disabling_step (task);                                                        \
     }
 
 INTERFACE_DISABLE_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
@@ -10588,6 +10588,7 @@ disabling_wait_for_final_state_ready (MMIfaceModem *self,
 
     /* We're in a final state now, go on */
 
+    g_assert (ctx->state_updates);
     mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
                                  MM_MODEM_STATE_DISABLING,
                                  MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
@@ -10601,11 +10602,6 @@ disabling_step (GTask *task)
 {
     DisablingContext *ctx;
 
-    /* Don't run new steps if we're cancelled */
-    if (g_task_return_error_if_cancelled (task)) {
-        g_object_unref (task);
-        return;
-    }
     ctx = g_task_get_task_data (task);
 
     switch (ctx->step) {
@@ -10614,6 +10610,11 @@ disabling_step (GTask *task)
         /* fall through */
 
     case DISABLING_STEP_WAIT_FOR_FINAL_STATE:
+        /* cancellability allowed at this point */
+        if (g_task_return_error_if_cancelled (task)) {
+            g_object_unref (task);
+            return;
+        }
         mm_iface_modem_wait_for_final_state (MM_IFACE_MODEM (ctx->self),
                                              MM_MODEM_STATE_UNKNOWN, /* just any */
                                              (GAsyncReadyCallback)disabling_wait_for_final_state_ready,
@@ -10621,6 +10622,11 @@ disabling_step (GTask *task)
         return;
 
     case DISABLING_STEP_DISCONNECT_BEARERS:
+        /* cancellability allowed at this point */
+        if (g_task_return_error_if_cancelled (task)) {
+            g_object_unref (task);
+            return;
+        }
         if (ctx->self->priv->modem_bearer_list) {
             mm_bearer_list_disconnect_all_bearers (
                 ctx->self->priv->modem_bearer_list,
@@ -10628,6 +10634,14 @@ disabling_step (GTask *task)
                 task);
             return;
         }
+        ctx->step++;
+        /* fall through */
+
+    case DISABLING_STEP_FIRST_AFTER_ENABLE_FAILED:
+        /* From this point onwards, the disabling sequence will NEVER fail, all
+         * errors will be treated as non-fatal, including a possible task
+         * cancellation. */
+        g_task_set_check_cancellable (task, FALSE);
         ctx->step++;
         /* fall through */
 
@@ -10642,7 +10656,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_VOICE:
         if (ctx->self->priv->modem_voice_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has voice capabilities, disabling the Voice interface...");
-            /* Disabling the Modem Voice interface */
             mm_iface_modem_voice_disable (MM_IFACE_MODEM_VOICE (ctx->self),
                                           (GAsyncReadyCallback)iface_modem_voice_disable_ready,
                                           task);
@@ -10654,7 +10667,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_SIGNAL:
         if (ctx->self->priv->modem_signal_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has extended signal reporting capabilities, disabling the Signal interface...");
-            /* Disabling the Modem Signal interface */
             mm_iface_modem_signal_disable (MM_IFACE_MODEM_SIGNAL (ctx->self),
                                            (GAsyncReadyCallback)iface_modem_signal_disable_ready,
                                            task);
@@ -10666,7 +10678,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_OMA:
         if (ctx->self->priv->modem_oma_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has OMA capabilities, disabling the OMA interface...");
-            /* Disabling the Modem Oma interface */
             mm_iface_modem_oma_disable (MM_IFACE_MODEM_OMA (ctx->self),
                                         (GAsyncReadyCallback)iface_modem_oma_disable_ready,
                                         task);
@@ -10678,7 +10689,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_TIME:
         if (ctx->self->priv->modem_time_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has time capabilities, disabling the Time interface...");
-            /* Disabling the Modem Time interface */
             mm_iface_modem_time_disable (MM_IFACE_MODEM_TIME (ctx->self),
                                          (GAsyncReadyCallback)iface_modem_time_disable_ready,
                                          task);
@@ -10690,7 +10700,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_MESSAGING:
         if (ctx->self->priv->modem_messaging_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has messaging capabilities, disabling the Messaging interface...");
-            /* Disabling the Modem Messaging interface */
             mm_iface_modem_messaging_disable (MM_IFACE_MODEM_MESSAGING (ctx->self),
                                               (GAsyncReadyCallback)iface_modem_messaging_disable_ready,
                                               task);
@@ -10702,7 +10711,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_LOCATION:
         if (ctx->self->priv->modem_location_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has location capabilities, disabling the Location interface...");
-            /* Disabling the Modem Location interface */
             mm_iface_modem_location_disable (MM_IFACE_MODEM_LOCATION (ctx->self),
                                              (GAsyncReadyCallback)iface_modem_location_disable_ready,
                                              task);
@@ -10714,7 +10722,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_CDMA:
         if (ctx->self->priv->modem_cdma_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has CDMA capabilities, disabling the Modem CDMA interface...");
-            /* Disabling the Modem CDMA interface */
             mm_iface_modem_cdma_disable (MM_IFACE_MODEM_CDMA (ctx->self),
                                         (GAsyncReadyCallback)iface_modem_cdma_disable_ready,
                                         task);
@@ -10726,7 +10733,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_3GPP_USSD:
         if (ctx->self->priv->modem_3gpp_ussd_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has 3GPP/USSD capabilities, disabling the Modem 3GPP/USSD interface...");
-            /* Disabling the Modem 3GPP USSD interface */
             mm_iface_modem_3gpp_ussd_disable (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
                                               (GAsyncReadyCallback)iface_modem_3gpp_ussd_disable_ready,
                                               task);
@@ -10738,7 +10744,6 @@ disabling_step (GTask *task)
     case DISABLING_STEP_IFACE_3GPP:
         if (ctx->self->priv->modem_3gpp_dbus_skeleton) {
             mm_obj_dbg (ctx->self, "modem has 3GPP capabilities, disabling the Modem 3GPP interface...");
-            /* Disabling the Modem 3GPP interface */
             mm_iface_modem_3gpp_disable (MM_IFACE_MODEM_3GPP (ctx->self),
                                         (GAsyncReadyCallback)iface_modem_3gpp_disable_ready,
                                         task);
@@ -10751,7 +10756,7 @@ disabling_step (GTask *task)
         /* This skeleton may be NULL when mm_base_modem_disable() gets called at
          * the same time as modem object disposal. */
         if (ctx->self->priv->modem_dbus_skeleton) {
-            /* Disabling the Modem interface */
+            mm_obj_dbg (ctx->self, "disabling the Modem interface...");
             mm_iface_modem_disable (MM_IFACE_MODEM (ctx->self),
                                     (GAsyncReadyCallback)iface_modem_disable_ready,
                                     task);
@@ -10761,8 +10766,8 @@ disabling_step (GTask *task)
         /* fall through */
 
     case DISABLING_STEP_LAST:
-        ctx->disabled = TRUE;
         /* All disabled without errors! */
+        ctx->disabled = TRUE;
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
@@ -10775,22 +10780,74 @@ disabling_step (GTask *task)
 }
 
 static void
-disable (MMBaseModem *self,
-         GCancellable *cancellable,
-         GAsyncReadyCallback callback,
-         gpointer user_data)
+common_disable (MMBroadbandModem    *self,
+                gboolean             state_updates,
+                DisablingStep        first_step,
+                GCancellable        *cancellable,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
 {
     DisablingContext *ctx;
-    GTask *task;
+    GTask            *task;
 
     ctx = g_new0 (DisablingContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->step = DISABLING_STEP_FIRST;
+    ctx->state_updates = state_updates;
+    ctx->step = first_step;
 
     task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)disabling_context_free);
 
     disabling_step (task);
+}
+
+/* Implicit disabling after failed enable */
+
+static gboolean
+enable_failed_finish (MMBroadbandModem  *self,
+                      GAsyncResult      *res,
+                      GError           **error)
+{
+    /* The implicit disabling should never ever fail */
+    g_assert (common_disable_finish (self, res, NULL));
+    return TRUE;
+}
+
+static void
+enable_failed (MMBroadbandModem    *self,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
+{
+    common_disable (self,
+                    FALSE, /* don't perform state updates */
+                    DISABLING_STEP_FIRST_AFTER_ENABLE_FAILED,
+                    NULL, /* no cancellable */
+                    callback,
+                    user_data);
+}
+
+/* User-requested disable operation */
+
+static gboolean
+disable_finish (MMBaseModem  *self,
+                GAsyncResult  *res,
+                GError       **error)
+{
+    return common_disable_finish (MM_BROADBAND_MODEM (self), res, error);
+}
+
+static void
+disable (MMBaseModem         *self,
+         GCancellable        *cancellable,
+         GAsyncReadyCallback  callback,
+         gpointer             user_data)
+{
+    common_disable (MM_BROADBAND_MODEM (self),
+                    TRUE, /* perform state updates */
+                    DISABLING_STEP_FIRST_AFTER_ENABLE_FAILED,
+                    cancellable,
+                    callback,
+                    user_data);
 }
 
 /*****************************************************************************/
@@ -10816,9 +10873,10 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
-    EnablingStep step;
-    MMModemState previous_state;
-    gboolean enabled;
+    EnablingStep      step;
+    MMModemState      previous_state;
+    gboolean          enabled;
+    GError           *saved_error;
 } EnablingContext;
 
 static void enabling_step (GTask *task);
@@ -10826,6 +10884,8 @@ static void enabling_step (GTask *task);
 static void
 enabling_context_free (EnablingContext *ctx)
 {
+    g_assert (!ctx->saved_error);
+
     if (ctx->enabled)
         mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
                                      MM_MODEM_STATE_ENABLED,
@@ -10849,34 +10909,51 @@ enable_finish (MMBaseModem *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static void
+enable_failed_ready (MMBroadbandModem *self,
+                     GAsyncResult     *res,
+                     GTask            *task)
+{
+    EnablingContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    /* The disabling run after a failed enable will never fail */
+    g_assert (enable_failed_finish (self, res, NULL));
+
+    g_assert (ctx->saved_error);
+    g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
+    g_object_unref (task);
+}
+
 #undef INTERFACE_ENABLE_READY_FN
-#define INTERFACE_ENABLE_READY_FN(NAME,TYPE,FATAL_ERRORS)               \
-    static void                                                         \
-    NAME##_enable_ready (MMBroadbandModem *self,                        \
-                         GAsyncResult *result,                          \
-                         GTask *task)                                   \
-    {                                                                   \
-        EnablingContext *ctx;                                           \
-        GError *error = NULL;                                           \
-                                                                        \
-        if (!mm_##NAME##_enable_finish (TYPE (self),                    \
-                                        result,                         \
-                                        &error)) {                      \
-            if (FATAL_ERRORS) {                                         \
-                g_task_return_error (task, error);                      \
-                g_object_unref (task);                                  \
-                return;                                                 \
-            }                                                           \
-                                                                        \
-            mm_obj_dbg (self, "couldn't enable interface: '%s'",        \
-                        error->message);                                \
-            g_error_free (error);                                       \
-        }                                                               \
-                                                                        \
-        /* Go on to next step */                                        \
-        ctx = g_task_get_task_data (task);                              \
-        ctx->step++;                                                    \
-        enabling_step (task);                                           \
+#define INTERFACE_ENABLE_READY_FN(NAME,TYPE,FATAL_ERRORS)                               \
+    static void                                                                         \
+    NAME##_enable_ready (MMBroadbandModem *self,                                        \
+                         GAsyncResult     *result,                                      \
+                         GTask            *task)                                        \
+    {                                                                                   \
+        EnablingContext   *ctx;                                                         \
+        g_autoptr(GError)  error = NULL;                                                \
+                                                                                        \
+        ctx = g_task_get_task_data (task);                                              \
+                                                                                        \
+        if (!mm_##NAME##_enable_finish (TYPE (self), result, &error)) {                 \
+            if (FATAL_ERRORS) {                                                         \
+                mm_obj_warn (self, "couldn't enable interface: '%s'", error->message);  \
+                g_assert (!ctx->saved_error);                                           \
+                ctx->saved_error = g_steal_pointer (&error);                            \
+                mm_obj_dbg (self, "running implicit disable after failed enable...");   \
+                enable_failed (self, (GAsyncReadyCallback) enable_failed_ready, task);  \
+                return;                                                                 \
+            }                                                                           \
+                                                                                        \
+            mm_obj_dbg (self, "couldn't enable interface: '%s'", error->message);       \
+        }                                                                               \
+                                                                                        \
+        /* Go on to next step */                                                        \
+        ctx->step++;                                                                    \
+        enabling_step (task);                                                           \
     }
 
 INTERFACE_ENABLE_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
@@ -10981,6 +11058,9 @@ enabling_step (GTask *task)
         /* fall through */
 
     case ENABLING_STEP_IFACE_MODEM:
+        /* From now on, the failure to enable one of the mandatory interfaces
+         * will trigger the implicit disabling process */
+
         g_assert (ctx->self->priv->modem_dbus_skeleton != NULL);
         /* Enabling the Modem interface */
         mm_iface_modem_enable (MM_IFACE_MODEM (ctx->self),
