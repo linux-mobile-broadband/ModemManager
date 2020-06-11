@@ -1372,8 +1372,7 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_IP_FAMILY_IPV4:
         /* If client is new enough, select IP family */
-        if (!ctx->no_ip_family_preference &&
-            qmi_client_check_version (QMI_CLIENT (ctx->client_ipv4), 1, 9)) {
+        if (!ctx->no_ip_family_preference) {
             QmiMessageWdsSetIpFamilyInput *input;
 
             mm_obj_dbg (self, "setting default IP family to: IPv4");
@@ -1467,31 +1466,23 @@ connect_context_step (GTask *task)
         ctx->step++;
     } /* fall through */
 
-    case CONNECT_STEP_IP_FAMILY_IPV6:
+    case CONNECT_STEP_IP_FAMILY_IPV6: {
+        QmiMessageWdsSetIpFamilyInput *input;
 
         g_assert (ctx->no_ip_family_preference == FALSE);
 
-        /* If client is new enough, select IP family */
-        if (qmi_client_check_version (QMI_CLIENT (ctx->client_ipv6), 1, 9)) {
-            QmiMessageWdsSetIpFamilyInput *input;
-
-            mm_obj_dbg (self, "setting default IP family to: IPv6");
-            input = qmi_message_wds_set_ip_family_input_new ();
-            qmi_message_wds_set_ip_family_input_set_preference (input, QMI_WDS_IP_FAMILY_IPV6, NULL);
-            qmi_client_wds_set_ip_family (ctx->client_ipv6,
-                                          input,
-                                          10,
-                                          g_task_get_cancellable (task),
-                                          (GAsyncReadyCallback)set_ip_family_ready,
-                                          task);
-            qmi_message_wds_set_ip_family_input_unref (input);
-            return;
-        }
-
-        ctx->default_ip_family_set = FALSE;
-
-        ctx->step++;
-        /* fall through */
+        mm_obj_dbg (self, "setting default IP family to: IPv6");
+        input = qmi_message_wds_set_ip_family_input_new ();
+        qmi_message_wds_set_ip_family_input_set_preference (input, QMI_WDS_IP_FAMILY_IPV6, NULL);
+        qmi_client_wds_set_ip_family (ctx->client_ipv6,
+                                      input,
+                                      10,
+                                      g_task_get_cancellable (task),
+                                      (GAsyncReadyCallback)set_ip_family_ready,
+                                      task);
+        qmi_message_wds_set_ip_family_input_unref (input);
+        return;
+    }
 
     case CONNECT_STEP_ENABLE_INDICATIONS_IPV6:
         common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
