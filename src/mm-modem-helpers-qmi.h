@@ -168,4 +168,8 @@ gboolean mm_qmi_uim_get_card_status_output_parse (gpointer                      
                                                   guint                             *o_puk2_retries,
                                                   GError                           **error);
 
+/*****************************************************************************/
+/* UIM Get Slot Status parsing */
+gchar *mm_qmi_uim_decode_eid (const gchar *eid, gsize eid_len);
+
 #endif  /* MM_MODEM_HELPERS_QMI_H */

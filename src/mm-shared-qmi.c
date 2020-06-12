@@ -3384,6 +3384,8 @@ uim_get_slot_status_ready (QmiClientUim *client,
     MMIfaceModem              *self;
     GError                    *error = NULL;
     GArray                    *physical_slots = NULL;
+    GArray                    *ext_information = NULL;
+    GArray                    *slot_eids = NULL;
     guint                      i;
 
     self = g_task_get_source_object (task);
@@ -3398,15 +3400,30 @@ uim_get_slot_status_ready (QmiClientUim *client,
         return;
     }
 
+    /* It's fine if we don't have EID information, but it should be well-formed if present. If it's malformed,
+     * there is probably a modem firmware bug. */
+    if (qmi_message_uim_get_slot_status_output_get_physical_slot_information (output, &ext_information, NULL) &&
+        qmi_message_uim_get_slot_status_output_get_slot_eid_information (output, &slot_eids, NULL) &&
+        (ext_information->len != physical_slots->len || slot_eids->len != physical_slots->len)) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "UIM Get Slot Status returned malformed response");
+        g_object_unref (task);
+        return;
+    }
+
     ctx->sim_slots = g_ptr_array_new_full (physical_slots->len, (GDestroyNotify) sim_slot_free);
 
     for (i = 0; i < physical_slots->len; i++) {
-        QmiPhysicalSlotStatusSlot *slot_status;
-        MMBaseSim                 *sim;
-        g_autofree gchar          *raw_iccid = NULL;
-        g_autofree gchar          *iccid = NULL;
-        g_autoptr(GError)          inner_error = NULL;
-        gboolean                   sim_active = FALSE;
+        QmiPhysicalSlotStatusSlot      *slot_status;
+        QmiPhysicalSlotInformationSlot *slot_info;
+        MMBaseSim                      *sim;
+        g_autofree gchar               *raw_iccid = NULL;
+        g_autofree gchar               *iccid = NULL;
+        g_autofree gchar               *eid = NULL;
+        g_autoptr(GError)               inner_error = NULL;
+        gboolean                        sim_active = FALSE;
 
         /* Store active slot info */
         slot_status = &g_array_index (physical_slots, QmiPhysicalSlotStatusSlot, i);
@@ -3438,12 +3455,26 @@ uim_get_slot_status_ready (QmiClientUim *client,
             continue;
         }
 
+        if (ext_information && slot_eids) {
+            slot_info = &g_array_index (ext_information, QmiPhysicalSlotInformationSlot, i);
+            if (slot_info->is_euicc) {
+                GArray *slot_eid;
+
+                slot_eid = g_array_index (slot_eids, GArray *, i);
+                if (slot_eid->len)
+                    eid = mm_qmi_uim_decode_eid (slot_eid->data, slot_eid->len);
+                if (!eid)
+                    mm_obj_dbg (self, "SIM in slot %d is marked as eUICC, but has malformed EID", i + 1);
+            }
+        }
+
         sim = mm_sim_qmi_new_initialized (MM_BASE_MODEM (self),
                                           TRUE, /* consider DMS UIM deprecated if we're creating SIM slots */
                                           i + 1, /* slot number is the array index starting at 1 */
                                           sim_active,
                                           iccid,
                                           NULL,  /* imsi unknown */
+                                          eid,   /* may be NULL, which is fine */
                                           NULL,  /* operator id unknown */
                                           NULL,  /* operator name unknown */
                                           NULL); /* emergency numbers unknown */

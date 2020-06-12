@@ -2026,3 +2026,17 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
     *o_lock = lock;
     return TRUE;
 }
+
+/*************************************************************************/
+/* EID parsing */
+
+#define EID_BYTE_LENGTH 16
+
+gchar *
+mm_qmi_uim_decode_eid (const gchar *eid, gsize eid_len)
+{
+    if (eid_len != EID_BYTE_LENGTH)
+        return NULL;
+
+    return mm_bcd_to_string ((const guint8 *) eid, eid_len, FALSE /* low_nybble_first */);
+}

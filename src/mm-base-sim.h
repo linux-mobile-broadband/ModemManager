@@ -175,6 +175,7 @@ MMBaseSim   *mm_base_sim_new_initialized            (MMBaseModem *modem,
                                                      gboolean     active,
                                                      const gchar *sim_identifier,
                                                      const gchar *imsi,
+                                                     const gchar *eid,
                                                      const gchar *operator_identifier,
                                                      const gchar *operator_name,
                                                      const GStrv  emergency_numbers);
