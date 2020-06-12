@@ -2766,11 +2766,18 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
             g_free (new_operator_id);
     }
 
-    /* Report new registration states */
+    /* Report new registration states. The QMI serving system API reports "CS"
+     * and "PS" registration states, and if the device is in LTE, we'll take the "PS"
+     * one as "EPS". But, if the device is not in LTE, we should also set the "EPS"
+     * state as unknown, so that the "PS" one takes precedence when building
+     * the consolidated registration state (otherwise we may be using some old cached
+     * "EPS" state wrongly). */
     mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), mm_cs_registration_state);
     mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state);
-    if (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_LTE)
-        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), mm_ps_registration_state);
+    if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
+        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                           (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_LTE) ?
+                                                           mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
 
     /* Get 3GPP location LAC/TAC and CI */
     lac = 0;
