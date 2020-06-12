@@ -96,6 +96,13 @@
     <property name="Imsi" type="s" access="read" />
 
     <!--
+        Eid:
+
+        The EID of the SIM card, if any.
+    -->
+    <property name="Eid" type="s" access="read" />
+
+    <!--
         OperatorId:
 
         The ID of the network operator that issued the SIM card,

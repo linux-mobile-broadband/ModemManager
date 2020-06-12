@@ -3110,6 +3110,8 @@ MmGdbusSimIface
 mm_gdbus_sim_get_active
 mm_gdbus_sim_get_imsi
 mm_gdbus_sim_dup_imsi
+mm_gdbus_sim_get_eid
+mm_gdbus_sim_dup_eid
 mm_gdbus_sim_get_sim_identifier
 mm_gdbus_sim_dup_sim_identifier
 mm_gdbus_sim_get_operator_identifier

@@ -1503,6 +1503,7 @@ typedef enum {
     INITIALIZATION_STEP_WAIT_READY,
     INITIALIZATION_STEP_SIM_IDENTIFIER,
     INITIALIZATION_STEP_IMSI,
+    INITIALIZATION_STEP_EID,
     INITIALIZATION_STEP_OPERATOR_ID,
     INITIALIZATION_STEP_OPERATOR_NAME,
     INITIALIZATION_STEP_EMERGENCY_NUMBERS,
@@ -1631,6 +1632,7 @@ init_load_emergency_numbers_ready (MMBaseSim    *self,
     }
 
 STR_REPLY_READY_FN (imsi, "IMSI")
+STR_REPLY_READY_FN (eid, "EID")
 STR_REPLY_READY_FN (operator_identifier, "operator identifier")
 STR_REPLY_READY_FN (operator_name, "operator name")
 
@@ -1708,6 +1710,22 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_imsi (
                 self,
                 (GAsyncReadyCallback)init_load_imsi_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case INITIALIZATION_STEP_EID:
+        /* EID is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_sim_get_eid (MM_GDBUS_SIM (self)) == NULL &&
+            MM_BASE_SIM_GET_CLASS (self)->load_eid &&
+            MM_BASE_SIM_GET_CLASS (self)->load_eid_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_eid (
+                self,
+                (GAsyncReadyCallback)init_load_eid_ready,
                 task);
             return;
         }
@@ -1807,6 +1825,7 @@ initable_init_async (GAsyncInitable *initable,
 {
     mm_gdbus_sim_set_sim_identifier (MM_GDBUS_SIM (initable), NULL);
     mm_gdbus_sim_set_imsi (MM_GDBUS_SIM (initable), NULL);
+    mm_gdbus_sim_set_eid (MM_GDBUS_SIM (initable), NULL);
     mm_gdbus_sim_set_operator_identifier (MM_GDBUS_SIM (initable), NULL);
     mm_gdbus_sim_set_operator_name (MM_GDBUS_SIM (initable), NULL);
 
