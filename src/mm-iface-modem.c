@@ -5574,6 +5574,12 @@ mm_iface_modem_is_3gpp_lte (MMIfaceModem *self)
 }
 
 gboolean
+mm_iface_modem_is_3gpp_5gnr (MMIfaceModem *self)
+{
+    return (mm_iface_modem_get_current_capabilities (self) & MM_MODEM_CAPABILITY_5GNR);
+}
+
+gboolean
 mm_iface_modem_is_cdma (MMIfaceModem *self)
 {
     return (mm_iface_modem_get_current_capabilities (self) & MM_MODEM_CAPABILITY_CDMA_EVDO);

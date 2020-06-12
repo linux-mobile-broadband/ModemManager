@@ -2778,6 +2778,12 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                            (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_LTE) ?
                                                            mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+    /* Same thing for "5GS" state */
+    if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
+        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                           (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_5GNR) ?
+                                                           mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+
 
     /* Get 3GPP location LAC/TAC and CI */
     lac = 0;
