@@ -203,6 +203,9 @@ mm_kernel_device_cmp (MMKernelDevice *a,
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE (a), FALSE);
     g_return_val_if_fail (MM_IS_KERNEL_DEVICE (b), FALSE);
 
+    if (G_OBJECT_TYPE (a) != G_OBJECT_TYPE (b))
+        return G_OBJECT_TYPE (a) < G_OBJECT_TYPE (b);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (a)->cmp ?
             MM_KERNEL_DEVICE_GET_CLASS (a)->cmp (a, b) :
             FALSE);
