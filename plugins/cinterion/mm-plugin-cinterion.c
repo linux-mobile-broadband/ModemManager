@@ -35,6 +35,10 @@
 #include "mm-broadband-modem-qmi-cinterion.h"
 #endif
 
+#if defined WITH_MBIM
+#include "mm-broadband-modem-mbim.h"
+#endif
+
 G_DEFINE_TYPE (MMPluginCinterion, mm_plugin_cinterion, MM_TYPE_PLUGIN)
 
 MM_PLUGIN_DEFINE_MAJOR_VERSION
@@ -124,6 +128,17 @@ create_modem (MMPlugin *self,
     }
 #endif
 
+#if defined WITH_MBIM
+    if (mm_port_probe_list_has_mbim_port (probes)) {
+        mm_obj_dbg (self, "MBIM-powered Cinterion modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
+                                                           drivers,
+                                                           mm_plugin_get_name (self),
+                                                           vendor,
+                                                           product));
+    }
+#endif
+
     return MM_BASE_MODEM (mm_broadband_modem_cinterion_new (uid,
                                                             drivers,
                                                             mm_plugin_get_name (self),
@@ -182,6 +197,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
                       MM_PLUGIN_ALLOWED_AT,             TRUE,
                       MM_PLUGIN_ALLOWED_QMI,            TRUE,
+                      MM_PLUGIN_ALLOWED_MBIM,           TRUE,
                       MM_PLUGIN_CUSTOM_INIT,            &custom_init,
                       NULL));
 }
