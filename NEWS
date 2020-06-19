@@ -126,6 +126,7 @@ The most important features and changes in this release are the following:
    ** cinterion: skip sim ready check for modules that don't support it.
    ** cinterion: implemented radio/band handling for LTE modems.
    ** cinterion: added Signal interface support bsaed on AT^SMONI.
+   ** cinterion: added support for MBIM based devices like the PLS62-W.
    ** quectel: updated to detect SIM hot swap via +QUSIM URCs.
    ** fibocom: added support for QMI based devices like the FM150.
    ** ublox: ignore error when disconnecting last LTE bearer.
