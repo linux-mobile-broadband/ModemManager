@@ -1,4 +1,28 @@
 
+ModemManager 1.12.12
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+The list of changes in this version includes:
+
+ * Voice interface:
+   ** Fix assertion in call setup/teardown logic.
+
+ * Plugins:
+   ** quectel: added port type hints for the EG95, EC25 and EG95.
+   ** telit: added port type hints for the LE910C1.
+   ** zte: added port type hints for the MF667.
+   ** huawei: ignore NDISDUP disconnection errors.
+   ** cinterion: added PLS62 port type hints.
+   ** wavecom: fix loading current capabilities.
+
+ * Blacklist:
+   ** Added a chinese clone of Arduino nano.
+   ** Added USB CEC adapters.
+
+ * Several other minor fixes.
+
+
 ModemManager 1.12.10
 -------------------------------------------
 This is a new bugfix release of ModemManager.
