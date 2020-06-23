@@ -68,6 +68,7 @@ clear_values (MMIfaceModemSignal *self)
     mm_gdbus_modem_signal_set_gsm  (skeleton, NULL);
     mm_gdbus_modem_signal_set_umts (skeleton, NULL);
     mm_gdbus_modem_signal_set_lte  (skeleton, NULL);
+    mm_gdbus_modem_signal_set_nr5g  (skeleton, NULL);
     g_object_unref (skeleton);
 }
 
@@ -82,6 +83,7 @@ load_values_ready (MMIfaceModemSignal *self,
     MMSignal *gsm = NULL;
     MMSignal *umts = NULL;
     MMSignal *lte = NULL;
+    MMSignal *nr5g = NULL;
     MmGdbusModemSignal *skeleton;
 
     if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values_finish (
@@ -92,6 +94,7 @@ load_values_ready (MMIfaceModemSignal *self,
             &gsm,
             &umts,
             &lte,
+            &nr5g,
             &error)) {
         mm_obj_warn (self, "couldn't load extended signal information: %s", error->message);
         g_error_free (error);
@@ -146,6 +149,15 @@ load_values_ready (MMIfaceModemSignal *self,
         g_object_unref (lte);
     } else
         mm_gdbus_modem_signal_set_lte (skeleton, NULL);
+
+    if (nr5g) {
+        dictionary = mm_signal_get_dictionary (nr5g);
+        mm_gdbus_modem_signal_set_nr5g (skeleton, dictionary);
+        g_variant_unref (dictionary);
+        g_object_unref (nr5g);
+    } else
+        mm_gdbus_modem_signal_set_nr5g (skeleton, NULL);
+
 
     /* Flush right away */
     g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));

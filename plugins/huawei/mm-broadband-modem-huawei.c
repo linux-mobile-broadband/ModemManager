@@ -87,6 +87,7 @@ typedef struct {
     MMSignal *gsm;
     MMSignal *umts;
     MMSignal *lte;
+    MMSignal *nr5g;
 } DetailedSignal;
 
 struct _MMBroadbandModemHuaweiPrivate {
@@ -4209,6 +4210,7 @@ signal_load_values_finish (MMIfaceModemSignal *self,
                            MMSignal **gsm,
                            MMSignal **umts,
                            MMSignal **lte,
+                           MMSignal **nr5g,
                            GError **error)
 {
     DetailedSignal *signals;
@@ -4222,6 +4224,7 @@ signal_load_values_finish (MMIfaceModemSignal *self,
     *gsm  = signals->gsm ? g_object_ref (signals->gsm) : NULL;
     *umts = signals->umts ? g_object_ref (signals->umts) : NULL;
     *lte  = signals->lte ? g_object_ref (signals->lte) : NULL;
+    *nr5g = signals->nr5g ? g_object_ref (signals->nr5g) : NULL;
 
     detailed_signal_free (signals);
     return TRUE;

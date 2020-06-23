@@ -53,6 +53,7 @@ typedef enum {
     UPDATED_PROPERTY_TYPE_GSM  = 2,
     UPDATED_PROPERTY_TYPE_UMTS = 3,
     UPDATED_PROPERTY_TYPE_LTE  = 4,
+    UPDATED_PROPERTY_TYPE_NR5G = 5,
     UPDATED_PROPERTY_TYPE_LAST
 } UpdatedPropertyType;
 
@@ -250,6 +251,13 @@ lte_updated (MMModemSignal *self,
     values_updated (self, pspec, UPDATED_PROPERTY_TYPE_LTE);
 }
 
+static void
+nr5g_updated (MMModemSignal *self,
+             GParamSpec *pspec)
+{
+    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_NR5G);
+}
+
 typedef GVariant * (* Getter)          (MmGdbusModemSignal *self);
 typedef GVariant * (* Dupper)          (MmGdbusModemSignal *self);
 typedef void       (* UpdatedCallback) (MMModemSignal *self, GParamSpec *pspec);
@@ -265,7 +273,8 @@ static const SignalData signal_data [UPDATED_PROPERTY_TYPE_LAST] = {
     { "notify::evdo", mm_gdbus_modem_signal_get_evdo, mm_gdbus_modem_signal_dup_evdo, evdo_updated },
     { "notify::gsm",  mm_gdbus_modem_signal_get_gsm,  mm_gdbus_modem_signal_dup_gsm,  gsm_updated  },
     { "notify::umts", mm_gdbus_modem_signal_get_umts, mm_gdbus_modem_signal_dup_umts, umts_updated },
-    { "notify::lte",  mm_gdbus_modem_signal_get_lte,  mm_gdbus_modem_signal_dup_lte,  lte_updated  }
+    { "notify::lte",  mm_gdbus_modem_signal_get_lte,  mm_gdbus_modem_signal_dup_lte,  lte_updated  },
+    { "notify::nr5g", mm_gdbus_modem_signal_get_nr5g, mm_gdbus_modem_signal_dup_nr5g, nr5g_updated }
 };
 
 static void
@@ -572,6 +581,33 @@ mm_modem_signal_get_lte (MMModemSignal *self)
 }
 
 /**
+ * mm_modem_signal_get_nr5g:
+ * @self: A #MMModem.
+ *
+ * Gets a #MMSignal object specifying the 5G signal information.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_signal_get_nr5g() again to get a new #MMSignal with the new values.
+ * </warning>
+ *
+ * Returns: (transfer full): A #MMSignal that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.16
+ */
+MMSignal *
+mm_modem_signal_get_nr5g (MMModemSignal *self)
+{
+    MMSignal *info = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_NR5G);
+    return info;
+}
+
+/**
  * mm_modem_signal_peek_lte:
  * @self: A #MMModem.
  *
@@ -593,6 +629,30 @@ mm_modem_signal_peek_lte (MMModemSignal *self)
 
     ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_LTE);
     return self->priv->values[UPDATED_PROPERTY_TYPE_LTE].info;
+}
+
+/**
+ * mm_modem_signal_peek_nr5g:
+ * @self: A #MMModem.
+ *
+ * Gets a #MMSignal object specifying the 5G signal information.
+ *
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_signal_get_nr5g() if on another thread.</warning>
+ *
+ * Returns: (transfer none): A #MMSignal. Do not free the returned value, it
+ * belongs to @self.
+ *
+ * Since: 1.16
+ */
+MMSignal *
+mm_modem_signal_peek_nr5g (MMModemSignal *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+
+    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_NR5G);
+    return self->priv->values[UPDATED_PROPERTY_TYPE_NR5G].info;
 }
 
 /*****************************************************************************/

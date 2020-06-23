@@ -140,6 +140,7 @@ gboolean          mm_shared_xmm_signal_load_values_finish      (MMIfaceModemSign
                                                                 MMSignal           **gsm,
                                                                 MMSignal           **umts,
                                                                 MMSignal           **lte,
+                                                                MMSignal           **nr5g,
                                                                 GError             **error);
 void              mm_shared_xmm_signal_load_values             (MMIfaceModemSignal  *self,
                                                                 GCancellable        *cancellable,

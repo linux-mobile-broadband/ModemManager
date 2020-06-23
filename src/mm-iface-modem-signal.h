@@ -54,6 +54,7 @@ struct _MMIfaceModemSignal {
                                      MMSignal **gsm,
                                      MMSignal **umts,
                                      MMSignal **lte,
+                                     MMSignal **nr5g,
                                      GError **error);
 };
 

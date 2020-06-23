@@ -761,6 +761,7 @@ mm_shared_xmm_signal_load_values_finish (MMIfaceModemSignal  *self,
                                          MMSignal           **gsm,
                                          MMSignal           **umts,
                                          MMSignal           **lte,
+                                         MMSignal           **nr5g,
                                          GError             **error)
 {
     const gchar *response;
@@ -773,6 +774,8 @@ mm_shared_xmm_signal_load_values_finish (MMIfaceModemSignal  *self,
         *cdma = NULL;
     if (evdo)
         *evdo = NULL;
+    if (nr5g)
+        *nr5g = NULL;
 
     return TRUE;
 }

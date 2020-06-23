@@ -97,6 +97,9 @@ MMSignal *mm_modem_signal_peek_umts (MMModemSignal *self);
 MMSignal *mm_modem_signal_get_lte   (MMModemSignal *self);
 MMSignal *mm_modem_signal_peek_lte  (MMModemSignal *self);
 
+MMSignal *mm_modem_signal_get_nr5g  (MMModemSignal *self);
+MMSignal *mm_modem_signal_peek_nr5g (MMModemSignal *self);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_SIGNAL_H_ */

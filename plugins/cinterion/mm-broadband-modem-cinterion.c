@@ -2187,13 +2187,14 @@ signal_load_values_finish (MMIfaceModemSignal  *_self,
                            MMSignal           **gsm,
                            MMSignal           **umts,
                            MMSignal           **lte,
+                           MMSignal           **nr5g,
                            GError             **error)
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar *response;
 
     if (self->priv->smoni_support == FEATURE_NOT_SUPPORTED)
-        return iface_modem_signal_parent->load_values_finish (_self, res, cdma, evdo, gsm, umts, lte, error);
+        return iface_modem_signal_parent->load_values_finish (_self, res, cdma, evdo, gsm, umts, lte, nr5g, error);
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (_self), res, error);
     if (!response || !mm_cinterion_smoni_response_to_signal_info (response, gsm, umts, lte, error))
@@ -2203,6 +2204,8 @@ signal_load_values_finish (MMIfaceModemSignal  *_self,
         *cdma = NULL;
     if (evdo)
         *evdo = NULL;
+    if (nr5g)
+        *nr5g = NULL;
 
     return TRUE;
 }

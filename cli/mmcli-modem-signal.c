@@ -153,6 +153,9 @@ print_signal_info (void)
     gchar    *lte_rsrp = NULL;
     gchar    *lte_rsrq = NULL;
     gchar    *lte_snr = NULL;
+    gchar    *nr5g_rsrp = NULL;
+    gchar    *nr5g_rsrq = NULL;
+    gchar    *nr5g_snr = NULL;
 
     refresh_rate = g_strdup_printf ("%u", mm_modem_signal_get_rate (ctx->modem_signal));
 
@@ -204,6 +207,16 @@ print_signal_info (void)
             lte_snr = g_strdup_printf ("%.2lf", value);
     }
 
+    signal = mm_modem_signal_peek_nr5g (ctx->modem_signal);
+    if (signal) {
+        if ((value = mm_signal_get_rsrq (signal)) != MM_SIGNAL_UNKNOWN)
+            nr5g_rsrq = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_rsrp (signal)) != MM_SIGNAL_UNKNOWN)
+            nr5g_rsrp = g_strdup_printf ("%.2lf", value);
+        if ((value = mm_signal_get_snr (signal)) != MM_SIGNAL_UNKNOWN)
+            nr5g_snr = g_strdup_printf ("%.2lf", value);
+    }
+
     mmcli_output_string_take_typed (MMC_F_SIGNAL_REFRESH_RATE, refresh_rate, "seconds");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_CDMA1X_RSSI,  cdma1x_rssi,  "dBm");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_CDMA1X_ECIO,  cdma1x_ecio,  "dBm");
@@ -219,6 +232,9 @@ print_signal_info (void)
     mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_RSRQ,     lte_rsrq,     "dB");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_RSRP,     lte_rsrp,     "dBm");
     mmcli_output_string_take_typed (MMC_F_SIGNAL_LTE_SNR,      lte_snr,      "dB");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_5G_RSRQ,      nr5g_rsrq,    "dB");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_5G_RSRP,      nr5g_rsrp,    "dBm");
+    mmcli_output_string_take_typed (MMC_F_SIGNAL_5G_SNR,       nr5g_snr,     "dB");
     mmcli_output_dump ();
 }
 

@@ -221,5 +221,43 @@
     -->
     <property name="Lte" type="a{sv}" access="read" />
 
+    <!--
+        Nr5g:
+
+        Dictionary of available signal information for the 5G access
+        technology.
+
+        This dictionary is composed of a string key, with an associated data
+        which contains type-specific information.
+
+        <variablelist>
+        <varlistentry><term><literal>"rsrq"</literal></term>
+          <listitem>
+            <para>
+              The 5G RSRQ (Reference Signal Received Quality), in dB, given as
+              a floating point value (signature <literal>"d"</literal>).
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"rsrp"</literal></term>
+          <listitem>
+            <para>
+              The 5G (Reference Signal Received Power), in dBm, given as
+              a floating point value (signature <literal>"d"</literal>).
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"snr"</literal></term>
+          <listitem>
+            <para>
+              The 5G S/R ratio, in dB, given as
+              a floating point value (signature <literal>"d"</literal>).
+            </para>
+          </listitem>
+        </varlistentry>
+        </variablelist>
+    -->
+    <property name="Nr5g" type="a{sv}" access="read" />
+
   </interface>
 </node>

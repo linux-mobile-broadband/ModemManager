@@ -4342,6 +4342,7 @@ typedef struct {
     MMSignal *gsm;
     MMSignal *umts;
     MMSignal *lte;
+    MMSignal *nr5g;
 } SignalLoadValuesResult;
 
 static void
@@ -4361,6 +4362,7 @@ modem_signal_load_values_finish (MMIfaceModemSignal  *self,
                                  MMSignal           **gsm,
                                  MMSignal           **umts,
                                  MMSignal           **lte,
+                                 MMSignal           **nr5g,
                                  GError             **error)
 {
     SignalLoadValuesResult *result;
@@ -4391,6 +4393,8 @@ modem_signal_load_values_finish (MMIfaceModemSignal  *self,
         *cdma = NULL;
     if (evdo)
         *evdo = NULL;
+    if (nr5g)
+        *nr5g = NULL;
     return TRUE;
 }
 
@@ -4489,7 +4493,7 @@ parent_signal_load_values_ready (MMIfaceModemSignal *self,
     result = g_slice_new0 (SignalLoadValuesResult);
     if (!iface_modem_signal_parent->load_values_finish (self, res,
                                                         NULL, NULL,
-                                                        &result->gsm, &result->umts, &result->lte,
+                                                        &result->gsm, &result->umts, &result->lte, &result->nr5g,
                                                         &error)) {
         signal_load_values_result_free (result);
         g_task_return_error (task, error);
