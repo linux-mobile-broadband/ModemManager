@@ -4739,17 +4739,17 @@ common_enable_disable_unsolicited_events_signal_strength (GTask *task)
     g_autoptr(QmiMessageNasSetEventReportInput)  input = NULL;
     g_autoptr(GArray)                            thresholds = NULL;
 
+    /* The device doesn't really like to have many threshold values, so don't
+     * grow this array without checking first */
+    static const gint8 thresholds_data[] = { -80, -40, 0, 40, 80 };
+
     ctx = g_task_get_task_data (task);
 
-    /* Only set thresholds during enable */
-    if (ctx->enable) {
-        /* The device doesn't really like to have many threshold values, so don't
-         * grow this array without checking first */
-        static const gint8 thresholds_data[] = { -80, -40, 0, 40, 80 };
-
-        thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (thresholds_data));
+    /* Only set thresholds during enable, but always create the array anyway,
+     * as the TLV setter expects it */
+    thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (thresholds_data));
+    if (ctx->enable)
         g_array_append_vals (thresholds, thresholds_data, G_N_ELEMENTS (thresholds_data));
-    }
 
     input = qmi_message_nas_set_event_report_input_new ();
     qmi_message_nas_set_event_report_input_set_signal_strength_indicator (
