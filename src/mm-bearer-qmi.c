@@ -433,7 +433,6 @@ typedef struct {
     gchar *apn;
     QmiWdsAuthentication auth;
     gboolean no_ip_family_preference;
-    gboolean default_ip_family_set;
 
     MMBearerIpMethod ip_method;
 
@@ -669,11 +668,8 @@ build_start_network_input (ConnectContext *ctx)
 
     /* Only add the IP family preference TLV if explicitly requested a given
      * family. This TLV may be newer than the Start Network command itself, so
-     * we'll just allow the case where none is specified. Also, don't add this
-     * TLV if we already set a default IP family preference with "WDS Set IP
-     * Family" */
-    if (!ctx->no_ip_family_preference &&
-        !ctx->default_ip_family_set) {
+     * we'll just allow the case where none is specified. */
+    if (!ctx->no_ip_family_preference) {
         qmi_message_wds_start_network_input_set_ip_family_preference (
             input,
             (ctx->running_ipv6 ? QMI_WDS_IP_FAMILY_IPV6 : QMI_WDS_IP_FAMILY_IPV4),
@@ -1015,13 +1011,8 @@ set_ip_family_ready (QmiClientWds *client,
     }
 
     if (error) {
-        /* Ensure we add the IP family preference TLV */
         mm_obj_dbg (self, "couldn't set IP family preference: %s", error->message);
         g_error_free (error);
-        ctx->default_ip_family_set = FALSE;
-    } else {
-        /* No need to add IP family preference */
-        ctx->default_ip_family_set = TRUE;
     }
 
     /* Keep on */
@@ -1406,8 +1397,6 @@ connect_context_step (GTask *task)
             qmi_message_wds_set_ip_family_input_unref (input);
             return;
         }
-
-        ctx->default_ip_family_set = FALSE;
 
         ctx->step++;
         /* fall through */
