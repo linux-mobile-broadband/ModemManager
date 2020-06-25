@@ -433,7 +433,7 @@ dial_3gpp_context_step (GTask *task)
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
                                        command,
-                                       90,
+                                       180,
                                        FALSE,
                                        FALSE,
                                        NULL,
