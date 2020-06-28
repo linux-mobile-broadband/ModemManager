@@ -57,35 +57,25 @@ gboolean                  mm_shared_quectel_setup_sim_hot_swap_finish (MMIfaceMo
                                                                        GAsyncResult *res,
                                                                        GError **error);
 
-void
-mm_shared_quectel_location_load_capabilities (MMIfaceModemLocation *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data);
+void                  mm_shared_quectel_location_load_capabilities        (MMIfaceModemLocation  *self,
+                                                                           GAsyncReadyCallback    callback,
+                                                                           gpointer               user_data);
+MMModemLocationSource mm_shared_quectel_location_load_capabilities_finish (MMIfaceModemLocation  *self,
+                                                                           GAsyncResult          *res,
+                                                                           GError               **error);
+void                  mm_shared_quectel_enable_location_gathering         (MMIfaceModemLocation   *self,
+                                                                           MMModemLocationSource   source,
+                                                                           GAsyncReadyCallback     callback,
+                                                                           gpointer                user_data);
+gboolean              mm_shared_quectel_enable_location_gathering_finish  (MMIfaceModemLocation   *self,
+                                                                           GAsyncResult           *res,
+                                                                           GError                **error);
+void                  mm_shared_quectel_disable_location_gathering        (MMIfaceModemLocation   *self,
+                                                                           MMModemLocationSource   source,
+                                                                           GAsyncReadyCallback     callback,
+                                                                           gpointer                user_data);
+gboolean              mm_shared_quectel_disable_location_gathering_finish (MMIfaceModemLocation   *self,
+                                                                           GAsyncResult           *res,
+                                                                           GError                **error);
 
-MMModemLocationSource
-mm_shared_quectel_location_load_capabilities_finish (MMIfaceModemLocation *self,
-                                   GAsyncResult *res,
-                                   GError **error);
-
-void
-mm_shared_quectel_enable_location_gathering (MMIfaceModemLocation *self,
-                           MMModemLocationSource source,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data);
-
-gboolean
-mm_shared_quectel_enable_location_gathering_finish (MMIfaceModemLocation *self,
-                                   GAsyncResult *res,
-                                   GError **error);
-
-void
-mm_shared_quectel_disable_location_gathering (MMIfaceModemLocation *_self,
-                            MMModemLocationSource source,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data);
-
-gboolean
-mm_shared_quectel_disable_location_gathering_finish (MMIfaceModemLocation *self,
-                                   GAsyncResult *res,
-                                   GError **error);
 #endif  /* MM_SHARED_QUECTEL_H */
