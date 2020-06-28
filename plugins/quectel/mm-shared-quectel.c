@@ -627,12 +627,10 @@ mm_shared_quectel_disable_location_gathering (MMIfaceModemLocation *self,
     if (!(source & priv->provided_sources) &&
         priv->iface_modem_location_parent->disable_location_gathering &&
         priv->iface_modem_location_parent->disable_location_gathering_finish) {
-        // TODO: Is there anything I can do about this long line?
-        priv->iface_modem_location_parent->
-            disable_location_gathering (self,
-                                        source,
-                                        (GAsyncReadyCallback)disable_location_gathering_parent_ready,
-                                        user_data);
+        priv->iface_modem_location_parent->disable_location_gathering (self,
+                                                                       source,
+                                                                       (GAsyncReadyCallback)disable_location_gathering_parent_ready,
+                                                                       task);
         return;
     }
 
