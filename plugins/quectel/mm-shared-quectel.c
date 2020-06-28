@@ -318,6 +318,14 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
         return;
     }
 
+    /* Now our own check. If we don't have any GPS port, we're done */
+    if (!mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
+        mm_obj_dbg (self, "no GPS data port found: no GPS capabilities");
+        g_task_return_int (task, sources);
+        g_object_unref (task);
+        return;
+    }
+
     /* Store parent supported sources in task data */
     g_task_set_task_data (task, GUINT_TO_POINTER (sources), NULL);
 
