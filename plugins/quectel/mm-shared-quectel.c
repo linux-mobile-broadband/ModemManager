@@ -30,6 +30,49 @@
 #include "mm-shared-quectel.h"
 
 /*****************************************************************************/
+/* Private context */
+
+#define PRIVATE_TAG "shared-quectel-private-tag"
+static GQuark private_quark;
+
+typedef enum {
+    FEATURE_SUPPORT_UNKNOWN,
+    FEATURE_NOT_SUPPORTED,
+    FEATURE_SUPPORTED,
+} FeatureSupport;
+
+typedef struct {
+    MMIfaceModemLocation  *iface_modem_location_parent;
+    MMModemLocationSource  provided_sources;
+    MMModemLocationSource  enabled_sources;
+    FeatureSupport         qgps_supported;
+} Private;
+
+static Private *
+get_private (MMSharedQuectel *self)
+{
+    Private *priv;
+
+    if (G_UNLIKELY (!private_quark))
+        private_quark = g_quark_from_static_string (PRIVATE_TAG);
+
+    priv = g_object_get_qdata (G_OBJECT (self), private_quark);
+    if (!priv) {
+        priv = g_slice_new0 (Private);
+
+        priv->provided_sources  = MM_MODEM_LOCATION_SOURCE_NONE;
+        priv->enabled_sources   = MM_MODEM_LOCATION_SOURCE_NONE;
+        priv->qgps_supported    = FEATURE_SUPPORT_UNKNOWN;
+
+        g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_location_interface);
+        priv->iface_modem_location_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_location_interface (self);
+
+        g_object_set_qdata (G_OBJECT (self), private_quark, priv);
+    }
+    return priv;
+}
+
+/*****************************************************************************/
 /* Firmware update settings loading (Firmware interface) */
 
 MMFirmwareUpdateSettings *
@@ -165,9 +208,6 @@ mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem *self,
 /*****************************************************************************/
 /* Location State Variables */
 
-#define PRIVATE_TAG "shared-quectel-private-tag"
-static GQuark private_quark;
-
 static const gchar *gps_startup[] = {
     /* NOTES:
      *  1) "+QGPSCFG=\"nmeasrc\",1" will be necessary for getting location data
@@ -187,19 +227,6 @@ typedef struct {
     GError               *command_error;
 } LocationGatheringContext;
 
-typedef enum {
-    FEATURE_SUPPORT_UNKNOWN,
-    FEATURE_NOT_SUPPORTED,
-    FEATURE_SUPPORTED,
-} FeatureSupport;
-
-typedef struct {
-    MMIfaceModemLocation  *iface_modem_location_parent;
-    MMModemLocationSource  provided_sources;
-    MMModemLocationSource  enabled_sources;
-    FeatureSupport         qgps_supported;
-} Private;
-
 static void
 location_gathering_context_free (LocationGatheringContext *ctx)
 {
@@ -215,30 +242,6 @@ location_gathering_context_new (MMModemLocationSource source)
     ctx = g_slice_new0 (LocationGatheringContext);
     ctx->source = source;
     return ctx;
-}
-
-static Private *
-get_private (MMSharedQuectel *self)
-{
-    Private *priv;
-
-    if (G_UNLIKELY (!private_quark))
-        private_quark = g_quark_from_static_string (PRIVATE_TAG);
-
-    priv = g_object_get_qdata (G_OBJECT (self), private_quark);
-    if (!priv) {
-        priv = g_slice_new0 (Private);
-
-        priv->provided_sources  = MM_MODEM_LOCATION_SOURCE_NONE;
-        priv->enabled_sources   = MM_MODEM_LOCATION_SOURCE_NONE;
-        priv->qgps_supported    = FEATURE_SUPPORT_UNKNOWN;
-
-        g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_location_interface);
-        priv->iface_modem_location_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_location_interface (self);
-
-        g_object_set_qdata (G_OBJECT (self), private_quark, priv);
-    }
-    return priv;
 }
 
 /*****************************************************************************/
