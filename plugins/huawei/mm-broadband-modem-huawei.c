@@ -3886,23 +3886,9 @@ gps_disabled_ready (MMBaseModem  *self,
                     GAsyncResult *res,
                     GTask        *task)
 {
-    MMModemLocationSource  source;
-    GError                *error = NULL;
+    GError *error = NULL;
 
-    mm_base_modem_at_command_finish (self, res, &error);
-
-    /* Only use the GPS port in NMEA/RAW setups */
-    source = GPOINTER_TO_UINT (g_task_get_task_data (task));
-    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        MMPortSerialGps *gps_port;
-
-        /* Even if we get an error here, we try to close the GPS port */
-        gps_port = mm_base_modem_peek_port_gps (self);
-        if (gps_port)
-            mm_port_serial_close (MM_PORT_SERIAL (gps_port));
-    }
-
-    if (error)
+    if (!mm_base_modem_at_command_finish (self, res, &error))
         g_task_return_error (task, error);
     else
         g_task_return_boolean (task, TRUE);
@@ -3916,25 +3902,30 @@ disable_location_gathering (MMIfaceModemLocation  *_self,
                             gpointer               user_data)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
-    gboolean                stop_gps = FALSE;
     GTask                  *task;
 
+    /* NOTE: no parent disable_location_gathering() implementation */
+
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, GUINT_TO_POINTER (source), NULL);
+
+    self->priv->enabled_sources &= ~source;
 
     /* Only stop GPS engine if no GPS-related sources enabled */
-    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                  MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                  MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
-        self->priv->enabled_sources &= ~source;
+    if ((source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                   MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                   MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) &&
+        !(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                         MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                         MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))) {
+        MMPortSerialGps *gps_port;
 
-        if (!(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                             MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)))
-            stop_gps = TRUE;
-    }
+        /* Close the data port if we don't need it anymore */
+        if (source & (MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA)) {
+            gps_port = mm_base_modem_peek_port_gps (MM_BASE_MODEM (self));
+            if (gps_port)
+                mm_port_serial_close (MM_PORT_SERIAL (gps_port));
+        }
 
-    if (stop_gps) {
         mm_base_modem_at_command (MM_BASE_MODEM (_self),
                                   "^WPEND",
                                   3,
@@ -4026,17 +4017,15 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
 
     source = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
-    /* NMEA and RAW are both enabled in the same way */
-    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                  MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                  MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
-        /* Only start GPS engine if not done already */
-        if (!(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                                             MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                                             MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)))
-            start_gps = TRUE;
-        self->priv->enabled_sources |= source;
-    }
+    /* Only start GPS engine if not done already */
+    start_gps = ((source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                            MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                            MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) &&
+                 !(self->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                                  MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                                  MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)));
+
+    self->priv->enabled_sources |= source;
 
     if (start_gps) {
         mm_base_modem_at_sequence (
