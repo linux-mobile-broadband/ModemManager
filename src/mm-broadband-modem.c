@@ -368,30 +368,6 @@ ports_context_new (void)
 }
 
 /*****************************************************************************/
-
-static gboolean
-response_processor_string_ignore_at_errors (MMBaseModem *self,
-                                            gpointer none,
-                                            const gchar *command,
-                                            const gchar *response,
-                                            gboolean last_command,
-                                            const GError *error,
-                                            GVariant **result,
-                                            GError **result_error)
-{
-    if (error) {
-        /* Ignore AT errors (ie, ERROR or CMx ERROR) */
-        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
-            *result_error = g_error_copy (error);
-
-        return FALSE;
-    }
-
-    *result = g_variant_new_string (response);
-    return TRUE;
-}
-
-/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBaseBearer *
@@ -583,27 +559,30 @@ static const ModemCaps modem_caps[] = {
     { NULL }
 };
 
-static gboolean
-parse_caps_gcap (MMBaseModem *self,
-                 gpointer none,
-                 const gchar *command,
-                 const gchar *response,
-                 gboolean last_command,
-                 const GError *error,
-                 GVariant **variant,
-                 GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+parse_caps_gcap (MMBaseModem   *self,
+                 gpointer       none,
+                 const gchar   *command,
+                 const gchar   *response,
+                 gboolean       last_command,
+                 const GError  *error,
+                 GVariant     **result,
+                 GError       **result_error)
 {
     const ModemCaps *cap = modem_caps;
     guint32 ret = 0;
 
+    *result = NULL;
+    *result_error = NULL;
+
     if (!response)
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 
     /* Some modems (Huawei E160g) won't respond to +GCAP with no SIM, but
      * will respond to ATI.  Ignore the error and continue.
      */
-    if (strstr (response, "+CME ERROR:"))
-        return FALSE;
+    if (strstr (response, "+CME ERROR:") || (error && error->domain == MM_MOBILE_EQUIPMENT_ERROR))
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 
     while (cap->name) {
         if (strstr (response, cap->name))
@@ -613,22 +592,25 @@ parse_caps_gcap (MMBaseModem *self,
 
     /* No result built? */
     if (ret == 0)
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 
-    *variant = g_variant_new_uint32 (ret);
-    return TRUE;
+    *result = g_variant_new_uint32 (ret);
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
-static gboolean
-parse_caps_cpin (MMBaseModem *self,
-                 gpointer none,
-                 const gchar *command,
-                 const gchar *response,
-                 gboolean last_command,
-                 const GError *error,
-                 GVariant **result,
-                 GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+parse_caps_cpin (MMBaseModem   *self,
+                 gpointer       none,
+                 const gchar   *command,
+                 const gchar   *response,
+                 gboolean       last_command,
+                 const GError  *error,
+                 GVariant     **result,
+                 GError       **result_error)
 {
+    *result = NULL;
+    *result_error = NULL;
+
     if (!response) {
         if (error &&
             (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
@@ -637,9 +619,9 @@ parse_caps_cpin (MMBaseModem *self,
              g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG))) {
             /* At least, it's a GSM modem */
             *result = g_variant_new_uint32 (MM_MODEM_CAPABILITY_GSM_UMTS);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         }
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     }
 
     if (strcasestr (response, "SIM PIN") ||
@@ -660,23 +642,27 @@ parse_caps_cpin (MMBaseModem *self,
         strcasestr (response, "READY")) {
         /* At least, it's a GSM modem */
         *result = g_variant_new_uint32 (MM_MODEM_CAPABILITY_GSM_UMTS);
-        return TRUE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
     }
-    return FALSE;
+
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 }
 
-static gboolean
-parse_caps_cgmm (MMBaseModem *self,
-                 gpointer none,
-                 const gchar *command,
-                 const gchar *response,
-                 gboolean last_command,
-                 const GError *error,
-                 GVariant **result,
-                 GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+parse_caps_cgmm (MMBaseModem   *self,
+                 gpointer       none,
+                 const gchar   *command,
+                 const gchar   *response,
+                 gboolean       last_command,
+                 const GError  *error,
+                 GVariant     **result,
+                 GError       **result_error)
 {
+    *result = NULL;
+    *result_error = NULL;
+
     if (!response)
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 
     /* This check detects some really old Motorola GPRS dongles and phones */
     if (strstr (response, "GSM900") ||
@@ -685,9 +671,10 @@ parse_caps_cgmm (MMBaseModem *self,
         strstr (response, "GSM850")) {
         /* At least, it's a GSM modem */
         *result = g_variant_new_uint32 (MM_MODEM_CAPABILITY_GSM_UMTS);
-        return TRUE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
     }
-    return FALSE;
+
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 }
 
 static const MMBaseModemAtCommand capabilities[] = {
@@ -942,8 +929,8 @@ modem_load_manufacturer_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand manufacturers[] = {
-    { "+CGMI",  3, TRUE, response_processor_string_ignore_at_errors },
-    { "+GMI",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGMI",  3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
+    { "+GMI",   3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -982,8 +969,8 @@ modem_load_model_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand models[] = {
-    { "+CGMM",  3, TRUE, response_processor_string_ignore_at_errors },
-    { "+GMM",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGMM",  3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
+    { "+GMM",   3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -1022,8 +1009,8 @@ modem_load_revision_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand revisions[] = {
-    { "+CGMR",  3, TRUE, response_processor_string_ignore_at_errors },
-    { "+GMR",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGMR",  3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
+    { "+GMR",   3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -1082,8 +1069,8 @@ modem_load_equipment_identifier_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand equipment_identifiers[] = {
-    { "+CGSN",  3, TRUE, response_processor_string_ignore_at_errors },
-    { "+GSN",   3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CGSN",  3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
+    { "+GSN",   3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -2099,8 +2086,8 @@ signal_quality_csq_ready (MMBroadbandModem *self,
  * try the other command if the first one fails.
  */
 static const MMBaseModemAtCommand signal_quality_csq_sequence[] = {
-    { "+CSQ",  3, FALSE, response_processor_string_ignore_at_errors },
-    { "+CSQ?", 3, FALSE, response_processor_string_ignore_at_errors },
+    { "+CSQ",  3, FALSE, mm_base_modem_response_processor_string_ignore_at_errors },
+    { "+CSQ?", 3, FALSE, mm_base_modem_response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -5269,23 +5256,27 @@ modem_3gpp_enable_disable_unsolicited_registration_events_finish (MMIfaceModem3g
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static gboolean
-parse_registration_setup_reply (MMBaseModem *self,
-                                gpointer none,
-                                const gchar *command,
-                                const gchar *response,
-                                gboolean last_command,
+static MMBaseModemAtResponseProcessorResult
+parse_registration_setup_reply (MMBaseModem  *self,
+                                gpointer      none,
+                                const gchar  *command,
+                                const gchar  *response,
+                                gboolean      last_command,
                                 const GError *error,
-                                GVariant **result,
-                                GError **result_error)
+                                GVariant    **result,
+                                GError      **result_error)
 {
+    *result_error = NULL;
+
     /* If error, try next command */
-    if (error)
-        return FALSE;
+    if (error) {
+        *result = NULL;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
+    }
 
     /* Set COMMAND as result! */
     *result = g_variant_new_string (command);
-    return TRUE;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
 static const MMBaseModemAtCommand cs_registration_sequence[] = {
@@ -7060,28 +7051,31 @@ modem_messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static gboolean
-cnmi_response_processor (MMBaseModem *self,
-                         gpointer none,
-                         const gchar *command,
-                         const gchar *response,
-                         gboolean last_command,
-                         const GError *error,
-                         GVariant **result,
-                         GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+cnmi_response_processor (MMBaseModem   *self,
+                         gpointer       none,
+                         const gchar   *command,
+                         const gchar   *response,
+                         gboolean       last_command,
+                         const GError  *error,
+                         GVariant     **result,
+                         GError       **result_error)
 {
+    *result = NULL;
+    *result_error = NULL;
+
     if (error) {
         /* If we get a not-supported error and we're not in the last command, we
          * won't set 'result_error', so we'll keep on the sequence */
-        if (!g_error_matches (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_NOT_SUPPORTED) ||
-            last_command)
+        if (!g_error_matches (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_NOT_SUPPORTED) || last_command) {
             *result_error = g_error_copy (error);
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
 
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     }
 
-    *result = NULL;
-    return TRUE;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
 static const MMBaseModemAtCommand cnmi_sequence[] = {

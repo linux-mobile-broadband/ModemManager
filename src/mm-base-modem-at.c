@@ -90,18 +90,18 @@ modem_cancellable_cancelled (GCancellable *modem_cancellable,
 /* AT sequence handling */
 
 typedef struct {
-    MMBaseModem *self;
-    MMPortSerialAt *port;
-    GCancellable *cancellable;
-    gulong cancelled_id;
-    GCancellable *modem_cancellable;
-    GCancellable *user_cancellable;
+    MMBaseModem                *self;
+    MMPortSerialAt             *port;
+    GCancellable               *cancellable;
+    gulong                      cancelled_id;
+    GCancellable               *modem_cancellable;
+    GCancellable               *user_cancellable;
     const MMBaseModemAtCommand *current;
     const MMBaseModemAtCommand *sequence;
-    GSimpleAsyncResult *simple;
-    gpointer response_processor_context;
-    GDestroyNotify response_processor_context_free;
-    GVariant *result;
+    GSimpleAsyncResult         *simple;
+    gpointer                    response_processor_context;
+    GDestroyNotify              response_processor_context_free;
+    GVariant                   *result;
 } AtSequenceContext;
 
 static void
@@ -131,15 +131,14 @@ at_sequence_context_free (AtSequenceContext *ctx)
 }
 
 GVariant *
-mm_base_modem_at_sequence_full_finish (MMBaseModem *self,
-                                       GAsyncResult *res,
-                                       gpointer *response_processor_context,
-                                       GError **error)
+mm_base_modem_at_sequence_full_finish (MMBaseModem   *self,
+                                       GAsyncResult  *res,
+                                       gpointer      *response_processor_context,
+                                       GError       **error)
 {
     AtSequenceContext *ctx;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res),
-                                               error))
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
     ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
@@ -153,63 +152,67 @@ mm_base_modem_at_sequence_full_finish (MMBaseModem *self,
 }
 
 static void
-at_sequence_parse_response (MMPortSerialAt *port,
-                            GAsyncResult *res,
+at_sequence_parse_response (MMPortSerialAt    *port,
+                            GAsyncResult      *res,
                             AtSequenceContext *ctx)
 {
-    GVariant *result = NULL;
-    GError *result_error = NULL;
-    gboolean continue_sequence;
-    GSimpleAsyncResult *simple;
-    const gchar *response;
-    GError *error = NULL;
+    MMBaseModemAtResponseProcessorResult  processor_result;
+    GVariant                             *result = NULL;
+    GError                               *result_error = NULL;
+    GSimpleAsyncResult                   *simple;
+    const gchar                          *response;
+    GError                               *error = NULL;
 
     response = mm_port_serial_at_command_finish (port, res, &error);
 
     /* Cancelled? */
     if (g_cancellable_is_cancelled (ctx->cancellable)) {
-        g_simple_async_result_set_error (ctx->simple, G_IO_ERROR, G_IO_ERROR_CANCELLED,
-                                         "AT sequence was cancelled");
-        if (error)
-            g_error_free (error);
+        g_simple_async_result_set_error (ctx->simple, G_IO_ERROR, G_IO_ERROR_CANCELLED, "AT sequence was cancelled");
+        g_clear_error (&error);
         g_simple_async_result_complete (ctx->simple);
         at_sequence_context_free (ctx);
         return;
     }
 
     if (!ctx->current->response_processor)
-        /* No need to process response, go on to next command */
-        continue_sequence = TRUE;
+        processor_result = MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     else {
         const MMBaseModemAtCommand *next = ctx->current + 1;
 
         /* Response processor will tell us if we need to keep on the sequence */
-        continue_sequence = !ctx->current->response_processor (
-            ctx->self,
-            ctx->response_processor_context,
-            ctx->current->command,
-            response,
-            next->command ? FALSE : TRUE,  /* Last command in sequence? */
-            error,
-            &result,
-            &result_error);
-        /* Were we told to abort the sequence? */
-        if (result_error) {
-            g_assert (result == NULL);
-            g_simple_async_result_take_error (ctx->simple, result_error);
-            g_simple_async_result_complete (ctx->simple);
-            at_sequence_context_free (ctx);
-            if (error)
-                g_error_free (error);
-            return;
+        processor_result = ctx->current->response_processor (ctx->self,
+                                                             ctx->response_processor_context,
+                                                             ctx->current->command,
+                                                             response,
+                                                             next->command ? FALSE : TRUE,  /* Last command in sequence? */
+                                                             error,
+                                                             &result,
+                                                             &result_error);
+        switch (processor_result) {
+            case MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE:
+                g_assert (!result && !result_error);
+                break;
+            case MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS:
+                g_assert (!result_error); /* result is optional */
+                break;
+            case MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE:
+                /* On failure, complete with error right away */
+                g_assert (!result && result_error); /* result is optional */
+                g_simple_async_result_take_error (ctx->simple, result_error);
+                g_simple_async_result_complete (ctx->simple);
+                at_sequence_context_free (ctx);
+                if (error)
+                    g_error_free (error);
+                return;
+            default:
+                g_assert_not_reached ();
         }
     }
 
     if (error)
         g_error_free (error);
 
-    if (continue_sequence) {
-        g_assert (result == NULL);
+    if (processor_result == MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE) {
         ctx->current++;
         if (ctx->current->command) {
             /* Schedule the next command in the probing group */
@@ -224,7 +227,6 @@ at_sequence_parse_response (MMPortSerialAt *port,
                 ctx);
             return;
         }
-
         /* On last command, end. */
     }
 
@@ -250,14 +252,14 @@ at_sequence_parse_response (MMPortSerialAt *port,
 }
 
 void
-mm_base_modem_at_sequence_full (MMBaseModem *self,
-                                MMPortSerialAt *port,
+mm_base_modem_at_sequence_full (MMBaseModem                *self,
+                                MMPortSerialAt             *port,
                                 const MMBaseModemAtCommand *sequence,
-                                gpointer response_processor_context,
-                                GDestroyNotify response_processor_context_free,
-                                GCancellable *cancellable,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data)
+                                gpointer                    response_processor_context,
+                                GDestroyNotify              response_processor_context_free,
+                                GCancellable               *cancellable,
+                                GAsyncReadyCallback         callback,
+                                gpointer                    user_data)
 {
     AtSequenceContext *ctx;
 
@@ -354,7 +356,7 @@ mm_base_modem_at_sequence (MMBaseModem *self,
 /*****************************************************************************/
 /* Response processor helpers */
 
-gboolean
+MMBaseModemAtResponseProcessorResult
 mm_base_modem_response_processor_string (MMBaseModem   *self,
                                          gpointer       none,
                                          const gchar   *command,
@@ -365,16 +367,17 @@ mm_base_modem_response_processor_string (MMBaseModem   *self,
                                          GError       **result_error)
 {
     if (error) {
-        /* Abort sequence on command error */
+        *result = NULL;
         *result_error = g_error_copy (error);
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
     }
 
     *result = g_variant_new_string (response);
-    return TRUE;
+    *result_error = NULL;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
-gboolean
+MMBaseModemAtResponseProcessorResult
 mm_base_modem_response_processor_no_result (MMBaseModem   *self,
                                             gpointer       none,
                                             const gchar   *command,
@@ -385,16 +388,17 @@ mm_base_modem_response_processor_no_result (MMBaseModem   *self,
                                             GError       **result_error)
 {
     if (error) {
-        /* Abort sequence on command error */
+        *result = NULL;
         *result_error = g_error_copy (error);
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
     }
 
     *result = NULL;
-    return TRUE;
+    *result_error = NULL;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
-gboolean
+MMBaseModemAtResponseProcessorResult
 mm_base_modem_response_processor_no_result_continue (MMBaseModem   *self,
                                                      gpointer       none,
                                                      const gchar   *command,
@@ -404,15 +408,18 @@ mm_base_modem_response_processor_no_result_continue (MMBaseModem   *self,
                                                      GVariant     **result,
                                                      GError       **result_error)
 {
-    if (error)
-        /* Abort sequence on command error */
-        *result_error = g_error_copy (error);
+    *result = NULL;
 
-    /* Return FALSE so that we keep on with the next steps in the sequence */
-    return FALSE;
+    if (error) {
+        *result_error = g_error_copy (error);
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+    }
+
+    *result_error = NULL;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 }
 
-gboolean
+MMBaseModemAtResponseProcessorResult
 mm_base_modem_response_processor_continue_on_error (MMBaseModem   *self,
                                                     gpointer       none,
                                                     const gchar   *command,
@@ -422,12 +429,40 @@ mm_base_modem_response_processor_continue_on_error (MMBaseModem   *self,
                                                     GVariant     **result,
                                                     GError       **result_error)
 {
-    if (error)
-        /* Ignore errors, continue to next command */
-        return FALSE;
-
     *result = NULL;
-    return TRUE;
+    *result_error = NULL;
+
+    return (error ?
+            MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE :
+            MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS);
+}
+
+MMBaseModemAtResponseProcessorResult
+mm_base_modem_response_processor_string_ignore_at_errors (MMBaseModem   *self,
+                                                          gpointer       none,
+                                                          const gchar   *command,
+                                                          const gchar   *response,
+                                                          gboolean       last_command,
+                                                          const GError  *error,
+                                                          GVariant     **result,
+                                                          GError       **result_error)
+{
+    if (error) {
+        *result = NULL;
+
+        /* Ignore AT errors (ie, ERROR or CMx ERROR) */
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command) {
+
+            *result_error = g_error_copy (error);
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
+
+        *result_error = NULL;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
+    }
+
+    *result = g_variant_new_string (response);
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
 /*****************************************************************************/

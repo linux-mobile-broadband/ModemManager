@@ -21,19 +21,25 @@
 #include "mm-base-modem.h"
 #include "mm-port-serial-at.h"
 
+typedef enum {
+    MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE,
+    MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS,
+    MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE,
+} MMBaseModemAtResponseProcessorResult;
+
 /*
  * The expected result depends on the specific operation, so the GVariant
  * created by the response processor needs to match the one expected in
  * finish().
  *
- * TRUE must be returned when the operation is to be considered successful,
+ * SUCCESS must be returned when the operation is to be considered successful,
  * and a result may be given.
  *
- * FALSE must be returned when:
- *  - A GError is propagated into result_error, which will be treated as a
- *    critical error and therefore the operation will be aborted.
- *  - When no result_error is given, to instruct the operation to go on with
- *    the next scheduled command.
+ * FAILURE must be returned when a GError is propagated into result_error,
+ * which will be treated as a critical error and therefore the operation will be aborted.
+ *
+ * CONTINUE must be returned when neither result nor result_error are given and
+ * the operation should go on with the next scheduled command.
  *
  * This setup, therefore allows:
  *  - Running a single command and processing its result.
@@ -42,14 +48,14 @@
  *  - Running a set of N commands out of M (N<M), where the global result is
  *    obtained without having executed all configured commands.
  */
-typedef gboolean (* MMBaseModemAtResponseProcessor) (MMBaseModem *self,
-                                                     gpointer response_processor_context,
-                                                     const gchar *command,
-                                                     const gchar *response,
-                                                     gboolean last_command,
-                                                     const GError *error,
-                                                     GVariant **result,
-                                                     GError **result_error);
+typedef MMBaseModemAtResponseProcessorResult (* MMBaseModemAtResponseProcessor) (MMBaseModem   *self,
+                                                                                 gpointer       response_processor_context,
+                                                                                 const gchar   *command,
+                                                                                 const gchar   *response,
+                                                                                 gboolean       last_command,
+                                                                                 const GError  *error,
+                                                                                 GVariant     **result,
+                                                                                 GError       **result_error);
 
 /* Struct to configure AT command operations (constant) */
 typedef struct {
@@ -98,28 +104,28 @@ GVariant *mm_base_modem_at_sequence_full_finish (MMBaseModem *self,
  * failure in the command triggers a failure in the sequence. If successful,
  * provides the output result as a STRING.
  */
-gboolean mm_base_modem_response_processor_string (MMBaseModem   *self,
-                                                  gpointer       none,
-                                                  const gchar   *command,
-                                                  const gchar   *response,
-                                                  gboolean       last_command,
-                                                  const GError  *error,
-                                                  GVariant     **result,
-                                                  GError       **result_error);
+MMBaseModemAtResponseProcessorResult mm_base_modem_response_processor_string (MMBaseModem   *self,
+                                                                              gpointer       none,
+                                                                              const gchar   *command,
+                                                                              const gchar   *response,
+                                                                              gboolean       last_command,
+                                                                              const GError  *error,
+                                                                              GVariant     **result,
+                                                                              GError       **result_error);
 
 /*
  * Response processor for commands that are treated as MANDATORY, where a
  * failure in the command triggers a failure in the sequence. If successful,
  * provides the output result as a BOOLEAN.
  */
-gboolean mm_base_modem_response_processor_no_result (MMBaseModem   *self,
-                                                     gpointer       none,
-                                                     const gchar   *command,
-                                                     const gchar   *response,
-                                                     gboolean       last_command,
-                                                     const GError  *error,
-                                                     GVariant     **result,
-                                                     GError       **result_error);
+MMBaseModemAtResponseProcessorResult mm_base_modem_response_processor_no_result (MMBaseModem   *self,
+                                                                                 gpointer       none,
+                                                                                 const gchar   *command,
+                                                                                 const gchar   *response,
+                                                                                 gboolean       last_command,
+                                                                                 const GError  *error,
+                                                                                 GVariant     **result,
+                                                                                 GError       **result_error);
 
 /*
  * Response processor for commands that are treated as MANDATORY, where a
@@ -129,14 +135,14 @@ gboolean mm_base_modem_response_processor_no_result (MMBaseModem   *self,
  * E.g. used when we provide a list of commands and we want to run all of
  * them successfully, and fail the sequence if one of them fails.
  */
-gboolean mm_base_modem_response_processor_no_result_continue (MMBaseModem   *self,
-                                                              gpointer       none,
-                                                              const gchar   *command,
-                                                              const gchar   *response,
-                                                              gboolean       last_command,
-                                                              const GError  *error,
-                                                              GVariant     **result,
-                                                              GError       **result_error);
+MMBaseModemAtResponseProcessorResult mm_base_modem_response_processor_no_result_continue (MMBaseModem   *self,
+                                                                                          gpointer       none,
+                                                                                          const gchar   *command,
+                                                                                          const gchar   *response,
+                                                                                          gboolean       last_command,
+                                                                                          const GError  *error,
+                                                                                          GVariant     **result,
+                                                                                          GError       **result_error);
 
 /*
  * Response processor for commands that are treated as OPTIONAL, where a
@@ -146,15 +152,29 @@ gboolean mm_base_modem_response_processor_no_result_continue (MMBaseModem   *sel
  * E.g. used when we provide a list of commands and we want to stop
  * as soon as one of them doesn't fail.
  */
-gboolean mm_base_modem_response_processor_continue_on_error (MMBaseModem   *self,
-                                                             gpointer       none,
-                                                             const gchar   *command,
-                                                             const gchar   *response,
-                                                             gboolean       last_command,
-                                                             const GError  *error,
-                                                             GVariant     **result,
-                                                             GError       **result_error);
+MMBaseModemAtResponseProcessorResult mm_base_modem_response_processor_continue_on_error (MMBaseModem   *self,
+                                                                                         gpointer       none,
+                                                                                         const gchar   *command,
+                                                                                         const gchar   *response,
+                                                                                         gboolean       last_command,
+                                                                                         const GError  *error,
+                                                                                         GVariant     **result,
+                                                                                         GError       **result_error);
 
+/*
+ * Response processor for commands that are partialy treated as OPTIONAL, where
+ * a failure in the command triggers a failure in the sequence only for non-AT
+ * generic errors. If successful, it finishes the sequence with the response of
+ * the command which didn't fail.
+ */
+MMBaseModemAtResponseProcessorResult mm_base_modem_response_processor_string_ignore_at_errors (MMBaseModem   *self,
+                                                                                               gpointer       none,
+                                                                                               const gchar   *command,
+                                                                                               const gchar   *response,
+                                                                                               gboolean       last_command,
+                                                                                               const GError  *error,
+                                                                                               GVariant     **result,
+                                                                                               GError       **result_error);
 
 /* Generic AT command handling, using the best AT port available and without
  * explicit cancellations. */

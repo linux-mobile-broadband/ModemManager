@@ -184,54 +184,65 @@ load_own_numbers_finish (MMIfaceModem *self,
     return own_numbers;
 }
 
-static gboolean
-response_processor_cnum_ignore_at_errors (MMBaseModem *self,
-                                          gpointer none,
-                                          const gchar *command,
-                                          const gchar *response,
-                                          gboolean last_command,
-                                          const GError *error,
-                                          GVariant **result,
-                                          GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+response_processor_cnum_ignore_at_errors (MMBaseModem   *self,
+                                          gpointer       none,
+                                          const gchar   *command,
+                                          const gchar   *response,
+                                          gboolean       last_command,
+                                          const GError  *error,
+                                          GVariant     **result,
+                                          GError       **result_error)
 {
     GStrv own_numbers;
 
+    *result = NULL;
+    *result_error = NULL;
+
     if (error) {
         /* Ignore AT errors (ie, ERROR or CMx ERROR) */
-        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command) {
             *result_error = g_error_copy (error);
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
 
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     }
 
     own_numbers = mm_3gpp_parse_cnum_exec_response (response);
     if (!own_numbers)
-        return FALSE;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 
     *result = g_variant_new_strv ((const gchar *const *) own_numbers, -1);
     g_strfreev (own_numbers);
-    return TRUE;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
-static gboolean
-response_processor_nwmdn_ignore_at_errors (MMBaseModem *self,
-                                           gpointer none,
-                                           const gchar *command,
-                                           const gchar *response,
-                                           gboolean last_command,
-                                           const GError *error,
-                                           GVariant **result,
-                                           GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+response_processor_nwmdn_ignore_at_errors (MMBaseModem   *self,
+                                           gpointer       none,
+                                           const gchar   *command,
+                                           const gchar   *response,
+                                           gboolean       last_command,
+                                           const GError  *error,
+                                           GVariant     **result,
+                                           GError       **result_error)
 {
     g_auto(GStrv)  own_numbers = NULL;
     GPtrArray     *array;
     gchar         *mdn;
 
+    *result = NULL;
+    *result_error = NULL;
+
     if (error) {
         /* Ignore AT errors (ie, ERROR or CMx ERROR) */
-        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command) {
             *result_error = g_error_copy (error);
-        return FALSE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
+
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     }
 
     mdn = g_strdup (mm_strip_tag (response, "$NWMDN:"));
@@ -242,7 +253,7 @@ response_processor_nwmdn_ignore_at_errors (MMBaseModem *self,
     own_numbers = (GStrv) g_ptr_array_free (array, FALSE);
 
     *result = g_variant_new_strv ((const gchar *const *) own_numbers, -1);
-    return TRUE;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
 }
 
 static const MMBaseModemAtCommand own_numbers_commands[] = {

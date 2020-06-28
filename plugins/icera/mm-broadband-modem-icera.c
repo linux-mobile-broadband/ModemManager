@@ -1223,18 +1223,21 @@ load_supported_bands_ready (MMBaseModem *self,
     g_object_unref (task);
 }
 
-static gboolean
-load_supported_bands_response_processor (MMBaseModem *self,
-                                         gpointer context,
-                                         const gchar *command,
-                                         const gchar *response,
-                                         gboolean last_command,
-                                         const GError *error,
-                                         GVariant **result,
-                                         GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+load_supported_bands_response_processor (MMBaseModem   *self,
+                                         gpointer       context,
+                                         const gchar   *command,
+                                         const gchar   *response,
+                                         gboolean       last_command,
+                                         const GError  *error,
+                                         GVariant     **result,
+                                         GError       **result_error)
 {
-    SupportedBandsContext *ctx = context;
-    Band *b = g_slist_nth_data (ctx->check_bands, ctx->idx++);
+    SupportedBandsContext *ctx;
+    Band                  *b;
+
+    ctx = context;
+    b = g_slist_nth_data (ctx->check_bands, ctx->idx++);
 
     /* If there was no error setting the band, that band is supported.  We
      * abuse the 'enabled' item to mean supported/unsupported.
@@ -1242,7 +1245,7 @@ load_supported_bands_response_processor (MMBaseModem *self,
     b->enabled = !error;
 
     /* Continue to next band */
-    return FALSE;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 }
 
 static void

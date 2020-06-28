@@ -1080,23 +1080,30 @@ load_access_technologies_finish (MMIfaceModem *self,
     return TRUE;
 }
 
-static gboolean
-response_processor_psnt_ignore_at_errors (MMBaseModem *self,
-                                          gpointer none,
-                                          const gchar *command,
-                                          const gchar *response,
-                                          gboolean last_command,
-                                          const GError *error,
-                                          GVariant **result,
-                                          GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+response_processor_psnt_ignore_at_errors (MMBaseModem   *self,
+                                          gpointer       none,
+                                          const gchar   *command,
+                                          const gchar   *response,
+                                          gboolean       last_command,
+                                          const GError  *error,
+                                          GVariant     **result,
+                                          GError       **result_error)
 {
-    const gchar *psnt, *mode;
+    const gchar *psnt;
+    const gchar *mode;
+
+    *result = NULL;
+    *result_error = NULL;
 
     if (error) {
         /* Ignore AT errors (ie, ERROR or CMx ERROR) */
-        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command) {
             *result_error = g_error_copy (error);
-        return FALSE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
+
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     }
 
     psnt = mm_strip_tag (response, "#PSNT:");
@@ -1105,26 +1112,26 @@ response_processor_psnt_ignore_at_errors (MMBaseModem *self,
         switch (atoi (++mode)) {
         case 0:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_GPRS);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         case 1:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_EDGE);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         case 2:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_UMTS);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         case 3:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_HSDPA);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         case 4:
             if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
                 *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_LTE);
             else
                 *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         case 5:
             if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
                 *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-                return TRUE;
+                return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
             }
             /* Fall-through since #PSNT: 5 is not supported in other than lte modems */
         default:
@@ -1137,26 +1144,32 @@ response_processor_psnt_ignore_at_errors (MMBaseModem *self,
                  MM_CORE_ERROR_FAILED,
                  "Failed to parse #PSNT response: '%s'",
                  response);
-    return FALSE;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
 }
 
-static gboolean
-response_processor_service_ignore_at_errors (MMBaseModem *self,
-                                             gpointer none,
-                                             const gchar *command,
-                                             const gchar *response,
-                                             gboolean last_command,
-                                             const GError *error,
-                                             GVariant **result,
-                                             GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+response_processor_service_ignore_at_errors (MMBaseModem   *self,
+                                             gpointer       none,
+                                             const gchar   *command,
+                                             const gchar   *response,
+                                             gboolean       last_command,
+                                             const GError  *error,
+                                             GVariant     **result,
+                                             GError       **result_error)
 {
     const gchar *service;
 
+    *result = NULL;
+    *result_error = NULL;
+
     if (error) {
         /* Ignore AT errors (ie, ERROR or CMx ERROR) */
-        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command) {
             *result_error = g_error_copy (error);
-        return FALSE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
+
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
     }
 
     service = mm_strip_tag (response, "+SERVICE:");
@@ -1164,13 +1177,13 @@ response_processor_service_ignore_at_errors (MMBaseModem *self,
         switch (atoi (service)) {
         case 1:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_1XRTT);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         case 2:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_EVDO0);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         case 3:
             *result = g_variant_new_uint32 (MM_MODEM_ACCESS_TECHNOLOGY_EVDOA);
-            return TRUE;
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
         default:
             break;
         }
@@ -1181,7 +1194,7 @@ response_processor_service_ignore_at_errors (MMBaseModem *self,
                  MM_CORE_ERROR_FAILED,
                  "Failed to parse +SERVICE response: '%s'",
                  response);
-    return FALSE;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
 }
 
 static const MMBaseModemAtCommand access_tech_commands[] = {

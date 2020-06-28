@@ -1780,16 +1780,18 @@ modem_time_check_ready (MMBaseModem *self,
     g_object_unref (task);
 }
 
-static gboolean
-parse_time_reply (MMBaseModem *self,
-                  gpointer none,
-                  const gchar *command,
-                  const gchar *response,
-                  gboolean last_command,
-                  const GError *error,
-                  GVariant **result,
-                  GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+parse_time_reply (MMBaseModem   *self,
+                  gpointer       none,
+                  const gchar   *command,
+                  const gchar   *response,
+                  gboolean       last_command,
+                  const GError  *error,
+                  GVariant     **result,
+                  GError       **result_error)
 {
+    *result_error = NULL;
+
     /* If error, try next command */
     if (!error) {
         if (strstr (command, "!TIME"))
@@ -1799,11 +1801,13 @@ parse_time_reply (MMBaseModem *self,
     }
 
     /* Stop sequence if we get a result, but not on errors */
-    return *result ? TRUE : FALSE;
+    return (*result ?
+            MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS :
+            MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE);
 }
 
 static const MMBaseModemAtCommand time_check_sequence[] = {
-    { "!TIME?", 3, FALSE, parse_time_reply },    /* 3GPP */
+    { "!TIME?",    3, FALSE, parse_time_reply }, /* 3GPP */
     { "!SYSTIME?", 3, FALSE, parse_time_reply }, /* CDMA */
     { NULL }
 };

@@ -857,30 +857,11 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Enabling unsolicited events (3GPP interface) */
 
-static gboolean
-response_processor_no_result_stop_on_error (MMBaseModem *self,
-                                            gpointer none,
-                                            const gchar *command,
-                                            const gchar *response,
-                                            gboolean last_command,
-                                            const GError *error,
-                                            GVariant **result,
-                                            GError **result_error)
-{
-    if (error) {
-        *result_error = g_error_copy (error);
-        return TRUE;
-    }
-
-    *result = NULL;
-    return FALSE;
-}
-
 static const MMBaseModemAtCommand unsolicited_events_enable_sequence[] = {
-  { "%STATCM=1", 10, FALSE, response_processor_no_result_stop_on_error },
-  { "%NOTIFYEV=\"SIMREFRESH\",1", 10, FALSE, NULL },
-  { "%PCOINFO=1", 10, FALSE, NULL },
-  { NULL }
+    { "%STATCM=1",                  10, FALSE, mm_base_modem_response_processor_no_result_continue },
+    { "%NOTIFYEV=\"SIMREFRESH\",1", 10, FALSE, NULL },
+    { "%PCOINFO=1",                 10, FALSE, NULL },
+    { NULL }
 };
 
 static gboolean

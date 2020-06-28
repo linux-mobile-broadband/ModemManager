@@ -4137,15 +4137,15 @@ modem_time_check_ready (MMBaseModem *_self,
     g_object_unref (task);
 }
 
-static gboolean
-modem_check_time_reply (MMBaseModem *_self,
-                        gpointer none,
-                        const gchar *command,
-                        const gchar *response,
-                        gboolean last_command,
-                        const GError *error,
-                        GVariant **result,
-                        GError **result_error)
+static MMBaseModemAtResponseProcessorResult
+modem_check_time_reply (MMBaseModem   *_self,
+                        gpointer       none,
+                        const gchar   *command,
+                        const gchar   *response,
+                        gboolean       last_command,
+                        const GError  *error,
+                        GVariant     **result,
+                        GError       **result_error)
 {
     MMBroadbandModemHuawei *self = MM_BROADBAND_MODEM_HUAWEI (_self);
 
@@ -4161,7 +4161,9 @@ modem_check_time_reply (MMBaseModem *_self,
             self->priv->time_support = FEATURE_NOT_SUPPORTED;
     }
 
-    return FALSE;
+    *result = NULL;
+    *result_error = NULL;
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
 }
 
 static const MMBaseModemAtCommand time_cmd_sequence[] = {
