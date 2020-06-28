@@ -320,20 +320,16 @@ mm_shared_quectel_location_load_capabilities (MMIfaceModemLocation *_self,
 /*****************************************************************************/
 /* Enable location gathering (Location interface) */
 
-static const gchar *gps_startup[] = {
-    /* NOTES:
-     *  1) "+QGPSCFG=\"nmeasrc\",1" will be necessary for getting location data
-     *     without the nmea port.
-     *  2) may be necessary to set "+QGPSCFG=\"gpsnmeatype\".
-     */
-    "+QGPSCFG=\"outport\",\"usbnmea\"",
-    "+QGPS=1",
+/* NOTES:
+ *  1) "+QGPSCFG=\"nmeasrc\",1" will be necessary for getting location data
+ *     without the nmea port.
+ *  2) may be necessary to set "+QGPSCFG=\"gpsnmeatype\".
+ */
+static const MMBaseModemAtCommand gps_startup[] = {
+    { "+QGPSCFG=\"outport\",\"usbnmea\"", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
+    { "+QGPS=1",                          3, FALSE, mm_base_modem_response_processor_no_result_continue },
+    { NULL }
 };
-
-typedef struct {
-    MMModemLocationSource source;
-    guint                 idx;
-} LocationGatheringContext;
 
 gboolean
 mm_shared_quectel_enable_location_gathering_finish (MMIfaceModemLocation  *self,
@@ -343,48 +339,25 @@ mm_shared_quectel_enable_location_gathering_finish (MMIfaceModemLocation  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void run_gps_startup (GTask *task);
-
 static void
-gps_startup_command_ready (MMBaseModem  *self,
-                           GAsyncResult *res,
-                           GTask        *task)
+gps_startup_ready (MMBaseModem  *self,
+                   GAsyncResult *res,
+                   GTask        *task)
 {
-    GError *error = NULL;
+    MMModemLocationSource  source;
+    GError                *error = NULL;
 
-    if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
+    mm_base_modem_at_sequence_finish (self, res, NULL, &error);
+    if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    /* continue with next command */
-    run_gps_startup (task);
-}
-
-static void
-run_gps_startup (GTask *task)
-{
-    MMSharedQuectel          *self;
-    LocationGatheringContext *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data     (task);
-
-    /* If there are more commands run them */
-    if (ctx->idx < G_N_ELEMENTS (gps_startup)) {
-        mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                  gps_startup[ctx->idx++],
-                                  3,
-                                  FALSE,
-                                  (GAsyncReadyCallback)gps_startup_command_ready,
-                                  task);
-        return;
-    }
+    source = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
     /* Check if the nmea/raw gps port exists and is available */
-    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
-        GError          *error = NULL;
+    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
         MMPortSerialGps *gps_port;
 
         gps_port = mm_base_modem_peek_port_gps (MM_BASE_MODEM (self));
@@ -425,10 +398,9 @@ mm_shared_quectel_enable_location_gathering (MMIfaceModemLocation  *self,
                                              GAsyncReadyCallback    callback,
                                              gpointer               user_data)
 {
-    LocationGatheringContext *ctx;
-    GTask                    *task;
-    Private                  *priv;
-    gboolean                  start_gps = FALSE;
+    GTask    *task;
+    Private  *priv;
+    gboolean  start_gps = FALSE;
 
     priv = get_private (MM_SHARED_QUECTEL (self));
     g_assert (priv->iface_modem_location_parent);
@@ -436,6 +408,7 @@ mm_shared_quectel_enable_location_gathering (MMIfaceModemLocation  *self,
     g_assert (priv->iface_modem_location_parent->enable_location_gathering_finish);
 
     task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, GUINT_TO_POINTER (source), NULL);
 
     /* Check if the source is provided by the parent */
     if (!(priv->provided_sources & source)) {
@@ -447,26 +420,28 @@ mm_shared_quectel_enable_location_gathering (MMIfaceModemLocation  *self,
         return;
     }
 
-    ctx = g_new0 (LocationGatheringContext, 1);
-    ctx->source = source;
-    g_task_set_task_data (task, ctx, g_free);
+    /* Only start GPS engine if not done already */
+    start_gps = ((source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                            MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                            MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) &&
+                 !(priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                            MM_MODEM_LOCATION_SOURCE_GPS_RAW |
+                                            MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)));
 
-    /* RAW, NMEA and UNMANAGED are all enabled in the same way */
-    if (ctx->source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
-                       MM_MODEM_LOCATION_SOURCE_GPS_RAW |
-                       MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
-        if (priv->enabled_sources == MM_MODEM_LOCATION_SOURCE_NONE)
-            start_gps = TRUE;
-
-        priv->enabled_sources |= ctx->source;
-    }
+    priv->enabled_sources |= source;
 
     if (start_gps) {
-        run_gps_startup (task);
+        mm_base_modem_at_sequence (
+            MM_BASE_MODEM (self),
+            gps_startup,
+            NULL, /* response_processor_context */
+            NULL, /* response_processor_context_free */
+            (GAsyncReadyCallback)gps_startup_ready,
+            task);
         return;
     }
 
-    /* For any other location (e.g. 3GPP), or if the GPS is already running just return */
+    /* If the GPS is already running just return */
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
