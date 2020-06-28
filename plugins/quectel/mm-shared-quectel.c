@@ -264,64 +264,41 @@ mm_shared_quectel_location_load_capabilities_finish (MMIfaceModemLocation  *self
 }
 
 static void
-build_provided_location_sources (GTask *task)
-{
-    MMModemLocationSource  parent_sources;
-    MMSharedQuectel       *self;
-    Private               *priv;
-
-    parent_sources = GPOINTER_TO_UINT (g_task_get_task_data (task));
-    self = MM_SHARED_QUECTEL (g_task_get_source_object (task));
-    priv = get_private (self);
-
-    /* Only enable any location sources the modem supports gps
-     * Then only report supporting a location source
-     * if it's not already supported by the parent location source */
-    if (priv->qgps_supported == FEATURE_SUPPORTED) {
-        if (!(parent_sources & MM_MODEM_LOCATION_SOURCE_GPS_NMEA))
-            priv->provided_sources |= MM_MODEM_LOCATION_SOURCE_GPS_NMEA;
-        if (!(parent_sources & MM_MODEM_LOCATION_SOURCE_GPS_RAW))
-            priv->provided_sources |= MM_MODEM_LOCATION_SOURCE_GPS_RAW;
-        if (!(parent_sources & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))
-            priv->provided_sources |= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
-    }
-
-    /* So we're done, complete */
-    g_task_return_int (task, priv->provided_sources);
-    g_object_unref (task);
-}
-
-static void
 probe_qgps_ready (MMBaseModem  *_self,
                   GAsyncResult *res,
                   GTask        *task)
 {
-    MMSharedQuectel *self;
-    Private         *priv;
-    GError          *error = NULL;
+    MMSharedQuectel       *self;
+    Private               *priv;
+    MMModemLocationSource  sources;
 
     self = MM_SHARED_QUECTEL (g_task_get_source_object (task));
     priv = get_private (self);
 
-    priv->qgps_supported = (!!mm_base_modem_at_command_full_finish (_self, res, &error) ?
+    priv->qgps_supported = (!!mm_base_modem_at_command_finish (_self, res, NULL) ?
                             FEATURE_SUPPORTED : FEATURE_NOT_SUPPORTED);
 
-    build_provided_location_sources (task);
-}
+    mm_obj_dbg (self, "GPS management with +QGPS is %ssupported",
+                priv->qgps_supported ? "" : "not ");
 
-static void
-probe_qgps (GTask *task)
-{
-    MMSharedQuectel *self;
+    /* Recover parent sources */
+    sources = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
-    self = MM_SHARED_QUECTEL (g_task_get_source_object (task));
+    /* Only flag as provided those sources not already provided by the parent */
+    if (priv->qgps_supported == FEATURE_SUPPORTED) {
+        if (!(sources & MM_MODEM_LOCATION_SOURCE_GPS_NMEA))
+            priv->provided_sources |= MM_MODEM_LOCATION_SOURCE_GPS_NMEA;
+        if (!(sources & MM_MODEM_LOCATION_SOURCE_GPS_RAW))
+            priv->provided_sources |= MM_MODEM_LOCATION_SOURCE_GPS_RAW;
+        if (!(sources & MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED))
+            priv->provided_sources |= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
 
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+QGPS?",
-                              3,
-                              FALSE, /* not cached */
-                              (GAsyncReadyCallback)probe_qgps_ready,
-                              task);
+        sources |= priv->provided_sources;
+    }
+
+    /* So we're done, complete */
+    g_task_return_int (task, sources);
+    g_object_unref (task);
 }
 
 static void
@@ -341,14 +318,17 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
         return;
     }
 
+    /* Store parent supported sources in task data */
     g_task_set_task_data (task, GUINT_TO_POINTER (sources), NULL);
 
-    if (priv->qgps_supported == FEATURE_SUPPORT_UNKNOWN) {
-        probe_qgps (task);
-        return;
-    }
-
-    build_provided_location_sources (task);
+    /* Probe QGPS support */
+    g_assert (priv->qgps_supported == FEATURE_SUPPORT_UNKNOWN);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+QGPS?",
+                              3,
+                              FALSE, /* not cached */
+                              (GAsyncReadyCallback)probe_qgps_ready,
+                              task);
 }
 
 void
