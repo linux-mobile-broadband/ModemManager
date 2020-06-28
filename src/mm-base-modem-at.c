@@ -355,16 +355,17 @@ mm_base_modem_at_sequence (MMBaseModem *self,
 /* Response processor helpers */
 
 gboolean
-mm_base_modem_response_processor_string (MMBaseModem *self,
-                                         gpointer none,
-                                         const gchar *command,
-                                         const gchar *response,
-                                         gboolean last_command,
-                                         const GError *error,
-                                         GVariant **result,
-                                         GError **result_error)
+mm_base_modem_response_processor_string (MMBaseModem   *self,
+                                         gpointer       none,
+                                         const gchar   *command,
+                                         const gchar   *response,
+                                         gboolean       last_command,
+                                         const GError  *error,
+                                         GVariant     **result,
+                                         GError       **result_error)
 {
     if (error) {
+        /* Abort sequence on command error */
         *result_error = g_error_copy (error);
         return FALSE;
     }
@@ -374,16 +375,17 @@ mm_base_modem_response_processor_string (MMBaseModem *self,
 }
 
 gboolean
-mm_base_modem_response_processor_no_result (MMBaseModem *self,
-                                            gpointer none,
-                                            const gchar *command,
-                                            const gchar *response,
-                                            gboolean last_command,
-                                            const GError *error,
-                                            GVariant **result,
-                                            GError **result_error)
+mm_base_modem_response_processor_no_result (MMBaseModem   *self,
+                                            gpointer       none,
+                                            const gchar   *command,
+                                            const gchar   *response,
+                                            gboolean       last_command,
+                                            const GError  *error,
+                                            GVariant     **result,
+                                            GError       **result_error)
 {
     if (error) {
+        /* Abort sequence on command error */
         *result_error = g_error_copy (error);
         return FALSE;
     }
@@ -393,16 +395,17 @@ mm_base_modem_response_processor_no_result (MMBaseModem *self,
 }
 
 gboolean
-mm_base_modem_response_processor_no_result_continue (MMBaseModem *self,
-                                                     gpointer none,
-                                                     const gchar *command,
-                                                     const gchar *response,
-                                                     gboolean last_command,
-                                                     const GError *error,
-                                                     GVariant **result,
-                                                     GError **result_error)
+mm_base_modem_response_processor_no_result_continue (MMBaseModem   *self,
+                                                     gpointer       none,
+                                                     const gchar   *command,
+                                                     const gchar   *response,
+                                                     gboolean       last_command,
+                                                     const GError  *error,
+                                                     GVariant     **result,
+                                                     GError       **result_error)
 {
     if (error)
+        /* Abort sequence on command error */
         *result_error = g_error_copy (error);
 
     /* Return FALSE so that we keep on with the next steps in the sequence */
@@ -410,16 +413,17 @@ mm_base_modem_response_processor_no_result_continue (MMBaseModem *self,
 }
 
 gboolean
-mm_base_modem_response_processor_continue_on_error (MMBaseModem *self,
-                                                    gpointer none,
-                                                    const gchar *command,
-                                                    const gchar *response,
-                                                    gboolean last_command,
-                                                    const GError *error,
-                                                    GVariant **result,
-                                                    GError **result_error)
+mm_base_modem_response_processor_continue_on_error (MMBaseModem   *self,
+                                                    gpointer       none,
+                                                    const gchar   *command,
+                                                    const gchar   *response,
+                                                    gboolean       last_command,
+                                                    const GError  *error,
+                                                    GVariant     **result,
+                                                    GError       **result_error)
 {
     if (error)
+        /* Ignore errors, continue to next command */
         return FALSE;
 
     *result = NULL;

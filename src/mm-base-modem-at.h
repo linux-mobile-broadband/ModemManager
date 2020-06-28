@@ -93,42 +93,68 @@ GVariant *mm_base_modem_at_sequence_full_finish (MMBaseModem *self,
 
 /* Common helper response processors */
 
-/* Every string received as response, will be set as result */
-gboolean mm_base_modem_response_processor_string (MMBaseModem *self,
-                                                  gpointer none,
-                                                  const gchar *command,
-                                                  const gchar *response,
-                                                  gboolean last_command,
-                                                  const GError *error,
-                                                  GVariant **result,
-                                                  GError **result_error);
-/* Just abort if error without result set, otherwise finish sequence */
-gboolean mm_base_modem_response_processor_no_result (MMBaseModem *self,
-                                                     gpointer none,
-                                                     const gchar *command,
-                                                     const gchar *response,
-                                                     gboolean last_command,
-                                                     const GError *error,
-                                                     GVariant **result,
-                                                     GError **result_error);
-/* Just abort if error without result set, otherwise continue sequence */
-gboolean mm_base_modem_response_processor_no_result_continue (MMBaseModem *self,
-                                                              gpointer none,
-                                                              const gchar *command,
-                                                              const gchar *response,
-                                                              gboolean last_command,
-                                                              const GError *error,
-                                                              GVariant **result,
-                                                              GError **result_error);
-/* If error, continue sequence, otherwise finish it */
-gboolean mm_base_modem_response_processor_continue_on_error (MMBaseModem *self,
-                                                             gpointer none,
-                                                             const gchar *command,
-                                                             const gchar *response,
-                                                             gboolean last_command,
-                                                             const GError *error,
-                                                             GVariant **result,
-                                                             GError **result_error);
+/*
+ * Response processor for commands that are treated as MANDATORY, where a
+ * failure in the command triggers a failure in the sequence. If successful,
+ * provides the output result as a STRING.
+ */
+gboolean mm_base_modem_response_processor_string (MMBaseModem   *self,
+                                                  gpointer       none,
+                                                  const gchar   *command,
+                                                  const gchar   *response,
+                                                  gboolean       last_command,
+                                                  const GError  *error,
+                                                  GVariant     **result,
+                                                  GError       **result_error);
+
+/*
+ * Response processor for commands that are treated as MANDATORY, where a
+ * failure in the command triggers a failure in the sequence. If successful,
+ * provides the output result as a BOOLEAN.
+ */
+gboolean mm_base_modem_response_processor_no_result (MMBaseModem   *self,
+                                                     gpointer       none,
+                                                     const gchar   *command,
+                                                     const gchar   *response,
+                                                     gboolean       last_command,
+                                                     const GError  *error,
+                                                     GVariant     **result,
+                                                     GError       **result_error);
+
+/*
+ * Response processor for commands that are treated as MANDATORY, where a
+ * failure in the command triggers a failure in the sequence. If successful,
+ * it will run the next command in the sequence.
+ *
+ * E.g. used when we provide a list of commands and we want to run all of
+ * them successfully, and fail the sequence if one of them fails.
+ */
+gboolean mm_base_modem_response_processor_no_result_continue (MMBaseModem   *self,
+                                                              gpointer       none,
+                                                              const gchar   *command,
+                                                              const gchar   *response,
+                                                              gboolean       last_command,
+                                                              const GError  *error,
+                                                              GVariant     **result,
+                                                              GError       **result_error);
+
+/*
+ * Response processor for commands that are treated as OPTIONAL, where a
+ * failure in the command doesn't trigger a failure in the sequence. If
+ * successful, it finishes the sequence.
+ *
+ * E.g. used when we provide a list of commands and we want to stop
+ * as soon as one of them doesn't fail.
+ */
+gboolean mm_base_modem_response_processor_continue_on_error (MMBaseModem   *self,
+                                                             gpointer       none,
+                                                             const gchar   *command,
+                                                             const gchar   *response,
+                                                             gboolean       last_command,
+                                                             const GError  *error,
+                                                             GVariant     **result,
+                                                             GError       **result_error);
+
 
 /* Generic AT command handling, using the best AT port available and without
  * explicit cancellations. */
