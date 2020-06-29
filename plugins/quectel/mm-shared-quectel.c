@@ -206,6 +206,17 @@ mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* GPS trace received */
+
+static void
+trace_received (MMPortSerialGps      *port,
+                const gchar          *trace,
+                MMIfaceModemLocation *self)
+{
+    mm_iface_modem_location_gps_update (self, trace);
+}
+
+/*****************************************************************************/
 /* Location capabilities loading (Location interface) */
 
 MMModemLocationSource
@@ -255,6 +266,12 @@ probe_qgps_ready (MMBaseModem  *_self,
             priv->provided_sources |= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
 
         sources |= priv->provided_sources;
+
+        /* Add handler for the NMEA traces in the GPS data port */
+        mm_port_serial_gps_add_trace_handler (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)),
+                                              (MMPortSerialGpsTraceFn)trace_received,
+                                              self,
+                                              NULL);
     }
 
     /* So we're done, complete */
