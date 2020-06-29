@@ -293,9 +293,9 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
     /* Probe QGPS support */
     g_assert (priv->qgps_supported == FEATURE_SUPPORT_UNKNOWN);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+QGPS?",
+                              "+QGPS=?",
                               3,
-                              FALSE, /* not cached */
+                              TRUE, /* cached */
                               (GAsyncReadyCallback)probe_qgps_ready,
                               task);
 }
