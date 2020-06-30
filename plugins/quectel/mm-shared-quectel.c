@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2018-2020 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -573,6 +573,39 @@ mm_shared_quectel_disable_location_gathering (MMIfaceModemLocation  *self,
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
+
+/*****************************************************************************/
+
+/* Custom time support check because Quectel modems require +CTZU=3 in order to
+ * have the CCLK? time reported in localtime, instead of UTC time. */
+static const MMBaseModemAtCommand time_check_sequence[] = {
+    { "+CTZU=3",  3, TRUE, mm_base_modem_response_processor_no_result_continue },
+    { "+CCLK?",   3, TRUE, mm_base_modem_response_processor_string },
+    { NULL }
+};
+
+gboolean
+mm_shared_quectel_time_check_support_finish (MMIfaceModemTime  *self,
+                                             GAsyncResult      *res,
+                                             GError           **error)
+{
+    return !!mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
+}
+
+void
+mm_shared_quectel_time_check_support (MMIfaceModemTime    *self,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
+                               time_check_sequence,
+                               NULL, /* response_processor_context */
+                               NULL, /* response_processor_context_free */
+                               callback,
+                               user_data);
+}
+
+/*****************************************************************************/
 
 static void
 shared_quectel_init (gpointer g_iface)

@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2018-2020 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #ifndef MM_SHARED_QUECTEL_H
@@ -26,6 +26,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-firmware.h"
 #include "mm-iface-modem-location.h"
+#include "mm-iface-modem-time.h"
 
 #define MM_TYPE_SHARED_QUECTEL               (mm_shared_quectel_get_type ())
 #define MM_SHARED_QUECTEL(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SHARED_QUECTEL, MMSharedQuectel))
@@ -77,5 +78,12 @@ void                  mm_shared_quectel_disable_location_gathering        (MMIfa
 gboolean              mm_shared_quectel_disable_location_gathering_finish (MMIfaceModemLocation   *self,
                                                                            GAsyncResult           *res,
                                                                            GError                **error);
+
+void                  mm_shared_quectel_time_check_support                (MMIfaceModemTime     *self,
+                                                                           GAsyncReadyCallback   callback,
+                                                                           gpointer              user_data);
+gboolean              mm_shared_quectel_time_check_support_finish         (MMIfaceModemTime     *self,
+                                                                           GAsyncResult         *res,
+                                                                           GError              **error);
 
 #endif  /* MM_SHARED_QUECTEL_H */
