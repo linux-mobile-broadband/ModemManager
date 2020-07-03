@@ -326,41 +326,14 @@ out:
         qmi_message_nas_initiate_network_register_output_unref (output);
 }
 
-void
-mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
-                                        const gchar         *operator_id,
-                                        GCancellable        *cancellable,
-                                        GAsyncReadyCallback  callback,
-                                        gpointer             user_data)
+static void
+register_in_network_inr (GTask        *task,
+                         QmiClient    *client,
+                         GCancellable *cancellable,
+                         guint16       mcc,
+                         guint16       mnc)
 {
-    GTask                                     *task;
-    RegisterInNetworkContext                  *ctx;
     QmiMessageNasInitiateNetworkRegisterInput *input;
-    guint16                                    mcc = 0;
-    guint16                                    mnc;
-    QmiClient                                 *client = NULL;
-    GError                                    *error = NULL;
-
-    /* Get NAS client */
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_NAS, &client,
-                                      callback, user_data))
-        return;
-
-    task = g_task_new (self, cancellable, callback, user_data);
-
-    ctx = g_slice_new0 (RegisterInNetworkContext);
-    ctx->client = g_object_ref (client);
-    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
-    g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
-
-    /* Parse input MCC/MNC */
-    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error)) {
-        g_assert (error != NULL);
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
 
     input = qmi_message_nas_initiate_network_register_input_new ();
 
@@ -393,6 +366,105 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         task);
 
     qmi_message_nas_initiate_network_register_input_unref (input);
+}
+
+static void
+set_system_selection_preference_ready (QmiClientNas *client,
+                                       GAsyncResult *res,
+                                       GTask        *task)
+{
+    GError                                          *error = NULL;
+    QmiMessageNasSetSystemSelectionPreferenceOutput *output;
+
+    output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_set_system_selection_preference_output_get_result (output, &error)) {
+        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_prefix_error (&error, "Couldn't set network selection preference: ");
+            g_task_return_error (task, error);
+            goto out;
+        }
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+
+out:
+    g_object_unref (task);
+
+    if (output)
+        qmi_message_nas_set_system_selection_preference_output_unref (output);
+}
+
+static void
+register_in_network_sssp (GTask        *task,
+                          QmiClient    *client,
+                          GCancellable *cancellable,
+                          guint16       mcc,
+                          guint16       mnc)
+{
+    QmiMessageNasSetSystemSelectionPreferenceInput *input;
+
+    input = qmi_message_nas_set_system_selection_preference_input_new ();
+
+    qmi_message_nas_set_system_selection_preference_input_set_network_selection_preference (
+        input,
+        mcc ? QMI_NAS_NETWORK_SELECTION_PREFERENCE_MANUAL : QMI_NAS_NETWORK_SELECTION_PREFERENCE_AUTOMATIC,
+        mcc,
+        mnc,
+        NULL);
+
+    qmi_client_nas_set_system_selection_preference (
+        QMI_CLIENT_NAS (client),
+        input,
+        120,
+        cancellable,
+        (GAsyncReadyCallback)set_system_selection_preference_ready,
+        task);
+
+    qmi_message_nas_set_system_selection_preference_input_unref (input);
+}
+
+void
+mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
+                                        const gchar         *operator_id,
+                                        GCancellable        *cancellable,
+                                        GAsyncReadyCallback  callback,
+                                        gpointer             user_data)
+{
+    GTask                    *task;
+    RegisterInNetworkContext *ctx;
+    guint16                   mcc = 0;
+    guint16                   mnc;
+    QmiClient                *client = NULL;
+    GError                   *error = NULL;
+    Private                  *priv = NULL;
+
+    /* Get NAS client */
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, cancellable, callback, user_data);
+
+    ctx = g_slice_new0 (RegisterInNetworkContext);
+    ctx->client = g_object_ref (client);
+    ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
+
+    /* Parse input MCC/MNC */
+    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error)) {
+        g_assert (error != NULL);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    priv = get_private (MM_SHARED_QMI (self));
+    if (priv->feature_nas_system_selection_preference == FEATURE_SUPPORTED)
+        register_in_network_sssp (task, client, cancellable, mcc, mnc);
+    else
+        register_in_network_inr (task, client, cancellable, mcc, mnc);
 }
 
 /*****************************************************************************/
