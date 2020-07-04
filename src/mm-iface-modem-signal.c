@@ -55,7 +55,7 @@ refresh_context_free (RefreshContext *ctx)
 static void
 clear_values (MMIfaceModemSignal *self)
 {
-    MmGdbusModemSignal *skeleton;
+    g_autoptr(MmGdbusModemSignalSkeleton) skeleton = NULL;
 
     g_object_get (self,
                   MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON, &skeleton,
@@ -63,28 +63,32 @@ clear_values (MMIfaceModemSignal *self)
     if (!skeleton)
         return;
 
-    mm_gdbus_modem_signal_set_cdma (skeleton, NULL);
-    mm_gdbus_modem_signal_set_evdo (skeleton, NULL);
-    mm_gdbus_modem_signal_set_gsm  (skeleton, NULL);
-    mm_gdbus_modem_signal_set_umts (skeleton, NULL);
-    mm_gdbus_modem_signal_set_lte  (skeleton, NULL);
-    mm_gdbus_modem_signal_set_nr5g  (skeleton, NULL);
-    g_object_unref (skeleton);
+    mm_gdbus_modem_signal_set_cdma (MM_GDBUS_MODEM_SIGNAL (skeleton), NULL);
+    mm_gdbus_modem_signal_set_evdo (MM_GDBUS_MODEM_SIGNAL (skeleton), NULL);
+    mm_gdbus_modem_signal_set_gsm  (MM_GDBUS_MODEM_SIGNAL (skeleton), NULL);
+    mm_gdbus_modem_signal_set_umts (MM_GDBUS_MODEM_SIGNAL (skeleton), NULL);
+    mm_gdbus_modem_signal_set_lte  (MM_GDBUS_MODEM_SIGNAL (skeleton), NULL);
+    mm_gdbus_modem_signal_set_nr5g (MM_GDBUS_MODEM_SIGNAL (skeleton), NULL);
 }
 
 static void
 load_values_ready (MMIfaceModemSignal *self,
-                   GAsyncResult *res)
+                   GAsyncResult       *res)
 {
-    GVariant *dictionary;
-    GError *error = NULL;
-    MMSignal *cdma = NULL;
-    MMSignal *evdo = NULL;
-    MMSignal *gsm = NULL;
-    MMSignal *umts = NULL;
-    MMSignal *lte = NULL;
-    MMSignal *nr5g = NULL;
-    MmGdbusModemSignal *skeleton;
+    g_autoptr(GError)   error = NULL;
+    g_autoptr(MMSignal) cdma = NULL;
+    g_autoptr(GVariant) dict_cdma = NULL;
+    g_autoptr(MMSignal) evdo = NULL;
+    g_autoptr(GVariant) dict_evdo = NULL;
+    g_autoptr(MMSignal) gsm = NULL;
+    g_autoptr(GVariant) dict_gsm = NULL;
+    g_autoptr(MMSignal) umts = NULL;
+    g_autoptr(GVariant) dict_umts = NULL;
+    g_autoptr(MMSignal) lte = NULL;
+    g_autoptr(GVariant) dict_lte = NULL;
+    g_autoptr(MMSignal) nr5g = NULL;
+    g_autoptr(GVariant) dict_nr5g = NULL;
+    g_autoptr(MmGdbusModemSignalSkeleton) skeleton = NULL;
 
     if (!MM_IFACE_MODEM_SIGNAL_GET_INTERFACE (self)->load_values_finish (
             self,
@@ -97,7 +101,6 @@ load_values_ready (MMIfaceModemSignal *self,
             &nr5g,
             &error)) {
         mm_obj_warn (self, "couldn't load extended signal information: %s", error->message);
-        g_error_free (error);
         clear_values (self);
         return;
     }
@@ -110,59 +113,32 @@ load_values_ready (MMIfaceModemSignal *self,
         return;
     }
 
-    if (cdma) {
-        dictionary = mm_signal_get_dictionary (cdma);
-        mm_gdbus_modem_signal_set_cdma (skeleton, dictionary);
-        g_variant_unref (dictionary);
-        g_object_unref (cdma);
-    } else
-        mm_gdbus_modem_signal_set_cdma (skeleton, NULL);
+    if (cdma)
+        dict_cdma = mm_signal_get_dictionary (cdma);
+    mm_gdbus_modem_signal_set_cdma (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_cdma);
 
-    if (evdo) {
-        dictionary = mm_signal_get_dictionary (evdo);
-        mm_gdbus_modem_signal_set_evdo (skeleton, dictionary);
-        g_variant_unref (dictionary);
-        g_object_unref (evdo);
-    } else
-        mm_gdbus_modem_signal_set_evdo (skeleton, NULL);
+    if (evdo)
+        dict_evdo = mm_signal_get_dictionary (evdo);
+    mm_gdbus_modem_signal_set_evdo (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_evdo);
 
-    if (gsm) {
-        dictionary = mm_signal_get_dictionary (gsm);
-        mm_gdbus_modem_signal_set_gsm (skeleton, dictionary);
-        g_variant_unref (dictionary);
-        g_object_unref (gsm);
-    } else
-        mm_gdbus_modem_signal_set_gsm (skeleton, NULL);
+    if (gsm)
+        dict_gsm = mm_signal_get_dictionary (gsm);
+    mm_gdbus_modem_signal_set_gsm (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_gsm);
 
-    if (umts) {
-        dictionary = mm_signal_get_dictionary (umts);
-        mm_gdbus_modem_signal_set_umts (skeleton, dictionary);
-        g_variant_unref (dictionary);
-        g_object_unref (umts);
-    } else
-        mm_gdbus_modem_signal_set_umts (skeleton, NULL);
+    if (umts)
+        dict_umts = mm_signal_get_dictionary (umts);
+    mm_gdbus_modem_signal_set_umts (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_umts);
 
-    if (lte) {
-        dictionary = mm_signal_get_dictionary (lte);
-        mm_gdbus_modem_signal_set_lte (skeleton, dictionary);
-        g_variant_unref (dictionary);
-        g_object_unref (lte);
-    } else
-        mm_gdbus_modem_signal_set_lte (skeleton, NULL);
+    if (lte)
+        dict_lte = mm_signal_get_dictionary (lte);
+    mm_gdbus_modem_signal_set_lte (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_lte);
 
-    if (nr5g) {
-        dictionary = mm_signal_get_dictionary (nr5g);
-        mm_gdbus_modem_signal_set_nr5g (skeleton, dictionary);
-        g_variant_unref (dictionary);
-        g_object_unref (nr5g);
-    } else
-        mm_gdbus_modem_signal_set_nr5g (skeleton, NULL);
-
+    if (nr5g)
+        dict_nr5g = mm_signal_get_dictionary (nr5g);
+    mm_gdbus_modem_signal_set_nr5g (MM_GDBUS_MODEM_SIGNAL (skeleton), dict_nr5g);
 
     /* Flush right away */
     g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
-
-    g_object_unref (skeleton);
 }
 
 static gboolean
