@@ -2171,7 +2171,7 @@ signal_check_support (MMIfaceModemSignal  *self,
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SMONI=?",
                               3,
-                              FALSE,
+                              TRUE,
                               (GAsyncReadyCallback) check_smoni_support,
                               task);
 }
