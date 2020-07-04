@@ -2143,7 +2143,7 @@ check_smoni_support (MMBaseModem  *_self,
     if (mm_base_modem_at_command_finish (_self, res, NULL)) {
         mm_obj_dbg (self, "SMONI supported");
         self->priv->smoni_support = FEATURE_SUPPORTED;
-        g_task_return_boolean (task, TRUE); // otherwise the whole interface is not available
+        g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }
@@ -2153,21 +2153,19 @@ check_smoni_support (MMBaseModem  *_self,
 
     /* Otherwise, check if the parent CESQ-based implementation works */
     g_assert (iface_modem_signal_parent->check_support && iface_modem_signal_parent->check_support_finish);
-    iface_modem_signal_parent->check_support (g_task_get_task_data (task),
-                                              (GAsyncReadyCallback)parent_signal_check_support_ready,
+    iface_modem_signal_parent->check_support (MM_IFACE_MODEM_SIGNAL (self),
+                                              (GAsyncReadyCallback) parent_signal_check_support_ready,
                                               task);
 }
 
 static void
-signal_check_support (MMIfaceModemSignal  *_self,
+signal_check_support (MMIfaceModemSignal  *self,
                       GAsyncReadyCallback  callback,
                       gpointer             user_data)
 {
-    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GTask *task;
 
-    GTask *task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, _self, NULL);
-
+    task = g_task_new (self, NULL, callback, user_data);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^SMONI=?",
                               3,
@@ -2217,8 +2215,9 @@ signal_load_values (MMIfaceModemSignal  *_self,
                     gpointer             user_data)
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+
     if (self->priv->smoni_support == FEATURE_SUPPORTED) {
-        mm_base_modem_at_command (MM_BASE_MODEM (_self),
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
                                   "^SMONI",
                                   3,
                                   FALSE,
