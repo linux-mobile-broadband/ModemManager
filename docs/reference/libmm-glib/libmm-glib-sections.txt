@@ -943,6 +943,8 @@ mm_modem_signal_peek_umts
 mm_modem_signal_get_umts
 mm_modem_signal_peek_lte
 mm_modem_signal_get_lte
+mm_modem_signal_peek_nr5g
+mm_modem_signal_get_nr5g
 <SUBSECTION Methods>
 mm_modem_signal_setup
 mm_modem_signal_setup_finish
@@ -2809,6 +2811,7 @@ mm_gdbus_modem_signal_set_cdma
 mm_gdbus_modem_signal_set_evdo
 mm_gdbus_modem_signal_set_gsm
 mm_gdbus_modem_signal_set_lte
+mm_gdbus_modem_signal_set_nr5g
 mm_gdbus_modem_signal_set_rate
 mm_gdbus_modem_signal_set_umts
 mm_gdbus_modem_signal_complete_setup
