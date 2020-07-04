@@ -4372,25 +4372,14 @@ modem_signal_load_values_finish (MMIfaceModemSignal  *self,
     if (!result)
         return FALSE;
 
-    if (gsm && result->gsm) {
-        *gsm = result->gsm;
-        result->gsm = NULL;
-    }
-
-    if (umts && result->umts) {
-        *umts = result->umts;
-        result->umts = NULL;
-    }
-
-    if (lte && result->lte) {
-        *lte = result->lte;
-        result->lte = NULL;
-    }
-
-    if (nr5g && result->nr5g) {
-        *nr5g = result->nr5g;
-        result->nr5g = NULL;
-    }
+    if (gsm)
+        *gsm = g_steal_pointer (&result->gsm);
+    if (umts)
+        *umts = g_steal_pointer (&result->umts);
+    if (lte)
+        *lte = g_steal_pointer (&result->lte);
+    if (nr5g)
+        *nr5g = g_steal_pointer (&result->nr5g);
 
     signal_load_values_result_free (result);
 
