@@ -8696,17 +8696,17 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
                                           GAsyncResult *res,
                                           GTask        *task)
 {
-    MMBroadbandModemQmi *self;
+    MMBroadbandModemQmi     *self;
     SignalLoadValuesContext *ctx;
-    gint8 rssi;
-    gint16 ecio;
-    QmiNasEvdoSinrLevel sinr_level;
-    gint32 io;
-    gint8 rsrq;
-    gint16 rsrp;
-    gint16 snr;
-    gint16 rsrq_5g;
-    g_autoptr(QmiMessageNasGetSignalInfoOutput)  output = NULL;
+    gint8                    rssi;
+    gint16                   ecio;
+    QmiNasEvdoSinrLevel      sinr_level;
+    gint32                   io;
+    gint8                    rsrq;
+    gint16                   rsrp;
+    gint16                   snr;
+    gint16                   rsrq_5g;
+    g_autoptr(QmiMessageNasGetSignalInfoOutput) output = NULL;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data     (task);
@@ -8793,7 +8793,7 @@ signal_load_values_get_signal_info_ready (QmiClientNas *client,
                                                                                 NULL)) {
         mm_signal_set_rsrq (ctx->values_result->nr5g, (gdouble)rsrq_5g);
     }
-  
+
     /* Keep on */
     ctx->step++;
     signal_load_values_context_step (task);
