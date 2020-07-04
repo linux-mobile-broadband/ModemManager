@@ -2125,10 +2125,12 @@ parent_signal_check_support_ready (MMIfaceModemSignal *self,
                                    GAsyncResult       *res,
                                    GTask              *task)
 {
-    gboolean parent_supported;
+    GError *error = NULL;
 
-    parent_supported = iface_modem_signal_parent->check_support_finish (self, res, NULL);
-    g_task_return_boolean (task, parent_supported);
+    if (!iface_modem_signal_parent->check_support_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
