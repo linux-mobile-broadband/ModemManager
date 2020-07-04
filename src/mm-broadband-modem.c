@@ -9990,7 +9990,6 @@ modem_signal_load_values_finish (MMIfaceModemSignal  *self,
     if (!response || !mm_3gpp_cesq_response_to_signal_info (response, self, gsm, umts, lte, error))
         return FALSE;
 
-    /* No 3GPP2 support */
     if (cdma)
         *cdma = NULL;
     if (evdo)
