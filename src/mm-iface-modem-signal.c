@@ -524,7 +524,6 @@ mm_iface_modem_signal_initialize (MMIfaceModemSignal *self,
                   NULL);
     if (!skeleton) {
         skeleton = mm_gdbus_modem_signal_skeleton_new ();
-        clear_values (self);
         g_object_set (self,
                       MM_IFACE_MODEM_SIGNAL_DBUS_SKELETON, skeleton,
                       NULL);
