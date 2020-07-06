@@ -203,12 +203,14 @@ build_auth_string (MMBroadbandBearerCinterion *self,
                    MMBearerProperties         *config,
                    guint                       cid)
 {
-    const gchar             *user;
-    const gchar             *passwd;
-    gboolean                 has_user;
-    gboolean                 has_passwd;
     MMBearerAllowedAuth      auth;
     BearerCinterionAuthType  encoded_auth = BEARER_CINTERION_AUTH_UNKNOWN;
+    gboolean                 has_user;
+    gboolean                 has_passwd;
+    const gchar             *user;
+    const gchar             *passwd;
+    g_autofree gchar        *quoted_user = NULL;
+    g_autofree gchar        *quoted_passwd = NULL;
 
     user   = mm_bearer_properties_get_user         (config);
     passwd = mm_bearer_properties_get_password     (config);
@@ -236,11 +238,14 @@ build_auth_string (MMBroadbandBearerCinterion *self,
         encoded_auth = BEARER_CINTERION_AUTH_PAP;
     }
 
+    quoted_user   = mm_port_serial_at_quote_string (user   ? user   : "");
+    quoted_passwd = mm_port_serial_at_quote_string (passwd ? passwd : "");
+
     return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",
                             cid,
                             encoded_auth,
-                            passwd ? passwd : "",
-                            user ? user : "");
+                            quoted_passwd,
+                            quoted_user);
 }
 
 /******************************************************************************/
