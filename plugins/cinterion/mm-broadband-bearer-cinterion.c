@@ -236,7 +236,11 @@ build_auth_string (MMBroadbandBearerCinterion *self,
         encoded_auth = BEARER_CINTERION_AUTH_PAP;
     }
 
-    return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s", cid, encoded_auth, passwd, user);
+    return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",
+                            cid,
+                            encoded_auth,
+                            passwd ? passwd : "",
+                            user ? user : "");
 }
 
 /******************************************************************************/
