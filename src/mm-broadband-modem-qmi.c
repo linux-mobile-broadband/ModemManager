@@ -7238,7 +7238,7 @@ ussd_indication_cb (QmiClientVoice               *client,
 
     qmi_indication_voice_ussd_output_get_user_action (output, &user_action, NULL);
     if (qmi_indication_voice_ussd_output_get_uss_data_utf16 (output, &uss_data, NULL) && uss_data)
-        utf8 = g_convert ((const gchar *) uss_data->data, (2 * uss_data->len), "UTF-8", "UTF16-LE", NULL, NULL, &error);
+        utf8 = g_convert ((const gchar *) uss_data->data, (2 * uss_data->len), "UTF-8", "UTF-16LE", NULL, NULL, &error);
     else if (qmi_indication_voice_ussd_output_get_uss_data (output, &scheme, &uss_data, NULL) && uss_data)
         utf8 = ussd_decode(scheme, uss_data, &error);
 
