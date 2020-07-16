@@ -2890,8 +2890,9 @@ process_common_info (QmiNasServiceStatus service_status,
             apply_ps = FALSE;
         else if (domain == QMI_NAS_NETWORK_SERVICE_DOMAIN_PS)
             apply_cs = FALSE;
-        else if (domain == QMI_NAS_NETWORK_SERVICE_DOMAIN_CS_PS)
+        else if (domain == QMI_NAS_NETWORK_SERVICE_DOMAIN_CS_PS) {
             /* both apply */ ;
+        }
 
         /* Check if we really are roaming or forbidden */
         if (forbidden_valid && forbidden)
