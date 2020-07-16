@@ -1445,7 +1445,8 @@ load_signal_quality_finish (MMIfaceModem *self,
 #if defined WITH_NEWEST_QMI_COMMANDS
 
 static gboolean
-common_signal_info_get_quality (gint8 cdma1x_rssi,
+common_signal_info_get_quality (MMBroadbandModemQmi *self,
+                                gint8 cdma1x_rssi,
                                 gint8 evdo_rssi,
                                 gint8 gsm_rssi,
                                 gint8 wcdma_rssi,
@@ -1535,7 +1536,7 @@ signal_info_get_quality (MMBroadbandModemQmi *self,
     qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output, &wcdma_rssi, NULL, NULL);
     qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output, &lte_rssi, NULL, NULL, NULL, NULL);
 
-    return common_signal_info_get_quality (cdma1x_rssi, evdo_rssi, gsm_rssi, wcdma_rssi, lte_rssi, out_quality, out_act);
+    return common_signal_info_get_quality (self, cdma1x_rssi, evdo_rssi, gsm_rssi, wcdma_rssi, lte_rssi, out_quality, out_act);
 }
 
 static void
@@ -2936,7 +2937,8 @@ process_common_info (QmiNasServiceStatus service_status,
 }
 
 static gboolean
-process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
+process_gsm_info (MMBroadbandModemQmi *self,
+                  QmiMessageNasGetSystemInfoOutput *response_output,
                   QmiIndicationNasSystemInfoOutput *indication_output,
                   MMModem3gppRegistrationState *mm_cs_registration_state,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
@@ -3041,7 +3043,8 @@ process_gsm_info (QmiMessageNasGetSystemInfoOutput *response_output,
 }
 
 static gboolean
-process_wcdma_info (QmiMessageNasGetSystemInfoOutput *response_output,
+process_wcdma_info (MMBroadbandModemQmi *self,
+                    QmiMessageNasGetSystemInfoOutput *response_output,
                     QmiIndicationNasSystemInfoOutput *indication_output,
                     MMModem3gppRegistrationState *mm_cs_registration_state,
                     MMModem3gppRegistrationState *mm_ps_registration_state,
@@ -3150,7 +3153,8 @@ process_wcdma_info (QmiMessageNasGetSystemInfoOutput *response_output,
 }
 
 static gboolean
-process_lte_info (QmiMessageNasGetSystemInfoOutput *response_output,
+process_lte_info (MMBroadbandModemQmi *self,
+                  QmiMessageNasGetSystemInfoOutput *response_output,
                   QmiIndicationNasSystemInfoOutput *indication_output,
                   MMModem3gppRegistrationState *mm_cs_registration_state,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
@@ -3280,7 +3284,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
      *   LTE > WCDMA > GSM
      * The first one giving results will be the one reported.
      */
-    has_lte_info = process_lte_info (response_output, indication_output,
+    has_lte_info = process_lte_info (self, response_output, indication_output,
                                      &cs_registration_state,
                                      &ps_registration_state,
                                      &lac,
@@ -3288,13 +3292,13 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
                                      &cid,
                                      &operator_id);
     if (!has_lte_info &&
-        !process_wcdma_info (response_output, indication_output,
+        !process_wcdma_info (self, response_output, indication_output,
                              &cs_registration_state,
                              &ps_registration_state,
                              &lac,
                              &cid,
                              &operator_id) &&
-        !process_gsm_info (response_output, indication_output,
+        !process_gsm_info (self, response_output, indication_output,
                            &cs_registration_state,
                            &ps_registration_state,
                            &lac,
@@ -4882,8 +4886,11 @@ config_signal_info_ready (QmiClientNas *client,
                           GAsyncResult *res,
                           GTask *task)
 {
+    MMBroadbandModemQmi *self;
     QmiMessageNasConfigSignalInfoOutput *output = NULL;
     GError *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     output = qmi_client_nas_config_signal_info_finish (client, res, &error);
     if (!output) {
@@ -5118,7 +5125,8 @@ signal_info_indication_cb (QmiClientNas *client,
     qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (output, &wcdma_rssi, NULL, NULL);
     qmi_indication_nas_signal_info_output_get_lte_signal_strength (output, &lte_rssi, NULL, NULL, NULL, NULL);
 
-    if (common_signal_info_get_quality (cdma1x_rssi,
+    if (common_signal_info_get_quality (self,
+                                        cdma1x_rssi,
                                         evdo_rssi,
                                         gsm_rssi,
                                         wcdma_rssi,
