@@ -375,13 +375,13 @@ mm_bearer_allowed_auth_to_mbim_auth_protocol (MMBearerAllowedAuth   bearer_auth,
     /* NOTE: the input is a BITMASK, so we try to find a "best match" */
 
     if (bearer_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-        mm_obj_dbg (log_object, "using default (PAP) authentication method");
-        return MBIM_AUTH_PROTOCOL_PAP;
+        mm_obj_dbg (log_object, "using default (CHAP) authentication method");
+        return MBIM_AUTH_PROTOCOL_CHAP;
     }
-    if (bearer_auth & MM_BEARER_ALLOWED_AUTH_PAP)
-        return MBIM_AUTH_PROTOCOL_PAP;
     if (bearer_auth & MM_BEARER_ALLOWED_AUTH_CHAP)
         return MBIM_AUTH_PROTOCOL_CHAP;
+    if (bearer_auth & MM_BEARER_ALLOWED_AUTH_PAP)
+        return MBIM_AUTH_PROTOCOL_PAP;
     if (bearer_auth & MM_BEARER_ALLOWED_AUTH_MSCHAPV2)
         return MBIM_AUTH_PROTOCOL_MSCHAPV2;
     if (bearer_auth & MM_BEARER_ALLOWED_AUTH_NONE)

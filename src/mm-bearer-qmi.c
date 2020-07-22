@@ -636,10 +636,10 @@ build_start_network_input (ConnectContext *ctx)
     /* Need to add auth info? */
     if (has_user || has_password || ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
         /* We define a valid auth preference if we have either user or password, or an explicit
-         * request for one to be set. If no explicit one was given, default to PAP. */
+         * request for one to be set. If no explicit one was given, default to CHAP. */
         qmi_message_wds_start_network_input_set_authentication_preference (
             input,
-            (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) ? ctx->auth : QMI_WDS_AUTHENTICATION_PAP,
+            (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) ? ctx->auth : QMI_WDS_AUTHENTICATION_CHAP,
             NULL);
 
         if (has_user)
@@ -1740,7 +1740,7 @@ _connect (MMBaseBearer *_self,
         g_object_unref (properties);
 
         if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-            /* We'll default to PAP later if needed */
+            /* We'll default to CHAP later if needed */
             ctx->auth = QMI_WDS_AUTHENTICATION_NONE;
         } else if (auth & (MM_BEARER_ALLOWED_AUTH_PAP |
                            MM_BEARER_ALLOWED_AUTH_CHAP |

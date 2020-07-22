@@ -391,17 +391,17 @@ connect_3gpp_context_step (GTask *task)
         if (!user && !passwd)
             command = g_strdup_printf ("AT^NDISDUP=1,1,\"%s\"",
                                        apn == NULL ? "" : apn);
-        else if (encoded_auth == MM_BEARER_HUAWEI_AUTH_NONE)
-            command = g_strdup_printf ("AT^NDISDUP=1,1,\"%s\",\"%s\",\"%s\"",
-                                       apn == NULL ? "" : apn,
-                                       user == NULL ? "" : user,
-                                       passwd == NULL ? "" : passwd);
-        else
+        else {
+            if (encoded_auth == MM_BEARER_HUAWEI_AUTH_NONE) {
+                encoded_auth = MM_BEARER_HUAWEI_AUTH_CHAP;
+                mm_obj_dbg (self, "using default (CHAP) authentication method");
+            }
             command = g_strdup_printf ("AT^NDISDUP=1,1,\"%s\",\"%s\",\"%s\",%d",
                                        apn == NULL ? "" : apn,
                                        user == NULL ? "" : user,
                                        passwd == NULL ? "" : passwd,
                                        encoded_auth);
+        }
 
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,

@@ -498,10 +498,10 @@ authenticate_3gpp (GTask *task)
         mm_obj_dbg (self, "using automatic authentication method");
         if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_AUTO)
             ublox_auth = 3;
-        else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_PAP)
-            ublox_auth = 1;
         else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_CHAP)
             ublox_auth = 2;
+        else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_PAP)
+            ublox_auth = 1;
         else if (self->priv->allowed_auths & MM_UBLOX_BEARER_ALLOWED_AUTH_NONE)
             ublox_auth = 0;
     } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {

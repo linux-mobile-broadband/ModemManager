@@ -233,9 +233,9 @@ build_auth_string (MMBroadbandBearerCinterion *self,
         if (!has_user && !has_passwd)
             return NULL;
 
-        /* If user/passwd given, default to PAP */
-        mm_obj_dbg (self, "APN user/password given but no authentication type explicitly requested: defaulting to 'PAP'");
-        encoded_auth = BEARER_CINTERION_AUTH_PAP;
+        /* If user/passwd given, default to CHAP (more common than PAP) */
+        mm_obj_dbg (self, "APN user/password given but no authentication type explicitly requested: defaulting to 'CHAP'");
+        encoded_auth = BEARER_CINTERION_AUTH_CHAP;
     }
 
     quoted_user   = mm_port_serial_at_quote_string (user   ? user   : "");
