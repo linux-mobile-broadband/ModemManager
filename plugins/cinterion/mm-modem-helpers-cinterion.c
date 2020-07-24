@@ -270,13 +270,8 @@ mm_cinterion_parse_scfg_test (const gchar                 *response,
         *format = MM_CINTERION_RADIO_BAND_FORMAT_SINGLE;
 
         maxbandstr = mm_get_string_unquoted_from_match_info (match_info1, 2);
-        if (maxbandstr) {
-            /* Handle charset conversion if the number is given in UCS2 */
-            if (charset != MM_MODEM_CHARSET_UNKNOWN)
-                maxbandstr = mm_charset_take_and_convert_to_utf8 (maxbandstr, charset);
-
+        if (maxbandstr)
             mm_get_uint_from_str (maxbandstr, &maxband);
-        }
 
         if (maxband == 0) {
             inner_error = g_error_new (MM_CORE_ERROR,
@@ -419,12 +414,8 @@ mm_cinterion_parse_scfg_response (const gchar                  *response,
             guint current = 0;
 
             currentstr = mm_get_string_unquoted_from_match_info (match_info, 1);
-            if (currentstr) {
-                /* Handle charset conversion if the number is given in UCS2 */
-                if (charset != MM_MODEM_CHARSET_UNKNOWN)
-                    currentstr = mm_charset_take_and_convert_to_utf8 (currentstr, charset);
+            if (currentstr)
                 mm_get_uint_from_str (currentstr, &current);
-            }
 
             if (current == 0) {
                 inner_error = g_error_new (MM_CORE_ERROR,

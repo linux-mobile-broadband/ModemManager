@@ -510,23 +510,6 @@ test_scfg_response_2g (void)
 }
 
 static void
-test_scfg_response_2g_ucs2 (void)
-{
-    GArray *expected_bands;
-    MMModemBand single;
-    const gchar *response =
-        "^SCFG: \"Radio/Band\",\"0031\",\"0031\"\r\n"
-        "\r\n";
-
-    expected_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 9);
-    single = MM_MODEM_BAND_EGSM,  g_array_append_val (expected_bands, single);
-
-    common_test_scfg_response (response, MM_MODEM_CHARSET_UCS2, expected_bands, MM_CINTERION_MODEM_FAMILY_DEFAULT, MM_CINTERION_RADIO_BAND_FORMAT_SINGLE);
-
-    g_array_unref (expected_bands);
-}
-
-static void
 test_scfg_response_3g (void)
 {
     GArray *expected_bands;
@@ -1629,7 +1612,6 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/scfg/alas5",              test_scfg_alas5);
     g_test_add_func ("/MM/cinterion/scfg/response/3g",        test_scfg_response_3g);
     g_test_add_func ("/MM/cinterion/scfg/response/2g",        test_scfg_response_2g);
-    g_test_add_func ("/MM/cinterion/scfg/response/2g/ucs2",   test_scfg_response_2g_ucs2);
     g_test_add_func ("/MM/cinterion/scfg/response/pls62/gsm", test_scfg_response_pls62_gsm);
     g_test_add_func ("/MM/cinterion/scfg/response/pls62/ucs2",test_scfg_response_pls62_ucs2);
     g_test_add_func ("/MM/cinterion/scfg/response/alas5",     test_scfg_response_alas5);
