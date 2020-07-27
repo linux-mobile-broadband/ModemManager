@@ -105,6 +105,14 @@ struct _MMBroadbandModemCinterionPrivate {
     MMBaseModemAtCommandAlloc *cmds;
 };
 
+MMCinterionModemFamily
+mm_broadband_modem_cinterion_get_family (MMBroadbandModemCinterion * modem)
+{
+    g_assert_nonnull (modem);
+    return modem->priv->modem_family;
+}
+
+
 /*****************************************************************************/
 /* Enable unsolicited events (SMS indications) (Messaging interface) */
 

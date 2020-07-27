@@ -197,9 +197,13 @@ parse_auth_type (MMBearerAllowedAuth mm_auth)
     }
 }
 
-/* AT^SGAUTH=<cid>[, <auth_type>[, <passwd>, <user>]] */
+/* Cinterion authentication is done with the command AT^SGAUTH,
+   whose syntax depends on the modem family, as follow:
+   - AT^SGAUTH=<cid>[, <auth_type>[, <user>, <passwd>]] for the IMT family
+   - AT^SGAUTH=<cid>[, <auth_type>[, <passwd>, <user>]] for the rest */
 static gchar *
 build_auth_string (MMBroadbandBearerCinterion *self,
+                   MMCinterionModemFamily      modem_family,
                    MMBearerProperties         *config,
                    guint                       cid)
 {
@@ -240,6 +244,13 @@ build_auth_string (MMBroadbandBearerCinterion *self,
 
     quoted_user   = mm_port_serial_at_quote_string (user   ? user   : "");
     quoted_passwd = mm_port_serial_at_quote_string (passwd ? passwd : "");
+
+    if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT)
+        return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",
+                                cid,
+                                encoded_auth,
+                                quoted_user,
+                                quoted_passwd);
 
     return g_strdup_printf ("^SGAUTH=%u,%d,%s,%s",
                             cid,
@@ -409,7 +420,11 @@ dial_3gpp_context_step (GTask *task)
     case DIAL_3GPP_CONTEXT_STEP_AUTH: {
         gchar *command;
 
-        command = build_auth_string (self, mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)), ctx->cid);
+        command = build_auth_string (self,
+                                     mm_broadband_modem_cinterion_get_family (MM_BROADBAND_MODEM_CINTERION (self)),
+                                     mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)),
+                                     ctx->cid);
+
         if (command) {
             mm_obj_dbg (self, "dial step %u/%u: authenticating...", ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST);
             /* Send SGAUTH write, if User & Pass are provided.
