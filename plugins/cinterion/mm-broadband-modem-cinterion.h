@@ -19,6 +19,7 @@
 #define MM_BROADBAND_MODEM_CINTERION_H
 
 #include "mm-broadband-modem.h"
+#include "mm-modem-helpers-cinterion.h"
 
 #define MM_TYPE_BROADBAND_MODEM_CINTERION            (mm_broadband_modem_cinterion_get_type ())
 #define MM_BROADBAND_MODEM_CINTERION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BROADBAND_MODEM_CINTERION, MMBroadbandModemCinterion))
@@ -47,5 +48,7 @@ MMBroadbandModemCinterion *mm_broadband_modem_cinterion_new (const gchar *device
                                                              const gchar *plugin,
                                                              guint16 vendor_id,
                                                              guint16 product_id);
+
+MMCinterionModemFamily mm_broadband_modem_cinterion_get_family (MMBroadbandModemCinterion * modem);
 
 #endif /* MM_BROADBAND_MODEM_CINTERION_H */
