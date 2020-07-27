@@ -51,4 +51,11 @@ void          mm_broadband_bearer_cinterion_new        (MMBroadbandModemCinterio
 MMBaseBearer *mm_broadband_bearer_cinterion_new_finish (GAsyncResult               *res,
                                                         GError                    **error);
 
+gchar *mm_broadband_bearer_cinterion_build_auth_string (gpointer                   log_object,
+		                                        MMCinterionModemFamily     modem_family,
+		                                        MMBearerProperties        *config,
+		                                        guint                      cid);
+
+MMBearerAllowedAuth mm_auth_type_from_cinterion_auth_type (guint cinterion_auth);
+
 #endif /* MM_BROADBAND_BEARER_CINTERION_H */

@@ -1398,3 +1398,55 @@ mm_cinterion_smoni_response_to_signal_info (const gchar  *response,
 
     return TRUE;
 }
+
+/*****************************************************************************/
+/* provider cfg information to CID number for EPS initial settings */
+
+/*
+ * at^scfg="MEopMode/Prov/Cfg"
+ * ^SCFG: "MEopMode/Prov/Cfg","vdfde"
+ * ^SCFG: "MEopMode/Prov/Cfg","attus"
+ * ^SCFG: "MEopMode/Prov/Cfg","2"      -> PLS8-X vzw
+ * ^SCFG: "MEopMode/Prov/Cfg","vzwdcus" -> PLAS9-x vzw
+ * ^SCFG: "MEopMode/Prov/Cfg","tmode" -> t-mob germany
+ * OK
+ */
+void
+mm_cinterion_provcfg_response_to_cid (const gchar            *response,
+                                      MMCinterionModemFamily  modem_family,
+                                      MMModemCharset          charset,
+                                      gpointer                log_object,
+                                      guint                  *cid)
+{
+    g_autoptr(GRegex)       r = NULL;
+    g_autoptr(GMatchInfo)   match_info = NULL;
+    g_autofree GError      *inner_error = NULL;
+
+    r = g_regex_new ("\\^SCFG:\\s*\"MEopMode/Prov/Cfg\",\\s*\"([0-9a-zA-Z]*)\"", 0, 0, NULL);
+    g_assert (r != NULL);
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+    if (inner_error)
+        return;
+    if (g_match_info_matches (match_info)) {
+        g_autofree gchar *mno = NULL;
+
+        mno = mm_get_string_unquoted_from_match_info (match_info, 1);
+        if (mno && modem_family == MM_CINTERION_MODEM_FAMILY_IMT) {
+            mno = mm_charset_take_and_convert_to_utf8 (mno, charset);
+            mm_obj_dbg (log_object, "current mno: %s", mno);
+        }
+
+        /* for Cinterion LTE modules, some CID numbers have special meaning.
+         * This is dictated by the chipset and by the MNO:
+         * - the chipset uses a special one, CID 1, as a LTE combined attach chipset
+         * - the MNOs can define the sequence and number of APN to be used for their network.
+         *   This takes priority over the chipset preferences, and therefore for some of them
+         *   the CID for the initial EPS context must be changed.
+         */
+        if (g_strcmp0 (mno, "2") == 0 || g_strcmp0 (mno, "vzwdcus") == 0)
+            *cid = 3;
+        else if (g_strcmp0 (mno, "tmode") == 0)
+            *cid = 2;
+        /* in all other cases no change to the preset value */
+    }
+}

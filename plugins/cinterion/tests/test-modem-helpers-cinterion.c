@@ -1596,6 +1596,71 @@ test_smoni_response_to_signal (void)
     }
 }
 
+/*****************************************************************************/
+/* Test ^SCFG="MEopMode/Prov/Cfg" responses */
+
+typedef struct {
+    const gchar            *str;
+    MMCinterionModemFamily  modem_family;
+    guint                   initial_cid;
+    gdouble                 expected_cid;
+} ProvcfgResponseTest;
+
+
+static const ProvcfgResponseTest provcfg_response_tests[] = {
+    {
+
+        .str          = "^SCFG: \"MEopMode/Prov/Cfg\",\"vdfde\"",
+        .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .initial_cid  = 1,
+        .expected_cid = 1,
+    },
+    {
+
+        .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"attus\"",
+        .modem_family = MM_CINTERION_MODEM_FAMILY_IMT,
+        .initial_cid  = 1,
+        .expected_cid = 1,
+    },
+    {
+
+        .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"2\"",
+        .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .initial_cid  = 1,
+        .expected_cid = 3,
+    },
+    {
+
+        .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"vzwdcus\"",
+        .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .initial_cid  = 1,
+        .expected_cid = 3,
+    },
+    {
+
+        .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"tmode\"",
+        .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .initial_cid  = 1,
+        .expected_cid = 2,
+    }
+};
+
+static void
+test_provcfg_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (provcfg_response_tests); i++) {
+        guint cid = provcfg_response_tests[i].initial_cid;
+
+        mm_cinterion_provcfg_response_to_cid (provcfg_response_tests[i].str,
+                                              provcfg_response_tests[i].modem_family,
+                                              MM_MODEM_CHARSET_GSM,
+                                              NULL,
+                                              &cid);
+        g_assert_cmpuint (cid,  ==, provcfg_response_tests[i].expected_cid);
+    }
+}
 
 /*****************************************************************************/
 
@@ -1629,6 +1694,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/cinterion/ctzu/urc/full",           test_ctzu_urc_full);
     g_test_add_func ("/MM/cinterion/smoni/query_response",    test_smoni_response);
     g_test_add_func ("/MM/cinterion/smoni/query_response_to_signal", test_smoni_response_to_signal);
+    g_test_add_func ("/MM/cinterion/scfg/provcfg",            test_provcfg_response);
 
     return g_test_run ();
 }
