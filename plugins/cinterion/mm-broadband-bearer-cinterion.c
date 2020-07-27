@@ -228,6 +228,8 @@ build_auth_string (MMBroadbandBearerCinterion *self,
     if (encoded_auth == BEARER_CINTERION_AUTH_NONE) {
         if (has_user || has_passwd)
             mm_obj_warn (self, "APN user/password given but 'none' authentication requested");
+        if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT)
+            return g_strdup_printf ("^SGAUTH=%u,%d,\"\",\"\"", cid, encoded_auth);
         return g_strdup_printf ("^SGAUTH=%u,%d", cid, encoded_auth);
     }
 
