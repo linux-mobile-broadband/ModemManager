@@ -88,6 +88,8 @@ struct _MMBroadbandModemCinterionPrivate {
     GArray *cnmi_supported_ds;
     GArray *cnmi_supported_bfr;
 
+    /* ignore regex */
+    GRegex *sysstart_regex;
     /* +CIEV indications as configured via AT^SIND */
     GRegex *ciev_regex;
 
@@ -1954,6 +1956,8 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
 
     self->priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV:\\s*([a-z]+),(\\d+)\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->sysstart_regex = g_regex_new ("\\r\\n\\^SYSSTART.*\\r\\n",
+                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -1975,6 +1979,7 @@ finalize (GObject *object)
         g_array_unref (self->priv->cnmi_supported_bfr);
 
     g_regex_unref (self->priv->ciev_regex);
+    g_regex_unref (self->priv->sysstart_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_cinterion_parent_class)->finalize (object);
 }
@@ -2107,14 +2112,44 @@ shared_cinterion_init (MMSharedCinterion *iface)
 }
 
 static void
+setup_ports (MMBroadbandModem *_self)
+{
+    MMBroadbandModemCinterion *self = (MM_BROADBAND_MODEM_CINTERION (_self));
+    MMPortSerialAt *port;
+
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_cinterion_parent_class)->setup_ports (_self);
+
+    /* Primary */
+    port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    if (port) {
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->sysstart_regex,
+            NULL, NULL, NULL);
+    }
+
+    /* Secondary */
+    port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (port) {
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->sysstart_regex,
+            NULL, NULL, NULL);
+    }
+}
+
+static void
 mm_broadband_modem_cinterion_class_init (MMBroadbandModemCinterionClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemCinterionPrivate));
 
     /* Virtual methods */
     object_class->finalize = finalize;
+    broadband_modem_class->setup_ports = setup_ports;
 }
 
 /*****************************************************************************/
