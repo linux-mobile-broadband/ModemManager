@@ -748,6 +748,53 @@ mmcli_get_sim_finish (GAsyncResult  *res,
 }
 
 static void
+list_sim_slots_ready (MMModem      *modem,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    g_autoptr(GPtrArray)  sim_slots = NULL;
+    GetSimContext        *ctx;
+    GetSimResults        *results = NULL;
+    guint                 i;
+    GError               *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    sim_slots = mm_modem_list_sim_slots_finish (modem, res, &error);
+    if (error) {
+        g_printerr ("error: couldn't list SIM slots at '%s': '%s'\n",
+                    mm_modem_get_path (modem),
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    for (i = 0; i < sim_slots->len; i++) {
+        MMSim *sim;
+
+        sim = MM_SIM (g_ptr_array_index (sim_slots, i));
+        if (sim && g_str_equal (mm_sim_get_path (sim), ctx->sim_path)) {
+            /* Found! */
+            results = g_new (GetSimResults, 1);
+            results->manager = g_object_ref (ctx->manager);
+            results->object  = g_object_ref (ctx->current);
+            results->sim     = g_object_ref (sim);
+            break;
+        }
+    }
+
+    if (results) {
+        g_task_return_pointer (task, results, (GDestroyNotify) get_sim_results_free);
+        g_object_unref (task);
+        return;
+    }
+
+    g_printerr ("error: couldn't get additional SIM '%s' at '%s'\n",
+                ctx->sim_path,
+                mm_modem_get_path (modem));
+    exit (EXIT_FAILURE);
+}
+
+static void
 get_sim_ready (MMModem      *modem,
                GAsyncResult *res,
                GTask        *task)
@@ -798,11 +845,13 @@ get_sim_manager_ready (GDBusConnection *connection,
     }
 
     for (l = modems; l && !ctx->current; l = g_list_next (l)) {
-        MMObject *object;
-        MMModem  *modem;
+        MMObject           *object;
+        MMModem            *modem;
+        const gchar *const *sim_slot_paths;
 
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
+        sim_slot_paths = mm_modem_get_sim_slot_paths (modem);
 
         /* check if we can match the first object found */
         if (ctx->sim_any) {
@@ -826,6 +875,19 @@ get_sim_manager_ready (GDBusConnection *connection,
                               g_task_get_cancellable (task),
                               (GAsyncReadyCallback)get_sim_ready,
                               task);
+        } else if (sim_slot_paths) {
+            guint i;
+
+            for (i = 0; sim_slot_paths[i]; i++) {
+                if (g_str_equal (ctx->sim_path, sim_slot_paths[i])) {
+                    ctx->current = g_object_ref (object);
+                    mm_modem_list_sim_slots (modem,
+                                             g_task_get_cancellable (task),
+                                             (GAsyncReadyCallback)list_sim_slots_ready,
+                                             task);
+                    break;
+                }
+            }
         }
         g_object_unref (modem);
     }
@@ -888,12 +950,14 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
     }
 
     for (l = modems; !found && l; l = g_list_next (l)) {
-        GError *error = NULL;
-        MMObject *object;
-        MMModem *modem;
+        GError             *error = NULL;
+        MMObject           *object;
+        MMModem            *modem;
+        const gchar *const *sim_slot_paths;
 
         object = MM_OBJECT (l->data);
         modem = mm_object_get_modem (object);
+        sim_slot_paths = mm_modem_get_sim_slot_paths (modem);
 
         /* check if we can match the first object found */
         if (sim_any) {
@@ -923,6 +987,34 @@ mmcli_get_sim_sync (GDBusConnection  *connection,
 
             if (found && o_object)
                 *o_object = g_object_ref (object);
+        } else if (sim_slot_paths) {
+            guint i;
+
+            for (i = 0; !found && sim_slot_paths[i]; i++) {
+                if (g_str_equal (sim_path, sim_slot_paths[i])) {
+                    g_autoptr(GPtrArray) sim_slots = NULL;
+                    guint                j;
+
+                    sim_slots = mm_modem_list_sim_slots_sync (modem, NULL, &error);
+                    if (error) {
+                        g_printerr ("error: couldn't get SIM slots in modem '%s': '%s'\n",
+                                    mm_modem_get_path (modem),
+                                    error->message);
+                        exit (EXIT_FAILURE);
+                    }
+
+                    for (j = 0; j < sim_slots->len; j++) {
+                        MMSim *sim;
+
+                        sim = MM_SIM (g_ptr_array_index (sim_slots, j));
+                        if (sim && g_str_equal (sim_path, mm_sim_get_path (sim))) {
+                            found = g_object_ref (sim);
+                            if (o_object)
+                                *o_object = g_object_ref (object);
+                        }
+                    }
+                }
+            }
         }
 
         g_object_unref (modem);
