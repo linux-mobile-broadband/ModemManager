@@ -221,11 +221,21 @@ handle_change_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    if (!mm_gdbus_sim_get_active (MM_GDBUS_SIM (ctx->self))) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot change PIN: "
+                                               "SIM not currently active");
+        handle_change_pin_context_free (ctx);
+        return;
+    }
+
     MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin (ctx->self,
-                                              ctx->old_pin,
-                                              ctx->new_pin,
-                                              (GAsyncReadyCallback)handle_change_pin_ready,
-                                              ctx);
+                                                   ctx->old_pin,
+                                                   ctx->new_pin,
+                                                   (GAsyncReadyCallback)handle_change_pin_ready,
+                                                   ctx);
 }
 
 static gboolean
@@ -391,11 +401,21 @@ handle_enable_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    if (!mm_gdbus_sim_get_active (MM_GDBUS_SIM (ctx->self))) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot enable/disable PIN: "
+                                               "SIM not currently active");
+        handle_enable_pin_context_free (ctx);
+        return;
+    }
+
     MM_BASE_SIM_GET_CLASS (ctx->self)->enable_pin (ctx->self,
-                                              ctx->pin,
-                                              ctx->enabled,
-                                              (GAsyncReadyCallback)handle_enable_pin_ready,
-                                              ctx);
+                                                   ctx->pin,
+                                                   ctx->enabled,
+                                                   (GAsyncReadyCallback)handle_enable_pin_ready,
+                                                   ctx);
 }
 
 static gboolean
@@ -782,6 +802,16 @@ handle_send_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    if (!mm_gdbus_sim_get_active (MM_GDBUS_SIM (ctx->self))) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot send PIN: "
+                                               "SIM not currently active");
+        handle_send_pin_context_free (ctx);
+        return;
+    }
+
     mm_base_sim_send_pin (ctx->self,
                           ctx->pin,
                           (GAsyncReadyCallback)handle_send_pin_ready,
@@ -852,6 +882,16 @@ handle_send_puk_auth_ready (MMBaseModem *modem,
 
     if (!mm_base_modem_authorize_finish (modem, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_send_puk_context_free (ctx);
+        return;
+    }
+
+    if (!mm_gdbus_sim_get_active (MM_GDBUS_SIM (ctx->self))) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot send PUK: "
+                                               "SIM not currently active");
         handle_send_puk_context_free (ctx);
         return;
     }
