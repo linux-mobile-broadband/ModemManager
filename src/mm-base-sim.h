@@ -36,9 +36,10 @@ typedef struct _MMBaseSimClass MMBaseSimClass;
 typedef struct _MMBaseSimPrivate MMBaseSimPrivate;
 
 /* Properties */
-#define MM_BASE_SIM_PATH       "sim-path"
-#define MM_BASE_SIM_CONNECTION "sim-connection"
-#define MM_BASE_SIM_MODEM      "sim-modem"
+#define MM_BASE_SIM_PATH        "sim-path"
+#define MM_BASE_SIM_CONNECTION  "sim-connection"
+#define MM_BASE_SIM_MODEM       "sim-modem"
+#define MM_BASE_SIM_SLOT_NUMBER "sim-slot-number"
 
 /* Signals */
 #define MM_BASE_SIM_PIN_LOCK_ENABLED "sim-pin-lock-enabled"
@@ -172,6 +173,8 @@ gboolean     mm_base_sim_send_puk_finish            (MMBaseSim *self,
 void         mm_base_sim_export                     (MMBaseSim *self);
 
 const gchar *mm_base_sim_get_path                   (MMBaseSim *sim);
+
+guint        mm_base_sim_get_slot_number            (MMBaseSim *self);
 
 void         mm_base_sim_load_sim_identifier        (MMBaseSim *self,
                                                      GAsyncReadyCallback callback,

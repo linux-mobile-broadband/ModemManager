@@ -45,6 +45,7 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_MODEM,
+    PROP_SLOT_NUMBER,
     PROP_LAST
 };
 
@@ -64,6 +65,10 @@ struct _MMBaseSimPrivate {
     MMBaseModem *modem;
     /* The path where the SIM object is exported */
     gchar *path;
+
+    /* The SIM slot number, which will be 0 always if the system
+     * doesn't support multiple SIMS. */
+     guint slot_number;
 };
 
 static guint signals[SIGNAL_LAST] = { 0 };
@@ -975,6 +980,12 @@ mm_base_sim_get_path (MMBaseSim *self)
     return self->priv->path;
 }
 
+guint
+mm_base_sim_get_slot_number (MMBaseSim *self)
+{
+    return self->priv->slot_number;
+}
+
 /*****************************************************************************/
 
 gboolean
@@ -1833,6 +1844,9 @@ set_property (GObject *object,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         }
         break;
+    case PROP_SLOT_NUMBER:
+        self->priv->slot_number = g_value_get_uint (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1856,6 +1870,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
+        break;
+    case PROP_SLOT_NUMBER:
+        g_value_set_uint (value, self->priv->slot_number);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1970,6 +1987,14 @@ mm_base_sim_class_init (MMBaseSimClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    properties[PROP_SLOT_NUMBER] =
+        g_param_spec_uint (MM_BASE_SIM_SLOT_NUMBER,
+                           "Slot number",
+                           "The slot number where the SIM is inserted",
+                           0, G_MAXUINT, 0,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_SLOT_NUMBER, properties[PROP_SLOT_NUMBER]);
 
     /* Signals */
     signals[SIGNAL_PIN_LOCK_ENABLED] =
