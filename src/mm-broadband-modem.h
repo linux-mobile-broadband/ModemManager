@@ -132,6 +132,6 @@ void     mm_broadband_modem_unlock_sms_storages      (MMBroadbandModem *self,
                                                       gboolean mem1,
                                                       gboolean mem2);
 /* Helper to update SIM hot swap */
-void mm_broadband_modem_update_sim_hot_swap_detected (MMBroadbandModem *self);
+void mm_broadband_modem_sim_hot_swap_detected (MMBroadbandModem *self);
 
 #endif /* MM_BROADBAND_MODEM_H */
