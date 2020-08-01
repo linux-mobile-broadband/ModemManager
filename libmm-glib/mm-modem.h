@@ -360,6 +360,19 @@ GPtrArray *mm_modem_list_sim_slots_sync   (MMModem              *self,
                                            GCancellable         *cancellable,
                                            GError              **error);
 
+void     mm_modem_set_primary_sim_slot        (MMModem              *self,
+                                               guint                 sim_slot,
+                                               GCancellable         *cancellable,
+                                               GAsyncReadyCallback   callback,
+                                               gpointer              user_data);
+gboolean mm_modem_set_primary_sim_slot_finish (MMModem              *self,
+                                               GAsyncResult         *res,
+                                               GError              **error);
+gboolean mm_modem_set_primary_sim_slot_sync   (MMModem              *self,
+                                               guint                 sim_slot,
+                                               GCancellable         *cancellable,
+                                               GError              **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_H_ */

@@ -183,6 +183,24 @@
     </method>
 
     <!--
+        SetPrimarySimSlot:
+        @sim_slot: SIM slot number to set as primary.
+
+        Selects which SIM slot to be considered as primary, on devices that expose
+	multiple slots in the #org.freedesktop.ModemManager1.Modem:SimSlots property.
+
+        When the switch happens the modem may require a full device reprobe, so the modem
+	object in DBus will get removed, and recreated once the selected SIM slot is in
+	use.
+
+        There is no limitation on which SIM slot to select, so the user may also set as
+	primary a slot that doesn't currently have any valid SIM card inserted.
+    -->
+    <method name="SetPrimarySimSlot">
+      <arg name="sim_slot" type="u" direction="in" />
+    </method>
+
+    <!--
        Command:
        @cmd: The command string, e.g. "AT+GCAP" or "+GCAP" (leading AT is inserted if necessary).
        @timeout: The number of seconds to wait for a response.

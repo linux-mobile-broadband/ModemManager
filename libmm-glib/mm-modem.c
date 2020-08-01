@@ -3699,6 +3699,93 @@ mm_modem_list_sim_slots_sync (MMModem       *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_set_primary_sim_slot_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_set_primary_sim_slot().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_set_primary_sim_slot().
+ *
+ * Returns: %TRUE if the SIM slot switch has been successfully requested, %FALSE if
+ * @error is set.
+ *
+ * Since: 1.16
+ */
+gboolean
+mm_modem_set_primary_sim_slot_finish (MMModem       *self,
+                                      GAsyncResult  *res,
+                                      GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_primary_sim_slot_finish (MM_GDBUS_MODEM (self), res, error);
+}
+
+/**
+ * mm_modem_set_primary_sim_slot:
+ * @self: A #MMModem.
+ * @sim_slot: SIM slot number.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to select which SIM slot to be considered as primary.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_set_primary_sim_slot_finish() to get the result of the operation.
+ *
+ * See mm_modem_set_primary_sim_slot_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.16
+ */
+void
+mm_modem_set_primary_sim_slot (MMModem             *self,
+                               guint                sim_slot,
+                               GCancellable        *cancellable,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+
+    mm_gdbus_modem_call_set_primary_sim_slot (MM_GDBUS_MODEM (self), sim_slot, cancellable, callback, user_data);
+}
+
+/**
+ * mm_modem_set_primary_sim_slot_sync:
+ * @self: A #MMModem.
+ * @sim_slot: SIM slot number.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to select which SIM slot to be considered as primary.
+ *
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_set_primary_sim_slot() for the asynchronous version of this method.
+ *
+ * Returns: %TRUE if the SIM slot switch has been successfully requested, %FALSE if
+ * @error is set.
+ *
+ * Since: 1.16
+ */
+gboolean
+mm_modem_set_primary_sim_slot_sync (MMModem       *self,
+                                    guint          sim_slot,
+                                    GCancellable  *cancellable,
+                                    GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_primary_sim_slot_sync (MM_GDBUS_MODEM (self), sim_slot, cancellable, error);
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_init (MMModem *self)
 {

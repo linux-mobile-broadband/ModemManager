@@ -354,6 +354,15 @@ struct _MMIfaceModem {
                                         guint                *primary_sim_slot,
                                         GError              **error);
 
+    /* Set primary SIM slot */
+    void     (* set_primary_sim_slot)        (MMIfaceModem         *self,
+                                              guint                 sim_slot,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
+    gboolean (* set_primary_sim_slot_finish) (MMIfaceModem         *self,
+                                              GAsyncResult         *res,
+                                              GError              **error);
+
     /* Create bearer */
     void (*create_bearer) (MMIfaceModem *self,
                            MMBearerProperties *properties,

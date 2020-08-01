@@ -281,6 +281,12 @@ MMModemBand documentation.
 An example would be: 'egsm|dcs|pcs|g850' to select all the GSM
 frequency bands.
 .TP
+.B \-\-set\-primary\-sim\-slot=[SLOT]
+Request to switch the primary SIM slot.
+
+The given \fBSLOT\fR must be a valid slot number in the [1,N] range, where
+N is the amount of SIM slots available in the system.
+.TP
 .B \-\-inhibit
 Inhibit the specific modem from being used by ModemManager. This method
 is completely equivalent to \fB\-\-inhibit\-device\fR, with the only
