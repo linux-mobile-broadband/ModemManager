@@ -1319,6 +1319,37 @@ mm_sim_qmi_new (MMBaseModem         *modem,
                                 NULL);
 }
 
+MMBaseSim *
+mm_sim_qmi_new_initialized (MMBaseModem *modem,
+                            gboolean     dms_uim_deprecated,
+                            guint        slot_number,
+                            gboolean     active,
+                            const gchar *sim_identifier,
+                            const gchar *imsi,
+                            const gchar *operator_identifier,
+                            const gchar *operator_name,
+                            const GStrv  emergency_numbers)
+{
+    MMBaseSim *sim;
+
+    sim = MM_BASE_SIM (g_object_new (MM_TYPE_SIM_QMI,
+                                     MM_BASE_SIM_MODEM,             modem,
+                                     MM_SIM_QMI_DMS_UIM_DEPRECATED, dms_uim_deprecated,
+                                     MM_BASE_SIM_SLOT_NUMBER,       slot_number,
+                                     "active",                      active,
+                                     "sim-identifier",              sim_identifier,
+                                     "imsi",                        imsi,
+                                     "operator-identifier",         operator_identifier,
+                                     "operator-name",               operator_name,
+                                     "emergency-numbers",           emergency_numbers,
+                                     NULL));
+
+    mm_base_sim_export (sim);
+    return sim;
+}
+
+/*****************************************************************************/
+
 static void
 mm_sim_qmi_init (MMSimQmi *self)
 {

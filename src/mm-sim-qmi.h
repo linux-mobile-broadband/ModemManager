@@ -53,4 +53,14 @@ void       mm_sim_qmi_new        (MMBaseModem          *modem,
 MMBaseSim *mm_sim_qmi_new_finish (GAsyncResult         *res,
                                   GError              **error);
 
+MMBaseSim *mm_sim_qmi_new_initialized (MMBaseModem *modem,
+                                       gboolean     dms_uim_deprecated,
+                                       guint        slot_number,
+                                       gboolean     active,
+                                       const gchar *sim_identifier,
+                                       const gchar *imsi,
+                                       const gchar *operator_identifier,
+                                       const gchar *operator_name,
+                                       const GStrv  emergency_numbers);
+
 #endif /* MM_SIM_QMI_H */
