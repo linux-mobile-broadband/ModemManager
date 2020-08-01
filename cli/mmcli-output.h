@@ -154,6 +154,8 @@ typedef enum {
     MMC_F_CDMA_ACTIVATION,
     /* SIM section */
     MMC_F_SIM_PATH,
+    MMC_F_SIM_PRIMARY_SLOT,
+    MMC_F_SIM_SLOT_PATHS,
     /* Bearer section */
     MMC_F_BEARER_PATHS,
     /* Time section */
@@ -338,14 +340,16 @@ void mmcli_output_listitem              (MmcF           field,
 /******************************************************************************/
 /* Custom output management */
 
-void mmcli_output_signal_quality   (guint                     value,
-                                    gboolean                  recent);
-void mmcli_output_state            (MMModemState              state,
-                                    MMModemStateFailedReason  reason);
-void mmcli_output_scan_networks    (GList                    *network_list);
-void mmcli_output_firmware_list    (GList                    *firmware_list,
-                                    MMFirmwareProperties     *selected);
-void mmcli_output_pco_list         (GList                    *pco_list);
+void mmcli_output_signal_quality   (guint                      value,
+                                    gboolean                   recent);
+void mmcli_output_state            (MMModemState               state,
+                                    MMModemStateFailedReason   reason);
+void mmcli_output_sim_slots        (gchar                    **sim_slot_paths,
+                                    guint                      primary_sim_slot);
+void mmcli_output_scan_networks    (GList                     *network_list);
+void mmcli_output_firmware_list    (GList                     *firmware_list,
+                                    MMFirmwareProperties      *selected);
+void mmcli_output_pco_list         (GList                     *pco_list);
 
 /******************************************************************************/
 /* Dump output */

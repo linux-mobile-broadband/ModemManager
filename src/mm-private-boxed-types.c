@@ -171,6 +171,35 @@ mm_pointer_array_get_type (void)
     return g_define_type_id__volatile;
 }
 
+static GPtrArray *
+object_array_copy (GPtrArray *object_array)
+{
+    return g_ptr_array_ref (object_array);
+}
+
+static void
+object_array_free (GPtrArray *object_array)
+{
+    g_ptr_array_unref (object_array);
+}
+
+GType
+mm_object_array_get_type (void)
+{
+    static volatile gsize g_define_type_id__volatile = 0;
+
+    if (g_once_init_enter (&g_define_type_id__volatile)) {
+        GType g_define_type_id =
+            g_boxed_type_register_static (g_intern_static_string ("MMObjectArray"),
+                                          (GBoxedCopyFunc) object_array_copy,
+                                          (GBoxedFreeFunc) object_array_free);
+
+        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+    }
+
+    return g_define_type_id__volatile;
+}
+
 static void
 async_method_free (MMAsyncMethod *method)
 {

@@ -75,6 +75,11 @@ gchar       *mm_modem_dup_path (MMModem *self);
 const gchar       *mm_modem_get_sim_path             (MMModem *self);
 gchar             *mm_modem_dup_sim_path             (MMModem *self);
 
+const gchar * const *mm_modem_get_sim_slot_paths (MMModem *self);
+gchar              **mm_modem_dup_sim_slot_paths (MMModem *self);
+
+guint              mm_modem_get_primary_sim_slot (MMModem *self);
+
 gboolean           mm_modem_peek_supported_capabilities (MMModem *self,
                                                          const MMModemCapability **capabilities,
                                                          guint *n_capabilities);
@@ -343,6 +348,17 @@ MMSim *mm_modem_get_sim_finish (MMModem *self,
 MMSim *mm_modem_get_sim_sync   (MMModem *self,
                                 GCancellable *cancellable,
                                 GError **error);
+
+void       mm_modem_list_sim_slots        (MMModem              *self,
+                                           GCancellable         *cancellable,
+                                           GAsyncReadyCallback   callback,
+                                           gpointer              user_data);
+GPtrArray *mm_modem_list_sim_slots_finish (MMModem              *self,
+                                           GAsyncResult         *res,
+                                           GError              **error);
+GPtrArray *mm_modem_list_sim_slots_sync   (MMModem              *self,
+                                           GCancellable         *cancellable,
+                                           GError              **error);
 
 G_END_DECLS
 

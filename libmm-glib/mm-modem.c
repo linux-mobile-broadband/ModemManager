@@ -172,6 +172,78 @@ mm_modem_dup_sim_path (MMModem *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_get_sim_slot_paths:
+ * @self: A #MMModem.
+ *
+ * Gets the DBus paths of the #MMSim objects available in the different SIM
+ * slots handled in this #MMModem. If a given SIM slot at a given index doesn't
+ * have a SIM card available, an empty object path will be given. This list
+ * includes the currently active SIM object path.
+ *
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_dup_sim_slot_paths() if on another thread.</warning>
+ *
+ * Returns: (transfer none): The DBus paths of the #MMSim objects handled in
+ * this #MMModem, or %NULL if none available. Do not free the returned value, it
+ * belongs to @self.
+ *
+ * Since: 1.16
+ */
+const gchar * const *
+mm_modem_get_sim_slot_paths (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    return mm_gdbus_modem_get_sim_slots (MM_GDBUS_MODEM (self));
+}
+
+/**
+ * mm_modem_dup_sim_slot_paths:
+ * @self: A #MMModem.
+ *
+ * Gets a copy of the DBus paths of the #MMSim objects available in the
+ * different SIM slots handled in this #MMModem. If a given SIM slot at a given
+ * index doesn't have a SIM card available, an empty object path will be given.
+ * This list includes the currently active SIM object path.
+ *
+ * Returns: (transfer full): The DBus paths of the #MMSim objects handled in
+ * this #MMModem, or %NULL if none available. The returned value should be
+ * freed with g_strfreev().
+ *
+ * Since: 1.16
+ */
+gchar **
+mm_modem_dup_sim_slot_paths (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    return mm_gdbus_modem_dup_sim_slots (MM_GDBUS_MODEM (self));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_get_primary_sim_slot:
+ * @self: A #MMModem.
+ *
+ * Gets the SIM slot number of the primary active SIM.
+ *
+ * Returns: slot number, in the [1,N] range.
+ *
+ * Since: 1.16
+ */
+guint
+mm_modem_get_primary_sim_slot (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), 0);
+
+    return mm_gdbus_modem_get_primary_sim_slot (MM_GDBUS_MODEM (self));
+}
+
+/*****************************************************************************/
+
 static void
 supported_capabilities_updated (MMModem *self,
                                 GParamSpec *pspec)
@@ -3379,6 +3451,250 @@ mm_modem_get_sim_sync (MMModem *self,
                           NULL);
 
     return (sim ? MM_SIM (sim) : NULL);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    gchar     **sim_paths;
+    GPtrArray  *sim_slots;
+    guint       n_sim_paths;
+    guint       i;
+} ListSimSlotsContext;
+
+static void
+list_sim_slots_context_free (ListSimSlotsContext *ctx)
+{
+    g_strfreev (ctx->sim_paths);
+    g_ptr_array_unref (ctx->sim_slots);
+    g_slice_free (ListSimSlotsContext, ctx);
+}
+
+/**
+ * mm_modem_list_sim_slots_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_list_sim_slots().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_list_sim_slots().
+ *
+ * Returns: (transfer full) (element-type ModemManager.Sim): The array of
+ * #MMSim objects, or %NULL if @error is set.
+ *
+ * Since: 1.16
+ */
+GPtrArray *
+mm_modem_list_sim_slots_finish (MMModem       *self,
+                                GAsyncResult  *res,
+                                GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+sim_slot_free (MMSim *sim)
+{
+    if (sim)
+        g_object_unref (sim);
+}
+
+static void create_next_sim (GTask *task);
+
+static void
+modem_list_sim_slots_build_object_ready (GDBusConnection *connection,
+                                         GAsyncResult    *res,
+                                         GTask           *task)
+{
+    GObject             *sim;
+    GError              *error = NULL;
+    GObject             *source_object;
+    ListSimSlotsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    source_object = g_async_result_get_source_object (res);
+    sim = g_async_initable_new_finish (G_ASYNC_INITABLE (source_object), res, &error);
+    g_object_unref (source_object);
+
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    g_ptr_array_add (ctx->sim_slots, sim);
+
+    /* Keep on creating next object */
+    ctx->i++;
+    create_next_sim (task);
+}
+
+static void
+create_next_sim (GTask *task)
+{
+    MMModem             *self;
+    ListSimSlotsContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    /* If no more additional sims, just end here. */
+    if (ctx->i == ctx->n_sim_paths) {
+        g_assert_cmpuint (ctx->n_sim_paths, ==, ctx->sim_slots->len);
+        g_task_return_pointer (task, g_steal_pointer (&ctx->sim_slots), (GDestroyNotify)g_ptr_array_unref);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Empty slot? */
+    if (g_str_equal (ctx->sim_paths[ctx->i], "/")) {
+        g_ptr_array_add (ctx->sim_slots, NULL);
+        ctx->i++;
+        create_next_sim (task);
+        return;
+    }
+
+    g_async_initable_new_async (MM_TYPE_SIM,
+                                G_PRIORITY_DEFAULT,
+                                g_task_get_cancellable (task),
+                                (GAsyncReadyCallback)modem_list_sim_slots_build_object_ready,
+                                task,
+                                "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                "g-name",           MM_DBUS_SERVICE,
+                                "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                                "g-object-path",    ctx->sim_paths[ctx->i],
+                                "g-interface-name", "org.freedesktop.ModemManager1.Sim",
+                                NULL);
+}
+
+/**
+ * mm_modem_list_sim_slots:
+ * @self: A #MMModem.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously lists the SIM slots available in the #MMModem.
+ *
+ * The returned array contains one element per slot available in the system;
+ * a #MMSim in each of the slots that contains a valid SIM card or %NULL if
+ * no SIM card is found.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_list_sim_slots_finish() to get the result of the operation.
+ *
+ * See mm_modem_list_sim_slots_sync() for the synchronous, blocking version of
+ * this method.
+ *
+ * Since: 1.16
+ */
+void
+mm_modem_list_sim_slots (MMModem             *self,
+                         GCancellable        *cancellable,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+    ListSimSlotsContext *ctx;
+    GTask               *task;
+
+    g_return_if_fail (MM_IS_MODEM (self));
+
+    ctx = g_slice_new0 (ListSimSlotsContext);
+    ctx->sim_paths = mm_gdbus_modem_dup_sim_slots (MM_GDBUS_MODEM (self));
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)list_sim_slots_context_free);
+
+    /* If no sim slots, just end here. */
+    if (!ctx->sim_paths) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_NOT_FOUND,
+                                 "No SIM slots available");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Got list of paths, start creating objects for each */
+    ctx->n_sim_paths = g_strv_length (ctx->sim_paths);
+    ctx->sim_slots = g_ptr_array_new_full (ctx->n_sim_paths, (GDestroyNotify)sim_slot_free);
+    ctx->i = 0;
+    create_next_sim (task);
+}
+
+/**
+ * mm_modem_list_sim_slots_sync:
+ * @self: A #MMModem.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously lists the SIM slots available in the #MMModem.
+ *
+ * The returned array contains one element per slot available in the system;
+ * a #MMSim in each of the slots that contains a valid SIM card or %NULL if
+ * no SIM card is found.
+ *
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_list_sim_slots() for the asynchronous version of this method.
+ *
+ * Returns: (transfer full) (element-type ModemManager.Sim): The array of
+ * #MMSim objects, or %NULL if @error is set.
+ *
+ * Since: 1.16
+ */
+GPtrArray *
+mm_modem_list_sim_slots_sync (MMModem       *self,
+                              GCancellable  *cancellable,
+                              GError       **error)
+{
+    g_autoptr(GPtrArray) sim_slots = NULL;
+    g_auto(GStrv)        sim_paths = NULL;
+    guint                n_sim_paths;
+    guint                i;
+
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    sim_paths = mm_gdbus_modem_dup_sim_slots (MM_GDBUS_MODEM (self));
+
+    /* Only non-empty lists are returned */
+    if (!sim_paths)
+        return NULL;
+
+    n_sim_paths = g_strv_length (sim_paths);
+
+    sim_slots = g_ptr_array_new_full (n_sim_paths, (GDestroyNotify)sim_slot_free);
+    for (i = 0; i < n_sim_paths; i++) {
+        GObject *sim;
+
+        if (g_str_equal (sim_paths[i], "/")) {
+            g_ptr_array_add (sim_slots, NULL);
+            continue;
+        }
+
+        sim = g_initable_new (MM_TYPE_SIM,
+                              cancellable,
+                              error,
+                              "g-flags",          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                              "g-name",           MM_DBUS_SERVICE,
+                              "g-connection",     g_dbus_proxy_get_connection (G_DBUS_PROXY (self)),
+                              "g-object-path",    sim_paths[i],
+                              "g-interface-name", "org.freedesktop.ModemManager1.Sim",
+                              NULL);
+        if (!sim)
+            return NULL;
+
+        /* Keep the object */
+        g_ptr_array_add (sim_slots, sim);
+    }
+    g_assert_cmpuint (sim_slots->len, ==, n_sim_paths);
+
+    return g_steal_pointer (&sim_slots);
 }
 
 /*****************************************************************************/

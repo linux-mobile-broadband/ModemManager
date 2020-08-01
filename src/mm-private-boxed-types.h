@@ -34,6 +34,9 @@ GType mm_str_pair_array_get_type (void) G_GNUC_CONST;
 GType mm_pointer_array_get_type (void) G_GNUC_CONST;
 #define MM_TYPE_POINTER_ARRAY (mm_pointer_array_get_type ())
 
+GType mm_object_array_get_type (void) G_GNUC_CONST;
+#define MM_TYPE_OBJECT_ARRAY (mm_object_array_get_type ())
+
 typedef struct {
     GCallback async;
     GCallback finish;

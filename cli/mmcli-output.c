@@ -147,7 +147,9 @@ static FieldInfo field_infos[] = {
     [MMC_F_CDMA_REGISTRATION_CDMA1X]          = { "modem.cdma.cdma1x-registration-state",            "registration cdma1x",      MMC_S_MODEM_CDMA,              },
     [MMC_F_CDMA_REGISTRATION_EVDO]            = { "modem.cdma.evdo-registration-state",              "registration evdo",        MMC_S_MODEM_CDMA,              },
     [MMC_F_CDMA_ACTIVATION]                   = { "modem.cdma.activation-state",                     "activation",               MMC_S_MODEM_CDMA,              },
-    [MMC_F_SIM_PATH]                          = { "modem.generic.sim",                               "path",                     MMC_S_MODEM_SIM,               },
+    [MMC_F_SIM_PATH]                          = { "modem.generic.sim",                               "primary sim path",         MMC_S_MODEM_SIM,               },
+    [MMC_F_SIM_PRIMARY_SLOT]                  = { "modem.generic.primary-sim-slot",                  NULL,                       MMC_S_MODEM_SIM,               },
+    [MMC_F_SIM_SLOT_PATHS]                    = { "modem.generic.sim-slots",                         "sim slot paths",           MMC_S_MODEM_SIM,               },
     [MMC_F_BEARER_PATHS]                      = { "modem.generic.bearers",                           "paths",                    MMC_S_MODEM_BEARER,            },
     [MMC_F_TIME_CURRENT]                      = { "modem.time.current",                              "current",                  MMC_S_MODEM_TIME,              },
     [MMC_F_TIMEZONE_CURRENT]                  = { "modem.timezone.current",                          "current",                  MMC_S_MODEM_TIMEZONE,          },
@@ -567,6 +569,37 @@ mmcli_output_state (MMModemState             state,
                                  (state == MM_MODEM_STATE_FAILED) ?
                                  g_strdup (mm_modem_state_failed_reason_get_string (reason)) :
                                  NULL);
+}
+
+/******************************************************************************/
+/* (Custom) SIM slots output */
+
+void
+mmcli_output_sim_slots (gchar **sim_slot_paths,
+                        guint   primary_sim_slot)
+{
+    guint i;
+
+    if (selected_type != MMC_OUTPUT_TYPE_HUMAN || !sim_slot_paths) {
+        mmcli_output_string_take       (MMC_F_SIM_PRIMARY_SLOT, primary_sim_slot ? g_strdup_printf ("%u", primary_sim_slot) : NULL);
+        mmcli_output_string_array_take (MMC_F_SIM_SLOT_PATHS, sim_slot_paths ? sim_slot_paths : NULL, TRUE);
+        return;
+    }
+
+    /* Include SIM slot number in each item */
+    for (i = 0; sim_slot_paths[i]; i++) {
+        gchar *aux;
+        guint  slot_number = i + 1;
+
+        aux = g_strdup_printf ("slot %u: %s%s",
+                               slot_number,
+                               g_str_equal (sim_slot_paths[i], "/") ? "none" : sim_slot_paths[i],
+                               (primary_sim_slot == slot_number) ? " (active)" : "");
+        g_free (sim_slot_paths[i]);
+        sim_slot_paths[i] = aux;
+    }
+
+    mmcli_output_string_array_take (MMC_F_SIM_SLOT_PATHS, sim_slot_paths, TRUE);
 }
 
 /******************************************************************************/

@@ -100,6 +100,7 @@ enum {
     PROP_MODEM_OMA_DBUS_SKELETON,
     PROP_MODEM_FIRMWARE_DBUS_SKELETON,
     PROP_MODEM_SIM,
+    PROP_MODEM_SIM_SLOTS,
     PROP_MODEM_BEARER_LIST,
     PROP_MODEM_STATE,
     PROP_MODEM_3GPP_REGISTRATION_STATE,
@@ -153,6 +154,7 @@ struct _MMBroadbandModemPrivate {
     /* Properties */
     GObject *modem_dbus_skeleton;
     MMBaseSim *modem_sim;
+    GPtrArray *modem_sim_slots;
     MMBearerList *modem_bearer_list;
     MMModemState modem_state;
     gchar *carrier_config_mapping;
@@ -12007,6 +12009,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_sim);
         self->priv->modem_sim = g_value_dup_object (value);
         break;
+    case PROP_MODEM_SIM_SLOTS:
+        g_clear_pointer (&self->priv->modem_sim_slots, g_ptr_array_unref);
+        self->priv->modem_sim_slots = g_value_dup_boxed (value);
+        break;
     case PROP_MODEM_BEARER_LIST:
         g_clear_object (&self->priv->modem_bearer_list);
         self->priv->modem_bearer_list = g_value_dup_object (value);
@@ -12146,6 +12152,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_SIM:
         g_value_set_object (value, self->priv->modem_sim);
+        break;
+    case PROP_MODEM_SIM_SLOTS:
+        g_value_set_boxed (value, self->priv->modem_sim_slots);
         break;
     case PROP_MODEM_BEARER_LIST:
         g_value_set_object (value, self->priv->modem_bearer_list);
@@ -12351,6 +12360,7 @@ dispose (GObject *object)
 
     g_clear_object (&self->priv->modem_3gpp_initial_eps_bearer);
     g_clear_object (&self->priv->modem_sim);
+    g_clear_pointer (&self->priv->modem_sim_slots, g_ptr_array_unref);
     g_clear_object (&self->priv->modem_bearer_list);
     g_clear_object (&self->priv->modem_messaging_sms_list);
     g_clear_object (&self->priv->modem_voice_call_list);
@@ -12711,6 +12721,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM,
                                       MM_IFACE_MODEM_SIM);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_SIM_SLOTS,
+                                      MM_IFACE_MODEM_SIM_SLOTS);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_BEARER_LIST,

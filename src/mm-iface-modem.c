@@ -13,7 +13,6 @@
  * Copyright (C) 2011 Google, Inc.
  */
 
-
 #include <ModemManager.h>
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
@@ -26,6 +25,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-base-sim.h"
 #include "mm-bearer-list.h"
+#include "mm-private-boxed-types.h"
 #include "mm-log-object.h"
 #include "mm-context.h"
 
@@ -4016,6 +4016,7 @@ typedef enum {
     INITIALIZATION_STEP_SUPPORTED_IP_FAMILIES,
     INITIALIZATION_STEP_POWER_STATE,
     INITIALIZATION_STEP_SIM_HOT_SWAP,
+    INITIALIZATION_STEP_SIM_SLOTS,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_SIM,
     INITIALIZATION_STEP_SETUP_CARRIER_CONFIG,
@@ -4392,6 +4393,73 @@ setup_sim_hot_swap_ready (MMIfaceModem *self,
         mm_obj_dbg (self, "SIM hot swap setup succeeded");
         g_object_set (self,
                       MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, TRUE,
+                      NULL);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
+}
+
+static void
+load_sim_slots_ready (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    InitializationContext *ctx;
+    g_autoptr(GPtrArray)   sim_slots = NULL;
+    g_autoptr(GError)      error = NULL;
+    guint                  primary_sim_slot = 0;
+
+    ctx  = g_task_get_task_data (task);
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_sim_slots_finish (self,
+                                                                     res,
+                                                                     &sim_slots,
+                                                                     &primary_sim_slot,
+                                                                     &error))
+        mm_obj_warn (self, "couldn't query SIM slots: %s", error->message);
+
+    if (sim_slots) {
+        MMBaseSim     *primary_sim = NULL;
+        GPtrArray     *sim_slot_paths_array;
+        g_auto(GStrv)  sim_slot_paths = NULL;
+        guint          i;
+
+        g_assert (primary_sim_slot);
+        g_assert_cmpuint (primary_sim_slot, <=, sim_slots->len);
+
+        sim_slot_paths_array = g_ptr_array_new ();
+        for (i = 0; i < sim_slots->len; i++) {
+            MMBaseSim   *sim;
+            const gchar *sim_path;
+
+            sim = MM_BASE_SIM (g_ptr_array_index (sim_slots, i));
+            if (!sim) {
+                g_ptr_array_add (sim_slot_paths_array, g_strdup ("/"));
+                continue;
+            }
+
+            sim_path = mm_base_sim_get_path (sim);
+            g_ptr_array_add (sim_slot_paths_array, g_strdup (sim_path));
+        }
+        g_ptr_array_add (sim_slot_paths_array, NULL);
+        sim_slot_paths = (GStrv) g_ptr_array_free (sim_slot_paths_array, FALSE);
+
+        mm_gdbus_modem_set_sim_slots (ctx->skeleton, (const gchar *const *)sim_slot_paths);
+        mm_gdbus_modem_set_primary_sim_slot (ctx->skeleton, primary_sim_slot);
+
+        /* If loading SIM slots is supported, we also expose already the primary active SIM object */
+        if (primary_sim_slot) {
+            primary_sim = g_ptr_array_index (sim_slots, primary_sim_slot - 1);
+            if (primary_sim)
+                g_object_bind_property (primary_sim, MM_BASE_SIM_PATH,
+                                        ctx->skeleton, "sim",
+                                        G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+        }
+        g_object_set (self,
+                      MM_IFACE_MODEM_SIM,       primary_sim,
+                      MM_IFACE_MODEM_SIM_SLOTS, sim_slots,
                       NULL);
     }
 
@@ -5090,6 +5158,22 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall-through */
 
+        case INITIALIZATION_STEP_SIM_SLOTS:
+        /* If the modem doesn't need any SIM (not implemented by plugin, or not
+         * needed in CDMA-only modems), or if we don't know how to query
+         * for SIM slots */
+        if (!mm_gdbus_modem_get_sim_slots (ctx->skeleton) &&
+            !mm_iface_modem_is_cdma_only (self) &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_sim_slots &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_sim_slots_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_sim_slots (MM_IFACE_MODEM (self),
+                                                                 (GAsyncReadyCallback)load_sim_slots_ready,
+                                                                 task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
+
     case INITIALIZATION_STEP_UNLOCK_REQUIRED:
         /* Only check unlock required if we were previously not unlocked */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
@@ -5683,6 +5767,14 @@ iface_modem_init (gpointer g_iface)
                               "SIM object",
                               MM_TYPE_BASE_SIM,
                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boxed (MM_IFACE_MODEM_SIM_SLOTS,
+                             "SIM slots",
+                             "SIM objects in SIM slots",
+                             MM_TYPE_OBJECT_ARRAY,
+                             G_PARAM_READWRITE));
 
     g_object_interface_install_property
         (g_iface,

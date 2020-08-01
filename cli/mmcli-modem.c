@@ -475,6 +475,8 @@ print_modem_info (void)
 
     sim_path = mm_modem_get_sim_path (ctx->modem);
     mmcli_output_string (MMC_F_SIM_PATH, g_strcmp0 (sim_path, "/") != 0 ? sim_path : NULL);
+    mmcli_output_sim_slots (mm_modem_dup_sim_slot_paths (ctx->modem),
+                            mm_modem_get_primary_sim_slot (ctx->modem));
 
     bearer_paths = (const gchar **) mm_modem_get_bearer_paths (ctx->modem);
     mmcli_output_string_array (MMC_F_BEARER_PATHS, (bearer_paths && bearer_paths[0]) ? bearer_paths : NULL, TRUE);

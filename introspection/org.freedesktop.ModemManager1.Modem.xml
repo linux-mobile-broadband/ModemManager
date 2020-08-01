@@ -217,9 +217,54 @@
     <!--
         Sim:
 
-        The path of the SIM object available in this device, if any.
+        The path of the primary active SIM object available in this device,
+        if any.
+
+        This SIM object is the one used for network registration and data
+        connection setup.
+
+        If multiple #org.freedesktop.ModemManager1.Modem.SimSlots are
+        supported, the #org.freedesktop.ModemManager1.Modem.PrimarySimSlot
+        index value specifies which is the slot number where this SIM card
+        is available.
     -->
     <property name="Sim" type="o" access="read" />
+
+    <!--
+        SimSlots:
+
+        The list of SIM slots available in the system, including the SIM object
+        paths if the cards are present. If a given SIM slot at a given index
+        doesn't have a SIM card available, an empty object path will be given.
+
+        The length of this array of objects will be equal to the amount of
+        available SIM slots in the system, and the index in the array is the
+        slot index.
+
+        This list includes the SIM object considered as primary active SIM slot
+        (#org.freedesktop.ModemManager1.Modem.Sim) at index
+        #org.freedesktop.ModemManager1.Modem.ActiveSimSlot.
+    -->
+    <property name="SimSlots" type="ao" access="read" />
+
+    <!--
+        PrimarySimSlot:
+
+        The index of the primary active SIM slot in the
+        #org.freedesktop.ModemManager1.Modem.SimSlots array, given in the [1,N]
+        range.
+
+        If multiple SIM slots aren't supported, this property will report
+        value 0.
+
+        In a Multi SIM Single Standby setup, this index identifies the only SIM
+        that is currently active. All the remaining slots will be inactive.
+
+        In a Multi SIM Multi Standby setup, this index identifies the active SIM
+        that is considered primary, i.e. the one that will be used when a data
+        connection is setup.
+    -->
+    <property name="PrimarySimSlot" type="u" access="read" />
 
     <!--
         Bearers:

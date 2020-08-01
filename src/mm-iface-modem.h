@@ -35,6 +35,7 @@
 #define MM_IFACE_MODEM_DBUS_SKELETON           "iface-modem-dbus-skeleton"
 #define MM_IFACE_MODEM_STATE                   "iface-modem-state"
 #define MM_IFACE_MODEM_SIM                     "iface-modem-sim"
+#define MM_IFACE_MODEM_SIM_SLOTS               "iface-modem-sim-slots"
 #define MM_IFACE_MODEM_BEARER_LIST             "iface-modem-bearer-list"
 #define MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED  "iface-modem-sim-hot-swap-supported"
 #define MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED "iface-modem-sim-hot-swap-configured"
@@ -342,6 +343,16 @@ struct _MMIfaceModem {
     MMBaseSim * (*create_sim_finish) (MMIfaceModem *self,
                                       GAsyncResult *res,
                                       GError **error);
+
+    /* Create SIMs in all SIM slots */
+    void     (* load_sim_slots)        (MMIfaceModem         *self,
+                                        GAsyncReadyCallback   callback,
+                                        gpointer              user_data);
+    gboolean (* load_sim_slots_finish) (MMIfaceModem         *self,
+                                        GAsyncResult         *res,
+                                        GPtrArray           **sim_slots,
+                                        guint                *primary_sim_slot,
+                                        GError              **error);
 
     /* Create bearer */
     void (*create_bearer) (MMIfaceModem *self,
