@@ -4375,6 +4375,31 @@ load_supported_ip_families_ready (MMIfaceModem *self,
 UINT_REPLY_READY_FN (power_state, "power state")
 
 static void
+setup_sim_hot_swap_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    InitializationContext *ctx;
+    g_autoptr(GError)      error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish (self, res, &error);
+    if (error)
+        mm_obj_warn (self, "SIM hot swap setup failed: %s", error->message);
+    else {
+        mm_obj_dbg (self, "SIM hot swap setup succeeded");
+        g_object_set (self,
+                      MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, TRUE,
+                      NULL);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
+}
+
+static void
 modem_update_lock_info_ready (MMIfaceModem *self,
                               GAsyncResult *res,
                               GTask *task)
@@ -4613,34 +4638,6 @@ load_current_bands_ready (MMIfaceModem *self,
     }
 
     /* Done, Go on to next step */
-    ctx->step++;
-    interface_initialization_step (task);
-}
-
-/*****************************************************************************/
-/* Setup SIM hot swap (Modem interface) */
-static void
-setup_sim_hot_swap_ready (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GTask *task)
-{
-    InitializationContext *ctx;
-    GError *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-
-    MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish (self, res, &error);
-    if (error) {
-        mm_obj_warn (self, "SIM hot swap setup failed: %s", error->message);
-        g_error_free (error);
-    } else {
-        mm_obj_dbg (self, "SIM hot swap setup succeeded");
-        g_object_set (self,
-                      MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, TRUE,
-                      NULL);
-    }
-
-    /* Go on to next step */
     ctx->step++;
     interface_initialization_step (task);
 }
