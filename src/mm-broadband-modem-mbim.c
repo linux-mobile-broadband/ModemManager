@@ -5479,6 +5479,8 @@ iface_modem_init (MMIfaceModem *iface)
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     iface->load_sim_slots = mm_shared_qmi_load_sim_slots;
     iface->load_sim_slots_finish = mm_shared_qmi_load_sim_slots_finish;
+    iface->set_primary_sim_slot = mm_shared_qmi_set_primary_sim_slot;
+    iface->set_primary_sim_slot_finish = mm_shared_qmi_set_primary_sim_slot_finish;
 #endif
 
     /* Create MBIM-specific bearer */

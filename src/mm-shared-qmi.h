@@ -171,6 +171,14 @@ gboolean           mm_shared_qmi_load_sim_slots_finish              (MMIfaceMode
                                                                      GPtrArray           **sim_slots,
                                                                      guint                *primary_sim_slot,
                                                                      GError              **error);
+void               mm_shared_qmi_set_primary_sim_slot               (MMIfaceModem         *self,
+                                                                     guint                 sim_slot,
+                                                                     GAsyncReadyCallback   callback,
+                                                                     gpointer              user_data);
+gboolean           mm_shared_qmi_set_primary_sim_slot_finish        (MMIfaceModem         *self,
+                                                                     GAsyncResult         *res,
+                                                                     GError              **error);
+
 /* Shared QMI location support */
 
 void                               mm_shared_qmi_location_load_capabilities                     (MMIfaceModemLocation   *self,
