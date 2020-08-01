@@ -4119,7 +4119,7 @@ load_sim_identifier_ready (MMBaseSim *sim,
 
     if (g_strcmp0 (current_simid, cached_simid) != 0) {
         mm_obj_info (self, "sim identifier has changed: possible SIM swap during power down/low");
-        mm_broadband_modem_update_sim_hot_swap_detected (self);
+        mm_broadband_modem_sim_hot_swap_detected (self);
     }
 
     g_task_return_boolean (task, TRUE);
@@ -11914,7 +11914,7 @@ after_hotswap_event_disable_ready (MMBaseModem *self,
 }
 
 void
-mm_broadband_modem_update_sim_hot_swap_detected (MMBroadbandModem *self)
+mm_broadband_modem_sim_hot_swap_detected (MMBroadbandModem *self)
 {
     if (self->priv->sim_hot_swap_ports_ctx) {
         mm_obj_dbg (self, "releasing SIM hot swap ports context");

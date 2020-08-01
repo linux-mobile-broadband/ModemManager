@@ -507,7 +507,7 @@ telit_qss_unsolicited_handler (MMPortSerialAt *port,
     if ((prev_qss_status == QSS_STATUS_SIM_REMOVED && cur_qss_status != QSS_STATUS_SIM_REMOVED) ||
         (prev_qss_status > QSS_STATUS_SIM_REMOVED && cur_qss_status == QSS_STATUS_SIM_REMOVED)) {
         mm_obj_info (self, "QSS handler: SIM swap detected");
-        mm_broadband_modem_update_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+        mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
     }
 }
 
