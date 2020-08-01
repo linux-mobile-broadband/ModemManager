@@ -1466,6 +1466,35 @@ load_operator_name (MMBaseSim *self,
 
 /*****************************************************************************/
 
+MMBaseSim *
+mm_base_sim_new_initialized (MMBaseModem *modem,
+                             guint        slot_number,
+                             gboolean     active,
+                             const gchar *sim_identifier,
+                             const gchar *imsi,
+                             const gchar *operator_identifier,
+                             const gchar *operator_name,
+                             const GStrv  emergency_numbers)
+{
+    MMBaseSim *sim;
+
+    sim = MM_BASE_SIM (g_object_new (MM_TYPE_BASE_SIM,
+                                     MM_BASE_SIM_MODEM,       modem,
+                                     MM_BASE_SIM_SLOT_NUMBER, slot_number,
+                                     "active",                active,
+                                     "sim-identifier",        sim_identifier,
+                                     "imsi",                  imsi,
+                                     "operator-identifier",   operator_identifier,
+                                     "operator-name",         operator_name,
+                                     "emergency-numbers",     emergency_numbers,
+                                     NULL));
+
+    mm_base_sim_export (sim);
+    return sim;
+}
+
+/*****************************************************************************/
+
 typedef struct _InitAsyncContext InitAsyncContext;
 static void interface_initialization_step (GTask *task);
 

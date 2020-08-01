@@ -153,6 +153,15 @@ gboolean     mm_base_sim_initialize_finish          (MMBaseSim *self,
                                                      GAsyncResult *result,
                                                      GError **error);
 
+MMBaseSim   *mm_base_sim_new_initialized            (MMBaseModem *modem,
+                                                     guint        slot_number,
+                                                     gboolean     active,
+                                                     const gchar *sim_identifier,
+                                                     const gchar *imsi,
+                                                     const gchar *operator_identifier,
+                                                     const gchar *operator_name,
+                                                     const GStrv  emergency_numbers);
+
 void         mm_base_sim_send_pin                   (MMBaseSim *self,
                                                      const gchar *pin,
                                                      GAsyncReadyCallback callback,
