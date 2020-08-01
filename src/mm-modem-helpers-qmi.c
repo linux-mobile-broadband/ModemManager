@@ -1804,20 +1804,17 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
                                          guint                             *o_puk2_retries,
                                          GError                           **error)
 {
-    GArray *cards;
-    QmiMessageUimGetCardStatusOutputCardStatusCardsElement *card;
+    QmiMessageUimGetCardStatusOutputCardStatusCardsElement                    *card;
     QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement *app;
-    MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
-    guint i;
-    gint card_i = -1;
-    gint application_j = -1;
-    guint n_absent = 0;
-    guint n_error = 0;
-    guint n_invalid = 0;
+    GArray      *cards;
+    guint16      index_gw_primary = 0xFFFF;
+    guint8       gw_primary_slot_i = 0;
+    guint8       gw_primary_application_i = 0;
+    MMModemLock  lock = MM_MODEM_LOCK_UNKNOWN;
 
     /* This command supports MULTIPLE cards with MULTIPLE applications each. For our
-     * purposes, we're going to consider as the SIM to use the first card present
-     * with a SIM/USIM application. */
+     * purposes, we're going to consider as the SIM to use the one identified as
+     * 'primary GW' exclusively. We don't really support Dual Sim Dual Standby yet. */
 
     if (!qmi_message_uim_get_card_status_output_get_result (output, error)) {
         g_prefix_error (error, "QMI operation failed: ");
@@ -1826,7 +1823,7 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
 
     qmi_message_uim_get_card_status_output_get_card_status (
         output,
-        NULL, /* index_gw_primary */
+        &index_gw_primary,
         NULL, /* index_1x_primary */
         NULL, /* index_gw_secondary */
         NULL, /* index_1x_secondary */
@@ -1839,103 +1836,91 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
         return FALSE;
     }
 
-    if (cards->len > 1)
-        mm_obj_dbg (log_object, "multiple cards reported: %u", cards->len);
+    /* Look for the primary GW slot and application.
+     * If we don't have valid GW primary slot index and application index, assume
+     * we're missing the SIM altogether */
+    gw_primary_slot_i        = ((index_gw_primary & 0xFF00) >> 8);
+    gw_primary_application_i = ((index_gw_primary & 0x00FF));
 
-    /* All KNOWN applications in all cards will need to be in READY state for us
-     * to consider UNLOCKED */
-    for (i = 0; i < cards->len; i++) {
-        card = &g_array_index (cards, QmiMessageUimGetCardStatusOutputCardStatusCardsElement, i);
-
-        switch (card->card_state) {
-        case QMI_UIM_CARD_STATE_PRESENT: {
-            guint j;
-            gboolean sim_usim_found = FALSE;
-
-            if (card->applications->len == 0) {
-                mm_obj_dbg (log_object, "no applications reported in card [%u]", i);
-                n_invalid++;
-                break;
-            }
-
-            if (card->applications->len > 1)
-                mm_obj_dbg (log_object, "multiple applications reported in card [%u]: %u", i, card->applications->len);
-
-            for (j = 0; j < card->applications->len; j++) {
-                app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, j);
-
-                if (app->type == QMI_UIM_CARD_APPLICATION_TYPE_UNKNOWN) {
-                    mm_obj_dbg (log_object, "mnknown application [%u] found in card [%u]: %s; ignored.",
-                            j, i, qmi_uim_card_application_state_get_string (app->state));
-                    continue;
-                }
-
-                mm_obj_dbg (log_object, "application '%s' [%u] in card [%u]: %s",
-                            qmi_uim_card_application_type_get_string (app->type), j, i, qmi_uim_card_application_state_get_string (app->state));
-
-                if (app->type == QMI_UIM_CARD_APPLICATION_TYPE_SIM || app->type == QMI_UIM_CARD_APPLICATION_TYPE_USIM) {
-                    /* We found the card/app pair to use! Only keep the first found,
-                     * but still, keep on looping to log about the remaining ones */
-                    if (card_i < 0 && application_j < 0) {
-                        card_i = i;
-                        application_j = j;
-                    }
-
-                    sim_usim_found = TRUE;
-                }
-            }
-
-            if (!sim_usim_found) {
-                mm_obj_dbg (log_object, "no SIM/USIM application found in card [%u]", i);
-                n_invalid++;
-            }
-
-            break;
-        }
-
-        case QMI_UIM_CARD_STATE_ABSENT:
-            mm_obj_dbg (log_object, "card '%u' is absent", i);
-            n_absent++;
-            break;
-
-        case QMI_UIM_CARD_STATE_ERROR:
-        default:
-            n_error++;
-            if (qmi_uim_card_error_get_string (card->error_code) != NULL)
-                mm_obj_warn (log_object, "card '%u' is unusable: %s", i, qmi_uim_card_error_get_string (card->error_code));
-            else
-                mm_obj_warn (log_object, "card '%u' is unusable: unknown error", i);
-            break;
-        }
-
-        /* go on to next card */
+    if (gw_primary_slot_i == 0xFF) {
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED,
+                     "GW primary session index unknown");
+        return FALSE;
     }
+    mm_obj_dbg (log_object, "GW primary session index: %u",     gw_primary_slot_i);
 
-    /* If we found no card/app to use, we need to report an error */
-    if (card_i < 0 || application_j < 0) {
-        /* If not a single card found, report SIM not inserted */
-        if (n_absent > 0 && !n_error && !n_invalid)
-            g_set_error (error,
-                         MM_MOBILE_EQUIPMENT_ERROR,
-                         MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED,
-                         "No card found");
-        else if (n_error > 0)
-            g_set_error (error,
-                         MM_MOBILE_EQUIPMENT_ERROR,
-                         MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                         "Card error");
-        else
-            g_set_error (error,
-                         MM_MOBILE_EQUIPMENT_ERROR,
-                         MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
-                         "Card failure: %u absent, %u errors, %u invalid",
-                         n_absent, n_error, n_invalid);
+    if (gw_primary_application_i == 0xFF) {
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED,
+                     "GW primary application index unknown");
+        return FALSE;
+    }
+    mm_obj_dbg (log_object, "GW primary application index: %u", gw_primary_application_i);
+
+    /* Validate slot index */
+    if (gw_primary_slot_i >= cards->len) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Invalid GW primary session index: %u",
+                     gw_primary_slot_i);
         return FALSE;
     }
 
-    /* Get card/app to use */
-    card = &g_array_index (cards, QmiMessageUimGetCardStatusOutputCardStatusCardsElement, card_i);
-    app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, application_j);
+    /* Get card at slot */
+    card = &g_array_index (cards, QmiMessageUimGetCardStatusOutputCardStatusCardsElement, gw_primary_slot_i);
+
+    if (card->card_state == QMI_UIM_CARD_STATE_ABSENT) {
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED,
+                     "No card found");
+        return FALSE;
+    }
+
+    if (card->card_state == QMI_UIM_CARD_STATE_ERROR) {
+        const gchar *card_error;
+
+        card_error = qmi_uim_card_error_get_string (card->error_code);
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
+                     "Card error: %s", card_error ? card_error : "unknown error");
+        return FALSE;
+    }
+
+    if (card->card_state != QMI_UIM_CARD_STATE_PRESENT) {
+        g_set_error (error,
+                     MM_MOBILE_EQUIPMENT_ERROR,
+                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
+                     "Card error: unexpected card state: 0x%x", card->card_state);
+        return FALSE;
+    }
+
+    /* Card is present */
+
+    if (card->applications->len == 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No applications reported in card");
+        return FALSE;
+    }
+
+    /* Validate application index */
+    if (gw_primary_application_i >= card->applications->len) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Invalid GW primary application index: %u",
+                     gw_primary_application_i);
+        return FALSE;
+    }
+
+    app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, gw_primary_application_i);
+    if ((app->type != QMI_UIM_CARD_APPLICATION_TYPE_SIM) && (app->type != QMI_UIM_CARD_APPLICATION_TYPE_USIM)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unsupported application type found in GW primary application index: %s",
+                     qmi_uim_card_application_type_get_string (app->type));
+        return FALSE;
+    }
 
     /* If card not ready yet, return RETRY error.
      * If the application state reports needing PIN/PUk, consider that ready as
