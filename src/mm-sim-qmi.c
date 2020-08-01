@@ -27,6 +27,7 @@
 
 #include "mm-log-object.h"
 #include "mm-sim-qmi.h"
+#include "mm-modem-helpers-qmi.h"
 
 G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
 
@@ -86,6 +87,131 @@ ensure_qmi_client (GTask       *task,
 
     *o_client = client;
     return TRUE;
+}
+
+/*****************************************************************************/
+/* Wait for SIM ready */
+
+#define SIM_READY_CHECKS_MAX 5
+#define SIM_READY_CHECKS_TIMEOUT_SECS 1
+
+typedef struct {
+    QmiClient *client_uim;
+    guint      ready_checks_n;
+} WaitSimReadyContext;
+
+static void
+wait_sim_ready_context_free (WaitSimReadyContext *ctx)
+{
+    g_clear_object (&ctx->client_uim);
+    g_slice_free (WaitSimReadyContext, ctx);
+}
+
+static gboolean
+wait_sim_ready_finish (MMBaseSim     *self,
+                       GAsyncResult  *res,
+                       GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void sim_ready_check (GTask *task);
+
+static gboolean
+sim_ready_retry_cb (GTask *task)
+{
+    sim_ready_check (task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+sim_ready_retry (GTask *task)
+{
+    g_timeout_add_seconds (SIM_READY_CHECKS_TIMEOUT_SECS, (GSourceFunc) sim_ready_retry_cb, task);
+}
+
+static void
+uim_get_card_status_ready (QmiClientUim *client,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    g_autoptr(QmiMessageUimGetCardStatusOutput)  output = NULL;
+    g_autoptr(GError)                            error = NULL;
+    MMSimQmi                                    *self;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_uim_get_card_status_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_uim_get_card_status_output_get_result (output, &error) ||
+        (!mm_qmi_uim_get_card_status_output_parse (self, output, NULL, NULL, NULL, NULL, NULL, &error) &&
+         (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
+          g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY)))) {
+        mm_obj_dbg (self, "sim not yet considered ready... retrying");
+        sim_ready_retry (task);
+        return;
+    }
+
+    /* SIM is considered ready now */
+    mm_obj_dbg (self, "sim is ready");
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+sim_ready_check (GTask *task)
+{
+    WaitSimReadyContext *ctx;
+    MMSimQmi            *self;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    ctx->ready_checks_n++;
+    if (ctx->ready_checks_n == SIM_READY_CHECKS_MAX) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "failed waiting for SIM readiness");
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "checking SIM readiness");
+    qmi_client_uim_get_card_status (QMI_CLIENT_UIM (ctx->client_uim),
+                                    NULL,
+                                    5,
+                                    NULL,
+                                    (GAsyncReadyCallback) uim_get_card_status_ready,
+                                    task);
+}
+
+static void
+wait_sim_ready (MMBaseSim           *_self,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
+{
+    QmiClient           *client;
+    MMSimQmi            *self;
+    GTask               *task;
+    WaitSimReadyContext *ctx;
+
+    self = MM_SIM_QMI (_self);
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_obj_dbg (self, "waiting for SIM to be ready...");
+    if (!self->priv->dms_uim_deprecated) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!ensure_qmi_client (task, self, QMI_SERVICE_UIM, &client))
+        return;
+
+    ctx = g_slice_new0 (WaitSimReadyContext);
+    ctx->client_uim = g_object_ref (client);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) wait_sim_ready_context_free);
+
+    sim_ready_check (task);
 }
 
 /*****************************************************************************/
@@ -1406,6 +1532,8 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
+    base_sim_class->wait_sim_ready = wait_sim_ready;
+    base_sim_class->wait_sim_ready_finish = wait_sim_ready_finish;
     base_sim_class->load_sim_identifier = load_sim_identifier;
     base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
     base_sim_class->load_imsi = load_imsi;
