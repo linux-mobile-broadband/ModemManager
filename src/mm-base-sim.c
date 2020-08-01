@@ -1500,6 +1500,7 @@ static void interface_initialization_step (GTask *task);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_WAIT_READY,
     INITIALIZATION_STEP_SIM_IDENTIFIER,
     INITIALIZATION_STEP_IMSI,
     INITIALIZATION_STEP_OPERATOR_ID,
@@ -1634,6 +1635,23 @@ STR_REPLY_READY_FN (operator_identifier, "operator identifier")
 STR_REPLY_READY_FN (operator_name, "operator name")
 
 static void
+init_wait_sim_ready (MMBaseSim    *self,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    InitAsyncContext  *ctx;
+    g_autoptr(GError)  error = NULL;
+
+    if (!MM_BASE_SIM_GET_CLASS (self)->wait_sim_ready_finish (self, res, &error))
+        mm_obj_warn (self, "couldn't wait for SIM to be ready: %s", error->message);
+
+    /* Go on to next step */
+    ctx = g_task_get_task_data (task);
+    ctx->step++;
+    interface_initialization_step (task);
+}
+
+static void
 interface_initialization_step (GTask *task)
 {
     MMBaseSim *self;
@@ -1649,6 +1667,18 @@ interface_initialization_step (GTask *task)
 
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
+        ctx->step++;
+        /* Fall through */
+
+    case INITIALIZATION_STEP_WAIT_READY:
+        if (MM_BASE_SIM_GET_CLASS (self)->wait_sim_ready &&
+            MM_BASE_SIM_GET_CLASS (self)->wait_sim_ready_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->wait_sim_ready (
+                self,
+                (GAsyncReadyCallback)init_wait_sim_ready,
+                task);
+            return;
+        }
         ctx->step++;
         /* Fall through */
 

@@ -52,6 +52,14 @@ struct _MMBaseSim {
 struct _MMBaseSimClass {
     MmGdbusSimSkeletonClass parent;
 
+    /* Wait SIM ready (async) */
+    void     (* wait_sim_ready)        (MMBaseSim            *self,
+                                        GAsyncReadyCallback   callback,
+                                        gpointer              user_data);
+    gboolean (* wait_sim_ready_finish) (MMBaseSim            *self,
+                                        GAsyncResult         *res,
+                                        GError              **error);
+
     /* Load SIM identifier (async) */
     void    (* load_sim_identifier)        (MMBaseSim *self,
                                             GAsyncReadyCallback callback,
