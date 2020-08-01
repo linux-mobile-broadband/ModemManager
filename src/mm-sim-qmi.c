@@ -1315,6 +1315,7 @@ mm_sim_qmi_new (MMBaseModem         *modem,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
                                 MM_SIM_QMI_DMS_UIM_DEPRECATED, dms_uim_deprecated,
+                                "active", TRUE, /* by default always active */
                                 NULL);
 }
 

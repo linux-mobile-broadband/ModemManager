@@ -264,6 +264,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_SMS_PROPERTIES_DELIVERY_STATE]     = { "sms.properties.delivery-state",                   "delivery state",           MMC_S_SMS_PROPERTIES,          },
     [MMC_F_SMS_PROPERTIES_DISCH_TIMESTAMP]    = { "sms.properties.discharge-timestamp",              "discharge timestamp",      MMC_S_SMS_PROPERTIES,          },
     [MMC_F_SIM_GENERAL_DBUS_PATH]             = { "sim.dbus-path",                                   "path",                     MMC_S_SIM_GENERAL,             },
+    [MMC_F_SIM_PROPERTIES_ACTIVE]             = { "sim.properties.active",                           "active",                   MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_IMSI]               = { "sim.properties.imsi",                             "imsi",                     MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_ICCID]              = { "sim.properties.iccid",                            "iccid",                    MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_OPERATOR_ID]        = { "sim.properties.operator-code",                    "operator id",              MMC_S_SIM_PROPERTIES,          },

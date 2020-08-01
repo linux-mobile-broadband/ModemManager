@@ -87,6 +87,26 @@ mm_sim_dup_path (MMSim *self)
 /*****************************************************************************/
 
 /**
+ * mm_sim_get_active:
+ * @self: A #MMSim.
+ *
+ * Checks whether the #MMSim is currently active.
+ *
+ * Returns: %TRUE if the SIM is active, %FALSE otherwise.
+ *
+ * Since: 1.16
+ */
+gboolean
+mm_sim_get_active (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
+
+    return mm_gdbus_sim_get_active (MM_GDBUS_SIM (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_sim_get_identifier:
  * @self: A #MMSim.
  *

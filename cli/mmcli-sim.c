@@ -159,6 +159,7 @@ static void
 print_sim_info (MMSim *sim)
 {
     mmcli_output_string       (MMC_F_SIM_GENERAL_DBUS_PATH,            mm_sim_get_path (sim));
+    mmcli_output_string       (MMC_F_SIM_PROPERTIES_ACTIVE,            mm_sim_get_active (sim) ? "yes" : "no");
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_IMSI,              mm_sim_get_imsi (sim));
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_ICCID,             mm_sim_get_identifier (sim));
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_OPERATOR_ID,       mm_sim_get_operator_identifier (sim));

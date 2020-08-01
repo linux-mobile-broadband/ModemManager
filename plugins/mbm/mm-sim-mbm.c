@@ -221,6 +221,7 @@ mm_sim_mbm_new (MMBaseModem *modem,
                                 callback,
                                 user_data,
                                 MM_BASE_SIM_MODEM, modem,
+                                "active", TRUE, /* by default always active */
                                 NULL);
 }
 

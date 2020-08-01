@@ -1209,6 +1209,7 @@ MMSim
 <SUBSECTION Getters>
 mm_sim_get_path
 mm_sim_dup_path
+mm_sim_get_active
 mm_sim_get_identifier
 mm_sim_dup_identifier
 mm_sim_get_imsi
@@ -3088,6 +3089,7 @@ mm_gdbus_object_manager_client_get_type
 MmGdbusSim
 MmGdbusSimIface
 <SUBSECTION Getters>
+mm_gdbus_sim_get_active
 mm_gdbus_sim_get_imsi
 mm_gdbus_sim_dup_imsi
 mm_gdbus_sim_get_sim_identifier
@@ -3112,6 +3114,7 @@ mm_gdbus_sim_call_change_pin
 mm_gdbus_sim_call_change_pin_finish
 mm_gdbus_sim_call_change_pin_sync
 <SUBSECTION Private>
+mm_gdbus_sim_set_active
 mm_gdbus_sim_set_imsi
 mm_gdbus_sim_set_operator_identifier
 mm_gdbus_sim_set_operator_name

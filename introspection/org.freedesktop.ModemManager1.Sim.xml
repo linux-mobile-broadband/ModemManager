@@ -66,6 +66,19 @@
     </method>
 
     <!--
+        Active:
+
+        Boolean indicating whether the SIM is currently active.
+
+        On systems that support Multi SIM Single Standby, only one SIM may be
+        active at any given time, which will be the one considered primary.
+
+        On systems that support Multi SIM Multi Standby, more than one SIM may
+        be active at any given time, but only one of them is considered primary.
+    -->
+    <property name="Active" type="b" access="read" />
+
+    <!--
         SimIdentifier:
 
         The ICCID of the SIM card.
