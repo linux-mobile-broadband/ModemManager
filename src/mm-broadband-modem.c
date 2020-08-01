@@ -11900,20 +11900,6 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
 
 
 /*****************************************************************************/
-static void
-after_hotswap_event_disable_ready (MMBaseModem *self,
-                                   GAsyncResult *res,
-                                   gpointer user_data)
-{
-    GError *error = NULL;
-
-    mm_base_modem_disable_finish (self, res, &error);
-    if (error) {
-        mm_obj_err (self, "failed to disable after hotswap event: %s", error->message);
-        g_error_free (error);
-    } else
-        mm_base_modem_set_valid (self, FALSE);
-}
 
 void
 mm_broadband_modem_sim_hot_swap_detected (MMBroadbandModem *self)
@@ -11924,10 +11910,7 @@ mm_broadband_modem_sim_hot_swap_detected (MMBroadbandModem *self)
         self->priv->sim_hot_swap_ports_ctx = NULL;
     }
 
-    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
-    mm_base_modem_disable (MM_BASE_MODEM (self),
-                           (GAsyncReadyCallback) after_hotswap_event_disable_ready,
-                           NULL);
+    mm_base_modem_process_sim_switch (MM_BASE_MODEM (self));
 }
 
 /*****************************************************************************/

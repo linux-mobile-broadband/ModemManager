@@ -214,4 +214,6 @@ gboolean mm_base_modem_disable_finish (MMBaseModem *self,
                                        GAsyncResult *res,
                                        GError **error);
 
+void mm_base_modem_process_sim_switch (MMBaseModem *self);
+
 #endif /* MM_BASE_MODEM_H */
