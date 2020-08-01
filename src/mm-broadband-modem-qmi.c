@@ -680,249 +680,6 @@ modem_load_unlock_required_finish (MMIfaceModem *self,
 
 static void load_unlock_required_context_step (GTask *task);
 
-/* Used also when loading unlock retries left */
-static gboolean
-uim_get_card_status_output_parse (MMBroadbandModemQmi               *self,
-                                  QmiMessageUimGetCardStatusOutput  *output,
-                                  MMModemLock                       *o_lock,
-                                  guint                             *o_pin1_retries,
-                                  guint                             *o_puk1_retries,
-                                  guint                             *o_pin2_retries,
-                                  guint                             *o_puk2_retries,
-                                  GError                           **error)
-{
-    GArray *cards;
-    QmiMessageUimGetCardStatusOutputCardStatusCardsElement *card;
-    QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement *app;
-    MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
-    guint i;
-    gint card_i = -1;
-    gint application_j = -1;
-    guint n_absent = 0;
-    guint n_error = 0;
-    guint n_invalid = 0;
-
-    /* This command supports MULTIPLE cards with MULTIPLE applications each. For our
-     * purposes, we're going to consider as the SIM to use the first card present
-     * with a SIM/USIM application. */
-
-    if (!qmi_message_uim_get_card_status_output_get_result (output, error)) {
-        g_prefix_error (error, "QMI operation failed: ");
-        return FALSE;
-    }
-
-    qmi_message_uim_get_card_status_output_get_card_status (
-        output,
-        NULL, /* index_gw_primary */
-        NULL, /* index_1x_primary */
-        NULL, /* index_gw_secondary */
-        NULL, /* index_1x_secondary */
-        &cards,
-        NULL);
-
-    if (cards->len == 0) {
-        g_set_error (error, QMI_CORE_ERROR, QMI_CORE_ERROR_FAILED,
-                     "No cards reported");
-        return FALSE;
-    }
-
-    if (cards->len > 1)
-        mm_obj_dbg (self, "multiple cards reported: %u", cards->len);
-
-    /* All KNOWN applications in all cards will need to be in READY state for us
-     * to consider UNLOCKED */
-    for (i = 0; i < cards->len; i++) {
-        card = &g_array_index (cards, QmiMessageUimGetCardStatusOutputCardStatusCardsElement, i);
-
-        switch (card->card_state) {
-        case QMI_UIM_CARD_STATE_PRESENT: {
-            guint j;
-            gboolean sim_usim_found = FALSE;
-
-            if (card->applications->len == 0) {
-                mm_obj_dbg (self, "no applications reported in card [%u]", i);
-                n_invalid++;
-                break;
-            }
-
-            if (card->applications->len > 1)
-                mm_obj_dbg (self, "multiple applications reported in card [%u]: %u", i, card->applications->len);
-
-            for (j = 0; j < card->applications->len; j++) {
-                app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, j);
-
-                if (app->type == QMI_UIM_CARD_APPLICATION_TYPE_UNKNOWN) {
-                    mm_obj_dbg (self, "mnknown application [%u] found in card [%u]: %s; ignored.",
-                            j, i, qmi_uim_card_application_state_get_string (app->state));
-                    continue;
-                }
-
-                mm_obj_dbg (self, "application '%s' [%u] in card [%u]: %s",
-                        qmi_uim_card_application_type_get_string (app->type), j, i, qmi_uim_card_application_state_get_string (app->state));
-
-                if (app->type == QMI_UIM_CARD_APPLICATION_TYPE_SIM || app->type == QMI_UIM_CARD_APPLICATION_TYPE_USIM) {
-                    /* We found the card/app pair to use! Only keep the first found,
-                     * but still, keep on looping to log about the remaining ones */
-                    if (card_i < 0 && application_j < 0) {
-                        card_i = i;
-                        application_j = j;
-                    }
-
-                    sim_usim_found = TRUE;
-                }
-            }
-
-            if (!sim_usim_found) {
-                mm_obj_dbg (self, "no SIM/USIM application found in card [%u]", i);
-                n_invalid++;
-            }
-
-            break;
-        }
-
-        case QMI_UIM_CARD_STATE_ABSENT:
-            mm_obj_dbg (self, "card '%u' is absent", i);
-            n_absent++;
-            break;
-
-        case QMI_UIM_CARD_STATE_ERROR:
-        default:
-            n_error++;
-            if (qmi_uim_card_error_get_string (card->error_code) != NULL)
-                mm_obj_warn (self, "card '%u' is unusable: %s", i, qmi_uim_card_error_get_string (card->error_code));
-            else
-                mm_obj_warn (self, "card '%u' is unusable: unknown error", i);
-            break;
-        }
-
-        /* go on to next card */
-    }
-
-    /* If we found no card/app to use, we need to report an error */
-    if (card_i < 0 || application_j < 0) {
-        /* If not a single card found, report SIM not inserted */
-        if (n_absent > 0 && !n_error && !n_invalid)
-            g_set_error (error,
-                         MM_MOBILE_EQUIPMENT_ERROR,
-                         MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED,
-                         "No card found");
-        else if (n_error > 0)
-            g_set_error (error,
-                         MM_MOBILE_EQUIPMENT_ERROR,
-                         MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                         "Card error");
-        else
-            g_set_error (error,
-                         MM_MOBILE_EQUIPMENT_ERROR,
-                         MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
-                         "Card failure: %u absent, %u errors, %u invalid",
-                         n_absent, n_error, n_invalid);
-        return FALSE;
-    }
-
-    /* Get card/app to use */
-    card = &g_array_index (cards, QmiMessageUimGetCardStatusOutputCardStatusCardsElement, card_i);
-    app = &g_array_index (card->applications, QmiMessageUimGetCardStatusOutputCardStatusCardsElementApplicationsElement, application_j);
-
-    /* If card not ready yet, return RETRY error.
-     * If the application state reports needing PIN/PUk, consider that ready as
-     * well, and let the logic fall down to check PIN1/PIN2. */
-    if (app->state != QMI_UIM_CARD_APPLICATION_STATE_READY &&
-        app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_OR_UPIN_PIN_REQUIRED &&
-        app->state != QMI_UIM_CARD_APPLICATION_STATE_PUK1_OR_UPIN_PUK_REQUIRED &&
-        app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_BLOCKED) {
-        mm_obj_dbg (self, "neither SIM nor USIM are ready");
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
-                     "SIM not ready yet (retry)");
-        return FALSE;
-    }
-
-    /* Report retries if requested to do so */
-    if (o_pin1_retries)
-        *o_pin1_retries = app->pin1_retries;
-    if (o_puk1_retries)
-        *o_puk1_retries = app->puk1_retries;
-    if (o_pin2_retries)
-        *o_pin2_retries = app->pin2_retries;
-    if (o_puk2_retries)
-        *o_puk2_retries = app->puk2_retries;
-
-    /* Early bail out if lock status isn't wanted at this point, so that we
-     * don't fail with an error the unlock retries check */
-    if (!o_lock)
-        return TRUE;
-
-    /* Card is ready, what's the lock status? */
-
-    /* PIN1 */
-    switch (app->pin1_state) {
-    case QMI_UIM_PIN_STATE_NOT_INITIALIZED:
-        g_set_error (error,
-                     MM_MOBILE_EQUIPMENT_ERROR,
-                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                     "SIM PIN/PUK status not known yet");
-        return FALSE;
-
-    case QMI_UIM_PIN_STATE_PERMANENTLY_BLOCKED:
-        g_set_error (error,
-                     MM_MOBILE_EQUIPMENT_ERROR,
-                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                     "SIM PIN/PUK permanently blocked");
-        return FALSE;
-
-    case QMI_UIM_PIN_STATE_ENABLED_NOT_VERIFIED:
-        lock = MM_MODEM_LOCK_SIM_PIN;
-        break;
-
-    case QMI_UIM_PIN_STATE_BLOCKED:
-        lock = MM_MODEM_LOCK_SIM_PUK;
-        break;
-
-    case QMI_UIM_PIN_STATE_DISABLED:
-    case QMI_UIM_PIN_STATE_ENABLED_VERIFIED:
-        lock = MM_MODEM_LOCK_NONE;
-        break;
-
-    default:
-        g_set_error (error,
-                     MM_MOBILE_EQUIPMENT_ERROR,
-                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
-                     "Unknown SIM PIN/PUK status");
-        return FALSE;
-    }
-
-    /* PIN2 */
-    if (lock == MM_MODEM_LOCK_NONE) {
-        switch (app->pin2_state) {
-        case QMI_UIM_PIN_STATE_NOT_INITIALIZED:
-            mm_obj_warn (self, "SIM PIN2/PUK2 status not known yet");
-            break;
-
-        case QMI_UIM_PIN_STATE_ENABLED_NOT_VERIFIED:
-            lock = MM_MODEM_LOCK_SIM_PIN2;
-            break;
-
-        case QMI_UIM_PIN_STATE_PERMANENTLY_BLOCKED:
-            mm_obj_warn (self, "PUK2 permanently blocked");
-            /* Fall through */
-        case QMI_UIM_PIN_STATE_BLOCKED:
-            lock = MM_MODEM_LOCK_SIM_PUK2;
-            break;
-
-        case QMI_UIM_PIN_STATE_DISABLED:
-        case QMI_UIM_PIN_STATE_ENABLED_VERIFIED:
-            break;
-
-        default:
-            mm_obj_warn (self, "unknown SIM PIN2/PUK2 status");
-            break;
-        }
-    }
-
-    *o_lock = lock;
-    return TRUE;
-}
-
 static void
 unlock_required_uim_get_card_status_ready (QmiClientUim *client,
                                            GAsyncResult *res,
@@ -945,11 +702,11 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
         return;
     }
 
-    if (!uim_get_card_status_output_parse (self,
-                                           output,
-                                           &lock,
-                                           NULL, NULL, NULL, NULL,
-                                           &error)) {
+    if (!mm_qmi_uim_get_card_status_output_parse (self,
+                                                  output,
+                                                  &lock,
+                                                  NULL, NULL, NULL, NULL,
+                                                  &error)) {
         /* The device may report a SIM NOT INSERTED error if we're querying the
          * card status soon after power on. We'll let the Modem interface generic
          * logic retry loading the info a bit later if that's the case. This will
@@ -1197,12 +954,12 @@ unlock_retries_uim_get_card_status_ready (QmiClientUim *client,
         return;
     }
 
-    if (!uim_get_card_status_output_parse (self,
-                                           output,
-                                           NULL,
-                                           &pin1_retries, &puk1_retries,
-                                           &pin2_retries, &puk2_retries,
-                                           &error)) {
+    if (!mm_qmi_uim_get_card_status_output_parse (self,
+                                                  output,
+                                                  NULL,
+                                                  &pin1_retries, &puk1_retries,
+                                                  &pin2_retries, &puk2_retries,
+                                                  &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;

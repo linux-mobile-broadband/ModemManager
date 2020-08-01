@@ -154,4 +154,16 @@ gchar  *mm_qmi_unique_id_to_firmware_unique_id (GArray       *qmi_unique_id,
 GArray *mm_firmware_unique_id_to_qmi_unique_id (const gchar  *unique_id,
                                                 GError      **error);
 
+/*****************************************************************************/
+/* Common UIM Get Card Status parsing */
+
+gboolean mm_qmi_uim_get_card_status_output_parse (gpointer                           log_object,
+                                                  QmiMessageUimGetCardStatusOutput  *output,
+                                                  MMModemLock                       *o_lock,
+                                                  guint                             *o_pin1_retries,
+                                                  guint                             *o_puk1_retries,
+                                                  guint                             *o_pin2_retries,
+                                                  guint                             *o_puk2_retries,
+                                                  GError                           **error);
+
 #endif  /* MM_MODEM_HELPERS_QMI_H */
