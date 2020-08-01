@@ -9273,6 +9273,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create QMI-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
+    iface->load_sim_slots = mm_shared_qmi_load_sim_slots;
+    iface->load_sim_slots_finish = mm_shared_qmi_load_sim_slots_finish;
 
     /* Create QMI-specific bearer */
     iface->create_bearer = modem_create_bearer;
