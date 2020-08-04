@@ -463,27 +463,48 @@ connect_context_free (ConnectContext *ctx)
     g_free (ctx->user);
     g_free (ctx->password);
 
-    if (ctx->packet_service_status_ipv4_indication_id) {
-        common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
-                                                                       ctx->client_ipv4,
-                                                                       FALSE,
-                                                                       &ctx->packet_service_status_ipv4_indication_id);
+    if (ctx->client_ipv4) {
+        if (ctx->packet_service_status_ipv4_indication_id) {
+            common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
+                                                                           ctx->client_ipv4,
+                                                                           FALSE,
+                                                                           &ctx->packet_service_status_ipv4_indication_id);
+        }
+        if (ctx->event_report_ipv4_indication_id) {
+            cleanup_event_report_unsolicited_events (ctx->self,
+                                                     ctx->client_ipv4,
+                                                     &ctx->event_report_ipv4_indication_id);
+        }
+        if (ctx->packet_data_handle_ipv4) {
+            g_autoptr(QmiMessageWdsStopNetworkInput) input = NULL;
+
+            input = qmi_message_wds_stop_network_input_new ();
+            qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv4, NULL);
+            qmi_client_wds_stop_network (ctx->client_ipv4, input, 30, NULL, NULL, NULL);
+        }
+        g_clear_object (&ctx->client_ipv4);
     }
-    if (ctx->event_report_ipv4_indication_id) {
-        cleanup_event_report_unsolicited_events (ctx->self,
-                                                 ctx->client_ipv4,
-                                                 &ctx->event_report_ipv4_indication_id);
-    }
-    if (ctx->packet_service_status_ipv6_indication_id) {
-        common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
-                                                                       ctx->client_ipv6,
-                                                                       FALSE,
-                                                                       &ctx->packet_service_status_ipv6_indication_id);
-    }
-    if (ctx->event_report_ipv6_indication_id) {
-        cleanup_event_report_unsolicited_events (ctx->self,
-                                                 ctx->client_ipv6,
-                                                 &ctx->event_report_ipv6_indication_id);
+
+    if (ctx->client_ipv6) {
+        if (ctx->packet_service_status_ipv6_indication_id) {
+            common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
+                                                                           ctx->client_ipv6,
+                                                                           FALSE,
+                                                                           &ctx->packet_service_status_ipv6_indication_id);
+        }
+        if (ctx->event_report_ipv6_indication_id) {
+            cleanup_event_report_unsolicited_events (ctx->self,
+                                                     ctx->client_ipv6,
+                                                     &ctx->event_report_ipv6_indication_id);
+        }
+        if (ctx->packet_data_handle_ipv6) {
+            g_autoptr(QmiMessageWdsStopNetworkInput) input = NULL;
+
+            input = qmi_message_wds_stop_network_input_new ();
+            qmi_message_wds_stop_network_input_set_packet_data_handle (input, ctx->packet_data_handle_ipv6, NULL);
+            qmi_client_wds_stop_network (ctx->client_ipv6, input, 30, NULL, NULL, NULL);
+        }
+        g_clear_object (&ctx->client_ipv6);
     }
 
     if (ctx->explicit_qmi_open)
@@ -491,8 +512,6 @@ connect_context_free (ConnectContext *ctx)
 
     g_clear_error (&ctx->error_ipv4);
     g_clear_error (&ctx->error_ipv6);
-    g_clear_object (&ctx->client_ipv4);
-    g_clear_object (&ctx->client_ipv6);
     g_clear_object (&ctx->ipv4_config);
     g_clear_object (&ctx->ipv6_config);
     g_object_unref (ctx->data);
@@ -1558,6 +1577,7 @@ connect_context_step (GTask *task)
         g_assert (ctx->self->priv->client_ipv4 == NULL);
         if (ctx->packet_data_handle_ipv4) {
             ctx->self->priv->packet_data_handle_ipv4 = ctx->packet_data_handle_ipv4;
+            ctx->packet_data_handle_ipv4 = 0;
             ctx->self->priv->packet_service_status_ipv4_indication_id = ctx->packet_service_status_ipv4_indication_id;
             ctx->packet_service_status_ipv4_indication_id = 0;
             ctx->self->priv->event_report_ipv4_indication_id = ctx->event_report_ipv4_indication_id;
@@ -1569,6 +1589,7 @@ connect_context_step (GTask *task)
         g_assert (ctx->self->priv->client_ipv6 == NULL);
         if (ctx->packet_data_handle_ipv6) {
             ctx->self->priv->packet_data_handle_ipv6 = ctx->packet_data_handle_ipv6;
+            ctx->packet_data_handle_ipv6 = 0;
             ctx->self->priv->packet_service_status_ipv6_indication_id = ctx->packet_service_status_ipv6_indication_id;
             ctx->packet_service_status_ipv6_indication_id = 0;
             ctx->self->priv->event_report_ipv6_indication_id = ctx->event_report_ipv6_indication_id;
