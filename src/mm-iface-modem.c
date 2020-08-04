@@ -1509,7 +1509,8 @@ __iface_modem_update_state_internal (MMIfaceModem *self,
 
     /* While connected we don't want registration status changes to change
      * the modem's state away from CONNECTED. */
-    if ((new_state == MM_MODEM_STATE_SEARCHING ||
+    if ((new_state == MM_MODEM_STATE_ENABLED   ||
+         new_state == MM_MODEM_STATE_SEARCHING ||
          new_state == MM_MODEM_STATE_REGISTERED) &&
         bearer_list &&
         old_state > MM_MODEM_STATE_REGISTERED) {
