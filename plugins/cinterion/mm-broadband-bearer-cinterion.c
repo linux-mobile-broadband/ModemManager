@@ -423,7 +423,7 @@ dial_3gpp_context_step (GTask *task)
         gchar *command;
 
         command = build_auth_string (self,
-                                     mm_broadband_modem_cinterion_get_family (MM_BROADBAND_MODEM_CINTERION (self)),
+                                     mm_broadband_modem_cinterion_get_family (MM_BROADBAND_MODEM_CINTERION (ctx->modem)),
                                      mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)),
                                      ctx->cid);
 
