@@ -1240,6 +1240,7 @@ libmm_plugin_sierra_la_SOURCES = \
 	$(NULL)
 libmm_plugin_sierra_la_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	$(XMM_COMMON_COMPILER_FLAGS) \
 	-DMM_MODULE_NAME=\"sierra\" \
 	$(NULL)
 libmm_plugin_sierra_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)

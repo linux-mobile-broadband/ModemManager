@@ -489,7 +489,8 @@ MM_ENABLE_PLUGIN([samsung],
 MM_ENABLE_PLUGIN([sierra-legacy],
                  [with_shared_icera,
                   with_shared_sierra])
-MM_ENABLE_PLUGIN([sierra])
+MM_ENABLE_PLUGIN([sierra],
+                 [with_shared_xmm])
 MM_ENABLE_PLUGIN([simtech])
 MM_ENABLE_PLUGIN([telit],
                  [with_shared_telit])
