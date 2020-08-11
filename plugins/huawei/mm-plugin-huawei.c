@@ -23,6 +23,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include <ModemManager-tags.h>
 #include "mm-port-enums-types.h"
 #include "mm-log.h"
 #include "mm-plugin-huawei.h"
@@ -426,91 +427,209 @@ huawei_custom_init (MMPortProbe *probe,
 
 /*****************************************************************************/
 
-static void
-propagate_port_mode_results (MMPlugin *self,
-                             GList    *probes)
+static guint
+propagate_getportmode_hints (MMPlugin *self,
+                             GList    *probes,
+                             gboolean *primary_flagged)
 {
     MMDevice *device;
     GList    *l;
-    gboolean  primary_flagged = FALSE;
+    guint     n_ports_with_hints = 0;
 
     g_assert (probes != NULL);
-
-    /* Now we propagate the tags to the specific port probes */
     device = mm_port_probe_peek_device (MM_PORT_PROBE (probes->data));
+
+    /* Nothing to do if GETPORTMODE is flagged as not supported */
+    if (!GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED)))
+        return 0;
+
+    /* Propagate the getportmode tags to the specific port probes */
     for (l = probes; l; l = g_list_next (l)) {
-        MMPortSerialAtFlag  at_port_flags = MM_PORT_SERIAL_AT_FLAG_NONE;
         MMPortProbe        *probe;
+        MMPortSerialAtFlag  at_port_flags = MM_PORT_SERIAL_AT_FLAG_NONE;
         guint               usbif;
-        const gchar        *description;
 
         probe = MM_PORT_PROBE (l->data);
 
-        /* Tags only applicable to AT ports */
         if (!mm_port_probe_is_at (probe))
-            goto next;
+            continue;
 
-        /* Port type hints from AT^GETPORTMODE */
         usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (probe), "ID_USB_INTERFACE_NUM");
-        if (GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_GETPORTMODE_SUPPORTED))) {
-            if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT))) {
-                at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-                primary_flagged = TRUE;
-            } else if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT))) {
-                at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
-            } else if (!g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT) &&
-                     usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT))) {
-                /* If NDIS reported only instead of MDM, use it */
-                at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
-            }
-            goto next;
-        }
 
-        /* Port type hints from interface description */
-        description = mm_kernel_device_get_interface_description (mm_port_probe_peek_port (probe));
-        if (description) {
-            gchar *lower_description;
-
-            mm_obj_dbg (probe, "%s interface description: %s", mm_port_probe_get_port_name (probe), description);
-
-            lower_description = g_ascii_strdown (description, -1);
-            if (strstr (lower_description, "modem"))
-                at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
-            else if (strstr (lower_description, "pcui")) {
-                at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-                primary_flagged = TRUE;
-            }
-            g_free (lower_description);
-            goto next;
-        }
-
-        /* If GETPORTMODE unsupported and no other port type hints, we assume
-         * usbif 0 is the modem port */
-        if (usbif == 0) {
+        if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_PCUI_PORT))) {
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
+            *primary_flagged = TRUE;
+        } else if (usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT))) {
             at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
-            goto next;
+        } else if (!g_object_get_data (G_OBJECT (device), TAG_HUAWEI_MODEM_PORT) &&
+                   usbif + 1 == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_HUAWEI_NDIS_PORT))) {
+            /* If NDIS reported only instead of MDM, use it */
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
         }
 
-    next:
-        g_object_set_data (G_OBJECT (l->data), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (at_port_flags));
+        if (at_port_flags != MM_PORT_SERIAL_AT_FLAG_NONE) {
+            n_ports_with_hints++;
+            g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (at_port_flags));
+        }
     }
 
-    if (primary_flagged)
-        return;
+    return n_ports_with_hints;
+}
 
-    /* For devices exposing a cdc-wdm port, make sure it gets flagged as primary, if there is none
-     * already */
+static guint
+propagate_description_hints (MMPlugin *self,
+                             GList    *probes,
+                             gboolean *primary_flagged)
+{
+    GList *l;
+    guint  n_ports_with_hints = 0;
+
     for (l = probes; l; l = g_list_next (l)) {
-        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+        MMPortProbe        *probe;
+        MMPortSerialAtFlag  at_port_flags = MM_PORT_SERIAL_AT_FLAG_NONE;
+        const gchar        *description;
+        g_autofree gchar   *lower_description = NULL;
 
-        if (mm_port_probe_is_at (probe) &&
-            g_str_has_prefix (mm_port_probe_get_port_subsys (probe), "usb") &&
-            g_str_has_prefix (mm_port_probe_get_port_name (probe), "cdc-wdm")) {
-            /* Flag as PRIMARY and do nothing else */
-            g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (MM_PORT_SERIAL_AT_FLAG_PRIMARY));
-            break;
+        probe = MM_PORT_PROBE (l->data);
+
+        if (!mm_port_probe_is_at (probe))
+            continue;
+
+        description = mm_kernel_device_get_interface_description (mm_port_probe_peek_port (probe));
+        if (!description)
+            continue;
+
+        mm_obj_dbg (probe, "%s interface description: %s", mm_port_probe_get_port_name (probe), description);
+
+        lower_description = g_ascii_strdown (description, -1);
+        if (strstr (lower_description, "modem"))
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
+        else if (strstr (lower_description, "pcui")) {
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
+            *primary_flagged = TRUE;
+        }
+
+        if (at_port_flags != MM_PORT_SERIAL_AT_FLAG_NONE) {
+            n_ports_with_hints++;
+            g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (at_port_flags));
         }
     }
+
+    return n_ports_with_hints;
+}
+
+static guint
+propagate_generic_hints (MMPlugin *self,
+                         GList    *probes,
+                         gboolean *primary_flagged)
+{
+    GList *l;
+    guint  n_ports_with_hints = 0;
+
+    for (l = probes; l; l = g_list_next (l)) {
+        MMPortProbe        *probe;
+        MMKernelDevice     *kernel_device;
+        MMPortSerialAtFlag  at_port_flags = MM_PORT_SERIAL_AT_FLAG_NONE;
+
+        probe = MM_PORT_PROBE (l->data);
+
+        if (!mm_port_probe_is_at (probe))
+            continue;
+
+        kernel_device = mm_port_probe_peek_port (probe);
+        if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_PRIMARY)) {
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
+            *primary_flagged = TRUE;
+        }
+        else if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_SECONDARY))
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_SECONDARY;
+        else if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_PPP))
+            at_port_flags = MM_PORT_SERIAL_AT_FLAG_PPP;
+
+        if (at_port_flags != MM_PORT_SERIAL_AT_FLAG_NONE) {
+            n_ports_with_hints++;
+            g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (at_port_flags));
+        }
+    }
+
+    return n_ports_with_hints;
+}
+
+static guint
+fallback_primary_cdcwdm (MMPlugin *self,
+                         GList    *probes)
+{
+    GList *l;
+
+    for (l = probes; l; l = g_list_next (l)) {
+        MMPortProbe *probe;
+
+        probe = MM_PORT_PROBE (l->data);
+
+        if (!mm_port_probe_is_at (probe))
+            continue;
+
+        if (g_str_has_prefix (mm_port_probe_get_port_subsys (probe), "usb") &&
+            g_str_has_prefix (mm_port_probe_get_port_name (probe), "cdc-wdm")) {
+            mm_obj_dbg (self, "fallback port type hint applied to first cdc-wmd port found");
+            g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (MM_PORT_SERIAL_AT_FLAG_PRIMARY));
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static guint
+fallback_usbif0 (MMPlugin *self,
+                 GList    *probes)
+{
+    GList *l;
+
+    for (l = probes; l; l = g_list_next (l)) {
+        MMPortProbe *probe;
+        guint        usbif;
+
+        probe = MM_PORT_PROBE (l->data);
+
+        if (!mm_port_probe_is_at (probe))
+            continue;
+
+        usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (probe), "ID_USB_INTERFACE_NUM");
+        if (usbif == 0) {
+            mm_obj_dbg (self, "fallback port type hint applied to interface 0");
+            g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (MM_PORT_SERIAL_AT_FLAG_PPP));
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void
+propagate_port_type_hints (MMPlugin *self,
+                           GList    *probes)
+{
+    gboolean primary_flagged = FALSE;
+    guint    n_ports_with_hints;
+
+    g_assert (probes != NULL);
+
+    if ((n_ports_with_hints = propagate_getportmode_hints (self, probes, &primary_flagged)) > 0)
+        mm_obj_dbg (self, "port type hints set by GETPORTMODE");
+    else if ((n_ports_with_hints = propagate_description_hints (self, probes, &primary_flagged)) > 0)
+        mm_obj_dbg (self, "port type hints set by interface descriptions");
+    else if ((n_ports_with_hints = propagate_generic_hints (self, probes, &primary_flagged)) > 0)
+        mm_obj_dbg (self, "port type hints set by generic udev tags");
+
+    /* Fallback hint for the first cdc-wdm port if no other port has been flagged as primary */
+    if (!primary_flagged)
+        n_ports_with_hints += fallback_primary_cdcwdm (self, probes);
+
+    /* If not a single port type hint available (not plugin-provided and not generic)
+     * then we'll assume usbif 0 is the modem port */
+    if (!n_ports_with_hints)
+        n_ports_with_hints = fallback_usbif0 (self, probes);
+
+    mm_obj_dbg (self, "%u port hints have been set", n_ports_with_hints);
 }
 
 static MMBaseModem *
@@ -522,7 +641,7 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    propagate_port_mode_results (self, probes);
+    propagate_port_type_hints (self, probes);
 
 #if defined WITH_QMI
     if (mm_port_probe_list_has_qmi_port (probes)) {
