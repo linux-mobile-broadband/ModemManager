@@ -1174,13 +1174,6 @@ modem_3gpp_set_initial_eps_bearer_settings_step (GTask *task)
         if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY)
             ip_family = MM_BEARER_IP_FAMILY_IPV4;
 
-        if (ip_family != MM_BEARER_IP_FAMILY_IPV4) {
-            /* we must have the same settings as in dial_3gpp_context_step()
-             * for the case when the CID is re-used for the connection PDN */
-            mm_obj_dbg (self, "Only IPv4 is supported by this modem");
-            ip_family = MM_BEARER_IP_FAMILY_IPV4;
-        }
-
         ip_family_str = mm_3gpp_get_pdp_type_from_ip_family (ip_family);
         apn = mm_bearer_properties_get_apn (ctx->properties);
         mm_obj_dbg (self, "context CID=%d with APN '%s' and PDP type '%s'", ctx->cid, apn, ip_family_str);

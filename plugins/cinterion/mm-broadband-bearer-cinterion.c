@@ -413,7 +413,6 @@ dial_3gpp_context_step (GTask *task)
     case DIAL_3GPP_CONTEXT_STEP_FIRST: {
         MMBearerIpFamily ip_family;
 
-        /* Only IPv4 supported by this bearer implementation for now */
         ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)));
         if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY) {
             gchar *ip_family_str;
@@ -422,13 +421,6 @@ dial_3gpp_context_step (GTask *task)
             ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
             mm_obj_dbg (self, "no specific IP family requested, defaulting to %s", ip_family_str);
             g_free (ip_family_str);
-        }
-
-        if (ip_family != MM_BEARER_IP_FAMILY_IPV4) {
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                     "Only IPv4 is supported by this modem");
-            g_object_unref (task);
-            return;
         }
 
         ctx->step++;
