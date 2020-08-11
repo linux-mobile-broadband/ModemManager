@@ -223,6 +223,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                                                    mm_serial_parser_v1_parse,
                                                    mm_serial_parser_v1_new (),
                                                    mm_serial_parser_v1_destroy);
+
             /* Prefer plugin-provided flags to the generic ones */
             if (at_pflags == MM_PORT_SERIAL_AT_FLAG_NONE) {
                 if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_PRIMARY)) {
@@ -236,7 +237,14 @@ mm_base_modem_grab_port (MMBaseModem         *self,
                     at_pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
                 }
             }
+
+            /* The plugin may specify NONE_NO_GENERIC to avoid the generic
+             * port type hints from being applied. */
+            if (at_pflags == MM_PORT_SERIAL_AT_FLAG_NONE_NO_GENERIC)
+                at_pflags = MM_PORT_SERIAL_AT_FLAG_NONE;
+
             mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (port), at_pflags);
+
         } else if (ptype == MM_PORT_TYPE_GPS) {
             /* Raw GPS port */
             port = MM_PORT (mm_port_serial_gps_new (name));

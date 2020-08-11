@@ -695,6 +695,10 @@ grab_port (MMPlugin *self,
                     mm_port_probe_get_port_name (probe),
                     str);
         g_free (str);
+    } else {
+        /* The huawei plugin handles the generic udev tags itself, so explicitly request
+         * to avoid processing them by the generic modem. */
+        pflags = MM_PORT_SERIAL_AT_FLAG_NONE_NO_GENERIC;
     }
 
     return mm_base_modem_grab_port (modem,

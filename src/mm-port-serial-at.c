@@ -473,6 +473,8 @@ mm_port_serial_at_set_flags (MMPortSerialAt *self, MMPortSerialAtFlag flags)
 {
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_PORT_SERIAL_AT (self));
+
+    /* MM_PORT_SERIAL_AT_FLAG_NONE_NO_GENERIC is not expected */
     g_return_if_fail (flags <= (MM_PORT_SERIAL_AT_FLAG_PRIMARY |
                                 MM_PORT_SERIAL_AT_FLAG_SECONDARY |
                                 MM_PORT_SERIAL_AT_FLAG_PPP |
