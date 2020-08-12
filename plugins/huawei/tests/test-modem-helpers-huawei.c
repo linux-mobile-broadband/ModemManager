@@ -1250,6 +1250,152 @@ test_hcsq (void)
 }
 
 /*****************************************************************************/
+/* Test ^GETPORTMODE response */
+
+typedef struct {
+    const gchar      *str;
+    guint             n_modes;
+    MMHuaweiPortMode  modes[8];
+} GetportmodeTest;
+
+static const GetportmodeTest getportmode_tests[] = {
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei,PCUI:0,MDM:1",
+        2, { MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_MODEM }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei,MDM:0,PCUI:1,NDIS:2,CDROM:3,SD:4,",
+        5, { MM_HUAWEI_PORT_MODE_MODEM,
+             MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_CDROM,
+             MM_HUAWEI_PORT_MODE_SD }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei,MDM:0,PCUI:1,NDIS:2,GPS:3,BT:4,",
+        5, { MM_HUAWEI_PORT_MODE_MODEM,
+             MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_GPS,
+             MM_HUAWEI_PORT_MODE_BT
+        }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei,PCUI:0,MDM:1,NDIS:2,CDROM:3,SD:4,GPS:5,BT:6",
+        7, { MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_MODEM,
+             MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_CDROM,
+             MM_HUAWEI_PORT_MODE_SD,
+             MM_HUAWEI_PORT_MODE_GPS,
+             MM_HUAWEI_PORT_MODE_BT
+        }
+    },
+    {
+        "^getportmode:type:WCDMA:Qualcomm,NDIS:0,DIAG:1,PCUI:2,MDM:3,SD:4",
+        5, { MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_MODEM,
+             MM_HUAWEI_PORT_MODE_SD
+        }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: ,pcui:1,modem:2,ncm:3,mass:4,mass_two:5,",
+        5, { MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_MODEM,
+             MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_SD,
+             MM_HUAWEI_PORT_MODE_SD
+        }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei ,, rndis: 0, pcui: 1, c_shell: 2, a_shell: 3,3g_diag: 4, gps: 5, 4g_diag: 6, mass_two: 7",
+        8, { MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_SHELL,
+             MM_HUAWEI_PORT_MODE_SHELL,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_GPS,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_SD
+        }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei,ecm:1,pcui:2,c_shell:3,a_shell:4,3g_diag:5,gps:6,4g_diag:7,mass:8,",
+        8, { MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_SHELL,
+             MM_HUAWEI_PORT_MODE_SHELL,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_GPS,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_SD
+        }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei,rndis:1,pcui:2,c_shell:3,a_shell:4,3g_diag:5,gps:6,4g_diag:7,mass:8,",
+        8, { MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_SHELL,
+             MM_HUAWEI_PORT_MODE_SHELL,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_GPS,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_SD
+        }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: huawei,,pcui:0,3g_modem:1,ncm:2,mass:3,mass_two:4",
+        5, { MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_MODEM,
+             MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_SD,
+             MM_HUAWEI_PORT_MODE_SD
+        }
+    },
+    {
+        "^GETPORTMODE:TYPE:WCDMA:Qualcomm,MDM:0,NDIS:1,DIAG:2,PCUI:3,CDROM:4,SD:5",
+        6, { MM_HUAWEI_PORT_MODE_MODEM,
+             MM_HUAWEI_PORT_MODE_NET,
+             MM_HUAWEI_PORT_MODE_DIAG,
+             MM_HUAWEI_PORT_MODE_PCUI,
+             MM_HUAWEI_PORT_MODE_CDROM,
+             MM_HUAWEI_PORT_MODE_SD
+        }
+    },
+    {
+        "^GETPORTMODE: TYPE: WCDMA: Huawei Technologies Co.,Ltd.,",
+        0
+    },
+};
+
+static void
+test_getportmode (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (getportmode_tests); i++) {
+        g_autoptr(GArray) modes = NULL;
+        g_autoptr(GError) error = NULL;
+
+        mm_obj_dbg (NULL, "testing ^GETPORTMODE response: '%s'", getportmode_tests[i].str);
+
+        modes = mm_huawei_parse_getportmode_response (getportmode_tests[i].str, NULL, &error);
+        if (modes) {
+            guint j;
+
+            g_assert_no_error (error);
+            g_assert_cmpuint (modes->len, ==, getportmode_tests[i].n_modes);
+            for (j = 0; j < getportmode_tests[i].n_modes; j++)
+                g_assert_cmpuint (g_array_index (modes, MMHuaweiPortMode, j), ==, getportmode_tests[i].modes[j]);
+        } else
+            g_assert (error);
+    }
+}
+
+/*****************************************************************************/
 
 int main (int argc, char **argv)
 {
@@ -1270,6 +1416,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/huawei/nwtime", test_nwtime);
     g_test_add_func ("/MM/huawei/time", test_time);
     g_test_add_func ("/MM/huawei/hcsq", test_hcsq);
+    g_test_add_func ("/MM/huawei/getportmode", test_getportmode);
 
     return g_test_run ();
 }

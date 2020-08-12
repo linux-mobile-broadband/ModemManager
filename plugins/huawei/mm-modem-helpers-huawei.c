@@ -25,6 +25,7 @@
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
+#include "mm-huawei-enums-types.h"
 
 /*****************************************************************************/
 /* ^NDISSTAT /  ^NDISSTATQRY response parser */
@@ -1466,4 +1467,101 @@ mm_huawei_parse_cvoice_response (const gchar  *response,
     g_regex_unref (r);
 
     return ret;
+}
+
+/*****************************************************************************/
+/* ^GETPORTMODE response parser */
+
+#define GETPORTMODE_PREFIX "^GETPORTMODE:"
+
+GArray *
+mm_huawei_parse_getportmode_response (const gchar  *response,
+                                      gpointer      log_object,
+                                      GError      **error)
+{
+    g_autoptr(GArray) modes = NULL;
+    g_auto(GStrv)     split = NULL;
+    guint             i;
+    gint              n_items;
+
+    split = g_strsplit (response, ",", -1);
+    n_items = g_strv_length (split) - 1;
+    if (n_items < 1) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unexpected number of items in response");
+        return NULL;
+    }
+
+    /* validate response prefix */
+    if (g_ascii_strncasecmp (split[0], GETPORTMODE_PREFIX, strlen (GETPORTMODE_PREFIX)) != 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unexpected response prefix");
+        return NULL;
+    }
+
+    mm_obj_dbg (log_object, "processing ^GETPORTMODE response...");
+
+    modes = g_array_sized_new (FALSE, FALSE, sizeof (MMHuaweiPortMode), n_items);
+
+    /* iterate all port items found */
+    for (i = 1; split[i]; i++) {
+        MMHuaweiPortMode  mode = MM_HUAWEI_PORT_MODE_NONE;
+        gchar            *separator;
+        guint             port_number;
+
+        separator = strchr (split[i], ':');
+        if (!separator)
+            continue;
+
+        /* the reported port number may start either by 0 or by 1; the important
+         * thing is therefore no the number itself, only that it's a number */
+        g_strstrip (&separator[1]);
+        if (!mm_get_uint_from_str (&separator[1], &port_number)) {
+            mm_obj_warn (log_object, "  couldn't parse port number: %s", split[i]);
+            break;
+        }
+
+        *separator = '\0';
+        g_strstrip (split[i]);
+
+        if (g_ascii_strcasecmp (split[i], "pcui") == 0)
+            mode = MM_HUAWEI_PORT_MODE_PCUI;
+        else if ((g_ascii_strcasecmp (split[i], "mdm") == 0) ||
+                 (g_ascii_strcasecmp (split[i], "modem") == 0) ||
+                 (g_ascii_strcasecmp (split[i], "3g_modem") == 0))
+            mode = MM_HUAWEI_PORT_MODE_MODEM;
+        else if ((g_ascii_strcasecmp (split[i], "diag") == 0)    ||
+                 (g_ascii_strcasecmp (split[i], "3g_diag") == 0) ||
+                 (g_ascii_strcasecmp (split[i], "4g_diag") == 0))
+            mode = MM_HUAWEI_PORT_MODE_DIAG;
+        else if (g_ascii_strcasecmp (split[i], "gps") == 0)
+            mode = MM_HUAWEI_PORT_MODE_GPS;
+        else if ((g_ascii_strcasecmp (split[i], "ndis") == 0)  ||
+                 (g_ascii_strcasecmp (split[i], "rndis") == 0) ||
+                 (g_ascii_strcasecmp (split[i], "ncm") == 0)   ||
+                 (g_ascii_strcasecmp (split[i], "ecm") == 0))
+            mode = MM_HUAWEI_PORT_MODE_NET;
+        else if (g_ascii_strcasecmp (split[i], "cdrom") == 0)
+            mode = MM_HUAWEI_PORT_MODE_CDROM;
+        else if ((g_ascii_strcasecmp (split[i], "sd") == 0) ||
+                 (g_ascii_strncasecmp (split[i], "mass", 4) == 0))
+            mode = MM_HUAWEI_PORT_MODE_SD;
+        else if (g_ascii_strcasecmp (split[i], "bt") == 0)
+            mode = MM_HUAWEI_PORT_MODE_BT;
+        else if ((g_ascii_strcasecmp (split[i], "a_shell") == 0) ||
+                 (g_ascii_strcasecmp (split[i], "c_shell") == 0))
+            mode = MM_HUAWEI_PORT_MODE_SHELL;
+
+        mm_obj_dbg (log_object, "  port mode %s reported at port number %u",
+                    mm_huawei_port_mode_get_string (mode), port_number);
+        g_array_append_val (modes, mode);
+    }
+
+    if (!modes->len) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No port modes loaded");
+        return NULL;
+    }
+
+    return g_steal_pointer (&modes);
 }

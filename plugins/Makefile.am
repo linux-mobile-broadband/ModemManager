@@ -777,6 +777,35 @@ endif
 
 if ENABLE_PLUGIN_HUAWEI
 
+HUAWEI_ENUMS_INPUTS = \
+	$(top_srcdir)/plugins/huawei/mm-modem-helpers-huawei.h \
+	$(NULL)
+
+HUAWEI_ENUMS_GENERATED = \
+	huawei/mm-huawei-enums-types.h \
+	huawei/mm-huawei-enums-types.c \
+	$(NULL)
+
+BUILT_SOURCES += $(HUAWEI_ENUMS_GENERATED)
+CLEANFILES    += $(HUAWEI_ENUMS_GENERATED)
+
+huawei/mm-huawei-enums-types.h: Makefile.am $(HUAWEI_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+	$(AM_V_GEN) \
+		$(MKDIR_P) huawei; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-modem-helpers-huawei.h\"\n#ifndef __MM_HUAWEI_ENUMS_TYPES_H__\n#define __MM_HUAWEI_ENUMS_TYPES_H__\n" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.h \
+			--ftail "#endif /* __MM_HUAWEI_ENUMS_TYPES_H__ */\n" \
+			$(HUAWEI_ENUMS_INPUTS) > $@
+
+huawei/mm-huawei-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c huawei/mm-huawei-enums-types.h
+	$(AM_V_GEN) \
+		$(MKDIR_P) huawei; \
+		$(GLIB_MKENUMS) \
+			--fhead "#include \"mm-huawei-enums-types.h\"" \
+			--template $(top_srcdir)/build-aux/mm-enums-template.c \
+			$(HUAWEI_ENUMS_INPUTS) > $@
+
 noinst_LTLIBRARIES += libhelpers-huawei.la
 libhelpers_huawei_la_SOURCES = \
 	huawei/mm-modem-helpers-huawei.c \
@@ -784,7 +813,10 @@ libhelpers_huawei_la_SOURCES = \
 	$(NULL)
 libhelpers_huawei_la_CPPFLAGS = \
 	-DMM_MODULE_NAME=\"huawei\" \
+	-I$(top_srcdir)/plugins/huawei \
+	-I$(top_builddir)/plugins/huawei \
 	$(NULL)
+nodist_libhelpers_huawei_la_SOURCES = $(HUAWEI_ENUMS_GENERATED)
 
 noinst_PROGRAMS += test-modem-helpers-huawei
 test_modem_helpers_huawei_SOURCES = \
@@ -792,6 +824,7 @@ test_modem_helpers_huawei_SOURCES = \
 	$(NULL)
 test_modem_helpers_huawei_CPPFLAGS = \
 	-I$(top_srcdir)/plugins/huawei \
+	-I$(top_builddir)/plugins/huawei \
 	$(NULL)
 test_modem_helpers_huawei_LDADD = \
 	$(builddir)/libhelpers-huawei.la \
@@ -811,6 +844,8 @@ libmm_plugin_huawei_la_SOURCES = \
 	huawei/mm-broadband-bearer-huawei.h \
 	$(NULL)
 libmm_plugin_huawei_la_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/huawei \
+	-I$(top_builddir)/plugins/huawei \
 	$(PLUGIN_COMMON_COMPILER_FLAGS) \
 	-DMM_MODULE_NAME=\"huawei\" \
 	$(NULL)
