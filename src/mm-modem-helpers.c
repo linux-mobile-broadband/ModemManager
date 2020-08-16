@@ -2888,8 +2888,11 @@ mm_3gpp_parse_cpms_test_response (const gchar  *reply,
 #define N_EXPECTED_GROUPS 3
 
     split = mm_split_string_groups (mm_strip_tag (reply, "+CPMS:"));
-    if (!split)
+    if (!split) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't split +CPMS test response in groups");
         return FALSE;
+    }
 
     if (g_strv_length (split) != N_EXPECTED_GROUPS) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
