@@ -160,6 +160,14 @@ test_fibocom (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_QUECTEL
+static void
+test_quectel (void)
+{
+    common_test (TESTUDEVRULESDIR_QUECTEL);
+}
+#endif
+
 /************************************************************/
 
 int main (int argc, char **argv)
@@ -207,6 +215,9 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_FIBOCOM
     g_test_add_func ("/MM/test-udev-rules/fibocom", test_fibocom);
+#endif
+#if defined ENABLE_PLUGIN_QUECTEL
+    g_test_add_func ("/MM/test-udev-rules/quectel", test_quectel);
 #endif
 
     return g_test_run ();
