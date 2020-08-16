@@ -1155,6 +1155,28 @@ endif
 
 if ENABLE_PLUGIN_QUECTEL
 
+noinst_LTLIBRARIES += libhelpers-quectel.la
+libhelpers_quectel_la_SOURCES = \
+	quectel/mm-modem-helpers-quectel.c \
+	quectel/mm-modem-helpers-quectel.h \
+	$(NULL)
+libhelpers_quectel_la_CPPFLAGS = \
+	-DMM_MODULE_NAME=\"quectel\" \
+	$(NULL)
+
+noinst_PROGRAMS += test-modem-helpers-quectel
+test_modem_helpers_quectel_SOURCES = \
+	quectel/tests/test-modem-helpers-quectel.c \
+	$(NULL)
+test_modem_helpers_quectel_CPPFLAGS = \
+	-I$(top_srcdir)/plugins/quectel \
+	$(NULL)
+test_modem_helpers_quectel_LDADD = \
+	$(builddir)/libhelpers-quectel.la  \
+	$(top_builddir)/src/libhelpers.la \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
 pkglib_LTLIBRARIES += libmm-plugin-quectel.la
 libmm_plugin_quectel_la_SOURCES = \
 	quectel/mm-plugin-quectel.c \
@@ -1175,6 +1197,7 @@ libmm_plugin_quectel_la_CPPFLAGS = \
 	-DMM_MODULE_NAME=\"quectel\" \
 	$(NULL)
 libmm_plugin_quectel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+libmm_plugin_quectel_la_LIBADD = $(builddir)/libhelpers-quectel.la
 
 dist_udevrules_DATA += quectel/77-mm-quectel-port-types.rules
 AM_CFLAGS += -DTESTUDEVRULESDIR_QUECTEL=\"${srcdir}/quectel\"
