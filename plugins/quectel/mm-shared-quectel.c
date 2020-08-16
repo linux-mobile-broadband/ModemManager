@@ -28,6 +28,7 @@
 #include "mm-base-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-shared-quectel.h"
+#include "mm-modem-helpers-quectel.h"
 
 /*****************************************************************************/
 /* Private context */
@@ -575,21 +576,103 @@ mm_shared_quectel_disable_location_gathering (MMIfaceModemLocation  *self,
 }
 
 /*****************************************************************************/
-
-/* Custom time support check because Quectel modems require +CTZU=3 in order to
- * have the CCLK? time reported in localtime, instead of UTC time. */
-static const MMBaseModemAtCommand time_check_sequence[] = {
-    { "+CTZU=3",  3, TRUE, mm_base_modem_response_processor_no_result_continue },
-    { "+CCLK?",   3, TRUE, mm_base_modem_response_processor_string },
-    { NULL }
-};
+/* Check support (Time interface) */
 
 gboolean
 mm_shared_quectel_time_check_support_finish (MMIfaceModemTime  *self,
                                              GAsyncResult      *res,
                                              GError           **error)
 {
-    return !!mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+support_cclk_query_ready (MMBaseModem  *self,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    /* error never returned */
+    g_task_return_boolean (task, !!mm_base_modem_at_command_finish (self, res, NULL));
+    g_object_unref (task);
+}
+
+static void
+support_cclk_query (GTask *task)
+{
+    MMBaseModem *self;
+
+    self = g_task_get_source_object (task);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CCLK?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)support_cclk_query_ready,
+                              task);
+}
+
+static void
+ctzu_set_ready (MMBaseModem  *self,
+                GAsyncResult *res,
+                GTask        *task)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        mm_obj_warn (self, "couldn't enable automatic time zone update: %s", error->message);
+
+    support_cclk_query (task);
+}
+
+static void
+ctzu_test_ready (MMBaseModem  *self,
+                 GAsyncResult *res,
+                 GTask        *task)
+{
+    g_autoptr(GError)  error = NULL;
+    const gchar       *response;
+    gboolean           supports_disable;
+    gboolean           supports_enable;
+    gboolean           supports_enable_update_rtc;
+    const gchar       *cmd = NULL;
+
+    /* If CTZU isn't supported, run CCLK right away */
+    response = mm_base_modem_at_command_finish (self, res, NULL);
+    if (!response) {
+        support_cclk_query (task);
+        return;
+    }
+
+    if (!mm_quectel_parse_ctzu_test_response (response,
+                                              self,
+                                              &supports_disable,
+                                              &supports_enable,
+                                              &supports_enable_update_rtc,
+                                              &error)) {
+        mm_obj_warn (self, "couldn't parse +CTZU test response: %s", error->message);
+        support_cclk_query (task);
+        return;
+    }
+
+    /* Custom time support check because some Quectel modems (e.g. EC25) require
+     * +CTZU=3 in order to have the CCLK? time reported in localtime, instead of
+     * UTC time. */
+    if (supports_enable_update_rtc)
+        cmd = "+CTZU=3";
+    else if (supports_enable)
+        cmd = "+CTZU=1";
+
+    if (!cmd) {
+        mm_obj_warn (self, "unknown +CTZU support");
+        support_cclk_query (task);
+        return;
+    }
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)ctzu_set_ready,
+                              task);
 }
 
 void
@@ -597,12 +680,15 @@ mm_shared_quectel_time_check_support (MMIfaceModemTime    *self,
                                       GAsyncReadyCallback  callback,
                                       gpointer             user_data)
 {
-    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
-                               time_check_sequence,
-                               NULL, /* response_processor_context */
-                               NULL, /* response_processor_context_free */
-                               callback,
-                               user_data);
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CTZU=?",
+                              3,
+                              TRUE, /* cached! */
+                              (GAsyncReadyCallback)ctzu_test_ready,
+                              task);
 }
 
 /*****************************************************************************/
