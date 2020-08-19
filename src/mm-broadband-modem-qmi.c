@@ -2921,7 +2921,7 @@ process_common_info (QmiNasServiceStatus service_status,
     if (network_id_valid) {
         *mm_operator_id = g_malloc (7);
         memcpy (*mm_operator_id, mcc, 3);
-        if (mnc[2] == 0xFF) {
+        if ((guint8)mnc[2] == 0xFF) {
             memcpy (&((*mm_operator_id)[3]), mnc, 2);
             (*mm_operator_id)[5] = '\0';
         } else {
