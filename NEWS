@@ -1,4 +1,33 @@
 
+ModemManager 1.14.2
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+ * Modem interface:
+   ** Avoid connection status flapping if briefly unregistered.
+
+ * QMI:
+   ** Fixed parsing of USSD indications with UTF-16 data.
+   ** Perform network registration using SSSP if possible, so that settings like
+      allowed modes are not silently modified.
+   ** Fixed connection sequence so that early attempt aborts end up correctly
+      releasing network handles that may have been allocated already.
+
+  * Plugins:
+   ** telit: added port type hints for the default MEx10G1 composition.
+   ** quectel: added port type hints for the Quectel 5G RM500.
+   ** quectel: added support for MBIM devices.
+   ** cinterion: increased SWWAN connection attempt timeout to 120s.
+   ** cinterion: if user OR password given, don't set the other as (null).
+   ** cinterion: quote user/password strings in AT^SGAUTH calls.
+   ** cinterion: support ^SGAUTH syntax in IMT family.
+   ** cinterion: ignore ^SYSSTART URC.
+   ** cinterion: simplify parsing of radio/band single SCFG line.
+   ** cinterion: remove limitation to IPv4 only PDP contexts.
+
+  * Several other minor improvements and fixes.
+
+
 ModemManager 1.14.0
 -------------------------------------------
 This is a new stable release of ModemManager.
