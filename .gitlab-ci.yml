@@ -63,6 +63,27 @@ build-no-qmi-no-mbim:
     - make check
     - make install
 
+build-qmi-newest-commands:
+  stage: build
+  only:
+    - master
+    - merge_requests
+    - tags
+    - schedules
+  script:
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+    - pushd libqmi
+    - NOCONFIGURE=1 ./autogen.sh
+    - ./configure --prefix=/usr --disable-mbim-qmux --enable-collection=basic
+    - make
+    - make install
+    - popd
+    - NOCONFIGURE=1 ./autogen.sh
+    - ./configure --prefix=/tmp/build-qmi-newest-commands --disable-gtk-doc --without-mbim CFLAGS="-DWITH_NEWEST_QMI_COMMANDS"
+    - make
+    - make check
+    - make install
+
 build-single-plugins:
   stage: build
   only:
