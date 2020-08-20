@@ -43,6 +43,7 @@ static CharsetEntry charset_map[] = {
     { "PCCP437", "CP437",  "CP437",     "CP437//TRANSLIT",     MM_MODEM_CHARSET_PCCP437 },
     { "PCDN",    "CP850",  "CP850",     "CP850//TRANSLIT",     MM_MODEM_CHARSET_PCDN },
     { "HEX",     NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_HEX },
+    { "UTF-16",  "UTF16",  "UTF-16BE",  "UTF-16BE//TRANSLIT",  MM_MODEM_CHARSET_UTF16 },
     { NULL,      NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_UNKNOWN }
 };
 
@@ -536,6 +537,14 @@ ucs2_is_subset (gunichar c, const char *utf8, gsize ulen)
 }
 
 static gboolean
+utf16_is_subset (gunichar     c,
+                 const gchar *utf8,
+                 gsize        ulen)
+{
+    return TRUE;
+}
+
+static gboolean
 iso88591_is_subset (gunichar c, const char *utf8, gsize ulen)
 {
     return (c <= 0xFF);
@@ -613,6 +622,7 @@ SubsetEntry subset_table[] = {
     { MM_MODEM_CHARSET_GSM,     gsm_is_subset },
     { MM_MODEM_CHARSET_IRA,     ira_is_subset },
     { MM_MODEM_CHARSET_UCS2,    ucs2_is_subset },
+    { MM_MODEM_CHARSET_UTF16,   utf16_is_subset },
     { MM_MODEM_CHARSET_8859_1,  iso88591_is_subset },
     { MM_MODEM_CHARSET_PCCP437, pccp437_is_subset },
     { MM_MODEM_CHARSET_PCDN,    pcdn_is_subset },
@@ -786,7 +796,8 @@ mm_charset_take_and_convert_to_utf8 (gchar *str, MMModemCharset charset)
         break;
     }
 
-    case MM_MODEM_CHARSET_UCS2: {
+    case MM_MODEM_CHARSET_UCS2:
+    case MM_MODEM_CHARSET_UTF16: {
         gsize len;
         gboolean possibly_hex = TRUE;
         gsize bread = 0, bwritten = 0;
@@ -914,7 +925,8 @@ mm_utf8_take_and_convert_to_charset (gchar *str,
         break;
     }
 
-    case MM_MODEM_CHARSET_UCS2: {
+    case MM_MODEM_CHARSET_UCS2:
+    case MM_MODEM_CHARSET_UTF16: {
         const gchar *iconv_to;
         gsize encoded_len = 0;
         GError *error = NULL;
