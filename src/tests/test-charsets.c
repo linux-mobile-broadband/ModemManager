@@ -369,6 +369,7 @@ struct charset_can_convert_to_test_s {
     gboolean    to_ira;
     gboolean    to_8859_1;
     gboolean    to_ucs2;
+    gboolean    to_utf16;
     gboolean    to_pccp437;
     gboolean    to_pcdn;
 };
@@ -379,35 +380,35 @@ test_charset_can_covert_to (void)
     static const struct charset_can_convert_to_test_s charset_can_convert_to_test[] = {
         {
             .utf8 = "",
-            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
         },
         {
             .utf8 = " ",
-            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
         },
         {
             .utf8 = "some basic ascii",
-            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+            .to_gsm = TRUE, .to_ira = TRUE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
         },
         {
             .utf8 = "ホモ・サピエンス 喂人类 katakana, chinese, english: UCS2 takes it all",
-            .to_gsm = FALSE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
+            .to_gsm = FALSE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
         },
         {
             .utf8 = "Some from the GSM7 basic set: a % Ψ Ω ñ ö è æ",
-            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
+            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
         },
         {
             .utf8 = "More from the GSM7 extended set: {} [] ~ € |",
-            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
+            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = FALSE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = FALSE, .to_pcdn = FALSE,
         },
         {
             .utf8 = "patín cannot be encoded in GSM7 or IRA, but is valid UCS2, ISO-8859-1, CP437 and CP850",
-            .to_gsm = FALSE, .to_ira = FALSE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+            .to_gsm = FALSE, .to_ira = FALSE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
         },
         {
             .utf8 = "ècole can be encoded in multiple ways, but not in IRA",
-            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
+            .to_gsm = TRUE, .to_ira = FALSE, .to_8859_1 = TRUE, .to_ucs2 = TRUE, .to_utf16 = TRUE, .to_pccp437 = TRUE, .to_pcdn = TRUE,
         },
     };
     guint i;
@@ -418,6 +419,7 @@ test_charset_can_covert_to (void)
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_IRA)     == charset_can_convert_to_test[i].to_ira);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_8859_1)  == charset_can_convert_to_test[i].to_8859_1);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_UCS2)    == charset_can_convert_to_test[i].to_ucs2);
+        g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_UTF16)   == charset_can_convert_to_test[i].to_utf16);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_PCCP437) == charset_can_convert_to_test[i].to_pccp437);
         g_assert (mm_charset_can_convert_to (charset_can_convert_to_test[i].utf8, MM_MODEM_CHARSET_PCDN)    == charset_can_convert_to_test[i].to_pcdn);
     }
