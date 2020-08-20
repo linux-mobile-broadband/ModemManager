@@ -20,11 +20,27 @@
 #include <glib.h>
 #include <ModemManager.h>
 
+/* Despite 3GPP TS 23.038 specifies that Unicode SMS messages are
+ * encoded in UCS-2, UTF-16 encoding is commonly used instead on many
+ * modern platforms to allow encoding code points that fall outside the
+ * Basic Multilingual Plane (BMP), such as Emoji. Most of the UCS-2
+ * code points are identical to their equivalent UTF-16 code points.
+ * In UTF-16, non-BMP code points are encoded in a pair of surrogate
+ * code points (i.e. a high surrogate in 0xD800..0xDBFF, followed by a
+ * low surrogate in 0xDC00..0xDFFF). An isolated surrogate code point
+ * has no general interpretation in UTF-16, but could be a valid
+ * (though unmapped) code point in UCS-2.
+ *
+ * The current implementation in ModemManager just assumes that whenever
+ * possible (i.e. when parsing received PDUs or when creating submit
+ * PDUs) UTF-16 will be used instead of plain UCS-2 (even if the PDUs
+ * report the encoding as UCS-2).
+ */
 typedef enum { /*< underscore_name=mm_sms_encoding >*/
     MM_SMS_ENCODING_UNKNOWN = 0x0,
     MM_SMS_ENCODING_GSM7,
     MM_SMS_ENCODING_8BIT,
-    MM_SMS_ENCODING_UCS2
+    MM_SMS_ENCODING_UCS2,
 } MMSmsEncoding;
 
 typedef struct _MMSmsPart MMSmsPart;

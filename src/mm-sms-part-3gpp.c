@@ -246,38 +246,25 @@ sms_decode_text (const guint8 *text,
                  int           bit_offset,
                  gpointer      log_object)
 {
-    char *utf8;
-    guint8 *unpacked;
-    guint32 unpacked_len;
+    gchar *utf8;
 
     if (encoding == MM_SMS_ENCODING_GSM7) {
+        g_autofree guint8 *unpacked = NULL;
+        guint32            unpacked_len;
+
         mm_obj_dbg (log_object, "converting SMS part text from GSM-7 to UTF-8...");
         unpacked = mm_charset_gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
         utf8 = (char *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
         mm_obj_dbg (log_object, "   got UTF-8 text: '%s'", utf8);
-        g_free (unpacked);
     } else if (encoding == MM_SMS_ENCODING_UCS2) {
-        /* Despite 3GPP TS 23.038 specifies that Unicode SMS messages are
-         * encoded in UCS-2, UTF-16 encoding is commonly used instead on many
-         * modern platforms to allow encoding code points that fall outside the
-         * Basic Multilingual Plane (BMP), such as Emoji. Most of the UCS-2
-         * code points are identical to their equivalent UTF-16 code points.
-         * In UTF-16, non-BMP code points are encoded in a pair of surrogate
-         * code points (i.e. a high surrogate in 0xD800..0xDBFF, followed by a
-         * low surrogate in 0xDC00..0xDFFF). An isolated surrogate code point
-         * has no general interpretation in UTF-16, but could be a valid
-         * (though unmapped) code point in UCS-2. Here we first try to decode
-         * the SMS message in UTF-16BE, and if that fails, fall back to decode
-         * in UCS-2BE.
-         */
+        g_autoptr(GByteArray) bytearray = NULL;
+
         mm_obj_dbg (log_object, "converting SMS part text from UTF-16BE to UTF-8...");
-        utf8 = g_convert ((const gchar *) text, len, "UTF-8", "UTF-16BE", NULL, NULL, NULL);
+        bytearray = g_byte_array_append (g_byte_array_sized_new (len), (const guint8 *)text, len);
+        /* Always assume UTF-16 instead of UCS-2! */
+        utf8 = mm_modem_charset_byte_array_to_utf8 (bytearray, MM_MODEM_CHARSET_UTF16);
         if (!utf8) {
-            mm_obj_dbg (log_object, "converting SMS part text from UCS-2BE to UTF-8...");
-            utf8 = g_convert ((const gchar *) text, len, "UTF-8", "UCS-2BE", NULL, NULL, NULL);
-        }
-        if (!utf8) {
-            mm_obj_warn (log_object, "couldn't convert SMS part contents from UTF-16BE/UCS-2BE to UTF-8: not decoding any text");
+            mm_obj_warn (log_object, "couldn't convert SMS part contents from UTF-16BE to UTF-8: not decoding any text");
             utf8 = g_strdup ("");
         } else
             mm_obj_dbg (log_object, "   got UTF-8 text: '%s'", utf8);
@@ -625,9 +612,11 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
             mm_obj_dbg (log_object, "  user data encoding is 8bit");
             break;
         case MM_SMS_ENCODING_UNKNOWN:
-        default:
             mm_obj_dbg (log_object, "  user data encoding is unknown");
             break;
+        default:
+            g_assert_not_reached ();
+
         }
         mm_sms_part_set_encoding (sms_part, user_data_encoding);
 
@@ -829,6 +818,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
     guint len, offset = 0;
     guint shift = 0;
     guint8 *udl_ptr;
+    MMSmsEncoding encoding;
 
     g_return_val_if_fail (mm_sms_part_get_number (part) != NULL, NULL);
     g_return_val_if_fail (mm_sms_part_get_text (part) != NULL || mm_sms_part_get_data (part) != NULL, NULL);
@@ -923,7 +913,9 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         pdu[offset] |= mm_sms_part_get_class (part);
     }
 
-    switch (mm_sms_part_get_encoding (part)) {
+    encoding = mm_sms_part_get_encoding (part);
+
+    switch (encoding) {
     case MM_SMS_ENCODING_UCS2:
         mm_obj_dbg (log_object, "  using UCS2 encoding...");
         pdu[offset] |= SMS_DCS_CODING_UCS2;
@@ -976,7 +968,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         shift = 1;
     }
 
-    if (mm_sms_part_get_encoding (part) == MM_SMS_ENCODING_GSM7) {
+    if (encoding == MM_SMS_ENCODING_GSM7) {
         guint8 *unpacked, *packed;
         guint32 unlen = 0, packlen = 0;
 
@@ -1012,17 +1004,19 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         memcpy (&pdu[offset], packed, packlen);
         g_free (packed);
         offset += packlen;
-    } else if (mm_sms_part_get_encoding (part) == MM_SMS_ENCODING_UCS2) {
+    } else if (encoding == MM_SMS_ENCODING_UCS2) {
         g_autoptr(GByteArray) array = NULL;
         g_autoptr(GError)     inner_error = NULL;
 
         /* Try to guess a good value for the array */
         array = g_byte_array_sized_new (strlen (mm_sms_part_get_text (part)) * 2);
-        if (!mm_modem_charset_byte_array_append (array, mm_sms_part_get_text (part), FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
+        /* Always assume UTF-16 instead of UCS-2! */
+        if (!mm_modem_charset_byte_array_append (array, mm_sms_part_get_text (part), FALSE, MM_MODEM_CHARSET_UTF16, &inner_error)) {
             g_set_error (error,
                          MM_MESSAGE_ERROR,
                          MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
-                         "Failed to convert message text to UCS2: %s", inner_error->message);
+                         "Failed to convert message text to UTF-16: %s",
+                         inner_error->message);
             goto error;
         }
 
@@ -1094,62 +1088,68 @@ util_split_text_gsm7 (const gchar *text,
 }
 
 static gchar **
-util_split_text_ucs2 (const gchar *text,
-                      gsize        text_len,
-                      gpointer     log_object)
+util_split_text_utf16_or_ucs2 (const gchar *text,
+                               gsize        text_len,
+                               gpointer     log_object)
 {
-    g_autoptr(GByteArray)   array = NULL;
-    g_autoptr(GError)       error = NULL;
-    gchar                 **out;
-    guint                   n_chunks;
-    guint                   i;
-    guint                   j;
+    g_autoptr(GPtrArray)  chunks = NULL;
+    const gchar          *walker;
+    const gchar          *chunk_start;
+    glong                 encoded_chunk_length;
+    glong                 total_encoded_chunk_length;
 
-    /* Guess the size of the output array to avoid multiple allocations */
-    array = g_byte_array_sized_new (text_len * 2);
-    if (!mm_modem_charset_byte_array_append (array,
-                                             text,
-                                             FALSE,
-                                             MM_MODEM_CHARSET_UCS2,
-                                             &error)) {
-        mm_obj_warn (log_object, "failed to append UCS2: %s", error->message);
-        return NULL;
+    chunks = g_ptr_array_new_with_free_func ((GDestroyNotify)g_free);
+
+    walker = text;
+    chunk_start = text;
+    encoded_chunk_length = 0;
+    total_encoded_chunk_length = 0;
+    while (walker && *walker) {
+        g_autofree gunichar2 *unichar2 = NULL;
+        glong                 unichar2_written = 0;
+        glong                 unichar2_written_bytes = 0;
+        gunichar              single;
+
+        single = g_utf8_get_char (walker);
+        unichar2 = g_ucs4_to_utf16 (&single, 1, NULL, &unichar2_written, NULL);
+        g_assert (unichar2_written > 0);
+
+        /* When splitting for UCS-2 encoding, only one single unichar2 will be
+         * written, because all codepoints represented in UCS2 fit in the BMP.
+         * When splitting for UTF-16, though, we may end up writing one or two
+         * unichar2 (without or with surrogate pairs), because UTF-16 covers the
+         * whole Unicode spectrum. */
+        unichar2_written_bytes = (unichar2_written * sizeof (gunichar2));
+        if ((encoded_chunk_length + unichar2_written_bytes) > 134) {
+            g_ptr_array_add (chunks, g_strndup (chunk_start, walker - chunk_start));
+            chunk_start = walker;
+            encoded_chunk_length = unichar2_written_bytes;
+        } else
+            encoded_chunk_length += unichar2_written_bytes;
+
+        total_encoded_chunk_length += unichar2_written_bytes;
+        walker = g_utf8_next_char (walker);
     }
 
-    /* Our bytearray has it in UCS-2 now.
-     * UCS-2 is a fixed-size encoding, which means that the text has exactly
-     * 2 bytes for each unicode point. We can now split this array into
-     * chunks of 67 UCS-2 characters (134 bytes).
-     *
-     * Note that UCS-2 covers unicode points between U+0000 and U+FFFF, which
-     * means that there is no direct relationship between the size of the
-     * input text in UTF-8 and the size of the text in UCS-2. A 3-byte UTF-8
-     * encoded character will still be represented with 2 bytes in UCS-2.
-     */
+    /* We have split the original string in chunks, where each chunk
+     * does not require more than 134 bytes when encoded in UTF-16.
+     * As a special case now, we consider the case that no splitting
+     * is necessary, i.e. if the total amount of bytes after encoding
+     * in UTF-16 is less or equal than 140. */
+    if (total_encoded_chunk_length <= 140) {
+        gchar **out;
 
-    /* No splitting needed? */
-    if (array->len <= 140) {
         out = g_new0 (gchar *, 2);
         out[0] = g_strdup (text);
         return out;
     }
 
-    /* Compute number of chunks needed */
-    n_chunks = array->len / 134;
-    if (array->len % 134 != 0)
-        n_chunks++;
+    /* Otherwise, we do need the splitted chunks. Add the last one
+     * with contents plus the last trailing NULL */
+    g_ptr_array_add (chunks, g_strndup (chunk_start, walker - chunk_start));
+    g_ptr_array_add (chunks, NULL);
 
-    /* Fill in all chunks */
-    out = g_new0 (gchar *, n_chunks + 1);
-    for (i = 0, j = 0; i < n_chunks; i++, j += 134) {
-        out[i] = sms_decode_text (&array->data[j],
-                                  MIN (array->len - j, 134),
-                                  MM_SMS_ENCODING_UCS2,
-                                  0,
-                                  log_object);
-    }
-
-    return out;
+    return (gchar **) g_ptr_array_free (g_steal_pointer (&chunks), FALSE);
 }
 
 gchar **
@@ -1174,6 +1174,11 @@ mm_sms_part_3gpp_util_split_text (const gchar   *text,
      *      134 * 8 = 1072; 1072/7=153.14
      *  2) If we're using UCS2 encoding, we can pack up to 70 characters in
      *     140 bytes (each with 2 bytes), or up to 67 characters in 134 bytes.
+     *  3) If we're using UTF-16 encoding (instead of UCS2), the amount of
+     *     characters we can pack is variable, depends on how the characters
+     *     are encoded in UTF-16 (e.g. if there are characters out of the BMP
+     *     we'll need surrogate pairs and a single character will need 4 bytes
+     *     instead of 2).
      *
      * This method does the split of the input string into N strings, so that
      * each of the strings can be placed in a SMS part.
@@ -1185,9 +1190,9 @@ mm_sms_part_3gpp_util_split_text (const gchar   *text,
         return util_split_text_gsm7 (text, strlen (text), log_object);
     }
 
-    /* Otherwise, fallback to UCS2 encoding */
+    /* Otherwise fallback to report UCS-2 and split supporting UTF-16 */
     *encoding = MM_SMS_ENCODING_UCS2;
-    return util_split_text_ucs2 (text, strlen (text), log_object);
+    return util_split_text_utf16_or_ucs2 (text, strlen (text), log_object);
 }
 
 GByteArray **
