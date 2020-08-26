@@ -874,7 +874,7 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
         }
         latin[i] = '\0';
 
-        text = g_convert (latin, -1, "UTF-8", "ISO−8859−1", NULL, NULL, NULL);
+        text = g_convert (latin, -1, "UTF-8", "ISO-8859-1", NULL, NULL, NULL);
         if (!text) {
             mm_obj_dbg (log_object, "            text/data: ignored (latin to UTF-8 conversion error)");
         } else {
