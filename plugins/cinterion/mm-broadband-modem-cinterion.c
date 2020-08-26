@@ -805,17 +805,17 @@ sind_psinfo_enable_ready (MMBaseModem  *_self,
 }
 
 static void
-parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *_self,
-                                        GAsyncResult     *res,
-                                        GTask            *task)
+set_urc_dest_port_ready (MMBaseModem  *_self,
+                         GAsyncResult *res,
+                         GTask        *task)
 {
     MMBroadbandModemCinterion *self;
     g_autoptr(GError)          error = NULL;
 
     self = MM_BROADBAND_MODEM_CINTERION (_self);
 
-    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (_self, res, &error))
-        mm_obj_warn (self, "couldn't enable parent 3GPP unsolicited events: %s", error->message);
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (_self), res, &error))
+        mm_obj_dbg (self, "couldn't guarantee unsolicited events are sent to the correct port: %s", error->message);
 
     if (self->priv->sind_psinfo_support == FEATURE_SUPPORTED) {
         /* Enable access technology update reporting */
@@ -830,6 +830,25 @@ parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *_self,
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
+}
+
+static void
+parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                        GAsyncResult     *res,
+                                        GTask            *task)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error))
+        mm_obj_warn (self, "couldn't enable parent 3GPP unsolicited events: %s", error->message);
+
+    /* Make sure unsolicited events are sent to an AT port (PLS9 can default to DATA port) */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SCFG=\"URC/DstIfc\",\"app\"",
+                              5,
+                              FALSE,
+                              (GAsyncReadyCallback)set_urc_dest_port_ready,
+                              task);
 }
 
 static void
