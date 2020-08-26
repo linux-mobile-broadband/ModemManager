@@ -92,6 +92,8 @@ struct _MMBroadbandModemCinterionPrivate {
     GRegex *sysstart_regex;
     /* +CIEV indications as configured via AT^SIND */
     GRegex *ciev_regex;
+    /* Ignore SIM hotswap SCKS msg, until ready */
+    GRegex *scks_regex;
 
     /* Flags for feature support checks */
     FeatureSupport swwan_support;
@@ -2357,6 +2359,107 @@ after_sim_unlock (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Setup SIM hot swap (Modem interface) */
+
+static void
+cinterion_scks_unsolicited_handler (MMPortSerialAt *port,
+                                    GMatchInfo *match_info,
+                                    MMBroadbandModemCinterion *self)
+{
+    guint scks;
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &scks))
+        return;
+
+    switch (scks) {
+        case 0:
+            mm_obj_info (self, "SIM removal detected");
+            break;
+        case 1:
+            mm_obj_info (self, "SIM insertion detected");
+            break;
+        case 2:
+            mm_obj_info (self, "SIM interface hardware deactivated (Potentially non-electrically compatible SIM inserted)");
+            break;
+        case 3:
+            mm_obj_info (self, "SIM interface hardware deactivated (Technical problem, no precise diagnosis)");
+            break;
+        default:
+            g_assert_not_reached ();
+            break;
+    }
+
+    mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+}
+
+static gboolean
+modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+cinterion_hot_swap_init_ready (MMBaseModem *_self,
+                               GAsyncResult *res,
+                               GTask *task)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GError *error = NULL;
+    MMPortSerialAt *primary;
+    MMPortSerialAt *secondary;
+
+    if (!mm_base_modem_at_command_finish (_self, res, &error)) {
+        g_prefix_error (&error, "Could not enable SCKS: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "SIM hot swap detect successfully enabled");
+
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    mm_port_serial_at_add_unsolicited_msg_handler (
+        primary,
+        self->priv->scks_regex,
+        (MMPortSerialAtUnsolicitedMsgFn) cinterion_scks_unsolicited_handler,
+        self,
+        NULL);
+
+    secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    if (secondary)
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            secondary,
+            self->priv->scks_regex,
+            (MMPortSerialAtUnsolicitedMsgFn) cinterion_scks_unsolicited_handler,
+            self,
+            NULL);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_setup_sim_hot_swap (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GTask *task;
+
+    mm_obj_dbg (self, "Enabling SCKS URCs for SIM hot swap detection");
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SCKS=1",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) cinterion_hot_swap_init_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBaseBearer *
@@ -2502,6 +2605,8 @@ mm_broadband_modem_cinterion_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
                          NULL);
 }
 
@@ -2523,6 +2628,8 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->sysstart_regex = g_regex_new ("\\r\\n\\^SYSSTART.*\\r\\n",
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->scks_regex = g_regex_new ("\\^SCKS:\\s*([0-3])\\r\\n",
+                                          G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -2545,6 +2652,7 @@ finalize (GObject *object)
 
     g_regex_unref (self->priv->ciev_regex);
     g_regex_unref (self->priv->sysstart_regex);
+    g_regex_unref (self->priv->scks_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_cinterion_parent_class)->finalize (object);
 }
@@ -2580,6 +2688,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->modem_power_off = modem_power_off;
     iface->modem_power_off_finish = modem_power_off_finish;
+    iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
+    iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
 }
 
 static void
@@ -2700,6 +2810,11 @@ setup_ports (MMBroadbandModem *_self)
             port,
             self->priv->sysstart_regex,
             NULL, NULL, NULL);
+
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->scks_regex,
+            NULL, NULL, NULL);
     }
 
     /* Secondary */
@@ -2708,6 +2823,11 @@ setup_ports (MMBroadbandModem *_self)
         mm_port_serial_at_add_unsolicited_msg_handler (
             port,
             self->priv->sysstart_regex,
+            NULL, NULL, NULL);
+
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->scks_regex,
             NULL, NULL, NULL);
     }
 }
