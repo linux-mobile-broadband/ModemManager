@@ -37,4 +37,18 @@ ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="02", ENV{
 ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_TYPE_AUDIO}="1"
 
+# SIM7070, SIM7080, SIM7090 (default layout)...
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9205", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9205", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9205", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9205", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+
+# SIM7070, SIM7080, SIM7090 (secondary layout)...
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9206", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+
 LABEL="mm_simtech_port_types_end"
