@@ -24,6 +24,12 @@
 
 #include <gmodule.h>
 
+#if defined WITH_QMI
+# include <libqmi-glib.h>
+#endif
+#if defined WITH_QMI && QMI_QRTR_SUPPORTED
+# include "mm-kernel-device-qrtr.h"
+#endif
 #if defined WITH_UDEV
 # include "mm-kernel-device-udev.h"
 #endif

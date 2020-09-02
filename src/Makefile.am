@@ -162,6 +162,13 @@ libkerneldevice_la_SOURCES = \
 	kerneldevice/mm-kernel-device-generic-rules.c \
 	$(NULL)
 
+if WITH_QRTR
+libkerneldevice_la_SOURCES += \
+	kerneldevice/mm-kernel-device-qrtr.h \
+	kerneldevice/mm-kernel-device-qrtr.c \
+	$(NULL)
+endif
+
 if WITH_UDEV
 libkerneldevice_la_SOURCES += \
 	kerneldevice/mm-kernel-device-udev.h \
