@@ -613,6 +613,11 @@ connect_set_ready (MbimDevice *device,
                                          "Unknown error: context activation failed");
                 }
             }
+            /* We're now connected, but we may have received an IP type different to the one
+             * requested (e.g. asking for IPv4v6 but received IPv4 only). Handle that, so that
+             * the next step getting IP details doesn't get confused. */
+            else if (ctx->ip_type != ip_type)
+                ctx->ip_type = ip_type;
         } else {
             /* Prefer the error from the result to the parsing error */
             if (!error)
