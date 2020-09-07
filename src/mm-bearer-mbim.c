@@ -570,6 +570,7 @@ connect_set_ready (MbimDevice *device,
     GError *error = NULL;
     MbimMessage *response;
     guint32 session_id;
+    MbimContextIpType ip_type;
     MbimActivationState activation_state;
     guint32 nw_error;
 
@@ -587,24 +588,30 @@ connect_set_ready (MbimDevice *device,
                 &session_id,
                 &activation_state,
                 NULL, /* voice_call_state */
-                NULL, /* ip_type */
+                &ip_type,
                 NULL, /* context_type */
                 &nw_error,
                 &inner_error)) {
-            if (nw_error) {
-                if (error)
-                    g_error_free (error);
-                error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
-            } else {
-                /* Report the ip_type we originally requested, since the ip_type
-                 * from the response is only relevant if the requested used
-                 * MBIM_CONTEXT_IP_TYPE_DEFAULT, which MM never does.  Some
-                 * devices (K5160) report the wrong type in the response.
-                 */
-                mm_obj_dbg (self, "session ID '%u': %s (IP type: %s)",
-                            session_id,
-                            mbim_activation_state_get_string (activation_state),
-                            mbim_context_ip_type_get_string (ctx->ip_type));
+            /* Report the IP type we asked for and the one returned by the modem */
+            mm_obj_dbg (self, "session ID '%u': %s (requested IP type: %s, received IP type: %s, nw error: %s)",
+                        session_id,
+                        mbim_activation_state_get_string (activation_state),
+                        mbim_context_ip_type_get_string (ctx->ip_type),
+                        mbim_context_ip_type_get_string (ip_type),
+                        nw_error ? mbim_nw_error_get_string (nw_error) : "none");
+            /* If the response reports an ACTIVATED state, we're good even if
+             * there is a nw_error set (e.g. asking for IPv4v6 may return a
+             * 'pdp-type-ipv4-only-allowed' nw_error). */
+            if (activation_state != MBIM_ACTIVATION_STATE_ACTIVATED &&
+                activation_state != MBIM_ACTIVATION_STATE_ACTIVATING) {
+                if (nw_error) {
+                    g_clear_error (&error);
+                    error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
+                } else if (!error) {
+                    error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                                         MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN,
+                                         "Unknown error: context activation failed");
+                }
             }
         } else {
             /* Prefer the error from the result to the parsing error */
