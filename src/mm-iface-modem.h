@@ -290,6 +290,7 @@ struct _MMIfaceModem {
      * Useful for when the modem changes power states since we might
      * not get the relevant notifications from the modem. */
     void (*check_for_sim_swap) (MMIfaceModem *self,
+                                const gchar *iccid,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data);
     gboolean (*check_for_sim_swap_finish) (MMIfaceModem *self,

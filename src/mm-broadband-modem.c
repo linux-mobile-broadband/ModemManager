@@ -4120,7 +4120,8 @@ load_sim_identifier_ready (MMBaseSim *sim,
     }
 
     if (g_strcmp0 (current_simid, cached_simid) != 0) {
-        mm_obj_info (self, "sim identifier has changed: possible SIM swap during power down/low");
+        mm_obj_info (self, "sim identifier has changed: %s -> %s - possible SIM swap",
+                     cached_simid, current_simid);
         mm_broadband_modem_sim_hot_swap_detected (self);
     }
 
@@ -4146,6 +4147,7 @@ load_sim_identifier (GTask *task)
 
 static void
 modem_check_for_sim_swap (MMIfaceModem *self,
+                          const gchar *iccid,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
@@ -4167,6 +4169,25 @@ modem_check_for_sim_swap (MMIfaceModem *self,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "could not acquire sim object");
+        g_object_unref (task);
+        return;
+    }
+
+    /* We may or may not get the new SIM identifier (iccid). In case
+     * we've got it, the load_sim_identifier phase can be skipped. */
+    if (iccid) {
+        const gchar *cached_simid;
+
+        cached_simid = mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->sim));
+        if (!cached_simid || g_strcmp0 (iccid, cached_simid) != 0) {
+            mm_obj_info (self, "detected ICCID change (%s -> %s), handle as SIM hot-swap",
+                         cached_simid ? cached_simid : "<none>",
+                         iccid);
+            mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+        } else
+            mm_obj_dbg (self, "ICCID not changed");
+
+        g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
     }

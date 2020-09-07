@@ -153,6 +153,7 @@ quectel_qusim_unsolicited_handler (MMPortSerialAt *port,
         mm_obj_dbg (self, "checking SIM swap");
         MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
             self,
+            NULL,
             (GAsyncReadyCallback)quectel_qusim_check_for_sim_swap_ready,
             NULL);
     }
