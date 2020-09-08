@@ -92,6 +92,12 @@ typedef struct {
     gboolean  config_active_default;
     GArray   *config_list;
     gint      config_active_i;
+
+    /* Slot status monitoring */
+    QmiClient    *uim_client;
+    gulong        uim_slot_status_indication_id;
+    gulong        uim_refresh_indication_id;
+    guint         uim_refresh_start_timeout_id;
 } Private;
 
 static void
@@ -111,6 +117,14 @@ private_free (Private *priv)
         g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
     if (priv->loc_client)
         g_object_unref (priv->loc_client);
+    if (priv->uim_slot_status_indication_id)
+        g_signal_handler_disconnect (priv->uim_client, priv->uim_slot_status_indication_id);
+    if (priv->uim_refresh_indication_id)
+        g_signal_handler_disconnect (priv->uim_client, priv->uim_refresh_indication_id);
+    if (priv->uim_client)
+        g_object_unref (priv->uim_client);
+    if (priv->uim_refresh_start_timeout_id)
+        g_source_remove (priv->uim_refresh_start_timeout_id);
     g_strfreev (priv->loc_assistance_data_servers);
     g_slice_free (Private, priv);
 }
@@ -3599,6 +3613,456 @@ mm_shared_qmi_set_primary_sim_slot (MMIfaceModem        *self,
                                     NULL,
                                     (GAsyncReadyCallback) uim_switch_get_slot_status_ready,
                                     task);
+}
+
+/*****************************************************************************/
+/* SIM hot swap detection */
+
+#define REFRESH_START_TIMEOUT_SECS  3
+
+gboolean
+mm_shared_qmi_setup_sim_hot_swap_finish (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+uim_refresh_complete (QmiClientUim *client,
+                      QmiUimSessionType session_type,
+                      gboolean success)
+{
+    g_autoptr(QmiMessageUimRefreshCompleteInput)  refresh_complete_input;
+    GArray                                       *dummy_aid;
+
+    dummy_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
+
+    refresh_complete_input = qmi_message_uim_refresh_complete_input_new ();
+    qmi_message_uim_refresh_complete_input_set_session (
+        refresh_complete_input,
+        session_type,
+        dummy_aid, /* ignored */
+        NULL);
+    qmi_message_uim_refresh_complete_input_set_info (
+        refresh_complete_input,
+        success,
+        NULL);
+
+    qmi_client_uim_refresh_complete (
+        client,
+        refresh_complete_input,
+        10,
+        NULL,
+        NULL,
+        NULL);
+    g_array_unref (dummy_aid);
+}
+
+static gboolean
+uim_start_refresh_timeout (gpointer data)
+{
+    MMSharedQmi *self = MM_SHARED_QMI (data);
+    Private     *priv;
+
+    priv = get_private (self);
+    priv->uim_refresh_start_timeout_id = 0;
+
+    mm_obj_dbg (self, "Refresh start timed out; trigger SIM change check");
+
+    mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self),
+                                       0,
+                                       NULL,
+                                       NULL,
+                                       NULL);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+uim_refresh_indication_cb (QmiClientUim                     *client,
+                           QmiIndicationUimRefreshOutput    *output,
+                           MMSharedQmi                      *self)
+{
+    QmiUimRefreshStage  stage;
+    QmiUimRefreshMode   mode;
+    QmiUimSessionType   session_type;
+    GError             *error = NULL;
+    Private            *priv;
+
+    priv = get_private (self);
+
+    if (!qmi_indication_uim_refresh_output_get_event (output,
+                                                      &stage,
+                                                      &mode,
+                                                      &session_type,
+                                                      NULL,
+                                                      NULL,
+                                                      &error)) {
+        mm_obj_warn (self, "Couldn't process UIM refresh indication: %s", error->message);
+        g_error_free (error);
+        return;
+    }
+    mm_obj_dbg (self, "Refresh indication; session type: '%s', stage: '%s', mode: '%s'",
+                qmi_uim_session_type_get_string (session_type),
+                qmi_uim_refresh_stage_get_string (stage),
+                qmi_uim_refresh_mode_get_string (mode));
+
+    /* Support only the first slot for now. Primary GW provisioning is used in old modems. */
+    if (session_type != QMI_UIM_SESSION_TYPE_CARD_SLOT_1 &&
+        session_type != QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING) {
+        mm_obj_warn (self, "Refresh session type not supported");
+        return;
+    }
+
+    /* Currently we handle only UICC Reset type refresh, which can be used
+     * in profile switch scenarios. In other cases we just trigger 'refresh
+     * complete' during start phase. Signal to notify about potential SIM
+     * profile switch is triggered when the refresh is ending. If it were
+     * triggered in start phase, reading SIM files seems to fail with
+     * an internal error.
+     *
+     * It's possible that 'end-with-success' stage never appears. For that,
+     * we start a timer at 'start' stage and if it expires, the SIM change
+     * check is triggered anyway. */
+    if (stage == QMI_UIM_REFRESH_STAGE_START) {
+        if (mode == QMI_UIM_REFRESH_MODE_RESET) {
+            if (!priv->uim_refresh_start_timeout_id)
+                priv->uim_refresh_start_timeout_id = g_timeout_add_seconds (REFRESH_START_TIMEOUT_SECS,
+                                                                            uim_start_refresh_timeout,
+                                                                            self);
+        } else
+            uim_refresh_complete (client, session_type, TRUE);
+    } else if (stage == QMI_UIM_REFRESH_STAGE_END_WITH_SUCCESS) {
+        if (mode == QMI_UIM_REFRESH_MODE_RESET) {
+            if (priv->uim_refresh_start_timeout_id) {
+                g_source_remove (priv->uim_refresh_start_timeout_id);
+                priv->uim_refresh_start_timeout_id = 0;
+            }
+            mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self),
+                                               0,
+                                               NULL,
+                                               NULL,
+                                               NULL);
+        }
+    }
+}
+
+static void
+uim_slot_status_indication_cb (QmiClientUim                     *client,
+                               QmiIndicationUimSlotStatusOutput *output,
+                               MMSharedQmi                      *self)
+{
+    GArray            *physical_slots = NULL;
+    g_autoptr(GError)  error = NULL;
+    guint              i;
+
+    mm_obj_dbg (self, "Received slot status indication");
+
+    if (!qmi_indication_uim_slot_status_output_get_physical_slot_status (output,
+                                                                         &physical_slots,
+                                                                         &error)) {
+        mm_obj_warn (self, "Could not parse slot status: %s", error->message);
+        return;
+    }
+
+    for (i = 0; i < physical_slots->len; i++) {
+        QmiPhysicalSlotStatusSlot *slot_status;
+        gchar                     *iccid = NULL;
+
+        slot_status = &g_array_index (physical_slots, QmiPhysicalSlotStatusSlot, i);
+
+        /* We only care about active slot changes */
+        if (slot_status->physical_slot_status == QMI_UIM_SLOT_STATE_ACTIVE) {
+            if (slot_status->iccid && slot_status->iccid->len > 0)
+                iccid = mm_bcd_to_string ((const guint8 *) slot_status->iccid->data, slot_status->iccid->len);
+
+            mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self),
+                                               i + 1, /* Slot index */
+                                               iccid,
+                                               NULL,
+                                               NULL);
+            g_free (iccid);
+        }
+    }
+}
+
+static void
+uim_refresh_register_iccid_change_ready (QmiClientUim *client,
+                                         GAsyncResult *res,
+                                         GTask        *task)
+{
+    g_autoptr(QmiMessageUimRefreshRegisterOutput)  output;
+    MMSharedQmi                                   *self;
+    GError                                        *error = NULL;
+    Private                                       *priv;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+
+    output = qmi_client_uim_refresh_register_finish (client, res, &error);
+    if (!output || !qmi_message_uim_refresh_register_output_get_result (output, &error)) {
+        mm_obj_warn (self, "refresh registration using 'refresh register' failed: %s", error->message);
+        g_clear_object (&priv->uim_client);
+        g_task_return_new_error (task, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
+                                 "SIM hot swap detection not supported by modem");
+    } else {
+        mm_obj_dbg (self, "registered for SIM refresh events using 'refresh register'");
+        priv->uim_refresh_indication_id =
+            g_signal_connect (client,
+                              "refresh",
+                              G_CALLBACK (uim_refresh_indication_cb),
+                              self);
+        g_task_return_boolean (task, TRUE);
+    }
+    g_clear_error (&error);
+    g_object_unref (task);
+}
+
+/* This is the last resort if 'refresh register all' does not work. It works
+ * on some older modems. Those modems may not also support QMI_UIM_SESSION_TYPE_CARD_SLOT_1
+ * so we'll use QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING */
+static void
+uim_refresh_register_iccid_change (QmiClientUim *client,
+                                   GTask        *task)
+{
+    g_autoptr(QmiMessageUimRefreshRegisterInput)       refresh_register_input;
+    GArray                                            *dummy_aid;
+    GArray                                            *file;
+    MMSharedQmi                                       *self;
+    QmiMessageUimRefreshRegisterInputInfoFilesElement  file_element;
+    guint8                                             val;
+
+    self = g_task_get_source_object (task);
+
+    mm_obj_info (self, "register for refresh file indication");
+
+    dummy_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
+    file = g_array_sized_new (FALSE, FALSE, sizeof (QmiMessageUimRefreshRegisterInputInfoFilesElement), 1);
+    memset (&file_element, 0, sizeof (file_element));
+    file_element.file_id = 0x2FE2; /* ICCID */
+    file_element.path = g_array_sized_new (FALSE, FALSE, sizeof (guint8), 2);
+    val = 0x00;
+    g_array_append_val (file_element.path, val);
+    val = 0x3F;
+    g_array_append_val (file_element.path, val);
+    g_array_append_val (file, file_element);
+
+    refresh_register_input = qmi_message_uim_refresh_register_input_new ();
+    qmi_message_uim_refresh_register_input_set_info (refresh_register_input,
+                                                     TRUE,
+                                                     FALSE,
+                                                     file,
+                                                     NULL);
+    qmi_message_uim_refresh_register_input_set_session (refresh_register_input,
+                                                        QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING,
+                                                        dummy_aid,
+                                                        NULL);
+
+    qmi_client_uim_refresh_register (client,
+                                     refresh_register_input,
+                                     10,
+                                     NULL,
+                                     (GAsyncReadyCallback) uim_refresh_register_iccid_change_ready,
+                                     task);
+    g_array_unref (dummy_aid);
+    g_array_unref (file_element.path);
+    g_array_unref (file);
+}
+
+/* Refresh registration and event handling.
+ * This is used only as fallback in case slot status indications do not work
+ * in the particular modem (determined by UIM Get Slot Status failing) for
+ * detecting ICCID changing due to a profile switch.
+ *
+ * We assume that devices not supporting UIM Get Slot Status only have a
+ * single slot, for which we register refresh events.
+ */
+
+static void
+uim_refresh_register_all_ready (QmiClientUim *client,
+                                GAsyncResult *res,
+                                GTask        *task)
+{
+    g_autoptr(QmiMessageUimRefreshRegisterAllOutput)  output;
+    MMIfaceModem                                     *self;
+    GError                                           *error = NULL;
+    Private                                          *priv;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+
+    output = qmi_client_uim_refresh_register_all_finish (client, res, &error);
+    if (!output || !qmi_message_uim_refresh_register_all_output_get_result (output, &error)) {
+        mm_obj_warn (self, "refresh register all operation failed: %s", error->message);
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NOT_SUPPORTED) ||
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            /* As last resort, if 'refresh register all' fails, try a plain 'refresh register'.
+             * Some older modems may not support 'refresh register all'. */
+            uim_refresh_register_iccid_change (client, task);
+            g_error_free (error);
+            return;
+        }
+        g_task_return_error (task, error);
+    } else {
+        mm_obj_dbg (self, "registered for all SIM refresh events");
+        priv->uim_refresh_indication_id =
+            g_signal_connect (client,
+                              "refresh",
+                              G_CALLBACK (uim_refresh_indication_cb),
+                              self);
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+}
+
+static void
+uim_slot_status_not_supported (QmiClientUim *client,
+                               GTask        *task)
+{
+    g_autoptr(QmiMessageUimRefreshRegisterAllInput)  refresh_register_all_input = NULL;
+    GArray                                          *dummy_aid;
+    MMIfaceModem                                    *self;
+    Private                                         *priv;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+
+    g_assert (!priv->uim_refresh_indication_id);
+
+    mm_obj_dbg (self, "slot status not supported by modem - register for refresh indications");
+
+    dummy_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
+    refresh_register_all_input = qmi_message_uim_refresh_register_all_input_new ();
+
+    qmi_message_uim_refresh_register_all_input_set_info (refresh_register_all_input,
+                                                         TRUE,
+                                                         NULL);
+    qmi_message_uim_refresh_register_all_input_set_session (refresh_register_all_input,
+                                                            QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
+                                                            dummy_aid,
+                                                            NULL);
+
+    qmi_client_uim_refresh_register_all (client,
+                                         refresh_register_all_input,
+                                         10,
+                                         NULL,
+                                         (GAsyncReadyCallback) uim_refresh_register_all_ready,
+                                         task);
+    g_array_unref (dummy_aid);
+}
+
+static void
+uim_check_get_slot_status_ready (QmiClientUim *client,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    g_autoptr(QmiMessageUimGetSlotStatusOutput) output = NULL;
+    MMIfaceModem              *self;
+    Private                   *priv;
+    GError                    *error = NULL;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+
+    output = qmi_client_uim_get_slot_status_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_uim_get_slot_status_output_get_result (output, &error)) {
+        if (priv->uim_slot_status_indication_id) {
+            g_signal_handler_disconnect (client, priv->uim_slot_status_indication_id);
+            priv->uim_slot_status_indication_id = 0;
+        }
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NOT_SUPPORTED) ||
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
+            uim_slot_status_not_supported (client, task);
+            g_error_free (error);
+        } else {
+            mm_obj_warn (self, "get slot status failed: %s", error->message);
+            g_clear_object (&priv->uim_client);
+            g_task_return_error (task, error);
+            g_object_unref (task);
+        }
+        return;
+    }
+    mm_obj_dbg (self, "get slot status OK, monitoring slot status indications");
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+uim_register_events_ready (QmiClientUim *client,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    g_autoptr(QmiMessageUimRegisterEventsOutput) output = NULL;
+    GError              *error = NULL;
+    MMIfaceModem        *self;
+    Private             *priv;
+
+    self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
+
+    /* If event registration fails, go on with initialization. In that case
+     * we cannot use slot status indications to detect eUICC profile switches. */
+    output = qmi_client_uim_register_events_finish (client, res, &error);
+    if (output &&
+        qmi_message_uim_register_events_output_get_result (output, &error)) {
+        g_assert (!priv->uim_slot_status_indication_id);
+        priv->uim_slot_status_indication_id = g_signal_connect (priv->uim_client,
+                                                                "slot-status",
+                                                                G_CALLBACK (uim_slot_status_indication_cb),
+                                                                self);
+        mm_obj_dbg (self, "registered for slot status indications");
+        /* Successful registration does not mean that the modem actually sends
+         * physical slot status indications; invoke Get Slot Status to find out if
+         * the modem really supports slot status. */
+        qmi_client_uim_get_slot_status (client,
+                                        NULL,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback) uim_check_get_slot_status_ready,
+                                        task);
+    } else {
+        mm_obj_dbg (self, "not registered for slot status indications: %s", error->message);
+        uim_slot_status_not_supported (client, task);
+    }
+
+    g_clear_error (&error);
+}
+
+void
+mm_shared_qmi_setup_sim_hot_swap (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GTask               *task;
+    QmiClient           *client = NULL;
+    Private             *priv;
+    QmiMessageUimRegisterEventsInput *register_events_input;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_UIM, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    priv = get_private (MM_SHARED_QMI (self));
+
+    g_assert (!priv->uim_slot_status_indication_id);
+    g_assert (!priv->uim_client);
+    priv->uim_client = g_object_ref (client);
+
+    register_events_input = qmi_message_uim_register_events_input_new ();
+    qmi_message_uim_register_events_input_set_event_registration_mask (register_events_input,
+                                                                       QMI_UIM_EVENT_REGISTRATION_FLAG_PHYSICAL_SLOT_STATUS,
+                                                                       NULL);
+    qmi_client_uim_register_events (QMI_CLIENT_UIM (priv->uim_client),
+                                    register_events_input,
+                                    10,
+                                    NULL,
+                                    (GAsyncReadyCallback) uim_register_events_ready,
+                                    task);
+    qmi_message_uim_register_events_input_unref (register_events_input);
 }
 
 /*****************************************************************************/
