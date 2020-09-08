@@ -567,4 +567,14 @@ MMModemState mm_iface_modem_wait_for_final_state_finish (MMIfaceModem *self,
 void mm_iface_modem_bind_simple_status (MMIfaceModem *self,
                                         MMSimpleStatus *status);
 
+/* Check if the SIM or eSIM profile has changed */
+void     mm_iface_modem_check_for_sim_swap        (MMIfaceModem *self,
+                                                   guint slot_index,
+                                                   const gchar *iccid,
+                                                   GAsyncReadyCallback callback,
+                                                   gpointer user_data);
+gboolean mm_iface_modem_check_for_sim_swap_finish (MMIfaceModem *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+
 #endif /* MM_IFACE_MODEM_H */

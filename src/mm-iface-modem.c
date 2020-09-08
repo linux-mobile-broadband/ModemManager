@@ -47,6 +47,82 @@ static GQuark restart_initialize_idle_quark;
 
 /*****************************************************************************/
 
+gboolean
+mm_iface_modem_check_for_sim_swap_finish (MMIfaceModem *self,
+                                          GAsyncResult *res,
+                                          GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+explicit_check_for_sim_swap_ready (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GTask *task)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish (self, res, &error)) {
+        mm_obj_warn (self, "SIM swap check failed: %s", error->message);
+        g_task_return_error (task, error);
+    } else {
+        mm_obj_dbg (self, "SIM swap check completed");
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+}
+
+void
+mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
+                                   guint slot_index,
+                                   const gchar *iccid,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /*  Slot index 0 is used when slot is not known, assumingly on a modem with just one SIM slot */
+    if (slot_index != 0) {
+        MmGdbusModem *skeleton;
+        guint primary_slot;
+
+        g_object_get (self,
+                      MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                      NULL);
+
+        g_assert (skeleton);
+
+        primary_slot = mm_gdbus_modem_get_primary_sim_slot (MM_GDBUS_MODEM (skeleton));
+        g_object_unref (skeleton);
+
+        /* Check that it's really the primary slot whose iccid has changed */
+        if (primary_slot && primary_slot != slot_index) {
+            mm_obj_dbg (self, "checking for SIM swap ignored: status changed in slot %u, but primary is %u", slot_index, primary_slot);
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        }
+    }
+
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap &&
+        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
+        mm_obj_dbg (self, "start checking for SIM swap in slot %u", slot_index);
+        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
+            self,
+            iccid,
+            (GAsyncReadyCallback)explicit_check_for_sim_swap_ready,
+            task);
+        return;
+    }
+
+    g_task_return_boolean (task, FALSE);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+
 void
 mm_iface_modem_bind_simple_status (MMIfaceModem *self,
                                    MMSimpleStatus *status)
