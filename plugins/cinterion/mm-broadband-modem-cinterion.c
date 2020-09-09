@@ -1260,10 +1260,10 @@ set_initial_eps_step (GTask *task)
     case SET_INITIAL_EPS_STEP_AUTH: {
         g_autofree gchar  *auth_cmd = NULL;
 
-        auth_cmd = mm_broadband_bearer_cinterion_build_auth_string (self,
-                                                                    MM_BROADBAND_MODEM_CINTERION (self)->priv->modem_family,
-                                                                    ctx->properties,
-                                                                    ctx->cid);
+        auth_cmd = mm_cinterion_build_auth_string (self,
+                                                   MM_BROADBAND_MODEM_CINTERION (self)->priv->modem_family,
+                                                   ctx->properties,
+                                                   ctx->cid);
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
             auth_cmd,

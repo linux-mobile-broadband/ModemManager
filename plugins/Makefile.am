@@ -583,6 +583,7 @@ test_modem_helpers_cinterion_CPPFLAGS = \
 	$(NULL)
 test_modem_helpers_cinterion_LDADD = \
 	$(builddir)/libhelpers-cinterion.la \
+	$(top_builddir)/src/libport.la \
 	$(top_builddir)/src/libhelpers.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la \
 	$(NULL)

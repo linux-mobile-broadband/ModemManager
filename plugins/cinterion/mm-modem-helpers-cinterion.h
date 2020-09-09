@@ -172,4 +172,14 @@ void mm_cinterion_provcfg_response_to_cid (const gchar            *response,
                                            gpointer                log_object,
                                            guint                  *cid);
 
+/*****************************************************************************/
+/* Auth related helpers */
+
+MMBearerAllowedAuth mm_auth_type_from_cinterion_auth_type (guint cinterion_auth);
+
+gchar *mm_cinterion_build_auth_string (gpointer                log_object,
+                                       MMCinterionModemFamily  modem_family,
+                                       MMBearerProperties     *config,
+                                       guint                   cid);
+
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */
