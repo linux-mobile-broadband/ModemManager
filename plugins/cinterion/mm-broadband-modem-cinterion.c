@@ -1127,15 +1127,16 @@ set_initial_eps_rf_off_ready (MMBaseModem  *self,
                               GAsyncResult *res,
                               GTask        *task)
 {
-    g_autoptr(GError)     error = NULL;
+    GError               *error = NULL;
     SetInitialEpsContext *ctx;
 
     ctx = (SetInitialEpsContext *) g_task_get_task_data (task);
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
         mm_obj_warn (self, "couldn't set RF off: %s", error->message);
-        if (!ctx->error)
-            ctx->error = g_steal_pointer (&error);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
 
     /* Go to next step */
