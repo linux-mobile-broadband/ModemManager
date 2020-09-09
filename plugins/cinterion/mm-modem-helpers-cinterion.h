@@ -112,6 +112,15 @@ MMBearerConnectionStatus mm_cinterion_parse_swwan_response (const gchar  *respon
                                                             GError      **error);
 
 /*****************************************************************************/
+/* ^SGAUTH response parser */
+
+gboolean mm_cinterion_parse_sgauth_response (const gchar          *response,
+                                             guint                 cid,
+                                             MMBearerAllowedAuth  *out_auth,
+                                             gchar               **out_username,
+                                             GError              **error);
+
+/*****************************************************************************/
 /* ^SMONG response parser */
 
 gboolean mm_cinterion_parse_smong_response (const gchar              *response,

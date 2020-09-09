@@ -1360,13 +1360,6 @@ common_load_initial_eps_bearer_finish (MMIfaceModem3gpp  *self,
 
 static void common_load_initial_eps_step (GTask *task);
 
-/*   at^sgauth?
- *   ^SGAUTH: 1,2,"vf"
- *   ^SGAUTH: 3,0,""
- *   ^SGAUTH: 4,0
- *
- *   OK
- */
 static void
 common_load_initial_eps_auth_ready (MMBaseModem  *self,
                                     GAsyncResult *res,
@@ -1374,35 +1367,20 @@ common_load_initial_eps_auth_ready (MMBaseModem  *self,
 {
     const gchar                 *response;
     CommonLoadInitialEpsContext *ctx;
+    g_autoptr(GError)            error = NULL;
+    MMBearerAllowedAuth          auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
+    g_autofree gchar            *username = NULL;
 
     ctx = (CommonLoadInitialEpsContext *) g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (self, res, NULL);
-
-    /* in case of error, skip */
-    if (response) {
-        g_autoptr(GRegex)     r = NULL;
-        g_autoptr(GMatchInfo) match_info = NULL;
-
-        r = g_regex_new ("\\^SGAUTH:\\s*(\\d+),(\\d+),?\"?([a-zA-Z0-9_-]+)?\"?", 0, 0, NULL);
-        g_assert (r != NULL);
-
-        g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL);
-        while (g_match_info_matches (match_info)) {
-            guint cid = 0;
-            guint cinterion_auth_type = 0;
-            g_autofree gchar *username = NULL;
-
-            mm_get_uint_from_match_info (match_info, 1, &cid);
-            mm_get_uint_from_match_info (match_info, 2, &cinterion_auth_type);
-            username = mm_get_string_unquoted_from_match_info (match_info, 3);
-            if (cid == ctx->cid) {
-                mm_bearer_properties_set_allowed_auth (ctx->properties, mm_auth_type_from_cinterion_auth_type (cinterion_auth_type));
-                if (username)
-                    mm_bearer_properties_set_user (ctx->properties, username);
-            }
-            g_match_info_next (match_info, NULL);
-        }
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        mm_obj_dbg (self, "couldn't load context %d auth settings: %s", ctx->cid, error->message);
+    else if (!mm_cinterion_parse_sgauth_response (response, ctx->cid, &auth, &username, &error))
+        mm_obj_dbg (self, "couldn't parse context %d auth settings: %s", ctx->cid, error->message);
+    else {
+        mm_bearer_properties_set_allowed_auth (ctx->properties, auth);
+        mm_bearer_properties_set_user (ctx->properties, username);
     }
 
     /* Go to next step */

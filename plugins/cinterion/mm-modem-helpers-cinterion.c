@@ -847,6 +847,51 @@ mm_cinterion_parse_swwan_response (const gchar  *response,
 }
 
 /*****************************************************************************/
+/* ^SGAUTH response parser */
+
+/*   at^sgauth?
+ *   ^SGAUTH: 1,2,"vf"
+ *   ^SGAUTH: 3,0,""
+ *   ^SGAUTH: 4,0
+ *
+ *   OK
+ */
+
+gboolean
+mm_cinterion_parse_sgauth_response (const gchar          *response,
+                                    guint                 cid,
+                                    MMBearerAllowedAuth  *out_auth,
+                                    gchar               **out_username,
+                                    GError              **error)
+{
+    g_autoptr(GRegex)     r = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
+
+    r = g_regex_new ("\\^SGAUTH:\\s*(\\d+),(\\d+),?\"?([a-zA-Z0-9_-]+)?\"?", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL);
+    while (g_match_info_matches (match_info)) {
+        guint sgauth_cid = 0;
+
+        if (mm_get_uint_from_match_info (match_info, 1, &sgauth_cid) &&
+            (sgauth_cid == cid)) {
+            guint cinterion_auth_type = 0;
+
+            mm_get_uint_from_match_info (match_info, 2, &cinterion_auth_type);
+            *out_auth = mm_auth_type_from_cinterion_auth_type (cinterion_auth_type);
+            *out_username = mm_get_string_unquoted_from_match_info (match_info, 3);
+            return TRUE;
+        }
+        g_match_info_next (match_info, NULL);
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                 "Auth settings for context %u not found", cid);
+    return FALSE;
+}
+
+/*****************************************************************************/
 /* ^SMONG response parser */
 
 static MMModemAccessTechnology
