@@ -1445,13 +1445,17 @@ common_load_initial_eps_cgcontrdp_ready (MMBaseModem  *self,
     const gchar                 *response;
     CommonLoadInitialEpsContext *ctx;
     g_autofree gchar            *apn = NULL;
+    g_autoptr(GError)            error = NULL;
 
     ctx = (CommonLoadInitialEpsContext *) g_task_get_task_data (task);
 
-    /* ignore errors */
-    response = mm_base_modem_at_command_finish (self, res, NULL);
-
-    if (response && mm_3gpp_parse_cgcontrdp_response (response, NULL, NULL, &apn, NULL, NULL, NULL, NULL, NULL, NULL))
+    /* errors aren't fatal */
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        mm_obj_dbg (self, "couldn't load context %d settings: %s", ctx->cid, error->message);
+    else if (!mm_3gpp_parse_cgcontrdp_response (response, NULL, NULL, &apn, NULL, NULL, NULL, NULL, NULL, &error))
+        mm_obj_dbg (self, "couldn't parse CGDCONTRDP response: %s", error->message);
+    else
         mm_bearer_properties_set_apn (ctx->properties, apn);
 
     /* Go to next step */
@@ -1466,16 +1470,21 @@ common_load_initial_eps_cgdcont_ready (MMBaseModem  *self,
 {
     const gchar                 *response;
     CommonLoadInitialEpsContext *ctx;
+    g_autoptr(GError)            error = NULL;
 
     ctx = (CommonLoadInitialEpsContext *) g_task_get_task_data (task);
 
-    /* ignore errors */
-    response = mm_base_modem_at_command_finish (self, res, NULL);
-    if (response) {
+    /* errors aren't fatal */
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        mm_obj_dbg (self, "couldn't load context %d status: %s", ctx->cid, error->message);
+    else {
         GList *context_list;
 
-        context_list = mm_3gpp_parse_cgdcont_read_response (response, NULL);
-        if (context_list) {
+        context_list = mm_3gpp_parse_cgdcont_read_response (response, &error);
+        if (!context_list)
+            mm_obj_dbg (self, "couldn't parse CGDCONT response: %s", error->message);
+        else {
             GList *l;
 
             for (l = context_list; l; l = g_list_next (l)) {
@@ -1484,8 +1493,11 @@ common_load_initial_eps_cgdcont_ready (MMBaseModem  *self,
                 if (pdp->cid == ctx->cid) {
                     mm_bearer_properties_set_ip_type (ctx->properties, pdp->pdp_type);
                     mm_bearer_properties_set_apn (ctx->properties, pdp->apn ? pdp->apn : "");
+                    break;
                 }
             }
+            if (!l)
+                mm_obj_dbg (self, "no status reported for context %d", ctx->cid);
             mm_3gpp_pdp_context_list_free (context_list);
         }
     }
