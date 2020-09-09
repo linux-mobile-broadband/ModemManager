@@ -105,6 +105,9 @@ struct _MMBroadbandModemCinterionPrivate {
     MMCinterionModemFamily modem_family;
     MMCinterionRadioBandFormat rb_format;
 
+    /* Initial EPS bearer context number */
+    gint initial_eps_bearer_cid;
+
     /* Command sequence */
     MMBaseModemAtCommandAlloc *cmds;
 };
@@ -993,13 +996,73 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp    *self,
 }
 
 /*****************************************************************************/
+/* Common operation to load expected CID for the initial EPS bearer */
+
+static gboolean
+load_initial_eps_bearer_cid_finish (MMBroadbandModemCinterion  *self,
+                                    GAsyncResult               *res,
+                                    GError                    **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+scfg_prov_cfg_query_ready (MMBaseModem  *_self,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    g_autoptr(GError)          error = NULL;
+    const gchar               *response;
+
+    response = mm_base_modem_at_command_finish (_self, res, &error);
+    if (!response)
+        mm_obj_dbg (self, "couldn't query MNO profiles: %s", error->message);
+
+    else if (!mm_cinterion_provcfg_response_to_cid (response,
+                                                    MM_BROADBAND_MODEM_CINTERION (self)->priv->modem_family,
+                                                    mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
+                                                    self,
+                                                    &self->priv->initial_eps_bearer_cid,
+                                                    &error))
+        mm_obj_dbg (self, "failed processing list of MNO profiles: %s", error->message);
+
+    if (self->priv->initial_eps_bearer_cid < 0) {
+        mm_obj_dbg (self, "using default EPS bearer context id: 1");
+        self->priv->initial_eps_bearer_cid = 1;
+    } else
+        mm_obj_dbg (self, "loaded EPS bearer context id from list of MNO profiles: %d", self->priv->initial_eps_bearer_cid);
+
+    /* This operation really never fails */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+load_initial_eps_bearer_cid (MMBroadbandModemCinterion *self,
+                             GAsyncReadyCallback        callback,
+                             gpointer                   user_data)
+{
+    GTask *task;
+
+    g_assert (self->priv->initial_eps_bearer_cid < 0);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "^SCFG=\"MEopMode/Prov/Cfg\"",
+                              20,
+                              FALSE,
+                              (GAsyncReadyCallback)scfg_prov_cfg_query_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Set initial EPS bearer settings */
 
 typedef enum {
     SET_INITIAL_EPS_STEP_FIRST = 0,
     SET_INITIAL_EPS_STEP_CHECK_MODE,
     SET_INITIAL_EPS_STEP_RF_OFF,
-    SET_INITIAL_EPS_STEP_PROFILE,
     SET_INITIAL_EPS_STEP_APN,
     SET_INITIAL_EPS_STEP_AUTH,
     SET_INITIAL_EPS_STEP_RF_ON,
@@ -1009,7 +1072,6 @@ typedef enum {
 typedef struct {
     MMBearerProperties *properties;
     SetInitialEpsStep   step;
-    guint               cid;
     guint               initial_cfun_mode;
     GError             *saved_error;
 } SetInitialEpsContext;
@@ -1054,16 +1116,18 @@ set_initial_eps_rf_on_ready (MMBaseModem  *self,
 }
 
 static void
-set_initial_eps_auth_ready (MMBaseModem  *self,
+set_initial_eps_auth_ready (MMBaseModem  *_self,
                             GAsyncResult *res,
                             GTask        *task)
 {
-    SetInitialEpsContext *ctx;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    SetInitialEpsContext      *ctx;
 
     ctx = (SetInitialEpsContext *) g_task_get_task_data (task);
 
-    if (!mm_base_modem_at_command_finish (self, res, &ctx->saved_error)) {
-        mm_obj_warn (self, "couldn't configure context %d auth settings: %s", ctx->cid, ctx->saved_error->message);
+    if (!mm_base_modem_at_command_finish (_self, res, &ctx->saved_error)) {
+        mm_obj_warn (self, "couldn't configure context %d auth settings: %s",
+                     self->priv->initial_eps_bearer_cid, ctx->saved_error->message);
         /* Fallback to recover RF before returning the error */
         ctx->step = SET_INITIAL_EPS_STEP_RF_ON;
     } else {
@@ -1074,49 +1138,24 @@ set_initial_eps_auth_ready (MMBaseModem  *self,
 }
 
 static void
-set_initial_eps_cgdcont_ready (MMBaseModem  *self,
+set_initial_eps_cgdcont_ready (MMBaseModem  *_self,
                                GAsyncResult *res,
                                GTask        *task)
 {
-    SetInitialEpsContext *ctx;
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    SetInitialEpsContext      *ctx;
 
     ctx = (SetInitialEpsContext *) g_task_get_task_data (task);
 
-    if (!mm_base_modem_at_command_finish (self, res, &ctx->saved_error)) {
-        mm_obj_warn (self, "couldn't configure context %d settings: %s", ctx->cid, ctx->saved_error->message);
+    if (!mm_base_modem_at_command_finish (_self, res, &ctx->saved_error)) {
+        mm_obj_warn (self, "couldn't configure context %d settings: %s",
+                     self->priv->initial_eps_bearer_cid, ctx->saved_error->message);
         /* Fallback to recover RF before returning the error */
         ctx->step = SET_INITIAL_EPS_STEP_RF_ON;
     } else {
         /* Go to next step */
         ctx->step++;
     }
-    set_initial_eps_step (task);
-}
-
-static void
-set_initial_eps_query_mno_profile_ready (MMBaseModem  *self,
-                                         GAsyncResult *res,
-                                         GTask        *task)
-{
-    const gchar          *response;
-    SetInitialEpsContext *ctx;
-
-    ctx = (SetInitialEpsContext *) g_task_get_task_data (task);
-
-    response = mm_base_modem_at_command_finish (self, res, NULL);
-
-    /* in case of error, it means that the MNO profiles are not supported
-     * and therefore that the default CID=1 is ok. */
-
-    if (response)
-        mm_cinterion_provcfg_response_to_cid (response,
-                                              MM_BROADBAND_MODEM_CINTERION (self)->priv->modem_family,
-                                              mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
-                                              self,
-                                              &ctx->cid);
-
-    /* Go to next step */
-    ctx->step++;
     set_initial_eps_step (task);
 }
 
@@ -1181,8 +1220,8 @@ set_initial_eps_cfun_mode_load_ready (MMBaseModem  *self,
 static void
 set_initial_eps_step (GTask *task)
 {
-    MMIfaceModem3gpp     *self;
-    SetInitialEpsContext *ctx;
+    MMBroadbandModemCinterion *self;
+    SetInitialEpsContext      *ctx;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -1216,16 +1255,6 @@ set_initial_eps_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case SET_INITIAL_EPS_STEP_PROFILE:
-        mm_base_modem_at_command (
-            MM_BASE_MODEM (self),
-            "^SCFG=\"MEopMode/Prov/Cfg\"",
-            20,
-            FALSE,
-            (GAsyncReadyCallback)set_initial_eps_query_mno_profile_ready,
-            task);
-        return;
-
     case SET_INITIAL_EPS_STEP_APN: {
         const gchar        *apn;
         g_autofree gchar   *quoted_apn = NULL;
@@ -1239,9 +1268,11 @@ set_initial_eps_step (GTask *task)
 
         ip_family_str = mm_3gpp_get_pdp_type_from_ip_family (ip_family);
         apn = mm_bearer_properties_get_apn (ctx->properties);
-        mm_obj_dbg (self, "context %d with APN '%s' and PDP type '%s'", ctx->cid, apn, ip_family_str);
+        mm_obj_dbg (self, "context %d with APN '%s' and PDP type '%s'",
+                    self->priv->initial_eps_bearer_cid, apn, ip_family_str);
         quoted_apn = mm_port_serial_at_quote_string (apn);
-        apn_cmd = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s", ctx->cid, ip_family_str, quoted_apn);
+        apn_cmd = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s",
+                                   self->priv->initial_eps_bearer_cid, ip_family_str, quoted_apn);
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
             apn_cmd,
@@ -1258,7 +1289,7 @@ set_initial_eps_step (GTask *task)
         auth_cmd = mm_cinterion_build_auth_string (self,
                                                    MM_BROADBAND_MODEM_CINTERION (self)->priv->modem_family,
                                                    ctx->properties,
-                                                   ctx->cid);
+                                                   self->priv->initial_eps_bearer_cid);
         mm_base_modem_at_command (
             MM_BASE_MODEM (self),
             auth_cmd,
@@ -1284,8 +1315,8 @@ set_initial_eps_step (GTask *task)
         /* fall through */
 
     case SET_INITIAL_EPS_STEP_LAST:
-        if (ctx->error)
-            g_task_return_error (task, g_steal_pointer (&ctx->error));
+        if (ctx->saved_error)
+            g_task_return_error (task, g_steal_pointer (&ctx->saved_error));
         else
             g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -1307,9 +1338,11 @@ modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    /* The initial EPS bearer settings should have already been loaded */
+    g_assert (MM_BROADBAND_MODEM_CINTERION (self)->priv->initial_eps_bearer_cid >= 0);
+
     /* Setup context */
     ctx = g_slice_new0 (SetInitialEpsContext);
-    ctx->cid = 1; /* default */
     ctx->properties = g_object_ref (properties);
     ctx->step = SET_INITIAL_EPS_STEP_FIRST;
     g_task_set_task_data (task, ctx, (GDestroyNotify) set_initial_eps_context_free);
@@ -1334,7 +1367,6 @@ typedef enum {
 typedef struct {
     MMBearerProperties       *properties;
     CommonLoadInitialEpsStep  step;
-    guint                     cid;
     gboolean                  runtime;
 } CommonLoadInitialEpsContext;
 
@@ -1356,10 +1388,11 @@ common_load_initial_eps_bearer_finish (MMIfaceModem3gpp  *self,
 static void common_load_initial_eps_step (GTask *task);
 
 static void
-common_load_initial_eps_auth_ready (MMBaseModem  *self,
+common_load_initial_eps_auth_ready (MMBaseModem  *_self,
                                     GAsyncResult *res,
                                     GTask        *task)
 {
+    MMBroadbandModemCinterion   *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar                 *response;
     CommonLoadInitialEpsContext *ctx;
     g_autoptr(GError)            error = NULL;
@@ -1368,11 +1401,12 @@ common_load_initial_eps_auth_ready (MMBaseModem  *self,
 
     ctx = (CommonLoadInitialEpsContext *) g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response)
-        mm_obj_dbg (self, "couldn't load context %d auth settings: %s", ctx->cid, error->message);
-    else if (!mm_cinterion_parse_sgauth_response (response, ctx->cid, &auth, &username, &error))
-        mm_obj_dbg (self, "couldn't parse context %d auth settings: %s", ctx->cid, error->message);
+        mm_obj_dbg (self, "couldn't load context %d auth settings: %s",
+                    self->priv->initial_eps_bearer_cid, error->message);
+    else if (!mm_cinterion_parse_sgauth_response (response, self->priv->initial_eps_bearer_cid, &auth, &username, &error))
+        mm_obj_dbg (self, "couldn't parse context %d auth settings: %s", self->priv->initial_eps_bearer_cid, error->message);
     else {
         mm_bearer_properties_set_allowed_auth (ctx->properties, auth);
         mm_bearer_properties_set_user (ctx->properties, username);
@@ -1384,26 +1418,16 @@ common_load_initial_eps_auth_ready (MMBaseModem  *self,
 }
 
 static void
-common_load_initial_eps_query_mno_profile_ready (MMBaseModem  *self,
-                                                 GAsyncResult *res,
-                                                 GTask        *task)
+common_load_initial_eps_load_cid_ready (MMBroadbandModemCinterion *self,
+                                        GAsyncResult              *res,
+                                        GTask                     *task)
 {
-    const gchar                 *response;
     CommonLoadInitialEpsContext *ctx;
 
     ctx = (CommonLoadInitialEpsContext *) g_task_get_task_data (task);
 
-    response = mm_base_modem_at_command_finish (self, res, NULL);
-
-    /* in case of error, it means that the MNO profiles are not supported
-     * and therefore that the default CID=1 is ok. */
-
-    if (response)
-        mm_cinterion_provcfg_response_to_cid (response,
-                                              MM_BROADBAND_MODEM_CINTERION (self)->priv->modem_family,
-                                              mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
-                                              self,
-                                              &ctx->cid);
+    load_initial_eps_bearer_cid_finish (self, res, NULL);
+    g_assert (self->priv->initial_eps_bearer_cid >= 0);
 
     /* Go to next step */
     ctx->step++;
@@ -1411,10 +1435,11 @@ common_load_initial_eps_query_mno_profile_ready (MMBaseModem  *self,
 }
 
 static void
-common_load_initial_eps_cgcontrdp_ready (MMBaseModem  *self,
+common_load_initial_eps_cgcontrdp_ready (MMBaseModem  *_self,
                                          GAsyncResult *res,
                                          GTask        *task)
 {
+    MMBroadbandModemCinterion   *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar                 *response;
     CommonLoadInitialEpsContext *ctx;
     g_autofree gchar            *apn = NULL;
@@ -1423,9 +1448,10 @@ common_load_initial_eps_cgcontrdp_ready (MMBaseModem  *self,
     ctx = (CommonLoadInitialEpsContext *) g_task_get_task_data (task);
 
     /* errors aren't fatal */
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response)
-        mm_obj_dbg (self, "couldn't load context %d settings: %s", ctx->cid, error->message);
+        mm_obj_dbg (self, "couldn't load context %d settings: %s",
+                    self->priv->initial_eps_bearer_cid, error->message);
     else if (!mm_3gpp_parse_cgcontrdp_response (response, NULL, NULL, &apn, NULL, NULL, NULL, NULL, NULL, &error))
         mm_obj_dbg (self, "couldn't parse CGDCONTRDP response: %s", error->message);
     else
@@ -1437,10 +1463,11 @@ common_load_initial_eps_cgcontrdp_ready (MMBaseModem  *self,
 }
 
 static void
-common_load_initial_eps_cgdcont_ready (MMBaseModem  *self,
+common_load_initial_eps_cgdcont_ready (MMBaseModem  *_self,
                                        GAsyncResult *res,
                                        GTask        *task)
 {
+    MMBroadbandModemCinterion   *self = MM_BROADBAND_MODEM_CINTERION (_self);
     const gchar                 *response;
     CommonLoadInitialEpsContext *ctx;
     g_autoptr(GError)            error = NULL;
@@ -1448,9 +1475,10 @@ common_load_initial_eps_cgdcont_ready (MMBaseModem  *self,
     ctx = (CommonLoadInitialEpsContext *) g_task_get_task_data (task);
 
     /* errors aren't fatal */
-    response = mm_base_modem_at_command_finish (self, res, &error);
+    response = mm_base_modem_at_command_finish (_self, res, &error);
     if (!response)
-        mm_obj_dbg (self, "couldn't load context %d status: %s", ctx->cid, error->message);
+        mm_obj_dbg (self, "couldn't load context %d status: %s",
+                    self->priv->initial_eps_bearer_cid, error->message);
     else {
         GList *context_list;
 
@@ -1463,14 +1491,14 @@ common_load_initial_eps_cgdcont_ready (MMBaseModem  *self,
             for (l = context_list; l; l = g_list_next (l)) {
                 MM3gppPdpContext *pdp = l->data;
 
-                if (pdp->cid == ctx->cid) {
+                if (pdp->cid == (guint) self->priv->initial_eps_bearer_cid) {
                     mm_bearer_properties_set_ip_type (ctx->properties, pdp->pdp_type);
                     mm_bearer_properties_set_apn (ctx->properties, pdp->apn ? pdp->apn : "");
                     break;
                 }
             }
             if (!l)
-                mm_obj_dbg (self, "no status reported for context %d", ctx->cid);
+                mm_obj_dbg (self, "no status reported for context %d", self->priv->initial_eps_bearer_cid);
             mm_3gpp_pdp_context_list_free (context_list);
         }
     }
@@ -1483,7 +1511,7 @@ common_load_initial_eps_cgdcont_ready (MMBaseModem  *self,
 static void
 common_load_initial_eps_step (GTask *task)
 {
-    MMIfaceModem3gpp            *self;
+    MMBroadbandModemCinterion   *self;
     CommonLoadInitialEpsContext *ctx;
 
     self = g_task_get_source_object (task);
@@ -1495,14 +1523,16 @@ common_load_initial_eps_step (GTask *task)
         /* fall through */
 
     case COMMON_LOAD_INITIAL_EPS_STEP_PROFILE:
-        mm_base_modem_at_command (
-            MM_BASE_MODEM (self),
-            "^SCFG=\"MEopMode/Prov/Cfg\"",
-            20,
-            FALSE,
-            (GAsyncReadyCallback)common_load_initial_eps_query_mno_profile_ready,
-            task);
-        return;
+        /* Initial EPS bearer CID initialization run once only */
+        if (G_UNLIKELY (self->priv->initial_eps_bearer_cid < 0)) {
+            load_initial_eps_bearer_cid (
+                self,
+                (GAsyncReadyCallback)common_load_initial_eps_load_cid_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
 
     case COMMON_LOAD_INITIAL_EPS_STEP_APN:
         if (ctx->runtime) {
@@ -1516,7 +1546,7 @@ common_load_initial_eps_step (GTask *task)
         } else {
             g_autofree gchar *cmd = NULL;
 
-            cmd = g_strdup_printf ("+CGCONTRDP=%u", ctx->cid);
+            cmd = g_strdup_printf ("+CGCONTRDP=%u", self->priv->initial_eps_bearer_cid);
             mm_base_modem_at_command (
                 MM_BASE_MODEM (self),
                 "+CGCONTRDP",
@@ -1560,7 +1590,6 @@ common_load_initial_eps_bearer (MMIfaceModem3gpp    *self,
 
     /* Setup context */
     ctx = g_slice_new0 (CommonLoadInitialEpsContext);
-    ctx->cid = 1; /* default */
     ctx->runtime = runtime;
     ctx->properties = mm_bearer_properties_new ();
     ctx->step = COMMON_LOAD_INITIAL_EPS_STEP_FIRST;
@@ -2688,6 +2717,7 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
                                               MMBroadbandModemCinterionPrivate);
 
     /* Initialize private variables */
+    self->priv->initial_eps_bearer_cid = -1;
     self->priv->sind_psinfo_support    = FEATURE_SUPPORT_UNKNOWN;
     self->priv->swwan_support          = FEATURE_SUPPORT_UNKNOWN;
     self->priv->smoni_support          = FEATURE_SUPPORT_UNKNOWN;

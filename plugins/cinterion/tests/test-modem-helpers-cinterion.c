@@ -1602,7 +1602,6 @@ test_smoni_response_to_signal (void)
 typedef struct {
     const gchar            *str;
     MMCinterionModemFamily  modem_family;
-    guint                   initial_cid;
     gdouble                 expected_cid;
 } ProvcfgResponseTest;
 
@@ -1612,35 +1611,30 @@ static const ProvcfgResponseTest provcfg_response_tests[] = {
 
         .str          = "^SCFG: \"MEopMode/Prov/Cfg\",\"vdfde\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
-        .initial_cid  = 1,
         .expected_cid = 1,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"attus\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_IMT,
-        .initial_cid  = 1,
         .expected_cid = 1,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"2\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
-        .initial_cid  = 1,
         .expected_cid = 3,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"vzwdcus\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
-        .initial_cid  = 1,
         .expected_cid = 3,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"tmode\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
-        .initial_cid  = 1,
         .expected_cid = 2,
     }
 };
@@ -1651,14 +1645,19 @@ test_provcfg_response (void)
     guint i;
 
     for (i = 0; i < G_N_ELEMENTS (provcfg_response_tests); i++) {
-        guint cid = provcfg_response_tests[i].initial_cid;
+        gint      cid = -1;
+        gboolean  result;
+        GError   *error = NULL;
 
-        mm_cinterion_provcfg_response_to_cid (provcfg_response_tests[i].str,
-                                              provcfg_response_tests[i].modem_family,
-                                              MM_MODEM_CHARSET_GSM,
-                                              NULL,
-                                              &cid);
-        g_assert_cmpuint (cid,  ==, provcfg_response_tests[i].expected_cid);
+        result = mm_cinterion_provcfg_response_to_cid (provcfg_response_tests[i].str,
+                                                       provcfg_response_tests[i].modem_family,
+                                                       MM_MODEM_CHARSET_GSM,
+                                                       NULL,
+                                                       &cid,
+                                                       &error);
+        g_assert_no_error (error);
+        g_assert (result);
+        g_assert_cmpuint (cid, ==, provcfg_response_tests[i].expected_cid);
     }
 }
 
