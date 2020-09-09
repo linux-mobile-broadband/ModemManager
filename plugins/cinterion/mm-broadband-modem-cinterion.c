@@ -1011,13 +1011,13 @@ typedef struct {
     SetInitialEpsStep   step;
     guint               cid;
     guint               initial_cfun_mode;
-    GError             *error;
+    GError             *saved_error;
 } SetInitialEpsContext;
 
 static void
 set_initial_eps_context_free (SetInitialEpsContext *ctx)
 {
-    g_assert (!ctx->error);
+    g_assert (!ctx->saved_error);
     g_object_unref (ctx->properties);
     g_slice_free (SetInitialEpsContext, ctx);
 }
@@ -1044,8 +1044,8 @@ set_initial_eps_rf_on_ready (MMBaseModem  *self,
 
     if (!mm_base_modem_at_command_finish (self, res, &error)) {
         mm_obj_warn (self, "couldn't set RF back on: %s", error->message);
-        if (!ctx->error)
-            ctx->error = g_steal_pointer (&error);
+        if (!ctx->saved_error)
+            ctx->saved_error = g_steal_pointer (&error);
     }
 
     /* Go to next step */
@@ -1058,19 +1058,18 @@ set_initial_eps_auth_ready (MMBaseModem  *self,
                             GAsyncResult *res,
                             GTask        *task)
 {
-    g_autoptr(GError)     error = NULL;
     SetInitialEpsContext *ctx;
 
     ctx = (SetInitialEpsContext *) g_task_get_task_data (task);
 
-    if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_obj_warn (self, "couldn't configure context %d auth settings: %s", ctx->cid, error->message);
-        if (!ctx->error)
-            ctx->error = g_steal_pointer (&error);
+    if (!mm_base_modem_at_command_finish (self, res, &ctx->saved_error)) {
+        mm_obj_warn (self, "couldn't configure context %d auth settings: %s", ctx->cid, ctx->saved_error->message);
+        /* Fallback to recover RF before returning the error */
+        ctx->step = SET_INITIAL_EPS_STEP_RF_ON;
+    } else {
+        /* Go to next step */
+        ctx->step++;
     }
-
-    /* Go to next step */
-    ctx->step++;
     set_initial_eps_step (task);
 }
 
@@ -1079,19 +1078,18 @@ set_initial_eps_cgdcont_ready (MMBaseModem  *self,
                                GAsyncResult *res,
                                GTask        *task)
 {
-    g_autoptr(GError)     error = NULL;
     SetInitialEpsContext *ctx;
 
     ctx = (SetInitialEpsContext *) g_task_get_task_data (task);
 
-    if (!mm_base_modem_at_command_finish (self, res, &error)) {
-        mm_obj_warn (self, "couldn't configure context %d settings: %s", ctx->cid, error->message);
-        if (!ctx->error)
-            ctx->error = g_steal_pointer (&error);
+    if (!mm_base_modem_at_command_finish (self, res, &ctx->saved_error)) {
+        mm_obj_warn (self, "couldn't configure context %d settings: %s", ctx->cid, ctx->saved_error->message);
+        /* Fallback to recover RF before returning the error */
+        ctx->step = SET_INITIAL_EPS_STEP_RF_ON;
+    } else {
+        /* Go to next step */
+        ctx->step++;
     }
-
-    /* Go to next step */
-    ctx->step++;
     set_initial_eps_step (task);
 }
 
@@ -1188,10 +1186,6 @@ set_initial_eps_step (GTask *task)
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
-
-    /* in case of error, skip all steps and restore radio if needed */
-    if (ctx->error && ctx->step < SET_INITIAL_EPS_STEP_RF_ON)
-        ctx->step = SET_INITIAL_EPS_STEP_RF_ON;
 
     switch (ctx->step) {
     case SET_INITIAL_EPS_STEP_FIRST:
