@@ -134,72 +134,69 @@ static void
 quectel_qusim_check_for_sim_swap_ready (MMIfaceModem *self,
                                         GAsyncResult *res)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish (self, res, &error))
         mm_obj_warn (self, "couldn't check SIM swap: %s", error->message);
-        g_error_free (error);
-    } else
+    else
         mm_obj_dbg (self, "check SIM swap completed");
 }
 
 static void
 quectel_qusim_unsolicited_handler (MMPortSerialAt *port,
-                                   GMatchInfo *match_info,
-                                   MMIfaceModem* self)
+                                   GMatchInfo     *match_info,
+                                   MMIfaceModem   *self)
 {
-    if (MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap &&
-        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish) {
-        mm_obj_dbg (self, "checking SIM swap");
-        MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
-            self,
-            NULL,
-            (GAsyncReadyCallback)quectel_qusim_check_for_sim_swap_ready,
-            NULL);
-    }
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap_finish)
+        return;
+
+    mm_obj_dbg (self, "checking SIM swap");
+    MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
+        self,
+        NULL,
+        (GAsyncReadyCallback)quectel_qusim_check_for_sim_swap_ready,
+        NULL);
 }
 
+/*****************************************************************************/
+/* Setup SIM hot swap context (Modem interface) */
+
 gboolean
-mm_shared_quectel_setup_sim_hot_swap_finish (MMIfaceModem *self,
-                                             GAsyncResult *res,
-                                             GError **error)
+mm_shared_quectel_setup_sim_hot_swap_finish (MMIfaceModem  *self,
+                                             GAsyncResult  *res,
+                                             GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 void
-mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem *self,
-                                      GAsyncReadyCallback callback,
-                                      gpointer user_data)
+mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem        *self,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
 {
-    MMPortSerialAt *port_primary;
-    MMPortSerialAt *port_secondary;
-    GTask *task;
-    GRegex *pattern;
+    MMPortSerialAt *ports[2];
+    GTask          *task;
+    GRegex         *pattern;
+    guint           i;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    port_primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    port_secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     pattern = g_regex_new ("\\+QUSIM:\\s*1\\r\\n", G_REGEX_RAW, 0, NULL);
     g_assert (pattern);
 
-    if (port_primary)
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            port_primary,
-            pattern,
-            (MMPortSerialAtUnsolicitedMsgFn)quectel_qusim_unsolicited_handler,
-            self,
-            NULL);
-
-    if (port_secondary)
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            port_secondary,
-            pattern,
-            (MMPortSerialAtUnsolicitedMsgFn)quectel_qusim_unsolicited_handler,
-            self,
-            NULL);
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (ports[i])
+            mm_port_serial_at_add_unsolicited_msg_handler (
+                ports[i],
+                pattern,
+                (MMPortSerialAtUnsolicitedMsgFn)quectel_qusim_unsolicited_handler,
+                self,
+                NULL);
+    }
 
     g_regex_unref (pattern);
     mm_obj_dbg (self, "+QUSIM detection set up");
