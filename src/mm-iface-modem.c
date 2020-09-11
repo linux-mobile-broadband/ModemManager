@@ -5334,8 +5334,14 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall-through */
 
-    case INITIALIZATION_STEP_SIM_HOT_SWAP:
-        if (MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap &&
+    case INITIALIZATION_STEP_SIM_HOT_SWAP: {
+        gboolean sim_hot_swap_configured = FALSE;
+
+        g_object_get (self,
+                      MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &sim_hot_swap_configured,
+                      NULL);
+        if (!sim_hot_swap_configured &&
+            MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap &&
             MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish) {
             MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap (
                 MM_IFACE_MODEM (self),
@@ -5344,7 +5350,7 @@ interface_initialization_step (GTask *task)
                 return;
         }
         ctx->step++;
-        /* fall-through */
+    } /* fall-through */
 
         case INITIALIZATION_STEP_SIM_SLOTS:
         /* If the modem doesn't need any SIM (not implemented by plugin, or not
