@@ -3554,16 +3554,9 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
                                  gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    gboolean is_sim_hot_swap_configured = FALSE;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
-                  NULL);
 
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
-    if (is_sim_hot_swap_configured)
-        self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
