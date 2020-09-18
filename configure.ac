@@ -25,7 +25,10 @@ m4_define([mm_glib_lt_age],      [6])
 dnl-----------------------------------------------------------------------------
 dnl autoconf, automake, libtool initialization
 dnl
-AC_INIT([ModemManager],[mm_version],[modemmanager-devel@lists.freedesktop.org],[ModemManager])
+AC_INIT([ModemManager],
+        [mm_version],
+        [https://gitlab.freedesktop.org/mobile-broadband/ModemManager/issues],
+        [ModemManager])
 AM_INIT_AUTOMAKE([1.11.2 subdir-objects tar-ustar no-dist-gzip dist-xz -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
