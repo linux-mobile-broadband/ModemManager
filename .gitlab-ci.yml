@@ -105,7 +105,7 @@ build-single-plugins:
     - popd
     - NOCONFIGURE=1 ./autogen.sh
     - for plugin in generic altair-lte anydata broadmobi cinterion
-                    dell dlink fibocom foxconn haier huawei iridium
+                    dell dlink fibocom foxconn gosuncn haier huawei iridium
                     linktop longcheer mbm motorola mtk nokia nokia-icera
                     novatel novatel-lte option option-hso pantech
                     quectel samsung sierra-legacy sierra simtech

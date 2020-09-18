@@ -467,6 +467,7 @@ MM_ENABLE_PLUGIN([fibocom],
                  [with_shared_xmm])
 MM_ENABLE_PLUGIN([foxconn],
                  [with_shared_foxconn])
+MM_ENABLE_PLUGIN([gosuncn])
 MM_ENABLE_PLUGIN([haier])
 MM_ENABLE_PLUGIN([huawei])
 MM_ENABLE_PLUGIN([iridium])
@@ -606,6 +607,7 @@ echo "
       dlink:                   ${enable_plugin_dlink}
       fibocom:                 ${enable_plugin_fibocom}
       foxconn:                 ${enable_plugin_foxconn}
+      gosuncn:                 ${enable_plugin_gosuncn}
       haier:                   ${enable_plugin_haier}
       huawei:                  ${enable_plugin_huawei}
       iridium:                 ${enable_plugin_iridium}

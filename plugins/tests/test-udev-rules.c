@@ -168,6 +168,14 @@ test_quectel (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_GOSUNCN
+static void
+test_gosuncn (void)
+{
+    common_test (TESTUDEVRULESDIR_GOSUNCN);
+}
+#endif
+
 /************************************************************/
 
 int main (int argc, char **argv)
@@ -218,6 +226,9 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_QUECTEL
     g_test_add_func ("/MM/test-udev-rules/quectel", test_quectel);
+#endif
+#if defined ENABLE_PLUGIN_GOSUNCN
+    g_test_add_func ("/MM/test-udev-rules/gosuncn", test_gosuncn);
 #endif
 
     return g_test_run ();

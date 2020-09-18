@@ -46,6 +46,11 @@ objects created by the plugin is given.
    ** MMBroadbandModemMbim              (generic)
    ** MMBroadbandModem                  (generic)
 
+ * Gosuncn:
+   ** MMBroadbandModemQmi               (generic)
+   ** MMBroadbandModemMbim              (generic)
+   ** MMBroadbandModem                  (generic)
+
  * Haier:
    ** MMBroadbandModem                  (generic)
 

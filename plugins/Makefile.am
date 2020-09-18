@@ -725,6 +725,29 @@ AM_CFLAGS += \
 endif
 
 ################################################################################
+# plugin: gosuncn
+################################################################################
+
+if ENABLE_PLUGIN_GOSUNCN
+
+pkglib_LTLIBRARIES += libmm-plugin-gosuncn.la
+libmm_plugin_gosuncn_la_SOURCES = \
+	gosuncn/mm-plugin-gosuncn.c \
+	gosuncn/mm-plugin-gosuncn.h \
+	$(NULL)
+libmm_plugin_gosuncn_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"gosuncn\" \
+	$(NULL)
+libmm_plugin_gosuncn_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+dist_udevrules_DATA += gosuncn/77-mm-gosuncn-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_GOSUNCN=\"${srcdir}/gosuncn\"
+
+endif
+
+################################################################################
 # plugin: haier
 ################################################################################
 
