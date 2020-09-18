@@ -1,15 +1,15 @@
 # Slovak translation for ModemManager.
 # Copyright (C) 2017 ModemManager's COPYRIGHT HOLDER
 # This file is distributed under the same license as the ModemManager package.
-# Dušan Kazik <prescott66@gmail.com>, 2017.
+# Dušan Kazik <prescott66@gmail.com>, 2020.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2020-09-18 10:30+0200\n"
-"PO-Revision-Date: 2017-09-16 08:51+0200\n"
+"POT-Creation-Date: 2020-05-26 15:30+0000\n"
+"PO-Revision-Date: 2020-09-17 15:00+0200\n"
 "Last-Translator: Dušan Kazik <prescott66@gmail.com>\n"
 "Language-Team: Slovak <gnome-sk-list@gnome.org>\n"
 "Language: sk\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 1 : (n>=2 && n<=4) ? 2 : 0;\n"
-"X-Generator: Poedit 2.0.3\n"
+"X-Generator: Poedit 2.4.1\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
@@ -73,14 +73,11 @@ msgstr "Politika systému zabraňuje hlasovým hovorom."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Požadovanie informácií o sieťovom čase a časovej zóne"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
-msgstr ""
-"Politika systému zabraňuje požadovaniu, alebo spracovaniu sieťových "
-"informácií a službám."
+msgstr "Politika systému zabraňuje požadovaniu informácií o sieťovom čase."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
