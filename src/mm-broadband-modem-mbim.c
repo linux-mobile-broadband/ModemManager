@@ -3791,6 +3791,17 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
 /*****************************************************************************/
 /* Setup SIM hot swap */
 
+typedef struct {
+    MbimDevice *device;
+} SetupSimHotSwapContext;
+
+static void
+setup_sim_hot_swap_context_free (SetupSimHotSwapContext *ctx)
+{
+    g_clear_object (&ctx->device);
+    g_slice_free (SetupSimHotSwapContext, ctx);
+}
+
 static gboolean
 modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
                                  GAsyncResult *res,
@@ -3801,13 +3812,19 @@ modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
 
 static void
 enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
-                                                 GAsyncResult *res,
-                                                 GTask *task)
+                                                 GAsyncResult         *res,
+                                                 GTask                *task)
 {
-    GError *error = NULL;
+    GError                 *error = NULL;
+    SetupSimHotSwapContext *ctx;
+
+    ctx = g_task_get_task_data (task);
 
     if (!common_enable_disable_unsolicited_events_finish (self, res, &error)) {
         mm_obj_dbg (self, "failed to enable subscriber info events: %s", error->message);
+        /* reset setup flags if enabling failed */
+        self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+        common_setup_cleanup_unsolicited_events_sync (self, ctx->device, FALSE);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -3818,40 +3835,32 @@ enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
 }
 
 static void
-setup_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
-                                                GAsyncResult *res,
-                                                GTask *task)
+modem_setup_sim_hot_swap (MMIfaceModem        *_self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
 {
-    GError *error = NULL;
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice             *device;
+    GTask                  *task;
+    SetupSimHotSwapContext *ctx;
 
-    if (!common_setup_cleanup_unsolicited_events_finish (self, res, &error)) {
-        mm_obj_dbg (self, "failed to set up subscriber info events: %s", error->message);
-        g_task_return_error (task, error);
-        g_object_unref (task);
+    if (!peek_device (self, &device, callback, user_data))
         return;
-    }
 
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (SetupSimHotSwapContext);
+    ctx->device = g_object_ref (device);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)setup_sim_hot_swap_context_free);
+
+    /* Setup flags synchronously, which never fails */
+    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    common_setup_cleanup_unsolicited_events_sync (self, ctx->device, TRUE);
+
+    /* Enable flags asynchronously, which may fail */
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     common_enable_disable_unsolicited_events (self,
                                               (GAsyncReadyCallback)enable_subscriber_info_unsolicited_events_ready,
                                               task);
-}
-
-static void
-modem_setup_sim_hot_swap (MMIfaceModem *_self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
-{
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
-    common_setup_cleanup_unsolicited_events (self,
-                                             TRUE,
-                                             (GAsyncReadyCallback)setup_subscriber_info_unsolicited_events_ready,
-                                             task);
 }
 
 /*****************************************************************************/
