@@ -3786,45 +3786,93 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
 
 typedef struct {
     MbimDevice *device;
+    GError     *subscriber_info_error;
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    GError     *qmi_error;
+#endif
 } SetupSimHotSwapContext;
 
 static void
 setup_sim_hot_swap_context_free (SetupSimHotSwapContext *ctx)
 {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    g_clear_error (&ctx->qmi_error);
+#endif
+    g_clear_error (&ctx->subscriber_info_error);
     g_clear_object (&ctx->device);
     g_slice_free (SetupSimHotSwapContext, ctx);
 }
 
 static gboolean
-modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
-                                 GAsyncResult *res,
-                                 GError **error)
+modem_setup_sim_hot_swap_finish (MMIfaceModem  *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
+
+static void
+sim_hot_swap_complete (GTask *task)
+{
+    SetupSimHotSwapContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    /* If MBIM based logic worked, success */
+    if (!ctx->subscriber_info_error)
+        g_task_return_boolean (task, TRUE);
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    /* Otherwise, If QMI-over-MBIM based logic worked, success */
+    else if (!ctx->qmi_error)
+        g_task_return_boolean (task, TRUE);
+#endif
+    /* Otherwise, prefer MBIM specific error */
+    else
+        g_task_return_error (task, g_steal_pointer (&ctx->subscriber_info_error));
+    g_object_unref (task);
+}
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+qmi_setup_sim_hot_swap_ready (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    SetupSimHotSwapContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    if (!mm_shared_qmi_setup_sim_hot_swap_finish (self, res, &ctx->qmi_error))
+        mm_obj_dbg (self, "couldn't setup SIM hot swap using QMI over MBIM: %s", ctx->qmi_error->message);
+
+    sim_hot_swap_complete (task);
+}
+
+#endif
 
 static void
 enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
                                                  GAsyncResult         *res,
                                                  GTask                *task)
 {
-    GError                 *error = NULL;
     SetupSimHotSwapContext *ctx;
 
     ctx = g_task_get_task_data (task);
 
-    if (!common_enable_disable_unsolicited_events_finish (self, res, &error)) {
-        mm_obj_dbg (self, "failed to enable subscriber info events: %s", error->message);
+    if (!common_enable_disable_unsolicited_events_finish (self, res, &ctx->subscriber_info_error)) {
+        mm_obj_dbg (self, "failed to enable subscriber info events: %s", ctx->subscriber_info_error->message);
         /* reset setup flags if enabling failed */
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
         common_setup_cleanup_unsolicited_events_sync (self, ctx->device, FALSE);
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
     }
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    mm_shared_qmi_setup_sim_hot_swap (MM_IFACE_MODEM (self),
+                                      (GAsyncReadyCallback)qmi_setup_sim_hot_swap_ready,
+                                      task);
+#else
+    sim_hot_swap_complete (task);
+#endif
 }
 
 static void
