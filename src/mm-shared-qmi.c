@@ -3896,6 +3896,7 @@ uim_refresh_register_all_ready (QmiClientUim *client,
         }
 
         mm_obj_dbg (self, "refresh register all operation failed: %s", error->message);
+        g_clear_object (&priv->uim_client);
         g_task_return_error (task, g_steal_pointer (&error));
     } else {
         mm_obj_dbg (self, "registered for all SIM refresh events");
