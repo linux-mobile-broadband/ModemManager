@@ -40,6 +40,7 @@ struct _MMSimMbimClass {
 };
 
 GType mm_sim_mbim_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSimMbim, g_object_unref)
 
 void       mm_sim_mbim_new        (MMBaseModem *modem,
                                    GCancellable *cancellable,

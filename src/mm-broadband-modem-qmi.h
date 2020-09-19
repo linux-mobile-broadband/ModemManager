@@ -39,6 +39,7 @@ struct _MMBroadbandModemQmiClass{
 };
 
 GType mm_broadband_modem_qmi_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBroadbandModemQmi, g_object_unref)
 
 MMBroadbandModemQmi *mm_broadband_modem_qmi_new (const gchar *device,
                                                  const gchar **drivers,

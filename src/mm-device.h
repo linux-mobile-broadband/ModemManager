@@ -60,6 +60,7 @@ struct _MMDeviceClass {
 };
 
 GType mm_device_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMDevice, g_object_unref)
 
 MMDevice *mm_device_new (const gchar              *uid,
                          gboolean                  hotplugged,

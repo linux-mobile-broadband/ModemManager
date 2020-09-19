@@ -141,6 +141,7 @@ struct _MMBroadbandBearerClass {
 };
 
 GType mm_broadband_bearer_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBroadbandBearer, g_object_unref)
 
 /* Default 3GPP bearer creation implementation */
 void          mm_broadband_bearer_new        (MMBroadbandModem *modem,

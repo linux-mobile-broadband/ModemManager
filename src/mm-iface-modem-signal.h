@@ -59,6 +59,7 @@ struct _MMIfaceModemSignal {
 };
 
 GType mm_iface_modem_signal_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemSignal, g_object_unref)
 
 /* Initialize Signal interface (async) */
 void     mm_iface_modem_signal_initialize        (MMIfaceModemSignal *self,

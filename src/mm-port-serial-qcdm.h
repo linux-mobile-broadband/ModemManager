@@ -43,6 +43,7 @@ struct _MMPortSerialQcdmClass {
 };
 
 GType mm_port_serial_qcdm_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortSerialQcdm, g_object_unref)
 
 MMPortSerialQcdm *mm_port_serial_qcdm_new    (const char *name);
 MMPortSerialQcdm *mm_port_serial_qcdm_new_fd (int fd);

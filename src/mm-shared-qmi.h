@@ -49,6 +49,7 @@ struct _MMSharedQmi {
 };
 
 GType mm_shared_qmi_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSharedQmi, g_object_unref)
 
 QmiClient *mm_shared_qmi_peek_client   (MMSharedQmi          *self,
                                         QmiService            service,

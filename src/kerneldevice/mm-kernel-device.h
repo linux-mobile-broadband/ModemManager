@@ -72,6 +72,7 @@ struct _MMKernelDeviceClass {
 };
 
 GType mm_kernel_device_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMKernelDevice, g_object_unref)
 
 const gchar *mm_kernel_device_get_subsystem   (MMKernelDevice *self);
 const gchar *mm_kernel_device_get_name        (MMKernelDevice *self);

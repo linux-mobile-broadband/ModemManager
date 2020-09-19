@@ -46,6 +46,7 @@ struct _MMPortSerialGpsClass {
 };
 
 GType mm_port_serial_gps_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortSerialGps, g_object_unref)
 
 MMPortSerialGps *mm_port_serial_gps_new (const char *name);
 

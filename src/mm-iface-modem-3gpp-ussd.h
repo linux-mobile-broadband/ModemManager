@@ -107,6 +107,7 @@ struct _MMIfaceModem3gppUssd {
 };
 
 GType mm_iface_modem_3gpp_ussd_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModem3gppUssd, g_object_unref)
 
 /* Initialize USSD interface (async) */
 void     mm_iface_modem_3gpp_ussd_initialize        (MMIfaceModem3gppUssd *self,

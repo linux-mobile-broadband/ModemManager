@@ -104,6 +104,7 @@ struct _MMBaseModemClass {
 };
 
 GType mm_base_modem_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseModem, g_object_unref)
 
 guint     mm_base_modem_get_dbus_id  (MMBaseModem *self);
 

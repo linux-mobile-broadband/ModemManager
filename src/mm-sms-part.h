@@ -59,6 +59,8 @@ MMSmsPart *mm_sms_part_new  (guint index,
                              MMSmsPduType type);
 void       mm_sms_part_free (MMSmsPart *part);
 
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSmsPart, mm_sms_part_free)
+
 guint             mm_sms_part_get_index              (MMSmsPart *part);
 void              mm_sms_part_set_index              (MMSmsPart *part,
                                                       guint index);

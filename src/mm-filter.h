@@ -43,6 +43,7 @@ typedef struct {
 } MMFilterClass;
 
 GType mm_filter_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMFilter, g_object_unref)
 
 typedef enum { /*< underscore_name=mm_filter_rule >*/
     MM_FILTER_RULE_NONE                  = 0,

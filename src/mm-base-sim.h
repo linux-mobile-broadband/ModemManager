@@ -145,6 +145,7 @@ struct _MMBaseSimClass {
 };
 
 GType mm_base_sim_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseSim, g_object_unref)
 
 void         mm_base_sim_new                        (MMBaseModem *modem,
                                                      GCancellable *cancellable,

@@ -69,6 +69,7 @@ struct _MMIfaceModemFirmware {
 };
 
 GType mm_iface_modem_firmware_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemFirmware, g_object_unref)
 
 /* Initialize Firmware interface (async) */
 void     mm_iface_modem_firmware_initialize        (MMIfaceModemFirmware *self,

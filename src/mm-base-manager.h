@@ -50,6 +50,7 @@ typedef struct {
 } MMBaseManagerClass;
 
 GType mm_base_manager_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseManager, g_object_unref)
 
 MMBaseManager   *mm_base_manager_new         (GDBusConnection  *bus,
                                               const gchar      *plugin_dir,

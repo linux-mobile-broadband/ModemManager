@@ -45,6 +45,7 @@ struct _MMSmsQmiClass {
 };
 
 GType mm_sms_qmi_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSmsQmi, g_object_unref)
 
 MMBaseSms *mm_sms_qmi_new (MMBaseModem *modem);
 
