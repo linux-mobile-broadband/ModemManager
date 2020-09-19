@@ -34,6 +34,7 @@ struct _MMIfaceModemSimple {
 };
 
 GType mm_iface_modem_simple_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemSimple, g_object_unref)
 
 /* Initialize Modem Simple interface */
 void mm_iface_modem_simple_initialize (MMIfaceModemSimple *self);

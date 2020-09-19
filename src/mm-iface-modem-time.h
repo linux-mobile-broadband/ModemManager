@@ -94,6 +94,7 @@ struct _MMIfaceModemTime {
 };
 
 GType mm_iface_modem_time_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemTime, g_object_unref)
 
 /* Initialize Time interface (async) */
 void     mm_iface_modem_time_initialize        (MMIfaceModemTime *self,

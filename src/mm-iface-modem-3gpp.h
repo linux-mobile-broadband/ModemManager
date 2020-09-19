@@ -237,6 +237,7 @@ struct _MMIfaceModem3gpp {
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModem3gpp, g_object_unref)
 
 /* Initialize Modem 3GPP interface (async) */
 void     mm_iface_modem_3gpp_initialize        (MMIfaceModem3gpp *self,

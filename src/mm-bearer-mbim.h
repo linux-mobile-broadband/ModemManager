@@ -48,6 +48,7 @@ struct _MMBearerMbimClass {
 };
 
 GType mm_bearer_mbim_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerMbim, g_object_unref)
 
 /* MBIM bearer creation implementation.
  * NOTE it is *not* a broadband bearer, so not async-initable */

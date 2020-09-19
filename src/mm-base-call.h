@@ -97,6 +97,7 @@ struct _MMBaseCallClass {
 };
 
 GType mm_base_call_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseCall, g_object_unref)
 
 /* This one can be overriden by plugins */
 MMBaseCall *mm_base_call_new (MMBaseModem     *modem,

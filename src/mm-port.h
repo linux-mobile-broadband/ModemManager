@@ -72,6 +72,7 @@ struct _MMPortClass {
 };
 
 GType mm_port_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPort, g_object_unref)
 
 const gchar    *mm_port_get_device         (MMPort *self);
 MMPortSubsys    mm_port_get_subsys         (MMPort *self);

@@ -51,6 +51,7 @@ struct _MMPortMbimClass {
 };
 
 GType mm_port_mbim_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortMbim, g_object_unref)
 
 MMPortMbim *mm_port_mbim_new (const gchar *name);
 

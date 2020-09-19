@@ -134,6 +134,7 @@ struct _MMIfaceModemMessaging {
 };
 
 GType mm_iface_modem_messaging_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemMessaging, g_object_unref)
 
 /* Initialize Messaging interface (async) */
 void     mm_iface_modem_messaging_initialize        (MMIfaceModemMessaging *self,

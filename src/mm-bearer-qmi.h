@@ -48,6 +48,7 @@ struct _MMBearerQmiClass {
 };
 
 GType mm_bearer_qmi_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerQmi, g_object_unref)
 
 /* QMI bearer creation implementation.
  * NOTE it is *not* a broadband bearer, so not async-initable */

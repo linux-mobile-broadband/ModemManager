@@ -128,6 +128,7 @@ struct _MMBaseBearerClass {
 };
 
 GType mm_base_bearer_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseBearer, g_object_unref)
 
 void         mm_base_bearer_export   (MMBaseBearer *self);
 

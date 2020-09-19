@@ -44,6 +44,7 @@ struct _MMSimQmiClass {
 };
 
 GType mm_sim_qmi_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSimQmi, g_object_unref)
 
 void       mm_sim_qmi_new        (MMBaseModem          *modem,
                                   gboolean              dms_uim_deprecated,

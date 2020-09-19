@@ -107,6 +107,7 @@ struct _MMPortSerialClass {
 };
 
 GType mm_port_serial_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortSerial, g_object_unref)
 
 MMPortSerial *mm_port_serial_new (const char *name, MMPortType ptype);
 

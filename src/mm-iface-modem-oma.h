@@ -120,6 +120,7 @@ struct _MMIfaceModemOma {
 };
 
 GType mm_iface_modem_oma_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemOma, g_object_unref)
 
 /* Initialize Oma interface (async) */
 void     mm_iface_modem_oma_initialize        (MMIfaceModemOma *self,

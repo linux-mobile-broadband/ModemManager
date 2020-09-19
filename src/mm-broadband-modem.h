@@ -92,6 +92,7 @@ struct _MMBroadbandModemClass {
 };
 
 GType mm_broadband_modem_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBroadbandModem, g_object_unref)
 
 MMBroadbandModem *mm_broadband_modem_new (const gchar *device,
                                           const gchar **drivers,

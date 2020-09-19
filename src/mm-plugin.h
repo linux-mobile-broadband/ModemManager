@@ -123,6 +123,7 @@ struct _MMPluginClass {
 };
 
 GType mm_plugin_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPlugin, g_object_unref)
 
 const gchar           *mm_plugin_get_name                (MMPlugin *self);
 const gchar          **mm_plugin_get_allowed_udev_tags   (MMPlugin *self);

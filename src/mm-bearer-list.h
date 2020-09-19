@@ -48,6 +48,7 @@ struct _MMBearerListClass {
 };
 
 GType mm_bearer_list_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerList, g_object_unref)
 
 MMBearerList *mm_bearer_list_new (guint max_bearers,
                                   guint max_active_bearers);

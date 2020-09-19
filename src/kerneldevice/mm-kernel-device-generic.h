@@ -44,7 +44,9 @@ struct _MMKernelDeviceGenericClass {
     MMKernelDeviceClass parent;
 };
 
-GType           mm_kernel_device_generic_get_type       (void);
+GType mm_kernel_device_generic_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMKernelDeviceGeneric, g_object_unref)
+
 MMKernelDevice *mm_kernel_device_generic_new            (MMKernelEventProperties  *properties,
                                                          GError                  **error);
 MMKernelDevice *mm_kernel_device_generic_new_with_rules (MMKernelEventProperties  *properties,

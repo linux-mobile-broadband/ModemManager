@@ -229,6 +229,7 @@ struct _MMIfaceModemCdma {
 };
 
 GType mm_iface_modem_cdma_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemCdma, g_object_unref)
 
 /* Initialize CDMA interface (async) */
 void     mm_iface_modem_cdma_initialize        (MMIfaceModemCdma *self,

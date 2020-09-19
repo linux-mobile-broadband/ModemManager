@@ -79,6 +79,7 @@ typedef gboolean (* MMPortProbeAtCustomInitFinish) (MMPortProbe *probe,
                                                     GError **error);
 
 GType mm_port_probe_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortProbe, g_object_unref)
 
 MMPortProbe *mm_port_probe_new (MMDevice       *device,
                                 MMKernelDevice *port);

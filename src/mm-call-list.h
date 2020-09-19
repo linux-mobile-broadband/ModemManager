@@ -55,6 +55,7 @@ struct _MMCallListClass {
 };
 
 GType mm_call_list_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMCallList, g_object_unref)
 
 MMCallList *mm_call_list_new (MMBaseModem *modem);
 

@@ -196,6 +196,7 @@ struct _MMIfaceModemVoice {
 };
 
 GType mm_iface_modem_voice_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemVoice, g_object_unref)
 
 /* Initialize Voice interface (async) */
 void     mm_iface_modem_voice_initialize        (MMIfaceModemVoice *self,

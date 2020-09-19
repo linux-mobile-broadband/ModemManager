@@ -382,6 +382,7 @@ struct _MMIfaceModem {
 };
 
 GType mm_iface_modem_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModem, g_object_unref)
 
 /* Helpers to query access technologies */
 MMModemAccessTechnology mm_iface_modem_get_access_technologies (MMIfaceModem *self);

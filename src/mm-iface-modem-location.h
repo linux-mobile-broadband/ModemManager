@@ -106,6 +106,7 @@ struct _MMIfaceModemLocation {
 };
 
 GType mm_iface_modem_location_get_type (void);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemLocation, g_object_unref)
 
 /* Initialize Location interface (async) */
 void     mm_iface_modem_location_initialize        (MMIfaceModemLocation *self,
