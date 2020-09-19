@@ -410,29 +410,27 @@ handle_list (MmGdbusModemMessaging *skeleton,
 
 gboolean
 mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
-                                    MMSmsPart *sms_part,
-                                    MMSmsState state,
-                                    MMSmsStorage storage)
+                                    MMSmsPart             *sms_part,
+                                    MMSmsState             state,
+                                    MMSmsStorage           storage)
 {
-    MMSmsList *list = NULL;
-    GError *error = NULL;
-    gboolean added;
+    g_autoptr(MMSmsList) list = NULL;
+    g_autoptr(GError)    error = NULL;
+    gboolean             added = FALSE;
 
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
-    if (!list)
-        return FALSE;
 
-    added = mm_sms_list_take_part (list, sms_part, state, storage, &error);
-    if (!added) {
-        mm_obj_dbg (self, "couldn't take part in SMS list: %s", error->message);
-        g_error_free (error);
-
-        /* If part wasn't taken, we need to free the part ourselves */
-        mm_sms_part_free (sms_part);
+    if (list) {
+        added = mm_sms_list_take_part (list, sms_part, state, storage, &error);
+        if (!added)
+            mm_obj_dbg (self, "couldn't take part in SMS list: %s", error->message);
     }
-    g_object_unref (list);
+
+    /* If part wasn't taken, we need to free the part ourselves */
+    if (!added)
+        mm_sms_part_free (sms_part);
 
     return added;
 }
