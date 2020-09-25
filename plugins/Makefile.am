@@ -1220,7 +1220,7 @@ libmm_plugin_samsung_la_SOURCES = \
 libmm_plugin_samsung_la_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS) \
 	$(ICERA_COMMON_COMPILER_FLAGS) \
-	-DMM_MODULE_NAME=\"samsumg\" \
+	-DMM_MODULE_NAME=\"samsung\" \
 	$(NULL)
 libmm_plugin_samsung_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
 
