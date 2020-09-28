@@ -37,7 +37,8 @@ typedef struct _MMSharedQuectel MMSharedQuectel;
 
 struct _MMSharedQuectel {
     GTypeInterface g_iface;
-    MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedQuectel *self);
+    MMIfaceModem         *  (* peek_parent_modem_interface)          (MMSharedQuectel *self);
+    MMIfaceModemLocation *  (* peek_parent_modem_location_interface) (MMSharedQuectel *self);
 };
 
 GType mm_shared_quectel_get_type (void);
