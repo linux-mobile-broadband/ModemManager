@@ -705,7 +705,7 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
     if (!mm_qmi_uim_get_card_status_output_parse (self,
                                                   output,
                                                   &lock,
-                                                  NULL, NULL, NULL, NULL,
+                                                  NULL, NULL, NULL, NULL, NULL, NULL,
                                                   &error)) {
         /* The device may report a SIM NOT INSERTED error if we're querying the
          * card status soon after power on. We'll let the Modem interface generic
@@ -957,8 +957,8 @@ unlock_retries_uim_get_card_status_ready (QmiClientUim *client,
     if (!mm_qmi_uim_get_card_status_output_parse (self,
                                                   output,
                                                   NULL,
-                                                  &pin1_retries, &puk1_retries,
-                                                  &pin2_retries, &puk2_retries,
+                                                  NULL, &pin1_retries, &puk1_retries,
+                                                  NULL, &pin2_retries, &puk2_retries,
                                                   &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1891,7 +1891,7 @@ typedef struct {
     MMModem3gppFacility locks;
 } LoadEnabledFacilityLocksContext;
 
-static void get_next_facility_lock_status (GTask *task);
+static void get_next_facility_lock_status_via_dms (GTask *task);
 
 static void
 load_enabled_facility_locks_context_free (LoadEnabledFacilityLocksContext *ctx)
@@ -1914,6 +1914,80 @@ modem_3gpp_load_enabled_facility_locks_finish (MMIfaceModem3gpp *self,
         return MM_MODEM_3GPP_FACILITY_NONE;
     }
     return (MMModem3gppFacility)value;
+}
+
+static void
+get_sim_lock_status_via_get_card_status_ready (QmiClientUim *client,
+                                               GAsyncResult *res,
+                                               GTask *task)
+{
+    MMBroadbandModemQmi *self;
+    LoadEnabledFacilityLocksContext *ctx;
+    QmiMessageUimGetCardStatusOutput *output;
+    GError *error = NULL;
+    MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
+    QmiUimPinState pin1_state;
+    QmiUimPinState pin2_state;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_uim_get_card_status_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_uim_get_card_status_output_get_result (output, &error)) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        if (output)
+            qmi_message_uim_get_card_status_output_unref (output);
+        return;
+    }
+
+    if (!mm_qmi_uim_get_card_status_output_parse (self,
+                                                  output,
+                                                  &lock,
+                                                  &pin1_state, NULL, NULL, &pin2_state, NULL, NULL,
+                                                  &error)) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else {
+        ctx->locks &= ~(MM_MODEM_3GPP_FACILITY_SIM);
+        ctx->locks &= ~(MM_MODEM_3GPP_FACILITY_FIXED_DIALING);
+
+        if (pin1_state == QMI_UIM_PIN_STATE_ENABLED_VERIFIED ||
+            pin1_state == QMI_UIM_PIN_STATE_ENABLED_NOT_VERIFIED ||
+            pin1_state == QMI_UIM_PIN_STATE_BLOCKED) {
+            ctx->locks |= (MM_MODEM_3GPP_FACILITY_SIM);
+        }
+        if (pin2_state == QMI_UIM_PIN_STATE_ENABLED_VERIFIED ||
+            pin2_state == QMI_UIM_PIN_STATE_ENABLED_NOT_VERIFIED ||
+            pin2_state == QMI_UIM_PIN_STATE_BLOCKED) {
+            ctx->locks |= (MM_MODEM_3GPP_FACILITY_FIXED_DIALING);
+        }
+
+        g_task_return_int (task, ctx->locks);
+    }
+
+    qmi_message_uim_get_card_status_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+get_sim_lock_status_via_get_card_status (GTask *task)
+{
+    MMBroadbandModemQmi *self;
+    LoadEnabledFacilityLocksContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    mm_obj_dbg (self, "Getting UIM card status to read pin lock state...");
+    qmi_client_uim_get_card_status (QMI_CLIENT_UIM (ctx->client),
+                                    NULL,
+                                    5,
+                                    NULL,
+                                    (GAsyncReadyCallback) get_sim_lock_status_via_get_card_status_ready,
+                                    task);
 }
 
 static void
@@ -2035,11 +2109,11 @@ dms_uim_get_ck_status_ready (QmiClientDms *client,
 
     /* And go on with the next one */
     ctx->current++;
-    get_next_facility_lock_status (task);
+    get_next_facility_lock_status_via_dms (task);
 }
 
 static void
-get_next_facility_lock_status (GTask *task)
+get_next_facility_lock_status_via_dms (GTask *task)
 {
     LoadEnabledFacilityLocksContext *ctx;
     guint i;
@@ -2085,10 +2159,17 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
     GTask *task;
     QmiClient *client = NULL;
 
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_DMS, &client,
-                                      callback, user_data))
-        return;
+    if (!MM_BROADBAND_MODEM_QMI (self)->priv->dms_uim_deprecated) {
+        if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                          QMI_SERVICE_DMS, &client,
+                                          callback, user_data))
+            return;
+    } else {
+        if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                          QMI_SERVICE_UIM, &client,
+                                          callback, user_data))
+            return;
+    }
 
     ctx = g_new (LoadEnabledFacilityLocksContext, 1);
     ctx->client = g_object_ref (client);
@@ -2105,7 +2186,13 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_enabled_facility_locks_context_free);
 
-    get_next_facility_lock_status (task);
+    /* DMS uses get_ck_status and get_pin_status to probe facilities
+     * UIM Messages to get all facility locks are not open-source yet
+     * UIM uses get_card_status to probe only FACILITY_SIM and FACILITY_FIXED_DIALING */
+    if (!MM_BROADBAND_MODEM_QMI (self)->priv->dms_uim_deprecated)
+        get_next_facility_lock_status_via_dms (task);
+    else
+        get_sim_lock_status_via_get_card_status (task);
 }
 
 /*****************************************************************************/

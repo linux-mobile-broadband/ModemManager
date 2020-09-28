@@ -1798,8 +1798,10 @@ gboolean
 mm_qmi_uim_get_card_status_output_parse (gpointer                           log_object,
                                          QmiMessageUimGetCardStatusOutput  *output,
                                          MMModemLock                       *o_lock,
+                                         QmiUimPinState                    *o_pin1_state,
                                          guint                             *o_pin1_retries,
                                          guint                             *o_puk1_retries,
+                                         QmiUimPinState                    *o_pin2_state,
                                          guint                             *o_pin2_retries,
                                          guint                             *o_puk2_retries,
                                          GError                           **error)
@@ -1935,11 +1937,15 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
         return FALSE;
     }
 
-    /* Report retries if requested to do so */
+    /* Report state and retries if requested to do so */
+    if (o_pin1_state)
+        *o_pin1_state = app->pin1_state;
     if (o_pin1_retries)
         *o_pin1_retries = app->pin1_retries;
     if (o_puk1_retries)
         *o_puk1_retries = app->puk1_retries;
+    if (o_pin2_state)
+        *o_pin2_state = app->pin2_state;
     if (o_pin2_retries)
         *o_pin2_retries = app->pin2_retries;
     if (o_puk2_retries)
