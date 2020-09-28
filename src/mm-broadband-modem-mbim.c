@@ -3554,9 +3554,16 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
                                  gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    gboolean is_sim_hot_swap_configured = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
+                  NULL);
 
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
+    if (is_sim_hot_swap_configured)
+        self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
@@ -3784,124 +3791,67 @@ modem_3gpp_enable_unsolicited_registration_events (MMIfaceModem3gpp *_self,
 /*****************************************************************************/
 /* Setup SIM hot swap */
 
-typedef struct {
-    MbimDevice *device;
-    GError     *subscriber_info_error;
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    GError     *qmi_error;
-#endif
-} SetupSimHotSwapContext;
-
-static void
-setup_sim_hot_swap_context_free (SetupSimHotSwapContext *ctx)
-{
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    g_clear_error (&ctx->qmi_error);
-#endif
-    g_clear_error (&ctx->subscriber_info_error);
-    g_clear_object (&ctx->device);
-    g_slice_free (SetupSimHotSwapContext, ctx);
-}
-
 static gboolean
-modem_setup_sim_hot_swap_finish (MMIfaceModem  *self,
-                                 GAsyncResult  *res,
-                                 GError       **error)
+modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-sim_hot_swap_complete (GTask *task)
+enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
+                                                 GAsyncResult *res,
+                                                 GTask *task)
 {
-    SetupSimHotSwapContext *ctx;
+    GError *error = NULL;
 
-    ctx = g_task_get_task_data (task);
+    if (!common_enable_disable_unsolicited_events_finish (self, res, &error)) {
+        mm_obj_dbg (self, "failed to enable subscriber info events: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
 
-    /* If MBIM based logic worked, success */
-    if (!ctx->subscriber_info_error)
-        g_task_return_boolean (task, TRUE);
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    /* Otherwise, If QMI-over-MBIM based logic worked, success */
-    else if (!ctx->qmi_error)
-        g_task_return_boolean (task, TRUE);
-#endif
-    /* Otherwise, prefer MBIM specific error */
-    else
-        g_task_return_error (task, g_steal_pointer (&ctx->subscriber_info_error));
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-
 static void
-qmi_setup_sim_hot_swap_ready (MMIfaceModem *self,
-                              GAsyncResult *res,
-                              GTask        *task)
+setup_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
+                                                GAsyncResult *res,
+                                                GTask *task)
 {
-    SetupSimHotSwapContext *ctx;
+    GError *error = NULL;
 
-    ctx = g_task_get_task_data (task);
-    if (!mm_shared_qmi_setup_sim_hot_swap_finish (self, res, &ctx->qmi_error))
-        mm_obj_dbg (self, "couldn't setup SIM hot swap using QMI over MBIM: %s", ctx->qmi_error->message);
-
-    sim_hot_swap_complete (task);
-}
-
-#endif
-
-static void
-enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
-                                                 GAsyncResult         *res,
-                                                 GTask                *task)
-{
-    SetupSimHotSwapContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-
-    if (!common_enable_disable_unsolicited_events_finish (self, res, &ctx->subscriber_info_error)) {
-        mm_obj_dbg (self, "failed to enable subscriber info events: %s", ctx->subscriber_info_error->message);
-        /* reset setup flags if enabling failed */
-        self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
-        common_setup_cleanup_unsolicited_events_sync (self, ctx->device, FALSE);
+    if (!common_setup_cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_obj_dbg (self, "failed to set up subscriber info events: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    mm_shared_qmi_setup_sim_hot_swap (MM_IFACE_MODEM (self),
-                                      (GAsyncReadyCallback)qmi_setup_sim_hot_swap_ready,
-                                      task);
-#else
-    sim_hot_swap_complete (task);
-#endif
-}
-
-static void
-modem_setup_sim_hot_swap (MMIfaceModem        *_self,
-                          GAsyncReadyCallback  callback,
-                          gpointer             user_data)
-{
-    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
-    MbimDevice             *device;
-    GTask                  *task;
-    SetupSimHotSwapContext *ctx;
-
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-    ctx = g_slice_new0 (SetupSimHotSwapContext);
-    ctx->device = g_object_ref (device);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)setup_sim_hot_swap_context_free);
-
-    /* Setup flags synchronously, which never fails */
-    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
-    common_setup_cleanup_unsolicited_events_sync (self, ctx->device, TRUE);
-
-    /* Enable flags asynchronously, which may fail */
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     common_enable_disable_unsolicited_events (self,
                                               (GAsyncReadyCallback)enable_subscriber_info_unsolicited_events_ready,
                                               task);
+}
+
+static void
+modem_setup_sim_hot_swap (MMIfaceModem *_self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+    common_setup_cleanup_unsolicited_events (self,
+                                             TRUE,
+                                             (GAsyncReadyCallback)setup_subscriber_info_unsolicited_events_ready,
+                                             task);
 }
 
 /*****************************************************************************/
