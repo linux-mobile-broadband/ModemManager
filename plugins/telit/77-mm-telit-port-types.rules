@@ -33,12 +33,12 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="03", ENV{
 # CE910-DUAL
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
-# LE922
+# LE922, LM9x0
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 
 # LE910C1 with default usb cfg
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
@@ -58,9 +58,9 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="01", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # LM940/960 use alternate settings for 3G band management
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1040", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1041", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1042", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="0x1043", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1042", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1043", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 
 LABEL="mm_telit_port_types_end"
