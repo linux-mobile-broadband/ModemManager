@@ -40,6 +40,27 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="04", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 
+# LE922, LM9x0 (MBIM composition)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{.MM_USBIFNUM}=="07", ENV{ID_MM_PORT_IGNORE}="1"
+
+# FN980
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
+
+# FN980 (MBIM composition)
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{.MM_USBIFNUM}=="07", ENV{ID_MM_PORT_IGNORE}="1"
+
 # LE910C1 with default usb cfg
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1201", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_GPS}="1"
@@ -62,5 +83,9 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_BND_ALTERNATE
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1042", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1043", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+
+# FN980 use alternate settings for 3G band management
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 
 LABEL="mm_telit_port_types_end"
