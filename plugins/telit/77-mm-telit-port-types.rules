@@ -88,4 +88,14 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1043", ENV{ID_MM_TELIT_BND_ALTERNATE
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 
+# LM940/960 initial port delay
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1042", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1043", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+
+# FN980 initial port delay
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1050", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TELIT_PORT_DELAY}="1"
+
 LABEL="mm_telit_port_types_end"
