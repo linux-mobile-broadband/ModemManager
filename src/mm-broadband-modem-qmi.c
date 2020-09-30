@@ -2171,41 +2171,44 @@ get_sim_lock_status_via_pin_status_ready (QmiClientDms *client,
     MMBroadbandModemQmi *self;
     LoadEnabledFacilityLocksContext *ctx;
     QmiMessageDmsUimGetPinStatusOutput *output;
-    gboolean enabled;
+    QmiDmsUimPinStatus current_status;
+    GError *error;
+    gboolean pin1_enabled;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
-    output = qmi_client_dms_uim_get_pin_status_finish (client, res, NULL);
+    output = qmi_client_dms_uim_get_pin_status_finish (client, res, &error);
     if (!output ||
-        !qmi_message_dms_uim_get_pin_status_output_get_result (output, NULL)) {
-        mm_obj_dbg (self, "couldn't query PIN status, assuming SIM PIN is disabled");
-        enabled = FALSE;
-    } else {
-        QmiDmsUimPinStatus current_status;
-
-        if (qmi_message_dms_uim_get_pin_status_output_get_pin1_status (
-            output,
-            &current_status,
-            NULL, /* verify_retries_left */
-            NULL, /* unblock_retries_left */
-            NULL)) {
-            enabled = mm_pin_enabled_from_qmi_uim_pin_status (current_status);
-            mm_obj_dbg (self, "PIN is reported %s", (enabled ? "enabled" : "disabled"));
-        } else {
-            mm_obj_dbg (self, "couldn't find PIN1 status in the result, assuming SIM PIN is disabled");
-            enabled = FALSE;
-        }
+        !qmi_message_dms_uim_get_pin_status_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        if (output)
+            qmi_message_dms_uim_get_pin_status_output_unref (output);
+        return;
     }
 
-    if (output)
+    if (qmi_message_dms_uim_get_pin_status_output_get_pin1_status (
+        output,
+        &current_status,
+        NULL, /* verify_retries_left */
+        NULL, /* unblock_retries_left */
+        &error)) {
+        pin1_enabled = mm_pin_enabled_from_qmi_uim_pin_status (current_status);
+        mm_obj_dbg (self, "PIN1 is reported %s", (pin1_enabled ? "enabled" : "disabled"));
+    } else {
         qmi_message_dms_uim_get_pin_status_output_unref (output);
-
-    if (enabled) {
-        ctx->locks |= (MM_MODEM_3GPP_FACILITY_SIM);
-    } else {
-        ctx->locks &= ~(MM_MODEM_3GPP_FACILITY_SIM);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
+
+    qmi_message_dms_uim_get_pin_status_output_unref (output);
+
+    if (pin1_enabled)
+        ctx->locks |= (MM_MODEM_3GPP_FACILITY_SIM);
+    else
+        ctx->locks &= ~(MM_MODEM_3GPP_FACILITY_SIM);
 
     /* No more facilities to query, all done */
     g_task_return_int (task, ctx->locks);
