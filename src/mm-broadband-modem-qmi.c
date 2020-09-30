@@ -2174,6 +2174,7 @@ get_sim_lock_status_via_pin_status_ready (QmiClientDms *client,
     QmiDmsUimPinStatus current_status;
     GError *error;
     gboolean pin1_enabled;
+    gboolean pin2_enabled;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -2203,12 +2204,32 @@ get_sim_lock_status_via_pin_status_ready (QmiClientDms *client,
         return;
     }
 
+    if (qmi_message_dms_uim_get_pin_status_output_get_pin2_status (
+        output,
+        &current_status,
+        NULL, /* verify_retries_left */
+        NULL, /* unblock_retries_left */
+        &error)) {
+        pin2_enabled = mm_pin_enabled_from_qmi_uim_pin_status (current_status);
+        mm_obj_dbg (self, "PIN2 is reported %s", (pin2_enabled ? "enabled" : "disabled"));
+    } else {
+        qmi_message_dms_uim_get_pin_status_output_unref (output);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
     qmi_message_dms_uim_get_pin_status_output_unref (output);
 
     if (pin1_enabled)
         ctx->locks |= (MM_MODEM_3GPP_FACILITY_SIM);
     else
         ctx->locks &= ~(MM_MODEM_3GPP_FACILITY_SIM);
+
+    if (pin2_enabled)
+        ctx->locks |= (MM_MODEM_3GPP_FACILITY_FIXED_DIALING);
+    else
+        ctx->locks &= ~(MM_MODEM_3GPP_FACILITY_FIXED_DIALING);
 
     /* No more facilities to query, all done */
     g_task_return_int (task, ctx->locks);
