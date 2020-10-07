@@ -10864,7 +10864,7 @@ disable (MMBaseModem         *self,
 {
     common_disable (MM_BROADBAND_MODEM (self),
                     TRUE, /* perform state updates */
-                    DISABLING_STEP_FIRST_AFTER_ENABLE_FAILED,
+                    DISABLING_STEP_FIRST,
                     cancellable,
                     callback,
                     user_data);
