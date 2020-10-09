@@ -396,9 +396,9 @@ mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
 
 void
 mm_iface_modem_location_3gpp_update_lac_tac_ci (MMIfaceModemLocation *self,
-                                                gulong location_area_code,
-                                                gulong tracking_area_code,
-                                                gulong cell_id)
+                                                gulong                location_area_code,
+                                                gulong                tracking_area_code,
+                                                gulong                cell_id)
 {
     MmGdbusModemLocation *skeleton;
     LocationContext *ctx;
@@ -414,9 +414,23 @@ mm_iface_modem_location_3gpp_update_lac_tac_ci (MMIfaceModemLocation *self,
         guint changed = 0;
 
         g_assert (ctx->location_3gpp != NULL);
-        changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, location_area_code);
-        changed += mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, tracking_area_code);
-        changed += mm_location_3gpp_set_cell_id            (ctx->location_3gpp, cell_id);
+
+        /* Update LAC if given, and clear TAC unless a TAC is also given */
+        if (location_area_code) {
+            changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, location_area_code);
+            if (!tracking_area_code)
+                changed += mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, 0);
+        }
+        /* Update TAC if given, and clear LAC unless a LAC is also given */
+        if (tracking_area_code) {
+            changed += mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, tracking_area_code);
+            if (!location_area_code)
+                changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
+        }
+        /* Cell ID only updated if given. It is assumed that if LAC or TAC are given, CID is also given */
+        if (cell_id)
+            changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp, cell_id);
+
         if (changed)
             notify_3gpp_location_update (self, skeleton, ctx->location_3gpp);
     }
