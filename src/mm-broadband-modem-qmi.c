@@ -2828,7 +2828,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         qmi_indication_nas_serving_system_output_get_cid_3gpp (indication_output, &cid, NULL);
     }
     /* Only update info in the interface if we get something */
-    if (cid && (lac || tac))
+    if (cid || lac || tac)
         mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 
     /* request to reload operator info explicitly, so that the new

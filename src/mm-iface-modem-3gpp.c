@@ -1389,9 +1389,9 @@ mm_iface_modem_3gpp_update_access_technologies (MMIfaceModem3gpp        *self,
 
 void
 mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
-                                     gulong location_area_code,
-                                     gulong tracking_area_code,
-                                     gulong cell_id)
+                                     gulong            location_area_code,
+                                     gulong            tracking_area_code,
+                                     gulong            cell_id)
 {
     Private                      *priv;
     MMModem3gppRegistrationState  state;
@@ -1410,7 +1410,7 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
      * where we're registering (loading current registration info after a state
      * change to registered), we also allow LAC/CID updates. */
     if (REG_STATE_IS_REGISTERED (state) || priv->reloading_registration_info) {
-        if ((location_area_code > 0 || tracking_area_code > 0) && cell_id > 0)
+        if (location_area_code || tracking_area_code || cell_id)
             mm_iface_modem_location_3gpp_update_lac_tac_ci (MM_IFACE_MODEM_LOCATION (self),
                                                             location_area_code,
                                                             tracking_area_code,
