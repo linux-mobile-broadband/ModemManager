@@ -400,42 +400,66 @@ mm_iface_modem_location_3gpp_update_lac_tac_ci (MMIfaceModemLocation *self,
                                                 gulong                tracking_area_code,
                                                 gulong                cell_id)
 {
-    MmGdbusModemLocation *skeleton;
-    LocationContext *ctx;
+    g_autoptr(MmGdbusModemLocationSkeleton)  skeleton = NULL;
+    LocationContext                         *ctx;
+    guint                                    changed = 0;
+    gulong                                   old_location_area_code;
+    gulong                                   old_tracking_area_code;
+    gulong                                   old_cell_id;
 
-    ctx = get_location_context (self);
     g_object_get (self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
-    if (!skeleton)
+    if (!skeleton || !(mm_gdbus_modem_location_get_enabled (MM_GDBUS_MODEM_LOCATION (skeleton)) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI))
         return;
 
-    if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
-        guint changed = 0;
+    ctx = get_location_context (self);
+    g_assert (ctx->location_3gpp != NULL);
 
-        g_assert (ctx->location_3gpp != NULL);
+    old_location_area_code = mm_location_3gpp_get_location_area_code (ctx->location_3gpp);
+    old_tracking_area_code = mm_location_3gpp_get_tracking_area_code (ctx->location_3gpp);
+    old_cell_id            = mm_location_3gpp_get_cell_id            (ctx->location_3gpp);
 
-        /* Update LAC if given, and clear TAC unless a TAC is also given */
-        if (location_area_code) {
-            changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, location_area_code);
-            if (!tracking_area_code)
-                changed += mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, 0);
+    /* Update LAC if given, and clear TAC unless a TAC is also given */
+    if (location_area_code) {
+        if (old_location_area_code != location_area_code) {
+            mm_obj_dbg (self, "3GPP location area code updated: '%lX->%lX'", old_location_area_code, location_area_code);
+            mm_location_3gpp_set_location_area_code (ctx->location_3gpp, location_area_code);
+            changed++;
         }
-        /* Update TAC if given, and clear LAC unless a LAC is also given */
-        if (tracking_area_code) {
-            changed += mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, tracking_area_code);
-            if (!location_area_code)
-                changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
+        if (!tracking_area_code) {
+            if (old_tracking_area_code != 0) {
+                mm_obj_dbg (self, "3GPP tracking area code cleared: '%lX->%lX'", old_tracking_area_code, tracking_area_code);
+                mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, 0);
+                changed++;
+            }
         }
-        /* Cell ID only updated if given. It is assumed that if LAC or TAC are given, CID is also given */
-        if (cell_id)
-            changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp, cell_id);
-
-        if (changed)
-            notify_3gpp_location_update (self, skeleton, ctx->location_3gpp);
+    }
+    /* Update TAC if given, and clear LAC unless a LAC is also given */
+    if (tracking_area_code) {
+        if (old_tracking_area_code != tracking_area_code) {
+            mm_obj_dbg (self, "3GPP tracking area code updated: '%lX->%lX'", old_tracking_area_code, tracking_area_code);
+            mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, tracking_area_code);
+            changed++;
+        }
+        if (!location_area_code) {
+            if (old_location_area_code != 0) {
+                mm_obj_dbg (self, "3GPP location area code cleared: '%lX->%lX'", old_location_area_code, location_area_code);
+                mm_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
+                changed++;
+            }
+        }
     }
 
-    g_object_unref (skeleton);
+    /* Cell ID only updated if given. It is assumed that if LAC or TAC are given, CID is also given */
+    if (cell_id && (old_cell_id != cell_id)) {
+        mm_obj_dbg (self, "3GPP cell id updated: '%lX->%lX'", old_cell_id, cell_id);
+        mm_location_3gpp_set_cell_id (ctx->location_3gpp, cell_id);
+        changed++;
+    }
+
+    if (changed)
+        notify_3gpp_location_update (self, MM_GDBUS_MODEM_LOCATION (skeleton), ctx->location_3gpp);
 }
 
 void
