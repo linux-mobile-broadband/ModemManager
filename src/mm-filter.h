@@ -50,25 +50,27 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
     MM_FILTER_RULE_EXPLICIT_WHITELIST    = 1 << 0,
     MM_FILTER_RULE_EXPLICIT_BLACKLIST    = 1 << 1,
     MM_FILTER_RULE_PLUGIN_WHITELIST      = 1 << 2,
-    MM_FILTER_RULE_VIRTUAL               = 1 << 3,
-    MM_FILTER_RULE_NET                   = 1 << 4,
-    MM_FILTER_RULE_USBMISC               = 1 << 5,
-    MM_FILTER_RULE_RPMSG                 = 1 << 6,
-    MM_FILTER_RULE_TTY                   = 1 << 7,
-    MM_FILTER_RULE_TTY_BLACKLIST         = 1 << 8,
-    MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  = 1 << 9,
-    MM_FILTER_RULE_TTY_PLATFORM_DRIVER   = 1 << 10,
-    MM_FILTER_RULE_TTY_DEFAULT_ALLOWED   = 1 << 11,
-    MM_FILTER_RULE_TTY_DRIVER            = 1 << 12,
-    MM_FILTER_RULE_TTY_ACM_INTERFACE     = 1 << 13,
-    MM_FILTER_RULE_TTY_WITH_NET          = 1 << 14,
-    MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN = 1 << 15,
+    MM_FILTER_RULE_QRTR                  = 1 << 3,
+    MM_FILTER_RULE_VIRTUAL               = 1 << 4,
+    MM_FILTER_RULE_NET                   = 1 << 5,
+    MM_FILTER_RULE_USBMISC               = 1 << 6,
+    MM_FILTER_RULE_RPMSG                 = 1 << 7,
+    MM_FILTER_RULE_TTY                   = 1 << 8,
+    MM_FILTER_RULE_TTY_BLACKLIST         = 1 << 9,
+    MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  = 1 << 10,
+    MM_FILTER_RULE_TTY_PLATFORM_DRIVER   = 1 << 11,
+    MM_FILTER_RULE_TTY_DEFAULT_ALLOWED   = 1 << 12,
+    MM_FILTER_RULE_TTY_DRIVER            = 1 << 13,
+    MM_FILTER_RULE_TTY_ACM_INTERFACE     = 1 << 14,
+    MM_FILTER_RULE_TTY_WITH_NET          = 1 << 15,
+    MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN = 1 << 16,
 } MMFilterRule;
 
 #define MM_FILTER_RULE_ALL                  \
     (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
      MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
      MM_FILTER_RULE_PLUGIN_WHITELIST      | \
+     MM_FILTER_RULE_QRTR                  | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
      MM_FILTER_RULE_USBMISC               | \
@@ -104,6 +106,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
     (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
      MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
      MM_FILTER_RULE_PLUGIN_WHITELIST      | \
+     MM_FILTER_RULE_QRTR                  | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
      MM_FILTER_RULE_USBMISC               | \
@@ -121,6 +124,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
     (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
      MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
      MM_FILTER_RULE_PLUGIN_WHITELIST      | \
+     MM_FILTER_RULE_QRTR                  | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
      MM_FILTER_RULE_USBMISC               | \

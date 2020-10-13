@@ -178,6 +178,15 @@ mm_filter_port (MMFilter        *self,
         }
     }
 
+    /* If this is a QRTR device, we always allow it. This check comes before
+     * checking for VIRTUAL since qrtr devices don't have a sysfs path, and the
+     * check for VIRTUAL will return FALSE. */
+    if ((self->priv->enabled_rules & MM_FILTER_RULE_QRTR) &&
+        g_str_equal (subsystem, "qrtr")) {
+        mm_obj_dbg (self, "(%s/%s) port allowed: qrtr device", subsystem, name);
+        return TRUE;
+    }
+
     /* If this is a virtual device, don't allow it */
     if ((self->priv->enabled_rules & MM_FILTER_RULE_VIRTUAL) &&
         (!mm_kernel_device_get_physdev_sysfs_path (port))) {
@@ -453,6 +462,7 @@ mm_filter_new (MMFilterRule   enabled_rules,
     mm_obj_dbg (self, "  explicit whitelist:         %s", RULE_ENABLED_STR (MM_FILTER_RULE_EXPLICIT_WHITELIST));
     mm_obj_dbg (self, "  explicit blacklist:         %s", RULE_ENABLED_STR (MM_FILTER_RULE_EXPLICIT_BLACKLIST));
     mm_obj_dbg (self, "  plugin whitelist:           %s", RULE_ENABLED_STR (MM_FILTER_RULE_PLUGIN_WHITELIST));
+    mm_obj_dbg (self, "  qrtr devices allowed:       %s", RULE_ENABLED_STR (MM_FILTER_RULE_QRTR));
     mm_obj_dbg (self, "  virtual devices forbidden:  %s", RULE_ENABLED_STR (MM_FILTER_RULE_VIRTUAL));
     mm_obj_dbg (self, "  net devices allowed:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_NET));
     mm_obj_dbg (self, "  usbmisc devices allowed:    %s", RULE_ENABLED_STR (MM_FILTER_RULE_USBMISC));
