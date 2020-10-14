@@ -1,4 +1,17 @@
 
+ModemManager 1.14.6
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+ * QMI:
+   ** Fix missing GError initialization.
+
+ * plugins:
+   ** xmm: fix missing GError initialization.
+   ** cinterion: fix missing GError initialization.
+   ** simtech: fix missing GError initialization.
+
+
 ModemManager 1.14.4
 -------------------------------------------
 This is a new bugfix release of ModemManager.
