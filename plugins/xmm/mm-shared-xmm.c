@@ -1222,7 +1222,7 @@ parent_disable_location_gathering_ready (MMIfaceModemLocation *self,
                                          GAsyncResult         *res,
                                          GTask                *task)
 {
-    GError  *error;
+    GError  *error = NULL;
     Private *priv;
 
     priv = get_private (MM_SHARED_XMM (self));
@@ -1321,7 +1321,7 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
                                         GAsyncResult         *res,
                                         GTask                *task)
 {
-    GError  *error;
+    GError  *error = NULL;
     Private *priv;
 
     priv = get_private (MM_SHARED_XMM (self));
