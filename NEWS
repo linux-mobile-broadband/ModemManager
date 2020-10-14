@@ -1,4 +1,39 @@
 
+ModemManager 1.14.4
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+ * Location interface:
+   ** Allow cell ID only updates.
+
+ * Messaging interface:
+   ** Fixed memory leak when SMS parts being processed but device goes away.
+   ** Fixed CDMA SMS UTF-8 translation.
+   ** Allow sending UTF-16 as if it were UCS-2.
+
+ * QMI:
+   ** Increased port probing timeout to 25s.
+   ** Return error in facility locks loading if PIN status check fails.
+   ** Return FIXED_DIALING lock status when checking PIN2.
+
+ * MBIM:
+   ** Don't fail IPv4 connection if IPv4v6 was requested.
+
+ * Plugins:
+   ** telit: new ID_MM_TELIT_PORT_DELAY tag to flag devices that require
+      extended AT probing.
+   ** telit: added FN980 and LM9x0 MBIM compositions rules.
+   ** telit: fixed LM9x0 udev rules.
+   ** cinterion: configure the PLAS9 to correctly send URCs.
+   ** simtech: add SIM7070/SIM7080/SIM7090 port type hints
+
+ * i18n:
+   ** Updated Swedish and Slovak translations.
+   ** Updated package bugreport to use the gitlab issues URL.
+
+ * Several other minor improvements and fixes.
+
+
 ModemManager 1.14.2
 -------------------------------------------
 This is a new bugfix release of ModemManager.
