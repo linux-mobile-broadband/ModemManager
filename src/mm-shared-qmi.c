@@ -3423,7 +3423,8 @@ uim_get_slot_status_ready (QmiClientUim *client,
             continue;
         }
 
-        raw_iccid = mm_bcd_to_string ((const guint8 *)slot_status->iccid->data, slot_status->iccid->len);
+        raw_iccid = mm_bcd_to_string ((const guint8 *)slot_status->iccid->data, slot_status->iccid->len,
+                                      TRUE /* low_nybble_first */);
         if (!raw_iccid) {
             mm_obj_warn (self, "not creating SIM object: failed to convert ICCID from BCD");
             g_ptr_array_add (ctx->sim_slots, NULL);
@@ -3765,8 +3766,10 @@ uim_slot_status_indication_cb (QmiClientUim                     *client,
         if (slot_status->physical_slot_status == QMI_UIM_SLOT_STATE_ACTIVE) {
             g_autofree gchar *iccid = NULL;
 
-            if (slot_status->iccid && slot_status->iccid->len > 0)
-                iccid = mm_bcd_to_string ((const guint8 *) slot_status->iccid->data, slot_status->iccid->len);
+            if (slot_status->iccid && slot_status->iccid->len > 0) {
+                iccid = mm_bcd_to_string ((const guint8 *) slot_status->iccid->data, slot_status->iccid->len,
+                                          TRUE /* low_nybble_first */);
+            }
 
             mm_iface_modem_check_for_sim_swap (MM_IFACE_MODEM (self),
                                                i + 1, /* Slot index */

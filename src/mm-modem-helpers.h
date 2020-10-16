@@ -84,7 +84,9 @@ GArray *mm_filter_supported_modes (const GArray *all,
                                    const GArray *supported_combinations,
                                    gpointer      log_object);
 
-gchar *mm_bcd_to_string (const guint8 *bcd, gsize bcd_len);
+gchar *mm_bcd_to_string (const guint8 *bcd,
+                         gsize bcd_len,
+                         gboolean low_nybble_first);
 
 /*****************************************************************************/
 /* VOICE specific helpers and utilities */

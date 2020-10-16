@@ -473,7 +473,7 @@ mm_filter_supported_modes (const GArray *all,
 static const gchar bcd_chars[] = "0123456789\0\0\0\0\0\0";
 
 gchar *
-mm_bcd_to_string (const guint8 *bcd, gsize bcd_len)
+mm_bcd_to_string (const guint8 *bcd, gsize bcd_len, gboolean low_nybble_first)
 {
     GString *str;
     gsize i;
@@ -482,8 +482,11 @@ mm_bcd_to_string (const guint8 *bcd, gsize bcd_len)
 
     str = g_string_sized_new (bcd_len * 2 + 1);
     for (i = 0 ; i < bcd_len; i++) {
-        str = g_string_append_c (str, bcd_chars[bcd[i] & 0xF]);
+        if (low_nybble_first)
+            str = g_string_append_c (str, bcd_chars[bcd[i] & 0xF]);
         str = g_string_append_c (str, bcd_chars[(bcd[i] >> 4) & 0xF]);
+        if (!low_nybble_first)
+            str = g_string_append_c (str, bcd_chars[bcd[i] & 0xF]);
     }
     return g_string_free (str, FALSE);
 }
@@ -4301,7 +4304,7 @@ mm_3gpp_parse_emergency_numbers (const char *raw, GError **error)
     for (i = 0; i < max_items; i++) {
         gchar *number;
 
-        number = mm_bcd_to_string (&bin[i*3], 3);
+        number = mm_bcd_to_string (&bin[i*3], 3, TRUE /* low_nybble_first */);
         if (number && number[0])
             g_ptr_array_add (out, number);
         else

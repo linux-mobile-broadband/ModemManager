@@ -344,7 +344,8 @@ uim_get_iccid_ready (QmiClientUim *client,
         return;
     }
 
-    iccid = mm_bcd_to_string ((const guint8 *) read_result->data, read_result->len);
+    iccid = mm_bcd_to_string ((const guint8 *) read_result->data, read_result->len,
+                              TRUE /* low_nybble_first */);
     g_assert (iccid);
     g_task_return_pointer (task, iccid, g_free);
     g_object_unref (task);
@@ -458,7 +459,8 @@ uim_get_imsi_ready (QmiClientUim *client,
         return;
     }
 
-    imsi = mm_bcd_to_string ((const guint8 *) read_result->data, read_result->len);
+    imsi = mm_bcd_to_string ((const guint8 *) read_result->data, read_result->len,
+                             TRUE /* low_nybble_first */);
     g_assert (imsi);
     if (strlen (imsi) < 3)
         g_task_return_new_error (task,

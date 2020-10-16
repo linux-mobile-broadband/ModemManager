@@ -4429,20 +4429,22 @@ test_parse_uint_list (void)
 typedef struct {
     const guint8 bcd[10];
     gsize bcd_len;
-    const gchar *str;
+    const gchar *low_nybble_first_str;
+    const gchar *high_nybble_first_str;
 } BcdToStringTest;
 
 static const BcdToStringTest bcd_to_string_tests[] = {
-    { { }, 0, "" },
-    { { 0x01 }, 1, "10" },
-    { { 0x1F }, 1, "" },
-    { { 0xE2 }, 1, "2" },
-    { { 0xD3 }, 1, "3" },
-    { { 0xC4 }, 1, "4" },
-    { { 0xB1, 0x23 }, 2, "1" },
-    { { 0x01, 0x23, 0x45, 0x67 }, 4, "10325476" },
-    { { 0x01, 0x23, 0x45, 0xA7 }, 4, "1032547" },
-    { { 0x01, 0x23, 0x45, 0x67 }, 2, "1032" },
+    { { }, 0, "", "" },
+    { { 0x01 }, 1, "10", "01" },
+    { { 0x1F }, 1, "", "1" },
+    { { 0xE2 }, 1, "2", "" },
+    { { 0xD3 }, 1, "3", "" },
+    { { 0xC4 }, 1, "4", "" },
+    { { 0xB1, 0x23 }, 2, "1", "" },
+    { { 0x01, 0x2A }, 2, "10", "012" },
+    { { 0x01, 0x23, 0x45, 0x67 }, 4, "10325476", "01234567" },
+    { { 0x01, 0x23, 0x45, 0xA7 }, 4, "1032547", "012345" },
+    { { 0x01, 0x23, 0x45, 0x67 }, 2, "1032", "0123" },
 };
 
 static void
@@ -4454,8 +4456,15 @@ test_bcd_to_string (void *f, gpointer d)
         gchar *str;
 
         str = mm_bcd_to_string (bcd_to_string_tests[i].bcd,
-                                bcd_to_string_tests[i].bcd_len);
-        g_assert_cmpstr (str, ==, bcd_to_string_tests[i].str);
+                                bcd_to_string_tests[i].bcd_len,
+                                TRUE /* low_nybble_first */);
+        g_assert_cmpstr (str, ==, bcd_to_string_tests[i].low_nybble_first_str);
+        g_free (str);
+
+        str = mm_bcd_to_string (bcd_to_string_tests[i].bcd,
+                                bcd_to_string_tests[i].bcd_len,
+                                FALSE /* low_nybble_first */);
+        g_assert_cmpstr (str, ==, bcd_to_string_tests[i].high_nybble_first_str);
         g_free (str);
     }
 }
