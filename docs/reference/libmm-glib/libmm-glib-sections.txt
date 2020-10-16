@@ -1223,6 +1223,8 @@ mm_sim_get_identifier
 mm_sim_dup_identifier
 mm_sim_get_imsi
 mm_sim_dup_imsi
+mm_sim_get_eid
+mm_sim_dup_eid
 mm_sim_get_operator_identifier
 mm_sim_dup_operator_identifier
 mm_sim_get_operator_name

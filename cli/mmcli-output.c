@@ -269,6 +269,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_SIM_PROPERTIES_ACTIVE]             = { "sim.properties.active",                           "active",                   MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_IMSI]               = { "sim.properties.imsi",                             "imsi",                     MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_ICCID]              = { "sim.properties.iccid",                            "iccid",                    MMC_S_SIM_PROPERTIES,          },
+    [MMC_F_SIM_PROPERTIES_EID]                = { "sim.properties.eid",                              "eid",                      MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_OPERATOR_ID]        = { "sim.properties.operator-code",                    "operator id",              MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_OPERATOR_NAME]      = { "sim.properties.operator-name",                    "operator name",            MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_EMERGENCY_NUMBERS]  = { "sim.properties.emergency-numbers",                "emergency numbers",        MMC_S_SIM_PROPERTIES,          },

@@ -202,6 +202,52 @@ mm_sim_dup_imsi (MMSim *self)
 /*****************************************************************************/
 
 /**
+ * mm_sim_get_eid:
+ * @self: A #MMSim.
+ *
+ * Gets the Embedded UICC ID (or EID) of the #MMSim object.
+ *
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_sim_dup_eid() if on another thread.</warning>
+ *
+ * Returns: (transfer none): The EID of the #MMSim object, or %NULL if it
+ * couldn't be retrieved.
+ *
+ * Since: 1.16
+ */
+const gchar *
+mm_sim_get_eid (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_sim_get_eid (MM_GDBUS_SIM (self)));
+}
+
+/**
+ * mm_sim_dup_eid:
+ * @self: A #MMSim.
+ *
+ * Gets a copy of the Embedded UICC ID (EID) of the #MMSim object.
+ *
+ * Returns: (transfer full): The EID of the #MMSim object, or %NULL if it
+ * couldn't be retrieved. The returned value should be freed with g_free().
+ *
+ * Since: 1.16
+ */
+gchar *
+mm_sim_dup_eid (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_sim_dup_eid (MM_GDBUS_SIM (self)));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_sim_get_operator_identifier:
  * @self: A #MMSim.
  *

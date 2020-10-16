@@ -75,6 +75,9 @@ gchar       *mm_sim_dup_identifier          (MMSim *self);
 const gchar *mm_sim_get_imsi                (MMSim *self);
 gchar       *mm_sim_dup_imsi                (MMSim *self);
 
+const gchar *mm_sim_get_eid                 (MMSim *self);
+gchar       *mm_sim_dup_eid                 (MMSim *self);
+
 const gchar *mm_sim_get_operator_identifier (MMSim *self);
 gchar       *mm_sim_dup_operator_identifier (MMSim *self);
 
