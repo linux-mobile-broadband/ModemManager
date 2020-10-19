@@ -9070,7 +9070,7 @@ qmi_device_removed_cb (QmiDevice *device,
 
 static void
 track_qmi_device_removed (MMBroadbandModemQmi *self,
-                          MMPortQmi* qmi)
+                          MMPortQmi           *qmi)
 {
     QmiDevice *device;
 
@@ -9086,7 +9086,7 @@ track_qmi_device_removed (MMBroadbandModemQmi *self,
 
 static void
 untrack_qmi_device_removed (MMBroadbandModemQmi *self,
-                            MMPortQmi* qmi)
+                            MMPortQmi           *qmi)
 {
     QmiDevice *device;
 
@@ -9289,7 +9289,7 @@ dispose (GObject *object)
     MMPortQmi *qmi;
 
     /* If any port cleanup is needed, it must be done during dispose(), as
-     * the modem object will be affected by an explciit g_object_run_dispose()
+     * the modem object will be affected by an explicit g_object_run_dispose()
      * that will remove all port references right away */
     qmi = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
     if (qmi) {
