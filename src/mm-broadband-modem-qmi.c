@@ -9218,7 +9218,7 @@ initialization_started (MMBroadbandModem *self,
 {
     InitializationStartedContext *ctx;
     GTask                        *task;
-    GError *error                = NULL;
+    GError                       *error = NULL;
 
     ctx = g_new0 (InitializationStartedContext, 1);
     ctx->qmi = mm_base_modem_get_port_qmi (MM_BASE_MODEM (self));
