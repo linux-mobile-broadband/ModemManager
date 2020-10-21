@@ -1543,17 +1543,7 @@ mm_port_probe_list_has_at_port (GList *list)
 gboolean
 mm_port_probe_is_qcdm (MMPortProbe *self)
 {
-    const gchar *subsys;
-    const gchar *name;
-
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
-
-    subsys = mm_kernel_device_get_subsystem (self->priv->port);
-    name = mm_kernel_device_get_name (self->priv->port);
-    if (g_str_equal (subsys, "net") ||
-        (g_str_has_prefix (subsys, "usb") &&
-         g_str_has_prefix (name, "cdc-wdm")))
-        return FALSE;
 
     return (self->priv->flags & MM_PORT_PROBE_QCDM ?
             self->priv->is_qcdm :
@@ -1563,19 +1553,11 @@ mm_port_probe_is_qcdm (MMPortProbe *self)
 gboolean
 mm_port_probe_is_qmi (MMPortProbe *self)
 {
-    const gchar *subsys;
-    const gchar *name;
-
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
-    subsys = mm_kernel_device_get_subsystem (self->priv->port);
-    name = mm_kernel_device_get_name (self->priv->port);
-    if (!g_str_has_prefix (subsys, "usb") ||
-        !name ||
-        !g_str_has_prefix (name, "cdc-wdm"))
-        return FALSE;
-
-    return self->priv->is_qmi;
+    return (self->priv->flags & MM_PORT_PROBE_QMI ?
+            self->priv->is_qmi :
+            FALSE);
 }
 
 gboolean
@@ -1597,19 +1579,11 @@ mm_port_probe_list_has_qmi_port (GList *list)
 gboolean
 mm_port_probe_is_mbim (MMPortProbe *self)
 {
-    const gchar *subsys;
-    const gchar *name;
-
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
-    subsys = mm_kernel_device_get_subsystem (self->priv->port);
-    name = mm_kernel_device_get_name (self->priv->port);
-    if (!g_str_has_prefix (subsys, "usb") ||
-        !name ||
-        !g_str_has_prefix (name, "cdc-wdm"))
-        return FALSE;
-
-    return self->priv->is_mbim;
+    return (self->priv->flags & MM_PORT_PROBE_MBIM ?
+            self->priv->is_mbim :
+            FALSE);
 }
 
 gboolean
@@ -1640,21 +1614,17 @@ mm_port_probe_get_port_type (MMPortProbe *self)
     if (g_str_equal (subsys, "net"))
         return MM_PORT_TYPE_NET;
 
-    if (g_str_has_prefix (subsys, "usb")) {
-        const gchar *name;
-
-        name = mm_kernel_device_get_name (self->priv->port);
-        if (g_str_has_prefix (name, "cdc-wdm")) {
 #if defined WITH_QMI
-            if (self->priv->is_qmi)
-                return MM_PORT_TYPE_QMI;
+    if (self->priv->flags & MM_PORT_PROBE_QMI &&
+        self->priv->is_qmi)
+        return MM_PORT_TYPE_QMI;
 #endif
+
 #if defined WITH_MBIM
-            if (self->priv->is_mbim)
-                return MM_PORT_TYPE_MBIM;
+    if (self->priv->flags & MM_PORT_PROBE_MBIM &&
+        self->priv->is_mbim)
+        return MM_PORT_TYPE_MBIM;
 #endif
-        }
-    }
 
     if (self->priv->flags & MM_PORT_PROBE_QCDM &&
         self->priv->is_qcdm)
@@ -1708,17 +1678,7 @@ mm_port_probe_get_port (MMPortProbe *self)
 const gchar *
 mm_port_probe_get_vendor (MMPortProbe *self)
 {
-    const gchar *subsys;
-    const gchar *name;
-
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
-
-    subsys = mm_kernel_device_get_subsystem (self->priv->port);
-    name = mm_kernel_device_get_name (self->priv->port);
-    if (g_str_equal (subsys, "net") ||
-        (g_str_has_prefix (subsys, "usb") &&
-         g_str_has_prefix (name, "cdc-wdm")))
-        return NULL;
 
     return (self->priv->flags & MM_PORT_PROBE_AT_VENDOR ?
             self->priv->vendor :
@@ -1728,17 +1688,7 @@ mm_port_probe_get_vendor (MMPortProbe *self)
 const gchar *
 mm_port_probe_get_product (MMPortProbe *self)
 {
-    const gchar *subsys;
-    const gchar *name;
-
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
-
-    subsys = mm_kernel_device_get_subsystem (self->priv->port);
-    name = mm_kernel_device_get_name (self->priv->port);
-    if (g_str_equal (subsys, "net") ||
-        (g_str_has_prefix (subsys, "usb") &&
-         g_str_has_prefix (name, "cdc-wdm")))
-        return NULL;
 
     return (self->priv->flags & MM_PORT_PROBE_AT_PRODUCT ?
             self->priv->product :
@@ -1749,9 +1699,6 @@ gboolean
 mm_port_probe_is_icera (MMPortProbe *self)
 {
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
-
-    if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "net"))
-        return FALSE;
 
     return (self->priv->flags & MM_PORT_PROBE_AT_ICERA ?
             self->priv->is_icera :
@@ -1775,9 +1722,6 @@ gboolean
 mm_port_probe_is_xmm (MMPortProbe *self)
 {
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
-
-    if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "net"))
-        return FALSE;
 
     return (self->priv->flags & MM_PORT_PROBE_AT_XMM ?
             self->priv->is_xmm :
