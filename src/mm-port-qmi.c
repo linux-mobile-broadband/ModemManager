@@ -234,7 +234,7 @@ typedef enum {
     PORT_OPEN_STEP_ALLOCATE_WDA_CLIENT,
     PORT_OPEN_STEP_GET_WDA_DATA_FORMAT,
     PORT_OPEN_STEP_CHECK_DATA_FORMAT,
-    PORT_OPEN_STEP_SET_KERNEL_DATA_FORMAT,
+    PORT_OPEN_STEP_SYNC_DATA_FORMAT,
     PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT,
     PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT,
     PORT_OPEN_STEP_LAST
@@ -294,29 +294,35 @@ qmi_device_close_on_error_ready (QmiDevice    *qmi_device,
                                  GAsyncResult *res,
                                  GTask        *task)
 {
-    MMPortQmi *self;
-    GError    *error = NULL;
+    MMPortQmi         *self;
+    g_autoptr(GError)  error = NULL;
 
     self = g_task_get_source_object (task);
 
-    if (!qmi_device_close_finish (qmi_device, res, &error)) {
+    if (!qmi_device_close_finish (qmi_device, res, &error))
         mm_obj_warn (self, "Couldn't close QMI device after failed open sequence: %s", error->message);
-        g_error_free (error);
-    }
 
     port_open_complete_with_error (task);
 }
 
 static void
-qmi_device_open_second_ready (QmiDevice *qmi_device,
+qmi_device_open_second_ready (QmiDevice    *qmi_device,
                               GAsyncResult *res,
-                              GTask *task)
+                              GTask        *task)
 {
+    MMPortQmi       *self;
     PortOpenContext *ctx;
 
-    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
-    qmi_device_open_finish (qmi_device, res, &ctx->error);
+    if (qmi_device_open_finish (qmi_device, res, &ctx->error)) {
+        /* If the open with CTL data format is sucessful, update */
+        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP)
+            self->priv->llp_is_raw_ip = TRUE;
+        else
+            self->priv->llp_is_raw_ip = FALSE;
+    }
 
     /* In both error and success, we go to last step */
     ctx->step = PORT_OPEN_STEP_LAST;
@@ -343,17 +349,44 @@ qmi_device_close_to_reopen_ready (QmiDevice    *qmi_device,
 }
 
 static void
-get_data_format_ready (QmiClientWda *client,
+set_data_format_ready (QmiClientWda *client,
                        GAsyncResult *res,
-                       GTask *task)
+                       GTask        *task)
 {
-    MMPortQmi *self;
-    PortOpenContext *ctx;
-    QmiMessageWdaGetDataFormatOutput *output;
-    g_autoptr(GError) error = NULL;
+    MMPortQmi                                   *self;
+    PortOpenContext                             *ctx;
+    g_autoptr(QmiMessageWdaSetDataFormatOutput)  output = NULL;
+    g_autoptr(GError)                            error = NULL;
 
     self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
+    ctx  = g_task_get_task_data (task);
+
+    output = qmi_client_wda_set_data_format_finish (client, res, &error);
+    if (!output || !qmi_message_wda_set_data_format_output_get_result (output, &error)) {
+        mm_obj_warn (self, "Couldn't set data format: %s", error->message);
+        /* If setting WDA data format fails, fallback to LLP requested via CTL */
+        ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
+    } else {
+        self->priv->llp_is_raw_ip = TRUE;
+        ctx->step = PORT_OPEN_STEP_LAST;
+    }
+
+    port_open_step (task);
+}
+
+static void
+get_data_format_ready (QmiClientWda *client,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMPortQmi                                   *self;
+    PortOpenContext                             *ctx;
+    g_autoptr(QmiMessageWdaGetDataFormatOutput)  output = NULL;
+    g_autoptr(GError)                            error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
     output = qmi_client_wda_get_data_format_finish (client, res, NULL);
     if (!output ||
         !qmi_message_wda_get_data_format_output_get_result (output, &error) ||
@@ -374,20 +407,18 @@ get_data_format_ready (QmiClientWda *client,
         /* Go on to next step */
         ctx->step++;
 
-    if (output)
-        qmi_message_wda_get_data_format_output_unref (output);
-
     port_open_step (task);
 }
 
 static void
-allocate_client_wda_ready (QmiDevice *device,
+allocate_client_wda_ready (QmiDevice    *device,
                            GAsyncResult *res,
-                           GTask *task)
+                           GTask        *task)
 {
     PortOpenContext *ctx;
 
     ctx = g_task_get_task_data (task);
+
     ctx->wda = qmi_device_allocate_client_finish (device, res, NULL);
     if (!ctx->wda) {
         /* If no WDA supported, then we just fallback to reopening explicitly
@@ -403,13 +434,14 @@ allocate_client_wda_ready (QmiDevice *device,
 }
 
 static void
-qmi_device_open_first_ready (QmiDevice *qmi_device,
+qmi_device_open_first_ready (QmiDevice    *qmi_device,
                              GAsyncResult *res,
-                             GTask *task)
+                             GTask        *task)
 {
     PortOpenContext *ctx;
 
     ctx = g_task_get_task_data (task);
+
     if (!qmi_device_open_finish (qmi_device, res, &ctx->error))
         /* Error opening the device */
         ctx->step = PORT_OPEN_STEP_LAST;
@@ -446,7 +478,7 @@ qmi_device_new_ready (GObject *unused,
 static void
 port_open_step (GTask *task)
 {
-    MMPortQmi *self;
+    MMPortQmi       *self;
     PortOpenContext *ctx;
 
     self = g_task_get_source_object (task);
@@ -516,15 +548,25 @@ port_open_step (GTask *task)
         return;
 
     case PORT_OPEN_STEP_GET_KERNEL_DATA_FORMAT:
-        mm_obj_dbg (self, "Querying kernel data format...");
-        /* Try to gather expected data format from the sysfs file */
-        ctx->kernel_data_format = qmi_device_get_expected_data_format (ctx->device, NULL);
-        /* If data format cannot be retrieved, we fallback to 802.3 via CTL */
-        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN) {
-            ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
-            port_open_step (task);
-            return;
+        /* Querying kernel data format is only expected when using qmi_wwan */
+        if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) {
+            mm_obj_dbg (self, "Querying kernel data format...");
+            /* Try to gather expected data format from the sysfs file */
+            ctx->kernel_data_format = qmi_device_get_expected_data_format (ctx->device, NULL);
+            /* If data format cannot be retrieved, we fallback to 802.3 via CTL */
+            if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN) {
+                ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
+                port_open_step (task);
+                return;
+            }
         }
+        /* For any driver other than qmi_wwan, assume raw-ip */
+        else {
+            ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
+            mm_obj_dbg (self, "Assuming default kernel data format: %s",
+                        qmi_device_expected_data_format_get_string (ctx->kernel_data_format));
+        }
+
         ctx->step++;
         /* Fall through */
 
@@ -542,7 +584,6 @@ port_open_step (GTask *task)
 
     case PORT_OPEN_STEP_GET_WDA_DATA_FORMAT:
         /* If we have WDA client, query current data format */
-        g_assert (ctx->wda);
         mm_obj_dbg (self, "Querying device data format...");
         qmi_client_wda_get_data_format (QMI_CLIENT_WDA (ctx->wda),
                                         NULL,
@@ -578,8 +619,26 @@ port_open_step (GTask *task)
         ctx->step++;
         /* Fall through */
 
-    case PORT_OPEN_STEP_SET_KERNEL_DATA_FORMAT:
-        /* Update the data format to be expected by the kernel */
+    case PORT_OPEN_STEP_SYNC_DATA_FORMAT:
+        /* For drivers other than qmi_wwan, the kernel data format was raw-ip
+         * by default, we need to ask the module to switch to it */
+        if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) {
+            g_autoptr(QmiMessageWdaSetDataFormatInput) input = NULL;
+
+            g_assert (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP);
+            input = qmi_message_wda_set_data_format_input_new ();
+            qmi_message_wda_set_data_format_input_set_link_layer_protocol (input, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, NULL);
+            qmi_client_wda_set_data_format (QMI_CLIENT_WDA (ctx->wda),
+                                            input,
+                                            10,
+                                            g_task_get_cancellable (task),
+                                            (GAsyncReadyCallback) set_data_format_ready,
+                                            task);
+            return;
+        }
+
+        /* If using the qmi_wwan driver, we ask the kernel to sync with the
+         * data format requested by the module */
         mm_obj_dbg (self, "Updating kernel data format: %s", qmi_wda_link_layer_protocol_get_string (ctx->llp));
         if (ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3) {
             ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3;
@@ -599,6 +658,7 @@ port_open_step (GTask *task)
         return;
 
     case PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT:
+        /* This fallback only applies when WDA unsupported */
         mm_obj_dbg (self, "Closing device to reopen it right away...");
         qmi_device_close_async (ctx->device,
                                 5,
@@ -607,19 +667,30 @@ port_open_step (GTask *task)
                                 task);
         return;
 
-    case PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT:
-        /* Need to reopen setting 802.3 using CTL */
-        mm_obj_dbg (self, "Reopening device with data format...");
+    case PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT: {
+        QmiDeviceOpenFlags open_flags;
+
+        /* Common open flags */
+        open_flags = (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
+                      QMI_DEVICE_OPEN_FLAGS_PROXY        |
+                      QMI_DEVICE_OPEN_FLAGS_NET_NO_QOS_HEADER);
+
+        /* Need to reopen setting 802.3/raw-ip using CTL */
+        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP)
+            open_flags |= QMI_DEVICE_OPEN_FLAGS_NET_RAW_IP;
+        else
+            open_flags |= QMI_DEVICE_OPEN_FLAGS_NET_802_3;
+
+        mm_obj_dbg (self, "Reopening device with data format: %s...",
+                    qmi_device_expected_data_format_get_string (ctx->kernel_data_format));
         qmi_device_open (ctx->device,
-                         (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
-                          QMI_DEVICE_OPEN_FLAGS_PROXY        |
-                          QMI_DEVICE_OPEN_FLAGS_NET_802_3    |
-                          QMI_DEVICE_OPEN_FLAGS_NET_NO_QOS_HEADER),
+                         open_flags,
                          10,
                          g_task_get_cancellable (task),
                          (GAsyncReadyCallback) qmi_device_open_second_ready,
                          task);
         return;
+    }
 
     case PORT_OPEN_STEP_LAST:
         if (ctx->error) {
@@ -655,26 +726,23 @@ port_open_step (GTask *task)
 }
 
 void
-mm_port_qmi_open (MMPortQmi *self,
-                  gboolean set_data_format,
-                  GCancellable *cancellable,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+mm_port_qmi_open (MMPortQmi           *self,
+                  gboolean             set_data_format,
+                  GCancellable        *cancellable,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
 {
     PortOpenContext *ctx;
-    GTask *task;
-
-    g_return_if_fail (MM_IS_PORT_QMI (self));
+    GTask           *task;
 
     ctx = g_slice_new0 (PortOpenContext);
     ctx->step = PORT_OPEN_STEP_FIRST;
     ctx->set_data_format = set_data_format;
-    ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
     ctx->llp = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
+    ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
 
     task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)port_open_context_free);
-
     port_open_step (task);
 }
 
