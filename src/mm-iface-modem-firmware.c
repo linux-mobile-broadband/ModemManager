@@ -21,6 +21,10 @@
 #include "mm-iface-modem-firmware.h"
 #include "mm-log-object.h"
 
+#if defined WITH_MBIM
+# include "mm-broadband-modem-mbim.h"
+#endif
+
 /*****************************************************************************/
 
 void
@@ -334,8 +338,8 @@ add_generic_device_ids (MMBaseModem               *self,
     primary = MM_PORT (mm_base_modem_peek_port_qmi (self));
 #endif
 #if defined WITH_MBIM
-    if (!primary)
-        primary = MM_PORT (mm_base_modem_peek_port_mbim (self));
+    if (!primary && MM_IS_BROADBAND_MODEM_MBIM (self))
+        primary = MM_PORT (mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self)));
 #endif
     if (!primary)
         primary = MM_PORT (mm_base_modem_peek_port_primary (self));

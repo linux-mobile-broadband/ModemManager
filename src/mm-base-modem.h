@@ -129,10 +129,6 @@ MMPortSerial     *mm_base_modem_peek_port_audio        (MMBaseModem *self);
 MMPortQmi        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
 MMPortQmi        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
-#if defined WITH_MBIM
-MMPortMbim       *mm_base_modem_peek_port_mbim          (MMBaseModem *self);
-MMPortMbim       *mm_base_modem_peek_port_mbim_for_data (MMBaseModem *self, MMPort *data, GError **error);
-#endif
 MMPortSerialAt   *mm_base_modem_peek_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self, MMPortType type);
 GList            *mm_base_modem_peek_data_ports        (MMBaseModem *self);
@@ -146,10 +142,6 @@ MMPortSerial     *mm_base_modem_get_port_audio        (MMBaseModem *self);
 #if defined WITH_QMI
 MMPortQmi        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
 MMPortQmi        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
-#endif
-#if defined WITH_MBIM
-MMPortMbim       *mm_base_modem_get_port_mbim          (MMBaseModem *self);
-MMPortMbim       *mm_base_modem_get_port_mbim_for_data (MMBaseModem *self, MMPort *data, GError **error);
 #endif
 MMPortSerialAt   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self, MMPortType type);

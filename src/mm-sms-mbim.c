@@ -24,6 +24,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-broadband-modem-mbim.h"
 #include "mm-modem-helpers-mbim.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-sms-mbim.h"
@@ -51,7 +52,7 @@ peek_device (gpointer self,
     if (o_device) {
         MMPortMbim *port;
 
-        port = mm_base_modem_peek_port_mbim (modem);
+        port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (modem));
         if (!port) {
             g_task_report_new_error (self,
                                      callback,

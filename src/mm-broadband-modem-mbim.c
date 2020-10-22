@@ -143,7 +143,7 @@ peek_device (gpointer self,
 {
     MMPortMbim *port;
 
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
     if (!port) {
         g_task_report_new_error (self,
                                  callback,
@@ -172,7 +172,7 @@ shared_qmi_peek_client (MMSharedQmi    *self,
 
     g_assert (flag == MM_PORT_QMI_FLAG_DEFAULT);
 
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
     if (!port) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -201,6 +201,108 @@ shared_qmi_peek_client (MMSharedQmi    *self,
 }
 
 #endif
+
+/*****************************************************************************/
+
+MMPortMbim *
+mm_broadband_modem_mbim_get_port_mbim (MMBroadbandModemMbim *self)
+{
+    MMPortMbim *primary_mbim_port;
+
+    g_assert (MM_IS_BROADBAND_MODEM_MBIM (self));
+
+    primary_mbim_port = mm_broadband_modem_mbim_peek_port_mbim (self);
+    return (primary_mbim_port ?
+            MM_PORT_MBIM (g_object_ref (primary_mbim_port)) :
+            NULL);
+}
+
+MMPortMbim *
+mm_broadband_modem_mbim_peek_port_mbim (MMBroadbandModemMbim *self)
+{
+    MMPortMbim *primary_mbim_port = NULL;
+    GList      *mbim_ports;
+
+    g_assert (MM_IS_BROADBAND_MODEM_MBIM (self));
+
+    mbim_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                           MM_PORT_SUBSYS_USB,
+                                           MM_PORT_TYPE_MBIM,
+                                           NULL);
+
+    /* First MBIM port in the list is the primary one always */
+    if (mbim_ports)
+        primary_mbim_port = MM_PORT_MBIM (mbim_ports->data);
+
+    g_list_free_full (mbim_ports, g_object_unref);
+
+    return primary_mbim_port;
+}
+
+MMPortMbim *
+mm_broadband_modem_mbim_get_port_mbim_for_data (MMBroadbandModemMbim  *self,
+                                                MMPort                *data,
+                                                GError               **error)
+{
+    MMPortMbim *mbim_port;
+
+    g_assert (MM_IS_BROADBAND_MODEM_MBIM (self));
+
+    mbim_port = mm_broadband_modem_mbim_peek_port_mbim_for_data (self, data, error);
+    return (mbim_port ?
+            MM_PORT_MBIM (g_object_ref (mbim_port)) :
+            NULL);
+}
+
+MMPortMbim *
+mm_broadband_modem_mbim_peek_port_mbim_for_data (MMBroadbandModemMbim  *self,
+                                                 MMPort                *data,
+                                                 GError               **error)
+{
+    GList       *cdc_wdm_mbim_ports;
+    GList       *l;
+    const gchar *net_port_parent_path;
+    MMPortMbim  *found = NULL;
+
+    g_assert (MM_IS_BROADBAND_MODEM_MBIM (self));
+    g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
+
+    net_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (data));
+    if (!net_port_parent_path) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "No parent path for 'net/%s'",
+                     mm_port_get_device (data));
+        return NULL;
+    }
+
+    /* Find the CDC-WDM port on the same USB interface as the given net port */
+    cdc_wdm_mbim_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                                   MM_PORT_SUBSYS_USB,
+                                                   MM_PORT_TYPE_MBIM,
+                                                   NULL);
+
+    for (l = cdc_wdm_mbim_ports; l && !found; l = g_list_next (l)) {
+        const gchar *wdm_port_parent_path;
+
+        g_assert (MM_IS_PORT_MBIM (l->data));
+        wdm_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (MM_PORT (l->data)));
+        if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
+            found = MM_PORT_MBIM (l->data);
+    }
+
+    g_list_free_full (cdc_wdm_mbim_ports, g_object_unref);
+
+    if (!found)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "Couldn't find associated MBIM port for 'net/%s'",
+                     mm_port_get_device (data));
+
+    return found;
+}
 
 /*****************************************************************************/
 /* Current capabilities (Modem interface) */
@@ -515,7 +617,7 @@ modem_load_manufacturer (MMIfaceModem *self,
     gchar *manufacturer = NULL;
     MMPortMbim *port;
 
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
     if (port) {
         manufacturer = g_strdup (mm_kernel_device_get_physdev_manufacturer (
             mm_port_peek_kernel_device (MM_PORT (port))));
@@ -549,7 +651,7 @@ modem_load_model (MMIfaceModem *self,
     GTask *task;
     MMPortMbim *port;
 
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
     if (port) {
         model = g_strdup (mm_kernel_device_get_physdev_product (
             mm_port_peek_kernel_device (MM_PORT (port))));
@@ -2307,7 +2409,7 @@ initialization_started (MMBroadbandModem    *self,
     GTask                        *task;
 
     ctx = g_slice_new0 (InitializationStartedContext);
-    ctx->mbim = mm_base_modem_get_port_mbim (MM_BASE_MODEM (self));
+    ctx->mbim = mm_broadband_modem_mbim_get_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
@@ -3270,7 +3372,7 @@ sms_notification_read_stored_sms (MMBroadbandModemMbim *self,
     MbimDevice *device;
     MbimMessage *message;
 
-    port = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    port = mm_broadband_modem_mbim_peek_port_mbim (self);
     if (!port)
         return;
     device = mm_port_mbim_peek_device (port);
@@ -5419,7 +5521,7 @@ dispose (GObject *object)
     /* If any port cleanup is needed, it must be done during dispose(), as
      * the modem object will be affected by an explciit g_object_run_dispose()
      * that will remove all port references right away */
-    mbim = mm_base_modem_peek_port_mbim (MM_BASE_MODEM (self));
+    mbim = mm_broadband_modem_mbim_peek_port_mbim (self);
     if (mbim) {
         /* Explicitly remove notification handler */
         self->priv->setup_flags = PROCESS_NOTIFICATION_FLAG_NONE;

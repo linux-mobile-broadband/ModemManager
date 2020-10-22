@@ -41,10 +41,19 @@ struct _MMBroadbandModemMbimClass{
 GType mm_broadband_modem_mbim_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBroadbandModemMbim, g_object_unref)
 
-MMBroadbandModemMbim *mm_broadband_modem_mbim_new (const gchar *device,
+MMBroadbandModemMbim *mm_broadband_modem_mbim_new (const gchar  *device,
                                                    const gchar **drivers,
-                                                   const gchar *plugin,
-                                                   guint16 vendor_id,
-                                                   guint16 product_id);
+                                                   const gchar  *plugin,
+                                                   guint16       vendor_id,
+                                                   guint16       product_id);
+
+MMPortMbim *mm_broadband_modem_mbim_peek_port_mbim          (MMBroadbandModemMbim  *self);
+MMPortMbim *mm_broadband_modem_mbim_peek_port_mbim_for_data (MMBroadbandModemMbim  *self,
+                                                             MMPort                *data,
+                                                             GError               **error);
+MMPortMbim *mm_broadband_modem_mbim_get_port_mbim           (MMBroadbandModemMbim  *self);
+MMPortMbim *mm_broadband_modem_mbim_get_port_mbim_for_data  (MMBroadbandModemMbim  *self,
+                                                             MMPort                *data,
+                                                             GError               **error);
 
 #endif /* MM_BROADBAND_MODEM_MBIM_H */
