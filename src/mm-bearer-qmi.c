@@ -1642,7 +1642,7 @@ _connect (MMBaseBearer *_self,
     }
 
     /* Each data port has a single QMI port associated */
-    qmi = mm_base_modem_get_port_qmi_for_data (modem, data, &error);
+    qmi = mm_broadband_modem_qmi_get_port_qmi_for_data (MM_BROADBAND_MODEM_QMI (modem), data, &error);
     if (!qmi) {
         g_task_report_error (
             self,

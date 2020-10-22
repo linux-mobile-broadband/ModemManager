@@ -25,6 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-broadband-modem-qmi.h"
 #include "mm-log-object.h"
 #include "mm-sim-qmi.h"
 #include "mm-modem-helpers-qmi.h"
@@ -60,7 +61,7 @@ ensure_qmi_client (GTask       *task,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
-    port = mm_base_modem_peek_port_qmi (modem);
+    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (modem));
     g_object_unref (modem);
 
     if (!port) {

@@ -28,6 +28,9 @@
 #include "mm-private-boxed-types.h"
 #include "mm-log-object.h"
 #include "mm-context.h"
+#if defined WITH_QMI
+# include "mm-broadband-modem-qmi.h"
+#endif
 #if defined WITH_MBIM
 # include "mm-broadband-modem-mbim.h"
 #endif
@@ -4959,7 +4962,8 @@ interface_initialization_step (GTask *task)
             MMPort *primary = NULL;
 
 #if defined WITH_QMI
-            primary = MM_PORT (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)));
+            if (MM_IS_BROADBAND_MODEM_QMI (self))
+                primary = MM_PORT (mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self)));
 #endif
 #if defined WITH_MBIM
             if (!primary && MM_IS_BROADBAND_MODEM_MBIM (self))

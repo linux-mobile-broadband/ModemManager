@@ -153,7 +153,7 @@ shared_qmi_peek_client (MMSharedQmi    *self,
     MMPortQmi *port;
     QmiClient *client;
 
-    port = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self));
     if (!port) {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -171,6 +171,107 @@ shared_qmi_peek_client (MMSharedQmi    *self,
                      qmi_service_get_string (service));
 
     return client;
+}
+
+/*****************************************************************************/
+
+MMPortQmi *
+mm_broadband_modem_qmi_get_port_qmi (MMBroadbandModemQmi *self)
+{
+    MMPortQmi *primary_qmi_port;
+
+    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
+
+    primary_qmi_port = mm_broadband_modem_qmi_peek_port_qmi (self);
+    return (primary_qmi_port ?
+            MM_PORT_QMI (g_object_ref (primary_qmi_port)) :
+            NULL);
+}
+
+MMPortQmi *
+mm_broadband_modem_qmi_peek_port_qmi (MMBroadbandModemQmi *self)
+{
+    MMPortQmi *primary_qmi_port = NULL;
+    GList     *qmi_ports;
+
+    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
+
+    qmi_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                          MM_PORT_SUBSYS_USB,
+                                          MM_PORT_TYPE_QMI,
+                                          NULL);
+
+    /* First QMI port in the list is the primary one always */
+    if (qmi_ports)
+        primary_qmi_port = MM_PORT_QMI (qmi_ports->data);
+
+    g_list_free_full (qmi_ports, g_object_unref);
+
+    return primary_qmi_port;
+}
+
+MMPortQmi *
+mm_broadband_modem_qmi_get_port_qmi_for_data (MMBroadbandModemQmi  *self,
+                                              MMPort               *data,
+                                              GError              **error)
+{
+    MMPortQmi *qmi_port;
+
+    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
+
+    qmi_port = mm_broadband_modem_qmi_peek_port_qmi_for_data (self, data, error);
+    return (qmi_port ?
+            MM_PORT_QMI (g_object_ref (qmi_port)) :
+            NULL);
+}
+
+MMPortQmi *
+mm_broadband_modem_qmi_peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
+                                               MMPort               *data,
+                                               GError              **error)
+{
+    GList       *cdc_wdm_qmi_ports;
+    GList       *l;
+    const gchar *net_port_parent_path;
+    MMPortQmi   *found = NULL;
+
+    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
+    g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
+
+    net_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (data));
+    if (!net_port_parent_path) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "No parent path for 'net/%s'",
+                     mm_port_get_device (data));
+        return NULL;
+    }
+
+    /* Find the CDC-WDM port on the same USB interface as the given net port */
+    cdc_wdm_qmi_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                                  MM_PORT_SUBSYS_USB,
+                                                  MM_PORT_TYPE_QMI,
+                                                  NULL);
+    for (l = cdc_wdm_qmi_ports; l && !found; l = g_list_next (l)) {
+        const gchar *wdm_port_parent_path;
+
+        g_assert (MM_IS_PORT_QMI (l->data));
+        wdm_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (MM_PORT (l->data)));
+        if (wdm_port_parent_path && g_str_equal (wdm_port_parent_path, net_port_parent_path))
+            found = MM_PORT_QMI (l->data);
+    }
+
+    g_list_free_full (cdc_wdm_qmi_ports, g_object_unref);
+
+    if (!found)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "Couldn't find associated QMI port for 'net/%s'",
+                     mm_port_get_device (data));
+
+    return found;
 }
 
 /*****************************************************************************/
@@ -8946,7 +9047,7 @@ parent_enabling_started_ready (MMBroadbandModem *_self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_started_context_free);
 
     /* Keep a full port reference around */
-    ctx->qmi = mm_base_modem_get_port_qmi (MM_BASE_MODEM (self));
+    ctx->qmi = mm_broadband_modem_qmi_get_port_qmi (MM_BROADBAND_MODEM_QMI (self));
     if (!ctx->qmi) {
         mm_obj_warn (self, "cannot check whether autoconnect is disabled or not: couldn't peek QMI port");
         /* not fatal, just assume autoconnect is disabled */
@@ -9220,7 +9321,7 @@ initialization_started (MMBroadbandModem *self,
     GError                       *error = NULL;
 
     ctx = g_new0 (InitializationStartedContext, 1);
-    ctx->qmi = mm_base_modem_get_port_qmi (MM_BASE_MODEM (self));
+    ctx->qmi = mm_broadband_modem_qmi_get_port_qmi (MM_BROADBAND_MODEM_QMI (self));
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)initialization_started_context_free);
@@ -9308,7 +9409,7 @@ dispose (GObject *object)
     /* If any port cleanup is needed, it must be done during dispose(), as
      * the modem object will be affected by an explicit g_object_run_dispose()
      * that will remove all port references right away */
-    qmi = mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self));
+    qmi = mm_broadband_modem_qmi_peek_port_qmi (self);
     if (qmi) {
         /* Disconnect signal handler for qmi-proxy disappearing, if it exists */
         untrack_qmi_device_removed (self, qmi);

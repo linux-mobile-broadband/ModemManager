@@ -125,10 +125,6 @@ MMPortSerialQcdm *mm_base_modem_peek_port_qcdm         (MMBaseModem *self);
 MMPortSerialAt   *mm_base_modem_peek_port_gps_control  (MMBaseModem *self);
 MMPortSerialGps  *mm_base_modem_peek_port_gps          (MMBaseModem *self);
 MMPortSerial     *mm_base_modem_peek_port_audio        (MMBaseModem *self);
-#if defined WITH_QMI
-MMPortQmi        *mm_base_modem_peek_port_qmi          (MMBaseModem *self);
-MMPortQmi        *mm_base_modem_peek_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
-#endif
 MMPortSerialAt   *mm_base_modem_peek_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_peek_best_data_port    (MMBaseModem *self, MMPortType type);
 GList            *mm_base_modem_peek_data_ports        (MMBaseModem *self);
@@ -139,10 +135,6 @@ MMPortSerialQcdm *mm_base_modem_get_port_qcdm         (MMBaseModem *self);
 MMPortSerialAt   *mm_base_modem_get_port_gps_control  (MMBaseModem *self);
 MMPortSerialGps  *mm_base_modem_get_port_gps          (MMBaseModem *self);
 MMPortSerial     *mm_base_modem_get_port_audio        (MMBaseModem *self);
-#if defined WITH_QMI
-MMPortQmi        *mm_base_modem_get_port_qmi          (MMBaseModem *self);
-MMPortQmi        *mm_base_modem_get_port_qmi_for_data (MMBaseModem *self, MMPort *data, GError **error);
-#endif
 MMPortSerialAt   *mm_base_modem_get_best_at_port      (MMBaseModem *self, GError **error);
 MMPort           *mm_base_modem_get_best_data_port    (MMBaseModem *self, MMPortType type);
 GList            *mm_base_modem_get_data_ports        (MMBaseModem *self);
