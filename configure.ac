@@ -400,7 +400,7 @@ dnl-----------------------------------------------------------------------------
 dnl QMI support (enabled by default)
 dnl
 
-LIBQMI_VERSION=1.27.1
+LIBQMI_VERSION=1.27.2
 
 AC_ARG_WITH(qmi, AS_HELP_STRING([--without-qmi], [Build without QMI support]), [], [with_qmi=yes])
 AM_CONDITIONAL(WITH_QMI, test "x$with_qmi" = "xyes")
@@ -490,6 +490,7 @@ MM_ENABLE_PLUGIN([option],
 MM_ENABLE_PLUGIN([option-hso],
                  [with_shared_option])
 MM_ENABLE_PLUGIN([pantech])
+MM_ENABLE_PLUGIN([qcom-soc])
 MM_ENABLE_PLUGIN([quectel])
 MM_ENABLE_PLUGIN([samsung],
                  [with_shared_icera])
@@ -627,6 +628,7 @@ echo "
       option:                  ${enable_plugin_option}
       option hso:              ${enable_plugin_option_hso}
       pantech:                 ${enable_plugin_pantech}
+      qcom-soc:                ${enable_plugin_qcom_soc}
       quectel:                 ${enable_plugin_quectel}
       samsung:                 ${enable_plugin_samsung}
       sierra legacy:           ${enable_plugin_sierra_legacy}

@@ -108,7 +108,7 @@ build-single-plugins:
                     dell dlink fibocom foxconn gosuncn haier huawei iridium
                     linktop longcheer mbm motorola mtk nokia nokia-icera
                     novatel novatel-lte option option-hso pantech
-                    quectel samsung sierra-legacy sierra simtech
+                    qcom-soc quectel samsung sierra-legacy sierra simtech
                     telit thuraya tplink ublox via wavecom x22x zte; do
         ./configure --prefix=/usr --disable-gtk-doc --disable-all-plugins --enable-plugin-$plugin;
         make;

@@ -176,6 +176,14 @@ test_gosuncn (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_QCOM_SOC && defined WITH_QMI
+static void
+test_qcom_soc (void)
+{
+    common_test (TESTUDEVRULESDIR_QCOM_SOC);
+}
+#endif
+
 /************************************************************/
 
 int main (int argc, char **argv)
@@ -229,6 +237,9 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_GOSUNCN
     g_test_add_func ("/MM/test-udev-rules/gosuncn", test_gosuncn);
+#endif
+#if defined ENABLE_PLUGIN_QCOM_SOC && defined WITH_QMI
+    g_test_add_func ("/MM/test-udev-rules/qcom-soc", test_qcom_soc);
 #endif
 
     return g_test_run ();

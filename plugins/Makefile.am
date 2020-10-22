@@ -1209,6 +1209,31 @@ libmm_plugin_pantech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 endif
 
 ################################################################################
+# plugin: qcom-soc
+################################################################################
+
+if ENABLE_PLUGIN_QCOM_SOC
+if WITH_QMI
+pkglib_LTLIBRARIES += libmm-plugin-qcom-soc.la
+libmm_plugin_qcom_soc_la_SOURCES = \
+	qcom-soc/mm-plugin-qcom-soc.c \
+	qcom-soc/mm-plugin-qcom-soc.h \
+	qcom-soc/mm-broadband-modem-qmi-qcom-soc.c \
+	qcom-soc/mm-broadband-modem-qmi-qcom-soc.h \
+	$(NULL)
+libmm_plugin_qcom_soc_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"qcom-soc\" \
+	$(NULL)
+libmm_plugin_qcom_soc_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+dist_udevrules_DATA += qcom-soc/77-mm-qcom-soc.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_QCOM_SOC=\"${srcdir}/qcom-soc/\"
+endif
+endif
+
+################################################################################
 # plugin: quectel
 ################################################################################
 
