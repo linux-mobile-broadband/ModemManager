@@ -36,6 +36,10 @@ struct _MMBroadbandModemQmi {
 
 struct _MMBroadbandModemQmiClass{
     MMBroadbandModemClass parent;
+
+    MMPortQmi * (* peek_port_qmi_for_data) (MMBroadbandModemQmi  *self,
+                                            MMPort               *data,
+                                            GError              **error);
 };
 
 GType mm_broadband_modem_qmi_get_type (void);

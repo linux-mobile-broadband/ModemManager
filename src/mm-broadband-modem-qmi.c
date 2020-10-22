@@ -225,18 +225,30 @@ mm_broadband_modem_qmi_get_port_qmi_for_data (MMBroadbandModemQmi  *self,
             NULL);
 }
 
-MMPortQmi *
-mm_broadband_modem_qmi_peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
-                                               MMPort               *data,
-                                               GError              **error)
+static MMPortQmi *
+peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
+                        MMPort               *data,
+                        GError              **error)
 {
     GList       *cdc_wdm_qmi_ports;
     GList       *l;
     const gchar *net_port_parent_path;
     MMPortQmi   *found = NULL;
+    const gchar *net_port_driver;
 
     g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
     g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
+
+    net_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (data));
+    if (g_strcmp0 (net_port_driver, "qmi_wwan") != 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unsupported QMI kernel driver for 'net/%s': %s",
+                     mm_port_get_device (data),
+                     net_port_driver);
+        return NULL;
+    }
 
     net_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (data));
     if (!net_port_parent_path) {
@@ -272,6 +284,16 @@ mm_broadband_modem_qmi_peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                      mm_port_get_device (data));
 
     return found;
+}
+
+MMPortQmi *
+mm_broadband_modem_qmi_peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
+                                               MMPort               *data,
+                                               GError              **error)
+{
+    g_assert (MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data);
+
+    return MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data (self, data, error);
 }
 
 /*****************************************************************************/
@@ -9723,6 +9745,8 @@ mm_broadband_modem_qmi_class_init (MMBroadbandModemQmiClass *klass)
     MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemQmiPrivate));
+
+    klass->peek_port_qmi_for_data = peek_port_qmi_for_data;
 
     object_class->finalize = finalize;
     object_class->dispose = dispose;
