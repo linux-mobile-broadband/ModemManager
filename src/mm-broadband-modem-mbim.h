@@ -36,6 +36,10 @@ struct _MMBroadbandModemMbim {
 
 struct _MMBroadbandModemMbimClass{
     MMBroadbandModemClass parent;
+
+    MMPortMbim * (* peek_port_mbim_for_data) (MMBroadbandModemMbim  *self,
+                                              MMPort                *data,
+                                              GError               **error);
 };
 
 GType mm_broadband_modem_mbim_get_type (void);
