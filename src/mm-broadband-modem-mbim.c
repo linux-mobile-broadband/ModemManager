@@ -226,7 +226,7 @@ mm_broadband_modem_mbim_peek_port_mbim (MMBroadbandModemMbim *self)
     g_assert (MM_IS_BROADBAND_MODEM_MBIM (self));
 
     mbim_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
-                                           MM_PORT_SUBSYS_USB,
+                                           MM_PORT_SUBSYS_UNKNOWN,
                                            MM_PORT_TYPE_MBIM,
                                            NULL);
 
