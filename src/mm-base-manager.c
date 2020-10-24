@@ -368,6 +368,11 @@ handle_kernel_event (MMBaseManager            *self,
         return FALSE;
     }
 
+    if (!g_strv_contains (mm_plugin_manager_get_subsystems (self->priv->plugin_manager), subsystem)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Invalid 'subsystem' parameter given: '%s'", subsystem);
+        return FALSE;
+    }
+
     name = mm_kernel_event_properties_get_name (properties);
     if (!name) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS, "Missing mandatory parameter 'name'");
@@ -457,28 +462,19 @@ static void
 process_scan (MMBaseManager *self,
               gboolean       manual_scan)
 {
-    GList *devices, *iter;
+    const gchar **subsystems;
+    guint         i;
 
-    devices = g_udev_client_query_by_subsystem (self->priv->udev, "tty");
-    for (iter = devices; iter; iter = g_list_next (iter)) {
-        start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
-        g_object_unref (G_OBJECT (iter->data));
-    }
-    g_list_free (devices);
+    subsystems = mm_plugin_manager_get_subsystems (self->priv->plugin_manager);
+    for (i = 0; subsystems[i]; i++) {
+        GList *devices;
+        GList *iter;
 
-    devices = g_udev_client_query_by_subsystem (self->priv->udev, "net");
-    for (iter = devices; iter; iter = g_list_next (iter)) {
-        start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
-        g_object_unref (G_OBJECT (iter->data));
+        devices = g_udev_client_query_by_subsystem (self->priv->udev, subsystems[i]);
+        for (iter = devices; iter; iter = g_list_next (iter))
+            start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
+        g_list_free_full (devices, g_object_unref);
     }
-    g_list_free (devices);
-
-    devices = g_udev_client_query_by_subsystem (self->priv->udev, "usbmisc");
-    for (iter = devices; iter; iter = g_list_next (iter)) {
-        start_device_added (self, G_UDEV_DEVICE (iter->data), manual_scan);
-        g_object_unref (G_OBJECT (iter->data));
-    }
-    g_list_free (devices);
 }
 
 #endif
@@ -1365,15 +1361,6 @@ mm_base_manager_init (MMBaseManager *self)
     /* Setup internal list of inhibited devices */
     self->priv->inhibited_devices = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify)inhibited_device_info_free);
 
-#if defined WITH_UDEV
-    {
-        const gchar *subsys[5] = { "tty", "net", "usbmisc", NULL };
-
-        /* Setup UDev client */
-        self->priv->udev = g_udev_client_new (subsys);
-    }
-#endif
-
     /* By default, enable autoscan */
     self->priv->auto_scan = TRUE;
 
@@ -1399,12 +1386,6 @@ initable_init (GInitable     *initable,
 {
     MMBaseManager *self = MM_BASE_MANAGER (initable);
 
-#if defined WITH_UDEV
-    /* If autoscan enabled, list for udev events */
-    if (self->priv->auto_scan)
-        g_signal_connect_swapped (self->priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
-#endif
-
     /* Create filter */
     self->priv->filter = mm_filter_new (self->priv->filter_policy, error);
     if (!self->priv->filter)
@@ -1414,6 +1395,15 @@ initable_init (GInitable     *initable,
     self->priv->plugin_manager = mm_plugin_manager_new (self->priv->plugin_dir, self->priv->filter, error);
     if (!self->priv->plugin_manager)
         return FALSE;
+
+#if defined WITH_UDEV
+    /* Create udev client based on the subsystems requested by the plugins */
+    self->priv->udev = g_udev_client_new (mm_plugin_manager_get_subsystems (self->priv->plugin_manager));
+
+    /* If autoscan enabled, list for udev events */
+    if (self->priv->auto_scan)
+        g_signal_connect_swapped (self->priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
+#endif
 
     /* Export the manager interface */
     if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (initable),

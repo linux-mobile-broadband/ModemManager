@@ -62,6 +62,9 @@ struct _MMPluginManagerPrivate {
 
     /* List of ongoing device support checks */
     GList *device_contexts;
+
+    /* Full list of subsystems requested by the registered plugins */
+    gchar **subsystems;
 };
 
 /*****************************************************************************/
@@ -1601,6 +1604,14 @@ mm_plugin_manager_peek_plugin (MMPluginManager *self,
 
 /*****************************************************************************/
 
+const gchar **
+mm_plugin_manager_get_subsystems (MMPluginManager *self)
+{
+    return (const gchar **) self->priv->subsystems;
+}
+
+/*****************************************************************************/
+
 static void
 register_plugin_whitelist_tags (MMPluginManager *self,
                                 MMPlugin        *plugin)
@@ -1765,15 +1776,17 @@ out:
 }
 
 static gboolean
-load_plugins (MMPluginManager *self,
-              GError **error)
+load_plugins (MMPluginManager  *self,
+              GError          **error)
 {
-    GDir *dir = NULL;
-    const gchar *fname;
-    gchar *plugindir_display = NULL;
-    GList *shared_paths = NULL;
-    GList *plugin_paths = NULL;
-    GList *l;
+    GDir             *dir = NULL;
+    const gchar      *fname;
+    GList            *shared_paths = NULL;
+    GList            *plugin_paths = NULL;
+    GList            *l;
+    GPtrArray        *subsystems = NULL;
+    g_autofree gchar *subsystems_str = NULL;
+    g_autofree gchar *plugindir_display = NULL;
 
     if (!g_module_supported ()) {
         g_set_error (error,
@@ -1811,20 +1824,40 @@ load_plugins (MMPluginManager *self,
         load_shared (self, (const gchar *)(l->data));
 
     /* Load all plugins */
+    subsystems = g_ptr_array_new ();
     for (l = plugin_paths; l; l = g_list_next (l)) {
-        MMPlugin *plugin;
+        MMPlugin     *plugin;
+        const gchar **plugin_subsystems;
+        guint         i;
 
         plugin = load_plugin (self, (const gchar *)(l->data));
         if (!plugin)
             continue;
 
+        /* Ignore plugins that don't specify subsystems */
+        plugin_subsystems = mm_plugin_get_allowed_subsystems (plugin);
+        if (!plugin_subsystems) {
+            mm_obj_warn (self, "plugin '%s' doesn't specify allowed subsystems: ignored",
+                         mm_plugin_get_name (plugin));
+            continue;
+        }
+
+        /* Process generic plugin */
         if (mm_plugin_is_generic (plugin)) {
-            if (self->priv->generic)
-                mm_obj_warn (self, "cannot register more than one generic plugin");
-            else
-                self->priv->generic = plugin;
+            if (self->priv->generic) {
+                mm_obj_warn (self, "plugin '%s' is generic and another one is already registered: ignored",
+                             mm_plugin_get_name (plugin));
+                continue;
+            }
+            self->priv->generic = plugin;
         } else
             self->priv->plugins = g_list_append (self->priv->plugins, plugin);
+
+        /* Track required subsystems, avoiding duplicates in the list */
+        for (i = 0; plugin_subsystems[i]; i++) {
+            if (!g_ptr_array_find_with_equal_func (subsystems, plugin_subsystems[i], g_str_equal, NULL))
+                g_ptr_array_add (subsystems, g_strdup (plugin_subsystems[i]));
+        }
 
         /* Register plugin whitelist rules in filter, if any */
         register_plugin_whitelist_tags        (self, plugin);
@@ -1846,15 +1879,28 @@ load_plugins (MMPluginManager *self,
         goto out;
     }
 
-    mm_obj_dbg (self, "successfully loaded %u plugins",
-                g_list_length (self->priv->plugins) + !!self->priv->generic);
+    /* Validate required subsystems */
+    if (!subsystems->len) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NO_PLUGINS,
+                     "empty list of subsystems required by plugins");
+        goto out;
+    }
+    /* Add trailing NULL and store as GStrv */
+    g_ptr_array_add (subsystems, NULL);
+    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
+    subsystems_str = g_strjoinv (", ", self->priv->subsystems);
+
+    mm_obj_dbg (self, "successfully loaded %u plugins registering %u subsystems: %s",
+                g_list_length (self->priv->plugins) + !!self->priv->generic,
+                g_strv_length (self->priv->subsystems), subsystems_str);
 
 out:
     g_list_free_full (shared_paths, g_free);
     g_list_free_full (plugin_paths, g_free);
     if (dir)
         g_dir_close (dir);
-    g_free (plugindir_display);
 
     /* Return TRUE if at least one plugin found */
     return (self->priv->plugins || self->priv->generic);
@@ -1884,12 +1930,12 @@ mm_plugin_manager_new (const gchar  *plugin_dir,
 }
 
 static void
-mm_plugin_manager_init (MMPluginManager *manager)
+mm_plugin_manager_init (MMPluginManager *self)
 {
     /* Initialize opaque pointer to private data */
-    manager->priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
-                                                 MM_TYPE_PLUGIN_MANAGER,
-                                                 MMPluginManagerPrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_PLUGIN_MANAGER,
+                                              MMPluginManagerPrivate);
 }
 
 static void
@@ -1949,17 +1995,11 @@ dispose (GObject *object)
 {
     MMPluginManager *self = MM_PLUGIN_MANAGER (object);
 
-    /* Cleanup list of plugins */
-    if (self->priv->plugins) {
-        g_list_free_full (self->priv->plugins, g_object_unref);
-        self->priv->plugins = NULL;
-    }
+    g_list_free_full (g_steal_pointer (&self->priv->plugins), g_object_unref);
     g_clear_object (&self->priv->generic);
-
-    g_free (self->priv->plugin_dir);
-    self->priv->plugin_dir = NULL;
-
+    g_clear_pointer (&self->priv->plugin_dir, g_free);
     g_clear_object (&self->priv->filter);
+    g_clear_pointer (&self->priv->subsystems, g_strfreev);
 
     G_OBJECT_CLASS (mm_plugin_manager_parent_class)->dispose (object);
 }

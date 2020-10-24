@@ -65,5 +65,6 @@ MMPlugin *       mm_plugin_manager_device_support_check_finish (MMPluginManager 
                                                                 GError              **error);
 MMPlugin        *mm_plugin_manager_peek_plugin                 (MMPluginManager      *self,
                                                                 const gchar          *plugin_name);
+const gchar    **mm_plugin_manager_get_subsystems              (MMPluginManager      *self);
 
 #endif /* MM_PLUGIN_MANAGER_H */

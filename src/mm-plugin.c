@@ -147,6 +147,12 @@ mm_plugin_get_name (MMPlugin *self)
 }
 
 const gchar **
+mm_plugin_get_allowed_subsystems (MMPlugin *self)
+{
+    return (const gchar **) self->priv->subsystems;
+}
+
+const gchar **
 mm_plugin_get_allowed_udev_tags (MMPlugin *self)
 {
     return (const gchar **) self->priv->udev_tags;
