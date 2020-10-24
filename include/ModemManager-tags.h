@@ -214,6 +214,36 @@
 #define ID_MM_PORT_TYPE_AUDIO "ID_MM_PORT_TYPE_AUDIO"
 
 /**
+ * ID_MM_PORT_TYPE_QMI:
+ *
+ * This is a port-specific tag applied to generic ports that we know in advance
+ * are QMI ports.
+ *
+ * This tag will also prevent other types of probing (e.g. AT, MBIM) on the
+ * port.
+ *
+ * This tag is not required for QMI ports exposed by the qmi_wwan driver.
+ *
+ * Since: 1.16
+ */
+#define ID_MM_PORT_TYPE_QMI "ID_MM_PORT_TYPE_QMI"
+
+/**
+ * ID_MM_PORT_TYPE_MBIM:
+ *
+ * This is a port-specific tag applied to generic ports that we know in advance
+ * are MBIM ports.
+ *
+ * This tag will also prevent other types of probing (e.g. AT, QMI) on the
+ * port.
+ *
+ * This tag is not required for MBIM ports exposed by the cdc_mbim driver.
+ *
+ * Since: 1.16
+ */
+#define ID_MM_PORT_TYPE_MBIM "ID_MM_PORT_TYPE_MBIM"
+
+/**
  * ID_MM_TTY_BAUDRATE:
  *
  * This is a port-specific tag applied to TTYs that require a specific

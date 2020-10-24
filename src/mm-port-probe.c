@@ -101,6 +101,8 @@ struct _MMPortProbePrivate {
     gboolean maybe_at_secondary;
     gboolean maybe_at_ppp;
     gboolean maybe_qcdm;
+    gboolean maybe_qmi;
+    gboolean maybe_mbim;
 
     /* Current probing task. Only one can be available at a time */
     GTask *task;
@@ -1428,30 +1430,54 @@ mm_port_probe_run (MMPortProbe                *self,
         return;
     }
 
-    /* If this is a port flagged as a GPS port, don't do any AT or QCDM probing */
+    /* If this is a port flagged as a GPS port, don't do any other probing */
     if (self->priv->is_gps) {
         mm_obj_dbg (self, "GPS port detected");
-        mm_port_probe_set_result_at (self, FALSE);
+        mm_port_probe_set_result_at   (self, FALSE);
         mm_port_probe_set_result_qcdm (self, FALSE);
+        mm_port_probe_set_result_qmi  (self, FALSE);
+        mm_port_probe_set_result_mbim (self, FALSE);
     }
 
-    /* If this is a port flagged as an audio port, don't do any AT or QCDM probing */
+    /* If this is a port flagged as an audio port, don't do any other probing */
     if (self->priv->is_audio) {
         mm_obj_dbg (self, "audio port detected");
-        mm_port_probe_set_result_at (self, FALSE);
+        mm_port_probe_set_result_at   (self, FALSE);
         mm_port_probe_set_result_qcdm (self, FALSE);
+        mm_port_probe_set_result_qmi  (self, FALSE);
+        mm_port_probe_set_result_mbim (self, FALSE);
     }
 
-    /* If this is a port flagged as being an AT port, don't do any QCDM probing */
+    /* If this is a port flagged as being an AT port, don't do any other probing */
     if (self->priv->maybe_at_primary || self->priv->maybe_at_secondary || self->priv->maybe_at_ppp) {
-        mm_obj_dbg (self, "no QCDM probing in possible AT port");
+        mm_obj_dbg (self, "no QCDM/QMI/MBIM probing in possible AT port");
         mm_port_probe_set_result_qcdm (self, FALSE);
+        mm_port_probe_set_result_qmi  (self, FALSE);
+        mm_port_probe_set_result_mbim (self, FALSE);
     }
 
-    /* If this is a port flagged as being a QCDM port, don't do any AT probing */
+    /* If this is a port flagged as being a QCDM port, don't do any other probing */
     if (self->priv->maybe_qcdm) {
-        mm_obj_dbg (self, "no AT probing in possible QCDM port");
-        mm_port_probe_set_result_at (self, FALSE);
+        mm_obj_dbg (self, "no AT/QMI/MBIM probing in possible QCDM port");
+        mm_port_probe_set_result_at   (self, FALSE);
+        mm_port_probe_set_result_qmi  (self, FALSE);
+        mm_port_probe_set_result_mbim (self, FALSE);
+    }
+
+    /* If this is a port flagged as being a QMI port, don't do any other probing */
+    if (self->priv->maybe_qmi) {
+        mm_obj_dbg (self, "no AT/QCDM/MBIM probing in possible QMI port");
+        mm_port_probe_set_result_at   (self, FALSE);
+        mm_port_probe_set_result_qcdm (self, FALSE);
+        mm_port_probe_set_result_mbim (self, FALSE);
+    }
+
+    /* If this is a port flagged as being a MBIM port, don't do any other probing */
+    if (self->priv->maybe_mbim) {
+        mm_obj_dbg (self, "no AT/QCDM/QMI probing in possible MBIM port");
+        mm_port_probe_set_result_at   (self, FALSE);
+        mm_port_probe_set_result_qcdm (self, FALSE);
+        mm_port_probe_set_result_qmi  (self, FALSE);
     }
 
     /* Check if we already have the requested probing results.
@@ -1819,6 +1845,8 @@ set_property (GObject *object,
         self->priv->maybe_at_secondary = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_SECONDARY);
         self->priv->maybe_at_ppp = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_AT_PPP);
         self->priv->maybe_qcdm = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_QCDM);
+        self->priv->maybe_qmi = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_QMI);
+        self->priv->maybe_mbim = mm_kernel_device_get_property_as_boolean (self->priv->port, ID_MM_PORT_TYPE_MBIM);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
