@@ -765,26 +765,16 @@ mm_plugin_supports_port (MMPlugin            *self,
         return;
     }
 
-    /* Before launching any probing, check if the port is a net device. */
-    if (g_str_equal (mm_kernel_device_get_subsystem (port), "net")) {
-        mm_obj_dbg (self, "probing of port %s deferred until result suggested", mm_kernel_device_get_name (port));
-        g_task_return_int (task, MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED);
-        g_object_unref (task);
-        return;
-    }
-
     /* Build flags depending on what probing needed */
     probe_run_flags = MM_PORT_PROBE_NONE;
-    if (!g_str_has_prefix (mm_kernel_device_get_name (port), "cdc-wdm")) {
-        /* Serial ports... */
+    if (g_str_equal (mm_kernel_device_get_subsystem (port), "tty")) {
         if (self->priv->at)
             probe_run_flags |= MM_PORT_PROBE_AT;
         else if (self->priv->single_at)
             probe_run_flags |= MM_PORT_PROBE_AT;
         if (self->priv->qcdm)
             probe_run_flags |= MM_PORT_PROBE_QCDM;
-    } else {
-        /* cdc-wdm ports... */
+    } else if (g_str_equal (mm_kernel_device_get_subsystem (port), "usbmisc")) {
         if (self->priv->qmi && !g_strcmp0 (mm_kernel_device_get_driver (port), "qmi_wwan"))
             probe_run_flags |= MM_PORT_PROBE_QMI;
         else if (self->priv->mbim && !g_strcmp0 (mm_kernel_device_get_driver (port), "cdc_mbim"))
@@ -805,9 +795,11 @@ mm_plugin_supports_port (MMPlugin            *self,
             probe_run_flags |= MM_PORT_PROBE_AT_XMM;
     }
 
-    /* If no explicit probing was required, just request to grab it without probing anything.
-     * This may happen, e.g. with cdc-wdm ports which do not need QMI/MBIM probing. */
+    /* If no explicit probing was required, just request to grab it without
+     * probing anything. This happens for all net ports and e.g. for cdc-wdm
+     * ports which do not need QMI/MBIM probing. */
     if (probe_run_flags == MM_PORT_PROBE_NONE) {
+        mm_obj_dbg (self, "probing of port %s deferred until result suggested", mm_kernel_device_get_name (port));
         g_task_return_int (task, MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED);
         g_object_unref (task);
         return;
