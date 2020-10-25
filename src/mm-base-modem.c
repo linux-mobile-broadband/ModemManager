@@ -928,54 +928,64 @@ mm_base_modem_has_at_port (MMBaseModem *self)
     return FALSE;
 }
 
+static gint
+port_info_cmp (const MMModemPortInfo *a,
+               const MMModemPortInfo *b)
+{
+    /* default to alphabetical sorting on the port name */
+    return g_strcmp0 (a->name, b->name);
+}
+
 MMModemPortInfo *
 mm_base_modem_get_port_infos (MMBaseModem *self,
-                              guint *n_port_infos)
+                              guint       *n_port_infos)
 {
-    GHashTableIter iter;
-    MMModemPortInfo *port_infos;
-    MMPort *port;
-    guint i;
+    GHashTableIter  iter;
+    GArray         *port_infos;
+    MMPort         *port;
 
     *n_port_infos = g_hash_table_size (self->priv->ports);
-    port_infos = g_new (MMModemPortInfo, *n_port_infos);
+    port_infos = g_array_sized_new (FALSE, FALSE, sizeof (MMModemPortInfo), *n_port_infos);
     g_hash_table_iter_init (&iter, self->priv->ports);
-    i = 0;
     while (g_hash_table_iter_next (&iter, NULL, (gpointer)&port)) {
-        port_infos[i].name = g_strdup (mm_port_get_device (port));
+        MMModemPortInfo port_info;
+
+        port_info.name = g_strdup (mm_port_get_device (port));
         switch (mm_port_get_port_type (port)) {
         case MM_PORT_TYPE_NET:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_NET;
+            port_info.type = MM_MODEM_PORT_TYPE_NET;
             break;
         case MM_PORT_TYPE_AT:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_AT;
+            port_info.type = MM_MODEM_PORT_TYPE_AT;
             break;
         case MM_PORT_TYPE_QCDM:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_QCDM;
+            port_info.type = MM_MODEM_PORT_TYPE_QCDM;
             break;
         case MM_PORT_TYPE_GPS:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_GPS;
+            port_info.type = MM_MODEM_PORT_TYPE_GPS;
             break;
         case MM_PORT_TYPE_AUDIO:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_AUDIO;
+            port_info.type = MM_MODEM_PORT_TYPE_AUDIO;
             break;
         case MM_PORT_TYPE_QMI:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_QMI;
+            port_info.type = MM_MODEM_PORT_TYPE_QMI;
             break;
         case MM_PORT_TYPE_MBIM:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_MBIM;
+            port_info.type = MM_MODEM_PORT_TYPE_MBIM;
             break;
         case MM_PORT_TYPE_UNKNOWN:
         case MM_PORT_TYPE_IGNORED:
         default:
-            port_infos[i].type = MM_MODEM_PORT_TYPE_UNKNOWN;
+            port_info.type = MM_MODEM_PORT_TYPE_UNKNOWN;
             break;
         }
 
-        i++;
+        g_array_append_val (port_infos, port_info);
     }
 
-    return port_infos;
+    g_assert (*n_port_infos == port_infos->len);
+    g_array_sort (port_infos, (GCompareFunc) port_info_cmp);
+    return (MMModemPortInfo *) g_array_free (port_infos, FALSE);
 }
 
 GList *
