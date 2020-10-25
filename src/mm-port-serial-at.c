@@ -529,17 +529,13 @@ config (MMPortSerial *_self)
 /*****************************************************************************/
 
 MMPortSerialAt *
-mm_port_serial_at_new (const char *name,
-                       MMPortSubsys subsys)
+mm_port_serial_at_new (const char   *name,
+                       MMPortSubsys  subsys)
 {
-    g_return_val_if_fail (subsys == MM_PORT_SUBSYS_TTY ||
-                          subsys == MM_PORT_SUBSYS_USBMISC ||
-                          subsys == MM_PORT_SUBSYS_UNIX, NULL);
-
     return MM_PORT_SERIAL_AT (g_object_new (MM_TYPE_PORT_SERIAL_AT,
                                             MM_PORT_DEVICE, name,
                                             MM_PORT_SUBSYS, subsys,
-                                            MM_PORT_TYPE, MM_PORT_TYPE_AT,
+                                            MM_PORT_TYPE,   MM_PORT_TYPE_AT,
                                             NULL));
 }
 
