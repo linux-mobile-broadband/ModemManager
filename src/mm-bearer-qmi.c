@@ -410,12 +410,14 @@ typedef enum {
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
     CONNECT_STEP_IP_FAMILY_IPV4,
+    CONNECT_STEP_BIND_DATA_PORT_IPV4,
     CONNECT_STEP_ENABLE_INDICATIONS_IPV4,
     CONNECT_STEP_START_NETWORK_IPV4,
     CONNECT_STEP_GET_CURRENT_SETTINGS_IPV4,
     CONNECT_STEP_IPV6,
     CONNECT_STEP_WDS_CLIENT_IPV6,
     CONNECT_STEP_IP_FAMILY_IPV6,
+    CONNECT_STEP_BIND_DATA_PORT_IPV6,
     CONNECT_STEP_ENABLE_INDICATIONS_IPV6,
     CONNECT_STEP_START_NETWORK_IPV6,
     CONNECT_STEP_GET_CURRENT_SETTINGS_IPV6,
@@ -427,6 +429,7 @@ typedef struct {
     ConnectStep step;
     MMPort *data;
     MMPortQmi *qmi;
+    QmiSioPort sio_port;
     gboolean explicit_qmi_open;
     gchar *user;
     gchar *password;
@@ -989,6 +992,32 @@ get_current_settings (GTask *task, QmiClientWds *client)
 }
 
 static void
+bind_data_port_ready (QmiClientWds *client,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    ConnectContext                             *ctx;
+    GError                                     *error = NULL;
+    g_autoptr(QmiMessageWdsBindDataPortOutput)  output = NULL;
+
+    ctx  = g_task_get_task_data (task);
+
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
+
+    output = qmi_client_wds_bind_data_port_finish (client, res, &error);
+    if (!output || !qmi_message_wds_bind_data_port_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't bind data port: ");
+        complete_connect (task, NULL, error);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static void
 set_ip_family_ready (QmiClientWds *client,
                      GAsyncResult *res,
                      GTask *task)
@@ -1401,6 +1430,26 @@ connect_context_step (GTask *task)
         ctx->step++;
         /* fall through */
 
+    case CONNECT_STEP_BIND_DATA_PORT_IPV4:
+        /* If SIO port given, bind client to it */
+        if (ctx->sio_port != QMI_SIO_PORT_NONE) {
+            g_autoptr(QmiMessageWdsBindDataPortInput) input = NULL;
+
+            mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->sio_port));
+            input = qmi_message_wds_bind_data_port_input_new ();
+            qmi_message_wds_bind_data_port_input_set_data_port (input, ctx->sio_port, NULL);
+            qmi_client_wds_bind_data_port (ctx->client_ipv4,
+                                           input,
+                                           10,
+                                           g_task_get_cancellable (task),
+                                           (GAsyncReadyCallback)bind_data_port_ready,
+                                           task);
+            return;
+        }
+
+        ctx->step++;
+        /* fall through */
+
     case CONNECT_STEP_ENABLE_INDICATIONS_IPV4:
         common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
                                                                        ctx->client_ipv4,
@@ -1491,6 +1540,26 @@ connect_context_step (GTask *task)
         qmi_message_wds_set_ip_family_input_unref (input);
         return;
     }
+
+    case CONNECT_STEP_BIND_DATA_PORT_IPV6:
+        /* If SIO port given, bind client to it */
+        if (ctx->sio_port != QMI_SIO_PORT_NONE) {
+            g_autoptr(QmiMessageWdsBindDataPortInput) input = NULL;
+
+            mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->sio_port));
+            input = qmi_message_wds_bind_data_port_input_new ();
+            qmi_message_wds_bind_data_port_input_set_data_port (input, ctx->sio_port, NULL);
+            qmi_client_wds_bind_data_port (ctx->client_ipv6,
+                                           input,
+                                           10,
+                                           g_task_get_cancellable (task),
+                                           (GAsyncReadyCallback)bind_data_port_ready,
+                                           task);
+            return;
+        }
+
+        ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_ENABLE_INDICATIONS_IPV6:
         common_setup_cleanup_packet_service_status_unsolicited_events (ctx->self,
@@ -1617,6 +1686,7 @@ _connect (MMBaseBearer *_self,
     MMBaseModem *modem  = NULL;
     MMPort *data = NULL;
     MMPortQmi *qmi = NULL;
+    QmiSioPort sio_port = QMI_SIO_PORT_NONE;
     GError *error = NULL;
     const gchar *apn;
     GTask *task;
@@ -1642,7 +1712,7 @@ _connect (MMBaseBearer *_self,
     }
 
     /* Each data port has a single QMI port associated */
-    qmi = mm_broadband_modem_qmi_get_port_qmi_for_data (MM_BROADBAND_MODEM_QMI (modem), data, &error);
+    qmi = mm_broadband_modem_qmi_get_port_qmi_for_data (MM_BROADBAND_MODEM_QMI (modem), data, &sio_port, &error);
     if (!qmi) {
         g_task_report_error (
             self,
@@ -1689,6 +1759,7 @@ _connect (MMBaseBearer *_self,
     ctx = g_slice_new0 (ConnectContext);
     ctx->self = g_object_ref (self);
     ctx->qmi = g_object_ref (qmi);
+    ctx->sio_port = sio_port;
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_STEP_FIRST;
     ctx->ip_method = MM_BEARER_IP_METHOD_UNKNOWN;

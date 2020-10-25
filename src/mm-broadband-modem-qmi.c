@@ -213,13 +213,14 @@ mm_broadband_modem_qmi_peek_port_qmi (MMBroadbandModemQmi *self)
 MMPortQmi *
 mm_broadband_modem_qmi_get_port_qmi_for_data (MMBroadbandModemQmi  *self,
                                               MMPort               *data,
+                                              QmiSioPort           *out_sio_port,
                                               GError              **error)
 {
     MMPortQmi *qmi_port;
 
     g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
 
-    qmi_port = mm_broadband_modem_qmi_peek_port_qmi_for_data (self, data, error);
+    qmi_port = mm_broadband_modem_qmi_peek_port_qmi_for_data (self, data, out_sio_port, error);
     return (qmi_port ?
             MM_PORT_QMI (g_object_ref (qmi_port)) :
             NULL);
@@ -228,6 +229,7 @@ mm_broadband_modem_qmi_get_port_qmi_for_data (MMBroadbandModemQmi  *self,
 static MMPortQmi *
 peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                         MMPort               *data,
+                        QmiSioPort           *out_sio_port,
                         GError              **error)
 {
     GList       *cdc_wdm_qmi_ports;
@@ -282,6 +284,8 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                      MM_CORE_ERROR_NOT_FOUND,
                      "Couldn't find associated QMI port for 'net/%s'",
                      mm_port_get_device (data));
+    else
+        *out_sio_port = QMI_SIO_PORT_NONE;
 
     return found;
 }
@@ -289,11 +293,12 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
 MMPortQmi *
 mm_broadband_modem_qmi_peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                                                MMPort               *data,
+                                               QmiSioPort           *out_sio_port,
                                                GError              **error)
 {
     g_assert (MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data);
 
-    return MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data (self, data, error);
+    return MM_BROADBAND_MODEM_QMI_GET_CLASS (self)->peek_port_qmi_for_data (self, data, out_sio_port, error);
 }
 
 /*****************************************************************************/

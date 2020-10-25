@@ -39,6 +39,7 @@ struct _MMBroadbandModemQmiClass{
 
     MMPortQmi * (* peek_port_qmi_for_data) (MMBroadbandModemQmi  *self,
                                             MMPort               *data,
+                                            QmiSioPort           *out_sio_port,
                                             GError              **error);
 };
 
@@ -54,10 +55,12 @@ MMBroadbandModemQmi *mm_broadband_modem_qmi_new (const gchar  *device,
 MMPortQmi *mm_broadband_modem_qmi_peek_port_qmi          (MMBroadbandModemQmi  *self);
 MMPortQmi *mm_broadband_modem_qmi_peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                                                           MMPort               *data,
+                                                          QmiSioPort           *out_sio_port,
                                                           GError              **error);
 MMPortQmi *mm_broadband_modem_qmi_get_port_qmi           (MMBroadbandModemQmi  *self);
 MMPortQmi *mm_broadband_modem_qmi_get_port_qmi_for_data  (MMBroadbandModemQmi  *self,
                                                           MMPort               *data,
+                                                          QmiSioPort           *out_sio_port,
                                                           GError              **error);
 
 #endif /* MM_BROADBAND_MODEM_QMI_H */
