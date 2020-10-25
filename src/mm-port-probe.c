@@ -491,16 +491,22 @@ wdm_probe_qmi (MMPortProbe *self)
     ctx = g_task_get_task_data (self->priv->task);
 
 #if defined WITH_QMI
-    mm_obj_dbg (self, "probing QMI...");
+    {
+        MMPortSubsys subsys = MM_PORT_SUBSYS_USBMISC;
 
-    /* Create a port and try to open it */
-    ctx->port_qmi = mm_port_qmi_new (mm_kernel_device_get_name (self->priv->port),
-                                     MM_PORT_SUBSYS_USBMISC);
-    mm_port_qmi_open (ctx->port_qmi,
-                      FALSE,
-                      NULL,
-                      (GAsyncReadyCallback) port_qmi_open_ready,
-                      self);
+        mm_obj_dbg (self, "probing QMI...");
+
+        if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "rpmsg"))
+            subsys = MM_PORT_SUBSYS_RPMSG;
+
+        /* Create a port and try to open it */
+        ctx->port_qmi = mm_port_qmi_new (mm_kernel_device_get_name (self->priv->port), subsys);
+        mm_port_qmi_open (ctx->port_qmi,
+                          FALSE,
+                          NULL,
+                          (GAsyncReadyCallback) port_qmi_open_ready,
+                          self);
+    }
 #else
     /* If not compiled with QMI support, just assume we won't have any QMI port */
     mm_port_probe_set_result_qmi (self, FALSE);
@@ -1273,6 +1279,8 @@ serial_open_at (MMPortProbe *self)
 
         if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "usbmisc"))
             subsys = MM_PORT_SUBSYS_USBMISC;
+        else if (g_str_equal (mm_kernel_device_get_subsystem (self->priv->port), "rpmsg"))
+            subsys = MM_PORT_SUBSYS_RPMSG;
 
         ctx->serial = MM_PORT_SERIAL (mm_port_serial_at_new (mm_kernel_device_get_name (self->priv->port), subsys));
         if (!ctx->serial) {

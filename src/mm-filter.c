@@ -199,6 +199,13 @@ mm_filter_port (MMFilter        *self,
         return TRUE;
     }
 
+    /* If this is a rpmsg channel device, we always allow it */
+    if ((self->priv->enabled_rules & MM_FILTER_RULE_RPMSG) &&
+        (g_strcmp0 (subsystem, "rpmsg") == 0)) {
+        mm_obj_dbg (self, "(%s/%s) port allowed: rpmsg device", subsystem, name);
+        return TRUE;
+    }
+
     /* If this is a tty device, we may allow it */
     if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY) &&
         (g_strcmp0 (subsystem, "tty") == 0)) {

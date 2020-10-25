@@ -781,6 +781,11 @@ mm_plugin_supports_port (MMPlugin            *self,
             probe_run_flags |= MM_PORT_PROBE_MBIM;
         else
             probe_run_flags |= MM_PORT_PROBE_AT;
+    } else if (g_str_equal (mm_kernel_device_get_subsystem (port), "rpmsg")) {
+        if (self->priv->at)
+            probe_run_flags |= MM_PORT_PROBE_AT;
+        if (self->priv->qmi)
+            probe_run_flags |= MM_PORT_PROBE_QMI;
     }
 
     /* For potential AT ports, check for more things */

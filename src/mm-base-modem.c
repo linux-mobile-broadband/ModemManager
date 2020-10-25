@@ -238,6 +238,20 @@ base_modem_create_usbmisc_port (MMBaseModem *self,
 }
 
 static MMPort *
+base_modem_create_rpmsg_port (MMBaseModem *self,
+                              const gchar *name,
+                              MMPortType   ptype)
+{
+#if defined WITH_QMI
+    if (ptype == MM_PORT_TYPE_QMI)
+        return MM_PORT (mm_port_qmi_new (name, MM_PORT_SUBSYS_RPMSG));
+#endif
+    if (ptype == MM_PORT_TYPE_AT)
+        return MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_RPMSG));
+    return NULL;
+}
+
+static MMPort *
 base_modem_create_virtual_port (MMBaseModem *self,
                                 const gchar *name)
 {
@@ -278,6 +292,8 @@ mm_base_modem_grab_port (MMBaseModem         *self,
         port = base_modem_create_tty_port (self, name, kernel_device, ptype);
     else if (g_str_equal (subsys, "usbmisc"))
         port = base_modem_create_usbmisc_port (self, name, ptype);
+    else if (g_str_equal (subsys, "rpmsg"))
+        port = base_modem_create_rpmsg_port (self, name, ptype);
     else if (g_str_equal (subsys, "virtual"))
         port = base_modem_create_virtual_port (self, name);
 
@@ -326,8 +342,6 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     g_hash_table_insert (self->priv->ports, g_steal_pointer (&key), port);
     return TRUE;
 }
-
-/******************************************************************************/
 
 gboolean
 mm_base_modem_disable_finish (MMBaseModem   *self,
