@@ -226,7 +226,7 @@ base_modem_create_usbmisc_port (MMBaseModem *self,
 {
 #if defined WITH_QMI
     if (ptype == MM_PORT_TYPE_QMI)
-        return MM_PORT (mm_port_qmi_new (name));
+        return MM_PORT (mm_port_qmi_new (name, MM_PORT_SUBSYS_USBMISC));
 #endif
 #if defined WITH_MBIM
     if (ptype == MM_PORT_TYPE_MBIM)

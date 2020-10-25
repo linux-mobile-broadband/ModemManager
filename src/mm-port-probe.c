@@ -494,7 +494,8 @@ wdm_probe_qmi (MMPortProbe *self)
     mm_obj_dbg (self, "probing QMI...");
 
     /* Create a port and try to open it */
-    ctx->port_qmi = mm_port_qmi_new (mm_kernel_device_get_name (self->priv->port));
+    ctx->port_qmi = mm_port_qmi_new (mm_kernel_device_get_name (self->priv->port),
+                                     MM_PORT_SUBSYS_USBMISC);
     mm_port_qmi_open (ctx->port_qmi,
                       FALSE,
                       NULL,
