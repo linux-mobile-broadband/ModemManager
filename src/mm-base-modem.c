@@ -230,7 +230,7 @@ base_modem_create_usbmisc_port (MMBaseModem *self,
 #endif
 #if defined WITH_MBIM
     if (ptype == MM_PORT_TYPE_MBIM)
-        return MM_PORT (mm_port_mbim_new (name));
+        return MM_PORT (mm_port_mbim_new (name, MM_PORT_SUBSYS_USBMISC));
 #endif
     if (ptype == MM_PORT_TYPE_AT)
         return MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_USBMISC));

@@ -53,7 +53,8 @@ struct _MMPortMbimClass {
 GType mm_port_mbim_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortMbim, g_object_unref)
 
-MMPortMbim *mm_port_mbim_new (const gchar *name);
+MMPortMbim *mm_port_mbim_new (const gchar  *name,
+                              MMPortSubsys  subsys);
 
 void     mm_port_mbim_open         (MMPortMbim *self,
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED

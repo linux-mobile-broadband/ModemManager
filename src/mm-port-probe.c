@@ -566,7 +566,8 @@ wdm_probe_mbim (MMPortProbe *self)
     mm_obj_dbg (self, "probing MBIM...");
 
     /* Create a port and try to open it */
-    ctx->mbim_port = mm_port_mbim_new (mm_kernel_device_get_name (self->priv->port));
+    ctx->mbim_port = mm_port_mbim_new (mm_kernel_device_get_name (self->priv->port),
+                                       MM_PORT_SUBSYS_USBMISC);
     mm_port_mbim_open (ctx->mbim_port,
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
                        FALSE, /* Don't check QMI over MBIM support at this stage */

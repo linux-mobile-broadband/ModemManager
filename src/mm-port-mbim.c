@@ -589,11 +589,12 @@ mm_port_mbim_peek_device (MMPortMbim *self)
 /*****************************************************************************/
 
 MMPortMbim *
-mm_port_mbim_new (const gchar *name)
+mm_port_mbim_new (const gchar  *name,
+                  MMPortSubsys  subsys)
 {
     return MM_PORT_MBIM (g_object_new (MM_TYPE_PORT_MBIM,
                                        MM_PORT_DEVICE, name,
-                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_USBMISC,
+                                       MM_PORT_SUBSYS, subsys,
                                        MM_PORT_TYPE, MM_PORT_TYPE_MBIM,
                                        NULL));
 }
