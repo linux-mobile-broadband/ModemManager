@@ -100,6 +100,11 @@ mm_to_syslog_priority (MMLogLevel level)
 static int
 glib_to_syslog_priority (GLogLevelFlags level)
 {
+    /* if the log was flagged as fatal (e.g. G_DEBUG=fatal-warnings), ignore
+     * the fatal flag for logging purposes */
+    if (level & G_LOG_FLAG_FATAL)
+        level &= ~G_LOG_FLAG_FATAL;
+
     switch (level) {
     case G_LOG_LEVEL_ERROR:
         return LOG_CRIT;
