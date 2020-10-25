@@ -3138,6 +3138,7 @@ mm_gdbus_sim_call_change_pin_sync
 <SUBSECTION Private>
 mm_gdbus_sim_set_active
 mm_gdbus_sim_set_imsi
+mm_gdbus_sim_set_eid
 mm_gdbus_sim_set_operator_identifier
 mm_gdbus_sim_set_operator_name
 mm_gdbus_sim_set_sim_identifier
