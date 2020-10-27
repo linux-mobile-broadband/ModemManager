@@ -538,6 +538,7 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
  * @MM_MODEM_PORT_TYPE_QMI: QMI port.
  * @MM_MODEM_PORT_TYPE_MBIM: MBIM port.
  * @MM_MODEM_PORT_TYPE_AUDIO: Audio port. Since 1.12.
+ * @MM_MODEM_PORT_TYPE_IGNORED: Ignored port. Since 1.16.
  *
  * Type of modem port.
  *
@@ -552,6 +553,7 @@ typedef enum { /*< underscore_name=mm_modem_port_type >*/
     MM_MODEM_PORT_TYPE_QMI     = 6,
     MM_MODEM_PORT_TYPE_MBIM    = 7,
     MM_MODEM_PORT_TYPE_AUDIO   = 8,
+    MM_MODEM_PORT_TYPE_IGNORED = 9,
 } MMModemPortType;
 
 /**

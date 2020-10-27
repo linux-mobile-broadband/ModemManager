@@ -965,8 +965,10 @@ mm_base_modem_get_port_infos (MMBaseModem *self,
         case MM_PORT_TYPE_MBIM:
             port_infos[i].type = MM_MODEM_PORT_TYPE_MBIM;
             break;
-        case MM_PORT_TYPE_UNKNOWN:
         case MM_PORT_TYPE_IGNORED:
+            port_info.type = MM_MODEM_PORT_TYPE_IGNORED;
+            break;
+        case MM_PORT_TYPE_UNKNOWN:
         default:
             port_infos[i].type = MM_MODEM_PORT_TYPE_UNKNOWN;
             break;
