@@ -1818,11 +1818,6 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
      * purposes, we're going to consider as the SIM to use the one identified as
      * 'primary GW' exclusively. We don't really support Dual Sim Dual Standby yet. */
 
-    if (!qmi_message_uim_get_card_status_output_get_result (output, error)) {
-        g_prefix_error (error, "QMI operation failed: ");
-        return FALSE;
-    }
-
     qmi_message_uim_get_card_status_output_get_card_status (
         output,
         &index_gw_primary,

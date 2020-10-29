@@ -695,7 +695,7 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
     ctx = g_task_get_task_data (task);
 
     output = qmi_client_uim_get_card_status_finish (client, res, &error);
-    if (!output) {
+    if (!output || !qmi_message_uim_get_card_status_output_get_result (output, &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -947,7 +947,7 @@ unlock_retries_uim_get_card_status_ready (QmiClientUim *client,
     self = g_task_get_source_object (task);
 
     output = qmi_client_uim_get_card_status_finish (client, res, &error);
-    if (!output) {
+    if (!output || !qmi_message_uim_get_card_status_output_get_result (output, &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1933,8 +1933,7 @@ get_sim_lock_status_via_get_card_status_ready (QmiClientUim *client,
     ctx = g_task_get_task_data (task);
 
     output = qmi_client_uim_get_card_status_finish (client, res, &error);
-    if (!output ||
-        !qmi_message_uim_get_card_status_output_get_result (output, &error)) {
+    if (!output || !qmi_message_uim_get_card_status_output_get_result (output, &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
