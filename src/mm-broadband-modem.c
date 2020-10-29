@@ -4165,10 +4165,23 @@ modem_check_for_sim_swap (MMIfaceModem *self,
                   MM_IFACE_MODEM_SIM, &ctx->sim,
                   NULL);
     if (!ctx->sim) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "could not acquire sim object");
+        MMModemState modem_state;
+
+        modem_state = MM_MODEM_STATE_UNKNOWN;
+        g_object_get (self,
+                      MM_IFACE_MODEM_STATE, &modem_state,
+                      NULL);
+
+        if (modem_state == MM_MODEM_STATE_FAILED) {
+            mm_obj_info (self, "new SIM detected, handle as SIM hot-swap");
+            mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+            g_task_return_boolean (task, TRUE);
+        } else {
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "could not acquire sim object");
+        }
         g_object_unref (task);
         return;
     }
