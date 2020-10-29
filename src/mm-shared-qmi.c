@@ -3321,10 +3321,14 @@ next_sim_switch_ready (QmiClientUim *client,
 
     output = qmi_client_uim_switch_slot_finish (client, res, &error);
     if (!output || !qmi_message_uim_switch_slot_output_get_result (output, &error)) {
-        mm_obj_dbg (self, "couldn't switch to SIM at slot %u: won't load additional info",
-                    ctx->current_slot_number);
-        load_next_sim_info (task);
-        return;
+        /* ignore NoEffect errors on slot switch, because that indicates we're
+         * already in the desired slot */
+        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            mm_obj_dbg (self, "couldn't switch to SIM at slot %u: won't load additional info",
+                        ctx->current_slot_number);
+            load_next_sim_info (task);
+            return;
+        }
     }
 
     mm_obj_dbg (self, "switched to SIM at slot %u: initializing...",
