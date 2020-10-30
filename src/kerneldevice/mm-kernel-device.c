@@ -277,6 +277,60 @@ mm_kernel_device_get_global_property_as_int_hex (MMKernelDevice *self,
     return ((value && mm_get_uint_from_hex_str (value, &aux)) ? aux : 0);
 }
 
+gboolean
+mm_kernel_device_has_attribute (MMKernelDevice *self,
+                                const gchar    *attribute)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), FALSE);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->has_attribute ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->has_attribute (self, attribute) :
+            FALSE);
+}
+
+const gchar *
+mm_kernel_device_get_attribute (MMKernelDevice *self,
+                                const gchar    *attribute)
+{
+    g_return_val_if_fail (MM_IS_KERNEL_DEVICE (self), NULL);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_attribute ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_attribute (self, attribute) :
+            NULL);
+}
+
+gboolean
+mm_kernel_device_get_attribute_as_boolean (MMKernelDevice *self,
+                                           const gchar    *attribute)
+{
+    const gchar *value;
+
+    value = mm_kernel_device_get_attribute (self, attribute);
+    return (value && mm_common_get_boolean_from_string (value, NULL));
+}
+
+gint
+mm_kernel_device_get_attribute_as_int (MMKernelDevice *self,
+                                       const gchar    *attribute)
+{
+    const gchar *value;
+    gint         aux;
+
+    value = mm_kernel_device_get_attribute (self, attribute);
+    return ((value && mm_get_int_from_str (value, &aux)) ? aux : 0);
+}
+
+guint
+mm_kernel_device_get_attribute_as_int_hex (MMKernelDevice *self,
+                                           const gchar    *attribute)
+{
+    const gchar *value;
+    guint        aux;
+
+    value = mm_kernel_device_get_attribute (self, attribute);
+    return ((value && mm_get_uint_from_hex_str (value, &aux)) ? aux : 0);
+}
+
 /*****************************************************************************/
 
 static gchar *

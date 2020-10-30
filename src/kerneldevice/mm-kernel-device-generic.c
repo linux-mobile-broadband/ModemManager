@@ -963,6 +963,41 @@ kernel_device_get_property (MMKernelDevice *self,
 
 /*****************************************************************************/
 
+static gchar *
+build_attribute_data_key (const gchar *attribute)
+{
+    return g_strdup_printf ("ATTR:%s", attribute);
+}
+
+static gboolean
+kernel_device_has_attribute (MMKernelDevice *self,
+                             const gchar    *attribute)
+{
+    return has_sysfs_attribute (MM_KERNEL_DEVICE_GENERIC (self)->priv->sysfs_path, attribute);
+}
+
+static const gchar *
+kernel_device_get_attribute (MMKernelDevice *_self,
+                             const gchar    *attribute)
+{
+    MMKernelDeviceGeneric *self;
+    g_autofree gchar      *key = NULL;
+    gchar                 *value = NULL;
+
+    self = MM_KERNEL_DEVICE_GENERIC (_self);
+
+    key = build_attribute_data_key (attribute);
+    value = g_object_get_data (G_OBJECT (self), key);
+    if (!value) {
+        value = read_sysfs_attribute_as_string (self->priv->sysfs_path, attribute);
+        if (value)
+            g_object_set_data_full (G_OBJECT (self), key, value, g_free);
+    }
+    return (const gchar *) value;
+}
+
+/*****************************************************************************/
+
 MMKernelDevice *
 mm_kernel_device_generic_new_with_rules (MMKernelEventProperties  *props,
                                          GArray                   *rules,
@@ -1145,6 +1180,8 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     kernel_device_class->cmp                       = kernel_device_cmp;
     kernel_device_class->has_property              = kernel_device_has_property;
     kernel_device_class->get_property              = kernel_device_get_property;
+    kernel_device_class->has_attribute             = kernel_device_has_attribute;
+    kernel_device_class->get_attribute             = kernel_device_get_attribute;
 
     /* Device-wide properties are stored per-port in the generic backend */
     kernel_device_class->has_global_property = kernel_device_has_property;

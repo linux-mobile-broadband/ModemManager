@@ -527,6 +527,34 @@ kernel_device_get_global_property (MMKernelDevice *_self,
 
 /*****************************************************************************/
 
+static gboolean
+kernel_device_has_attribute (MMKernelDevice *_self,
+                             const gchar    *attribute)
+{
+    MMKernelDeviceUdev *self;
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+    if (!self->priv->device)
+        return FALSE;
+
+    return g_udev_device_has_sysfs_attr (self->priv->device, attribute);
+}
+
+static const gchar *
+kernel_device_get_attribute (MMKernelDevice *_self,
+                             const gchar    *attribute)
+{
+    MMKernelDeviceUdev *self;
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+    if (!self->priv->device)
+        return NULL;
+
+    return g_udev_device_get_sysfs_attr (self->priv->device, attribute);
+}
+
+/*****************************************************************************/
+
 MMKernelDevice *
 mm_kernel_device_udev_new (GUdevDevice *udev_device)
 {
@@ -725,6 +753,8 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     kernel_device_class->get_property              = kernel_device_get_property;
     kernel_device_class->has_global_property       = kernel_device_has_global_property;
     kernel_device_class->get_global_property       = kernel_device_get_global_property;
+    kernel_device_class->has_attribute             = kernel_device_has_attribute;
+    kernel_device_class->get_attribute             = kernel_device_get_attribute;
 
     properties[PROP_UDEV_DEVICE] =
         g_param_spec_object ("udev-device",
