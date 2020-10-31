@@ -358,6 +358,13 @@ mm_log_setup (const char *level,
                        NULL);
 #endif
 
+#if defined WITH_QRTR
+    g_log_set_handler ("Qrtr",
+                       G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
+                       log_handler,
+                       NULL);
+#endif
+
 #if defined WITH_MBIM
     g_log_set_handler ("Mbim",
                        G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
