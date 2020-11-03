@@ -831,38 +831,6 @@ kernel_device_get_property (MMKernelDevice *self,
     return g_object_get_data (G_OBJECT (self), property);
 }
 
-static gboolean
-kernel_device_get_property_as_boolean (MMKernelDevice *self,
-                                       const gchar    *property)
-{
-    const gchar *value;
-
-    value = g_object_get_data (G_OBJECT (self), property);
-    return (value && mm_common_get_boolean_from_string (value, NULL));
-}
-
-static gint
-kernel_device_get_property_as_int (MMKernelDevice *self,
-                                   const gchar    *property)
-{
-    const gchar *value;
-    gint aux = 0;
-
-    value = g_object_get_data (G_OBJECT (self), property);
-    return ((value && mm_get_int_from_str (value, &aux)) ? aux : 0);
-}
-
-static guint
-kernel_device_get_property_as_int_hex (MMKernelDevice *self,
-                                       const gchar    *property)
-{
-    const gchar *value;
-    guint aux = 0;
-
-    value = g_object_get_data (G_OBJECT (self), property);
-    return ((value && mm_get_uint_from_hex_str (value, &aux)) ? aux : 0);
-}
-
 /*****************************************************************************/
 
 MMKernelDevice *
@@ -1047,16 +1015,10 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     kernel_device_class->cmp                       = kernel_device_cmp;
     kernel_device_class->has_property              = kernel_device_has_property;
     kernel_device_class->get_property              = kernel_device_get_property;
-    kernel_device_class->get_property_as_boolean   = kernel_device_get_property_as_boolean;
-    kernel_device_class->get_property_as_int       = kernel_device_get_property_as_int;
-    kernel_device_class->get_property_as_int_hex   = kernel_device_get_property_as_int_hex;
 
     /* Device-wide properties are stored per-port in the generic backend */
-    kernel_device_class->has_global_property            = kernel_device_has_property;
-    kernel_device_class->get_global_property            = kernel_device_get_property;
-    kernel_device_class->get_global_property_as_boolean = kernel_device_get_property_as_boolean;
-    kernel_device_class->get_global_property_as_int     = kernel_device_get_property_as_int;
-    kernel_device_class->get_global_property_as_int_hex = kernel_device_get_property_as_int_hex;
+    kernel_device_class->has_global_property = kernel_device_has_property;
+    kernel_device_class->get_global_property = kernel_device_get_property;
 
     properties[PROP_PROPERTIES] =
         g_param_spec_object ("properties",

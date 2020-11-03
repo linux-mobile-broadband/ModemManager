@@ -599,51 +599,6 @@ kernel_device_get_property (MMKernelDevice *_self,
 }
 
 static gboolean
-kernel_device_get_property_as_boolean (MMKernelDevice *_self,
-                                       const gchar    *property)
-{
-    MMKernelDeviceUdev *self;
-
-    self = MM_KERNEL_DEVICE_UDEV (_self);
-
-    if (!self->priv->device)
-        return FALSE;
-
-    return g_udev_device_get_property_as_boolean (self->priv->device, property);
-}
-
-static gint
-kernel_device_get_property_as_int (MMKernelDevice *_self,
-                                   const gchar    *property)
-{
-    MMKernelDeviceUdev *self;
-
-    self = MM_KERNEL_DEVICE_UDEV (_self);
-
-    if (!self->priv->device)
-        return -1;
-
-    return g_udev_device_get_property_as_int (self->priv->device, property);
-}
-
-static guint
-kernel_device_get_property_as_int_hex (MMKernelDevice *_self,
-                                       const gchar    *property)
-{
-    MMKernelDeviceUdev *self;
-    const gchar        *s;
-    guint               out = 0;
-
-    self = MM_KERNEL_DEVICE_UDEV (_self);
-
-    if (!self->priv->device)
-        return G_MAXUINT;
-
-    s = g_udev_device_get_property (self->priv->device, property);
-    return ((s && mm_get_uint_from_hex_str (s, &out)) ? out : 0);
-}
-
-static gboolean
 kernel_device_has_global_property (MMKernelDevice *_self,
                                    const gchar    *property)
 {
@@ -676,59 +631,6 @@ kernel_device_get_global_property (MMKernelDevice *_self,
     return kernel_device_get_property (_self, property);
 }
 
-static gboolean
-kernel_device_get_global_property_as_boolean (MMKernelDevice *_self,
-                                              const gchar    *property)
-{
-    MMKernelDeviceUdev *self;
-
-    self = MM_KERNEL_DEVICE_UDEV (_self);
-
-    ensure_physdev (self);
-    if (self->priv->physdev &&
-        g_udev_device_has_property (self->priv->physdev, property) &&
-        g_udev_device_get_property (self->priv->physdev, property))
-        return TRUE;
-
-    return kernel_device_get_property_as_boolean (_self, property);
-}
-
-static gint
-kernel_device_get_global_property_as_int (MMKernelDevice *_self,
-                                          const gchar    *property)
-{
-    MMKernelDeviceUdev *self;
-    gint                value;
-
-    self = MM_KERNEL_DEVICE_UDEV (_self);
-
-    ensure_physdev (self);
-    if (self->priv->physdev &&
-        g_udev_device_has_property (self->priv->physdev, property) &&
-        (value = g_udev_device_get_property_as_int (self->priv->physdev, property)) >= 0)
-        return value;
-
-    return kernel_device_get_property_as_int (_self, property);
-}
-
-static guint
-kernel_device_get_global_property_as_int_hex (MMKernelDevice *_self,
-                                              const gchar    *property)
-{
-    MMKernelDeviceUdev *self;
-    const gchar        *s;
-    guint               out = 0;
-
-    self = MM_KERNEL_DEVICE_UDEV (_self);
-
-    ensure_physdev (self);
-    if (self->priv->physdev &&
-        g_udev_device_has_property (self->priv->physdev, property) &&
-        (s = g_udev_device_get_property (self->priv->physdev, property)) != NULL)
-        return ((s && mm_get_uint_from_hex_str (s, &out)) ? out : 0);
-
-    return kernel_device_get_property_as_int_hex (_self, property);
-}
 
 /*****************************************************************************/
 
@@ -903,34 +805,28 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
-    kernel_device_class->get_subsystem                  = kernel_device_get_subsystem;
-    kernel_device_class->get_name                       = kernel_device_get_name;
-    kernel_device_class->get_driver                     = kernel_device_get_driver;
-    kernel_device_class->get_sysfs_path                 = kernel_device_get_sysfs_path;
-    kernel_device_class->get_physdev_uid                = kernel_device_get_physdev_uid;
-    kernel_device_class->get_physdev_vid                = kernel_device_get_physdev_vid;
-    kernel_device_class->get_physdev_pid                = kernel_device_get_physdev_pid;
-    kernel_device_class->get_physdev_revision           = kernel_device_get_physdev_revision;
-    kernel_device_class->get_physdev_sysfs_path         = kernel_device_get_physdev_sysfs_path;
-    kernel_device_class->get_physdev_subsystem          = kernel_device_get_physdev_subsystem;
-    kernel_device_class->get_physdev_manufacturer       = kernel_device_get_physdev_manufacturer;
-    kernel_device_class->get_physdev_product            = kernel_device_get_physdev_product;
-    kernel_device_class->get_interface_class            = kernel_device_get_interface_class;
-    kernel_device_class->get_interface_subclass         = kernel_device_get_interface_subclass;
-    kernel_device_class->get_interface_protocol         = kernel_device_get_interface_protocol;
-    kernel_device_class->get_interface_sysfs_path       = kernel_device_get_interface_sysfs_path;
-    kernel_device_class->get_interface_description      = kernel_device_get_interface_description;
-    kernel_device_class->cmp                            = kernel_device_cmp;
-    kernel_device_class->has_property                   = kernel_device_has_property;
-    kernel_device_class->get_property                   = kernel_device_get_property;
-    kernel_device_class->get_property_as_boolean        = kernel_device_get_property_as_boolean;
-    kernel_device_class->get_property_as_int            = kernel_device_get_property_as_int;
-    kernel_device_class->get_property_as_int_hex        = kernel_device_get_property_as_int_hex;
-    kernel_device_class->has_global_property            = kernel_device_has_global_property;
-    kernel_device_class->get_global_property            = kernel_device_get_global_property;
-    kernel_device_class->get_global_property_as_boolean = kernel_device_get_global_property_as_boolean;
-    kernel_device_class->get_global_property_as_int     = kernel_device_get_global_property_as_int;
-    kernel_device_class->get_global_property_as_int_hex = kernel_device_get_global_property_as_int_hex;
+    kernel_device_class->get_subsystem             = kernel_device_get_subsystem;
+    kernel_device_class->get_name                  = kernel_device_get_name;
+    kernel_device_class->get_driver                = kernel_device_get_driver;
+    kernel_device_class->get_sysfs_path            = kernel_device_get_sysfs_path;
+    kernel_device_class->get_physdev_uid           = kernel_device_get_physdev_uid;
+    kernel_device_class->get_physdev_vid           = kernel_device_get_physdev_vid;
+    kernel_device_class->get_physdev_pid           = kernel_device_get_physdev_pid;
+    kernel_device_class->get_physdev_revision      = kernel_device_get_physdev_revision;
+    kernel_device_class->get_physdev_sysfs_path    = kernel_device_get_physdev_sysfs_path;
+    kernel_device_class->get_physdev_subsystem     = kernel_device_get_physdev_subsystem;
+    kernel_device_class->get_physdev_manufacturer  = kernel_device_get_physdev_manufacturer;
+    kernel_device_class->get_physdev_product       = kernel_device_get_physdev_product;
+    kernel_device_class->get_interface_class       = kernel_device_get_interface_class;
+    kernel_device_class->get_interface_subclass    = kernel_device_get_interface_subclass;
+    kernel_device_class->get_interface_protocol    = kernel_device_get_interface_protocol;
+    kernel_device_class->get_interface_sysfs_path  = kernel_device_get_interface_sysfs_path;
+    kernel_device_class->get_interface_description = kernel_device_get_interface_description;
+    kernel_device_class->cmp                       = kernel_device_cmp;
+    kernel_device_class->has_property              = kernel_device_has_property;
+    kernel_device_class->get_property              = kernel_device_get_property;
+    kernel_device_class->has_global_property       = kernel_device_has_global_property;
+    kernel_device_class->get_global_property       = kernel_device_get_global_property;
 
     properties[PROP_UDEV_DEVICE] =
         g_param_spec_object ("udev-device",

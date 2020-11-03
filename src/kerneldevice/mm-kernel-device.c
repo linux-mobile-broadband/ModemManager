@@ -16,6 +16,9 @@
 #include <config.h>
 #include <string.h>
 
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include "mm-kernel-device.h"
 #include "mm-log-object.h"
 
@@ -196,27 +199,32 @@ gboolean
 mm_kernel_device_get_property_as_boolean (MMKernelDevice *self,
                                           const gchar    *property)
 {
-    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_boolean ?
-            MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_boolean (self, property) :
-            FALSE);
+    const gchar *value;
+
+    value = mm_kernel_device_get_property (self, property);
+    return (value && mm_common_get_boolean_from_string (value, NULL));
 }
 
 gint
 mm_kernel_device_get_property_as_int (MMKernelDevice *self,
                                       const gchar    *property)
 {
-    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_int ?
-            MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_int (self, property) :
-            -1);
+    const gchar *value;
+    gint         aux;
+
+    value = mm_kernel_device_get_property (self, property);
+    return ((value && mm_get_int_from_str (value, &aux)) ? aux : 0);
 }
 
 guint
 mm_kernel_device_get_property_as_int_hex (MMKernelDevice *self,
                                           const gchar    *property)
 {
-    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_int_hex ?
-            MM_KERNEL_DEVICE_GET_CLASS (self)->get_property_as_int_hex (self, property) :
-            0);
+    const gchar *value;
+    guint        aux;
+
+    value = mm_kernel_device_get_property (self, property);
+    return ((value && mm_get_uint_from_hex_str (value, &aux)) ? aux : 0);
 }
 
 gboolean
@@ -241,27 +249,32 @@ gboolean
 mm_kernel_device_get_global_property_as_boolean (MMKernelDevice *self,
                                                  const gchar    *property)
 {
-    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_boolean ?
-            MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_boolean (self, property) :
-            FALSE);
+    const gchar *value;
+
+    value = mm_kernel_device_get_global_property (self, property);
+    return (value && mm_common_get_boolean_from_string (value, NULL));
 }
 
 gint
 mm_kernel_device_get_global_property_as_int (MMKernelDevice *self,
                                              const gchar    *property)
 {
-    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int ?
-            MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int (self, property) :
-            -1);
+    const gchar *value;
+    gint         aux;
+
+    value = mm_kernel_device_get_global_property (self, property);
+    return ((value && mm_get_int_from_str (value, &aux)) ? aux : 0);
 }
 
 guint
 mm_kernel_device_get_global_property_as_int_hex (MMKernelDevice *self,
                                                  const gchar    *property)
 {
-    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int_hex ?
-            MM_KERNEL_DEVICE_GET_CLASS (self)->get_global_property_as_int_hex (self, property) :
-            0);
+    const gchar *value;
+    guint        aux;
+
+    value = mm_kernel_device_get_global_property (self, property);
+    return ((value && mm_get_uint_from_hex_str (value, &aux)) ? aux : 0);
 }
 
 /*****************************************************************************/
