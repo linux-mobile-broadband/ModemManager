@@ -19,25 +19,14 @@ LABEL="mm_qcom_soc_process"
 ENV{ID_MM_PHYSDEV_UID}="qcom-soc"
 
 # port type hints for the rpmsgexport-ed ports
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA5_CNTL",  ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA6_CNTL",  ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA7_CNTL",  ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA8_CNTL",  ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA9_CNTL",  ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA12_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA13_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA14_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA15_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA16_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA1",       ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA2",       ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA3",       ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA4",       ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+SUBSYSTEM=="rpmsg", ATTR{name}=="DATA[0-9]*_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
+SUBSYSTEM=="rpmsg", ATTR{name}=="DATA[0-9]",       ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # ignore every other port without explicit hints
 SUBSYSTEM=="rpmsg", ENV{ID_MM_PORT_TYPE_QMI}!="1", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}!="1", ENV{ID_MM_PORT_IGNORE}="1"
 
-# explicitly ignore bam-dmux network ports like rmnet_usb0
+# explicitly ignore ports intended for USB tethering (DATA40, DATA40_CNTL)
+SUBSYSTEM=="rpmsg", ATTR{name}=="DATA40*", ENV{ID_MM_PORT_IGNORE}="1"
 KERNEL=="rmnet_usb[0-9]*", ENV{ID_MM_PORT_IGNORE}="1"
 
 # flag all rpmsg ports under this plugin as candidate
