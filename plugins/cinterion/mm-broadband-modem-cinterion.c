@@ -2817,33 +2817,24 @@ static void
 setup_ports (MMBroadbandModem *_self)
 {
     MMBroadbandModemCinterion *self = (MM_BROADBAND_MODEM_CINTERION (_self));
-    MMPortSerialAt *port;
+    MMPortSerialAt            *ports[2];
+    guint                      i;
 
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_cinterion_parent_class)->setup_ports (_self);
 
-    /* Primary */
-    port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    if (port) {
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            port,
-            self->priv->sysstart_regex,
-            NULL, NULL, NULL);
-        mm_port_serial_at_add_unsolicited_msg_handler (
-            port,
-            self->priv->scks_regex,
-            NULL, NULL, NULL);
-    }
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
-    /* Secondary */
-    port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (port) {
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
         mm_port_serial_at_add_unsolicited_msg_handler (
-            port,
+            ports[i],
             self->priv->sysstart_regex,
             NULL, NULL, NULL);
         mm_port_serial_at_add_unsolicited_msg_handler (
-            port,
+            ports[i],
             self->priv->scks_regex,
             NULL, NULL, NULL);
     }
