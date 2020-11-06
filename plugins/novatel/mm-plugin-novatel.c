@@ -76,7 +76,7 @@ create_modem (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendors[] = { 0x1410, 0 };
     static const mm_uint16_pair forbidden_products[] = { { 0x1410, 0x9010 }, /* Novatel E362 */
                                                          { 0, 0 } };

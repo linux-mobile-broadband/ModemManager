@@ -181,7 +181,7 @@ grab_port (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const gchar *vendor_strings[] = { "cinterion", "siemens", NULL };
     static const guint16 vendor_ids[] = { 0x1e2d, 0x0681, 0 };
     static const MMAsyncMethod custom_init = {

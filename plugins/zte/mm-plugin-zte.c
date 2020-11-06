@@ -144,7 +144,7 @@ grab_port (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x19d2, 0 };
 
     return MM_PLUGIN (

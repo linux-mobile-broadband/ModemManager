@@ -87,7 +87,7 @@ create_modem (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     /* Vendors: Telit */
     static const guint16 vendor_ids[] = { 0x1bc7, 0 };
     static const gchar *vendor_strings[] = { "telit", NULL };

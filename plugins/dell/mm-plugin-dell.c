@@ -491,7 +491,7 @@ grab_port (MMPlugin     *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendors[] = { 0x413c, 0 };
     static const MMAsyncMethod custom_init = {
         .async  = G_CALLBACK (dell_custom_init),

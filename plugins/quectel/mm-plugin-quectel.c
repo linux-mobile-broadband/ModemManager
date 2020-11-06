@@ -81,7 +81,7 @@ create_modem (MMPlugin     *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const gchar *vendor_strings[] = { "quectel", NULL };
     static const guint16 vendor_ids[] = { 0x2c7c, 0 };
 

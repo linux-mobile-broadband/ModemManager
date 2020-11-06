@@ -276,7 +276,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
         port = base_modem_create_net_port (self, name);
     else if (g_str_equal (subsys, "tty"))
         port = base_modem_create_tty_port (self, name, kernel_device, ptype);
-    else if (g_str_has_prefix (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm"))
+    else if (g_str_equal (subsys, "usbmisc"))
         port = base_modem_create_usbmisc_port (self, name, ptype);
     else if (g_str_equal (subsys, "virtual"))
         port = base_modem_create_virtual_port (self, name);

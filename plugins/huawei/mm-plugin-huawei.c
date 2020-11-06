@@ -556,8 +556,7 @@ fallback_primary_cdcwdm (MMPlugin *self,
         if (!mm_port_probe_is_at (probe))
             continue;
 
-        if (g_str_has_prefix (mm_port_probe_get_port_subsys (probe), "usb") &&
-            g_str_has_prefix (mm_port_probe_get_port_name (probe), "cdc-wdm")) {
+        if (g_str_equal (mm_port_probe_get_port_subsys (probe), "usbmisc")) {
             mm_obj_dbg (self, "fallback port type hint applied to first cdc-wmd port found");
             g_object_set_data (G_OBJECT (probe), TAG_AT_PORT_FLAGS, GUINT_TO_POINTER (MM_PORT_SERIAL_AT_FLAG_PRIMARY));
             return 1;
@@ -700,7 +699,7 @@ grab_port (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x12d1, 0 };
     static const MMAsyncMethod custom_init = {
         .async  = G_CALLBACK (huawei_custom_init),

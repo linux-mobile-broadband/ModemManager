@@ -217,10 +217,6 @@ apply_subsystem_filter (MMPlugin       *self,
         for (i = 0; self->priv->subsystems[i]; i++) {
             if (g_str_equal (subsys, self->priv->subsystems[i]))
                 break;
-            /* New kernels may report as 'usbmisc' the subsystem */
-            else if (g_str_equal (self->priv->subsystems[i], "usb") &&
-                     g_str_equal (subsys, "usbmisc"))
-                break;
         }
 
         /* If we didn't match any subsystem: unsupported */

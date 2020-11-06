@@ -194,7 +194,7 @@ mm_filter_port (MMFilter        *self,
 
     /* If this is a cdc-wdm device, we always allow it */
     if ((self->priv->enabled_rules & MM_FILTER_RULE_USBMISC) &&
-        (g_strcmp0 (subsystem, "usb") == 0 || g_strcmp0 (subsystem, "usbmisc") == 0)) {
+        (g_strcmp0 (subsystem, "usbmisc") == 0)) {
         mm_obj_dbg (self, "(%s/%s) port allowed: usbmisc device", subsystem, name);
         return TRUE;
     }
