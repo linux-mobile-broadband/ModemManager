@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 1.0 Interface Specification
+
+   Copyright (C) 2020 Google, Inc.
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Sar:
+      @short_description: The ModemManager dynamic SAR interface.
+
+      The SAR interface defines operations and properties for dynamic SAR.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Modem.Sar">
+
+    <!--
+        Enable:
+        @enable: %TRUE to enable dynamic SAR and %FALSE to disable it.
+
+        Enable or disable dynamic SAR.
+
+        When enabled, the modem's output power level can be dynamically updated
+        by the host.
+
+        When disabled, the modem's output power level is dynamically updated
+        exclusively by the device.
+    -->
+    <method name="Enable">
+      <arg name="enable" type="b" direction="in" />
+    </method>
+
+    <!--
+        SetPowerLevel:
+        @level: Index of the SAR power level mapping table.
+
+        Set current dynamic SAR power level for all antennas on the device.
+
+        Please check with your modem vendor for detailed description on the
+        number of levels and corresponding power output for each level.
+
+        The index set here will apply to all antennas on the system.
+    -->
+    <method name="SetPowerLevel">
+      <arg name="level" type="u" direction="in" />
+    </method>
+
+    <!--
+        State:
+
+        Boolean indicating whether dynamic SAR is currently enabled.
+    -->
+    <property name="State" type="b" access="read" />
+
+    <!--
+        PowerLevel:
+
+        Current index of the SAR power level mapping table that is being used
+        for setting the output power of all antennas on the system.
+    -->
+    <property name="PowerLevel" type="u" access="read" />
+
+  </interface>
+</node>
