@@ -291,7 +291,7 @@ peek_port_mbim_for_data (MMBroadbandModemMbim  *self,
 
     /* Find the CDC-WDM port on the same USB interface as the given net port */
     cdc_wdm_mbim_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
-                                                   MM_PORT_SUBSYS_USB,
+                                                   MM_PORT_SUBSYS_USBMISC,
                                                    MM_PORT_TYPE_MBIM,
                                                    NULL);
 

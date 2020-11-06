@@ -26,7 +26,7 @@ typedef enum { /*< underscore_name=mm_port_subsys >*/
     MM_PORT_SUBSYS_UNKNOWN = 0x0,
     MM_PORT_SUBSYS_TTY,
     MM_PORT_SUBSYS_NET,
-    MM_PORT_SUBSYS_USB,
+    MM_PORT_SUBSYS_USBMISC,
     MM_PORT_SUBSYS_UNIX,
 
     MM_PORT_SUBSYS_LAST = MM_PORT_SUBSYS_UNIX /*< skip >*/

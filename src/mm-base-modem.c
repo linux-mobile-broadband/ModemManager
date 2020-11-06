@@ -314,7 +314,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
 
         /* Non-serial AT port */
         if (!port && ptype == MM_PORT_TYPE_AT) {
-            port = MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_USB));
+            port = MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_USBMISC));
 
             /* Set common response parser */
             mm_port_serial_at_set_response_parser (MM_PORT_SERIAL_AT (port),

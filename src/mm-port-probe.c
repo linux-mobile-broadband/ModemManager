@@ -1270,7 +1270,7 @@ serial_open_at (MMPortProbe *self)
         MMPortSubsys subsys = MM_PORT_SUBSYS_TTY;
 
         if (g_str_has_prefix (mm_kernel_device_get_subsystem (self->priv->port), "usb"))
-            subsys = MM_PORT_SUBSYS_USB;
+            subsys = MM_PORT_SUBSYS_USBMISC;
 
         ctx->serial = MM_PORT_SERIAL (mm_port_serial_at_new (mm_kernel_device_get_name (self->priv->port), subsys));
         if (!ctx->serial) {

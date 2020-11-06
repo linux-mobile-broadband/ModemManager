@@ -176,7 +176,7 @@ mm_broadband_modem_huawei_get_at_port_list (MMBroadbandModemHuawei *self)
 
     /* Additional cdc-wdm ports used for dialing */
     cdc_wdm_at_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
-                                                 MM_PORT_SUBSYS_USB,
+                                                 MM_PORT_SUBSYS_USBMISC,
                                                  MM_PORT_TYPE_AT,
                                                  NULL);
 
@@ -2200,7 +2200,7 @@ peek_port_at_for_data (MMBroadbandModemHuawei *self,
 
     /* Find the CDC-WDM port on the same USB interface as the given net port */
     cdc_wdm_at_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
-                                                 MM_PORT_SUBSYS_USB,
+                                                 MM_PORT_SUBSYS_USBMISC,
                                                  MM_PORT_TYPE_AT,
                                                  NULL);
     for (l = cdc_wdm_at_ports; l && !found; l = g_list_next (l)) {

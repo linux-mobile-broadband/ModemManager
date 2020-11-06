@@ -593,7 +593,7 @@ mm_port_mbim_new (const gchar *name)
 {
     return MM_PORT_MBIM (g_object_new (MM_TYPE_PORT_MBIM,
                                        MM_PORT_DEVICE, name,
-                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_USB,
+                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_USBMISC,
                                        MM_PORT_TYPE, MM_PORT_TYPE_MBIM,
                                        NULL));
 }

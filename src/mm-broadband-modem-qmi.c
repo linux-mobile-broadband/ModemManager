@@ -262,7 +262,7 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
 
     /* Find the CDC-WDM port on the same USB interface as the given net port */
     cdc_wdm_qmi_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
-                                                  MM_PORT_SUBSYS_USB,
+                                                  MM_PORT_SUBSYS_USBMISC,
                                                   MM_PORT_TYPE_QMI,
                                                   NULL);
     for (l = cdc_wdm_qmi_ports; l && !found; l = g_list_next (l)) {
