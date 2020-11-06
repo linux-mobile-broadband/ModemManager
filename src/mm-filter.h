@@ -52,7 +52,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
     MM_FILTER_RULE_PLUGIN_WHITELIST      = 1 << 2,
     MM_FILTER_RULE_VIRTUAL               = 1 << 3,
     MM_FILTER_RULE_NET                   = 1 << 4,
-    MM_FILTER_RULE_CDC_WDM               = 1 << 5,
+    MM_FILTER_RULE_USBMISC               = 1 << 5,
     MM_FILTER_RULE_TTY                   = 1 << 6,
     MM_FILTER_RULE_TTY_BLACKLIST         = 1 << 7,
     MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  = 1 << 8,
@@ -70,7 +70,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_PLUGIN_WHITELIST      | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
-     MM_FILTER_RULE_CDC_WDM               | \
+     MM_FILTER_RULE_USBMISC               | \
      MM_FILTER_RULE_TTY                   | \
      MM_FILTER_RULE_TTY_BLACKLIST         | \
      MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  | \
@@ -88,7 +88,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_EXPLICIT_BLACKLIST   | \
      MM_FILTER_RULE_VIRTUAL              | \
      MM_FILTER_RULE_NET                  | \
-     MM_FILTER_RULE_CDC_WDM              | \
+     MM_FILTER_RULE_USBMISC              | \
      MM_FILTER_RULE_TTY                  | \
      MM_FILTER_RULE_TTY_BLACKLIST        | \
      MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY | \
@@ -103,7 +103,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_PLUGIN_WHITELIST      | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
-     MM_FILTER_RULE_CDC_WDM               | \
+     MM_FILTER_RULE_USBMISC               | \
      MM_FILTER_RULE_TTY                   | \
      MM_FILTER_RULE_TTY_PLATFORM_DRIVER   | \
      MM_FILTER_RULE_TTY_DRIVER            | \
@@ -119,7 +119,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_PLUGIN_WHITELIST      | \
      MM_FILTER_RULE_VIRTUAL               | \
      MM_FILTER_RULE_NET                   | \
-     MM_FILTER_RULE_CDC_WDM               | \
+     MM_FILTER_RULE_USBMISC               | \
      MM_FILTER_RULE_TTY                   | \
      MM_FILTER_RULE_TTY_BLACKLIST         | \
      MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  | \

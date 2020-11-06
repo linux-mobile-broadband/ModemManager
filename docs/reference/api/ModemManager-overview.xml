@@ -159,10 +159,10 @@ $ sudo udevadm trigger
             </para>
           </listitem>
           <listitem>
-            <para><emphasis>MM_FILTER_RULE_CDC_WDM</emphasis></para>
+            <para><emphasis>MM_FILTER_RULE_USBMISC</emphasis></para>
             <para>
-              This filter will automatically flag as allowed all cdc-wdm ports exposed by
-              devices. Unless there is a will to explicitly forbid the cdc-wdm ports exposed
+              This filter will automatically flag as allowed all cdc-wdm ports exposed in the
+              usbmisc subsystem. Unless there is a will to explicitly forbid the cdc-wdm ports exposed
               by qmi_wwan, cdc_mbim or huawei-cdc-ncm kernel drivers, this filter should always
               be enabled.
             </para>
@@ -254,7 +254,7 @@ $ sudo udevadm trigger
                 <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
-                <listitem>MM_FILTER_RULE_CDC_WDM</listitem>
+                <listitem>MM_FILTER_RULE_USBMISC</listitem>
                 <listitem>MM_FILTER_RULE_TTY</listitem>
                 <listitem>MM_FILTER_RULE_TTY_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY</listitem>
@@ -280,7 +280,7 @@ $ sudo udevadm trigger
                 <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
-                <listitem>MM_FILTER_RULE_CDC_WDM</listitem>
+                <listitem>MM_FILTER_RULE_USBMISC</listitem>
                 <listitem>MM_FILTER_RULE_TTY</listitem>
                 <listitem>MM_FILTER_RULE_TTY_PLATFORM_DRIVER</listitem>
                 <listitem>MM_FILTER_RULE_TTY_DRIVER</listitem>
@@ -307,7 +307,7 @@ $ sudo udevadm trigger
                 <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
-                <listitem>MM_FILTER_RULE_CDC_WDM</listitem>
+                <listitem>MM_FILTER_RULE_USBMISC</listitem>
                 <listitem>MM_FILTER_RULE_TTY</listitem>
                 <listitem>MM_FILTER_RULE_TTY_BLACKLIST</listitem>
                 <listitem>MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY</listitem>
@@ -339,7 +339,7 @@ $ sudo udevadm trigger
               net and cdc-wdm ports forbidden completely:
               <programlisting>
 # MM_FILTER_RULE_NET=0 \
-  MM_FILTER_RULE_CDC_WDM=0 \
+  MM_FILTER_RULE_USBMISC=0 \
   /usr/sbin/ModemManager --filter-policy=DEFAULT</programlisting>
             </para>
             <para>
@@ -348,7 +348,7 @@ $ sudo udevadm trigger
               net ports (e.g. 'lo') are also being allowed.
               <programlisting>
 # MM_FILTER_RULE_NET=1 \
-  MM_FILTER_RULE_CDC_WDM=1 \
+  MM_FILTER_RULE_USBMISC=1 \
   /usr/sbin/ModemManager --filter-policy=WHITELIST-ONLY</programlisting>
             </para>
           </listitem>
