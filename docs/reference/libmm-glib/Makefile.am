@@ -86,6 +86,7 @@ CLEANFILES += \
 	$(DOC_MODULE).interfaces \
 	$(DOC_MODULE).prerequisites \
 	$(DOC_MODULE).signals \
+	$(DOC_MODULE).actions \
 	*.stamp \
 	-rf xml html tmpl \
 	$(NULL)
