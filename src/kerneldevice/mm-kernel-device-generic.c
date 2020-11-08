@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2016 Velocloud, Inc.
+ * Copyright (C) 2020 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #define _GNU_SOURCE
@@ -69,39 +70,57 @@ struct _MMKernelDeviceGenericPrivate {
     gchar   *physdev_product;
 };
 
-static guint
-read_sysfs_property_as_hex (const gchar *path,
-                            const gchar *property)
+static gboolean
+has_sysfs_attribute (const gchar *path,
+                     const gchar *attribute)
 {
-    gchar *aux;
-    gchar *contents = NULL;
-    guint val = 0;
+    g_autofree gchar *aux_filepath = NULL;
 
-    aux = g_strdup_printf ("%s/%s", path, property);
+    aux_filepath = g_strdup_printf ("%s/%s", path, attribute);
+    return g_file_test (aux_filepath, G_FILE_TEST_EXISTS);
+}
+
+static gchar *
+read_sysfs_attribute_as_string (const gchar *path,
+                                const gchar *attribute)
+{
+    g_autofree gchar *aux = NULL;
+    gchar            *contents = NULL;
+
+    aux = g_strdup_printf ("%s/%s", path, attribute);
     if (g_file_get_contents (aux, &contents, NULL, NULL)) {
         g_strdelimit (contents, "\r\n", ' ');
         g_strstrip (contents);
-        mm_get_uint_from_hex_str (contents, &val);
     }
-    g_free (contents);
-    g_free (aux);
+    return contents;
+}
+
+static guint
+read_sysfs_attribute_as_hex (const gchar *path,
+                             const gchar *attribute)
+{
+    g_autofree gchar *contents = NULL;
+    guint             val = 0;
+
+    contents = read_sysfs_attribute_as_string (path, attribute);
+    if (contents)
+        mm_get_uint_from_hex_str (contents, &val);
     return val;
 }
 
 static gchar *
-read_sysfs_property_as_string (const gchar *path,
-                               const gchar *property)
+read_sysfs_attribute_link_basename (const gchar *path,
+                                    const gchar *attribute)
 {
-    gchar *aux;
-    gchar *contents = NULL;
+    g_autofree gchar *aux_filepath = NULL;
+    g_autofree gchar *canonicalized_path = NULL;
 
-    aux = g_strdup_printf ("%s/%s", path, property);
-    if (g_file_get_contents (aux, &contents, NULL, NULL)) {
-        g_strdelimit (contents, "\r\n", ' ');
-        g_strstrip (contents);
-    }
-    g_free (aux);
-    return contents;
+    aux_filepath = g_strdup_printf ("%s/%s", path, attribute);
+    if (!g_file_test (aux_filepath, G_FILE_TEST_EXISTS))
+        return NULL;
+
+    canonicalized_path = realpath (aux_filepath, NULL);
+    return g_path_get_basename (canonicalized_path);
 }
 
 /*****************************************************************************/
@@ -110,7 +129,7 @@ read_sysfs_property_as_string (const gchar *path,
 static void
 preload_sysfs_path (MMKernelDeviceGeneric *self)
 {
-    gchar *tmp;
+    g_autofree gchar *tmp = NULL;
 
     if (self->priv->sysfs_path)
         return;
@@ -141,263 +160,271 @@ preload_sysfs_path (MMKernelDeviceGeneric *self)
                    self->priv->sysfs_path);
         g_object_set_data_full (G_OBJECT (self), "DEVPATH", g_strdup (devpath), g_free);
     }
-    g_free (tmp);
+}
+
+/*****************************************************************************/
+
+static void
+preload_common_properties (MMKernelDeviceGeneric *self)
+{
+    if (self->priv->interface_sysfs_path) {
+        mm_obj_dbg (self, "  ID_USB_INTERFACE_NUM: 0x%02x", self->priv->interface_number);
+        g_object_set_data_full (G_OBJECT (self), "ID_USB_INTERFACE_NUM", g_strdup_printf ("%02x", self->priv->interface_number), g_free);
+    }
+
+    if (self->priv->physdev_product) {
+        mm_obj_dbg (self, "  ID_MODEL: %s", self->priv->physdev_product);
+        g_object_set_data_full (G_OBJECT (self), "ID_MODEL", g_strdup (self->priv->physdev_product), g_free);
+    }
+
+    if (self->priv->physdev_manufacturer) {
+        mm_obj_dbg (self, "  ID_VENDOR: %s", self->priv->physdev_manufacturer);
+        g_object_set_data_full (G_OBJECT (self), "ID_VENDOR", g_strdup (self->priv->physdev_manufacturer), g_free);
+    }
+
+    if (self->priv->physdev_sysfs_path) {
+        mm_obj_dbg (self, "  ID_VENDOR_ID: 0x%04x", self->priv->physdev_vid);
+        g_object_set_data_full (G_OBJECT (self), "ID_VENDOR_ID", g_strdup_printf ("%04x", self->priv->physdev_vid), g_free);
+        mm_obj_dbg (self, "  ID_MODEL_ID: 0x%04x", self->priv->physdev_pid);
+        g_object_set_data_full (G_OBJECT (self), "ID_MODEL_ID", g_strdup_printf ("%04x", self->priv->physdev_pid), g_free);
+        mm_obj_dbg (self, "  ID_REVISION: 0x%04x", self->priv->physdev_revision);
+        g_object_set_data_full (G_OBJECT (self), "ID_REVISION", g_strdup_printf ("%04x", self->priv->physdev_revision), g_free);
+    }
 }
 
 static void
-preload_interface_sysfs_path (MMKernelDeviceGeneric *self)
+preload_contents_other (MMKernelDeviceGeneric *self)
 {
-    gchar *dirpath;
-    gchar *aux;
+    /* For any other kind of bus (or the absence of one, as in virtual devices),
+     * assume this is a single port device and don't try to match multiple ports
+     * together. Also, obviously, no vendor, product, revision or interface. */
+    self->priv->driver = read_sysfs_attribute_link_basename (self->priv->sysfs_path, "driver");
+}
 
-    if (self->priv->interface_sysfs_path || !self->priv->sysfs_path)
-        return;
+static void
+preload_contents_platform (MMKernelDeviceGeneric *self,
+                           const gchar           *platform)
+{
+    g_autofree gchar *iter = NULL;
 
-    /* parent sysfs can be built directly using subsystem and name; e.g. for
-     * subsystem usbmisc and name cdc-wdm0:
-     *    $ realpath /sys/class/usbmisc/cdc-wdm0/device
-     *    /sys/devices/pci0000:00/0000:00:1d.0/usb4/4-1/4-1.3/4-1.3:1.8
-     *
-     * This sysfs path will be equal for all devices exported from within the
-     * same interface (e.g. a pair of cdc-wdm/wwan devices).
-     *
-     * The correct parent dir we want to have is the first one with "usb" subsystem.
-     */
-    aux = g_strdup_printf ("%s/device", self->priv->sysfs_path);
-    dirpath = realpath (aux, NULL);
-    g_free (aux);
+    iter = g_strdup (self->priv->sysfs_path);
+    while (iter && (g_strcmp0 (iter, "/") != 0)) {
+        gchar       *parent;
+        const gchar *current_subsystem;
 
-    while (dirpath) {
-        gchar *subsystem_filepath;
+        /* Store the first driver found */
+        if (!self->priv->driver)
+            self->priv->driver = read_sysfs_attribute_link_basename (iter, "driver");
 
-        /* Directory must exist */
-        if (!g_file_test (dirpath, G_FILE_TEST_EXISTS))
-            break;
-
-        /* If subsystem file not found, keep looping */
-        subsystem_filepath = g_strdup_printf ("%s/subsystem", dirpath);
-        if (g_file_test (subsystem_filepath, G_FILE_TEST_EXISTS)) {
-            gchar *canonicalized_subsystem;
-            gchar *subsystem_name;
-
-            canonicalized_subsystem = realpath (subsystem_filepath, NULL);
-            g_free (subsystem_filepath);
-
-            subsystem_name = g_path_get_basename (canonicalized_subsystem);
-            g_free (canonicalized_subsystem);
-
-            if (subsystem_name && g_str_equal (subsystem_name, "usb")) {
-                self->priv->interface_sysfs_path = dirpath;
-                g_free (subsystem_name);
-                break;
-            }
-            g_free (subsystem_name);
-        } else
-            g_free (subsystem_filepath);
-
-        /* Just in case */
-        if (g_str_equal (dirpath, "/")) {
-            g_free (dirpath);
+        /* Take first parent with the given platform subsystem as physical device */
+        current_subsystem = read_sysfs_attribute_link_basename (iter, "subsystem");
+        if (!self->priv->physdev_sysfs_path && (g_strcmp0 (current_subsystem, platform) == 0)) {
+            self->priv->physdev_sysfs_path = g_strdup (iter);
+            /* stop traversing as soon as the physical device is found */
             break;
         }
 
-        aux = g_path_get_dirname (dirpath);
-        g_free (dirpath);
-        dirpath = aux;
+        parent = g_path_get_dirname (iter);
+        g_clear_pointer (&iter, g_free);
+        iter = parent;
+    }
+}
+
+static void
+preload_contents_pcmcia (MMKernelDeviceGeneric *self)
+{
+    g_autofree gchar *iter = NULL;
+    gboolean          pcmcia_subsystem_found = FALSE;
+
+    iter = g_strdup (self->priv->sysfs_path);
+    while (iter && (g_strcmp0 (iter, "/") != 0)) {
+        g_autofree gchar *subsys = NULL;
+        g_autofree gchar *parent = NULL;
+        g_autofree gchar *parent_subsys = NULL;
+
+        /* Store the first driver found */
+        if (!self->priv->driver)
+            self->priv->driver = read_sysfs_attribute_link_basename (iter, "driver");
+
+        subsys = read_sysfs_attribute_link_basename (iter, "subsystem");
+        if (g_strcmp0 (subsys, "pcmcia") == 0)
+            pcmcia_subsystem_found = TRUE;
+
+        parent = g_path_get_dirname (iter);
+        if (parent)
+            parent_subsys = read_sysfs_attribute_link_basename (parent, "subsystem");
+
+        if (pcmcia_subsystem_found  && parent_subsys && (g_strcmp0 (parent_subsys, "pcmcia") != 0)) {
+            self->priv->physdev_sysfs_path = g_strdup (iter);
+            self->priv->physdev_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "manf_id");
+            self->priv->physdev_pid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "card_id");
+            /* stop traversing as soon as the physical device is found */
+            break;
+        }
+
+        g_clear_pointer (&iter, g_free);
+        iter = g_steal_pointer (&parent);
+    }
+}
+
+static void
+preload_contents_pci (MMKernelDeviceGeneric *self)
+{
+    g_autofree gchar *iter = NULL;
+
+    iter = g_strdup (self->priv->sysfs_path);
+    while (iter && (g_strcmp0 (iter, "/") != 0)) {
+        g_autofree gchar *subsys = NULL;
+        gchar            *parent;
+
+        /* Store the first driver found */
+        if (!self->priv->driver)
+            self->priv->driver = read_sysfs_attribute_link_basename (iter, "driver");
+
+        /* the PCI channel specific devices have their own drivers and
+         * subsystems, we can rely on the physical device being the first
+         * one that reports the 'pci' subsystem */
+        subsys = read_sysfs_attribute_link_basename (iter, "subsystem");
+        if (!self->priv->physdev_sysfs_path && (g_strcmp0 (subsys, "pci") == 0)) {
+            self->priv->physdev_sysfs_path = g_strdup (iter);
+            self->priv->physdev_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "vendor");
+            self->priv->physdev_pid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "device");
+            self->priv->physdev_revision = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "revision");
+            self->priv->physdev_subsystem = g_steal_pointer (&subsys);
+            /* stop traversing as soon as the physical device is found */
+            break;
+        }
+
+        parent = g_path_get_dirname (iter);
+        g_clear_pointer (&iter, g_free);
+        iter = parent;
+    }
+}
+
+static void
+preload_contents_usb (MMKernelDeviceGeneric *self)
+{
+    g_autofree gchar *iter = NULL;
+
+    iter = g_strdup (self->priv->sysfs_path);
+    while (iter && (g_strcmp0 (iter, "/") != 0)) {
+        gchar *parent;
+
+        /* is this the USB interface? */
+        if (!self->priv->interface_sysfs_path && has_sysfs_attribute (iter, "bInterfaceClass")) {
+            self->priv->interface_sysfs_path = g_strdup (iter);
+            self->priv->interface_class = read_sysfs_attribute_as_hex (self->priv->interface_sysfs_path, "bInterfaceClass");
+            self->priv->interface_subclass = read_sysfs_attribute_as_hex (self->priv->interface_sysfs_path, "bInterfaceSubClass");
+            self->priv->interface_protocol = read_sysfs_attribute_as_hex (self->priv->interface_sysfs_path, "bInterfaceProtocol");
+            self->priv->interface_number = read_sysfs_attribute_as_hex (self->priv->interface_sysfs_path, "bInterfaceNumber");
+            self->priv->interface_description = read_sysfs_attribute_as_string (self->priv->interface_sysfs_path, "interface");
+            self->priv->driver = read_sysfs_attribute_link_basename (self->priv->interface_sysfs_path, "driver");
+        }
+        /* is this the USB physdev? */
+        else if (!self->priv->physdev_sysfs_path && has_sysfs_attribute (iter, "idVendor")) {
+            self->priv->physdev_sysfs_path = g_strdup (iter);
+            self->priv->physdev_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "idVendor");
+            self->priv->physdev_pid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "idProduct");
+            self->priv->physdev_revision = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "bcdDevice");
+            self->priv->physdev_subsystem = read_sysfs_attribute_link_basename (self->priv->physdev_sysfs_path, "subsystem");
+            self->priv->physdev_manufacturer = read_sysfs_attribute_as_string (self->priv->physdev_sysfs_path, "manufacturer");
+            self->priv->physdev_product = read_sysfs_attribute_as_string (self->priv->physdev_sysfs_path, "product");
+            /* stop traversing as soon as the physical device is found */
+            break;
+        }
+
+        parent = g_path_get_dirname (iter);
+        g_clear_pointer (&iter, g_free);
+        iter = parent;
+    }
+}
+
+static gchar *
+find_device_bus_subsystem (MMKernelDeviceGeneric *self)
+{
+    g_autofree gchar *iter = NULL;
+
+    iter = g_strdup (self->priv->sysfs_path);
+    while (iter && (g_strcmp0 (iter, "/") != 0)) {
+        g_autofree gchar *subsys = NULL;
+        gchar            *parent;
+
+        subsys = read_sysfs_attribute_link_basename (iter, "subsystem");
+
+        /* stop search as soon as we find a parent object
+         * of one of the supported bus subsystems */
+        if (subsys &&
+            ((g_strcmp0 (subsys, "usb") == 0)      ||
+             (g_strcmp0 (subsys, "pcmcia") == 0)   ||
+             (g_strcmp0 (subsys, "pci") == 0)      ||
+             (g_strcmp0 (subsys, "platform") == 0) ||
+             (g_strcmp0 (subsys, "pnp") == 0)      ||
+             (g_strcmp0 (subsys, "sdio") == 0)))
+            return g_steal_pointer (&subsys);
+
+        parent = g_path_get_dirname (iter);
+        g_clear_pointer (&iter, g_free);
+        iter = parent;
     }
 
-    if (self->priv->interface_sysfs_path)
-        mm_obj_dbg (self, "interface sysfs path: %s", self->priv->interface_sysfs_path);
-}
-
-static void
-preload_physdev_sysfs_path (MMKernelDeviceGeneric *self)
-{
-    /* physdev sysfs is the dirname of the parent sysfs path, e.g.:
-     *    /sys/devices/pci0000:00/0000:00:1d.0/usb4/4-1/4-1.3
-     *
-     * This sysfs path will be equal for all devices exported from the same
-     * physical device.
-     */
-    if (!self->priv->physdev_sysfs_path && self->priv->interface_sysfs_path)
-        self->priv->physdev_sysfs_path = g_path_get_dirname (self->priv->interface_sysfs_path);
-
-    if (self->priv->physdev_sysfs_path)
-        mm_obj_dbg (self, "physdev sysfs path: %s", self->priv->physdev_sysfs_path);
-}
-
-static void
-preload_driver (MMKernelDeviceGeneric *self)
-{
-    if (!self->priv->driver && self->priv->interface_sysfs_path) {
-        gchar *tmp;
-        gchar *tmp2;
-
-        tmp = g_strdup_printf ("%s/driver", self->priv->interface_sysfs_path);
-        tmp2 = realpath (tmp, NULL);
-        if (tmp2 && g_file_test (tmp2, G_FILE_TEST_EXISTS))
-            self->priv->driver = g_path_get_basename (tmp2);
-        g_free (tmp2);
-        g_free (tmp);
-    }
-
-    if (self->priv->driver)
-        mm_obj_dbg (self, "driver: %s", self->priv->driver);
-}
-
-static void
-preload_physdev_vid (MMKernelDeviceGeneric *self)
-{
-    if (!self->priv->physdev_vid && self->priv->physdev_sysfs_path) {
-        guint val;
-
-        val = read_sysfs_property_as_hex (self->priv->physdev_sysfs_path, "idVendor");
-        if (val && val <= G_MAXUINT16)
-            self->priv->physdev_vid = val;
-    }
-
-    if (self->priv->physdev_vid) {
-        mm_obj_dbg (self, "vid (ID_VENDOR_ID): 0x%04x", self->priv->physdev_vid);
-        g_object_set_data_full (G_OBJECT (self), "ID_VENDOR_ID", g_strdup_printf ("%04x", self->priv->physdev_vid), g_free);
-    } else
-        mm_obj_dbg (self, "vid: unknown");
-
-}
-
-static void
-preload_physdev_pid (MMKernelDeviceGeneric *self)
-{
-    if (!self->priv->physdev_pid && self->priv->physdev_sysfs_path) {
-        guint val;
-
-        val = read_sysfs_property_as_hex (self->priv->physdev_sysfs_path, "idProduct");
-        if (val && val <= G_MAXUINT16)
-            self->priv->physdev_pid = val;
-    }
-
-    if (self->priv->physdev_pid) {
-        mm_obj_dbg (self, "pid (ID_MODEL_ID): 0x%04x", self->priv->physdev_pid);
-        g_object_set_data_full (G_OBJECT (self), "ID_MODEL_ID", g_strdup_printf ("%04x", self->priv->physdev_pid), g_free);
-    } else
-        mm_obj_dbg (self, "pid: unknown");
-}
-
-static void
-preload_physdev_revision (MMKernelDeviceGeneric *self)
-{
-    if (!self->priv->physdev_revision && self->priv->physdev_sysfs_path) {
-        guint val;
-
-        val = read_sysfs_property_as_hex (self->priv->physdev_sysfs_path, "bcdDevice");
-        if (val && val <= G_MAXUINT16)
-            self->priv->physdev_revision = val;
-    }
-
-    if (self->priv->physdev_revision) {
-        mm_obj_dbg (self, "revision (ID_REVISION): 0x%04x", self->priv->physdev_revision);
-        g_object_set_data_full (G_OBJECT (self), "ID_REVISION", g_strdup_printf ("%04x", self->priv->physdev_revision), g_free);
-    } else
-        mm_obj_dbg (self, "revision: unknown");
-}
-
-static void
-preload_physdev_subsystem (MMKernelDeviceGeneric *self)
-{
-    if (!self->priv->physdev_subsystem && self->priv->physdev_sysfs_path) {
-        gchar *aux;
-        gchar *subsyspath;
-
-        aux = g_strdup_printf ("%s/subsystem", self->priv->physdev_sysfs_path);
-        subsyspath = realpath (aux, NULL);
-        self->priv->physdev_subsystem = g_path_get_dirname (subsyspath);
-        g_free (subsyspath);
-        g_free (aux);
-    }
-
-    mm_obj_dbg (self, "subsystem: %s", self->priv->physdev_subsystem ? self->priv->physdev_subsystem : "unknown");
-}
-
-static void
-preload_manufacturer (MMKernelDeviceGeneric *self)
-{
-    if (!self->priv->physdev_manufacturer)
-        self->priv->physdev_manufacturer = (self->priv->physdev_sysfs_path ? read_sysfs_property_as_string (self->priv->physdev_sysfs_path, "manufacturer") : NULL);
-
-    if (self->priv->physdev_manufacturer) {
-        mm_obj_dbg (self, "manufacturer (ID_VENDOR): %s", self->priv->physdev_manufacturer);
-        g_object_set_data_full (G_OBJECT (self), "ID_VENDOR", g_strdup (self->priv->physdev_manufacturer), g_free);
-    } else
-        mm_obj_dbg (self, "manufacturer: unknown");
-}
-
-static void
-preload_product (MMKernelDeviceGeneric *self)
-{
-    if (!self->priv->physdev_product)
-        self->priv->physdev_product = (self->priv->physdev_sysfs_path ? read_sysfs_property_as_string (self->priv->physdev_sysfs_path, "product") : NULL);
-
-    if (self->priv->physdev_product) {
-        mm_obj_dbg (self, "product (ID_MODEL): %s", self->priv->physdev_product);
-        g_object_set_data_full (G_OBJECT (self), "ID_MODEL", g_strdup (self->priv->physdev_product), g_free);
-    } else
-        mm_obj_dbg (self, "product: unknown");
-
-}
-
-static void
-preload_interface_class (MMKernelDeviceGeneric *self)
-{
-    self->priv->interface_class = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceClass") : 0x00);
-    mm_obj_dbg (self, "interface class: 0x%02x", self->priv->interface_class);
-}
-
-static void
-preload_interface_subclass (MMKernelDeviceGeneric *self)
-{
-    self->priv->interface_subclass = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceSubClass") : 0x00);
-    mm_obj_dbg (self, "interface subclass: 0x%02x", self->priv->interface_subclass);
-}
-
-static void
-preload_interface_protocol (MMKernelDeviceGeneric *self)
-{
-    self->priv->interface_protocol = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceProtocol") : 0x00);
-    mm_obj_dbg (self, "interface protocol: 0x%02x", self->priv->interface_protocol);
-}
-
-static void
-preload_interface_number (MMKernelDeviceGeneric *self)
-{
-    self->priv->interface_number = (self->priv->interface_sysfs_path ? read_sysfs_property_as_hex (self->priv->interface_sysfs_path, "bInterfaceNumber") : 0x00);
-    mm_obj_dbg (self, "interface number (ID_USB_INTERFACE_NUM): 0x%02x", self->priv->interface_number);
-    g_object_set_data_full (G_OBJECT (self), "ID_USB_INTERFACE_NUM", g_strdup_printf ("%02x", self->priv->interface_number), g_free);
-}
-
-static void
-preload_interface_description (MMKernelDeviceGeneric *self)
-{
-    self->priv->interface_description = (self->priv->interface_sysfs_path ? read_sysfs_property_as_string (self->priv->interface_sysfs_path, "interface") : NULL);
-    mm_obj_dbg (self, "interface description: %s", self->priv->interface_description ? self->priv->interface_description : "unknown");
+    /* no more parents to check */
+    return NULL;
 }
 
 static void
 preload_contents (MMKernelDeviceGeneric *self)
 {
-    preload_sysfs_path            (self);
-    preload_interface_sysfs_path  (self);
-    preload_interface_class       (self);
-    preload_interface_subclass    (self);
-    preload_interface_protocol    (self);
-    preload_interface_number      (self);
-    preload_interface_description (self);
-    preload_physdev_sysfs_path    (self);
-    preload_manufacturer          (self);
-    preload_product               (self);
-    preload_driver                (self);
-    preload_physdev_vid           (self);
-    preload_physdev_pid           (self);
-    preload_physdev_revision      (self);
-    preload_physdev_subsystem     (self);
+    g_autofree gchar *bus_subsys = NULL;
+
+    if (self->priv->sysfs_path)
+        return;
+
+    preload_sysfs_path (self);
+    bus_subsys = find_device_bus_subsystem (self);
+
+    if (g_strcmp0 (bus_subsys, "usb") == 0)
+        preload_contents_usb (self);
+    else if (g_strcmp0 (bus_subsys, "pcmcia") == 0)
+        preload_contents_pcmcia (self);
+    else if (g_strcmp0 (bus_subsys, "pci") == 0)
+        preload_contents_pci (self);
+    else if ((g_strcmp0 (bus_subsys, "platform") == 0) ||
+             (g_strcmp0 (bus_subsys, "pnp") == 0)      ||
+             (g_strcmp0 (bus_subsys, "sdio") == 0))
+        preload_contents_platform (self, bus_subsys);
+    else
+        preload_contents_other (self);
+
+    if (!bus_subsys)
+        return;
+
+    mm_obj_dbg (self, "port contents loaded:");
+    mm_obj_dbg (self, "  bus: %s", bus_subsys ? bus_subsys : "n/a");
+    if (self->priv->interface_sysfs_path) {
+        mm_obj_dbg (self, "  interface: %s", self->priv->interface_sysfs_path);
+        mm_obj_dbg (self, "  interface class: %02x", self->priv->interface_class);
+        mm_obj_dbg (self, "  interface subclass: %02x", self->priv->interface_subclass);
+        mm_obj_dbg (self, "  interface protocol: %02x", self->priv->interface_protocol);
+        mm_obj_dbg (self, "  interface number: %02x", self->priv->interface_number);
+    }
+    if (self->priv->interface_description)
+        mm_obj_dbg (self, "  interface description: %s", self->priv->interface_description);
+    if (self->priv->physdev_sysfs_path)
+        mm_obj_dbg (self, "  device: %s", self->priv->physdev_sysfs_path);
+    if (self->priv->driver)
+        mm_obj_dbg (self, "  driver: %s", self->priv->driver);
+    if (self->priv->physdev_vid)
+        mm_obj_dbg (self, "  vendor: %04x", self->priv->physdev_vid);
+    if (self->priv->physdev_pid)
+        mm_obj_dbg (self, "  product: %04x", self->priv->physdev_pid);
+    if (self->priv->physdev_revision)
+        mm_obj_dbg (self, "  revision: %04x", self->priv->physdev_revision);
+    if (self->priv->physdev_manufacturer)
+        mm_obj_dbg (self, "  manufacturer: %s", self->priv->physdev_manufacturer);
+    if (self->priv->physdev_product)
+        mm_obj_dbg (self, "  product: %s", self->priv->physdev_product);
+
+    preload_common_properties (self);
 }
 
 /*****************************************************************************/
@@ -780,7 +807,7 @@ check_rule (MMKernelDeviceGeneric *self,
 }
 
 static void
-preload_properties (MMKernelDeviceGeneric *self)
+preload_rule_properties (MMKernelDeviceGeneric *self)
 {
     guint i;
 
@@ -814,7 +841,7 @@ check_preload (MMKernelDeviceGeneric *self)
 
     mm_obj_dbg (self, "preloading contents and properties...");
     preload_contents (self);
-    preload_properties (self);
+    preload_rule_properties (self);
 }
 
 static gboolean
@@ -885,12 +912,10 @@ set_property (GObject      *object,
     case PROP_PROPERTIES:
         g_assert (!self->priv->properties);
         self->priv->properties = g_value_dup_object (value);
-        check_preload (self);
         break;
     case PROP_RULES:
         g_assert (!self->priv->rules);
         self->priv->rules = g_value_dup_boxed (value);
-        check_preload (self);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -926,6 +951,8 @@ initable_init (GInitable     *initable,
 {
     MMKernelDeviceGeneric *self = MM_KERNEL_DEVICE_GENERIC (initable);
     const gchar *subsystem;
+
+    check_preload (self);
 
     subsystem = mm_kernel_device_get_subsystem (MM_KERNEL_DEVICE (self));
     if (!subsystem) {
