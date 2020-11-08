@@ -46,5 +46,8 @@ gboolean     mm_context_get_log_relative_timestamps (void);
 gboolean     mm_context_get_test_session    (void);
 gboolean     mm_context_get_test_enable     (void);
 const gchar *mm_context_get_test_plugin_dir (void);
+#if defined WITH_UDEV
+gboolean     mm_context_get_test_no_udev    (void);
+#endif
 
 #endif /* MM_CONTEXT_H */

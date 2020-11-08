@@ -388,10 +388,11 @@ handle_kernel_event (MMBaseManager            *self,
     mm_obj_dbg (self, "  uid:       %s", uid ? uid : "n/a");
 
 #if defined WITH_UDEV
-    kernel_device = mm_kernel_device_udev_new_from_properties (properties, error);
-#else
-    kernel_device = mm_kernel_device_generic_new (properties, error);
+    if (!mm_context_get_test_no_udev ())
+        kernel_device = mm_kernel_device_udev_new_from_properties (properties, error);
+    else
 #endif
+        kernel_device = mm_kernel_device_generic_new (properties, error);
 
     if (!kernel_device)
         return FALSE;
@@ -541,12 +542,13 @@ mm_base_manager_start (MMBaseManager *self,
     }
 
 #if defined WITH_UDEV
-    mm_obj_dbg (self, "starting %s device scan...", manual_scan ? "manual" : "automatic");
-    process_scan (self, manual_scan);
-    mm_obj_dbg (self, "finished device scan...");
-#else
-    mm_obj_dbg (self, "unsupported %s device scan...", manual_scan ? "manual" : "automatic");
+    if (!mm_context_get_test_no_udev ()) {
+        mm_obj_dbg (self, "starting %s device scan...", manual_scan ? "manual" : "automatic");
+        process_scan (self, manual_scan);
+        mm_obj_dbg (self, "finished device scan...");
+    } else
 #endif
+        mm_obj_dbg (self, "unsupported %s device scan...", manual_scan ? "manual" : "automatic");
 }
 
 /*****************************************************************************/
@@ -725,16 +727,17 @@ scan_devices_auth_ready (MMAuthProvider *authp,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
 #if defined WITH_UDEV
-        /* Otherwise relaunch device scan */
-        mm_base_manager_start (MM_BASE_MANAGER (ctx->self), TRUE);
-        mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (
-            MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
-            ctx->invocation);
-#else
-        g_dbus_method_invocation_return_error_literal (
-            ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-            "Cannot request manual scan of devices: unsupported");
+        if (!mm_context_get_test_no_udev ()) {
+            /* Otherwise relaunch device scan */
+            mm_base_manager_start (MM_BASE_MANAGER (ctx->self), TRUE);
+            mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (
+                MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
+                ctx->invocation);
+        } else
 #endif
+            g_dbus_method_invocation_return_error_literal (
+                ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                "Cannot request manual scan of devices: unsupported");
     }
 
     scan_devices_context_free (ctx);
@@ -788,7 +791,7 @@ report_kernel_event_auth_ready (MMAuthProvider           *authp,
         goto out;
 
 #if defined WITH_UDEV
-    if (ctx->self->priv->auto_scan) {
+    if (!mm_context_get_test_no_udev () && ctx->self->priv->auto_scan) {
         error = g_error_new_literal (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                      "Cannot report kernel event: "
                                      "udev monitoring already in place");
@@ -1397,12 +1400,13 @@ initable_init (GInitable     *initable,
         return FALSE;
 
 #if defined WITH_UDEV
-    /* Create udev client based on the subsystems requested by the plugins */
-    self->priv->udev = g_udev_client_new (mm_plugin_manager_get_subsystems (self->priv->plugin_manager));
-
-    /* If autoscan enabled, list for udev events */
-    if (self->priv->auto_scan)
-        g_signal_connect_swapped (self->priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
+    if (!mm_context_get_test_no_udev ()) {
+        /* Create udev client based on the subsystems requested by the plugins */
+        self->priv->udev = g_udev_client_new (mm_plugin_manager_get_subsystems (self->priv->plugin_manager));
+        /* If autoscan enabled, list for udev events */
+        if (self->priv->auto_scan)
+            g_signal_connect_swapped (self->priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
+    }
 #endif
 
     /* Export the manager interface */
