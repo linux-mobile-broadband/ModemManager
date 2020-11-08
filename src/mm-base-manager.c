@@ -889,9 +889,10 @@ report_kernel_event_auth_ready (MMAuthProvider           *authp,
     handle_kernel_event (ctx->self, properties, &error);
 
 out:
-    if (error)
+    if (error) {
+        mm_obj_warn (ctx->self, "couldn't handle kernel event: %s", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else
         mm_gdbus_org_freedesktop_modem_manager1_complete_report_kernel_event (
             MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
             ctx->invocation);
