@@ -677,10 +677,10 @@ check_condition (MMKernelDeviceGeneric *self,
         g_strstrip (attribute);
 
         /* VID/PID directly from our API */
-        if (g_str_equal (attribute, "idVendor"))
+        if (g_str_equal (attribute, "idVendor") || g_str_equal (attribute, "vendor"))
             result = ((mm_get_uint_from_hex_str (match->value, &val)) &&
                       ((mm_kernel_device_get_physdev_vid (MM_KERNEL_DEVICE (self)) == val) == condition_equal));
-        else if (g_str_equal (attribute, "idProduct"))
+        else if (g_str_equal (attribute, "idProduct") || g_str_equal (attribute, "device"))
             result = ((mm_get_uint_from_hex_str (match->value, &val)) &&
                       ((mm_kernel_device_get_physdev_pid (MM_KERNEL_DEVICE (self)) == val) == condition_equal));
         /* manufacturer in the physdev */
