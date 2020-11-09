@@ -745,7 +745,7 @@ serial_probe_qcdm (MMPortProbe *self)
     }
 
     /* Open the QCDM port */
-    ctx->serial = MM_PORT_SERIAL (mm_port_serial_qcdm_new (mm_kernel_device_get_name (self->priv->port)));
+    ctx->serial = MM_PORT_SERIAL (mm_port_serial_qcdm_new (mm_kernel_device_get_name (self->priv->port), MM_PORT_SUBSYS_TTY));
     if (!ctx->serial) {
         port_probe_task_return_error (self,
                                       g_error_new (MM_CORE_ERROR,

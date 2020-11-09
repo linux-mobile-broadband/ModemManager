@@ -176,7 +176,7 @@ base_modem_create_tty_port (MMBaseModem        *self,
     const gchar *flow_control_tag;
 
     if (ptype == MM_PORT_TYPE_QCDM)
-        port = MM_PORT (mm_port_serial_qcdm_new (name));
+        port = MM_PORT (mm_port_serial_qcdm_new (name, MM_PORT_SUBSYS_TTY));
     else if (ptype == MM_PORT_TYPE_GPS)
         port = MM_PORT (mm_port_serial_gps_new (name));
     else if (ptype == MM_PORT_TYPE_AUDIO)
