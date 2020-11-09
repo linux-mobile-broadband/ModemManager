@@ -1046,13 +1046,15 @@ dispose (GObject *object)
 {
     MMKernelDeviceGeneric *self = MM_KERNEL_DEVICE_GENERIC (object);
 
-    g_clear_pointer (&self->priv->physdev_product,      g_free);
-    g_clear_pointer (&self->priv->physdev_manufacturer, g_free);
-    g_clear_pointer (&self->priv->physdev_sysfs_path,   g_free);
-    g_clear_pointer (&self->priv->interface_sysfs_path, g_free);
-    g_clear_pointer (&self->priv->sysfs_path,           g_free);
-    g_clear_pointer (&self->priv->driver,               g_free);
-    g_clear_pointer (&self->priv->rules,                g_array_unref);
+    g_clear_pointer (&self->priv->physdev_product,       g_free);
+    g_clear_pointer (&self->priv->physdev_manufacturer,  g_free);
+    g_clear_pointer (&self->priv->physdev_subsystem,     g_free);
+    g_clear_pointer (&self->priv->physdev_sysfs_path,    g_free);
+    g_clear_pointer (&self->priv->interface_description, g_free);
+    g_clear_pointer (&self->priv->interface_sysfs_path,  g_free);
+    g_clear_pointer (&self->priv->sysfs_path,            g_free);
+    g_clear_pointer (&self->priv->driver,                g_free);
+    g_clear_pointer (&self->priv->rules,                 g_array_unref);
     g_clear_object  (&self->priv->properties);
 
     G_OBJECT_CLASS (mm_kernel_device_generic_parent_class)->dispose (object);
