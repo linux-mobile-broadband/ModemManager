@@ -53,7 +53,8 @@ struct _MMKernelDeviceGenericPrivate {
     GArray *rules;
 
     /* Contents from sysfs */
-    gchar   *driver;
+    gchar  **drivers;
+    gchar  **subsystems;
     gchar   *sysfs_path;
     gchar   *interface_sysfs_path;
     guint8   interface_class;
@@ -65,7 +66,6 @@ struct _MMKernelDeviceGenericPrivate {
     guint16  physdev_vid;
     guint16  physdev_pid;
     guint16  physdev_revision;
-    gchar   *physdev_subsystem;
     gchar   *physdev_manufacturer;
     gchar   *physdev_product;
 };
@@ -193,12 +193,40 @@ preload_common_properties (MMKernelDeviceGeneric *self)
 }
 
 static void
+ptr_array_add_sysfs_attribute_link_basename (GPtrArray    *array,
+                                             const gchar  *sysfs_path,
+                                             const gchar  *attribute,
+                                             gchar       **out_value)
+{
+    g_autofree gchar *value = NULL;
+
+    g_assert (array && sysfs_path && attribute);
+    value = read_sysfs_attribute_link_basename (sysfs_path, attribute);
+    if (value && !g_ptr_array_find_with_equal_func (array, value, g_str_equal, NULL))
+        g_ptr_array_add (array, g_steal_pointer (&value));
+    if (out_value)
+        *out_value = g_strdup (value);
+}
+
+static void
 preload_contents_other (MMKernelDeviceGeneric *self)
 {
+    GPtrArray *drivers;
+    GPtrArray *subsystems;
+
     /* For any other kind of bus (or the absence of one, as in virtual devices),
      * assume this is a single port device and don't try to match multiple ports
      * together. Also, obviously, no vendor, product, revision or interface. */
-    self->priv->driver = read_sysfs_attribute_link_basename (self->priv->sysfs_path, "driver");
+
+    drivers = g_ptr_array_sized_new (2);
+    ptr_array_add_sysfs_attribute_link_basename (drivers, self->priv->sysfs_path, "driver", NULL);
+    g_ptr_array_add (drivers, NULL);
+    self->priv->drivers = (gchar **) g_ptr_array_free (drivers, FALSE);
+
+    subsystems = g_ptr_array_sized_new (2);
+    ptr_array_add_sysfs_attribute_link_basename (subsystems, self->priv->sysfs_path, "subsystem", NULL);
+    g_ptr_array_add (subsystems, NULL);
+    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
 }
 
 static void
@@ -206,15 +234,19 @@ preload_contents_platform (MMKernelDeviceGeneric *self,
                            const gchar           *platform)
 {
     g_autofree gchar *iter = NULL;
+    GPtrArray        *drivers;
+    GPtrArray        *subsystems;
+
+    drivers = g_ptr_array_sized_new (3);
+    subsystems = g_ptr_array_sized_new (3);
 
     iter = g_strdup (self->priv->sysfs_path);
     while (iter && (g_strcmp0 (iter, "/") != 0)) {
-        gchar       *parent;
-        const gchar *current_subsystem;
+        gchar            *parent;
+        g_autofree gchar *current_subsystem = NULL;
 
-        /* Store the first driver found */
-        if (!self->priv->driver)
-            self->priv->driver = read_sysfs_attribute_link_basename (iter, "driver");
+        ptr_array_add_sysfs_attribute_link_basename (drivers,    iter, "driver",    NULL);
+        ptr_array_add_sysfs_attribute_link_basename (subsystems, iter, "subsystem", &current_subsystem);
 
         /* Take first parent with the given platform subsystem as physical device */
         current_subsystem = read_sysfs_attribute_link_basename (iter, "subsystem");
@@ -228,33 +260,41 @@ preload_contents_platform (MMKernelDeviceGeneric *self,
         g_clear_pointer (&iter, g_free);
         iter = parent;
     }
+
+    g_ptr_array_add (drivers, NULL);
+    self->priv->drivers = (gchar **) g_ptr_array_free (drivers, FALSE);
+    g_ptr_array_add (subsystems, NULL);
+    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
 }
 
 static void
 preload_contents_pcmcia (MMKernelDeviceGeneric *self)
 {
     g_autofree gchar *iter = NULL;
+    GPtrArray        *drivers;
+    GPtrArray        *subsystems;
     gboolean          pcmcia_subsystem_found = FALSE;
+
+    drivers = g_ptr_array_sized_new (3);
+    subsystems = g_ptr_array_sized_new (3);
 
     iter = g_strdup (self->priv->sysfs_path);
     while (iter && (g_strcmp0 (iter, "/") != 0)) {
-        g_autofree gchar *subsys = NULL;
         g_autofree gchar *parent = NULL;
-        g_autofree gchar *parent_subsys = NULL;
+        g_autofree gchar *parent_subsystem = NULL;
+        g_autofree gchar *current_subsystem = NULL;
 
-        /* Store the first driver found */
-        if (!self->priv->driver)
-            self->priv->driver = read_sysfs_attribute_link_basename (iter, "driver");
+        ptr_array_add_sysfs_attribute_link_basename (drivers,    iter, "driver",    NULL);
+        ptr_array_add_sysfs_attribute_link_basename (subsystems, iter, "subsystem", &current_subsystem);
 
-        subsys = read_sysfs_attribute_link_basename (iter, "subsystem");
-        if (g_strcmp0 (subsys, "pcmcia") == 0)
+        if (g_strcmp0 (current_subsystem, "pcmcia") == 0)
             pcmcia_subsystem_found = TRUE;
 
         parent = g_path_get_dirname (iter);
         if (parent)
-            parent_subsys = read_sysfs_attribute_link_basename (parent, "subsystem");
+            parent_subsystem = read_sysfs_attribute_link_basename (parent, "subsystem");
 
-        if (pcmcia_subsystem_found  && parent_subsys && (g_strcmp0 (parent_subsys, "pcmcia") != 0)) {
+        if (pcmcia_subsystem_found  && parent_subsystem && (g_strcmp0 (parent_subsystem, "pcmcia") != 0)) {
             self->priv->physdev_sysfs_path = g_strdup (iter);
             self->priv->physdev_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "manf_id");
             self->priv->physdev_pid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "card_id");
@@ -265,32 +305,39 @@ preload_contents_pcmcia (MMKernelDeviceGeneric *self)
         g_clear_pointer (&iter, g_free);
         iter = g_steal_pointer (&parent);
     }
+
+    g_ptr_array_add (drivers, NULL);
+    self->priv->drivers = (gchar **) g_ptr_array_free (drivers, FALSE);
+    g_ptr_array_add (subsystems, NULL);
+    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
 }
 
 static void
 preload_contents_pci (MMKernelDeviceGeneric *self)
 {
     g_autofree gchar *iter = NULL;
+    GPtrArray        *drivers;
+    GPtrArray        *subsystems;
+
+    drivers = g_ptr_array_sized_new (4);
+    subsystems = g_ptr_array_sized_new (4);
 
     iter = g_strdup (self->priv->sysfs_path);
     while (iter && (g_strcmp0 (iter, "/") != 0)) {
-        g_autofree gchar *subsys = NULL;
+        g_autofree gchar *current_subsystem = NULL;
         gchar            *parent;
 
-        /* Store the first driver found */
-        if (!self->priv->driver)
-            self->priv->driver = read_sysfs_attribute_link_basename (iter, "driver");
+        ptr_array_add_sysfs_attribute_link_basename (drivers,    iter, "driver",    NULL);
+        ptr_array_add_sysfs_attribute_link_basename (subsystems, iter, "subsystem", &current_subsystem);
 
         /* the PCI channel specific devices have their own drivers and
          * subsystems, we can rely on the physical device being the first
          * one that reports the 'pci' subsystem */
-        subsys = read_sysfs_attribute_link_basename (iter, "subsystem");
-        if (!self->priv->physdev_sysfs_path && (g_strcmp0 (subsys, "pci") == 0)) {
+        if (!self->priv->physdev_sysfs_path && (g_strcmp0 (current_subsystem, "pci") == 0)) {
             self->priv->physdev_sysfs_path = g_strdup (iter);
             self->priv->physdev_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "vendor");
             self->priv->physdev_pid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "device");
             self->priv->physdev_revision = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "revision");
-            self->priv->physdev_subsystem = g_steal_pointer (&subsys);
             /* stop traversing as soon as the physical device is found */
             break;
         }
@@ -299,16 +346,29 @@ preload_contents_pci (MMKernelDeviceGeneric *self)
         g_clear_pointer (&iter, g_free);
         iter = parent;
     }
+
+    g_ptr_array_add (drivers, NULL);
+    self->priv->drivers = (gchar **) g_ptr_array_free (drivers, FALSE);
+    g_ptr_array_add (subsystems, NULL);
+    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
 }
 
 static void
 preload_contents_usb (MMKernelDeviceGeneric *self)
 {
     g_autofree gchar *iter = NULL;
+    GPtrArray        *drivers;
+    GPtrArray        *subsystems;
+
+    drivers = g_ptr_array_sized_new (4);
+    subsystems = g_ptr_array_sized_new (4);
 
     iter = g_strdup (self->priv->sysfs_path);
     while (iter && (g_strcmp0 (iter, "/") != 0)) {
         gchar *parent;
+
+        ptr_array_add_sysfs_attribute_link_basename (drivers,    iter, "driver",    NULL);
+        ptr_array_add_sysfs_attribute_link_basename (subsystems, iter, "subsystem", NULL);
 
         /* is this the USB interface? */
         if (!self->priv->interface_sysfs_path && has_sysfs_attribute (iter, "bInterfaceClass")) {
@@ -318,7 +378,6 @@ preload_contents_usb (MMKernelDeviceGeneric *self)
             self->priv->interface_protocol = read_sysfs_attribute_as_hex (self->priv->interface_sysfs_path, "bInterfaceProtocol");
             self->priv->interface_number = read_sysfs_attribute_as_hex (self->priv->interface_sysfs_path, "bInterfaceNumber");
             self->priv->interface_description = read_sysfs_attribute_as_string (self->priv->interface_sysfs_path, "interface");
-            self->priv->driver = read_sysfs_attribute_link_basename (self->priv->interface_sysfs_path, "driver");
         }
         /* is this the USB physdev? */
         else if (!self->priv->physdev_sysfs_path && has_sysfs_attribute (iter, "idVendor")) {
@@ -326,7 +385,6 @@ preload_contents_usb (MMKernelDeviceGeneric *self)
             self->priv->physdev_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "idVendor");
             self->priv->physdev_pid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "idProduct");
             self->priv->physdev_revision = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "bcdDevice");
-            self->priv->physdev_subsystem = read_sysfs_attribute_link_basename (self->priv->physdev_sysfs_path, "subsystem");
             self->priv->physdev_manufacturer = read_sysfs_attribute_as_string (self->priv->physdev_sysfs_path, "manufacturer");
             self->priv->physdev_product = read_sysfs_attribute_as_string (self->priv->physdev_sysfs_path, "product");
             /* stop traversing as soon as the physical device is found */
@@ -337,6 +395,11 @@ preload_contents_usb (MMKernelDeviceGeneric *self)
         g_clear_pointer (&iter, g_free);
         iter = parent;
     }
+
+    g_ptr_array_add (drivers, NULL);
+    self->priv->drivers = (gchar **) g_ptr_array_free (drivers, FALSE);
+    g_ptr_array_add (subsystems, NULL);
+    self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
 }
 
 static gchar *
@@ -411,8 +474,18 @@ preload_contents (MMKernelDeviceGeneric *self)
         mm_obj_dbg (self, "  interface description: %s", self->priv->interface_description);
     if (self->priv->physdev_sysfs_path)
         mm_obj_dbg (self, "  device: %s", self->priv->physdev_sysfs_path);
-    if (self->priv->driver)
-        mm_obj_dbg (self, "  driver: %s", self->priv->driver);
+    if (self->priv->subsystems) {
+        g_autofree gchar *subsystems_str = NULL;
+
+        subsystems_str = g_strjoinv (", ", self->priv->subsystems);
+        mm_obj_dbg (self, "  subsystems: %s", subsystems_str);
+    }
+    if (self->priv->drivers) {
+        g_autofree gchar *drivers_str = NULL;
+
+        drivers_str = g_strjoinv (", ", self->priv->drivers);
+        mm_obj_dbg (self, "  drivers: %s", drivers_str);
+    }
     if (self->priv->physdev_vid)
         mm_obj_dbg (self, "  vendor: %04x", self->priv->physdev_vid);
     if (self->priv->physdev_pid)
@@ -499,9 +572,11 @@ kernel_device_get_physdev_uid (MMKernelDevice *self)
 }
 
 static const gchar *
-kernel_device_get_driver (MMKernelDevice *self)
+kernel_device_get_driver (MMKernelDevice *_self)
 {
-    return MM_KERNEL_DEVICE_GENERIC (self)->priv->driver;
+    MMKernelDeviceGeneric *self = MM_KERNEL_DEVICE_GENERIC (_self);
+
+    return (self->priv->drivers ? self->priv->drivers[0] : NULL);
 }
 
 static guint16
@@ -529,9 +604,13 @@ kernel_device_get_physdev_sysfs_path (MMKernelDevice *self)
 }
 
 static const gchar *
-kernel_device_get_physdev_subsystem (MMKernelDevice *self)
+kernel_device_get_physdev_subsystem (MMKernelDevice *_self)
 {
-    return MM_KERNEL_DEVICE_GENERIC (self)->priv->physdev_subsystem;
+    MMKernelDeviceGeneric *self = MM_KERNEL_DEVICE_GENERIC (_self);
+    guint                  len;
+
+    len = (self->priv->subsystems ? g_strv_length (self->priv->subsystems) : 0);
+    return (len > 0 ? self->priv->subsystems[len - 1] : NULL);
 }
 
 static const gchar *
@@ -604,22 +683,21 @@ check_condition (MMKernelDeviceGeneric *self,
     if (g_str_equal (match->parameter, "ACTION"))
         return ((!!strstr (match->value, "add")) == condition_equal);
 
-    /* We look for the subsystem string in the whole sysfs path.
-     *
-     * Note that we're not really making a difference between "SUBSYSTEMS"
-     * (where the whole device tree is checked) and "SUBSYSTEM" (where just one
-     * single device is checked), because a lot of the MM udev rules are meant
-     * to just tag the physical device (e.g. with ID_MM_DEVICE_IGNORE) instead
-     * of the single ports. In our case with the custom parsing, we do tag all
-     * independent ports.
-     */
-    if (g_str_equal (match->parameter, "SUBSYSTEMS") || g_str_equal (match->parameter, "SUBSYSTEM"))
-        return ((self->priv->sysfs_path && !!strstr (self->priv->sysfs_path, match->value)) == condition_equal);
+    /* Exact SUBSYSTEM match */
+    if (g_str_equal (match->parameter, "SUBSYSTEM"))
+        return ((self->priv->subsystems && !g_strcmp0 (self->priv->subsystems[0], match->value)) == condition_equal);
 
-    /* Exact DRIVER match? We also include the check for DRIVERS, even if we
-     * only apply it to this port driver. */
-    if (g_str_equal (match->parameter, "DRIVER") || g_str_equal (match->parameter, "DRIVERS"))
-        return ((!g_strcmp0 (match->value, mm_kernel_device_get_driver (MM_KERNEL_DEVICE (self)))) == condition_equal);
+    /* Loose SUBSYSTEMS match */
+    if (g_str_equal (match->parameter, "SUBSYSTEMS"))
+        return ((self->priv->subsystems && g_strv_contains ((const gchar * const *) self->priv->subsystems, match->value)) == condition_equal);
+
+    /* Exact DRIVER match */
+    if (g_str_equal (match->parameter, "DRIVER"))
+        return ((self->priv->drivers && !g_strcmp0 (self->priv->drivers[0], match->value)) == condition_equal);
+
+    /* Loose DRIVERS match */
+    if (g_str_equal (match->parameter, "DRIVERS"))
+        return ((self->priv->drivers && g_strv_contains ((const gchar * const *) self->priv->drivers, match->value)) == condition_equal);
 
     /* Device name checks */
     if (g_str_equal (match->parameter, "KERNEL"))
@@ -992,12 +1070,12 @@ dispose (GObject *object)
 
     g_clear_pointer (&self->priv->physdev_product,       g_free);
     g_clear_pointer (&self->priv->physdev_manufacturer,  g_free);
-    g_clear_pointer (&self->priv->physdev_subsystem,     g_free);
     g_clear_pointer (&self->priv->physdev_sysfs_path,    g_free);
     g_clear_pointer (&self->priv->interface_description, g_free);
     g_clear_pointer (&self->priv->interface_sysfs_path,  g_free);
     g_clear_pointer (&self->priv->sysfs_path,            g_free);
-    g_clear_pointer (&self->priv->driver,                g_free);
+    g_clear_pointer (&self->priv->drivers,               g_strfreev);
+    g_clear_pointer (&self->priv->subsystems,            g_strfreev);
     g_clear_pointer (&self->priv->rules,                 g_array_unref);
     g_clear_object  (&self->priv->properties);
 
