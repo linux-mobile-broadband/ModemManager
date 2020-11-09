@@ -666,39 +666,30 @@ kernel_device_cmp (MMKernelDevice *a,
 /*****************************************************************************/
 
 static gboolean
-string_match (const gchar *str,
-              const gchar *original_pattern)
+string_match (MMKernelDeviceGeneric *self,
+              const gchar           *str,
+              const gchar           *pattern)
 {
-    gchar    *pattern;
-    gchar    *start;
-    gboolean  open_prefix = FALSE;
-    gboolean  open_suffix = FALSE;
-    gboolean  match;
+    g_autoptr(GError)     inner_error = NULL;
+    g_autoptr(GRegex)     regex = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
 
-    pattern = g_strdup (original_pattern);
-    start = pattern;
-
-    if (start[0] == '*') {
-        open_prefix = TRUE;
-        start++;
+    regex = g_regex_new (pattern, 0, 0, &inner_error);
+    if (!regex) {
+        mm_obj_warn (self, "invalid pattern in rule '%s': %s", pattern, inner_error->message);
+        return FALSE;
+    }
+    g_regex_match_full (regex, str, -1, 0, 0, &match_info, &inner_error);
+    if (inner_error) {
+        mm_obj_warn (self, "couldn't apply pattern match in rule '%s': %s", pattern, inner_error->message);
+        return FALSE;
     }
 
-    if (start[strlen (start) - 1] == '*') {
-        open_suffix = TRUE;
-        start[strlen (start) - 1] = '\0';
-    }
+    if (!g_match_info_matches (match_info))
+        return FALSE;
 
-    if (open_suffix && !open_prefix)
-        match = g_str_has_prefix (str, start);
-    else if (!open_suffix && open_prefix)
-        match = g_str_has_suffix (str, start);
-    else if (open_suffix && open_prefix)
-        match = !!strstr (str, start);
-    else
-        match = g_str_equal (str, start);
-
-    g_free (pattern);
-    return match;
+    mm_obj_dbg (self, "pattern '%s' matched: '%s'", pattern, str);
+    return TRUE;
 }
 
 static gboolean
@@ -731,7 +722,7 @@ check_condition (MMKernelDeviceGeneric *self,
 
     /* Device name checks */
     if (g_str_equal (match->parameter, "KERNEL"))
-        return (string_match (mm_kernel_device_get_name (MM_KERNEL_DEVICE (self)), match->value) == condition_equal);
+        return (string_match (self, mm_kernel_device_get_name (MM_KERNEL_DEVICE (self)), match->value) == condition_equal);
 
     /* Device sysfs path checks; we allow both a direct match and a prefix patch */
     if (g_str_equal (match->parameter, "DEVPATH")) {
@@ -748,22 +739,22 @@ check_condition (MMKernelDeviceGeneric *self,
         if (match->value[0] && match->value[strlen (match->value) - 1] != '*')
             prefix_match = g_strdup_printf ("%s/*", match->value);
 
-        if (string_match (self->priv->sysfs_path, match->value) == condition_equal) {
+        if (string_match (self, self->priv->sysfs_path, match->value) == condition_equal) {
             result = TRUE;
             goto out;
         }
 
-        if (prefix_match && string_match (self->priv->sysfs_path, prefix_match) == condition_equal) {
+        if (prefix_match && string_match (self, self->priv->sysfs_path, prefix_match) == condition_equal) {
             result = TRUE;
             goto out;
         }
 
         if (g_str_has_prefix (self->priv->sysfs_path, "/sys")) {
-            if (string_match (&self->priv->sysfs_path[4], match->value) == condition_equal) {
+            if (string_match (self, &self->priv->sysfs_path[4], match->value) == condition_equal) {
                 result = TRUE;
                 goto out;
             }
-            if (prefix_match && string_match (&self->priv->sysfs_path[4], prefix_match) == condition_equal) {
+            if (prefix_match && string_match (self, &self->priv->sysfs_path[4], prefix_match) == condition_equal) {
                 result = TRUE;
                 goto out;
             }
