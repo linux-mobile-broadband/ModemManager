@@ -123,6 +123,36 @@ read_sysfs_attribute_link_basename (const gchar *path,
     return g_path_get_basename (canonicalized_path);
 }
 
+static gchar *
+lookup_sysfs_attribute_as_string (MMKernelDeviceGeneric *self,
+                                  const gchar           *attribute)
+{
+    g_autofree gchar *iter = NULL;
+
+    /* if there is no parent sysfs path set, we look for the attribute
+     * only in the port sysfs path */
+    if (!self->priv->physdev_sysfs_path)
+        return read_sysfs_attribute_as_string (self->priv->sysfs_path, attribute);
+
+    iter = g_strdup (self->priv->sysfs_path);
+    while (iter) {
+        g_autofree gchar *parent = NULL;
+        gchar            *value;
+
+        /* return first one found */
+        if ((value = read_sysfs_attribute_as_string (iter, attribute)) != NULL)
+            return value;
+
+        if (g_strcmp0 (iter, self->priv->physdev_sysfs_path) == 0)
+            break;
+        parent = g_path_get_dirname (iter);
+        g_clear_pointer (&iter, g_free);
+        iter = g_steal_pointer (&parent);
+    }
+
+    return NULL;
+}
+
 /*****************************************************************************/
 /* Load contents */
 
@@ -780,8 +810,12 @@ check_condition (MMKernelDeviceGeneric *self,
         else if (g_str_equal (attribute, "bInterfaceNumber"))
             result = (g_str_equal (match->value, "?*") || ((mm_get_uint_from_hex_str (match->value, &val)) &&
                                                            ((self->priv->interface_number == val) == condition_equal)));
-        else
-            mm_obj_warn (self, "unknown attribute: %s", attribute);
+        else {
+            g_autofree gchar *found_value = NULL;
+
+            found_value = lookup_sysfs_attribute_as_string (self, attribute);
+            result = ((found_value && g_str_equal (found_value, match->value)) == condition_equal);
+        }
 
         g_free (contents);
         g_free (attribute);
