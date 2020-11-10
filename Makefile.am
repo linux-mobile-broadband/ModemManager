@@ -13,6 +13,7 @@ SUBDIRS = \
 	vapi \
 	introspection \
 	test \
+	tools \
 	examples \
 	docs \
 	$(NULL)

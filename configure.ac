@@ -539,6 +539,7 @@ src/Makefile
 src/tests/Makefile
 plugins/Makefile
 test/Makefile
+tools/Makefile
 introspection/Makefile
 introspection/tests/Makefile
 po/Makefile.in
