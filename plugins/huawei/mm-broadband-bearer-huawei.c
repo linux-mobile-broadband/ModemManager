@@ -327,7 +327,7 @@ connect_3gpp_context_step (GTask *task)
             mm_base_modem_at_command_full (ctx->modem,
                                            ctx->primary,
                                            "^NDISDUP=1,0",
-                                           3,
+                                           MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                                            FALSE,
                                            FALSE,
                                            NULL,
@@ -417,11 +417,11 @@ connect_3gpp_context_step (GTask *task)
     }
 
     case CONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY:
-        /* Wait for dial up timeout, retries for 60 times
-         * (1s between the retries, so it means 1 minute).
+        /* Wait for dial up timeout, retries for 180 times
+         * (1s between the retries, so it means 3 minutes).
          * If too many retries, failed
          */
-        if (ctx->check_count > 60) {
+        if (ctx->check_count > MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT) {
             /* Clear context */
             self->priv->connect_pending = NULL;
             g_task_return_new_error (task,
@@ -701,7 +701,7 @@ disconnect_3gpp_context_step (GTask *task)
 
     case DISCONNECT_3GPP_CONTEXT_STEP_NDISSTATQRY:
         /* If too many retries (1s of wait between the retries), failed */
-        if (ctx->check_count > 60) {
+        if (ctx->check_count > MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT) {
             /* Clear task */
             self->priv->disconnect_pending = NULL;
             g_task_return_new_error (task,

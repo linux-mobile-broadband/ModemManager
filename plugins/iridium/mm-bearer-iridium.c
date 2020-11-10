@@ -165,7 +165,7 @@ service_type_ready (MMBaseModem *modem,
         modem,
         ctx->primary,
         "ATDT008816000025",
-        60,
+        MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
         FALSE,
         FALSE, /* raw */
         NULL, /* cancellable */

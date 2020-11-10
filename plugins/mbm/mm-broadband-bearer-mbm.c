@@ -232,7 +232,7 @@ connect_poll_cb (MMBroadbandBearerMbm *self)
     }
 
     /* Too many retries... */
-    if (ctx->poll_count > 50) {
+    if (ctx->poll_count > MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT) {
         g_assert (!ctx->saved_error);
         ctx->saved_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
                                         MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,
@@ -318,7 +318,7 @@ activate (GTask *task)
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    command,
-                                   3,
+                                   10,
                                    FALSE,
                                    FALSE, /* raw */
                                    g_task_get_cancellable (task),
@@ -682,7 +682,7 @@ disconnect_poll_cb (MMBroadbandBearerMbm *self)
     ctx->poll_id = 0;
 
     /* Too many retries... */
-    if (ctx->poll_count > 20) {
+    if (ctx->poll_count > MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT) {
         g_task_return_new_error (task,
                                  MM_MOBILE_EQUIPMENT_ERROR,
                                  MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT,

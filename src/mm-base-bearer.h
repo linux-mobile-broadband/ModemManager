@@ -43,6 +43,17 @@ MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv6_config (MMBearerConnec
 
 /*****************************************************************************/
 
+/* Default timeout values to be used in the steps of a connection or
+ * disconnection attempt that may take long to complete. Note that the actual
+ * connection attempt from the user may have a different timeout, but we don't
+ * really fully care about that, it's a problem to consider in the user side.
+ * In the daemon itself, what we want and require is to be in sync with the
+ * state of the modem. */
+#define MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT    180
+#define MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT 120
+
+/*****************************************************************************/
+
 #define MM_TYPE_BASE_BEARER            (mm_base_bearer_get_type ())
 #define MM_BASE_BEARER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_BEARER, MMBaseBearer))
 #define MM_BASE_BEARER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_BASE_BEARER, MMBaseBearerClass))

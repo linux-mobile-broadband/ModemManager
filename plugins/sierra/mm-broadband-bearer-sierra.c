@@ -407,7 +407,7 @@ dial_3gpp_context_step (GTask *task)
             mm_base_modem_at_command_full (ctx->modem,
                                            ctx->primary,
                                            command,
-                                           10,
+                                           MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                            FALSE,
                                            FALSE, /* raw */
                                            NULL, /* cancellable */
@@ -538,7 +538,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
         mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
                                        primary,
                                        command,
-                                       3,
+                                       MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                                        FALSE,
                                        FALSE, /* raw */
                                        NULL, /* cancellable */

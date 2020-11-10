@@ -119,7 +119,7 @@ connect_3gpp_apnsettings_ready (MMBaseModem *modem,
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    "%DPDNACT=1",
-                                   20, /* timeout */
+                                   MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT, /* timeout */
                                    FALSE, /* allow_cached */
                                    FALSE, /* is_raw */
                                    g_task_get_cancellable (task),
@@ -296,7 +296,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    "%DPDNACT=0",
-                                   20, /* timeout */
+                                   MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT, /* timeout */
                                    FALSE, /* allow_cached */
                                    FALSE, /* is_raw */
                                    NULL, /* cancellable */

@@ -948,7 +948,7 @@ connect_context_step (GTask *task)
 
         mbim_device_command (ctx->device,
                              message,
-                             60,
+                             MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                              NULL,
                              (GAsyncReadyCallback)ensure_disconnected_ready,
                              task);
@@ -1022,7 +1022,7 @@ connect_context_step (GTask *task)
 
         mbim_device_command (ctx->device,
                              message,
-                             60,
+                             MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                              NULL,
                              (GAsyncReadyCallback)connect_set_ready,
                              task);
@@ -1318,7 +1318,7 @@ disconnect_context_step (GTask *task)
 
         mbim_device_command (ctx->device,
                              message,
-                             60,
+                             MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                              NULL,
                              (GAsyncReadyCallback)disconnect_set_ready,
                              task);

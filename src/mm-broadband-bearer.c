@@ -269,7 +269,7 @@ cdma_connect_context_dial (GTask *task)
     mm_base_modem_at_command_full (ctx->modem,
                                    MM_PORT_SERIAL_AT (ctx->data),
                                    "DT#777",
-                                   90,
+                                   MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                    FALSE,
                                    FALSE,
                                    NULL,
@@ -586,7 +586,7 @@ dial_3gpp (MMBroadbandBearer *self,
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->dial_port,
                                    command,
-                                   60,
+                                   MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                                    FALSE,
                                    FALSE, /* raw */
                                    NULL, /* cancellable */

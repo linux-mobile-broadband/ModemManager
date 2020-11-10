@@ -335,7 +335,7 @@ connect_3gpp (MMBroadbandBearer *self,
     ctx = g_slice_new0 (DetailedConnectContext);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
-    ctx->retries = 60;
+    ctx->retries = MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT;
 
     task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_connect_context_free);
@@ -498,7 +498,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
     ctx->data = g_object_ref (data);
-    ctx->retries = 60;
+    ctx->retries = MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_disconnect_context_free);
