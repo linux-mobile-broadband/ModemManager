@@ -542,6 +542,8 @@ src/tests/Makefile
 plugins/Makefile
 test/Makefile
 tools/Makefile
+tools/tests/Makefile
+tools/tests/services/org.freedesktop.ModemManager1.service
 introspection/Makefile
 introspection/tests/Makefile
 po/Makefile.in

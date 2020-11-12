@@ -175,5 +175,9 @@ Makefile.in
 /test/mmsmspdu
 /test/mmsmsmonitor
 
+/tools/tests/services/org.freedesktop.ModemManager1.service
+/tools/tests/test-stub
+/tools/tests/test-wrapper.sh
+
 /ModemManager-*-coverage.info
 /ModemManager-*-coverage/

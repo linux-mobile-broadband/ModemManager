@@ -5,7 +5,7 @@ stages:
 
 before_script:
     - apt update || true
-    - apt -y install autoconf automake libtool libglib2.0-dev libgudev-1.0-dev libgettextpo-dev autopoint xsltproc dbus autoconf-archive gettext
+    - apt -y install autoconf automake libtool libgettextpo-dev libgirepository1.0-dev libglib2.0-dev libgudev-1.0-dev python3-dbus python3-gi autopoint xsltproc dbus autoconf-archive gettext
 
 build-no-qmi:
   stage: build
@@ -125,7 +125,7 @@ build-default:
     - schedules
     - pushes
   script:
-    - apt -y install gtk-doc-tools libglib2.0-doc gobject-introspection libgirepository1.0-dev libsystemd-dev libpolkit-gobject-1-dev valac
+    - apt -y install gtk-doc-tools libglib2.0-doc gobject-introspection libsystemd-dev libpolkit-gobject-1-dev valac
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh

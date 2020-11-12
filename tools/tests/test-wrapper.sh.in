@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# For debugging behavior of test-modemmanager-service.py, you can modify
+# this line to add --log-file option
+GI_TYPELIB_PATH=@abs_top_builddir@/libmm-glib @abs_top_srcdir@/tools/test-modemmanager-service.py
