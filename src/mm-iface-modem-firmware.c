@@ -326,13 +326,15 @@ add_generic_device_ids (MMBaseModem               *self,
                         MMFirmwareUpdateSettings  *update_settings,
                         GError                   **error)
 {
-    guint16      vid;
-    guint16      pid;
-    guint16      rid;
-    GPtrArray   *ids;
-    MMPort      *primary = NULL;
-    const gchar *subsystem;
-    const gchar *aux;
+    static const gchar   *supported_subsystems[] = { "USB", "PCI" };
+    guint16               vid;
+    guint16               pid;
+    guint16               rid;
+    MMPort               *primary = NULL;
+    const gchar          *subsystem;
+    const gchar          *aux;
+    g_autoptr(GPtrArray)  ids = NULL;
+    guint                 i;
 
     vid = mm_base_modem_get_vendor_id (self);
     pid = mm_base_modem_get_product_id (self);
@@ -350,8 +352,19 @@ add_generic_device_ids (MMBaseModem               *self,
     g_assert (primary != NULL);
     rid = mm_kernel_device_get_physdev_revision (mm_port_peek_kernel_device (primary));
 
+
     subsystem = mm_kernel_device_get_physdev_subsystem (mm_port_peek_kernel_device (primary));
-    if (g_strcmp0 (subsystem, "usb")) {
+    if (!subsystem) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unknown device subsystem");
+        return FALSE;
+    }
+
+    for (i = 0; i < G_N_ELEMENTS (supported_subsystems); i++) {
+        if (g_ascii_strcasecmp (supported_subsystems[i], subsystem) == 0)
+            break;
+    }
+    if (i == G_N_ELEMENTS (supported_subsystems)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Unsupported subsystem: %s", subsystem);
         return FALSE;
@@ -364,16 +377,19 @@ add_generic_device_ids (MMBaseModem               *self,
         gchar *carrier;
 
         carrier = g_ascii_strup (aux, -1);
-        g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X&REV_%04X&CARRIER_%s", vid, pid, rid, carrier));
+        g_ptr_array_add (ids, g_strdup_printf ("%s\\VID_%04X&PID_%04X&REV_%04X&CARRIER_%s",
+                                               supported_subsystems[i], vid, pid, rid, carrier));
         g_free (carrier);
     }
-    g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X&REV_%04X", vid, pid, rid));
-    g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X&PID_%04X", vid, pid));
-    g_ptr_array_add (ids, g_strdup_printf ("USB\\VID_%04X", vid));
+    g_ptr_array_add (ids, g_strdup_printf ("%s\\VID_%04X&PID_%04X&REV_%04X",
+                                           supported_subsystems[i], vid, pid, rid));
+    g_ptr_array_add (ids, g_strdup_printf ("%s\\VID_%04X&PID_%04X",
+                                           supported_subsystems[i], vid, pid));
+    g_ptr_array_add (ids, g_strdup_printf ("%s\\VID_%04X",
+                                           supported_subsystems[i], vid));
     g_ptr_array_add (ids, NULL);
 
     mm_firmware_update_settings_set_device_ids (update_settings, (const gchar **)ids->pdata);
-    g_ptr_array_unref (ids);
     return TRUE;
 }
 
