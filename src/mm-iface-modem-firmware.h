@@ -27,7 +27,8 @@
 #define MM_IS_IFACE_MODEM_FIRMWARE(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_FIRMWARE))
 #define MM_IFACE_MODEM_FIRMWARE_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_FIRMWARE, MMIfaceModemFirmware))
 
-#define MM_IFACE_MODEM_FIRMWARE_DBUS_SKELETON       "iface-modem-firmware-dbus-skeleton"
+#define MM_IFACE_MODEM_FIRMWARE_DBUS_SKELETON  "iface-modem-firmware-dbus-skeleton"
+#define MM_IFACE_MODEM_FIRMWARE_IGNORE_CARRIER "iface-modem-firmware-ignore-carrier"
 
 typedef struct _MMIfaceModemFirmware MMIfaceModemFirmware;
 

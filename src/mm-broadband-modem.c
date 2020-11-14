@@ -126,6 +126,7 @@ enum {
     PROP_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED,
     PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED,
     PROP_MODEM_CARRIER_CONFIG_MAPPING,
+    PROP_MODEM_FIRMWARE_IGNORE_CARRIER,
     PROP_FLOW_CONTROL,
     PROP_INDICATORS_DISABLED,
     PROP_LAST
@@ -253,7 +254,8 @@ struct _MMBroadbandModemPrivate {
 
     /*<--- Modem Firmware interface --->*/
     /* Properties */
-    GObject *modem_firmware_dbus_skeleton;
+    GObject  *modem_firmware_dbus_skeleton;
+    gboolean  modem_firmware_ignore_carrier;
 };
 
 /*****************************************************************************/
@@ -12110,6 +12112,9 @@ set_property (GObject *object,
     case PROP_MODEM_CARRIER_CONFIG_MAPPING:
         self->priv->carrier_config_mapping = g_value_dup_string (value);
         break;
+    case PROP_MODEM_FIRMWARE_IGNORE_CARRIER:
+        self->priv->modem_firmware_ignore_carrier = g_value_get_boolean (value);
+        break;
     case PROP_FLOW_CONTROL:
         self->priv->flow_control = g_value_get_flags (value);
         break;
@@ -12247,6 +12252,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_CARRIER_CONFIG_MAPPING:
         g_value_set_string (value, self->priv->carrier_config_mapping);
+        break;
+    case PROP_MODEM_FIRMWARE_IGNORE_CARRIER:
+        g_value_set_boolean (value, self->priv->modem_firmware_ignore_carrier);
         break;
     case PROP_FLOW_CONTROL:
         g_value_set_flags (value, self->priv->flow_control);
@@ -12842,6 +12850,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_CARRIER_CONFIG_MAPPING,
                                       MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_FIRMWARE_IGNORE_CARRIER,
+                                      MM_IFACE_MODEM_FIRMWARE_IGNORE_CARRIER);
 
     properties[PROP_FLOW_CONTROL] =
         g_param_spec_flags (MM_BROADBAND_MODEM_FLOW_CONTROL,

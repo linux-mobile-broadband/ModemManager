@@ -297,18 +297,23 @@ add_generic_version (MMBaseModem               *self,
                      MMFirmwareUpdateSettings  *update_settings,
                      GError                   **error)
 {
-    const gchar *firmware_revision;
-    const gchar *carrier_revision;
-    gchar       *combined;
+    const gchar      *firmware_revision;
+    const gchar      *carrier_revision = NULL;
+    g_autofree gchar *combined = NULL;
+    gboolean          ignore_carrier = FALSE;
 
     firmware_revision = mm_iface_modem_get_revision (MM_IFACE_MODEM (self));
     if (!firmware_revision) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                     "Unknown revision");
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Unknown revision");
         return FALSE;
     }
 
-    mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self), NULL, &carrier_revision);
+    g_object_get (self,
+                  MM_IFACE_MODEM_FIRMWARE_IGNORE_CARRIER, &ignore_carrier,
+                  NULL);
+
+    if (!ignore_carrier)
+        mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self), NULL, &carrier_revision);
 
     if (!carrier_revision) {
         mm_firmware_update_settings_set_version (update_settings, firmware_revision);
@@ -317,7 +322,6 @@ add_generic_version (MMBaseModem               *self,
 
     combined = g_strdup_printf ("%s - %s", firmware_revision, carrier_revision);
     mm_firmware_update_settings_set_version (update_settings, combined);
-    g_free (combined);
     return TRUE;
 }
 
@@ -332,9 +336,10 @@ add_generic_device_ids (MMBaseModem               *self,
     guint16               rid;
     MMPort               *primary = NULL;
     const gchar          *subsystem;
-    const gchar          *aux;
+    const gchar          *carrier_config = NULL;
     g_autoptr(GPtrArray)  ids = NULL;
     guint                 i;
+    gboolean              ignore_carrier = FALSE;
 
     vid = mm_base_modem_get_vendor_id (self);
     pid = mm_base_modem_get_product_id (self);
@@ -370,16 +375,20 @@ add_generic_device_ids (MMBaseModem               *self,
         return FALSE;
     }
 
-    mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self), &aux, NULL);
+    g_object_get (self,
+                  MM_IFACE_MODEM_FIRMWARE_IGNORE_CARRIER, &ignore_carrier,
+                  NULL);
+
+    if (!ignore_carrier)
+        mm_iface_modem_get_carrier_config (MM_IFACE_MODEM (self), &carrier_config, NULL);
 
     ids = g_ptr_array_new_with_free_func (g_free);
-    if (aux) {
-        gchar *carrier;
+    if (carrier_config) {
+        g_autofree gchar *carrier = NULL;
 
-        carrier = g_ascii_strup (aux, -1);
+        carrier = g_ascii_strup (carrier_config, -1);
         g_ptr_array_add (ids, g_strdup_printf ("%s\\VID_%04X&PID_%04X&REV_%04X&CARRIER_%s",
                                                supported_subsystems[i], vid, pid, rid, carrier));
-        g_free (carrier);
     }
     g_ptr_array_add (ids, g_strdup_printf ("%s\\VID_%04X&PID_%04X&REV_%04X",
                                            supported_subsystems[i], vid, pid, rid));
@@ -562,6 +571,14 @@ iface_modem_firmware_init (gpointer g_iface)
                               "DBus skeleton for the Firmware interface",
                               MM_GDBUS_TYPE_MODEM_FIRMWARE_SKELETON,
                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_FIRMWARE_IGNORE_CARRIER,
+                               "Ignore carrier info in firmware details",
+                               "Whether carrier info (version, name) should be ignored when showing the firmware details",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     initialized = TRUE;
 }
