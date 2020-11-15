@@ -181,7 +181,7 @@ common_async_context_new (MMPluginManager *self,
 /*
  * Port context
  *
- * This structure hold all the probing information related to a single port.
+ * This structure holds all the probing information related to a single port.
  */
 struct _PortContext {
     /* Reference counting */
@@ -738,7 +738,7 @@ struct _DeviceContext {
 
     /* The operation task */
     GTask *task;
-    /* Internal ancellable */
+    /* Internal cancellable */
     GCancellable *cancellable;
 
     /* Timer tracking how much time is required for the device support check */
