@@ -1,4 +1,22 @@
 
+ModemManager 1.14.8
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+ * Build:
+   ** Fixed distcheck with new gtk-doc releases.
+   ** ModemManager-names.h was being included in the dist tarball, but then
+      removed on the 'clean' target. Fix that, by only removing it on the
+      'maintainer-clean' target. Therefore, 'xsltproc' is now only needed in
+      git builds, not needed when building from a dist tarball.
+
+ * QMI:
+   ** Fix daemon crash when the device is removed during the initialization
+      sequence.
+
+ * Several other minor improvements and fixes.
+
+
 ModemManager 1.14.6
 -------------------------------------------
 This is a new bugfix release of ModemManager.
