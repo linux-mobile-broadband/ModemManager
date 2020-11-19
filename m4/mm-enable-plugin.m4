@@ -20,24 +20,38 @@ AC_ARG_ENABLE(all-plugins,
 ])
 
 dnl Usage:
-dnl  MM_ENABLE_PLUGIN([NAME],[WITH_SHARED_NAME_1,WITH_SHARED_NAME_2,...])
-AC_DEFUN([MM_ENABLE_PLUGIN],
+dnl  MM_ENABLE_PLUGIN_FULL([NAME],[DEFAULT],[WITH_SHARED_NAME_1,WITH_SHARED_NAME_2,...])
+AC_DEFUN([MM_ENABLE_PLUGIN_FULL],
 [dnl
 m4_pushdef([var_enable_plugin], patsubst([enable_plugin_$1], -, _))dnl
 m4_pushdef([VAR_ENABLE_PLUGIN], patsubst(translit([enable_plugin_$1], [a-z], [A-Z]), -, _))dnl
 AC_ARG_ENABLE(plugin-$1,
               AS_HELP_STRING([--enable-plugin-$1], [Build $1 plugin]),
               [],
-              [var_enable_plugin=$enable_all_plugins])
+              [var_enable_plugin=$2])
 if test "x$var_enable_plugin" = "xyes"; then
   AC_DEFINE([VAR_ENABLE_PLUGIN], 1, [Define if $1 plugin is enabled])
-m4_ifval([$2],[m4_foreach(with_shared,[$2],[dnl
+m4_ifval([$3],[m4_foreach(with_shared,[$3],[dnl
   with_shared="yes"
 ])])dnl
 fi
 AM_CONDITIONAL(VAR_ENABLE_PLUGIN, [test "x$var_enable_plugin" = "xyes"])
 m4_popdef([VAR_ENABLE_PLUGIN])dnl
 m4_popdef([var_enable_plugin])dnl
+])
+
+dnl Usage:
+dnl  MM_ENABLE_PLUGIN([NAME],[WITH_SHARED_NAME_1,WITH_SHARED_NAME_2,...])
+AC_DEFUN([MM_ENABLE_PLUGIN],
+[dnl
+MM_ENABLE_PLUGIN_FULL($1,$enable_all_plugins,$2)
+])
+
+dnl Usage:
+dnl  MM_ENABLE_PLUGIN_DISABLED([NAME],[WITH_SHARED_NAME_1,WITH_SHARED_NAME_2,...])
+AC_DEFUN([MM_ENABLE_PLUGIN_DISABLED],
+[dnl
+MM_ENABLE_PLUGIN_FULL($1,"no",$2)
 ])
 
 dnl Usage:

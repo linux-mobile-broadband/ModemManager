@@ -490,7 +490,7 @@ MM_ENABLE_PLUGIN([option],
 MM_ENABLE_PLUGIN([option-hso],
                  [with_shared_option])
 MM_ENABLE_PLUGIN([pantech])
-MM_ENABLE_PLUGIN([qcom-soc])
+MM_ENABLE_PLUGIN_DISABLED([qcom-soc])
 MM_ENABLE_PLUGIN([quectel])
 MM_ENABLE_PLUGIN([samsung],
                  [with_shared_icera])
