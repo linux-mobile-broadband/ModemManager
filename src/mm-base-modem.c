@@ -813,6 +813,14 @@ mm_base_modem_get_port_infos (MMBaseModem *self,
     return (MMModemPortInfo *) g_array_free (port_infos, FALSE);
 }
 
+static gint
+port_cmp (MMPort *a,
+          MMPort *b)
+{
+    /* default to alphabetical sorting on the port name */
+    return g_strcmp0 (mm_port_get_device (a), mm_port_get_device (b));
+}
+
 GList *
 mm_base_modem_find_ports (MMBaseModem *self,
                           MMPortSubsys subsys,
@@ -845,7 +853,7 @@ mm_base_modem_find_ports (MMBaseModem *self,
         out = g_list_append (out, g_object_ref (port));
     }
 
-    return out;
+    return g_list_sort (out, (GCompareFunc) port_cmp);
 }
 
 static void
@@ -903,14 +911,13 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMPortSerialAt *gps_control = NULL;
     MMPortSerialGps *gps = NULL;
     MMPortSerial *audio = NULL;
-    MMPort *data_primary = NULL;
-    GList *data = NULL;
+    MMPortSerialAt *data_at_primary = NULL;
+    GList *data_at = NULL;
+    GList *data_net = NULL;
 #if defined WITH_QMI
-    MMPort *qmi_primary = NULL;
     GList *qmi = NULL;
 #endif
 #if defined WITH_MBIM
-    MMPort *mbim_primary = NULL;
     GList *mbim = NULL;
 #endif
     GList *l;
@@ -942,10 +949,10 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             }
 
             if (flags & MM_PORT_SERIAL_AT_FLAG_PPP) {
-                if (!data_primary)
-                    data_primary = candidate;
+                if (!data_at_primary)
+                    data_at_primary = MM_PORT_SERIAL_AT (candidate);
                 else
-                    data = g_list_append (data, candidate);
+                    data_at = g_list_append (data_at, candidate);
             }
 
             /* Explicitly flagged secondary ports trump NONE ports for secondary */
@@ -975,16 +982,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             break;
 
         case MM_PORT_TYPE_NET:
-            if (!data_primary)
-                data_primary = candidate;
-            else if (MM_IS_PORT_SERIAL_AT (data_primary)) {
-                /* Net device (if any) is the preferred data port */
-                data = g_list_append (data, data_primary);
-                data_primary = candidate;
-            }
-            else
-                /* All non-primary net ports get added to the list of data ports */
-                data = g_list_append (data, candidate);
+            data_net = g_list_append (data_net, candidate);
             break;
 
         case MM_PORT_TYPE_GPS:
@@ -1001,21 +999,13 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
 #if defined WITH_QMI
         case MM_PORT_TYPE_QMI:
-            if (!qmi_primary)
-                qmi_primary = candidate;
-            else
-                /* All non-primary QMI ports get added to the list of QMI ports */
-                qmi = g_list_append (qmi, candidate);
+            qmi = g_list_append (qmi, candidate);
             break;
 #endif
 
 #if defined WITH_MBIM
         case MM_PORT_TYPE_MBIM:
-            if (!mbim_primary)
-                mbim_primary = candidate;
-            else
-                /* All non-primary MBIM ports get added to the list of MBIM ports */
-                mbim = g_list_append (mbim, candidate);
+            mbim = g_list_append (mbim, candidate);
             break;
 #endif
 
@@ -1040,20 +1030,20 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             secondary = NULL;
         }
         /* Fallback to a data port if no primary or secondary */
-        else if (data_primary && MM_IS_PORT_SERIAL_AT (data_primary)) {
-            primary = MM_PORT_SERIAL_AT (data_primary);
-            data_primary = NULL;
+        else if (data_at_primary) {
+            primary = data_at_primary;
+            data_at_primary = NULL;
         }
         else {
             gboolean allow_modem_without_at_port = FALSE;
 
 #if defined WITH_QMI
-            if (qmi_primary)
+            if (qmi)
                 allow_modem_without_at_port = TRUE;
 #endif
 
 #if defined WITH_MBIM
-            if (mbim_primary)
+            if (mbim)
                 allow_modem_without_at_port = TRUE;
 #endif
 
@@ -1075,7 +1065,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
 #if defined WITH_QMI
     /* On QMI-based modems, we need to have at least a net port */
-    if (qmi_primary && !data_primary) {
+    if (qmi && !data_net) {
         g_set_error_literal (error,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
@@ -1086,7 +1076,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
 #if defined WITH_MBIM
     /* On MBIM-based modems, we need to have at least a net port */
-    if (mbim_primary && !data_primary) {
+    if (mbim && !data_net) {
         g_set_error_literal (error,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
@@ -1096,73 +1086,84 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 #endif
 
     /* Data port defaults to primary AT port */
-    if (!data_primary)
-        data_primary = MM_PORT (primary);
-    g_assert (data_primary);
+    if (primary && !data_at_primary)
+        data_at_primary = primary;
 
     /* Reset flags on all ports; clear data port first since it might also
      * be the primary or secondary port.
      */
-    if (MM_IS_PORT_SERIAL_AT (data_primary))
-        mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (data_primary), MM_PORT_SERIAL_AT_FLAG_NONE);
-
+    if (data_at_primary)
+        mm_port_serial_at_set_flags (data_at_primary, MM_PORT_SERIAL_AT_FLAG_NONE);
     if (primary)
         mm_port_serial_at_set_flags (primary, MM_PORT_SERIAL_AT_FLAG_PRIMARY);
     if (secondary)
         mm_port_serial_at_set_flags (secondary, MM_PORT_SERIAL_AT_FLAG_SECONDARY);
-
-    if (MM_IS_PORT_SERIAL_AT (data_primary)) {
-        flags = mm_port_serial_at_get_flags (MM_PORT_SERIAL_AT (data_primary));
-        mm_port_serial_at_set_flags (MM_PORT_SERIAL_AT (data_primary), flags | MM_PORT_SERIAL_AT_FLAG_PPP);
+    if (data_at_primary) {
+        flags = mm_port_serial_at_get_flags (data_at_primary);
+        mm_port_serial_at_set_flags (data_at_primary, flags | MM_PORT_SERIAL_AT_FLAG_PPP);
     }
 
-    log_port (self, MM_PORT (primary),      "at (primary)");
-    log_port (self, MM_PORT (secondary),    "at (secondary)");
-    log_port (self, MM_PORT (data_primary), "data (primary)");
-    for (l = data; l; l = g_list_next (l))
-        log_port (self, MM_PORT (l->data),  "data (secondary)");
-    log_port (self, MM_PORT (qcdm),         "qcdm");
-    log_port (self, MM_PORT (gps_control),  "gps (control)");
-    log_port (self, MM_PORT (gps),          "gps (nmea)");
-    log_port (self, MM_PORT (audio),        "audio");
+    /* sort ports by name */
 #if defined WITH_QMI
-    log_port (self, MM_PORT (qmi_primary),  "qmi (primary)");
-    for (l = qmi; l; l = g_list_next (l))
-        log_port (self, MM_PORT (l->data),  "qmi (secondary)");
+    qmi = g_list_sort (qmi, (GCompareFunc) port_cmp);
 #endif
 #if defined WITH_MBIM
-    log_port (self, MM_PORT (mbim_primary),  "mbim (primary)");
+    mbim = g_list_sort (mbim, (GCompareFunc) port_cmp);
+#endif
+    data_net = g_list_sort (data_net, (GCompareFunc) port_cmp);
+    data_at  = g_list_sort (data_at,  (GCompareFunc) port_cmp);
+
+    log_port (self, MM_PORT (primary),         "at (primary)");
+    log_port (self, MM_PORT (secondary),       "at (secondary)");
+    log_port (self, MM_PORT (data_at_primary), "at (data primary)");
+    for (l = data_at; l; l = g_list_next (l))
+        log_port (self, MM_PORT (l->data),     "at (data secondary)");
+    for (l = data_net; l; l = g_list_next (l))
+        log_port (self, MM_PORT (l->data),     "net (data)");
+    log_port (self, MM_PORT (qcdm),            "qcdm");
+    log_port (self, MM_PORT (gps_control),     "gps (control)");
+    log_port (self, MM_PORT (gps),             "gps (nmea)");
+    log_port (self, MM_PORT (audio),           "audio");
+#if defined WITH_QMI
+    for (l = qmi; l; l = g_list_next (l))
+        log_port (self, MM_PORT (l->data),     "qmi");
+#endif
+#if defined WITH_MBIM
     for (l = mbim; l; l = g_list_next (l))
-        log_port (self, MM_PORT (l->data),   "mbim (secondary)");
+        log_port (self, MM_PORT (l->data),     "mbim");
 #endif
 
     /* We keep new refs to the objects here */
+
     self->priv->primary = (primary ? g_object_ref (primary) : NULL);
     self->priv->secondary = (secondary ? g_object_ref (secondary) : NULL);
     self->priv->qcdm = (qcdm ? g_object_ref (qcdm) : NULL);
     self->priv->gps_control = (gps_control ? g_object_ref (gps_control) : NULL);
     self->priv->gps = (gps ? g_object_ref (gps) : NULL);
 
-    /* Build the final list of data ports, primary port first */
-    self->priv->data = g_list_append (self->priv->data, g_object_ref (data_primary));
-    g_list_foreach (data, (GFunc)g_object_ref, NULL);
-    self->priv->data = g_list_concat (self->priv->data, data);
+    /* Build the final list of data ports, NET ports preferred */
+    if (data_net) {
+        g_list_foreach (data_net, (GFunc)g_object_ref, NULL);
+        self->priv->data = g_list_concat (self->priv->data, data_net);
+    }
+    if (data_at_primary)
+        self->priv->data = g_list_append (self->priv->data, g_object_ref (data_at_primary));
+    if (data_at) {
+        g_list_foreach (data_at, (GFunc)g_object_ref, NULL);
+        self->priv->data = g_list_concat (self->priv->data, data_at);
+    }
 
 #if defined WITH_QMI
-    /* Build the final list of QMI ports, primary port first */
-    if (qmi_primary) {
-        self->priv->qmi = g_list_append (self->priv->qmi, g_object_ref (qmi_primary));
+    if (qmi) {
         g_list_foreach (qmi, (GFunc)g_object_ref, NULL);
-        self->priv->qmi = g_list_concat (self->priv->qmi, qmi);
+        self->priv->qmi = qmi;
     }
 #endif
 
 #if defined WITH_MBIM
-    /* Build the final list of MBIM ports, primary port first */
-    if (mbim_primary) {
-        self->priv->mbim = g_list_append (self->priv->mbim, g_object_ref (mbim_primary));
+    if (mbim) {
         g_list_foreach (mbim, (GFunc)g_object_ref, NULL);
-        self->priv->mbim = g_list_concat (self->priv->mbim, mbim);
+        self->priv->mbim = mbim;
     }
 #endif
 
