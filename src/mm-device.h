@@ -67,14 +67,19 @@ MMDevice *mm_device_new (const gchar              *uid,
                          gboolean                  virtual,
                          GDBusObjectManagerServer *object_manager);
 
-void     mm_device_grab_port    (MMDevice       *self,
-                                 MMKernelDevice *kernel_port);
-void     mm_device_release_port (MMDevice       *self,
-                                 MMKernelDevice *kernel_port);
-gboolean mm_device_owns_port    (MMDevice       *self,
-                                 MMKernelDevice *kernel_port);
-void     mm_device_ignore_port  (MMDevice       *self,
-                                 MMKernelDevice *kernel_port);
+void     mm_device_grab_port   (MMDevice       *self,
+                                MMKernelDevice *kernel_port);
+gboolean mm_device_owns_port   (MMDevice       *self,
+                                MMKernelDevice *kernel_port);
+void     mm_device_ignore_port (MMDevice       *self,
+                                MMKernelDevice *kernel_port);
+
+gboolean mm_device_owns_port_name    (MMDevice       *self,
+                                      const gchar    *subsystem,
+                                      const gchar    *name);
+void     mm_device_release_port_name (MMDevice       *self,
+                                      const gchar    *subsystem,
+                                      const gchar    *name);
 
 gboolean mm_device_create_modem (MMDevice  *self,
                                  GError   **error);

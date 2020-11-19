@@ -137,6 +137,24 @@ find_device_by_port (MMBaseManager  *manager,
 }
 
 static MMDevice *
+find_device_by_port_name (MMBaseManager *manager,
+                          const gchar   *subsystem,
+                          const gchar   *name)
+{
+    GHashTableIter iter;
+    gpointer key, value;
+
+    g_hash_table_iter_init (&iter, manager->priv->devices);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        MMDevice *candidate = MM_DEVICE (value);
+
+        if (mm_device_owns_port_name (candidate, subsystem, name))
+            return candidate;
+    }
+    return NULL;
+}
+
+static MMDevice *
 find_device_by_physdev_uid (MMBaseManager *self,
                             const gchar   *physdev_uid)
 {
@@ -208,24 +226,24 @@ static void     device_inhibited_track_port   (MMBaseManager  *self,
                                                MMKernelDevice *port,
                                                gboolean        manual_scan);
 static void     device_inhibited_untrack_port (MMBaseManager  *self,
-                                               MMKernelDevice *port);
+                                               const gchar    *subsystem,
+                                               const gchar    *name);
 
 static void
-device_removed (MMBaseManager  *self,
-                MMKernelDevice *kernel_device)
+device_removed (MMBaseManager *self,
+                const gchar   *subsystem,
+                const gchar   *name)
 {
-    g_autoptr(MMDevice)  device = NULL;
-    const gchar         *name;
+    g_autoptr(MMDevice) device = NULL;
 
-    g_return_if_fail (kernel_device != NULL);
-
-    device = find_device_by_port (self, kernel_device);
+    g_assert (subsystem && name);
+    device = find_device_by_port_name (self, subsystem, name);
     if (!device) {
         /* If the device was inhibited and the port is gone, untrack it.
          * This is only needed for ports that were tracked out of device objects.
          * In this case we don't rely on the physdev uid, as API-reported
          * remove kernel events may not include uid. */
-        device_inhibited_untrack_port (self, kernel_device);
+        device_inhibited_untrack_port (self, subsystem, name);
         return;
     }
 
@@ -236,9 +254,8 @@ device_removed (MMBaseManager  *self,
      * ourselves. */
     g_object_ref (device);
 
-    name = mm_kernel_device_get_name (kernel_device);
     mm_obj_info (self, "port %s released by device '%s'", name, mm_device_get_uid (device));
-    mm_device_release_port (device, kernel_device);
+    mm_device_release_port_name (device, subsystem, name);
 
     /* If port probe list gets empty, remove the device object iself */
     if (!mm_device_peek_port_probe_list (device)) {
@@ -283,7 +300,7 @@ device_added (MMBaseManager  *self,
         /* This could mean that device changed, losing its candidate
          * flags (such as Bluetooth RFCOMM devices upon disconnect.
          * Try to forget it. */
-        device_removed (self, port);
+        device_removed (self, mm_kernel_device_get_subsystem (port), name);
         mm_obj_dbg (self, "port %s not candidate", name);
         return;
     }
@@ -346,11 +363,10 @@ handle_kernel_event (MMBaseManager            *self,
                      MMKernelEventProperties  *properties,
                      GError                  **error)
 {
-    MMKernelDevice *kernel_device;
-    const gchar    *action;
-    const gchar    *subsystem;
-    const gchar    *name;
-    const gchar    *uid;
+    const gchar *action;
+    const gchar *subsystem;
+    const gchar *name;
+    const gchar *uid;
 
     action = mm_kernel_event_properties_get_action (properties);
     if (!action) {
@@ -387,25 +403,27 @@ handle_kernel_event (MMBaseManager            *self,
     mm_obj_dbg (self, "  name:      %s", name);
     mm_obj_dbg (self, "  uid:       %s", uid ? uid : "n/a");
 
+    if (g_strcmp0 (action, "add") == 0) {
+        g_autoptr(MMKernelDevice) kernel_device = NULL;
 #if defined WITH_UDEV
-    if (!mm_context_get_test_no_udev ())
-        kernel_device = mm_kernel_device_udev_new_from_properties (properties, error);
-    else
+        if (!mm_context_get_test_no_udev ())
+            kernel_device = mm_kernel_device_udev_new_from_properties (properties, error);
+        else
 #endif
-        kernel_device = mm_kernel_device_generic_new (properties, error);
+            kernel_device = mm_kernel_device_generic_new (properties, error);
+        if (!kernel_device)
+            return FALSE;
 
-    if (!kernel_device)
-        return FALSE;
-
-    if (g_strcmp0 (action, "add") == 0)
         device_added (self, kernel_device, TRUE, TRUE);
-    else if (g_strcmp0 (action, "remove") == 0)
-        device_removed (self, kernel_device);
-    else
-        g_assert_not_reached ();
-    g_object_unref (kernel_device);
+        return TRUE;
+    }
 
-    return TRUE;
+    if (g_strcmp0 (action, "remove") == 0) {
+        device_removed (self, subsystem, name);
+        return TRUE;
+    }
+
+    g_assert_not_reached ();
 }
 
 #if defined WITH_UDEV
@@ -415,13 +433,18 @@ handle_uevent (MMBaseManager *self,
                const gchar   *action,
                GUdevDevice   *device)
 {
-    g_autoptr(MMKernelDevice) kernel_device = NULL;
+    if (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change")) {
+        g_autoptr(MMKernelDevice) kernel_device = NULL;
 
-    kernel_device = mm_kernel_device_udev_new (device);
-    if (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change"))
+        kernel_device = mm_kernel_device_udev_new (device);
         device_added (self, kernel_device, TRUE, FALSE);
-    else if (g_str_equal (action, "remove"))
-        device_removed (self, kernel_device);
+        return;
+    }
+
+    if (g_str_equal (action, "remove")) {
+        device_removed (self, g_udev_device_get_subsystem (device), g_udev_device_get_name (device));
+        return;
+    }
 }
 
 typedef struct {
@@ -886,7 +909,8 @@ is_device_inhibited (MMBaseManager *self,
 
 static void
 device_inhibited_untrack_port (MMBaseManager  *self,
-                               MMKernelDevice *kernel_port)
+                               const gchar    *subsystem,
+                               const gchar    *name)
 {
     GHashTableIter       iter;
     gchar               *uid;
@@ -900,8 +924,10 @@ device_inhibited_untrack_port (MMBaseManager  *self,
             InhibitedDevicePortInfo *port_info;
 
             port_info = (InhibitedDevicePortInfo *)(l->data);
-            if (mm_kernel_device_cmp (port_info->kernel_port, kernel_port)) {
-                mm_obj_dbg (self, "released port %s while inhibited", mm_kernel_device_get_name (kernel_port));
+
+            if ((g_strcmp0 (subsystem, mm_kernel_device_get_subsystem (port_info->kernel_port)) == 0) &&
+                (g_strcmp0 (name, mm_kernel_device_get_name (port_info->kernel_port)) == 0)) {
+                mm_obj_dbg (self, "released port %s while inhibited", name);
                 inhibited_device_port_info_free (port_info);
                 info->port_infos = g_list_delete_link (info->port_infos, l);
                 return;

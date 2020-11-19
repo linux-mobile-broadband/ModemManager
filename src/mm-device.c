@@ -97,30 +97,54 @@ struct _MMDevicePrivate {
 /*****************************************************************************/
 
 static MMPortProbe *
+probe_list_lookup_by_device (GList          *port_probes,
+                             MMKernelDevice *kernel_port)
+{
+    GList *l;
+
+    for (l = port_probes; l; l = g_list_next (l)) {
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+
+        if (mm_kernel_device_cmp (mm_port_probe_peek_port (probe), kernel_port))
+            return probe;
+    }
+    return NULL;
+}
+
+static MMPortProbe *
+probe_list_lookup_by_name (GList       *port_probes,
+                           const gchar *subsystem,
+                           const gchar *name)
+{
+    GList *l;
+
+    for (l = port_probes; l; l = g_list_next (l)) {
+        MMPortProbe    *probe = MM_PORT_PROBE (l->data);
+        MMKernelDevice *probe_device;
+
+        probe_device = mm_port_probe_peek_port (probe);
+        if ((g_strcmp0 (subsystem, mm_kernel_device_get_subsystem (probe_device)) == 0) &&
+            (g_strcmp0 (name,      mm_kernel_device_get_name      (probe_device)) == 0))
+            return probe;
+    }
+    return NULL;
+}
+
+static MMPortProbe *
 device_find_probe_with_device (MMDevice       *self,
                                MMKernelDevice *kernel_port,
                                gboolean        lookup_ignored)
 {
-    GList *l;
+    MMPortProbe *probe;
 
-    for (l = self->priv->port_probes; l; l = g_list_next (l)) {
-        MMPortProbe *probe = MM_PORT_PROBE (l->data);
-
-        if (mm_kernel_device_cmp (mm_port_probe_peek_port (probe), kernel_port))
-            return probe;
-    }
+    probe = probe_list_lookup_by_device (self->priv->port_probes, kernel_port);
+    if (probe)
+        return probe;
 
     if (!lookup_ignored)
         return NULL;
 
-    for (l = self->priv->ignored_port_probes; l; l = g_list_next (l)) {
-        MMPortProbe *probe = MM_PORT_PROBE (l->data);
-
-        if (mm_kernel_device_cmp (mm_port_probe_peek_port (probe), kernel_port))
-            return probe;
-    }
-
-    return NULL;
+    return probe_list_lookup_by_device (self->priv->ignored_port_probes, kernel_port);
 }
 
 gboolean
@@ -128,6 +152,28 @@ mm_device_owns_port (MMDevice       *self,
                      MMKernelDevice *kernel_port)
 {
     return !!device_find_probe_with_device (self, kernel_port, TRUE);
+}
+
+static MMPortProbe *
+device_find_probe_with_name (MMDevice    *self,
+                             const gchar *subsystem,
+                             const gchar *name)
+{
+    MMPortProbe *probe;
+
+    probe = probe_list_lookup_by_name (self->priv->port_probes, subsystem, name);
+    if (probe)
+        return probe;
+
+    return probe_list_lookup_by_name (self->priv->ignored_port_probes, subsystem, name);
+}
+
+gboolean
+mm_device_owns_port_name (MMDevice    *self,
+                          const gchar *subsystem,
+                          const gchar *name)
+{
+    return !!device_find_probe_with_name (self, subsystem, name);
 }
 
 static void
@@ -190,12 +236,13 @@ mm_device_grab_port (MMDevice       *self,
 }
 
 void
-mm_device_release_port (MMDevice       *self,
-                        MMKernelDevice *kernel_port)
+mm_device_release_port_name (MMDevice    *self,
+                             const gchar *subsystem,
+                             const gchar *name)
 {
     MMPortProbe *probe;
 
-    probe = device_find_probe_with_device (self, kernel_port, TRUE);
+    probe = device_find_probe_with_name (self, subsystem, name);
     if (probe) {
         /* Found, remove from lists and destroy probe */
         if (g_list_find (self->priv->port_probes, probe))
