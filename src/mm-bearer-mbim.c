@@ -250,6 +250,7 @@ typedef struct {
     ConnectStep            step;
     MMPort                *data;
     MMBearerConnectResult *connect_result;
+    MbimMessage           *abort_on_failure;
     guint64                uplink_speed;
     guint64                downlink_speed;
     /* settings to use */
@@ -271,6 +272,14 @@ typedef struct {
 static void
 connect_context_free (ConnectContext *ctx)
 {
+    if (ctx->abort_on_failure) {
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
+                             ctx->abort_on_failure,
+                             MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
+                             NULL, NULL, NULL);
+        mbim_message_unref (ctx->abort_on_failure);
+    }
+
     if (ctx->link_name) {
         mm_port_mbim_cleanup_link (ctx->mbim, ctx->link_name, NULL, NULL);
         g_free (ctx->link_name);
@@ -287,6 +296,7 @@ connect_context_free (ConnectContext *ctx)
     g_clear_object (&ctx->data);
     g_object_unref (ctx->mbim);
     g_object_unref (ctx->modem);
+
     g_slice_free (ConnectContext, ctx);
 }
 
@@ -712,12 +722,18 @@ connect_set_ready (MbimDevice   *device,
     }
 
     if (error) {
+        /* A timeout when attempting to activate the request will require us to
+         * explicitly abort the operation */
+        if (g_error_matches (error, MBIM_CORE_ERROR, MBIM_CORE_ERROR_TIMEOUT))
+            ctx->abort_on_failure = build_disconnect_message (self, ctx->mbim, ctx->session_id);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    /* Keep on */
+    /* Keep on. From now on, any additional command failure will require an
+     * explicit disconnection */
+    ctx->abort_on_failure = build_disconnect_message (self, ctx->mbim, ctx->session_id);
     ctx->step++;
     connect_context_step (task);
 }
@@ -1275,6 +1291,10 @@ connect_context_step (GTask *task)
         return;
 
     case CONNECT_STEP_LAST:
+        /* Cleanup the abort message so that we don't
+         * run it */
+        g_clear_pointer (&ctx->abort_on_failure, mbim_message_unref);
+
         /* Port is connected; update the state */
         mm_port_set_connected (ctx->link ? ctx->link : ctx->data, TRUE);
 
