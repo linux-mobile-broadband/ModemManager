@@ -192,6 +192,41 @@ reload_stats (MMBaseBearer        *self,
 }
 
 /*****************************************************************************/
+/* Disconnection message builder.
+ */
+
+static MbimMessage *
+build_disconnect_message (MMBearerMbim *self,
+                          MMPortMbim   *port,
+                          guint32       session_id)
+{
+    if (mbim_device_check_ms_mbimex_version (mm_port_mbim_peek_device (port), 3, 0))
+        return mbim_message_ms_basic_connect_v3_connect_set_new (session_id,
+                                                                 MBIM_ACTIVATION_COMMAND_DEACTIVATE,
+                                                                 MBIM_COMPRESSION_NONE,
+                                                                 MBIM_AUTH_PROTOCOL_NONE,
+                                                                 MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                                                                 mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                                                                 MBIM_ACCESS_MEDIA_TYPE_UNKNOWN,
+                                                                 "", /* access string */
+                                                                 "", /* user name */
+                                                                 "", /* password */
+                                                                 NULL, /* unnamed ies */
+                                                                 NULL);
+
+    return mbim_message_connect_set_new (session_id,
+                                         MBIM_ACTIVATION_COMMAND_DEACTIVATE,
+                                         "", /* access string */
+                                         "", /* user name */
+                                         "", /* password */
+                                         MBIM_COMPRESSION_NONE,
+                                         MBIM_AUTH_PROTOCOL_NONE,
+                                         MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                                         mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                                         NULL);
+}
+
+/*****************************************************************************/
 /* Connect */
 
 #define WAIT_LINK_PORT_TIMEOUT_MS 2500
@@ -1158,39 +1193,9 @@ connect_context_step (GTask *task)
         return;
     }
 
-    case CONNECT_STEP_ENSURE_DISCONNECTED: {
-        MbimDevice *device;
-
+    case CONNECT_STEP_ENSURE_DISCONNECTED:
         mm_obj_dbg (self, "ensuring session %u is disconnected...", ctx->session_id);
-
-        device = mm_port_mbim_peek_device (ctx->mbim);
-        if (mbim_device_check_ms_mbimex_version (device, 3, 0))
-            message = mbim_message_ms_basic_connect_v3_connect_set_new (
-                          ctx->session_id,
-                          MBIM_ACTIVATION_COMMAND_DEACTIVATE,
-                          MBIM_COMPRESSION_NONE,
-                          MBIM_AUTH_PROTOCOL_NONE,
-                          MBIM_CONTEXT_IP_TYPE_DEFAULT,
-                          mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                          MBIM_ACCESS_MEDIA_TYPE_UNKNOWN,
-                          "", /* access string */
-                          "", /* user name */
-                          "", /* password */
-                          NULL, /* unnamed ies */
-                          NULL);
-        else
-            message = mbim_message_connect_set_new (
-                          ctx->session_id,
-                          MBIM_ACTIVATION_COMMAND_DEACTIVATE,
-                          "",
-                          "",
-                          "",
-                          MBIM_COMPRESSION_NONE,
-                          MBIM_AUTH_PROTOCOL_NONE,
-                          MBIM_CONTEXT_IP_TYPE_DEFAULT,
-                          mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                          NULL);
-
+        message = build_disconnect_message (self, ctx->mbim, ctx->session_id);
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
@@ -1198,7 +1203,6 @@ connect_context_step (GTask *task)
                              (GAsyncReadyCallback)ensure_disconnected_ready,
                              task);
         return;
-    }
 
     case CONNECT_STEP_CONNECT: {
         MbimDevice *device;
@@ -1600,35 +1604,8 @@ disconnect_context_step (GTask *task)
 
     case DISCONNECT_STEP_DISCONNECT: {
         g_autoptr(MbimMessage) message = NULL;
-        MbimDevice *device;
 
-        device = mm_port_mbim_peek_device (ctx->mbim);
-        if (mbim_device_check_ms_mbimex_version (device, 3, 0))
-            message = mbim_message_ms_basic_connect_v3_connect_set_new (
-                          ctx->session_id,
-                          MBIM_ACTIVATION_COMMAND_DEACTIVATE,
-                          MBIM_COMPRESSION_NONE,
-                          MBIM_AUTH_PROTOCOL_NONE,
-                          MBIM_CONTEXT_IP_TYPE_DEFAULT,
-                          mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                          MBIM_ACCESS_MEDIA_TYPE_UNKNOWN,
-                          "",
-                          "",
-                          "",
-                          NULL,
-                          NULL);
-        else
-            message = mbim_message_connect_set_new (
-                          ctx->session_id,
-                          MBIM_ACTIVATION_COMMAND_DEACTIVATE,
-                          "",
-                          "",
-                          "",
-                          MBIM_COMPRESSION_NONE,
-                          MBIM_AUTH_PROTOCOL_NONE,
-                          MBIM_CONTEXT_IP_TYPE_DEFAULT,
-                          mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                          NULL);
+        message = build_disconnect_message (self, ctx->mbim, ctx->session_id);
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
