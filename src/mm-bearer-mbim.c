@@ -1147,7 +1147,7 @@ connect_context_step (GTask *task)
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              30,
-                             NULL,
+                             g_task_get_cancellable (task),
                              (GAsyncReadyCallback)packet_service_set_ready,
                              task);
         return;
@@ -1203,7 +1203,7 @@ connect_context_step (GTask *task)
         mbim_device_command (device,
                              message,
                              10,
-                             NULL,
+                             g_task_get_cancellable (task),
                              (GAsyncReadyCallback)check_disconnected_ready,
                              task);
         return;
@@ -1215,7 +1215,7 @@ connect_context_step (GTask *task)
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
-                             NULL,
+                             g_task_get_cancellable (task),
                              (GAsyncReadyCallback)ensure_disconnected_ready,
                              task);
         return;
@@ -1257,7 +1257,7 @@ connect_context_step (GTask *task)
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
-                             NULL,
+                             g_task_get_cancellable (task),
                              (GAsyncReadyCallback)connect_set_ready,
                              task);
         return;
@@ -1285,7 +1285,7 @@ connect_context_step (GTask *task)
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              60,
-                             NULL,
+                             g_task_get_cancellable (task),
                              (GAsyncReadyCallback)ip_configuration_query_ready,
                              task);
         return;
