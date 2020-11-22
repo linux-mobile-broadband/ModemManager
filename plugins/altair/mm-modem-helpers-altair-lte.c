@@ -155,9 +155,9 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, NULL);
     g_assert (regex);
-    if (!g_regex_match_full (regex, pco_info, strlen (pco_info), 0, 0, &match_info, error)) {
+
+    if (!g_regex_match_full (regex, pco_info, strlen (pco_info), 0, 0, &match_info, error))
         return NULL;
-    }
 
     num_matches = g_match_info_get_match_count (match_info);
     if (num_matches != 5) {
@@ -170,22 +170,18 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
     }
 
     while (g_match_info_matches (match_info)) {
-        guint pco_cid;
-        gchar *pco_id;
-        gchar *pco_payload;
-        gsize pco_payload_len;
-        gchar *pco_payload_bytes = NULL;
-        gsize pco_payload_bytes_len;
-        guint8 pco_prefix[6];
+        guint             pco_cid;
+        g_autofree gchar *pco_id = NULL;
+        g_autofree gchar *pco_payload = NULL;
+        g_autofree gchar *pco_payload_bytes = NULL;
+        gsize             pco_payload_bytes_len;
+        guint8            pco_prefix[6];
         GByteArray *pco_raw;
-        gsize pco_raw_len;
+        gsize             pco_raw_len;
 
         if (!mm_get_uint_from_match_info (match_info, 1, &pco_cid)) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Couldn't parse CID from PCO info: '%s'",
-                         pco_info);
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't parse CID from PCO info: '%s'", pco_info);
             break;
         }
 
@@ -197,42 +193,26 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
 
         pco_id = mm_get_string_unquoted_from_match_info (match_info, 3);
         if (!pco_id) {
-            g_set_error (error,
-                         MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                         "Couldn't parse PCO ID from PCO info: '%s'",
-                         pco_info);
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't parse PCO ID from PCO info: '%s'", pco_info);
             break;
         }
 
         if (g_strcmp0 (pco_id, "FF00")) {
-            g_free (pco_id);
             g_match_info_next (match_info, error);
             continue;
         }
-        g_free (pco_id);
 
         pco_payload = mm_get_string_unquoted_from_match_info (match_info, 4);
         if (!pco_payload) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Couldn't parse PCO payload from PCO info: '%s'",
-                         pco_info);
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't parse PCO payload from PCO info: '%s'", pco_info);
             break;
         }
 
-        pco_payload_len = strlen (pco_payload);
-        if (pco_payload_len % 2 == 0)
-            pco_payload_bytes = mm_utils_hexstr2bin (pco_payload, &pco_payload_bytes_len);
-
-        g_free (pco_payload);
-
+        pco_payload_bytes = mm_utils_hexstr2bin (pco_payload, &pco_payload_bytes_len, error);
         if (!pco_payload_bytes) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Invalid PCO payload from PCO info: '%s'",
-                         pco_info);
+            g_prefix_error (error, "Invalid PCO payload from PCO info '%s': ", pco_info);
             break;
         }
 
@@ -267,13 +247,11 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
         pco_raw = g_byte_array_sized_new (pco_raw_len);
         g_byte_array_append (pco_raw, pco_prefix, sizeof (pco_prefix));
         g_byte_array_append (pco_raw, (guint8 *)pco_payload_bytes, pco_payload_bytes_len);
-        g_free (pco_payload_bytes);
 
         pco = mm_pco_new ();
         mm_pco_set_session_id (pco, pco_cid);
         mm_pco_set_complete (pco, TRUE);
         mm_pco_set_data (pco, pco_raw->data, pco_raw->len);
-        g_byte_array_unref (pco_raw);
         break;
     }
 

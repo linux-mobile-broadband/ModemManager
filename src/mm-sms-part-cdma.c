@@ -317,24 +317,17 @@ mm_sms_part_cdma_new_from_pdu (guint         index,
                                gpointer      log_object,
                                GError      **error)
 {
-    gsize pdu_len;
-    guint8 *pdu;
-    MMSmsPart *part;
+    g_autofree guint8 *pdu = NULL;
+    gsize              pdu_len;
 
     /* Convert PDU from hex to binary */
-    pdu = (guint8 *) mm_utils_hexstr2bin (hexpdu, &pdu_len);
+    pdu = (guint8 *) mm_utils_hexstr2bin (hexpdu, &pdu_len, error);
     if (!pdu) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Couldn't convert CDMA PDU from hex to binary");
+        g_prefix_error (error, "Couldn't convert CDMA PDU from hex to binary: ");
         return NULL;
     }
 
-    part = mm_sms_part_cdma_new_from_binary_pdu (index, pdu, pdu_len, log_object, error);
-    g_free (pdu);
-
-    return part;
+    return mm_sms_part_cdma_new_from_binary_pdu (index, pdu, pdu_len, log_object, error);
 }
 
 struct Parameter {
