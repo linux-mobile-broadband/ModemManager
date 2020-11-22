@@ -4792,7 +4792,7 @@ ussd_encode (const gchar  *command,
 
         *scheme = MM_MODEM_GSM_USSD_SCHEME_UCS2;
         array = g_byte_array_sized_new (strlen (command) * 2);
-        if (!mm_modem_charset_byte_array_append (array, command, FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
+        if (!mm_modem_charset_byte_array_append (array, command, MM_MODEM_CHARSET_UCS2, &inner_error)) {
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                          "Failed to encode USSD command in UCS2 charset: %s", inner_error->message);
             return NULL;

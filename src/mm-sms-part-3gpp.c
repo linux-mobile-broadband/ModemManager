@@ -1011,7 +1011,7 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         /* Try to guess a good value for the array */
         array = g_byte_array_sized_new (strlen (mm_sms_part_get_text (part)) * 2);
         /* Always assume UTF-16 instead of UCS-2! */
-        if (!mm_modem_charset_byte_array_append (array, mm_sms_part_get_text (part), FALSE, MM_MODEM_CHARSET_UTF16, &inner_error)) {
+        if (!mm_modem_charset_byte_array_append (array, mm_sms_part_get_text (part), MM_MODEM_CHARSET_UTF16, &inner_error)) {
             g_set_error (error,
                          MM_MESSAGE_ERROR,
                          MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
