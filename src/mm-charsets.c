@@ -42,7 +42,6 @@ static const CharsetEntry charset_map[] = {
     { "8859-1",  NULL,     "ISO8859-1", "ISO8859-1//TRANSLIT", MM_MODEM_CHARSET_8859_1  },
     { "PCCP437", "CP437",  "CP437",     "CP437//TRANSLIT",     MM_MODEM_CHARSET_PCCP437 },
     { "PCDN",    "CP850",  "CP850",     "CP850//TRANSLIT",     MM_MODEM_CHARSET_PCDN    },
-    { "HEX",     NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_HEX     },
     { "UTF-16",  "UTF16",  "UTF-16BE",  "UTF-16BE//TRANSLIT",  MM_MODEM_CHARSET_UTF16   },
 };
 
@@ -773,11 +772,6 @@ mm_charset_take_and_convert_to_utf8 (gchar          *str,
         utf8 = str;
         break;
 
-    case MM_MODEM_CHARSET_HEX:
-        /* We'll assume that the HEX string is really valid ASCII at the end */
-        utf8 = str;
-        break;
-
     case MM_MODEM_CHARSET_GSM:
         utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 ((const guint8 *) str, strlen (str));
         g_free (str);
@@ -900,10 +894,6 @@ mm_utf8_take_and_convert_to_charset (gchar          *str,
     switch (charset) {
     case MM_MODEM_CHARSET_UNKNOWN:
         g_warn_if_reached ();
-        encoded = str;
-        break;
-
-    case MM_MODEM_CHARSET_HEX:
         encoded = str;
         break;
 
