@@ -140,9 +140,11 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
     MMPco *pco = NULL;
     gint num_matches;
 
-    if (!pco_info[0])
-        /* No APNs configured, all done */
+    if (!pco_info || !pco_info[0]) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "No PCO info given");
         return NULL;
+    }
 
     /* Expected %PCOINFO response:
      *

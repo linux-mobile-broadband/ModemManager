@@ -1105,9 +1105,13 @@ altair_pco_info_changed (MMPortSerialAt *port,
 
     pco_info = g_match_info_fetch (match_info, 0);
 
+    /* ignore if empty */
+    if (!pco_info || !pco_info[0])
+        return;
+
     mm_obj_dbg (self, "parsing vendor PCO info: %s", pco_info);
     pco = mm_altair_parse_vendor_pco_info (pco_info, &error);
-    if (error) {
+    if (!pco) {
         mm_obj_warn (self, "error parsing vendor PCO info: %s", error->message);
         return;
     }
