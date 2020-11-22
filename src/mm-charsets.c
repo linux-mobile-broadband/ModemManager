@@ -185,34 +185,6 @@ mm_modem_charset_hex_to_utf8 (const gchar    *src,
     return g_steal_pointer (&converted);
 }
 
-gchar *
-mm_modem_charset_utf8_to_hex (const gchar    *src,
-                              MMModemCharset  charset)
-{
-    const gchar      *iconv_to;
-    g_autofree gchar *converted = NULL;
-    g_autoptr(GError) error = NULL;
-    gsize             converted_len = 0;
-
-    g_return_val_if_fail (src != NULL, NULL);
-    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
-
-    iconv_to = charset_iconv_from (charset);
-    g_return_val_if_fail (iconv_to != NULL, FALSE);
-
-    if (charset == MM_MODEM_CHARSET_UTF8 || charset == MM_MODEM_CHARSET_IRA)
-        return g_strdup (src);
-
-    converted = g_convert (src, strlen (src),
-                           iconv_to, "UTF-8//TRANSLIT",
-                           NULL, &converted_len, &error);
-    if (!converted || error)
-        return NULL;
-
-    /* Get hex representation of the string */
-    return mm_utils_bin2hexstr ((guint8 *)converted, converted_len);
-}
-
 /* GSM 03.38 encoding conversion stuff */
 
 #define GSM_DEF_ALPHABET_SIZE 128
