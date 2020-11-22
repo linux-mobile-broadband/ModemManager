@@ -1411,11 +1411,7 @@ decide_best_encoding (const gchar *text,
     /* Check if we can do Latin encoding */
     if (mm_charset_can_convert_to (text, MM_MODEM_CHARSET_8859_1)) {
         *out = g_byte_array_sized_new (len);
-        if (!mm_modem_charset_byte_array_append (*out,
-                                                 text,
-                                                 FALSE,
-                                                 MM_MODEM_CHARSET_8859_1,
-                                                 &error))
+        if (!mm_modem_charset_byte_array_append (*out, text, MM_MODEM_CHARSET_8859_1, &error))
             mm_obj_warn (log_object, "failed to convert to latin encoding: %s", error->message);
         *num_fields = (*out)->len;
         *num_bits_per_field = 8;
@@ -1425,11 +1421,7 @@ decide_best_encoding (const gchar *text,
 
     /* If no Latin and no ASCII, default to UTF-16 */
     *out = g_byte_array_sized_new (len * 2);
-    if (!mm_modem_charset_byte_array_append (*out,
-                                             text,
-                                             FALSE,
-                                             MM_MODEM_CHARSET_UCS2,
-                                             &error))
+    if (!mm_modem_charset_byte_array_append (*out, text, MM_MODEM_CHARSET_UCS2, &error))
         mm_obj_warn (log_object, "failed to convert to UTF-16 encoding: %s", error->message);
     *num_fields = (*out)->len / 2;
     *num_bits_per_field = 16;

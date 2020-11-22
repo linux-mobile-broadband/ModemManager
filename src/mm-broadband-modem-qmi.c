@@ -7257,7 +7257,7 @@ ussd_encode (const gchar                  *command,
     }
 
     barray = g_byte_array_sized_new (command_len * 2);
-    if (!mm_modem_charset_byte_array_append (barray, command, FALSE, MM_MODEM_CHARSET_UCS2, &inner_error)) {
+    if (!mm_modem_charset_byte_array_append (barray, command, MM_MODEM_CHARSET_UCS2, &inner_error)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                      "Failed to encode USSD command in UCS2 charset: %s", inner_error->message);
         return NULL;

@@ -5890,11 +5890,7 @@ modem_3gpp_ussd_encode (MMIfaceModem3gppUssd  *self,
 
     /* Encode to the current charset (as per AT+CSCS, which is what most modems
      * (except for Huawei it seems) will ask for. */
-    if (mm_modem_charset_byte_array_append (ussd_command,
-                                            command,
-                                            FALSE,
-                                            broadband->priv->modem_current_charset,
-                                            NULL)) {
+    if (mm_modem_charset_byte_array_append (ussd_command, command, broadband->priv->modem_current_charset, NULL)) {
         /* The scheme value does NOT represent the encoding used to encode the string
          * we're giving. This scheme reflects the encoding that the modem should use when
          * sending the data out to the network. We're hardcoding this to GSM-7 because

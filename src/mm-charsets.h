@@ -39,7 +39,6 @@ MMModemCharset  mm_modem_charset_from_string (const gchar    *string);
  */
 gboolean mm_modem_charset_byte_array_append (GByteArray      *array,
                                              const gchar     *utf8,
-                                             gboolean         quoted,
                                              MMModemCharset   charset,
                                              GError         **error);
 

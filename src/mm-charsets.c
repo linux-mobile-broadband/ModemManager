@@ -105,7 +105,6 @@ charset_iconv_from (MMModemCharset charset)
 gboolean
 mm_modem_charset_byte_array_append (GByteArray      *array,
                                     const gchar     *utf8,
-                                    gboolean         quoted,
                                     MMModemCharset   charset,
                                     GError         **error)
 {
@@ -126,11 +125,7 @@ mm_modem_charset_byte_array_append (GByteArray      *array,
         return FALSE;
     }
 
-    if (quoted)
-        g_byte_array_append (array, (const guint8 *) "\"", 1);
     g_byte_array_append (array, (const guint8 *) converted, written);
-    if (quoted)
-        g_byte_array_append (array, (const guint8 *) "\"", 1);
 
     return TRUE;
 }
