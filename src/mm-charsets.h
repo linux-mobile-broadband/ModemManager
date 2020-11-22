@@ -27,8 +27,7 @@ typedef enum {
     MM_MODEM_CHARSET_UCS2    = 1 << 4,
     MM_MODEM_CHARSET_PCCP437 = 1 << 5,
     MM_MODEM_CHARSET_PCDN    = 1 << 6,
-    MM_MODEM_CHARSET_HEX     = 1 << 7,
-    MM_MODEM_CHARSET_UTF16   = 1 << 8,
+    MM_MODEM_CHARSET_UTF16   = 1 << 7,
 } MMModemCharset;
 
 const gchar    *mm_modem_charset_to_string   (MMModemCharset  charset);
