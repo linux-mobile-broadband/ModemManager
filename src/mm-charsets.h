@@ -53,12 +53,6 @@ gchar *mm_modem_charset_byte_array_to_utf8 (GByteArray     *array,
 gchar *mm_modem_charset_hex_to_utf8 (const gchar    *src,
                                     MMModemCharset  charset);
 
-/* Take a string in UTF-8 and convert it to the given charset in hex
- * representation.
- */
-gchar *mm_modem_charset_utf8_to_hex (const gchar    *src,
-                                     MMModemCharset  charset);
-
 guint8 *mm_charset_utf8_to_unpacked_gsm (const gchar  *utf8,
                                          guint32      *out_len);
 guint8 *mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm,
