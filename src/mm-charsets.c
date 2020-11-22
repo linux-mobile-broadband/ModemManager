@@ -169,7 +169,7 @@ mm_modem_charset_hex_to_utf8 (const gchar    *src,
     iconv_from = charset_iconv_from (charset);
     g_return_val_if_fail (iconv_from != NULL, FALSE);
 
-    unconverted = mm_utils_hexstr2bin (src, &unconverted_len);
+    unconverted = mm_utils_hexstr2bin (src, &unconverted_len, NULL);
     if (!unconverted)
         return NULL;
 

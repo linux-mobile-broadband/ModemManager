@@ -1687,10 +1687,12 @@ mm_utils_hex2byte (const gchar *hex)
 }
 
 gchar *
-mm_utils_hexstr2bin (const gchar *hex, gsize *out_len)
+mm_utils_hexstr2bin (const gchar  *hex,
+                     gsize        *out_len,
+                     GError      **error)
 {
     const gchar *ipos = hex;
-    gchar *buf = NULL;
+    g_autofree gchar *buf = NULL;
     gsize i;
     gint a;
     gchar *opos;
@@ -1699,20 +1701,26 @@ mm_utils_hexstr2bin (const gchar *hex, gsize *out_len)
     len = strlen (hex);
 
     /* Length must be a multiple of 2 */
-    g_return_val_if_fail ((len % 2) == 0, NULL);
+    if ((len % 2) != 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Hex conversion failed: invalid input length");
+        return NULL;
+    }
 
     opos = buf = g_malloc0 ((len / 2) + 1);
     for (i = 0; i < len; i += 2) {
         a = mm_utils_hex2byte (ipos);
         if (a < 0) {
-            g_free (buf);
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Hex byte conversion from '%c%c' failed",
+                         ipos[0], ipos[1]);
             return NULL;
         }
         *opos++ = a;
         ipos += 2;
     }
     *out_len = len / 2;
-    return buf;
+    return g_steal_pointer (&buf);
 }
 
 /* End from hostap */

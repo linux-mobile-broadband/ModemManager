@@ -4291,10 +4291,9 @@ mm_3gpp_parse_emergency_numbers (const char *raw, GError **error)
         return NULL;
     }
 
-    bin = (guint8 *) mm_utils_hexstr2bin (raw, &binlen);
+    bin = (guint8 *) mm_utils_hexstr2bin (raw, &binlen, error);
     if (!bin) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                     "invalid raw emergency numbers list contents: %s", raw);
+        g_prefix_error (error, "invalid raw emergency numbers list contents: ");
         return NULL;
     }
 

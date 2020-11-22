@@ -1811,25 +1811,19 @@ mm_firmware_unique_id_to_qmi_unique_id (const gchar  *unique_id,
 
     /* The length will be exactly EXPECTED_QMI_UNIQUE_ID_LENGTH*2 if given in HEX */
     if (len == (2 * EXPECTED_QMI_UNIQUE_ID_LENGTH)) {
-        guint8 *tmp;
-        gsize   tmp_len;
-        guint   i;
-
-        for (i = 0; i < len; i++) {
-            if (!g_ascii_isxdigit (unique_id[i])) {
-                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Unexpected character found in unique id (not HEX): %c", unique_id[i]);
-                return NULL;
-            }
-        }
+        g_autofree guint8 *tmp = NULL;
+        gsize              tmp_len;
 
         tmp_len = 0;
-        tmp = (guint8 *) mm_utils_hexstr2bin (unique_id, &tmp_len);
+        tmp = (guint8 *) mm_utils_hexstr2bin (unique_id, &tmp_len, error);
+        if (!tmp) {
+            g_prefix_error (error, "Unexpected character found in unique id: ");
+            return NULL;
+        }
         g_assert (tmp_len == EXPECTED_QMI_UNIQUE_ID_LENGTH);
 
         qmi_unique_id = g_array_sized_new (FALSE, FALSE, sizeof (guint8), tmp_len);
         g_array_insert_vals (qmi_unique_id, 0, tmp, tmp_len);
-        g_free (tmp);
         return qmi_unique_id;
     }
 
