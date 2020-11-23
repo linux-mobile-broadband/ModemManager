@@ -18,6 +18,8 @@ SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02"
 SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="05", ENV{ID_MM_PORT_TYPE_GPS}="1"
 # GPS NMEA port on MU909
 SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="14", ENV{ID_MM_PORT_TYPE_GPS}="1"
+# GPS NMEA port on MU906e
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="06", ATTRS{bInterfaceProtocol}=="14", ENV{ID_MM_PORT_TYPE_GPS}="1"
 
 # Only the standard ECM or NCM port can support dial-up with AT NDISDUP through AT port
 SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="02", ATTRS{bInterfaceSubClass}=="06",ATTRS{bInterfaceProtocol}=="00", ENV{ID_MM_HUAWEI_NDISDUP_SUPPORTED}="1"
