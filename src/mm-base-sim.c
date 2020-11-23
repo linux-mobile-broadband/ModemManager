@@ -88,6 +88,21 @@ mm_base_sim_export (MMBaseSim *self)
 }
 
 /*****************************************************************************/
+/* Reprobe when a puk lock is discovered after pin1_retries are exhausted */
+
+static void
+reprobe_if_puk_discovered (MMBaseSim *self,
+                           GError *error)
+{
+    if (g_error_matches (error,
+                         MM_MOBILE_EQUIPMENT_ERROR,
+                         MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK)) {
+        mm_obj_dbg (self, "Discovered PUK lock, discarding old modem...");
+        mm_base_modem_process_sim_event (self->priv->modem);
+    }
+}
+
+/*****************************************************************************/
 /* CHANGE PIN (Generic implementation) */
 
 static gboolean
@@ -171,8 +186,9 @@ after_change_update_lock_info_ready (MMIfaceModem *modem,
     mm_iface_modem_update_lock_info_finish (modem, res, NULL);
 
     if (ctx->save_error) {
-        g_dbus_method_invocation_take_error (ctx->invocation, ctx->save_error);
-        ctx->save_error = NULL;
+        g_dbus_method_invocation_return_gerror (ctx->invocation, ctx->save_error);
+        reprobe_if_puk_discovered (ctx->self, ctx->save_error);
+        g_clear_error (&ctx->save_error);
     } else {
         mm_gdbus_sim_complete_change_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
     }
@@ -349,8 +365,9 @@ after_enable_update_lock_info_ready (MMIfaceModem *modem,
     mm_iface_modem_update_lock_info_finish (modem, res, NULL);
 
     if (ctx->save_error) {
-        g_dbus_method_invocation_take_error (ctx->invocation, ctx->save_error);
-        ctx->save_error = NULL;
+        g_dbus_method_invocation_return_gerror (ctx->invocation, ctx->save_error);
+        reprobe_if_puk_discovered (ctx->self, ctx->save_error);
+        g_clear_error (&ctx->save_error);
     } else {
         /* Signal about the new lock state */
         g_signal_emit (ctx->self, signals[SIGNAL_PIN_LOCK_ENABLED], 0, ctx->enabled);
@@ -786,9 +803,11 @@ handle_send_pin_ready (MMBaseSim *self,
 {
     GError *error = NULL;
 
-    if (!mm_base_sim_send_pin_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    if (!mm_base_sim_send_pin_finish (self, res, &error)) {
+        g_dbus_method_invocation_return_gerror (ctx->invocation, error);
+        reprobe_if_puk_discovered (self, error);
+        g_clear_error (&error);
+    } else
         mm_gdbus_sim_complete_send_pin (MM_GDBUS_SIM (self), ctx->invocation);
 
     handle_send_pin_context_free (ctx);
