@@ -11946,7 +11946,7 @@ mm_broadband_modem_sim_hot_swap_detected (MMBroadbandModem *self)
         self->priv->sim_hot_swap_ports_ctx = NULL;
     }
 
-    mm_base_modem_process_sim_switch (MM_BASE_MODEM (self));
+    mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
 }
 
 /*****************************************************************************/

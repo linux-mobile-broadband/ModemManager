@@ -1076,7 +1076,7 @@ set_primary_sim_slot_ready (MMIfaceModem                   *self,
         /* Notify about the SIM swap, which will disable and reprobe the device.
          * There is no need to update the PrimarySimSlot property, as this value will be
          * reloaded automatically during the reprobe. */
-        mm_base_modem_process_sim_switch (MM_BASE_MODEM (self));
+        mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
     }
 
     mm_gdbus_modem_complete_set_primary_sim_slot (ctx->skeleton, ctx->invocation);
@@ -3314,6 +3314,8 @@ set_lock_status (MMIfaceModem *self,
 
     old_lock = mm_gdbus_modem_get_unlock_required (skeleton);
     mm_gdbus_modem_set_unlock_required (skeleton, lock);
+    if (lock == MM_MODEM_LOCK_UNKNOWN)
+        mm_gdbus_modem_set_unlock_retries (skeleton, 0);
 
     /* We don't care about SIM-PIN2/SIM-PUK2 since the device is
      * operational without it. */
@@ -3639,6 +3641,7 @@ update_lock_info_context_step (GTask *task)
 
     case UPDATE_LOCK_INFO_CONTEXT_STEP_LAST:
         if (ctx->saved_error) {
+            set_lock_status (self, ctx->skeleton, MM_MODEM_LOCK_UNKNOWN);
             /* Return saved error */
             g_task_return_error (task, ctx->saved_error);
             ctx->saved_error = NULL;

@@ -584,17 +584,17 @@ update_lock_info_ready (MMIfaceModem *modem,
         const GError *saved_error;
 
         /* Device is locked. Now:
+         *   - If we got an error during update_lock_info, report it. The sim might have been blocked.
          *   - If we got an error in the original send-pin action, report it.
-         *   - If we got an error in the pin-check action, report it.
          *   - Otherwise, build our own error from the lock code.
          */
-        saved_error = g_task_get_task_data (task);
-        if (saved_error) {
-            g_clear_error (&error);
-            error = g_error_copy (saved_error);
-        } else if (!error)
-            error = error_for_unlock_check (lock);
-
+        if (!error) {
+            saved_error = g_task_get_task_data (task);
+            if (saved_error)
+                error = g_error_copy (saved_error);
+            else
+                error = error_for_unlock_check (lock);
+        }
         g_task_return_error (task, error);
     } else
         g_task_return_boolean (task, TRUE);
@@ -869,11 +869,26 @@ handle_send_puk_ready (MMBaseSim *self,
                        HandleSendPukContext *ctx)
 {
     GError *error = NULL;
+    gboolean sim_error = FALSE;
 
-    if (!mm_base_sim_send_puk_finish (self, res, &error))
+    if (!mm_base_sim_send_puk_finish (self, res, &error)) {
+        sim_error = g_error_matches (error,
+                                     MM_MOBILE_EQUIPMENT_ERROR,
+                                     MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
+                    g_error_matches (error,
+                                     MM_MOBILE_EQUIPMENT_ERROR,
+                                     MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
+                    g_error_matches (error,
+                                     MM_MOBILE_EQUIPMENT_ERROR,
+                                     MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    } else
         mm_gdbus_sim_complete_send_puk (MM_GDBUS_SIM (self), ctx->invocation);
+
+    if (sim_error) {
+        mm_obj_info (self, "Received critical sim error. SIM might be permanently blocked. Reprobing...");
+        mm_base_modem_process_sim_event (self->priv->modem);
+    }
 
     handle_send_puk_context_free (ctx);
 }

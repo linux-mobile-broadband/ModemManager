@@ -1285,7 +1285,7 @@ after_sim_switch_disable_ready (MMBaseModem  *self,
 }
 
 void
-mm_base_modem_process_sim_switch (MMBaseModem *self)
+mm_base_modem_process_sim_event (MMBaseModem *self)
 {
     mm_base_modem_set_reprobe (self, TRUE);
     mm_base_modem_disable (self, (GAsyncReadyCallback) after_sim_switch_disable_ready, NULL);
