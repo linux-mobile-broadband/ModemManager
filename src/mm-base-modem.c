@@ -30,6 +30,9 @@
 
 #include "mm-context.h"
 #include "mm-base-modem.h"
+#if defined WITH_QMI && QMI_QRTR_SUPPORTED
+#include "mm-kernel-device-qrtr.h"
+#endif
 
 #include "mm-log-object.h"
 #include "mm-port-enums-types.h"
@@ -263,6 +266,24 @@ base_modem_create_rpmsg_port (MMBaseModem *self,
     return NULL;
 }
 
+#if defined WITH_QRTR
+static MMPort *
+base_modem_create_qrtr_port (MMBaseModem    *self,
+                             const gchar    *name,
+                             MMKernelDevice *kernel_device,
+                             MMPortType      ptype)
+{
+    if (ptype == MM_PORT_TYPE_QMI) {
+        g_autoptr(QrtrNode) node = NULL;
+
+        g_assert (MM_IS_KERNEL_DEVICE_QRTR (kernel_device));
+        node = mm_kernel_device_qrtr_get_node (MM_KERNEL_DEVICE_QRTR (kernel_device));
+        return MM_PORT (mm_port_qmi_new_from_node (name, node));
+    }
+    return NULL;
+}
+#endif
+
 static MMPort *
 base_modem_create_virtual_port (MMBaseModem *self,
                                 const gchar *name)
@@ -307,6 +328,10 @@ base_modem_internal_grab_port (MMBaseModem         *self,
         port = base_modem_create_usbmisc_port (self, name, ptype);
     else if (g_str_equal (subsys, "rpmsg"))
         port = base_modem_create_rpmsg_port (self, name, ptype);
+#if defined WITH_QRTR
+    else if (g_str_equal (subsys, "qrtr"))
+        port = base_modem_create_qrtr_port (self, name, kernel_device, ptype);
+#endif
     else if (g_str_equal (subsys, "virtual"))
         port = base_modem_create_virtual_port (self, name);
 
