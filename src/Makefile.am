@@ -373,6 +373,13 @@ ModemManager_SOURCES = \
 	mm-shared.h \
 	$(NULL)
 
+if WITH_QRTR
+ModemManager_SOURCES += \
+	mm-qrtr-bus-watcher.h \
+	mm-qrtr-bus-watcher.c \
+	$(NULL)
+endif
+
 nodist_ModemManager_SOURCES = $(DAEMON_ENUMS_GENERATED)
 
 # Additional suspend/resume support via systemd
