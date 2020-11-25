@@ -1560,6 +1560,7 @@ mm_port_subsys_to_qmi_endpoint_type (MMPortSubsys subsys)
         case MM_PORT_SUBSYS_USBMISC:
             return QMI_DATA_ENDPOINT_TYPE_HSUSB;
         case MM_PORT_SUBSYS_RPMSG:
+        case MM_PORT_SUBSYS_QRTR:
             return QMI_DATA_ENDPOINT_TYPE_EMBEDDED;
         case MM_PORT_SUBSYS_UNKNOWN:
         case MM_PORT_SUBSYS_TTY:

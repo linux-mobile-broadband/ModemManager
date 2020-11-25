@@ -14,6 +14,7 @@
  * Copyright (C) 2021 Aleksander Morgado <aleksander@aleksander.es>
  */
 
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -32,6 +33,16 @@
 
 G_DEFINE_TYPE (MMPortQmi, mm_port_qmi, MM_TYPE_PORT)
 
+enum {
+    PROP_0,
+#if WITH_QMI
+    PROP_NODE,
+#endif
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
+
 typedef struct {
     QmiService     service;
     QmiClient     *client;
@@ -43,6 +54,10 @@ struct _MMPortQmiPrivate {
     QmiDevice *qmi_device;
     GList     *services;
     gchar     *net_driver;
+#if defined WITH_QRTR
+    QrtrNode  *node;
+#endif
+
     /* endpoint info */
     gulong              endpoint_info_signal_id;
     QmiDataEndpointType endpoint_type;
@@ -1748,6 +1763,10 @@ internal_setup_data_format (MMPortQmi                      *self,
     ctx->wda_ul_dap_requested = QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED;
     ctx->wda_dl_dap_current = QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED;
     ctx->wda_dl_dap_requested = QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED;
+
+    if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_QRTR)
+        ctx->use_endpoint = TRUE;
+
     g_task_set_task_data (task, ctx, (GDestroyNotify) internal_setup_data_format_context_free);
 
     internal_setup_data_format_context_step (task);
@@ -2155,28 +2174,36 @@ port_open_step (GTask *task)
         ctx->step++;
         /* Fall through */
 
-    case PORT_OPEN_STEP_DEVICE_NEW: {
-        GFile *file;
-        gchar *fullpath;
-
-        fullpath = g_strdup_printf ("/dev/%s", mm_port_get_device (MM_PORT (self)));
-        file = g_file_new_for_path (fullpath);
-
+    case PORT_OPEN_STEP_DEVICE_NEW:
         /* We flag in this point that we're opening. From now on, if we stop
          * for whatever reason, we should clear this flag. We do this by ensuring
          * that all callbacks go through the LAST step for completing. */
         self->priv->in_progress = TRUE;
 
-        mm_obj_dbg (self, "Creating QMI device...");
-        qmi_device_new (file,
-                        g_task_get_cancellable (task),
-                        (GAsyncReadyCallback) qmi_device_new_ready,
-                        task);
+#if defined WITH_QRTR
+        if (self->priv->node) {
+            mm_obj_info (self, "Creating QMI device from QRTR node...");
+            qmi_device_new_from_node (self->priv->node,
+                                      g_task_get_cancellable (task),
+                                      (GAsyncReadyCallback) qmi_device_new_ready,
+                                      task);
+            return;
+        }
+#endif
+        {
+            g_autoptr(GFile)  file = NULL;
+            g_autofree gchar *fullpath = NULL;
 
-        g_free (fullpath);
-        g_object_unref (file);
-        return;
-    }
+            fullpath = g_strdup_printf ("/dev/%s", mm_port_get_device (MM_PORT (self)));
+            file = g_file_new_for_path (fullpath);
+
+            mm_obj_dbg (self, "Creating QMI device...");
+            qmi_device_new (file,
+                            g_task_get_cancellable (task),
+                            (GAsyncReadyCallback) qmi_device_new_ready,
+                            task);
+            return;
+        }
 
     case PORT_OPEN_STEP_OPEN_WITHOUT_DATA_FORMAT:
         if (!self->priv->wda_unsupported) {
@@ -2451,6 +2478,20 @@ mm_port_qmi_new (const gchar  *name,
                                       NULL));
 }
 
+#if defined WITH_QRTR
+MMPortQmi *
+mm_port_qmi_new_from_node (const gchar *name,
+                           QrtrNode    *node)
+{
+    return MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
+                                      "node", node,
+                                      MM_PORT_DEVICE, name,
+                                      MM_PORT_SUBSYS, MM_PORT_SUBSYS_QRTR,
+                                      MM_PORT_TYPE, MM_PORT_TYPE_QMI,
+                                      NULL));
+}
+#endif
+
 static void
 mm_port_qmi_init (MMPortQmi *self)
 {
@@ -2461,6 +2502,51 @@ mm_port_qmi_init (MMPortQmi *self)
                                                             "notify::" MM_PORT_KERNEL_DEVICE,
                                                             G_CALLBACK (initialize_endpoint_info),
                                                             NULL);
+}
+
+static void
+set_property (GObject      *object,
+              guint         prop_id,
+              const GValue *value,
+              GParamSpec   *pspec)
+{
+    switch (prop_id) {
+#if defined WITH_QRTR
+    case PROP_NODE:
+    {
+        MMPortQmi *self = MM_PORT_QMI (object);
+
+        /* construct only, no new reference! */
+        self->priv->node = g_value_get_object (value);
+        break;
+    }
+#endif
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject    *object,
+              guint       prop_id,
+              GValue     *value,
+              GParamSpec *pspec)
+{
+    switch (prop_id) {
+#if defined WITH_QRTR
+    case PROP_NODE:
+    {
+        MMPortQmi *self = MM_PORT_QMI (object);
+
+        g_value_set_object (value, self->priv->node);
+        break;
+    }
+#endif
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
@@ -2490,6 +2576,10 @@ dispose (GObject *object)
     g_clear_pointer (&self->priv->preallocated_links, g_array_unref);
     g_clear_object (&self->priv->preallocated_links_master);
 
+    /* Clear node object */
+#if defined WITH_QRTR
+    g_clear_object (&self->priv->node);
+#endif
     /* Clear device object */
     g_clear_object (&self->priv->qmi_device);
 
@@ -2506,5 +2596,18 @@ mm_port_qmi_class_init (MMPortQmiClass *klass)
     g_type_class_add_private (object_class, sizeof (MMPortQmiPrivate));
 
     /* Virtual methods */
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
     object_class->dispose = dispose;
+
+#if defined WITH_QRTR
+    properties[PROP_NODE] =
+        g_param_spec_object ("node",
+                             "Qrtr Node",
+                             "Qrtr node to be probed",
+                             QRTR_TYPE_NODE,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+
+#endif
+    g_object_class_install_properties (object_class, PROP_LAST, properties);
 }

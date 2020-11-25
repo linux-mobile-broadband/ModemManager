@@ -61,6 +61,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortQmi, g_object_unref)
 
 MMPortQmi *mm_port_qmi_new          (const gchar          *name,
                                      MMPortSubsys          subsys);
+#if QMI_QRTR_SUPPORTED
+MMPortQmi *mm_port_qmi_new_from_node (const gchar *name,
+                                      QrtrNode    *node);
+#endif
 void       mm_port_qmi_open         (MMPortQmi            *self,
                                      gboolean              set_data_format,
                                      GCancellable         *cancellable,
