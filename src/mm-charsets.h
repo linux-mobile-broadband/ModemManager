@@ -18,6 +18,8 @@
 
 #include <glib.h>
 
+/*****************************************************************************************/
+
 typedef enum {
     MM_MODEM_CHARSET_UNKNOWN = 0,
     MM_MODEM_CHARSET_GSM     = 1 << 0,
@@ -32,6 +34,8 @@ typedef enum {
 
 const gchar    *mm_modem_charset_to_string   (MMModemCharset  charset);
 MMModemCharset  mm_modem_charset_from_string (const gchar    *string);
+
+/*****************************************************************************************/
 
 /* Append the given string to the given byte array but re-encode it
  * into the given charset first.  The original string is assumed to be
@@ -80,5 +84,62 @@ gchar *mm_charset_take_and_convert_to_utf8 (gchar          *str,
                                             MMModemCharset  charset);
 gchar *mm_utf8_take_and_convert_to_charset (gchar          *str,
                                             MMModemCharset  charset);
+
+/*****************************************************************************************/
+
+/*
+ * Convert the given UTF-8 encoded string into the given charset.
+ *
+ * The output is given as a bytearray, because the target charset may allow
+ * embedded NUL bytes (e.g. UTF-16).
+ *
+ * The output encoded string is not guaranteed to be NUL-terminated, instead
+ * the bytearray length itself gives the correct string length.
+ */
+GByteArray *mm_modem_charset_bytearray_from_utf8 (const gchar     *utf8,
+                                                  MMModemCharset   charset,
+                                                  gboolean         translit,
+                                                  GError         **error);
+
+/*
+ * Convert the given UTF-8 encoded string into the given charset.
+ *
+ * The output is given as a C string, and those charsets that allow
+ * embedded NUL bytes (e.g. UTF-16) will be hex-encoded.
+ *
+ * The output encoded string is guaranteed to be NUL-terminated, and so no
+ * explicit output length is returned.
+ */
+gchar *mm_modem_charset_str_from_utf8 (const gchar     *utf8,
+                                       MMModemCharset   charset,
+                                       gboolean         translit,
+                                       GError         **error);
+
+/*
+ * Convert into an UTF-8 encoded string the input byte array, which is
+ * encoded in the given charset.
+ *
+ * The output string is guaranteed to be valid UTF-8 and NUL-terminated.
+ */
+gchar *mm_modem_charset_bytearray_to_utf8 (GByteArray      *bytearray,
+                                           MMModemCharset   charset,
+                                           gboolean         translit,
+                                           GError         **error);
+
+/*
+ * Convert into an UTF-8 encoded string the input string, which is
+ * encoded in the given charset. Those charsets that allow embedded NUL
+ * bytes (e.g. UTF-16) need to be hex-encoded.
+ *
+ * If the input string is NUL-terminated, len may be given as -1; otherwise
+ * len needs to specify the number of valid bytes in the input string.
+ *
+ * The output string is guaranteed to be valid UTF-8 and NUL-terminated.
+ */
+gchar *mm_modem_charset_str_to_utf8 (const gchar     *str,
+                                     gssize           len,
+                                     MMModemCharset   charset,
+                                     gboolean         translit,
+                                     GError         **error);
 
 #endif /* MM_CHARSETS_H */
