@@ -30,6 +30,7 @@ common_test_gsm7 (const gchar *in_utf8)
     g_autofree guint8 *packed_gsm = NULL;
     g_autofree guint8 *unpacked_gsm_2 = NULL;
     g_autofree gchar *built_utf8 = NULL;
+    g_autoptr(GError) error = NULL;
 
     /* Convert to GSM */
     unpacked_gsm = mm_charset_utf8_to_unpacked_gsm (in_utf8, &unpacked_gsm_len);
@@ -58,8 +59,9 @@ common_test_gsm7 (const gchar *in_utf8)
     g_assert_nonnull (unpacked_gsm_2);
 
     /* And back to UTF-8 */
-    built_utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked_gsm_2, unpacked_gsm_len_2);
+    built_utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked_gsm_2, unpacked_gsm_len_2, FALSE, &error);
     g_assert_nonnull (built_utf8);
+    g_assert_no_error (error);
     g_assert_cmpstr (built_utf8, ==, in_utf8);
 }
 

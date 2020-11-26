@@ -2343,7 +2343,7 @@ decode (MMIfaceModem3gppUssd *self,
     /* if the last character in a 7-byte block is padding, then drop it */
     if ((bin_len % 7 == 0) && (unpacked[unpacked_len - 1] == 0x0d))
         unpacked_len--;
-    return (gchar*) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
+    return (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len, FALSE, error);
 }
 
 /*****************************************************************************/

@@ -360,11 +360,13 @@ utf8_to_gsm_ext_char (const gchar *utf8,
 }
 
 guint8 *
-mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm,
-                                 guint32       len)
+mm_charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
+                                 guint32        len,
+                                 gboolean       translit,
+                                 GError       **error)
 {
-    guint       i;
-    GByteArray *utf8;
+    g_autoptr(GByteArray) utf8 = NULL;
+    guint                 i;
 
     g_return_val_if_fail (gsm != NULL, NULL);
     g_return_val_if_fail (len < 4096, NULL);
@@ -410,13 +412,18 @@ mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm,
 
         if (ulen)
             g_byte_array_append (utf8, &uchars[0], ulen);
-        else
+        else if (translit)
             g_byte_array_append (utf8, (guint8 *) "?", 1);
+        else {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid conversion from GSM7");
+            return NULL;
+        }
     }
 
     /* Always make sure returned string is NUL terminated */
     g_byte_array_append (utf8, (guint8 *) "\0", 1);
-    return g_byte_array_free (utf8, FALSE);
+    return g_byte_array_free (g_steal_pointer (&utf8), FALSE);
 }
 
 guint8 *
@@ -740,7 +747,7 @@ mm_charset_take_and_convert_to_utf8 (gchar          *str,
         break;
 
     case MM_MODEM_CHARSET_GSM:
-        utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 ((const guint8 *) str, strlen (str));
+        utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 ((const guint8 *) str, strlen (str), FALSE, NULL);
         g_free (str);
         break;
 

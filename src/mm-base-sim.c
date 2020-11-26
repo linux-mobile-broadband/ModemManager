@@ -1427,7 +1427,7 @@ parse_spn (const gchar *response,
             buflen--;
 
         /* First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
-        return (gchar *)mm_charset_gsm_unpacked_to_utf8 (bin + 1, buflen - 1);
+        return (gchar *)mm_charset_gsm_unpacked_to_utf8 (bin + 1, buflen - 1, FALSE, error);
     }
 
     g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
