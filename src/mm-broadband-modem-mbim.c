@@ -4777,10 +4777,9 @@ ussd_encode (const gchar  *command,
         guint32  packed_len = 0;
 
         *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
-        gsm = mm_charset_utf8_to_unpacked_gsm (command, &len);
+        gsm = mm_charset_utf8_to_unpacked_gsm (command, FALSE, &len, error);
         if (!gsm) {
-            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                         "Failed to encode USSD command in GSM7 charset");
+            g_prefix_error (error, "Failed to encode USSD command in GSM7 charset: ");
             return NULL;
         }
         packed = mm_charset_gsm_pack (gsm, len, 0, &packed_len);
