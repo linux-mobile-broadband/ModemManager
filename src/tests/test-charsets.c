@@ -33,8 +33,9 @@ common_test_gsm7 (const gchar *in_utf8)
     g_autoptr(GError) error = NULL;
 
     /* Convert to GSM */
-    unpacked_gsm = mm_charset_utf8_to_unpacked_gsm (in_utf8, &unpacked_gsm_len);
+    unpacked_gsm = mm_charset_utf8_to_unpacked_gsm (in_utf8, FALSE, &unpacked_gsm_len, &error);
     g_assert_nonnull (unpacked_gsm);
+    g_assert_no_error (error);
     g_assert_cmpuint (unpacked_gsm_len, >, 0);
 
     /* Pack */

@@ -427,16 +427,21 @@ mm_charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
 }
 
 guint8 *
-mm_charset_utf8_to_unpacked_gsm (const gchar *utf8,
-                                 guint32     *out_len)
+mm_charset_utf8_to_unpacked_gsm (const gchar  *utf8,
+                                 gboolean      translit,
+                                 guint32      *out_len,
+                                 GError      **error)
 {
-    GByteArray          *gsm;
-    const gchar         *c;
-    const gchar         *next;
-    static const guint8  gesc = GSM_ESCAPE_CHAR;
+    g_autoptr(GByteArray)  gsm = NULL;
+    const gchar           *c;
+    const gchar           *next;
+    static const guint8    gesc = GSM_ESCAPE_CHAR;
 
-    g_return_val_if_fail (utf8 != NULL, NULL);
-    g_return_val_if_fail (g_utf8_validate (utf8, -1, NULL), NULL);
+    if (!utf8 || !g_utf8_validate (utf8, -1, NULL)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Couldn't convert UTF-8 to GSM: input UTF-8 validation failed");
+        return NULL;
+    }
 
     /* worst case initial length */
     gsm = g_byte_array_sized_new (g_utf8_strlen (utf8, -1) * 2 + 1);
@@ -446,7 +451,7 @@ mm_charset_utf8_to_unpacked_gsm (const gchar *utf8,
         g_byte_array_append (gsm, (guint8 *) "\0", 1);
         if (out_len)
             *out_len = 0;
-        return g_byte_array_free (gsm, FALSE);
+        return g_byte_array_free (g_steal_pointer (&gsm), FALSE);
     }
 
     next = utf8;
@@ -461,8 +466,16 @@ mm_charset_utf8_to_unpacked_gsm (const gchar *utf8,
             /* Add the escape char */
             g_byte_array_append (gsm, &gesc, 1);
             g_byte_array_append (gsm, &gch, 1);
-        } else if (utf8_to_gsm_def_char (c, next - c, &gch))
+        } else if (utf8_to_gsm_def_char (c, next - c, &gch)) {
             g_byte_array_append (gsm, &gch, 1);
+        } else if (translit) {
+            /* add ? */
+            g_byte_array_append (gsm, &gch, 1);
+        } else {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Couldn't convert UTF-8 char to GSM");
+            return NULL;
+        }
 
         c = next;
     }
@@ -473,7 +486,7 @@ mm_charset_utf8_to_unpacked_gsm (const gchar *utf8,
 
     /* Always make sure returned string is NUL terminated */
     g_byte_array_append (gsm, (guint8 *) "\0", 1);
-    return g_byte_array_free (gsm, FALSE);
+    return g_byte_array_free (g_steal_pointer (&gsm), FALSE);
 }
 
 static gboolean
@@ -872,7 +885,7 @@ mm_utf8_take_and_convert_to_charset (gchar          *str,
         break;
 
     case MM_MODEM_CHARSET_GSM:
-        encoded = (gchar *) mm_charset_utf8_to_unpacked_gsm (str, NULL);
+        encoded = (gchar *) mm_charset_utf8_to_unpacked_gsm (str, FALSE, NULL, NULL);
         g_free (str);
         break;
 

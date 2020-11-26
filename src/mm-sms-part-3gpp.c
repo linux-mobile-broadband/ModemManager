@@ -987,8 +987,11 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         guint8 *unpacked, *packed;
         guint32 unlen = 0, packlen = 0;
 
-        unpacked = mm_charset_utf8_to_unpacked_gsm (mm_sms_part_get_text (part), &unlen);
-        if (!unpacked || unlen == 0) {
+        unpacked = mm_charset_utf8_to_unpacked_gsm (mm_sms_part_get_text (part), FALSE, &unlen, error);
+        if (!unpacked)
+            goto error;
+
+        if (unlen == 0) {
             g_free (unpacked);
             g_set_error_literal (error,
                                  MM_MESSAGE_ERROR,

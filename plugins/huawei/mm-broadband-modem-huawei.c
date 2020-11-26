@@ -2305,8 +2305,11 @@ encode (MMIfaceModem3gppUssd *self,
     guint8 *gsm, *packed;
     guint32 len = 0, packed_len = 0;
 
+    gsm = mm_charset_utf8_to_unpacked_gsm (command, FALSE, &len, error);
+    if (!gsm)
+        return NULL;
+
     *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
-    gsm = mm_charset_utf8_to_unpacked_gsm (command, &len);
 
     /* If command is a multiple of 7 characters long, Huawei firmwares
      * apparently want that padded.  Maybe all modems?
