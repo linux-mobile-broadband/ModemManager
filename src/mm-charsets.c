@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2010 Red Hat, Inc.
+ * Copyright (C) 2020 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -184,6 +185,7 @@ mm_modem_charset_hex_to_utf8 (const gchar    *src,
     return g_steal_pointer (&converted);
 }
 
+/******************************************************************************/
 /* GSM 03.38 encoding conversion stuff */
 
 #define GSM_DEF_ALPHABET_SIZE 128
@@ -300,6 +302,23 @@ utf8_to_gsm_def_char (const gchar *utf8,
         }
     }
     return FALSE;
+}
+
+static gboolean
+translit_gsm_nul_byte (GByteArray *gsm)
+{
+    static const gchar *replacement = "?";
+    guint               i;
+    guint               n_replaces = 0;
+
+    for (i = 0; i < gsm->len; i++) {
+        if (gsm->data[i] == 0x00) {
+            utf8_to_gsm_def_char (replacement, 1, &gsm->data[i]);
+            n_replaces++;
+        }
+    }
+
+    return (n_replaces > 0);
 }
 
 
@@ -488,6 +507,10 @@ mm_charset_utf8_to_unpacked_gsm (const gchar  *utf8,
     return g_byte_array_free (g_steal_pointer (&gsm), FALSE);
 }
 
+/******************************************************************************/
+/* Checks to see whether conversion to a target charset may be done without
+ * any loss. */
+
 static gboolean
 gsm_is_subset (gunichar     c,
                const gchar *utf8,
@@ -617,13 +640,6 @@ const SubsetEntry subset_table[] = {
     { MM_MODEM_CHARSET_PCDN,    pcdn_is_subset     },
 };
 
-/**
- * mm_charset_can_covert_to:
- * @utf8: UTF-8 valid string.
- * @charset: the #MMModemCharset to validate the conversion from @utf8.
- *
- * Returns: %TRUE if the conversion is possible without errors, %FALSE otherwise.
- */
 gboolean
 mm_charset_can_convert_to (const gchar    *utf8,
                            MMModemCharset  charset)
@@ -666,6 +682,9 @@ mm_charset_can_convert_to (const gchar    *utf8,
 
     return TRUE;
 }
+
+/******************************************************************************/
+/* GSM-7 pack/unpack operations */
 
 guint8 *
 mm_charset_gsm_unpack (const guint8 *gsm,
@@ -943,4 +962,269 @@ mm_utf8_take_and_convert_to_charset (gchar          *str,
     }
 
     return encoded;
+}
+
+/*****************************************************************************/
+/* Main conversion functions */
+
+static guint8 *
+charset_iconv_from_utf8 (const gchar     *utf8,
+                         MMModemCharset   charset,
+                         gboolean         translit,
+                         guint           *out_size,
+                         GError         **error)
+{
+    g_autoptr(GError)      inner_error = NULL;
+    const CharsetSettings *settings;
+    gsize                  bytes_written = 0;
+    g_autofree guint8     *encoded = NULL;
+
+    settings = lookup_charset_settings (charset);
+
+    encoded = (guint8 *) g_convert (utf8, -1,
+                                    settings->iconv_name, "UTF-8",
+                                    NULL, &bytes_written, &inner_error);
+    if (encoded) {
+        if (out_size)
+            *out_size = (guint) bytes_written;
+        return g_steal_pointer (&encoded);
+    }
+
+    if (!translit) {
+        g_propagate_error (error, g_steal_pointer (&inner_error));
+        g_prefix_error (error, "Couldn't convert from UTF-8 to %s: ", settings->gsm_name);
+        return NULL;
+    }
+
+    encoded = (guint8 *) g_convert_with_fallback (utf8, -1,
+                                                  settings->iconv_name, "UTF-8", "?",
+                                                  NULL, &bytes_written, error);
+    if (encoded) {
+        if (out_size)
+            *out_size = (guint) bytes_written;
+        return g_steal_pointer (&encoded);
+    }
+
+    g_prefix_error (error, "Couldn't convert from UTF-8 to %s with translit: ", settings->gsm_name);
+    return NULL;
+}
+
+GByteArray *
+mm_modem_charset_bytearray_from_utf8 (const gchar     *utf8,
+                                      MMModemCharset   charset,
+                                      gboolean         translit,
+                                      GError         **error)
+{
+    guint8 *encoded = NULL;
+    guint   encoded_size = 0;
+
+    if (charset == MM_MODEM_CHARSET_UNKNOWN) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot convert from UTF-8: unknown target charset");
+        return NULL;
+    }
+
+    switch (charset) {
+        case MM_MODEM_CHARSET_GSM:
+            encoded = mm_charset_utf8_to_unpacked_gsm (utf8, translit, &encoded_size, error);
+            break;
+        case MM_MODEM_CHARSET_IRA:
+        case MM_MODEM_CHARSET_8859_1:
+        case MM_MODEM_CHARSET_UTF8:
+        case MM_MODEM_CHARSET_UCS2:
+        case MM_MODEM_CHARSET_PCCP437:
+        case MM_MODEM_CHARSET_PCDN:
+        case MM_MODEM_CHARSET_UTF16:
+            encoded = charset_iconv_from_utf8 (utf8, charset, translit, &encoded_size, error);
+            break;
+        case MM_MODEM_CHARSET_UNKNOWN:
+        default:
+            g_assert_not_reached ();
+    }
+
+    return g_byte_array_new_take (encoded, encoded_size);
+}
+
+gchar *
+mm_modem_charset_str_from_utf8 (const gchar     *utf8,
+                                MMModemCharset   charset,
+                                gboolean         translit,
+                                GError         **error)
+{
+    g_autoptr(GByteArray) bytearray = NULL;
+
+    if (charset == MM_MODEM_CHARSET_UNKNOWN) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot convert from UTF-8: unknown target charset");
+        return NULL;
+    }
+
+    bytearray = mm_modem_charset_bytearray_from_utf8 (utf8, charset, translit, error);
+    if (!bytearray)
+        return NULL;
+
+    switch (charset) {
+        case MM_MODEM_CHARSET_GSM:
+            /* Note: strings encoded in unpacked GSM-7 can be used as plain
+             * strings as long as the string doesn't contain character '@', which
+             * is the one encoded as 0x00. At this point, we perform transliteration
+             * of the NUL bytes in the GSM-7 bytearray, and we fail the operation
+             * if one or more replacements were done and transliteration wasn't
+             * requested */
+            if (translit_gsm_nul_byte (bytearray) && !translit) {
+                g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                             "Cannot convert to GSM-7 string: transliteration required for embedded '@'");
+                return NULL;
+            }
+            /* fall through */
+        case MM_MODEM_CHARSET_IRA:
+        case MM_MODEM_CHARSET_8859_1:
+        case MM_MODEM_CHARSET_UTF8:
+        case MM_MODEM_CHARSET_PCCP437:
+        case MM_MODEM_CHARSET_PCDN:
+            return (gchar *) g_byte_array_free (g_steal_pointer (&bytearray), FALSE);
+        case MM_MODEM_CHARSET_UCS2:
+        case MM_MODEM_CHARSET_UTF16:
+            return mm_utils_bin2hexstr (bytearray->data, bytearray->len);
+        default:
+        case MM_MODEM_CHARSET_UNKNOWN:
+            g_assert_not_reached ();
+    }
+}
+
+static gchar *
+charset_iconv_to_utf8 (const guint8           *data,
+                       guint32                 len,
+                       MMModemCharset          charset,
+                       gboolean                translit,
+                       GError                **error)
+{
+    g_autoptr(GError)      inner_error = NULL;
+    g_autofree gchar      *utf8 = NULL;
+    const CharsetSettings *settings;
+
+    settings = lookup_charset_settings (charset);
+
+    utf8 = g_convert ((const gchar *) data, len,
+                      "UTF-8",
+                      settings->iconv_name,
+                      NULL, NULL, &inner_error);
+    if (utf8)
+        return g_steal_pointer (&utf8);
+
+    if (!translit) {
+        g_propagate_error (error, g_steal_pointer (&inner_error));
+        g_prefix_error (error, "Couldn't convert from %s to UTF-8: ", settings->gsm_name);
+        return NULL;
+    }
+
+    utf8 = g_convert_with_fallback ((const gchar *) data, len,
+                                    "UTF-8", settings->iconv_name, "?",
+                                    NULL, NULL, error);
+    if (utf8)
+        return g_steal_pointer (&utf8);
+
+    g_prefix_error (error, "Couldn't convert from %s to UTF-8 with translit: ", settings->gsm_name);
+    return NULL;
+}
+
+gchar *
+mm_modem_charset_bytearray_to_utf8 (GByteArray      *bytearray,
+                                    MMModemCharset   charset,
+                                    gboolean         translit,
+                                    GError         **error)
+{
+    const CharsetSettings *settings;
+    g_autofree gchar      *utf8 = NULL;
+
+    if (charset == MM_MODEM_CHARSET_UNKNOWN) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot convert from UTF-8: unknown target charset");
+        return NULL;
+    }
+
+    settings = lookup_charset_settings (charset);
+    switch (charset) {
+        case MM_MODEM_CHARSET_GSM:
+            utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (bytearray->data,
+                                                              bytearray->len,
+                                                              translit,
+                                                              error);
+            break;
+        case MM_MODEM_CHARSET_IRA:
+        case MM_MODEM_CHARSET_UTF8:
+        case MM_MODEM_CHARSET_8859_1:
+        case MM_MODEM_CHARSET_PCCP437:
+        case MM_MODEM_CHARSET_PCDN:
+        case MM_MODEM_CHARSET_UCS2:
+        case MM_MODEM_CHARSET_UTF16:
+            utf8 = charset_iconv_to_utf8 (bytearray->data,
+                                          bytearray->len,
+                                          charset,
+                                          translit,
+                                          error);
+            break;
+        case MM_MODEM_CHARSET_UNKNOWN:
+        default:
+            g_assert_not_reached ();
+    }
+
+    if (utf8 && g_utf8_validate (utf8, -1, NULL))
+        return g_steal_pointer (&utf8);
+
+    g_prefix_error (error, "Invalid conversion from %s to UTF-8: ", settings->gsm_name);
+    return NULL;
+}
+
+gchar *
+mm_modem_charset_str_to_utf8 (const gchar     *str,
+                              gssize           len,
+                              MMModemCharset   charset,
+                              gboolean         translit,
+                              GError         **error)
+{
+    g_autoptr(GByteArray) bytearray = NULL;
+
+    if (charset == MM_MODEM_CHARSET_UNKNOWN) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot convert from UTF-8: unknown target charset");
+        return NULL;
+    }
+
+    /* Note: if the input string is GSM-7 encoded and it contains the '@'
+     * character, using -1 to indicate string length won't work properly,
+     * as '@' is encoded as 0x00. Whenever possible, if using GSM-7,
+     * give a proper len value or otherwise use the bytearray_to_utf8()
+     * method instead. */
+    if (len < 0)
+        len = strlen (str);
+
+    switch (charset) {
+        case MM_MODEM_CHARSET_GSM:
+        case MM_MODEM_CHARSET_IRA:
+        case MM_MODEM_CHARSET_8859_1:
+        case MM_MODEM_CHARSET_UTF8:
+        case MM_MODEM_CHARSET_PCCP437:
+        case MM_MODEM_CHARSET_PCDN:
+            bytearray = g_byte_array_sized_new (len);
+            g_byte_array_append (bytearray, (const guint8 *)str, len);
+            break;
+        case MM_MODEM_CHARSET_UCS2:
+        case MM_MODEM_CHARSET_UTF16: {
+            guint8 *bin = NULL;
+            gsize   bin_len;
+
+            bin = (guint8 *) mm_utils_hexstr2bin (str, len, &bin_len, error);
+            if (!bin)
+                return NULL;
+
+            bytearray = g_byte_array_new_take (bin, bin_len);
+            break;
+        }
+        case MM_MODEM_CHARSET_UNKNOWN:
+        default:
+            g_assert_not_reached ();
+    }
+
+    return mm_modem_charset_bytearray_to_utf8 (bytearray, charset, translit, error);
 }
