@@ -18,12 +18,18 @@
 #include <glib.h>
 
 #include "mm-port-serial-at.h"
+#include "mm-serial-parsers.h"
 #include "mm-log-test.h"
 
 typedef struct {
     const gchar *original;
     const gchar *without_echo;
 } EchoRemovalTest;
+
+typedef struct {
+    const gchar *response;
+    const gboolean found;
+} ParseOkTest;
 
 static const EchoRemovalTest echo_removal_tests[] = {
     { "\r\n", "\r\n" },
@@ -39,6 +45,13 @@ static const EchoRemovalTest echo_removal_tests[] = {
     { "echo echo\r\nthis is valid\r\nand so is this", "\r\nthis is valid\r\nand so is this" },
     { "\r\nthis is valid\r\nand so is this", "\r\nthis is valid\r\nand so is this" },
     { "\r\nthis is valid\r\nand so is this\r\n", "\r\nthis is valid\r\nand so is this\r\n" },
+};
+
+static const ParseOkTest parse_ok_tests[] = {
+    { "\r\nOK\r\n", TRUE},
+    { "\r\nOK\r\n\r\n+CMTI: \"ME\",1\r\n", TRUE},
+    { "\r\nOK\r\n\r\n+CIEV: 7,1\r\n\r\n+CRING: VOICE\r\n\r\n+CLIP: \"+0123456789\",145,,,,0\r\n", TRUE},
+    { "\r\nERROR\r\n", FALSE}
 };
 
 static void
@@ -64,11 +77,40 @@ at_serial_echo_removal (void)
     }
 }
 
+static void
+at_serial_parse_ok (void)
+{
+    guint i;
+    gpointer parser;
+    GError *error = NULL;
+    gboolean found = FALSE;
+    GString *response;
+
+    for (i = 0; i < G_N_ELEMENTS (parse_ok_tests); i++) {
+        parser = mm_serial_parser_v1_new ();
+        response = g_string_new (parse_ok_tests[i].response);
+        found = mm_serial_parser_v1_parse (parser, response, NULL, &error);
+
+        /* Match found */
+        if (parse_ok_tests[i].found) {
+            g_assert_cmpint (found, ==, parse_ok_tests[i].found);
+            g_assert_no_error (error);
+        }
+        /* Not found: error */
+        else {
+            g_assert (error != NULL);
+        }
+
+        g_string_free (response, TRUE);
+    }
+}
+
 int main (int argc, char **argv)
 {
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/ModemManager/AT-serial/echo-removal", at_serial_echo_removal);
+    g_test_add_func ("/ModemManager/AT-serial/parse-ok", at_serial_parse_ok);
 
     return g_test_run ();
 }
