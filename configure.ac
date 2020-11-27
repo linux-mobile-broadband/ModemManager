@@ -248,13 +248,14 @@ dnl
 
 PKG_CHECK_MODULES(LIBSYSTEMD, [libsystemd >= 209],[have_libsystemd=yes],[have_libsystemd=no])
 PKG_CHECK_MODULES(LIBSYSTEMD_LOGIN, [libsystemd-login >= 183],[have_libsystemd_login=yes],[have_libsystemd_login=no])
+PKG_CHECK_MODULES(LIBELOGIND, [libelogind >= 209], [have_elogind=yes], [have_elogind=no])
 AC_ARG_WITH(systemd-suspend-resume,
             AS_HELP_STRING([--with-systemd-suspend-resume=no|yes],
                            [Enable systemd suspend/resume support [[default=auto]]]),,
             [with_systemd_suspend_resume=auto])
 
 if test "x$with_systemd_suspend_resume" = "xauto"; then
-    if test "x$have_libsystemd" = "xyes" || test "x$have_libsystemd_login" = "xyes"; then
+    if test "x$have_libsystemd" = "xyes" || test "x$have_libsystemd_login" = "xyes" || test "x$have_elogind" = "xyes"; then
         with_systemd_suspend_resume=yes
     else
         with_systemd_suspend_resume=no
@@ -263,8 +264,8 @@ fi
 
 case $with_systemd_suspend_resume in
     yes)
-        if test "x$have_libsystemd" = "xno" && test "x$have_libsystemd_login" = "xno"; then
-		    AC_MSG_ERROR(libsystemd or libsystemd-login development headers are required)
+        if test "x$have_libsystemd" = "xno" && test "x$have_libsystemd_login" = "xno" && test "x$have_elogind" = "xno"; then
+		    AC_MSG_WARN(libsystemd, libsystemd-login or elogind must be available at runtime for suspend/resume support)
 	    fi
         AC_DEFINE(WITH_SYSTEMD_SUSPEND_RESUME, 1, [Define if you have systemd suspend-resume support])
         ;;
