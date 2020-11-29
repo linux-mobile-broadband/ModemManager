@@ -7646,6 +7646,79 @@ modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *_self,
 }
 
 /*****************************************************************************/
+/* Initial EPS bearer info loading */
+
+static MMBearerProperties *
+modem_3gpp_load_initial_eps_bearer_finish (MMIfaceModem3gpp  *self,
+                                           GAsyncResult      *res,
+                                           GError           **error)
+{
+    return MM_BEARER_PROPERTIES (g_task_propagate_pointer (G_TASK (res), error));
+}
+
+static void
+get_lte_attach_parameters_ready (QmiClientWds *client,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    g_autoptr(QmiMessageWdsGetLteAttachParametersOutput) output = NULL;
+    GError              *error = NULL;
+    MMBearerProperties  *properties;
+    const gchar         *apn;
+    QmiWdsIpSupportType  ip_support_type;
+
+    output = qmi_client_wds_get_lte_attach_parameters_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_wds_get_lte_attach_parameters_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get LTE attach parameters: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    properties = mm_bearer_properties_new ();
+    if (qmi_message_wds_get_lte_attach_parameters_output_get_apn (output, &apn, NULL))
+        mm_bearer_properties_set_apn (properties, apn);
+    if (qmi_message_wds_get_lte_attach_parameters_output_get_ip_support_type (output, &ip_support_type, NULL)) {
+        MMBearerIpFamily ip_family;
+
+        ip_family = mm_bearer_ip_family_from_qmi_ip_support_type (ip_support_type);
+        if (ip_family != MM_BEARER_IP_FAMILY_NONE)
+            mm_bearer_properties_set_ip_type (properties, ip_family);
+    }
+    g_task_return_pointer (task, properties, g_object_unref);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *self,
+                                    GAsyncReadyCallback  callback,
+                                    gpointer             user_data)
+{
+    GTask     *task;
+    QmiClient *client;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WDS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    qmi_client_wds_get_lte_attach_parameters (QMI_CLIENT_WDS (client),
+                                              NULL,
+                                              10,
+                                              NULL,
+                                              (GAsyncReadyCallback) get_lte_attach_parameters_ready,
+                                              task);
+}
+
+/*****************************************************************************/
 /* Check firmware support (Firmware interface) */
 
 typedef struct {
@@ -9537,6 +9610,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
     iface->load_operator_name = modem_3gpp_load_operator_name;
     iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
+    iface->load_initial_eps_bearer = modem_3gpp_load_initial_eps_bearer;
+    iface->load_initial_eps_bearer_finish = modem_3gpp_load_initial_eps_bearer_finish;
 }
 
 static void

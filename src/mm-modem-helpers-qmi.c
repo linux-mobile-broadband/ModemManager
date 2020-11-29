@@ -1472,6 +1472,21 @@ mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth)
     return out;
 }
 
+MMBearerIpFamily
+mm_bearer_ip_family_from_qmi_ip_support_type (QmiWdsIpSupportType ip_support_type)
+{
+    switch (ip_support_type) {
+    case QMI_WDS_IP_SUPPORT_TYPE_IPV4:
+        return MM_BEARER_IP_FAMILY_IPV4;
+    case QMI_WDS_IP_SUPPORT_TYPE_IPV6:
+        return MM_BEARER_IP_FAMILY_IPV6;
+    case QMI_WDS_IP_SUPPORT_TYPE_IPV4V6:
+        return MM_BEARER_IP_FAMILY_IPV4V6;
+    default:
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+}
+
 /*****************************************************************************/
 
 /**
