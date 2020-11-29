@@ -97,6 +97,9 @@ struct _MMBroadbandModemQmiPrivate {
      * the device enabling */
     gboolean autoconnect_checked;
 
+    /* Index of the WDS profile used as initial EPS bearer */
+    guint16 default_attach_pdn;
+
     /* 3GPP/CDMA registration helpers */
     gchar *current_operator_id;
     gchar *current_operator_description;
@@ -7719,6 +7722,468 @@ modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *self,
 }
 
 /*****************************************************************************/
+/* Initial EPS bearer settings setting */
+
+typedef enum {
+    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST,
+    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LOAD_POWER_STATE,
+    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_DOWN,
+    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_MODIFY_PROFILE,
+    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_UP,
+    SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST_SETTING,
+} SetInitialEpsBearerSettingsStep;
+
+typedef struct {
+    SetInitialEpsBearerSettingsStep  step;
+    QmiClientWds                    *client;
+    MMBearerProperties              *settings;
+    MMModemPowerState                power_state;
+} SetInitialEpsBearerSettingsContext;
+
+static void
+set_initial_eps_bearer_settings_context_free (SetInitialEpsBearerSettingsContext *ctx)
+{
+    g_clear_object (&ctx->client);
+    g_clear_object (&ctx->settings);
+    g_slice_free (SetInitialEpsBearerSettingsContext, ctx);
+}
+
+static gboolean
+modem_3gpp_set_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
+                                                   GAsyncResult      *res,
+                                                   GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void set_initial_eps_bearer_settings_step (GTask *task);
+
+static void
+set_initial_eps_bearer_power_up_ready (MMIfaceModem *self,
+                                       GAsyncResult *res,
+                                       GTask        *task)
+{
+    SetInitialEpsBearerSettingsContext *ctx;
+    GError                             *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!modem_power_up_down_off_finish (self, res, &error)) {
+        g_prefix_error (&error, "Couldn't power up modem: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    set_initial_eps_bearer_settings_step (task);
+}
+
+static void
+set_initial_eps_bearer_modify_profile_ready (QmiClientWds *client,
+                                             GAsyncResult *res,
+                                             GTask        *task)
+{
+    g_autoptr(QmiMessageWdsModifyProfileOutput)  output = NULL;
+    GError                             *error = NULL;
+    SetInitialEpsBearerSettingsContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_wds_modify_profile_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_wds_modify_profile_output_get_result (output, &error)) {
+        QmiWdsDsProfileError ds_profile_error;
+
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_EXTENDED_INTERNAL) &&
+            qmi_message_wds_modify_profile_output_get_extended_error_code (output, &ds_profile_error, NULL)) {
+            g_prefix_error (&error, "DS profile error: %s: ",
+                            qmi_wds_ds_profile_error_get_string (ds_profile_error));
+        }
+        g_prefix_error (&error, "Couldn't modify default LTE attach PDN settings: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    set_initial_eps_bearer_settings_step (task);
+}
+
+static void
+set_initial_eps_bearer_modify_profile (GTask *task)
+{
+    g_autoptr(QmiMessageWdsModifyProfileInput)  input = NULL;
+    MMBroadbandModemQmi                *self;
+    SetInitialEpsBearerSettingsContext *ctx;
+    const gchar                        *str;
+    MMBearerIpFamily                    ip_family;
+    QmiWdsPdpType                       pdp_type;
+    MMBearerAllowedAuth                 allowed_auth;
+    QmiWdsAuthentication                auth;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    input = qmi_message_wds_modify_profile_input_new ();
+    qmi_message_wds_modify_profile_input_set_profile_identifier (input,
+                                                                 QMI_WDS_PROFILE_TYPE_3GPP,
+                                                                 self->priv->default_attach_pdn,
+                                                                 NULL);
+
+    str = mm_bearer_properties_get_apn (ctx->settings);
+    qmi_message_wds_modify_profile_input_set_apn_name (input, str ? str : "", NULL);
+
+    ip_family = mm_bearer_properties_get_ip_type (ctx->settings);
+    if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY)
+        ip_family = MM_BEARER_IP_FAMILY_IPV4;
+    if (mm_bearer_ip_family_to_qmi_pdp_type (ip_family, &pdp_type))
+        qmi_message_wds_modify_profile_input_set_pdp_type (input, pdp_type, NULL);
+
+    allowed_auth = mm_bearer_properties_get_allowed_auth (ctx->settings);
+    if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN)
+        allowed_auth = MM_BEARER_ALLOWED_AUTH_NONE;
+    auth = mm_bearer_allowed_auth_to_qmi_authentication (allowed_auth);
+    qmi_message_wds_modify_profile_input_set_authentication (input, auth, NULL);
+
+    str = mm_bearer_properties_get_user (ctx->settings);
+    qmi_message_wds_modify_profile_input_set_username (input, str ? str : "", NULL);
+
+    str = mm_bearer_properties_get_password (ctx->settings);
+    qmi_message_wds_modify_profile_input_set_password (input, str ? str : "", NULL);
+
+    qmi_client_wds_modify_profile (ctx->client,
+                                   input,
+                                   10,
+                                   NULL,
+                                   (GAsyncReadyCallback)set_initial_eps_bearer_modify_profile_ready,
+                                   task);
+}
+
+static void
+set_initial_eps_bearer_power_down_ready (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GTask        *task)
+{
+    SetInitialEpsBearerSettingsContext *ctx;
+    GError                             *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!modem_power_up_down_off_finish (self, res, &error)) {
+        g_prefix_error (&error, "Couldn't power down modem: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    set_initial_eps_bearer_settings_step (task);
+}
+
+static void
+set_initial_eps_bearer_load_power_state_ready (MMIfaceModem *self,
+                                               GAsyncResult *res,
+                                               GTask        *task)
+{
+    SetInitialEpsBearerSettingsContext *ctx;
+    GError                             *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->power_state = load_power_state_finish (self, res, &error);
+    if (ctx->power_state == MM_MODEM_POWER_STATE_UNKNOWN) {
+        g_prefix_error (&error, "Couldn't load power state: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    set_initial_eps_bearer_settings_step (task);
+}
+
+static void
+set_initial_eps_bearer_settings_step (GTask *task)
+{
+    SetInitialEpsBearerSettingsContext *ctx;
+    MMBroadbandModemQmi                *self;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST:
+            ctx->step++;
+            /* fall through */
+
+        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LOAD_POWER_STATE:
+            mm_obj_dbg (self, "querying current power state...");
+            load_power_state (MM_IFACE_MODEM (self),
+                              (GAsyncReadyCallback) set_initial_eps_bearer_load_power_state_ready,
+                              task);
+            return;
+
+        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_DOWN:
+            if (ctx->power_state == MM_MODEM_POWER_STATE_ON) {
+                mm_obj_dbg (self, "powering down before changing initial EPS bearer settings...");
+                modem_power_down (MM_IFACE_MODEM (self),
+                                  (GAsyncReadyCallback) set_initial_eps_bearer_power_down_ready,
+                                  task);
+                return;
+            }
+            ctx->step++;
+            /* fall through */
+
+        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_MODIFY_PROFILE:
+            mm_obj_dbg (self, "modifying initial EPS bearer settings profile...");
+            set_initial_eps_bearer_modify_profile (task);
+            return;
+
+        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_POWER_UP:
+            if (ctx->power_state == MM_MODEM_POWER_STATE_ON) {
+                mm_obj_dbg (self, "powering up after changing initial EPS bearer settings...");
+                modem_power_up (MM_IFACE_MODEM (self),
+                                (GAsyncReadyCallback) set_initial_eps_bearer_power_up_ready,
+                                task);
+                return;
+            }
+            ctx->step++;
+            /* fall through */
+
+        case SET_INITIAL_EPS_BEARER_SETTINGS_STEP_LAST_SETTING:
+            g_task_return_boolean (task, TRUE);
+            g_object_unref (task);
+            return;
+        default:
+            g_assert_not_reached ();
+    }
+}
+
+static void
+modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
+                                            MMBearerProperties  *config,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data)
+{
+    MMBroadbandModemQmi                *self = MM_BROADBAND_MODEM_QMI (_self);
+    SetInitialEpsBearerSettingsContext *ctx;
+    GTask                              *task;
+    QmiClient                          *client;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WDS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->default_attach_pdn) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unknown default LTE attach APN index");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (SetInitialEpsBearerSettingsContext);
+    ctx->settings = g_object_ref (config);;
+    ctx->client = QMI_CLIENT_WDS (g_object_ref (client));
+    ctx->step = SET_INITIAL_EPS_BEARER_SETTINGS_STEP_FIRST;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) set_initial_eps_bearer_settings_context_free);
+
+    set_initial_eps_bearer_settings_step (task);
+}
+
+/*****************************************************************************/
+/* Initial EPS bearer settings loading */
+
+static MMBearerProperties *
+modem_3gpp_load_initial_eps_bearer_settings_finish (MMIfaceModem3gpp  *self,
+                                                    GAsyncResult      *res,
+                                                    GError           **error)
+{
+    return MM_BEARER_PROPERTIES (g_task_propagate_pointer (G_TASK (res), error));
+}
+
+static void
+load_initial_eps_bearer_get_profile_settings_ready (QmiClientWds *client,
+                                                    GAsyncResult *res,
+                                                    GTask        *task)
+{
+    g_autoptr(QmiMessageWdsGetProfileSettingsOutput)  output = NULL;
+    GError               *error = NULL;
+    const gchar          *str;
+    QmiWdsPdpType         pdp_type;
+    QmiWdsAuthentication  auth;
+    gboolean              flag;
+    MMBearerProperties   *properties;
+
+    output = qmi_client_wds_get_profile_settings_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_wds_get_profile_settings_output_get_result (output, &error)) {
+        QmiWdsDsProfileError ds_profile_error;
+
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_EXTENDED_INTERNAL) &&
+            qmi_message_wds_get_profile_settings_output_get_extended_error_code (output, &ds_profile_error, NULL)) {
+            g_prefix_error (&error, "DS profile error: %s: ",
+                            qmi_wds_ds_profile_error_get_string (ds_profile_error));
+        }
+        g_prefix_error (&error, "Couldn't get default LTE attach PDN settings: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    properties = mm_bearer_properties_new ();
+    if (qmi_message_wds_get_profile_settings_output_get_apn_name (output, &str, NULL))
+        mm_bearer_properties_set_apn (properties, str);
+
+    if (qmi_message_wds_get_profile_settings_output_get_pdp_type (output, &pdp_type, NULL)) {
+        MMBearerIpFamily ip_family;
+
+        ip_family = mm_bearer_ip_family_from_qmi_pdp_type (pdp_type);
+        if (ip_family != MM_BEARER_IP_FAMILY_NONE)
+            mm_bearer_properties_set_ip_type (properties, ip_family);
+    }
+
+    if (qmi_message_wds_get_profile_settings_output_get_username (output, &str, NULL))
+        mm_bearer_properties_set_user (properties, str);
+
+    if (qmi_message_wds_get_profile_settings_output_get_password (output, &str, NULL))
+        mm_bearer_properties_set_password (properties, str);
+
+    if (qmi_message_wds_get_profile_settings_output_get_authentication (output, &auth, NULL)) {
+        MMBearerAllowedAuth allowed_auth;
+
+        allowed_auth = mm_bearer_allowed_auth_from_qmi_authentication (auth);
+        if (allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN)
+            mm_bearer_properties_set_allowed_auth (properties, allowed_auth);
+    }
+
+    if (qmi_message_wds_get_profile_settings_output_get_roaming_disallowed_flag (output, &flag, NULL))
+        mm_bearer_properties_set_allow_roaming (properties, !flag);
+
+    g_task_return_pointer (task, properties, g_object_unref);
+    g_object_unref (task);
+}
+
+static void
+load_initial_eps_bearer_get_profile_settings (GTask        *task,
+                                              QmiClientWds *client)
+{
+    g_autoptr(QmiMessageWdsGetProfileSettingsInput)  input = NULL;
+    MMBroadbandModemQmi                             *self;
+
+    self = g_task_get_source_object (task);
+    g_assert (self->priv->default_attach_pdn);
+
+    input = qmi_message_wds_get_profile_settings_input_new ();
+    qmi_message_wds_get_profile_settings_input_set_profile_id (input,
+                                                               QMI_WDS_PROFILE_TYPE_3GPP,
+                                                               self->priv->default_attach_pdn,
+                                                               NULL);
+    mm_obj_dbg (self, "querying LTE attach PDN settings at index %u...", self->priv->default_attach_pdn);
+    qmi_client_wds_get_profile_settings (client,
+                                         input,
+                                         10,
+                                         NULL,
+                                         (GAsyncReadyCallback)load_initial_eps_bearer_get_profile_settings_ready,
+                                         task);
+}
+
+static void
+load_initial_eps_bearer_get_lte_attach_pdn_list_ready (QmiClientWds *client,
+                                                       GAsyncResult *res,
+                                                       GTask        *task)
+{
+    g_autoptr(QmiMessageWdsGetLteAttachPdnListOutput) output = NULL;
+    MMBroadbandModemQmi *self;
+    GError              *error = NULL;
+    GArray              *current_list = NULL;
+    guint                i;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_wds_get_lte_attach_pdn_list_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_wds_get_lte_attach_pdn_list_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get LTE attach PDN list: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_message_wds_get_lte_attach_pdn_list_output_get_current_list (output, &current_list, NULL);
+    if (!current_list || !current_list->len) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Undefined list of LTE attach PDN");
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "Found %u LTE attach PDNs defined", current_list->len);
+    for (i = 0; i < current_list->len; i++) {
+        if (i == 0) {
+            self->priv->default_attach_pdn = g_array_index (current_list, guint16, i);
+            mm_obj_dbg (self, "Default LTE attach PDN profile: %u", self->priv->default_attach_pdn);
+        } else
+            mm_obj_dbg (self, "Additional LTE attach PDN profile: %u", g_array_index (current_list, guint16, i));
+    }
+
+    load_initial_eps_bearer_get_profile_settings (task, client);
+}
+
+static void
+modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
+                                             GAsyncReadyCallback  callback,
+                                             gpointer             user_data)
+{
+    MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
+    QmiClient           *client;
+    GTask               *task;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_WDS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Default attach PDN is assumed to never change during runtime
+     * (we don't change it) so just load it the first time */
+    if (!self->priv->default_attach_pdn) {
+        mm_obj_dbg (self, "querying LTE attach PDN list...");
+        qmi_client_wds_get_lte_attach_pdn_list (QMI_CLIENT_WDS (client),
+                                                NULL,
+                                                10,
+                                                NULL,
+                                                (GAsyncReadyCallback)load_initial_eps_bearer_get_lte_attach_pdn_list_ready,
+                                                task);
+        return;
+    }
+
+    load_initial_eps_bearer_get_profile_settings (task, QMI_CLIENT_WDS (client));
+}
+
+/*****************************************************************************/
 /* Check firmware support (Firmware interface) */
 
 typedef struct {
@@ -9612,6 +10077,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
     iface->load_initial_eps_bearer = modem_3gpp_load_initial_eps_bearer;
     iface->load_initial_eps_bearer_finish = modem_3gpp_load_initial_eps_bearer_finish;
+    iface->load_initial_eps_bearer_settings = modem_3gpp_load_initial_eps_bearer_settings;
+    iface->load_initial_eps_bearer_settings_finish = modem_3gpp_load_initial_eps_bearer_settings_finish;
+    iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
+    iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
 }
 
 static void

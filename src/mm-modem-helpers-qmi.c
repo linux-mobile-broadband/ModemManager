@@ -1472,6 +1472,19 @@ mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth)
     return out;
 }
 
+MMBearerAllowedAuth
+mm_bearer_allowed_auth_from_qmi_authentication (QmiWdsAuthentication auth)
+{
+    MMBearerAllowedAuth out = 0;
+
+    if (auth & QMI_WDS_AUTHENTICATION_PAP)
+        out |= MM_BEARER_ALLOWED_AUTH_PAP;
+    if (auth & QMI_WDS_AUTHENTICATION_CHAP)
+        out |= MM_BEARER_ALLOWED_AUTH_CHAP;
+
+    return out;
+}
+
 MMBearerIpFamily
 mm_bearer_ip_family_from_qmi_ip_support_type (QmiWdsIpSupportType ip_support_type)
 {
@@ -1484,6 +1497,44 @@ mm_bearer_ip_family_from_qmi_ip_support_type (QmiWdsIpSupportType ip_support_typ
         return MM_BEARER_IP_FAMILY_IPV4V6;
     default:
         return MM_BEARER_IP_FAMILY_NONE;
+    }
+}
+
+MMBearerIpFamily
+mm_bearer_ip_family_from_qmi_pdp_type (QmiWdsPdpType pdp_type)
+{
+    switch (pdp_type) {
+    case QMI_WDS_PDP_TYPE_IPV4:
+        return MM_BEARER_IP_FAMILY_IPV4;
+    case QMI_WDS_PDP_TYPE_IPV6:
+        return MM_BEARER_IP_FAMILY_IPV6;
+    case QMI_WDS_PDP_TYPE_IPV4_OR_IPV6:
+        return MM_BEARER_IP_FAMILY_IPV4V6;
+    case QMI_WDS_PDP_TYPE_PPP:
+    default:
+        return MM_BEARER_IP_FAMILY_NONE;
+    }
+}
+
+gboolean
+mm_bearer_ip_family_to_qmi_pdp_type (MMBearerIpFamily  ip_family,
+                                     QmiWdsPdpType    *out_pdp_type)
+{
+    switch (ip_family) {
+    case MM_BEARER_IP_FAMILY_IPV4:
+        *out_pdp_type = QMI_WDS_PDP_TYPE_IPV4;
+        return TRUE;
+    case MM_BEARER_IP_FAMILY_IPV6:
+        *out_pdp_type =  QMI_WDS_PDP_TYPE_IPV6;
+        return TRUE;
+    case MM_BEARER_IP_FAMILY_IPV4V6:
+        *out_pdp_type =  QMI_WDS_PDP_TYPE_IPV4_OR_IPV6;
+        return TRUE;
+    case MM_BEARER_IP_FAMILY_NONE:
+    case MM_BEARER_IP_FAMILY_ANY:
+    default:
+        /* there is no valid conversion, so just return FALSE to indicate it */
+        return FALSE;
     }
 }
 

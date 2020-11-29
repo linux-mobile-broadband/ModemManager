@@ -113,8 +113,12 @@ MMSmsState mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag);
 /*****************************************************************************/
 /* QMI/WDS to MM translations */
 
-QmiWdsAuthentication mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth);
-MMBearerIpFamily     mm_bearer_ip_family_from_qmi_ip_support_type (QmiWdsIpSupportType ip_support_type);
+QmiWdsAuthentication mm_bearer_allowed_auth_to_qmi_authentication   (MMBearerAllowedAuth auth);
+MMBearerAllowedAuth  mm_bearer_allowed_auth_from_qmi_authentication (QmiWdsAuthentication auth);
+MMBearerIpFamily     mm_bearer_ip_family_from_qmi_ip_support_type   (QmiWdsIpSupportType ip_support_type);
+MMBearerIpFamily     mm_bearer_ip_family_from_qmi_pdp_type          (QmiWdsPdpType pdp_type);
+gboolean             mm_bearer_ip_family_to_qmi_pdp_type            (MMBearerIpFamily  ip_family,
+                                                                     QmiWdsPdpType    *out_pdp_type);
 
 /*****************************************************************************/
 /* QMI/OMA to MM translations */
