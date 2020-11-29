@@ -111,13 +111,13 @@ mm_serial_parser_v1_new (void)
     parser->regex_ok = g_regex_new ("\\r\\nOK(\\r\\n)+", flags, 0, NULL);
     parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n", flags, 0, NULL);
     parser->regex_sms = g_regex_new ("\\r\\n>\\s*$", flags, 0, NULL);
-    parser->regex_cme_error = g_regex_new ("\\r\\n\\+CME ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
-    parser->regex_cms_error = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
-    parser->regex_cme_error_str = g_regex_new ("\\r\\n\\+CME ERROR:\\s*([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
-    parser->regex_cms_error_str = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
-    parser->regex_ezx_error = g_regex_new ("\\r\\n\\MODEM ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
-    parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
-    parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$", flags, 0, NULL);
+    parser->regex_cme_error = g_regex_new ("\\r\\n\\+CME ERROR:\\s*(\\d+)\\r\\n", flags, 0, NULL);
+    parser->regex_cms_error = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*(\\d+)\\r\\n", flags, 0, NULL);
+    parser->regex_cme_error_str = g_regex_new ("\\r\\n\\+CME ERROR:\\s*([^\\n\\r]+)\\r\\n", flags, 0, NULL);
+    parser->regex_cms_error_str = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*([^\\n\\r]+)\\r\\n", flags, 0, NULL);
+    parser->regex_ezx_error = g_regex_new ("\\r\\n\\MODEM ERROR:\\s*(\\d+)\\r\\n", flags, 0, NULL);
+    parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n", flags, 0, NULL);
+    parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n", flags, 0, NULL);
     /* Samsung Z810 may reply "NA" to report a not-available error */
     parser->regex_na = g_regex_new ("\\r\\nNA\\r\\n", flags, 0, NULL);
 
