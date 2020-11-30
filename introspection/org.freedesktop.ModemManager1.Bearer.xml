@@ -120,7 +120,7 @@
         </variablelist>
 
         If the bearer specifies configuration via PPP or DHCP, only the
-        <literal>"method"</literal> item will be present.
+        <literal>"method"</literal> item is guaranteed to be present.
 
         Additional items which are only applicable when using the
         <link linkend="MM-BEARER-IP-METHOD-STATIC:CAPS">MM_BEARER_IP_METHOD_STATIC</link>
