@@ -113,8 +113,17 @@ gboolean mm_bearer_properties_consume_variant (MMBearerProperties *properties,
 
 GVariant *mm_bearer_properties_get_dictionary (MMBearerProperties *self);
 
-gboolean mm_bearer_properties_cmp (MMBearerProperties *a,
-                                   MMBearerProperties *b);
+typedef enum {
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NONE             = 0,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE            = 1 << 0,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD      = 1 << 1,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING = 1 << 2,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL   = 1 << 3,
+} MMBearerPropertiesCmpFlags;
+
+gboolean mm_bearer_properties_cmp (MMBearerProperties         *a,
+                                   MMBearerProperties         *b,
+                                   MMBearerPropertiesCmpFlags  flags);
 
 #endif
 

@@ -30,6 +30,16 @@
 
 #define SUBSYSTEM_3GPP "3gpp"
 
+/* When comparing EPS bearer settings take into account that PASSWORD may not always
+ * be readable, and apply very loose matching for all fields. Also, some implementations
+ * may allow configuring roaming allowance in the initial EPS bearer, but that is also
+ * not common. */
+#define MM_BEARER_PROPERTIES_CMP_FLAGS_EPS              \
+    (MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE |             \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD |       \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING |  \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL)
+
 /*****************************************************************************/
 /* Private data context */
 
@@ -1029,7 +1039,7 @@ after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp              
     mm_obj_dbg (self, "Updated initial EPS bearer settings:");
     log_initial_eps_bearer_settings (self, new_config);
 
-    if (!mm_bearer_properties_cmp (new_config, ctx->config)) {
+    if (!mm_bearer_properties_cmp (new_config, ctx->config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
         mm_obj_dbg (self, "Requested initial EPS bearer settings:");
         log_initial_eps_bearer_settings (self, ctx->config);
         g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -1108,15 +1118,11 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
         return;
     }
 
-    /* If the user doesn't specify explicit auth settings, assume NONE as default */
-    if (mm_bearer_properties_get_allowed_auth (ctx->config) == MM_BEARER_ALLOWED_AUTH_UNKNOWN)
-        mm_bearer_properties_set_allowed_auth (ctx->config, MM_BEARER_ALLOWED_AUTH_NONE);
-
     old_dictionary = mm_gdbus_modem3gpp_get_initial_eps_bearer_settings (ctx->skeleton);
     if (old_dictionary)
         old_config = mm_bearer_properties_new_from_dictionary (old_dictionary, NULL);
 
-    if (old_config && mm_bearer_properties_cmp (ctx->config, old_config)) {
+    if (old_config && mm_bearer_properties_cmp (ctx->config, old_config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
         mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
     } else {
@@ -1756,7 +1762,10 @@ mm_iface_modem_3gpp_update_initial_eps_bearer (MMIfaceModem3gpp   *self,
 
     /* skip update? */
     if ((!old_bearer && !properties) ||
-        (old_bearer && properties && mm_bearer_properties_cmp (properties, mm_base_bearer_peek_config (MM_BASE_BEARER (old_bearer)))))
+        (old_bearer && properties &&
+         mm_bearer_properties_cmp (properties,
+                                   mm_base_bearer_peek_config (MM_BASE_BEARER (old_bearer)),
+                                   MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)))
         goto out;
 
     if (properties) {
