@@ -973,6 +973,45 @@ handle_set_initial_eps_bearer_settings_context_free (HandleSetInitialEpsBearerSe
 }
 
 static void
+log_initial_eps_bearer_settings (MMIfaceModem3gpp   *self,
+                                 MMBearerProperties *properties)
+{
+    const gchar         *apn;
+    MMBearerAllowedAuth  allowed_auth;
+    const gchar         *user;
+    const gchar         *password;
+    MMBearerIpFamily     ip_family;
+
+    apn = mm_bearer_properties_get_apn (properties);
+    if (apn)
+        mm_obj_dbg (self, "  APN: '%s'", apn);
+
+    allowed_auth = mm_bearer_properties_get_allowed_auth (properties);
+    if (allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+        g_autofree gchar *allowed_auth_str = NULL;
+
+        allowed_auth_str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
+        mm_obj_dbg (self, "  allowed auth: '%s'", allowed_auth_str);
+    }
+
+    user = mm_bearer_properties_get_user (properties);
+    if (user)
+        mm_obj_dbg (self, "  user: '%s'", user);
+
+    password = mm_bearer_properties_get_password (properties);
+    if (password)
+        mm_obj_dbg (self, "  password: '%s'", password);
+
+    ip_family = mm_bearer_properties_get_ip_type (properties);
+    if (ip_family != MM_BEARER_IP_FAMILY_NONE) {
+        g_autofree gchar *ip_family_str = NULL;
+
+        ip_family_str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+        mm_obj_dbg (self, "  ip family: '%s'", ip_family_str);
+    }
+}
+
+static void
 after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp                         *self,
                                                   GAsyncResult                             *res,
                                                   HandleSetInitialEpsBearerSettingsContext *ctx)
@@ -987,7 +1026,12 @@ after_set_load_initial_eps_bearer_settings_ready (MMIfaceModem3gpp              
         return;
     }
 
+    mm_obj_dbg (self, "Updated initial EPS bearer settings:");
+    log_initial_eps_bearer_settings (self, new_config);
+
     if (!mm_bearer_properties_cmp (new_config, ctx->config)) {
+        mm_obj_dbg (self, "Requested initial EPS bearer settings:");
+        log_initial_eps_bearer_settings (self, ctx->config);
         g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                                        "Initial EPS bearer settings were not updated");
     } else {
