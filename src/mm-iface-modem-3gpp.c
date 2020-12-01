@@ -1792,6 +1792,41 @@ out:
     g_object_unref (skeleton);
 }
 
+static void
+reload_initial_eps_bearer_ready (MMIfaceModem3gpp *self,
+                                 GAsyncResult     *res)
+{
+    g_autoptr(MMBearerProperties) properties = NULL;
+    g_autoptr(GError)             error = NULL;
+
+    properties = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_finish (self, res, &error);
+    if (!properties) {
+        mm_obj_dbg (self, "couldn't load initial default bearer properties: %s", error->message);
+        return;
+    }
+
+    mm_iface_modem_3gpp_update_initial_eps_bearer (self, properties);
+}
+
+void
+mm_iface_modem_3gpp_reload_initial_eps_bearer (MMIfaceModem3gpp *self)
+{
+    gboolean eps_supported = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &eps_supported,
+                  NULL);
+
+    if (eps_supported &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_finish) {
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer (
+            self,
+            (GAsyncReadyCallback)reload_initial_eps_bearer_ready,
+            NULL);
+    }
+}
+
 /*****************************************************************************/
 
 typedef struct _DisablingContext DisablingContext;
