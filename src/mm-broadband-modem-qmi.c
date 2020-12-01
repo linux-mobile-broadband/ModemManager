@@ -4805,11 +4805,10 @@ common_enable_disable_unsolicited_events_signal_strength (GTask *task)
 
     ctx = g_task_get_task_data (task);
 
-    /* Only set thresholds during enable, but always create the array anyway,
-     * as the TLV setter expects it */
+    /* Always set thresholds, both in enable and disable, or otherwise the protocol will
+     * complain with FAILURE: NoThresholdsProvided */
     thresholds = g_array_sized_new (FALSE, FALSE, sizeof (gint8), G_N_ELEMENTS (thresholds_data));
-    if (ctx->enable)
-        g_array_append_vals (thresholds, thresholds_data, G_N_ELEMENTS (thresholds_data));
+    g_array_append_vals (thresholds, thresholds_data, G_N_ELEMENTS (thresholds_data));
 
     input = qmi_message_nas_set_event_report_input_new ();
     qmi_message_nas_set_event_report_input_set_signal_strength_indicator (
