@@ -85,9 +85,10 @@ struct _MMBroadbandModemQmiPrivate {
     /* 3GPP and CDMA share unsolicited events setup/enable/disable/cleanup */
     gboolean unsolicited_events_enabled;
     gboolean unsolicited_events_setup;
-    guint event_report_indication_id;
+    guint nas_event_report_indication_id;
+    guint wds_event_report_indication_id;
 #if defined WITH_NEWEST_QMI_COMMANDS
-    guint signal_info_indication_id;
+    guint nas_signal_info_indication_id;
 #endif /* WITH_NEWEST_QMI_COMMANDS */
 
     /* New devices may not support the legacy DMS UIM commands */
@@ -4704,14 +4705,16 @@ modem_cdma_load_esn (MMIfaceModemCdma *_self,
 /* Enabling/disabling unsolicited events (3GPP and CDMA interface) */
 
 typedef struct {
-    QmiClientNas *client;
+    QmiClientNas *client_nas;
+    QmiClientWds *client_wds;
     gboolean      enable;
 } EnableUnsolicitedEventsContext;
 
 static void
 enable_unsolicited_events_context_free (EnableUnsolicitedEventsContext *ctx)
 {
-    g_object_unref (ctx->client);
+    g_clear_object (&ctx->client_wds);
+    g_clear_object (&ctx->client_nas);
     g_free (ctx);
 }
 
@@ -4721,6 +4724,44 @@ common_enable_disable_unsolicited_events_finish (MMBroadbandModemQmi  *self,
                                                  GError              **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+ser_data_system_status_ready (QmiClientWds *client,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    MMBroadbandModemQmi                          *self;
+    g_autoptr(QmiMessageWdsSetEventReportOutput)  output = NULL;
+    g_autoptr(GError)                             error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_wds_set_event_report_finish (client, res, &error);
+    if (!output || !qmi_message_wds_set_event_report_output_get_result (output, &error))
+        mm_obj_dbg (self, "couldn't set event report: '%s'", error->message);
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_enable_disable_unsolicited_events_data_system_status (GTask *task)
+{
+    EnableUnsolicitedEventsContext              *ctx;
+    g_autoptr(QmiMessageWdsSetEventReportInput)  input = NULL;
+    g_autoptr(GError)                            error = NULL;
+
+    ctx = g_task_get_task_data     (task);
+
+    input = qmi_message_wds_set_event_report_input_new ();
+    qmi_message_wds_set_event_report_input_set_data_systems (input, ctx->enable, NULL);
+    qmi_client_wds_set_event_report (ctx->client_wds,
+                                     input,
+                                     5,
+                                     NULL,
+                                     (GAsyncReadyCallback)ser_data_system_status_ready,
+                                     task);
 }
 
 #if !defined WITH_NEWEST_QMI_COMMANDS
@@ -4742,10 +4783,13 @@ ser_signal_strength_ready (QmiClientNas *client,
     if (!output || !qmi_message_nas_set_event_report_output_get_result (output, &error))
         mm_obj_dbg (self, "couldn't set event report: '%s'", error->message);
 
-    /* Just ignore errors for now */
-    self->priv->unsolicited_events_enabled = ctx->enable;
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    if (!ctx->client_wds) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    common_enable_disable_unsolicited_events_data_system_status (task);
 }
 
 static void
@@ -4774,7 +4818,7 @@ common_enable_disable_unsolicited_events_signal_strength (GTask *task)
         thresholds,
         NULL);
     qmi_client_nas_set_event_report (
-        ctx->client,
+        ctx->client_nas,
         input,
         5,
         NULL,
@@ -4801,10 +4845,13 @@ ri_signal_info_ready (QmiClientNas *client,
     if (!output || !qmi_message_nas_register_indications_output_get_result (output, &error))
         mm_obj_dbg (self, "couldn't register indications: '%s'", error->message);
 
-    /* Just ignore errors for now */
-    self->priv->unsolicited_events_enabled = ctx->enable;
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    if (!ctx->client_wds) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    common_enable_disable_unsolicited_events_data_system_status (task);
 }
 
 static void
@@ -4817,7 +4864,7 @@ common_enable_disable_unsolicited_events_signal_info (GTask *task)
     input = qmi_message_nas_register_indications_input_new ();
     qmi_message_nas_register_indications_input_set_signal_info (input, ctx->enable, NULL);
     qmi_client_nas_register_indications (
-        ctx->client,
+        ctx->client_nas,
         input,
         5,
         NULL,
@@ -4876,7 +4923,7 @@ common_enable_disable_unsolicited_events_signal_info_config (GTask *task)
     }
 
     qmi_client_nas_config_signal_info (
-        ctx->client,
+        ctx->client_nas,
         input,
         5,
         NULL,
@@ -4894,12 +4941,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
 {
     EnableUnsolicitedEventsContext *ctx;
     GTask                          *task;
-    QmiClient                      *client = NULL;
-
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_NAS, &client,
-                                      callback, user_data))
-        return;
+    QmiClient                      *client_nas = NULL;
+    QmiClient                      *client_wds = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -4910,18 +4953,40 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
         g_object_unref (task);
         return;
     }
+    self->priv->unsolicited_events_enabled = enable;
+
+    client_nas = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                            QMI_SERVICE_NAS,
+                                            MM_PORT_QMI_FLAG_DEFAULT,
+                                            NULL);
+    client_wds = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                            QMI_SERVICE_WDS,
+                                            MM_PORT_QMI_FLAG_DEFAULT,
+                                            NULL);
 
     ctx = g_new0 (EnableUnsolicitedEventsContext, 1);
     ctx->enable = enable;
-    ctx->client = g_object_ref (client);
+    ctx->client_nas = client_nas ? g_object_ref (client_nas) : NULL;
+    ctx->client_wds = client_wds ? g_object_ref (client_wds) : NULL;
 
     g_task_set_task_data (task, ctx, (GDestroyNotify)enable_unsolicited_events_context_free);
 
+    if (ctx->client_nas) {
 #if defined WITH_NEWEST_QMI_COMMANDS
-    common_enable_disable_unsolicited_events_signal_info_config (task);
+        common_enable_disable_unsolicited_events_signal_info_config (task);
 #else
-    common_enable_disable_unsolicited_events_signal_strength (task);
+        common_enable_disable_unsolicited_events_signal_strength (task);
 #endif /* WITH_NEWEST_QMI_COMMANDS */
+        return;
+    }
+
+    if (ctx->client_wds) {
+        common_enable_disable_unsolicited_events_data_system_status (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -5002,9 +5067,26 @@ common_setup_cleanup_unsolicited_events_finish (MMBroadbandModemQmi *self,
 }
 
 static void
-event_report_indication_cb (QmiClientNas *client,
-                            QmiIndicationNasEventReportOutput *output,
-                            MMBroadbandModemQmi *self)
+wds_event_report_indication_cb (QmiClientWds                      *client,
+                                QmiIndicationWdsEventReportOutput *output,
+                                MMBroadbandModemQmi               *self)
+{
+    QmiWdsDataSystemNetworkType preferred_network;
+
+    if (qmi_indication_wds_event_report_output_get_data_systems (output, &preferred_network, NULL, NULL)) {
+        mm_obj_dbg (self, "data systems update, preferred network: %s",
+                    qmi_wds_data_system_network_type_get_string (preferred_network));
+        if (preferred_network == QMI_WDS_DATA_SYSTEM_NETWORK_TYPE_3GPP)
+            mm_iface_modem_3gpp_reload_initial_eps_bearer (MM_IFACE_MODEM_3GPP (self));
+        else
+            mm_iface_modem_3gpp_update_initial_eps_bearer (MM_IFACE_MODEM_3GPP (self), NULL);
+    }
+}
+
+static void
+nas_event_report_indication_cb (QmiClientNas                      *client,
+                                QmiIndicationNasEventReportOutput *output,
+                                MMBroadbandModemQmi               *self)
 {
     gint8 signal_strength;
     QmiNasRadioInterface signal_strength_radio_interface;
@@ -5041,9 +5123,9 @@ event_report_indication_cb (QmiClientNas *client,
 #if defined WITH_NEWEST_QMI_COMMANDS
 
 static void
-signal_info_indication_cb (QmiClientNas *client,
-                           QmiIndicationNasSignalInfoOutput *output,
-                           MMBroadbandModemQmi *self)
+nas_signal_info_indication_cb (QmiClientNas                     *client,
+                               QmiIndicationNasSignalInfoOutput *output,
+                               MMBroadbandModemQmi              *self)
 {
     gint8 cdma1x_rssi = 0;
     gint8 evdo_rssi = 0;
@@ -5083,13 +5165,9 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data)
 {
-    GTask *task;
-    QmiClient *client = NULL;
-
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_NAS, &client,
-                                      callback, user_data))
-        return;
+    GTask     *task;
+    QmiClient *client_nas = NULL;
+    QmiClient *client_wds = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -5100,38 +5178,59 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
         g_object_unref (task);
         return;
     }
-
-    /* Store new state */
     self->priv->unsolicited_events_setup = enable;
 
+    client_nas = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                            QMI_SERVICE_NAS,
+                                            MM_PORT_QMI_FLAG_DEFAULT,
+                                            NULL);
+    client_wds = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                            QMI_SERVICE_WDS,
+                                            MM_PORT_QMI_FLAG_DEFAULT,
+                                            NULL);
+
     /* Connect/Disconnect "Event Report" indications */
-    if (enable) {
-        g_assert (self->priv->event_report_indication_id == 0);
-        self->priv->event_report_indication_id =
-            g_signal_connect (client,
-                              "event-report",
-                              G_CALLBACK (event_report_indication_cb),
-                              self);
-    } else {
-        g_assert (self->priv->event_report_indication_id != 0);
-        g_signal_handler_disconnect (client, self->priv->event_report_indication_id);
-        self->priv->event_report_indication_id = 0;
-    }
+    if (client_nas) {
+        if (enable) {
+            g_assert (self->priv->nas_event_report_indication_id == 0);
+            self->priv->nas_event_report_indication_id =
+                g_signal_connect (client_nas,
+                                  "event-report",
+                                  G_CALLBACK (nas_event_report_indication_cb),
+                                  self);
+        } else if (self->priv->nas_event_report_indication_id != 0) {
+            g_signal_handler_disconnect (client_nas, self->priv->nas_event_report_indication_id);
+            self->priv->nas_event_report_indication_id = 0;
+        }
 
 #if defined WITH_NEWEST_QMI_COMMANDS
-    if (enable) {
-        g_assert (self->priv->signal_info_indication_id == 0);
-        self->priv->signal_info_indication_id =
-            g_signal_connect (client,
-                              "signal-info",
-                              G_CALLBACK (signal_info_indication_cb),
-                              self);
-    } else {
-        g_assert (self->priv->signal_info_indication_id != 0);
-        g_signal_handler_disconnect (client, self->priv->signal_info_indication_id);
-        self->priv->signal_info_indication_id = 0;
-    }
+        if (enable) {
+            g_assert (self->priv->nas_signal_info_indication_id == 0);
+            self->priv->nas_signal_info_indication_id =
+                g_signal_connect (client_nas,
+                                  "signal-info",
+                                  G_CALLBACK (nas_signal_info_indication_cb),
+                                  self);
+        } else if (self->priv->nas_signal_info_indication_id != 0) {
+            g_signal_handler_disconnect (client_nas, self->priv->nas_signal_info_indication_id);
+            self->priv->nas_signal_info_indication_id = 0;
+        }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
+    }
+
+    if (client_wds) {
+        if (enable) {
+            g_assert (self->priv->wds_event_report_indication_id == 0);
+            self->priv->wds_event_report_indication_id =
+                g_signal_connect (client_wds,
+                                  "event-report",
+                                  G_CALLBACK (wds_event_report_indication_cb),
+                                  self);
+        } else if (self->priv->wds_event_report_indication_id != 0) {
+            g_signal_handler_disconnect (client_wds, self->priv->wds_event_report_indication_id);
+            self->priv->wds_event_report_indication_id = 0;
+        }
+    }
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
