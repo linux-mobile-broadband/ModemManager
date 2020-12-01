@@ -4781,7 +4781,15 @@ ser_signal_strength_ready (QmiClientNas *client,
 
     output = qmi_client_nas_set_event_report_finish (client, res, &error);
     if (!output || !qmi_message_nas_set_event_report_output_get_result (output, &error))
-        mm_obj_dbg (self, "couldn't set event report: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't enable signal strength indications: '%s'", error->message);
+    else {
+        /* Disable access technology and signal quality polling if we can use the indications */
+        mm_obj_dbg (self, "signal strength indications enabled: polling disabled");
+        g_object_set (self,
+                      MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      TRUE,
+                      MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, TRUE,
+                      NULL);
+    }
 
     if (!ctx->client_wds) {
         g_task_return_boolean (task, TRUE);
@@ -4842,7 +4850,15 @@ ri_signal_info_ready (QmiClientNas *client,
 
     output = qmi_client_nas_register_indications_finish (client, res, &error);
     if (!output || !qmi_message_nas_register_indications_output_get_result (output, &error))
-        mm_obj_dbg (self, "couldn't register indications: '%s'", error->message);
+        mm_obj_dbg (self, "couldn't register signal info indications: '%s'", error->message);
+    else {
+        /* Disable access technology and signal quality polling if we can use the indications */
+        mm_obj_dbg (self, "signal strength indications enabled: polling disabled");
+        g_object_set (self,
+                      MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      TRUE,
+                      MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, TRUE,
+                      NULL);
+    }
 
     if (!ctx->client_wds) {
         g_task_return_boolean (task, TRUE);
