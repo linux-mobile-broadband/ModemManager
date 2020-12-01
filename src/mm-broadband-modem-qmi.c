@@ -5013,6 +5013,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
     }
 
     ctx = g_new0 (EnableUnsolicitedEventsContext, 1);
+    ctx->enable = enable;
     ctx->client = g_object_ref (client);
 
     g_task_set_task_data (task, ctx, (GDestroyNotify)enable_unsolicited_events_context_free);
