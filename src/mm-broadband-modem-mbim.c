@@ -86,6 +86,14 @@ typedef enum {
     PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS    = 1 << 8,
 } ProcessNotificationFlag;
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+enum {
+    PROP_0,
+    PROP_QMI_UNSUPPORTED,
+    PROP_LAST
+};
+#endif
+
 struct _MMBroadbandModemMbimPrivate {
     /* Queried and cached capabilities */
     MbimCellularClass caps_cellular_class;
@@ -128,6 +136,7 @@ struct _MMBroadbandModemMbimPrivate {
     gulong mbim_device_removed_id;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    gboolean qmi_unsupported;
     /* Flag when QMI-based capability/mode switching is in use */
     gboolean qmi_capability_and_mode_switching;
 #endif
@@ -2429,6 +2438,9 @@ initialization_started (MMBroadbandModem    *self,
 {
     InitializationStartedContext *ctx;
     GTask                        *task;
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    gboolean                      qmi_unsupported = FALSE;
+#endif
 
     ctx = g_slice_new0 (InitializationStartedContext);
     ctx->mbim = mm_broadband_modem_mbim_get_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
@@ -2454,10 +2466,16 @@ initialization_started (MMBroadbandModem    *self,
         return;
     }
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    g_object_get (self,
+                  MM_BROADBAND_MODEM_MBIM_QMI_UNSUPPORTED, &qmi_unsupported,
+                  NULL);
+#endif
+
     /* Now open our MBIM port */
     mm_port_mbim_open (ctx->mbim,
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-                       TRUE, /* With QMI over MBIM support if available */
+                       ! qmi_unsupported, /* With QMI over MBIM support if available */
 #endif
                        NULL,
                        (GAsyncReadyCallback)mbim_port_open_ready,
@@ -5506,6 +5524,44 @@ messaging_create_sms (MMIfaceModemMessaging *self)
 
 /*****************************************************************************/
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
+
+    switch (prop_id) {
+   case PROP_QMI_UNSUPPORTED:
+        self->priv->qmi_unsupported = g_value_get_boolean (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
+
+    switch (prop_id) {
+    case PROP_QMI_UNSUPPORTED:
+        g_value_set_boolean (value, self->priv->qmi_unsupported);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+#endif
+
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
                              const gchar **drivers,
@@ -5835,6 +5891,10 @@ mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
 
     klass->peek_port_mbim_for_data = peek_port_mbim_for_data;
 
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    object_class->set_property = set_property;
+    object_class->get_property = get_property;
+#endif
     object_class->dispose = dispose;
     object_class->finalize = finalize;
 
@@ -5845,4 +5905,13 @@ mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
     /* Do not initialize the MBIM modem through AT commands */
     broadband_modem_class->enabling_modem_init = NULL;
     broadband_modem_class->enabling_modem_init_finish = NULL;
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    g_object_class_install_property (object_class, PROP_QMI_UNSUPPORTED,
+        g_param_spec_boolean (MM_BROADBAND_MODEM_MBIM_QMI_UNSUPPORTED,
+                              "QMI over MBIM unsupported",
+                              "TRUE when QMI over MBIM should not be considered.",
+                              FALSE,
+                              G_PARAM_READWRITE));
+#endif
 }

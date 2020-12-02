@@ -29,6 +29,8 @@ typedef struct _MMBroadbandModemMbim MMBroadbandModemMbim;
 typedef struct _MMBroadbandModemMbimClass MMBroadbandModemMbimClass;
 typedef struct _MMBroadbandModemMbimPrivate MMBroadbandModemMbimPrivate;
 
+#define MM_BROADBAND_MODEM_MBIM_QMI_UNSUPPORTED "broadband-modem-mbim-qmi-unsupported"
+
 struct _MMBroadbandModemMbim {
     MMBroadbandModem parent;
     MMBroadbandModemMbimPrivate *priv;
