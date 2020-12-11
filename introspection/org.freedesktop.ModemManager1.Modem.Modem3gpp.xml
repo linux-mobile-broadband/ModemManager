@@ -186,6 +186,33 @@
     <property name="EnabledFacilityLocks" type="u" access="read" />
 
     <!--
+        DisableFacilityLock:
+        @properties: A tuple of facility type and control key.
+
+        Sends control key to modem to disable selected facility lock
+
+        <variablelist>
+        <varlistentry><term>"facility"</term>
+          <listitem>
+            <para>
+              A <link linkend="MMModem3gppFacility">MMModem3gppFacility</link> value
+              representing the type of the facility lock to disable.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"control key"</term>
+          <listitem>
+            <para>
+              Alphanumeric key required to unlock facility.
+            </para>
+          </listitem>
+        </varlistentry>
+    -->
+    <method name="DisableFacilityLock">
+        <arg name="properties" type="(us)" direction="in" />
+    </method>
+
+    <!--
         SubscriptionState:
 
         A <link linkend="MMModem3gppSubscriptionState">MMModem3gppSubscriptionState</link>

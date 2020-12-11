@@ -1260,6 +1260,56 @@ mm_modem_3gpp_set_initial_eps_bearer_settings_sync (MMModem3gpp         *self,
 
 /*****************************************************************************/
 
+void
+mm_modem_3gpp_disable_facility_lock (MMModem3gpp         *self,
+                                     MMModem3gppFacility  facility,
+                                     const gchar         *control_key,
+                                     GCancellable        *cancellable,
+                                     GAsyncReadyCallback  callback,
+                                     gpointer             user_data)
+{
+    GVariant *properties;
+
+    properties = g_variant_ref_sink (g_variant_new ("(us)", (guint)facility, control_key));
+    mm_gdbus_modem3gpp_call_disable_facility_lock (MM_GDBUS_MODEM3GPP (self),
+                                                   properties,
+                                                   cancellable,
+                                                   callback,
+                                                   user_data);
+    g_variant_unref (properties);
+}
+
+gboolean
+mm_modem_3gpp_disable_facility_lock_finish (MMModem3gpp   *self,
+                                            GAsyncResult  *res,
+                                            GError       **error)
+{
+    return mm_gdbus_modem3gpp_call_disable_facility_lock_finish (MM_GDBUS_MODEM3GPP (self),
+                                                                 res,
+                                                                 error);
+}
+
+gboolean
+mm_modem_3gpp_disable_facility_lock_sync (MMModem3gpp          *self,
+                                          MMModem3gppFacility   facility,
+                                          const gchar          *control_key,
+                                          GCancellable         *cancellable,
+                                          GError              **error)
+{
+    GVariant *properties;
+    gboolean  result;
+
+    properties = g_variant_ref_sink (g_variant_new ("(us)", (guint)facility, control_key));
+    result = mm_gdbus_modem3gpp_call_disable_facility_lock_sync (MM_GDBUS_MODEM3GPP (self),
+                                                                 properties,
+                                                                 cancellable,
+                                                                 error);
+    g_variant_unref (properties);
+    return result;
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_3gpp_init (MMModem3gpp *self)
 {
