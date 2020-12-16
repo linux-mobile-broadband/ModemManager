@@ -1562,6 +1562,13 @@ mm_port_subsys_to_qmi_endpoint_type (MMPortSubsys subsys)
         case MM_PORT_SUBSYS_RPMSG:
         case MM_PORT_SUBSYS_QRTR:
             return QMI_DATA_ENDPOINT_TYPE_EMBEDDED;
+        /* The WWAN subsystem abstracts the underlying transport bus, and so
+         * endpoint type can not be deducted from that. This function should
+         * then be revisited, but in practice, only MHI/PCI modem ports are
+         * exposed through the WWAN subsystem for now.
+         */
+        case MM_PORT_SUBSYS_WWAN:
+            return QMI_DATA_ENDPOINT_TYPE_PCIE;
         case MM_PORT_SUBSYS_UNKNOWN:
         case MM_PORT_SUBSYS_TTY:
         case MM_PORT_SUBSYS_NET:

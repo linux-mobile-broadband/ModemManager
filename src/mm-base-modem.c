@@ -285,6 +285,30 @@ base_modem_create_qrtr_port (MMBaseModem    *self,
 #endif
 
 static MMPort *
+base_modem_create_wwan_port (MMBaseModem *self,
+                             const gchar *name,
+                             MMPortType   ptype)
+{
+#if defined WITH_QMI
+    if (ptype == MM_PORT_TYPE_QMI)
+        return MM_PORT (mm_port_qmi_new (name, MM_PORT_SUBSYS_WWAN));
+#endif
+
+#if defined WITH_MBIM
+    if (ptype == MM_PORT_TYPE_MBIM)
+        return MM_PORT (mm_port_mbim_new (name, MM_PORT_SUBSYS_WWAN));
+#endif
+
+    if (ptype == MM_PORT_TYPE_QCDM)
+        return MM_PORT (mm_port_serial_qcdm_new (name, MM_PORT_SUBSYS_WWAN));
+
+    if (ptype == MM_PORT_TYPE_AT)
+        return MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_WWAN));
+
+    return NULL;
+}
+
+static MMPort *
 base_modem_create_virtual_port (MMBaseModem *self,
                                 const gchar *name)
 {
@@ -334,6 +358,8 @@ base_modem_internal_grab_port (MMBaseModem         *self,
 #endif
     else if (g_str_equal (subsys, "virtual"))
         port = base_modem_create_virtual_port (self, name);
+    else if (g_str_equal (subsys, "wwan"))
+        port = base_modem_create_wwan_port (self, name, ptype);
 
     if (!port) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
