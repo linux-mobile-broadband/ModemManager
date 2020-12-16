@@ -91,7 +91,7 @@ create_modem (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_GENERIC,
