@@ -215,6 +215,13 @@ mm_filter_port (MMFilter        *self,
         return TRUE;
     }
 
+    /* If this is a wwan port/device, we always allow it */
+    if ((self->priv->enabled_rules & MM_FILTER_RULE_WWAN) &&
+        (g_strcmp0 (subsystem, "wwan") == 0)) {
+        mm_obj_dbg (self, "(%s/%s) port allowed: wwan device", subsystem, name);
+        return TRUE;
+    }
+
     /* If this is a tty device, we may allow it */
     if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY) &&
         (g_strcmp0 (subsystem, "tty") == 0)) {
@@ -467,6 +474,7 @@ mm_filter_new (MMFilterRule   enabled_rules,
     mm_obj_dbg (self, "  net devices allowed:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_NET));
     mm_obj_dbg (self, "  usbmisc devices allowed:    %s", RULE_ENABLED_STR (MM_FILTER_RULE_USBMISC));
     mm_obj_dbg (self, "  rpmsg devices allowed:      %s", RULE_ENABLED_STR (MM_FILTER_RULE_RPMSG));
+    mm_obj_dbg (self, "  wwan devices allowed:       %s", RULE_ENABLED_STR (MM_FILTER_RULE_WWAN));
     if (self->priv->enabled_rules & MM_FILTER_RULE_TTY) {
         mm_obj_dbg (self, "  tty devices:");
         mm_obj_dbg (self, "      blacklist applied:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_BLACKLIST));

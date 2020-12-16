@@ -64,6 +64,7 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
     MM_FILTER_RULE_TTY_ACM_INTERFACE     = 1 << 14,
     MM_FILTER_RULE_TTY_WITH_NET          = 1 << 15,
     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN = 1 << 16,
+    MM_FILTER_RULE_WWAN                  = 1 << 17,
 } MMFilterRule;
 
 #define MM_FILTER_RULE_ALL                  \
@@ -83,7 +84,8 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_TTY_DRIVER            | \
      MM_FILTER_RULE_TTY_ACM_INTERFACE     | \
      MM_FILTER_RULE_TTY_WITH_NET          | \
-     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)
+     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN | \
+     MM_FILTER_RULE_WWAN)
 
 /* This is the legacy ModemManager policy that tries to automatically probe
  * device ports unless they're blacklisted in some way or another. */
@@ -98,7 +100,8 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_TTY_BLACKLIST        | \
      MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY | \
      MM_FILTER_RULE_TTY_PLATFORM_DRIVER  | \
-     MM_FILTER_RULE_TTY_DEFAULT_ALLOWED)
+     MM_FILTER_RULE_TTY_DEFAULT_ALLOWED  | \
+     MM_FILTER_RULE_WWAN)
 
 /* This is a stricter policy which will only automatically probe device ports
  * if they are allowed by any of the automatic whitelist rules. */
@@ -116,7 +119,8 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_TTY_DRIVER            | \
      MM_FILTER_RULE_TTY_ACM_INTERFACE     | \
      MM_FILTER_RULE_TTY_WITH_NET          | \
-     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)
+     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN | \
+     MM_FILTER_RULE_WWAN)
 
 /* This is equivalent to the strict policy, but also applying the device
  * blacklists explicitly */
@@ -136,7 +140,8 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_TTY_DRIVER            | \
      MM_FILTER_RULE_TTY_ACM_INTERFACE     | \
      MM_FILTER_RULE_TTY_WITH_NET          | \
-     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)
+     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN | \
+     MM_FILTER_RULE_WWAN)
 
 /* This policy only allows using device ports explicitly whitelisted via
  * udev rules. i.e. ModemManager won't do any kind of automatic probing. */
