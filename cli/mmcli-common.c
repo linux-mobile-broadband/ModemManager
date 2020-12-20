@@ -205,7 +205,9 @@ find_modem (MMManager   *manager,
         MMModem  *modem;
 
         obj   = MM_OBJECT (l->data);
-        modem = MM_MODEM (mm_object_get_modem (obj));
+        modem = mm_object_get_modem (obj);
+        if (!modem)
+             continue;
 
         if (modem_any ||
             (modem_path && g_str_equal (mm_object_get_path (obj), modem_path)) ||

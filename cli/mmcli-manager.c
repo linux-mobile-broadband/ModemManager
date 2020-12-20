@@ -332,9 +332,14 @@ output_modem_info (MMObject    *obj,
     gchar       *extra;
     const gchar *manufacturer;
     const gchar *model;
+    MMModem     *modem;
 
-    manufacturer = mm_modem_get_manufacturer (mm_object_peek_modem (obj));
-    model = mm_modem_get_model (mm_object_peek_modem (obj));
+    modem = mm_object_peek_modem (obj);
+    if (!modem)
+        return;
+
+    manufacturer = mm_modem_get_manufacturer (modem);
+    model = mm_modem_get_model (modem);
     extra = g_strdup_printf ("[%s] %s",
                              manufacturer ? manufacturer : "manufacturer unknown",
                              model        ? model        : "model unknown");
