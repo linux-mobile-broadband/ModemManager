@@ -1688,6 +1688,7 @@ mm_utils_hex2byte (const gchar *hex)
 
 gchar *
 mm_utils_hexstr2bin (const gchar  *hex,
+                     gssize        len,
                      gsize        *out_len,
                      GError      **error)
 {
@@ -1695,10 +1696,10 @@ mm_utils_hexstr2bin (const gchar  *hex,
     g_autofree gchar *buf = NULL;
     gsize i;
     gint a;
-    gchar *opos;
-    gsize len;
-
-    len = strlen (hex);
+    gchar *opos
+;
+    if (len < 0)
+        len = strlen (hex);
 
     /* Length must be a multiple of 2 */
     if ((len % 2) != 0) {

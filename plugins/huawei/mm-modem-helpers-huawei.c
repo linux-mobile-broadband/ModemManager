@@ -188,7 +188,7 @@ match_info_to_ip4_addr (GMatchInfo *match_info,
     else
         g_assert_not_reached ();
 
-    bin = mm_utils_hexstr2bin (buf, &bin_len, NULL);
+    bin = mm_utils_hexstr2bin (buf, -1, &bin_len, NULL);
     if (!bin || bin_len != 4)
         goto done;
 

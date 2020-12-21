@@ -343,7 +343,7 @@ mm_sms_part_3gpp_new_from_pdu (guint         index,
     gsize              pdu_len;
 
     /* Convert PDU from hex to binary */
-    pdu = (guint8 *) mm_utils_hexstr2bin (hexpdu, &pdu_len, error);
+    pdu = (guint8 *) mm_utils_hexstr2bin (hexpdu, -1, &pdu_len, error);
     if (!pdu) {
         g_prefix_error (error, "Couldn't convert 3GPP PDU from hex to binary: ");
         return NULL;
