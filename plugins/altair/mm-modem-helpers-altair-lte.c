@@ -210,7 +210,7 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
             break;
         }
 
-        pco_payload_bytes = mm_utils_hexstr2bin (pco_payload, &pco_payload_bytes_len, error);
+        pco_payload_bytes = mm_utils_hexstr2bin (pco_payload, -1, &pco_payload_bytes_len, error);
         if (!pco_payload_bytes) {
             g_prefix_error (error, "Invalid PCO payload from PCO info '%s': ", pco_info);
             break;

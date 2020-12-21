@@ -2335,7 +2335,7 @@ decode (MMIfaceModem3gppUssd *self,
     gsize              bin_len = 0;
     guint32            unpacked_len;
 
-    bin = mm_utils_hexstr2bin (reply, &bin_len, error);
+    bin = mm_utils_hexstr2bin (reply, -1, &bin_len, error);
     if (!bin)
         return NULL;
 

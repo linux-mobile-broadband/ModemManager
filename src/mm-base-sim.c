@@ -1311,7 +1311,7 @@ parse_mnc_length (const gchar *response,
         g_autofree gchar *bin = NULL;
 
         /* Convert hex string to binary */
-        bin = mm_utils_hexstr2bin (hex, &buflen, error);
+        bin = mm_utils_hexstr2bin (hex, -1, &buflen, error);
         if (!bin) {
             g_prefix_error (error, "SIM returned malformed response '%s': ", hex);
             return 0;
@@ -1416,7 +1416,7 @@ parse_spn (const gchar *response,
         g_autofree gchar *bin = NULL;
 
         /* Convert hex string to binary */
-        bin = mm_utils_hexstr2bin (hex, &buflen, error);
+        bin = mm_utils_hexstr2bin (hex, -1, &buflen, error);
         if (!bin) {
             g_prefix_error (error, "SIM returned malformed response '%s': ", hex);
             return NULL;
