@@ -4809,11 +4809,14 @@ ussd_decode (guint32      scheme,
     gchar *decoded = NULL;
 
     if (scheme == MM_MODEM_GSM_USSD_SCHEME_7BIT) {
-        g_autofree guint8  *unpacked = NULL;
-        guint32             unpacked_len;
+        g_autoptr(GByteArray)  unpacked_array = NULL;
+        guint8                *unpacked = NULL;
+        guint32                unpacked_len;
 
         unpacked = mm_charset_gsm_unpack ((const guint8 *)data->data, (data->len * 8) / 7, 0, &unpacked_len);
-        decoded = (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len, FALSE, error);
+        unpacked_array = g_byte_array_new_take (unpacked, unpacked_len);
+
+        decoded = mm_modem_charset_bytearray_to_utf8 (unpacked_array, MM_MODEM_CHARSET_GSM, FALSE, error);
         if (!decoded)
             g_prefix_error (error, "Error decoding USSD command in 0x%04x scheme (GSM7 charset): ", scheme);
     } else if (scheme == MM_MODEM_GSM_USSD_SCHEME_UCS2) {

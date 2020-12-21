@@ -2329,10 +2329,11 @@ decode (MMIfaceModem3gppUssd *self,
         const gchar *reply,
         GError **error)
 {
-    g_autofree guint8 *bin = NULL;
-    g_autofree guint8 *unpacked = NULL;
-    gsize              bin_len = 0;
-    guint32            unpacked_len;
+    g_autofree guint8    *bin = NULL;
+    gsize                 bin_len = 0;
+    g_autofree guint8    *unpacked = NULL;
+    guint32               unpacked_len;
+    g_autoptr(GByteArray) unpacked_array = NULL;
 
     bin = mm_utils_hexstr2bin (reply, -1, &bin_len, error);
     if (!bin)
@@ -2342,7 +2343,11 @@ decode (MMIfaceModem3gppUssd *self,
     /* if the last character in a 7-byte block is padding, then drop it */
     if ((bin_len % 7 == 0) && (unpacked[unpacked_len - 1] == 0x0d))
         unpacked_len--;
-    return (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len, FALSE, error);
+
+    unpacked_array = g_byte_array_sized_new (unpacked_len);
+    g_byte_array_append (unpacked_array, unpacked, unpacked_len);
+
+    return mm_modem_charset_bytearray_to_utf8 (unpacked_array, MM_MODEM_CHARSET_GSM, FALSE, error);
 }
 
 /*****************************************************************************/

@@ -48,11 +48,6 @@ gchar *mm_modem_charset_byte_array_to_utf8 (GByteArray     *array,
 gchar *mm_modem_charset_hex_to_utf8 (const gchar    *src,
                                     MMModemCharset  charset);
 
-guint8 *mm_charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
-                                         guint32        len,
-                                         gboolean       translit,
-                                         GError       **error);
-
 /* Checks whether conversion to the given charset may be done without errors */
 gboolean mm_charset_can_convert_to (const gchar    *utf8,
                                     MMModemCharset  charset);

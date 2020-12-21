@@ -133,11 +133,13 @@ sms_decode_address (const guint8  *address,
     address++;
 
     if (addrtype == SMS_NUMBER_TYPE_ALPHA) {
-        g_autofree guint8 *unpacked = NULL;
-        guint32            unpacked_len;
+        g_autoptr(GByteArray)  unpacked_array = NULL;
+        guint8                *unpacked = NULL;
+        guint32                unpacked_len;
 
         unpacked = mm_charset_gsm_unpack (address, (len * 4) / 7, 0, &unpacked_len);
-        utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len, FALSE, error);
+        unpacked_array = g_byte_array_new_take (unpacked, unpacked_len);
+        utf8 = mm_modem_charset_bytearray_to_utf8 (unpacked_array, MM_MODEM_CHARSET_GSM, FALSE, error);
     } else if (addrtype == SMS_NUMBER_TYPE_INTL &&
                addrplan == SMS_NUMBER_PLAN_TELEPHONE) {
         /* International telphone number, format as "+1234567890" */
@@ -249,12 +251,14 @@ sms_decode_text (const guint8   *text,
                  GError        **error)
 {
     if (encoding == MM_SMS_ENCODING_GSM7) {
-        g_autofree guint8 *unpacked = NULL;
-        guint32            unpacked_len;
-        gchar             *utf8;
+        g_autoptr(GByteArray)  unpacked_array = NULL;
+        guint8                *unpacked = NULL;
+        guint32                unpacked_len;
+        gchar                 *utf8;
 
         unpacked = mm_charset_gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
-        utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len, FALSE, error);
+        unpacked_array = g_byte_array_new_take (unpacked, unpacked_len);
+        utf8 = mm_modem_charset_bytearray_to_utf8 (unpacked_array, MM_MODEM_CHARSET_GSM, FALSE, error);
         if (utf8)
             mm_obj_dbg (log_object, "converted SMS part text from GSM-7 to UTF-8: %s", utf8);
         return utf8;
