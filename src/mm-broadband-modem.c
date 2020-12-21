@@ -5877,31 +5877,31 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *_self,
 /* USSD Encode/Decode (3GPP/USSD interface) */
 
 static gchar *
-modem_3gpp_ussd_encode (MMIfaceModem3gppUssd  *self,
+modem_3gpp_ussd_encode (MMIfaceModem3gppUssd  *_self,
                         const gchar           *command,
                         guint                 *scheme,
                         GError               **error)
 {
-    MMBroadbandModem      *broadband = MM_BROADBAND_MODEM (self);
-    gchar                 *hex = NULL;
+    MMBroadbandModem      *self = MM_BROADBAND_MODEM (_self);
     g_autoptr(GByteArray)  ussd_command = NULL;
-
-    ussd_command = g_byte_array_new ();
 
     /* Encode to the current charset (as per AT+CSCS, which is what most modems
      * (except for Huawei it seems) will ask for. */
-    if (mm_modem_charset_byte_array_append (ussd_command, command, broadband->priv->modem_current_charset, NULL)) {
-        /* The scheme value does NOT represent the encoding used to encode the string
-         * we're giving. This scheme reflects the encoding that the modem should use when
-         * sending the data out to the network. We're hardcoding this to GSM-7 because
-         * USSD commands fit well in GSM-7, unlike USSD responses that may contain code
-         * points that may only be encoded in UCS-2. */
-        *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
-        /* convert to hex representation */
-        hex = mm_utils_bin2hexstr (ussd_command->data, ussd_command->len);
+    ussd_command = mm_modem_charset_bytearray_from_utf8 (command, self->priv->modem_current_charset, FALSE, error);
+    if (!ussd_command) {
+        g_prefix_error (error, "Failed to encode USSD command: ");
+        return NULL;
     }
 
-    return hex;
+    /* The scheme value does NOT represent the encoding used to encode the string
+     * we're giving. This scheme reflects the encoding that the modem should use when
+     * sending the data out to the network. We're hardcoding this to GSM-7 because
+     * USSD commands fit well in GSM-7, unlike USSD responses that may contain code
+     * points that may only be encoded in UCS-2. */
+    *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
+
+    /* convert to hex representation */
+    return (gchar *) mm_utils_bin2hexstr (ussd_command->data, ussd_command->len);
 }
 
 static gchar *

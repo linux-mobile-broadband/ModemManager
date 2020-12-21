@@ -37,15 +37,6 @@ MMModemCharset  mm_modem_charset_from_string (const gchar    *string);
 
 /*****************************************************************************************/
 
-/* Append the given string to the given byte array but re-encode it
- * into the given charset first.  The original string is assumed to be
- * UTF-8 encoded.
- */
-gboolean mm_modem_charset_byte_array_append (GByteArray      *array,
-                                             const gchar     *utf8,
-                                             MMModemCharset   charset,
-                                             GError         **error);
-
 /* Take a string encoded in the given charset in binary form, and
  * convert it to UTF-8. */
 gchar *mm_modem_charset_byte_array_to_utf8 (GByteArray     *array,
