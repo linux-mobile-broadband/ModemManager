@@ -264,17 +264,14 @@ sms_decode_text (const guint8   *text,
         return utf8;
     }
 
+    /* Always assume UTF-16 instead of UCS-2! */
     if (encoding == MM_SMS_ENCODING_UCS2) {
         g_autoptr(GByteArray)  bytearray = NULL;
         gchar                 *utf8;
 
         bytearray = g_byte_array_append (g_byte_array_sized_new (len), (const guint8 *)text, len);
-        /* Always assume UTF-16 instead of UCS-2! */
-        utf8 = mm_modem_charset_byte_array_to_utf8 (bytearray, MM_MODEM_CHARSET_UTF16);
-        if (!utf8)
-            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                         "Couldn't convert SMS part contents from UTF-16BE to UTF-8: not decoding any text");
-        else
+        utf8 = mm_modem_charset_bytearray_to_utf8 (bytearray, MM_MODEM_CHARSET_UTF16, FALSE, error);
+        if (utf8)
             mm_obj_dbg (log_object, "converted SMS part text from UTF-16BE to UTF-8: %s", utf8);
         return utf8;
     }

@@ -97,29 +97,6 @@ charset_iconv_from (MMModemCharset charset)
 }
 
 gchar *
-mm_modem_charset_byte_array_to_utf8 (GByteArray     *array,
-                                     MMModemCharset  charset)
-{
-    const gchar       *iconv_from;
-    g_autofree gchar  *converted = NULL;
-    g_autoptr(GError)  error = NULL;
-
-    g_return_val_if_fail (array != NULL, NULL);
-    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
-
-    iconv_from = charset_iconv_from (charset);
-    g_return_val_if_fail (iconv_from != NULL, FALSE);
-
-    converted = g_convert ((const gchar *)array->data, array->len,
-                           "UTF-8", iconv_from,
-                           NULL, NULL, &error);
-    if (!converted || error)
-        return NULL;
-
-    return g_steal_pointer (&converted);
-}
-
-gchar *
 mm_modem_charset_hex_to_utf8 (const gchar    *src,
                               MMModemCharset  charset)
 {
