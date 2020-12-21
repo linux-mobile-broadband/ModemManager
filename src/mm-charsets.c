@@ -343,11 +343,11 @@ utf8_to_gsm_ext_char (const gchar *utf8,
     return FALSE;
 }
 
-guint8 *
-mm_charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
-                                 guint32        len,
-                                 gboolean       translit,
-                                 GError       **error)
+static guint8 *
+charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
+                              guint32        len,
+                              gboolean       translit,
+                              GError       **error)
 {
     g_autoptr(GByteArray) utf8 = NULL;
     guint                 i;
@@ -744,7 +744,8 @@ mm_charset_take_and_convert_to_utf8 (gchar          *str,
         break;
 
     case MM_MODEM_CHARSET_GSM:
-        utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 ((const guint8 *) str, strlen (str), FALSE, NULL);
+        /* This is WRONG! GSM may have embedded NULs (character @)! */
+        utf8 = (gchar *) charset_gsm_unpacked_to_utf8 ((const guint8 *) str, strlen (str), FALSE, NULL);
         g_free (str);
         break;
 
@@ -1111,10 +1112,10 @@ mm_modem_charset_bytearray_to_utf8 (GByteArray      *bytearray,
 
     switch (charset) {
         case MM_MODEM_CHARSET_GSM:
-            utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (bytearray->data,
-                                                              bytearray->len,
-                                                              translit,
-                                                              error);
+            utf8 = (gchar *) charset_gsm_unpacked_to_utf8 (bytearray->data,
+                                                           bytearray->len,
+                                                           translit,
+                                                           error);
             break;
         case MM_MODEM_CHARSET_IRA:
         case MM_MODEM_CHARSET_UTF8:

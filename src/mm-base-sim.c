@@ -1412,22 +1412,31 @@ parse_spn (const gchar *response,
         (sw1 == 0x91) ||
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
-        gsize              buflen = 0;
-        g_autofree guint8 *bin = NULL;
+        g_autoptr(GByteArray)  bin_array = NULL;
+        g_autofree guint8     *bin = NULL;
+        gsize                  binlen = 0;
 
         /* Convert hex string to binary */
-        bin = mm_utils_hexstr2bin (hex, -1, &buflen, error);
+        bin = mm_utils_hexstr2bin (hex, -1, &binlen, error);
         if (!bin) {
             g_prefix_error (error, "SIM returned malformed response '%s': ", hex);
             return NULL;
         }
 
         /* Remove the FF filler at the end */
-        while (buflen > 1 && bin[buflen - 1] == 0xff)
-            buflen--;
+        while (binlen > 1 && bin[binlen - 1] == 0xff)
+            binlen--;
+        if (binlen <= 1) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "SIM returned empty response '%s'", hex);
+            return NULL;
+        }
+        /* Setup as bytearray.
+         * First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
+        bin_array = g_byte_array_sized_new (binlen - 1);
+        g_byte_array_append (bin_array, bin + 1, binlen - 1);
 
-        /* First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
-        return (gchar *)mm_charset_gsm_unpacked_to_utf8 (bin + 1, buflen - 1, FALSE, error);
+        return mm_modem_charset_bytearray_to_utf8 (bin_array, MM_MODEM_CHARSET_GSM, FALSE, error);
     }
 
     g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,

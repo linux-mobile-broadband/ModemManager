@@ -27,7 +27,8 @@ common_test_gsm7 (const gchar *in_utf8)
     guint32 unpacked_gsm_len_2 = 0;
     g_autoptr(GByteArray) unpacked_gsm = NULL;
     g_autofree guint8 *packed_gsm = NULL;
-    g_autofree guint8 *unpacked_gsm_2 = NULL;
+    guint8 *unpacked_gsm_2 = NULL;
+    g_autoptr(GByteArray) unpacked_gsm_2_array = NULL;
     g_autofree gchar *built_utf8 = NULL;
     g_autoptr(GError) error = NULL;
 
@@ -56,9 +57,10 @@ common_test_gsm7 (const gchar *in_utf8)
     /* Unpack */
     unpacked_gsm_2 = mm_charset_gsm_unpack (packed_gsm, packed_gsm_len * 8 / 7, 0, &unpacked_gsm_len_2);
     g_assert_nonnull (unpacked_gsm_2);
+    unpacked_gsm_2_array = g_byte_array_new_take (unpacked_gsm_2, unpacked_gsm_len_2);
 
     /* And back to UTF-8 */
-    built_utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (unpacked_gsm_2, unpacked_gsm_len_2, FALSE, &error);
+    built_utf8 = mm_modem_charset_bytearray_to_utf8 (unpacked_gsm_2_array, MM_MODEM_CHARSET_GSM, FALSE, &error);
     g_assert_nonnull (built_utf8);
     g_assert_no_error (error);
     g_assert_cmpstr (built_utf8, ==, in_utf8);
