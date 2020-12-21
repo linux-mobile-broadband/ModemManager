@@ -1368,57 +1368,49 @@ write_bearer_data_message_identifier (MMSmsPart  *part,
     return TRUE;
 }
 
-static void
+static GByteArray *
 decide_best_encoding (const gchar *text,
                       gpointer     log_object,
-                      GByteArray **out,
                       guint       *num_fields,
                       guint       *num_bits_per_field,
-                      Encoding    *encoding)
+                      Encoding    *encoding,
+                      GError     **error)
 {
-    guint ascii_unsupported = 0;
-    guint i;
-    guint len;
-    g_autoptr(GError) error = NULL;
+    g_autoptr(GByteArray) barray = NULL;
+    MMModemCharset        target_charset = MM_MODEM_CHARSET_UNKNOWN;
+    guint                 len;
 
     len = strlen (text);
 
-    /* Check if we can do ASCII-7 */
-    for (i = 0; i < len; i++) {
-        if (text[i] & 0x80) {
-            ascii_unsupported++;
-            break;
-        }
+    if (mm_charset_can_convert_to (text, MM_MODEM_CHARSET_IRA))
+        target_charset = MM_MODEM_CHARSET_IRA;
+    else if (mm_charset_can_convert_to (text, MM_MODEM_CHARSET_8859_1))
+        target_charset = MM_MODEM_CHARSET_8859_1;
+    else
+        target_charset = MM_MODEM_CHARSET_UCS2;
+
+    barray = mm_modem_charset_bytearray_from_utf8 (text, target_charset, FALSE, error);
+    if (!barray) {
+        g_prefix_error (error, "Couldn't decide best encoding: ");
+        return NULL;
     }
 
-    /* If ASCII-7 already supported, done we are */
-    if (!ascii_unsupported) {
-        *out = g_byte_array_sized_new (len);
-        g_byte_array_append (*out, (const guint8 *)text, len);
+    if (target_charset == MM_MODEM_CHARSET_IRA) {
         *num_fields = len;
         *num_bits_per_field = 7;
         *encoding = ENCODING_ASCII_7BIT;
-        return;
-    }
-
-    /* Check if we can do Latin encoding */
-    if (mm_charset_can_convert_to (text, MM_MODEM_CHARSET_8859_1)) {
-        *out = g_byte_array_sized_new (len);
-        if (!mm_modem_charset_byte_array_append (*out, text, MM_MODEM_CHARSET_8859_1, &error))
-            mm_obj_warn (log_object, "failed to convert to latin encoding: %s", error->message);
-        *num_fields = (*out)->len;
+    } else if (target_charset == MM_MODEM_CHARSET_8859_1) {
+        *num_fields = barray->len;
         *num_bits_per_field = 8;
         *encoding = ENCODING_LATIN;
-        return;
-    }
+    } else if (target_charset == MM_MODEM_CHARSET_UCS2) {
+        *num_fields = barray->len / 2;
+        *num_bits_per_field = 16;
+        *encoding = ENCODING_UNICODE;
+    } else
+        g_assert_not_reached ();
 
-    /* If no Latin and no ASCII, default to UTF-16 */
-    *out = g_byte_array_sized_new (len * 2);
-    if (!mm_modem_charset_byte_array_append (*out, text, MM_MODEM_CHARSET_UCS2, &error))
-        mm_obj_warn (log_object, "failed to convert to UTF-16 encoding: %s", error->message);
-    *num_fields = (*out)->len / 2;
-    *num_bits_per_field = 16;
-    *encoding = ENCODING_UNICODE;
+    return g_steal_pointer (&barray);
 }
 
 static gboolean
@@ -1462,12 +1454,14 @@ write_bearer_data_user_data (MMSmsPart  *part,
 
     /* Text or Data */
     if (text) {
-        decide_best_encoding (text,
-                              log_object,
-                              &converted,
-                              &num_fields,
-                              &num_bits_per_field,
-                              &encoding);
+        converted = decide_best_encoding (text,
+                                          log_object,
+                                          &num_fields,
+                                          &num_bits_per_field,
+                                          &encoding,
+                                          error);
+        if (!converted)
+            return FALSE;
         aux = (const GByteArray *)converted;
     } else {
         aux = data;
