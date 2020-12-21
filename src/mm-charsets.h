@@ -37,11 +37,6 @@ MMModemCharset  mm_modem_charset_from_string (const gchar    *string);
 
 /*****************************************************************************************/
 
-/* Take a string encoded in the given charset in binary form, and
- * convert it to UTF-8. */
-gchar *mm_modem_charset_byte_array_to_utf8 (GByteArray     *array,
-                                            MMModemCharset  charset);
-
 /* Take a string in hex representation ("00430052" or "A4BE11" for example)
  * and convert it from the given character set to UTF-8.
  */
