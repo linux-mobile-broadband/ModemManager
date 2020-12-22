@@ -5905,15 +5905,25 @@ modem_3gpp_ussd_encode (MMIfaceModem3gppUssd  *_self,
 }
 
 static gchar *
-modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
-                        const gchar *reply,
-                        GError **error)
+modem_3gpp_ussd_decode (MMIfaceModem3gppUssd  *self,
+                        const gchar           *reply,
+                        GError               **error)
 {
-    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    MMBroadbandModem      *broadband = MM_BROADBAND_MODEM (self);
+    guint8                *bin = NULL;
+    gsize                  bin_len = 0;
+    g_autoptr(GByteArray)  barray = NULL;
+
+    bin = (guint8 *) mm_utils_hexstr2bin (reply, -1, &bin_len, error);
+    if (!bin) {
+        g_prefix_error (error, "Couldn't convert HEX string to binary: ");
+        return NULL;
+    }
+    barray = g_byte_array_new_take (bin, bin_len);
 
     /* Decode from current charset (as per AT+CSCS, which is what most modems
      * (except for Huawei it seems) will ask for. */
-    return mm_modem_charset_hex_to_utf8 (reply, broadband->priv->modem_current_charset);
+    return mm_modem_charset_bytearray_to_utf8 (barray, broadband->priv->modem_current_charset, FALSE, error);
 }
 
 /*****************************************************************************/
