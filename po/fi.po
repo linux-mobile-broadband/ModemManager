@@ -1,0 +1,116 @@
+# Finnish translation for ModemManager.
+# Copyright (C) 2020 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# JRfi <starman@starman.fi>, 2020.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
+"ModemManager/issues\n"
+"POT-Creation-Date: 2021-01-08 03:28+0000\n"
+"PO-Revision-Date: 2020-08-08 18:58+0300\n"
+"Last-Translator: JR-Fi <starman@starman.fi>\n"
+"Language-Team: Finnish <lokalisointi-lista@googlegroups.com>\n"
+"Language: fi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 2.0.6\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Hallitse Modem Manager taustaprosessia"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr ""
+"Järjestelmän sääntö estää Modem Managerin hallinta-asetusten muuttamisen."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Avaa ja hallitse mobiilia laajakaistalaitetta"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"Järjestelmän sääntö estää avaamasta tai hallitsemasta mobiilia "
+"laajakaistalaitetta."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Lisää, muuta ja poista mobiilin laajakaistan yhteystietoja"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"Järjestelmän sääntö estää lisäämästä, muuttamasta tai poistamasta tämän "
+"laitteen yhteystietoja."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Lähetä, talleta, muuta ja poista tekstiviestejä"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"Järjestelmän sääntö estää lähettämästä tai muokkaamasta tämän laitteen "
+"tekstiviestejä."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Hyväksy tulevat puhelut tai aloita (ääni)puheluita."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "Järjestelmän sääntö estää äänipuhelut."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr "Tarkista verkon aika ja aikavyöhyketiedot"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid "System policy prevents querying network time information."
+msgstr ""
+"Järjestelmän sääntö estää tarkastamasta verkon aikaa ja aikavyöhyketietoja."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Enable and view geographic location and positioning information"
+msgstr "Salli ja katso sijainti- ja paikkatiedot"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"Järjestelmän sääntö estää sallimasta tai katsomasta sijainti- ja "
+"paikkatietoja"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and utilize network information and services"
+msgstr "Tarkista ja käytä verkon tietoja ja palveluita"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"Järjestelmän sääntö estää tarkistamasta tai käyttämästä verkon tietoja ja "
+"palveluita."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Tarkista ja hallitse mobiilin laajakaistalaitteen laiteohjelmistoa"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"Järjestelmän sääntö estää tarkistamasta ja hallitsemasta tämän laitteen "
+"laiteohjelmistoa."
+
+#: src/mm-sleep-monitor.c:125
+msgid "ModemManager needs to reset devices"
+msgstr "Modem Managerin pitää uudelleen käynnistää laitteita"
