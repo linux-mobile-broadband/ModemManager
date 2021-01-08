@@ -533,6 +533,8 @@ test_create_parse_pdu_text_ascii_encoding (void)
         g_assert_cmpstr ("123456789", ==, mm_sms_part_get_number (part));
         g_assert_cmpstr (text, ==, mm_sms_part_get_text (part));
         mm_sms_part_free (part);
+
+        g_free (pdu);
     }
 }
 
