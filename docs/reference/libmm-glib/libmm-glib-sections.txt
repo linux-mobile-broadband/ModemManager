@@ -1194,6 +1194,7 @@ mm_bearer_properties_set_rm_protocol
 <SUBSECTION Private>
 mm_bearer_properties_new_from_dictionary
 mm_bearer_properties_new_from_string
+MMBearerPropertiesCmpFlags
 mm_bearer_properties_cmp
 mm_bearer_properties_consume_string
 mm_bearer_properties_consume_variant
