@@ -359,7 +359,7 @@ gpsp_test_ready (MMIfaceModemLocation *self,
     if (error) {
         mm_obj_dbg (self, "GPS controller not supported: %s", error->message);
         g_clear_error (&error);
-    } else if (mm_base_modem_get_port_gps (MM_BASE_MODEM (self)))
+    } else if (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)))
         sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
                     MM_MODEM_LOCATION_SOURCE_GPS_RAW  |
                     MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED);
