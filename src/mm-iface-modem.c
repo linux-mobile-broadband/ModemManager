@@ -422,6 +422,7 @@ bearer_list_updated (MMBearerList *bearer_list,
     g_strfreev (paths);
 
     g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
+    g_object_unref (skeleton);
 }
 
 /*****************************************************************************/
