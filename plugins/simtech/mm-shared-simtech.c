@@ -293,7 +293,7 @@ disable_cgps_ready (MMBaseModem  *self,
     if (error)
         g_task_return_error (task, error);
     else {
-        priv->enabled_sources &= source;
+        priv->enabled_sources &= ~source;
         g_task_return_boolean (task, TRUE);
     }
     g_object_unref (task);
