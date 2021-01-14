@@ -2544,33 +2544,140 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 /* Load operator name (3GPP interface) */
 
 static gchar *
-modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
-                                      GAsyncResult *res,
-                                      GError **error)
+modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp  *self,
+                                      GAsyncResult      *res,
+                                      GError           **error)
 {
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-modem_3gpp_load_operator_name (MMIfaceModem3gpp *_self,
+get_plmn_name_ready (QmiClientNas *client,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    MMBroadbandModemQmi              *self;
+    GError                           *error = NULL;
+    QmiNasNetworkDescriptionEncoding  plmn_name_service_provider_name_encoding;
+    QmiNasNetworkDescriptionEncoding  plmn_name_short_name_encoding;
+    QmiNasNetworkDescriptionEncoding  plmn_name_long_name_encoding;
+    GArray                           *plmn_name_service_provider_name;
+    GArray                           *plmn_name_short_name;
+    GArray                           *plmn_name_long_name;
+    g_autoptr(QmiMessageNasGetPlmnNameOutput) output = NULL;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_nas_get_plmn_name_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_nas_get_plmn_name_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (qmi_message_nas_get_plmn_name_output_get_3gpp_eons_plmn_name (
+        output,
+        &plmn_name_service_provider_name_encoding,
+        &plmn_name_service_provider_name,
+        &plmn_name_short_name_encoding,
+        NULL,
+        NULL,
+        &plmn_name_short_name,
+        &plmn_name_long_name_encoding,
+        NULL,
+        NULL,
+        &plmn_name_long_name,
+        NULL)) {
+            g_autofree gchar *long_name = NULL;
+            g_autofree gchar *short_name = NULL;
+            g_autofree gchar *service_name = NULL;
+
+            long_name = qmi_nas_read_string_from_network_description_encoded_array (plmn_name_long_name_encoding, plmn_name_long_name);
+            short_name = qmi_nas_read_string_from_network_description_encoded_array (plmn_name_short_name_encoding, plmn_name_short_name);
+            service_name = qmi_nas_read_string_from_network_description_encoded_array (plmn_name_service_provider_name_encoding, plmn_name_service_provider_name);
+            mm_obj_dbg (self, "current operator long name: %s",    long_name);
+            mm_obj_dbg (self, "current operator short name: %s",   short_name);
+            mm_obj_dbg (self, "current operator service name: %s", service_name);
+            if (!self->priv->current_operator_description) {
+                self->priv->current_operator_description = (service_name ? g_steal_pointer (&service_name) :
+                                                            (long_name   ? g_steal_pointer (&long_name)    :
+                                                             (short_name ? g_steal_pointer (&short_name)   :
+                                                              NULL)));
+            }
+    }
+
+    if (!self->priv->current_operator_description)
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Current operator description is still unknown and cannot be retrieved from MCC/MNC");
+    else
+        g_task_return_pointer (task, g_strdup (self->priv->current_operator_description), g_free);
+
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_load_operator_name (MMIfaceModem3gpp    *_self,
                                GAsyncReadyCallback callback,
-                               gpointer user_data)
+                               gpointer            user_data)
 {
     MMBroadbandModemQmi *self = MM_BROADBAND_MODEM_QMI (_self);
-    GTask *task;
+    GTask               *task;
+    QmiClient           *client;
+    guint16              mcc = 0;
+    guint16              mnc = 0;
+    g_autoptr(GError)    error = NULL;
+    g_autoptr(QmiMessageNasGetPlmnNameInput) input = NULL;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (self->priv->current_operator_description)
-        g_task_return_pointer (task,
-                               g_strdup (self->priv->current_operator_description),
-                               g_free);
-    else
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Current operator description is still unknown");
-    g_object_unref (task);
+    if (self->priv->current_operator_description) {
+        g_task_return_pointer (task, g_strdup (self->priv->current_operator_description), g_free);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Check if operator id is set */
+    if (!self->priv->current_operator_id) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Current operator id is still unknown");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Parse input MCC/MNC */
+    if (!mm_3gpp_parse_operator_id (self->priv->current_operator_id, &mcc, &mnc, &error)) {
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+    /* Try to get PLMN name from MCC/MNC */
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_NAS,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        &error);
+    if (!client) {
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+    input = qmi_message_nas_get_plmn_name_input_new ();
+    qmi_message_nas_get_plmn_name_input_set_plmn (input, mcc, mnc, NULL);
+
+    qmi_client_nas_get_plmn_name (QMI_CLIENT_NAS (client),
+                                  input,
+                                  5,
+                                  NULL,
+                                  (GAsyncReadyCallback)get_plmn_name_ready,
+                                  task);
 }
 
 /*****************************************************************************/
