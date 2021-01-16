@@ -1,0 +1,37 @@
+
+
+The ModemManager releases are generated using the GNU autotools.
+
+1) Configure and build the whole project, making sure gtk-doc is enabled:
+
+    $ NOCONFIGURE=1 ./autogen.sh
+    $ ./configure --enable-gtk-doc
+    $ make -j8
+
+2) Run distcheck so that the source distribution tarball is generated, and the
+   project test suite is run on it:
+
+    $ make distcheck
+
+3) Compute checksum of the tarball so that it can be referenced in the release
+   email:
+
+    $ sha256sum ModemManager-${VERSION}.tar.xz
+
+4) Sign release tarball, and verify it (*):
+
+    $ gpg --detach-sign --armor ModemManager-${VERSION}.tar.xz
+    $ gpg --verify ModemManager-${VERSION}.tar.xz.asc ModemManager-${VERSION}.tar.xz
+
+5) Upload source tarball (.tar.xz) and signature (.tar.xz.asc) to
+   freedesktop.org
+
+TODO: manpages and gtk-doc references
+
+-------------------------------------------------------------------------------
+
+*) Verifying the release signature requires the public key of the person who
+   signed it, e.g.:
+
+    $ curl https://www.freedesktop.org/software/ModemManager/0x3CAD53398973FFFA.asc | gpg --import
+
