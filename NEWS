@@ -1,4 +1,34 @@
 
+ModemManager 1.14.10
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+ * Modem interface:
+   ** Plug MmGdbusModem leak when bearers are updated.
+   ** Don't consider charset setup failure as fatal.
+
+ * Messaging interface:
+   ** Fix 7-bit ASCII decoding in CDMA SMS messages.
+
+ * QMI:
+   ** Fix reporting of signal strengh indications.
+
+ * MBIM:
+   ** Plug memleak when processing USSD in GSM7.
+
+ * mmcli:
+   ** Don't assume that mm_object_peek|get_modem() return always non-NULL.
+
+ * Plugins:
+   ** cinterion: add PLS83 port type hints.
+   ** cinterion: add QCDM and GPS port type hints for PLS26.
+   ** cinterion: add AT primary/secondary port type hints for PLS8.
+   ** telit: plug GPS data port leak.
+   ** zte: add after SIM unlock delay.
+
+ * Several other minor improvements and fixes.
+
+
 ModemManager 1.14.8
 -------------------------------------------
 This is a new bugfix release of ModemManager.
