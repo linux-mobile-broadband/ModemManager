@@ -112,14 +112,7 @@ kernel_device_get_name (MMKernelDevice *_self)
 static const gchar *
 kernel_device_get_physdev_uid (MMKernelDevice *_self)
 {
-    MMKernelDeviceQrtr *self;
-
-    self = MM_KERNEL_DEVICE_QRTR (_self);
-
-    if (!self->priv->physdev_uid)
-        self->priv->physdev_uid = g_strdup_printf ("qrtr%d", qrtr_node_get_id (self->priv->node));
-
-    return self->priv->physdev_uid;
+    return MM_KERNEL_DEVICE_QRTR_PHYSDEV_UID;
 }
 
 static const gchar *
