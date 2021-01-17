@@ -456,6 +456,7 @@ mm_filter_new (MMFilterRule   enabled_rules,
     mm_obj_dbg (self, "  virtual devices forbidden:  %s", RULE_ENABLED_STR (MM_FILTER_RULE_VIRTUAL));
     mm_obj_dbg (self, "  net devices allowed:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_NET));
     mm_obj_dbg (self, "  usbmisc devices allowed:    %s", RULE_ENABLED_STR (MM_FILTER_RULE_USBMISC));
+    mm_obj_dbg (self, "  rpmsg devices allowed:      %s", RULE_ENABLED_STR (MM_FILTER_RULE_RPMSG));
     if (self->priv->enabled_rules & MM_FILTER_RULE_TTY) {
         mm_obj_dbg (self, "  tty devices:");
         mm_obj_dbg (self, "      blacklist applied:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_BLACKLIST));
