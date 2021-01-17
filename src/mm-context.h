@@ -52,5 +52,8 @@ gboolean     mm_context_get_test_no_udev           (void);
 #if defined WITH_SYSTEMD_SUSPEND_RESUME
 gboolean     mm_context_get_test_no_suspend_resume (void);
 #endif
+#if defined WITH_QRTR
+gboolean     mm_context_get_test_no_qrtr    (void);
+#endif
 
 #endif /* MM_CONTEXT_H */

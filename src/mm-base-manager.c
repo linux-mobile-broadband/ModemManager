@@ -1455,19 +1455,6 @@ initable_init (GInitable     *initable,
 {
     MMBaseManager *self = MM_BASE_MANAGER (initable);
 
-#if defined WITH_QRTR
-    /* Create and setup the QrtrBusWatcher */
-    self->priv->qrtr_bus_watcher = mm_qrtr_bus_watcher_new ();
-    mm_qrtr_bus_watcher_start (self->priv->qrtr_bus_watcher, NULL, NULL);
-
-    /* If autoscan enabled, list for QrtrBusWatcher events */
-    if (self->priv->auto_scan) {
-        g_object_connect (self->priv->qrtr_bus_watcher,
-                          "swapped-signal::" MM_QRTR_BUS_WATCHER_DEVICE_ADDED,   G_CALLBACK (handle_qrtr_device_added),   self,
-                          "swapped-signal::" MM_QRTR_BUS_WATCHER_DEVICE_REMOVED, G_CALLBACK (handle_qrtr_device_removed), self,
-                          NULL);
-    }
-#endif
     /* Create filter */
     self->priv->filter = mm_filter_new (self->priv->filter_policy, error);
     if (!self->priv->filter)
@@ -1485,6 +1472,21 @@ initable_init (GInitable     *initable,
     /* If autoscan enabled, list for udev events */
     if (!mm_context_get_test_no_udev () && self->priv->auto_scan)
         g_signal_connect_swapped (self->priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
+#endif
+
+#if defined WITH_QRTR
+    if (!mm_context_get_test_no_qrtr ()) {
+        /* Create and setup the QrtrBusWatcher */
+        self->priv->qrtr_bus_watcher = mm_qrtr_bus_watcher_new ();
+        mm_qrtr_bus_watcher_start (self->priv->qrtr_bus_watcher, NULL, NULL);
+        /* If autoscan enabled, list for QrtrBusWatcher events */
+        if (self->priv->auto_scan) {
+            g_object_connect (self->priv->qrtr_bus_watcher,
+                              "swapped-signal::" MM_QRTR_BUS_WATCHER_DEVICE_ADDED,   G_CALLBACK (handle_qrtr_device_added),   self,
+                              "swapped-signal::" MM_QRTR_BUS_WATCHER_DEVICE_REMOVED, G_CALLBACK (handle_qrtr_device_removed), self,
+                              NULL);
+        }
+    }
 #endif
 
     /* Export the manager interface */

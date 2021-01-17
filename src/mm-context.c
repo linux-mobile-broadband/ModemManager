@@ -25,12 +25,12 @@
 /*****************************************************************************/
 /* Application context */
 
-#if defined WITH_UDEV
+#if defined WITH_UDEV || defined WITH_QRTR
 # define NO_AUTO_SCAN_OPTION_FLAG 0
 # define NO_AUTO_SCAN_DEFAULT     FALSE
 #else
-/* Keep the option when udev disabled, just so that the unit test setup can
- * unconditionally use --no-auto-scan */
+/* Keep the option when udev and QRTR disabled, just so that the unit test
+ * setup can unconditionally use --no-auto-scan */
 # define NO_AUTO_SCAN_OPTION_FLAG G_OPTION_FLAG_HIDDEN
 # define NO_AUTO_SCAN_DEFAULT     TRUE
 #endif
@@ -228,6 +228,9 @@ static gboolean  test_no_udev;
 #if defined WITH_SYSTEMD_SUSPEND_RESUME
 static gboolean  test_no_suspend_resume;
 #endif
+#if defined WITH_QRTR
+static gboolean  test_no_qrtr;
+#endif
 
 static const GOptionEntry test_entries[] = {
     {
@@ -256,6 +259,13 @@ static const GOptionEntry test_entries[] = {
     {
         "test-no-suspend-resume", 0, 0, G_OPTION_ARG_NONE, &test_no_suspend_resume,
         "Disable suspend/resume support at runtime even if available",
+        NULL
+    },
+#endif
+#if defined WITH_QRTR
+    {
+        "test-no-qrtr", 0, 0, G_OPTION_ARG_NONE, &test_no_qrtr,
+        "Run without qrtr support even if available",
         NULL
     },
 #endif
@@ -310,6 +320,13 @@ mm_context_get_test_no_suspend_resume (void)
 }
 #endif
 
+#if defined WITH_QRTR
+gboolean
+mm_context_get_test_no_qrtr (void)
+{
+    return test_no_qrtr;
+}
+#endif
 /*****************************************************************************/
 
 static void
@@ -376,13 +393,22 @@ mm_context_init (gint argc,
     }
 
     /* Initial kernel events processing may only be used if autoscan is disabled */
-#if defined WITH_UDEV
+#if defined WITH_UDEV || defined WITH_QRTR
     if (!no_auto_scan && initial_kernel_events) {
         g_warning ("error: --initial-kernel-events must be used only if --no-auto-scan is also used");
         exit (1);
     }
+# if defined WITH_UDEV
     /* Force skipping autoscan if running test without udev */
     if (test_no_udev)
         no_auto_scan = TRUE;
+# endif
+# if defined WITH_QRTR
+    /* Force skipping autoscan if running test without qrtr */
+    if (test_no_qrtr)
+        no_auto_scan = TRUE;
+# endif
 #endif
+
+
 }
