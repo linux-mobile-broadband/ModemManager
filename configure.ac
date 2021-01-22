@@ -422,6 +422,42 @@ case $with_qmi in
 esac
 
 dnl-----------------------------------------------------------------------------
+dnl QRTR support (both as libqrtr-glib and libqmi-glib apis)
+dnl
+
+LIBQRTR_VERSION=1.0.0
+PKG_CHECK_MODULES(QRTR, [qrtr-glib >= $LIBQRTR_VERSION],[have_qrtr=yes],[have_qrtr=no])
+qmi_qrtr_supported=$($PKG_CONFIG --variable=qmi_qrtr_supported qmi-glib)
+
+AC_ARG_WITH(qrtr, AS_HELP_STRING([--without-qrtr], [Build without QRTR support]), [], [with_qrtr=auto])
+if test "x$with_qrtr" = "xauto"; then
+    if test "x$qmi_qrtr_supported" = "x1" && test "x$with_qmi" = "xyes" && test "x$have_qrtr" = "xyes"; then
+        with_qrtr=yes
+    else
+        with_qrtr=no
+    fi
+fi
+case $with_qrtr in
+    yes)
+        if test "x$with_qmi" = "xno"; then
+            AC_MSG_ERROR([QRTR support requires QMI enabled. Configure using --with-qmi, or otherwise configure using --without-qrtr to disable QRTR support.])
+        elif test "x$have_qrtr" = "xno"; then
+            AC_MSG_ERROR([Couldn't find libqrtr-glib >= $LIBQRTR_VERSION. Install it, or otherwise configure using --without-qrtr to disable QRTR support.])
+        elif test "x$qmi_qrtr_supported" != "x1"; then
+            AC_MSG_ERROR([Couldn't find QRTR support in libqmi-glib. Install it, or otherwise configure using --without-qrtr to disable QRTR support.])
+        else
+            AC_DEFINE(WITH_QRTR, 1, [Define if you want QRTR support])
+            AC_SUBST(QRTR_CFLAGS)
+            AC_SUBST(QRTR_LIBS)
+        fi
+        ;;
+    *)
+        with_qrtr=no
+        ;;
+esac
+AM_CONDITIONAL(WITH_QRTR, test "x$with_qrtr" = "xyes")
+
+dnl-----------------------------------------------------------------------------
 dnl Distribution version string
 dnl
 AC_ARG_WITH(dist-version, AS_HELP_STRING([--with-dist-version=<mm-dist-version>], [Define the custom version (like distribution package name and revision)]), ac_distver=$withval, ac_distver="")
@@ -592,6 +628,7 @@ echo "
       policykit:               ${with_polkit}
       mbim:                    ${with_mbim}
       qmi:                     ${with_qmi}
+      qrtr:                    ${with_qrtr}
       systemd suspend/resume:  ${with_systemd_suspend_resume}
       systemd journal:         ${with_systemd_journal}
       at command via dbus:     ${with_at_command_via_dbus}
