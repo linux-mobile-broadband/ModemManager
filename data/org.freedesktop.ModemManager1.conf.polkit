@@ -124,6 +124,10 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp"
            send_member="SetInitialEpsBearerSettings"/>
 
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp"
+           send_member="DisableFacilityLock"/>
+
     <!-- org.freedesktop.ModemManager1.Modem.ModemCdma.xml -->
 
     <!-- Protected by the Device.Control policy rule -->
