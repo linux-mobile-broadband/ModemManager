@@ -278,7 +278,7 @@ peek_port_mbim_for_data (MMBroadbandModemMbim  *self,
     g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
 
     net_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (data));
-    if (g_strcmp0 (net_port_driver, "cdc_mbim") != 0) {
+    if (g_strcmp0 (net_port_driver, "cdc_mbim") != 0 && g_strcmp0 (net_port_driver, "mhi_net")) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -287,6 +287,9 @@ peek_port_mbim_for_data (MMBroadbandModemMbim  *self,
                      net_port_driver);
         return NULL;
     }
+
+    if (!g_strcmp0 (net_port_driver, "mhi_net"))
+        return mm_broadband_modem_mbim_peek_port_mbim (self);
 
     net_port_parent_path = mm_kernel_device_get_interface_sysfs_path (mm_port_peek_kernel_device (data));
     if (!net_port_parent_path) {
