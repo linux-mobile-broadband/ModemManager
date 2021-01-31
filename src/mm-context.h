@@ -43,11 +43,14 @@ gboolean     mm_context_get_log_timestamps          (void);
 gboolean     mm_context_get_log_relative_timestamps (void);
 
 /* Testing support */
-gboolean     mm_context_get_test_session    (void);
-gboolean     mm_context_get_test_enable     (void);
-const gchar *mm_context_get_test_plugin_dir (void);
+gboolean     mm_context_get_test_session           (void);
+gboolean     mm_context_get_test_enable            (void);
+const gchar *mm_context_get_test_plugin_dir        (void);
 #if defined WITH_UDEV
-gboolean     mm_context_get_test_no_udev    (void);
+gboolean     mm_context_get_test_no_udev           (void);
+#endif
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+gboolean     mm_context_get_test_no_suspend_resume (void);
 #endif
 
 #endif /* MM_CONTEXT_H */

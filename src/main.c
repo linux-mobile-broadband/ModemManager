@@ -195,9 +195,13 @@ main (int argc, char *argv[])
     {
         MMSleepMonitor *sleep_monitor;
 
-        sleep_monitor = mm_sleep_monitor_get ();
-        g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_SLEEPING, G_CALLBACK (sleeping_cb), NULL);
-        g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_RESUMING, G_CALLBACK (resuming_cb), NULL);
+        if (mm_context_get_test_no_suspend_resume())
+            mm_dbg ("Suspend/resume support disabled at runtime");
+        else {
+            sleep_monitor = mm_sleep_monitor_get ();
+            g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_SLEEPING, G_CALLBACK (sleeping_cb), NULL);
+            g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_RESUMING, G_CALLBACK (resuming_cb), NULL);
+        }
     }
 #endif
 
