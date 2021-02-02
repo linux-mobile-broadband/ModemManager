@@ -1311,8 +1311,6 @@ set_initial_eps_cfun_mode_load_ready (MMBaseModem  *self,
 {
     GError                *error = NULL;
     const gchar           *response;
-    g_autoptr(GRegex)      r = NULL;
-    g_autoptr(GMatchInfo)  match_info = NULL;
     SetInitialEpsContext  *ctx;
     guint                  mode;
 

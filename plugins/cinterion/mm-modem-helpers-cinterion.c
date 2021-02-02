@@ -1467,7 +1467,6 @@ mm_cinterion_provcfg_response_to_cid (const gchar             *response,
 {
     g_autoptr(GRegex)      r = NULL;
     g_autoptr(GMatchInfo)  match_info = NULL;
-    g_autofree GError     *inner_error = NULL;
     g_autofree gchar      *mno = NULL;
 
     r = g_regex_new ("\\^SCFG:\\s*\"MEopMode/Prov/Cfg\",\\s*\"([0-9a-zA-Z]*)\"", 0, 0, NULL);
