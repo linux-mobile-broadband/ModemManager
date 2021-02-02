@@ -4750,7 +4750,6 @@ common_enable_disable_unsolicited_events_data_system_status (GTask *task)
 {
     EnableUnsolicitedEventsContext              *ctx;
     g_autoptr(QmiMessageWdsSetEventReportInput)  input = NULL;
-    g_autoptr(GError)                            error = NULL;
 
     ctx = g_task_get_task_data     (task);
 
