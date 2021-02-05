@@ -34,3 +34,11 @@ and need to add or change some public method, feel free to suggest it!
 License.
 The ModemManager and mmcli binaries are both GPLv2+.
 The libmm-glib library is LGPLv2+.
+
+Code of Conduct.
+Please note that this project is released with a Contributor Code of Conduct.
+By participating in this project you agree to abide by its terms, which you can
+find in the following link:
+  https://www.freedesktop.org/wiki/CodeOfConduct
+CoC issues may be raised to the project maintainers at the following address:
+  modemmanager-devel-owner@lists.freedesktop.org
