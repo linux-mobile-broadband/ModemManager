@@ -403,6 +403,15 @@ kernel_device_get_physdev_product (MMKernelDevice *_self)
 }
 
 static gint
+kernel_device_get_interface_number (MMKernelDevice *_self)
+{
+    MMKernelDeviceUdev *self;
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+    return (self->priv->interface ? (gint) udev_device_get_sysfs_attr_as_hex (self->priv->interface, "bInterfaceNumber") : -1);
+}
+
+static gint
 kernel_device_get_interface_class (MMKernelDevice *_self)
 {
     MMKernelDeviceUdev *self;
@@ -743,6 +752,7 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     kernel_device_class->get_physdev_subsystem     = kernel_device_get_physdev_subsystem;
     kernel_device_class->get_physdev_manufacturer  = kernel_device_get_physdev_manufacturer;
     kernel_device_class->get_physdev_product       = kernel_device_get_physdev_product;
+    kernel_device_class->get_interface_number      = kernel_device_get_interface_number;
     kernel_device_class->get_interface_class       = kernel_device_get_interface_class;
     kernel_device_class->get_interface_subclass    = kernel_device_get_interface_subclass;
     kernel_device_class->get_interface_protocol    = kernel_device_get_interface_protocol;

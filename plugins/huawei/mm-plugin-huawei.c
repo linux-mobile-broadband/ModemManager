@@ -56,7 +56,7 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
 
 typedef struct {
     MMPortProbe *probe;
-    guint        first_usbif;
+    gint         first_usbif;
     guint        timeout_id;
     gboolean     custom_init_run;
 } FirstInterfaceContext;
@@ -177,23 +177,23 @@ try_next_usbif (MMPortProbe *probe,
                 MMDevice    *device)
 {
     FirstInterfaceContext *fi_ctx;
-    GList *l;
-    guint closest;
+    GList                 *l;
+    gint                   closest;
 
     fi_ctx = g_object_get_data (G_OBJECT (device), TAG_FIRST_INTERFACE_CONTEXT);
     g_assert (fi_ctx != NULL);
 
     /* Look for the next closest one among the list of interfaces in the device,
      * and enable that one as being first */
-    closest = G_MAXUINT;
+    closest = G_MAXINT;
     for (l = mm_device_peek_port_probe_list (device); l; l = g_list_next (l)) {
         MMPortProbe *iter = MM_PORT_PROBE (l->data);
 
         /* Only expect ttys for next probing attempt */
         if (g_str_equal (mm_port_probe_get_port_subsys (iter), "tty")) {
-            guint usbif;
+            gint usbif;
 
-            usbif = mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (iter), "ID_USB_INTERFACE_NUM");
+            usbif = mm_kernel_device_get_interface_number (mm_port_probe_peek_port (iter));
             if (usbif == fi_ctx->first_usbif) {
                 /* This is the one we just probed, which wasn't yet removed, so just skip it */
             } else if (usbif > fi_ctx->first_usbif &&
@@ -203,7 +203,7 @@ try_next_usbif (MMPortProbe *probe,
         }
     }
 
-    if (closest == G_MAXUINT) {
+    if (closest == G_MAXINT) {
         /* No more ttys to try! Just return something */
         closest = 0;
         mm_obj_dbg (probe, "no more ports to run initial probing");
@@ -359,9 +359,7 @@ huawei_custom_init (MMPortProbe *probe,
     g_task_set_task_data (task, ctx, (GDestroyNotify)huawei_custom_init_context_free);
 
     /* Custom init only to be run in the first interface */
-    if (mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (probe),
-                                                  "ID_USB_INTERFACE_NUM") != fi_ctx->first_usbif) {
-
+    if (mm_kernel_device_get_interface_number (mm_port_probe_peek_port (probe)) != fi_ctx->first_usbif) {
         if (fi_ctx->custom_init_run)
             /* If custom init was run already, we can consider this as successfully run */
             g_task_return_boolean (task, TRUE);
@@ -391,8 +389,8 @@ static gint
 probe_cmp_by_usbif (MMPortProbe *a,
                     MMPortProbe *b)
 {
-    return ((gint) mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (a), "ID_USB_INTERFACE_NUM") -
-            (gint) mm_kernel_device_get_property_as_int_hex (mm_port_probe_peek_port (b), "ID_USB_INTERFACE_NUM"));
+    return (mm_kernel_device_get_interface_number (mm_port_probe_peek_port (a)) -
+            mm_kernel_device_get_interface_number (mm_port_probe_peek_port (b)));
 }
 
 static guint

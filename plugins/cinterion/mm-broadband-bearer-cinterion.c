@@ -63,7 +63,7 @@ get_usb_interface_config_index (MMPort  *data,
     guint usb_iface_num;
     guint i;
 
-    usb_iface_num = mm_kernel_device_get_property_as_int_hex (mm_port_peek_kernel_device (data), "ID_USB_INTERFACE_NUM");
+    usb_iface_num = (guint) mm_kernel_device_get_interface_number (mm_port_peek_kernel_device (data));
 
     for (i = 0; i < G_N_ELEMENTS (usb_interface_configs); i++) {
         if (usb_interface_configs[i].usb_iface_num == usb_iface_num)

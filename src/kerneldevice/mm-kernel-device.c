@@ -126,6 +126,14 @@ mm_kernel_device_get_physdev_product (MMKernelDevice *self)
 }
 
 gint
+mm_kernel_device_get_interface_number (MMKernelDevice *self)
+{
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_interface_number ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_interface_number (self) :
+            -1);
+}
+
+gint
 mm_kernel_device_get_interface_class (MMKernelDevice *self)
 {
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_interface_class ?

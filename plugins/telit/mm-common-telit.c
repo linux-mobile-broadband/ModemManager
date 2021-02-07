@@ -59,7 +59,7 @@ telit_grab_port (MMPlugin *self,
     if (g_object_get_data (G_OBJECT (device), TAG_GETPORTCFG_SUPPORTED) != NULL) {
         guint usbif;
 
-        usbif = mm_kernel_device_get_property_as_int_hex (port, "ID_USB_INTERFACE_NUM");
+        usbif = (guint) mm_kernel_device_get_interface_number (port);
         if (usbif == GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (device), TAG_TELIT_MODEM_PORT))) {
             mm_obj_dbg (self, "AT port '%s/%s' flagged as primary",
                         mm_port_probe_get_port_subsys (probe),
@@ -257,9 +257,7 @@ telit_custom_init_step (GTask *task)
      * is always linked to an AT port
      */
     port = mm_port_probe_peek_port (probe);
-    if (!ctx->getportcfg_done &&
-        g_strcmp0 (mm_kernel_device_get_property (port, "ID_USB_INTERFACE_NUM"), "00") == 0) {
-
+    if (!ctx->getportcfg_done && mm_kernel_device_get_interface_number (port) == 0) {
         if (ctx->getportcfg_retries == 0)
             goto out;
         ctx->getportcfg_retries--;
