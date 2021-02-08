@@ -1,0 +1,105 @@
+# Hebrew translation of Modem Manager
+# Copyright (C) 2020 Free Software Foundation, Inc.
+# This file is distributed under the same license as the Modem Manager package.
+#
+# Yaron Shahrabani <sh.yaron@gmail.com>, 2020.
+msgid ""
+msgstr ""
+"Project-Id-Version: Modem Manager\n"
+"Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
+"ModemManager/issues\n"
+"POT-Creation-Date: 2020-09-18 10:30+0200\n"
+"PO-Revision-Date: 2020-02-08 18:14+0200\n"
+"Last-Translator: Yaron Shahrabani <sh.yaron@gmail.com>\n"
+"Language-Team: Hebrew <kde-i18n-he@kde.org>\n"
+"Language: he\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: GitLab Editor\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "שליטה בסוכן מנהל המודמים"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "מדיניות מערכת מונעת שליטה במנהל המודמים."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "שחרור ושליטה במכשיר לרשת תקשורת סלולרית"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid "System policy prevents unlocking or controlling the mobile broadband device."
+msgstr "מדיניות המערכת מונעת שחרור או שליטה בהתקן רשת התקשורת האלחוטית."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "ניתן להוסיף, לערוך ולמחוק אנשי קשר בהתקן רשת תקשורת אלחוטית"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr "מדיניות המערכת מונעת הוספה, עריכה או מחיקה של אנשי הקשר במכשיר הזה."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "שליחה, שמירה, עריכה ומחיקה של הודעות טקסט"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"מדיניות המערכת מונעת שליחה או עריכה של המסרונים בהתקן הזה."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "לקבל שיחות נכנסות או להוציא שיחות."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "מדיניות המערכת מונעת שיחות קוליות."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr "לתשאל את פרטי השעה ואזור הזמן מהרשת"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid "System policy prevents querying network time information."
+msgstr "מדיניות מערכת מונעת תשאול פרטי זמן מהרשת."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"להפעיל ולהציג פרטי מיקום גאוגרפי"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"מדיניות מערכת מונעת הפעלה או הצגה של פרטי מיקום גאוגרפי."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and utilize network information and services"
+msgstr "תשאול ושימוש בשירותי ומידע על הרשת"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"מדיניות המערכת מונעת תשאול או שימוש במידע על הרשת או שירותים שלה."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "תשאול וניהול קושחה על התקן רשת תקשורת סלולרית"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr "מדיניות המערכת מונעת תשאול או ניהול של קושחת ההתקן הזה."
+
+#: src/mm-sleep-monitor.c:125
+msgid "ModemManager needs to reset devices"
+msgstr "על ModemManager לאפס התקנים"
