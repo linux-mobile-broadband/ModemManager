@@ -61,7 +61,14 @@ enum {
     PROP_LAST
 };
 
+enum {
+    SIGNAL_LINK_PORT_GRABBED,
+    SIGNAL_LINK_PORT_RELEASED,
+    SIGNAL_LAST
+};
+
 static GParamSpec *properties[PROP_LAST];
+static guint signals[SIGNAL_LAST];
 
 struct _MMBaseModemPrivate {
     /* The connection to the system bus */
@@ -120,6 +127,10 @@ struct _MMBaseModemPrivate {
     /* MBIM ports */
     GList *mbim;
 #endif
+
+    /* Additional port links grabbed after having
+     * organized ports */
+    GHashTable *link_ports;
 };
 
 guint
@@ -259,12 +270,13 @@ base_modem_create_virtual_port (MMBaseModem *self,
     return MM_PORT (mm_port_serial_at_new (name, MM_PORT_SUBSYS_UNIX));
 }
 
-gboolean
-mm_base_modem_grab_port (MMBaseModem         *self,
-                         MMKernelDevice      *kernel_device,
-                         MMPortType           ptype,
-                         MMPortSerialAtFlag   at_pflags,
-                         GError             **error)
+static MMPort *
+base_modem_internal_grab_port (MMBaseModem         *self,
+                               MMKernelDevice      *kernel_device,
+                               gboolean             link_port,
+                               MMPortType           ptype,
+                               MMPortSerialAtFlag   at_pflags,
+                               GError             **error)
 {
     MMPort           *port;
     const gchar      *subsys;
@@ -280,7 +292,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     if (port) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                      "Cannot add port '%s/%s', already exists", subsys, name);
-        return FALSE;
+        return NULL;
     }
 
     /* Explicitly ignored ports, grab them but explicitly flag them as ignored
@@ -301,7 +313,7 @@ mm_base_modem_grab_port (MMBaseModem         *self,
     if (!port) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                      "Cannot add port '%s/%s', unhandled port type", subsys, name);
-        return FALSE;
+        return NULL;
     }
 
     /* Store kernel device */
@@ -339,10 +351,95 @@ mm_base_modem_grab_port (MMBaseModem         *self,
 
     /* Add it to the tracking HT.
      * Note: 'key' and 'port' now owned by the HT. */
-    mm_obj_dbg (port, "port grabbed");
-    g_hash_table_insert (self->priv->ports, g_steal_pointer (&key), port);
+    if (link_port)
+        g_hash_table_insert (self->priv->link_ports, g_steal_pointer (&key), port);
+    else
+        g_hash_table_insert (self->priv->ports, g_steal_pointer (&key), port);
+    return port;
+}
+
+gboolean
+mm_base_modem_grab_port (MMBaseModem         *self,
+                         MMKernelDevice      *kernel_device,
+                         MMPortType           ptype,
+                         MMPortSerialAtFlag   at_pflags,
+                         GError             **error)
+{
+    if (!base_modem_internal_grab_port (self, kernel_device, FALSE, ptype, at_pflags, error))
+        return FALSE;
+
+    mm_obj_dbg (self, "port '%s/%s' grabbed",
+                mm_kernel_device_get_subsystem (kernel_device),
+                mm_kernel_device_get_name      (kernel_device));
     return TRUE;
 }
+
+/******************************************************************************/
+
+gboolean
+mm_base_modem_grab_link_port (MMBaseModem     *self,
+                              MMKernelDevice  *kernel_device,
+                              GError         **error)
+{
+    const gchar *subsystem;
+    const gchar *name;
+    MMPort      *port;
+
+    /* To simplify things, we only support NET link ports at this point */
+    subsystem = mm_kernel_device_get_subsystem (kernel_device);
+    name      = mm_kernel_device_get_name      (kernel_device);
+
+    if (!g_str_equal (subsystem, "net")) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot add port '%s/%s', unexpected link port subsystem", subsystem, name);
+        return FALSE;
+    }
+
+    /* all the newly added link ports will NOT be 'organized'; i.e. they won't
+     * be available as 'data ports' in the modem, but they can be looked up
+     * by name */
+    port = base_modem_internal_grab_port (self,
+                                          kernel_device,
+                                          TRUE,
+                                          MM_PORT_TYPE_NET,
+                                          MM_PORT_SERIAL_AT_FLAG_NONE,
+                                          error);
+    if (!port)
+        return FALSE;
+
+
+    mm_obj_dbg (self, "link port '%s/%s' grabbed", subsystem, name);
+    g_signal_emit (self, signals[SIGNAL_LINK_PORT_GRABBED], 0, port);
+    return TRUE;
+}
+
+gboolean
+mm_base_modem_release_link_port (MMBaseModem  *self,
+                                 const gchar  *subsystem,
+                                 const gchar  *name,
+                                 GError      **error)
+{
+    g_autofree gchar *key = NULL;
+    MMPort           *port;
+
+    key  = g_strdup_printf ("%s%s", subsystem, name);
+    port = g_hash_table_lookup (self->priv->link_ports, key);
+    if (!port) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot release link port '%s/%s', not grabbed", subsystem, name);
+        return FALSE;
+    }
+
+    /* make sure the port object is valid during the port release signal */
+    g_object_ref (port);
+    g_hash_table_remove (self->priv->link_ports, key);
+    mm_obj_dbg (self, "link port '%s/%s' released", subsystem, name);
+    g_signal_emit (self, signals[SIGNAL_LINK_PORT_RELEASED], 0, port);
+    g_object_unref (port);
+    return TRUE;
+}
+
+/******************************************************************************/
 
 gboolean
 mm_base_modem_disable_finish (MMBaseModem   *self,
@@ -851,18 +948,18 @@ mm_base_modem_find_ports (MMBaseModem  *self,
     return g_list_sort (out, (GCompareFunc) port_cmp);
 }
 
-MMPort *
-mm_base_modem_peek_port (MMBaseModem *self,
-                         const gchar *name)
+static MMPort *
+peek_port_in_ht (GHashTable  *ht,
+                 const gchar *name)
 {
     GHashTableIter iter;
     gpointer       value;
     gpointer       key;
 
-    if (!self->priv->ports)
+    if (!ht)
         return NULL;
 
-    g_hash_table_iter_init (&iter, self->priv->ports);
+    g_hash_table_iter_init (&iter, ht);
     while (g_hash_table_iter_next (&iter, &key, &value)) {
         MMPort *port = MM_PORT (value);
 
@@ -871,6 +968,19 @@ mm_base_modem_peek_port (MMBaseModem *self,
     }
 
     return NULL;
+}
+
+MMPort *
+mm_base_modem_peek_port (MMBaseModem *self,
+                         const gchar *name)
+{
+    MMPort *found;
+
+    found = peek_port_in_ht (self->priv->ports, name);
+    if (!found)
+        found = peek_port_in_ht (self->priv->link_ports, name);
+
+    return found;
 }
 
 MMPort *
@@ -1362,13 +1472,10 @@ base_modem_cancelled (GCancellable *cancellable,
 /*****************************************************************************/
 
 static void
-setup_ports_table (MMBaseModem *self)
+setup_ports_table (GHashTable **ht)
 {
-    g_assert (!self->priv->ports);
-    self->priv->ports = g_hash_table_new_full (g_str_hash,
-                                               g_str_equal,
-                                               g_free,
-                                               g_object_unref);
+    g_assert (ht && !*ht);
+    *ht = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 }
 
 static void
@@ -1406,19 +1513,20 @@ cleanup_modem_port (MMBaseModem *self,
 }
 
 static void
-teardown_ports_table (MMBaseModem *self)
+teardown_ports_table (MMBaseModem  *self,
+                      GHashTable  **ht)
 {
     GHashTableIter iter;
     gpointer       value;
     gpointer       key;
 
-    if (!self->priv->ports)
+    if (!*ht)
         return;
 
-    g_hash_table_iter_init (&iter, self->priv->ports);
+    g_hash_table_iter_init (&iter, *ht);
     while (g_hash_table_iter_next (&iter, &key, &value))
         cleanup_modem_port (self, MM_PORT (value));
-    g_hash_table_destroy (g_steal_pointer (&self->priv->ports));
+    g_hash_table_destroy (g_steal_pointer (ht));
 }
 
 /*****************************************************************************/
@@ -1461,7 +1569,8 @@ mm_base_modem_init (MMBaseModem *self)
 
     self->priv->max_timeouts = DEFAULT_MAX_TIMEOUTS;
 
-    setup_ports_table (self);
+    setup_ports_table (&self->priv->ports);
+    setup_ports_table (&self->priv->link_ports);
 }
 
 static void
@@ -1618,7 +1727,8 @@ dispose (GObject *object)
     g_list_free_full (g_steal_pointer (&self->priv->mbim), g_object_unref);
 #endif
 
-    teardown_ports_table (self);
+    teardown_ports_table (self, &self->priv->link_ports);
+    teardown_ports_table (self, &self->priv->ports);
 
     g_clear_object (&self->priv->connection);
 
@@ -1732,4 +1842,22 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                               FALSE,
                               G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_DATA_TTY_SUPPORTED, properties[PROP_DATA_TTY_SUPPORTED]);
+
+    signals[SIGNAL_LINK_PORT_GRABBED] =
+        g_signal_new (MM_BASE_MODEM_SIGNAL_LINK_PORT_GRABBED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMBaseModemClass, link_port_grabbed),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 1, MM_TYPE_PORT);
+
+    signals[SIGNAL_LINK_PORT_RELEASED] =
+        g_signal_new (MM_BASE_MODEM_SIGNAL_LINK_PORT_RELEASED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMBaseModemClass, link_port_released),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 1, MM_TYPE_PORT);
 }

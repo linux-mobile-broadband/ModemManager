@@ -211,10 +211,27 @@ void
 mm_device_grab_port (MMDevice       *self,
                      MMKernelDevice *kernel_port)
 {
-    MMPortProbe *probe;
+    MMPortProbe    *probe;
+    MMKernelDevice *lower_port;
 
     if (mm_device_owns_port (self, kernel_port))
         return;
+
+    lower_port = mm_kernel_device_peek_lower_device (kernel_port);
+    if (lower_port) {
+        g_autoptr(GError) error = NULL;
+
+        /* No port probing done, at this point this is not something we require
+         * as all the virtual instantiated ports are net devices. We also avoid
+         * emitting the PORT_GRABBED signal in the MMDevice, because that is
+         * exclusively linked to a port being added to the list of probes, which
+         * we don't do here. */
+        if (self->priv->modem && !mm_base_modem_grab_link_port (self->priv->modem, kernel_port, &error))
+            mm_obj_dbg (self, "fully ignoring link port %s from now on: %s",
+                        mm_kernel_device_get_name (kernel_port),
+                        error->message);
+        return;
+    }
 
     /* Get the vendor/product IDs out of the first one that gives us
      * some valid value (it seems we may get NULL reported for VID in QMI
@@ -241,6 +258,12 @@ mm_device_release_port_name (MMDevice    *self,
                              const gchar *name)
 {
     MMPortProbe *probe;
+
+    /* If modem exists, try to remove it as a link port. We also avoid emitting
+     * the PORT_RELEASED signal in this case, as the link ports are not associated
+     * to the port probe list */
+    if (self->priv->modem && mm_base_modem_release_link_port (self->priv->modem, subsystem, name, NULL))
+        return;
 
     probe = device_find_probe_with_name (self, subsystem, name);
     if (probe) {
