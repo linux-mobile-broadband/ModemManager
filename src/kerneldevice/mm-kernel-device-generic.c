@@ -26,6 +26,7 @@
 
 #include "mm-kernel-device-generic.h"
 #include "mm-kernel-device-generic-rules.h"
+#include "mm-kernel-device-helpers.h"
 #include "mm-log-object.h"
 #include "mm-utils.h"
 
@@ -242,8 +243,9 @@ ptr_array_add_sysfs_attribute_link_basename (GPtrArray    *array,
 static void
 preload_contents_other (MMKernelDeviceGeneric *self)
 {
-    GPtrArray *drivers;
-    GPtrArray *subsystems;
+    g_autofree gchar *lower_device_name = NULL;
+    GPtrArray        *drivers;
+    GPtrArray        *subsystems;
 
     /* For any other kind of bus (or the absence of one, as in virtual devices),
      * assume this is a single port device and don't try to match multiple ports
@@ -258,6 +260,31 @@ preload_contents_other (MMKernelDeviceGeneric *self)
     ptr_array_add_sysfs_attribute_link_basename (subsystems, self->priv->sysfs_path, "subsystem", NULL);
     g_ptr_array_add (subsystems, NULL);
     self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
+
+    /* But look for a lower real physical device, as we may have one */
+    lower_device_name = mm_kernel_device_get_lower_device_name (self->priv->sysfs_path);
+    if (lower_device_name) {
+        g_autoptr(MMKernelDevice)           lower_kernel_device = NULL;
+        g_autoptr(MMKernelEventProperties)  props = NULL;
+        g_autoptr(GError)                   error = NULL;
+        const gchar                        *subsystem;
+
+        subsystem = mm_kernel_device_get_subsystem (MM_KERNEL_DEVICE (self));
+
+        props = mm_kernel_event_properties_new ();
+        mm_kernel_event_properties_set_subsystem (props, subsystem);
+        mm_kernel_event_properties_set_name      (props, lower_device_name);
+
+        lower_kernel_device = mm_kernel_device_generic_new (props, &error);
+        if (!lower_kernel_device) {
+            mm_obj_dbg (self, "couldn't find lower device: %s/%s", subsystem, lower_device_name);
+        } else {
+            mm_obj_dbg (self, "setting up lower device: %s/%s", subsystem, lower_device_name);
+            g_object_set (self,
+                          "lower-device", lower_kernel_device,
+                          NULL);
+        }
+    }
 }
 
 static void
