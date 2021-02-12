@@ -822,21 +822,18 @@ port_cmp (MMPort *a,
 }
 
 GList *
-mm_base_modem_find_ports (MMBaseModem *self,
-                          MMPortSubsys subsys,
-                          MMPortType type,
-                          const gchar *name)
+mm_base_modem_find_ports (MMBaseModem  *self,
+                          MMPortSubsys  subsys,
+                          MMPortType    type)
 {
-    GList *out = NULL;
-    GHashTableIter iter;
-    gpointer value;
-    gpointer key;
+    GList          *out = NULL;
+    GHashTableIter  iter;
+    gpointer        value;
+    gpointer        key;
 
     if (!self->priv->ports)
         return NULL;
 
-    /* We'll iterate the ht of ports, looking for any port which is matches
-     * the compare function */
     g_hash_table_iter_init (&iter, self->priv->ports);
     while (g_hash_table_iter_next (&iter, &key, &value)) {
         MMPort *port = MM_PORT (value);
@@ -847,13 +844,42 @@ mm_base_modem_find_ports (MMBaseModem *self,
         if (type != MM_PORT_TYPE_UNKNOWN && mm_port_get_port_type (port) != type)
             continue;
 
-        if (name != NULL && !g_str_equal (mm_port_get_device (port), name))
-            continue;
-
         out = g_list_append (out, g_object_ref (port));
     }
 
     return g_list_sort (out, (GCompareFunc) port_cmp);
+}
+
+MMPort *
+mm_base_modem_peek_port (MMBaseModem *self,
+                         const gchar *name)
+{
+    GHashTableIter iter;
+    gpointer       value;
+    gpointer       key;
+
+    if (!self->priv->ports)
+        return NULL;
+
+    g_hash_table_iter_init (&iter, self->priv->ports);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        MMPort *port = MM_PORT (value);
+
+        if (g_str_equal (mm_port_get_device (port), name))
+            return port;
+    }
+
+    return NULL;
+}
+
+MMPort *
+mm_base_modem_get_port (MMBaseModem *self,
+                        const gchar *name)
+{
+    MMPort *port;
+
+    port = mm_base_modem_peek_port (self, name);
+    return (port ? g_object_ref (port) : NULL);
 }
 
 static void

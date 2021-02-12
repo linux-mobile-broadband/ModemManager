@@ -81,8 +81,7 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
     /* Find one QMI port, we don't care which one */
     rpmsg_qmi_ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
                                                 MM_PORT_SUBSYS_RPMSG,
-                                                MM_PORT_TYPE_QMI,
-                                                NULL);
+                                                MM_PORT_TYPE_QMI);
     if (!rpmsg_qmi_ports) {
         g_set_error (error,
                      MM_CORE_ERROR,
