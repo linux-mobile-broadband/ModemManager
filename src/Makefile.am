@@ -149,6 +149,8 @@ libkerneldevice_la_CPPFLAGS = \
 libkerneldevice_la_SOURCES = \
 	kerneldevice/mm-kernel-device.h \
 	kerneldevice/mm-kernel-device.c \
+	kerneldevice/mm-kernel-device-helpers.h \
+	kerneldevice/mm-kernel-device-helpers.c \
 	kerneldevice/mm-kernel-device-generic.h \
 	kerneldevice/mm-kernel-device-generic.c \
 	kerneldevice/mm-kernel-device-generic-rules.h \
