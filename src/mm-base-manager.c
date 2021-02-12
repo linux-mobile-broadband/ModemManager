@@ -407,7 +407,7 @@ handle_kernel_event (MMBaseManager            *self,
         g_autoptr(MMKernelDevice) kernel_device = NULL;
 #if defined WITH_UDEV
         if (!mm_context_get_test_no_udev ())
-            kernel_device = mm_kernel_device_udev_new_from_properties (properties, error);
+            kernel_device = mm_kernel_device_udev_new_from_properties (self->priv->udev, properties, error);
         else
 #endif
             kernel_device = mm_kernel_device_generic_new (properties, error);
@@ -436,7 +436,7 @@ handle_uevent (MMBaseManager *self,
     if (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change")) {
         g_autoptr(MMKernelDevice) kernel_device = NULL;
 
-        kernel_device = mm_kernel_device_udev_new (device);
+        kernel_device = mm_kernel_device_udev_new (self->priv->udev, device);
         device_added (self, kernel_device, TRUE, FALSE);
         return;
     }
@@ -458,7 +458,7 @@ start_device_added_idle (StartDeviceAdded *ctx)
 {
     MMKernelDevice *kernel_device;
 
-    kernel_device = mm_kernel_device_udev_new (ctx->device);
+    kernel_device = mm_kernel_device_udev_new (ctx->self->priv->udev, ctx->device);
     device_added (ctx->self, kernel_device, FALSE, ctx->manual_scan);
     g_object_unref (kernel_device);
 
@@ -1426,13 +1426,12 @@ initable_init (GInitable     *initable,
         return FALSE;
 
 #if defined WITH_UDEV
-    if (!mm_context_get_test_no_udev ()) {
-        /* Create udev client based on the subsystems requested by the plugins */
-        self->priv->udev = g_udev_client_new (mm_plugin_manager_get_subsystems (self->priv->plugin_manager));
-        /* If autoscan enabled, list for udev events */
-        if (self->priv->auto_scan)
-            g_signal_connect_swapped (self->priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
-    }
+    /* Create udev client based on the subsystems requested by the plugins */
+    self->priv->udev = g_udev_client_new (mm_plugin_manager_get_subsystems (self->priv->plugin_manager));
+
+    /* If autoscan enabled, list for udev events */
+    if (!mm_context_get_test_no_udev () && self->priv->auto_scan)
+        g_signal_connect_swapped (self->priv->udev, "uevent", G_CALLBACK (handle_uevent), initable);
 #endif
 
     /* Export the manager interface */

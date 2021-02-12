@@ -31,6 +31,7 @@ G_DEFINE_TYPE_EXTENDED (MMKernelDeviceUdev, mm_kernel_device_udev,  MM_TYPE_KERN
 
 enum {
     PROP_0,
+    PROP_UDEV_CLIENT,
     PROP_UDEV_DEVICE,
     PROP_PROPERTIES,
     PROP_LAST
@@ -39,6 +40,7 @@ enum {
 static GParamSpec *properties[PROP_LAST];
 
 struct _MMKernelDeviceUdevPrivate {
+    GUdevClient *client;
     GUdevDevice *device;
 
     GUdevDevice *interface;
@@ -565,7 +567,8 @@ kernel_device_get_attribute (MMKernelDevice *_self,
 /*****************************************************************************/
 
 MMKernelDevice *
-mm_kernel_device_udev_new (GUdevDevice *udev_device)
+mm_kernel_device_udev_new (GUdevClient *udev_client,
+                           GUdevDevice *udev_device)
 {
     GError         *error = NULL;
     MMKernelDevice *self;
@@ -574,6 +577,7 @@ mm_kernel_device_udev_new (GUdevDevice *udev_device)
     self = MM_KERNEL_DEVICE (g_initable_new (MM_TYPE_KERNEL_DEVICE_UDEV,
                                              NULL,
                                              &error,
+                                             "udev-client", udev_client,
                                              "udev-device", udev_device,
                                              NULL));
     g_assert_no_error (error);
@@ -583,13 +587,15 @@ mm_kernel_device_udev_new (GUdevDevice *udev_device)
 /*****************************************************************************/
 
 MMKernelDevice *
-mm_kernel_device_udev_new_from_properties (MMKernelEventProperties  *props,
+mm_kernel_device_udev_new_from_properties (GUdevClient              *udev_client,
+                                           MMKernelEventProperties  *props,
                                            GError                  **error)
 {
     return MM_KERNEL_DEVICE (g_initable_new (MM_TYPE_KERNEL_DEVICE_UDEV,
                                              NULL,
                                              error,
-                                             "properties", props,
+                                             "udev-client", udev_client,
+                                             "properties",  props,
                                              NULL));
 }
 
@@ -611,6 +617,10 @@ set_property (GObject      *object,
     MMKernelDeviceUdev *self = MM_KERNEL_DEVICE_UDEV (object);
 
     switch (prop_id) {
+    case PROP_UDEV_CLIENT:
+        g_assert (!self->priv->client);
+        self->priv->client = g_value_dup_object (value);
+        break;
     case PROP_UDEV_DEVICE:
         g_assert (!self->priv->device);
         self->priv->device = g_value_dup_object (value);
@@ -634,6 +644,9 @@ get_property (GObject    *object,
     MMKernelDeviceUdev *self = MM_KERNEL_DEVICE_UDEV (object);
 
     switch (prop_id) {
+    case PROP_UDEV_CLIENT:
+        g_value_set_object (value, self->priv->client);
+        break;
     case PROP_UDEV_DEVICE:
         g_value_set_object (value, self->priv->device);
         break;
@@ -654,6 +667,12 @@ initable_init (GInitable     *initable,
     MMKernelDeviceUdev *self = MM_KERNEL_DEVICE_UDEV (initable);
     const gchar        *subsystem;
     const gchar        *name;
+
+    if (!self->priv->client) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "missing client in kernel device");
+        return FALSE;
+    }
 
     /* When created from a GUdevDevice, we're done */
     if (self->priv->device) {
@@ -684,23 +703,15 @@ initable_init (GInitable     *initable,
 
     /* On remove events, we don't look for the GUdevDevice */
     if (g_strcmp0 (mm_kernel_event_properties_get_action (self->priv->properties), "remove")) {
-        GUdevClient *client;
-        GUdevDevice *device;
-
-        client = g_udev_client_new (NULL);
-        device = g_udev_client_query_by_subsystem_and_name (client, subsystem, name);
-        if (!device) {
+        g_assert (!self->priv->device);
+        self->priv->device = g_udev_client_query_by_subsystem_and_name (self->priv->client, subsystem, name);
+        if (!self->priv->device) {
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                          "device %s/%s not found",
                          subsystem,
                          name);
-            g_object_unref (client);
             return FALSE;
         }
-
-        /* Store device */
-        self->priv->device = device;
-        g_object_unref (client);
     }
 
     if (self->priv->device)
@@ -717,6 +728,7 @@ dispose (GObject *object)
     g_clear_object  (&self->priv->physdev);
     g_clear_object  (&self->priv->interface);
     g_clear_object  (&self->priv->device);
+    g_clear_object  (&self->priv->client);
     g_clear_object  (&self->priv->properties);
 
     G_OBJECT_CLASS (mm_kernel_device_udev_parent_class)->dispose (object);
@@ -773,6 +785,14 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
                              G_UDEV_TYPE_DEVICE,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_UDEV_DEVICE, properties[PROP_UDEV_DEVICE]);
+
+    properties[PROP_UDEV_CLIENT] =
+        g_param_spec_object ("udev-client",
+                             "udev client",
+                             "GUdev client",
+                             G_UDEV_TYPE_CLIENT,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_UDEV_CLIENT, properties[PROP_UDEV_CLIENT]);
 
     properties[PROP_PROPERTIES] =
         g_param_spec_object ("properties",

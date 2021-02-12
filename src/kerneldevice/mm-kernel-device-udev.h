@@ -48,8 +48,10 @@ struct _MMKernelDeviceUdevClass {
 GType mm_kernel_device_udev_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMKernelDeviceUdev, g_object_unref)
 
-MMKernelDevice *mm_kernel_device_udev_new                 (GUdevDevice              *udev_device);
-MMKernelDevice *mm_kernel_device_udev_new_from_properties (MMKernelEventProperties  *properties,
+MMKernelDevice *mm_kernel_device_udev_new                 (GUdevClient              *udev_client,
+                                                           GUdevDevice              *udev_device);
+MMKernelDevice *mm_kernel_device_udev_new_from_properties (GUdevClient              *udev_client,
+                                                           MMKernelEventProperties  *properties,
                                                            GError                  **error);
 
 #endif /* MM_KERNEL_DEVICE_UDEV_H */
