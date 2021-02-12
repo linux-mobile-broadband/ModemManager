@@ -27,6 +27,18 @@ static void log_object_iface_init (MMLogObjectInterface *iface);
 G_DEFINE_ABSTRACT_TYPE_WITH_CODE (MMKernelDevice, mm_kernel_device, G_TYPE_OBJECT,
                                   G_IMPLEMENT_INTERFACE (MM_TYPE_LOG_OBJECT, log_object_iface_init))
 
+enum {
+    PROP_0,
+    PROP_LOWER_DEVICE,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
+
+struct _MMKernelDevicePrivate {
+    MMKernelDevice *lower_device;
+};
+
 /*****************************************************************************/
 
 const gchar *
@@ -64,6 +76,10 @@ mm_kernel_device_get_sysfs_path (MMKernelDevice *self)
 const gchar *
 mm_kernel_device_get_physdev_uid (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_uid (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_uid ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_uid (self) :
             NULL);
@@ -72,6 +88,10 @@ mm_kernel_device_get_physdev_uid (MMKernelDevice *self)
 guint16
 mm_kernel_device_get_physdev_vid (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_vid (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_vid ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_vid (self) :
             0);
@@ -80,6 +100,10 @@ mm_kernel_device_get_physdev_vid (MMKernelDevice *self)
 guint16
 mm_kernel_device_get_physdev_pid (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_pid (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_pid ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_pid (self) :
             0);
@@ -88,6 +112,10 @@ mm_kernel_device_get_physdev_pid (MMKernelDevice *self)
 guint16
 mm_kernel_device_get_physdev_revision (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_revision (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_revision ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_revision (self) :
             0);
@@ -96,6 +124,10 @@ mm_kernel_device_get_physdev_revision (MMKernelDevice *self)
 const gchar *
 mm_kernel_device_get_physdev_subsystem (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_subsystem (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_subsystem ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_subsystem (self) :
             NULL);
@@ -104,6 +136,10 @@ mm_kernel_device_get_physdev_subsystem (MMKernelDevice *self)
 const gchar *
 mm_kernel_device_get_physdev_sysfs_path (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_sysfs_path (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_sysfs_path ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_sysfs_path (self) :
             NULL);
@@ -112,6 +148,10 @@ mm_kernel_device_get_physdev_sysfs_path (MMKernelDevice *self)
 const gchar *
 mm_kernel_device_get_physdev_manufacturer (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_manufacturer (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_manufacturer ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_manufacturer (self) :
             NULL);
@@ -120,9 +160,19 @@ mm_kernel_device_get_physdev_manufacturer (MMKernelDevice *self)
 const gchar *
 mm_kernel_device_get_physdev_product (MMKernelDevice *self)
 {
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_product (self->priv->lower_device);
+
     return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_product ?
             MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_product (self) :
             NULL);
+}
+
+MMKernelDevice *
+mm_kernel_device_peek_lower_device (MMKernelDevice *self)
+{
+    return self->priv->lower_device;
 }
 
 gint
@@ -355,6 +405,45 @@ log_object_build_id (MMLogObject *_self)
 static void
 mm_kernel_device_init (MMKernelDevice *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_KERNEL_DEVICE, MMKernelDevicePrivate);
+}
+
+static void
+set_property (GObject      *object,
+              guint         prop_id,
+              const GValue *value,
+              GParamSpec   *pspec)
+{
+    MMKernelDevice *self = MM_KERNEL_DEVICE (object);
+
+    switch (prop_id) {
+    case PROP_LOWER_DEVICE:
+        g_clear_object (&self->priv->lower_device);
+        self->priv->lower_device = g_value_dup_object (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject    *object,
+              guint       prop_id,
+              GValue     *value,
+              GParamSpec *pspec)
+{
+    MMKernelDevice *self = MM_KERNEL_DEVICE (object);
+
+    switch (prop_id) {
+    case PROP_LOWER_DEVICE:
+        g_value_set_object (value, self->priv->lower_device);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
@@ -364,6 +453,31 @@ log_object_iface_init (MMLogObjectInterface *iface)
 }
 
 static void
+dispose (GObject *object)
+{
+    MMKernelDevice *self = MM_KERNEL_DEVICE (object);
+
+    g_clear_object (&self->priv->lower_device);
+
+    G_OBJECT_CLASS (mm_kernel_device_parent_class)->dispose (object);
+}
+
+static void
 mm_kernel_device_class_init (MMKernelDeviceClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMKernelDevicePrivate));
+
+    object_class->dispose      = dispose;
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
+    properties[PROP_LOWER_DEVICE] =
+        g_param_spec_object ("lower-device",
+                             "lower device",
+                             "Lower real device, when this is a virtual one",
+                             MM_TYPE_KERNEL_DEVICE,
+                             G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_LOWER_DEVICE, properties[PROP_LOWER_DEVICE]);
 }
