@@ -22,6 +22,7 @@
 #include <ModemManager-tags.h>
 
 #include "mm-kernel-device-udev.h"
+#include "mm-kernel-device-helpers.h"
 #include "mm-log-object.h"
 
 static void initable_iface_init (GInitableIface *iface);
@@ -73,10 +74,33 @@ udev_device_get_sysfs_attr_as_hex (GUdevDevice *device,
 static void
 preload_contents_other (MMKernelDeviceUdev *self)
 {
+    g_autofree gchar *lower_device_name = NULL;
+
     /* For any other kind of bus (or the absence of one, as in virtual devices),
      * assume this is a single port device and don't try to match multiple ports
      * together. Also, obviously, no vendor, product, revision or interface. */
     self->priv->driver = g_strdup (g_udev_device_get_driver (self->priv->device));
+
+    /* But look for a lower real physical device, as we may have one */
+    lower_device_name = mm_kernel_device_get_lower_device_name (g_udev_device_get_sysfs_path (self->priv->device));
+    if (lower_device_name) {
+        g_autoptr(GUdevDevice)  lower_device = NULL;
+        const gchar            *subsystem;
+
+        subsystem = g_udev_device_get_subsystem (self->priv->device);
+        lower_device = g_udev_client_query_by_subsystem_and_name (self->priv->client, subsystem, lower_device_name);
+        if (!lower_device) {
+            mm_obj_dbg (self, "couldn't find lower device: %s/%s", subsystem, lower_device_name);
+        } else {
+            g_autoptr(MMKernelDevice) lower_kernel_device = NULL;
+
+            mm_obj_dbg (self, "setting up lower device: %s/%s", subsystem, lower_device_name);
+            lower_kernel_device = mm_kernel_device_udev_new (self->priv->client, lower_device);
+            g_object_set (self,
+                          "lower-device", lower_kernel_device,
+                          NULL);
+        }
+    }
 }
 
 static void
