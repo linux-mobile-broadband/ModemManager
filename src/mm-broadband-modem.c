@@ -4465,7 +4465,7 @@ modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
                                            error))
         return NULL;
 
-    mm_3gpp_normalize_operator (&operator_code, MM_BROADBAND_MODEM (self)->priv->modem_current_charset);
+    mm_3gpp_normalize_operator (&operator_code, MM_BROADBAND_MODEM (self)->priv->modem_current_charset, self);
     if (operator_code)
         mm_obj_dbg (self, "loaded Operator Code: %s", operator_code);
     return operator_code;
@@ -4504,7 +4504,7 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
                                            error))
         return NULL;
 
-    mm_3gpp_normalize_operator (&operator_name, MM_BROADBAND_MODEM (self)->priv->modem_current_charset);
+    mm_3gpp_normalize_operator (&operator_name, MM_BROADBAND_MODEM (self)->priv->modem_current_charset, self);
     if (operator_name)
         mm_obj_dbg (self, "loaded Operator Name: %s", operator_name);
     return operator_name;

@@ -626,9 +626,10 @@ test_cops_response_motoc (void *f, gpointer d)
 static void
 test_cops_response_mf627a (void *f, gpointer d)
 {
+    /* The '@' in this string is ASCII 0x40, and 0x40 is a valid GSM-7 char: '¡' (which is 0xc2,0xa1 in UTF-8) */
     const char *reply = "+COPS: (2,\"AT&T@\",\"AT&TD\",\"310410\",0),(3,\"Vstream Wireless\",\"VSTREAM\",\"31026\",0),";
     static MM3gppNetworkInfo expected[] = {
-        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT,   (gchar *) "AT&T@",            (gchar *) "AT&TD",   (gchar *) "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT,   (gchar *) "AT&T¡",            (gchar *) "AT&TD",   (gchar *) "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, (gchar *) "Vstream Wireless", (gchar *) "VSTREAM", (gchar *) "31026",  MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
@@ -638,9 +639,10 @@ test_cops_response_mf627a (void *f, gpointer d)
 static void
 test_cops_response_mf627b (void *f, gpointer d)
 {
+    /* The '@' in this string is ASCII 0x40, and 0x40 is a valid GSM-7 char: '¡' (which is 0xc2,0xa1 in UTF-8) */
     const char *reply = "+COPS: (2,\"AT&Tp\",\"AT&T@\",\"310410\",0),(3,\"\",\"\",\"31026\",0),";
     static MM3gppNetworkInfo expected[] = {
-        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT,   (gchar *) "AT&Tp", (gchar *) "AT&T@", (gchar *) "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT,   (gchar *) "AT&Tp", (gchar *) "AT&T¡", (gchar *) "310410", MM_MODEM_ACCESS_TECHNOLOGY_GSM },
         { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL,              NULL,              (gchar *) "31026",  MM_MODEM_ACCESS_TECHNOLOGY_GSM },
     };
 
@@ -1041,7 +1043,7 @@ common_test_normalize_operator (const NormalizeOperatorTest *t)
     gchar *str;
 
     str = g_strdup (t->input);
-    mm_3gpp_normalize_operator (&str, t->charset);
+    mm_3gpp_normalize_operator (&str, t->charset, NULL);
     if (!t->normalized)
         g_assert (!str);
     else

@@ -429,7 +429,8 @@ const gchar         *mm_3gpp_facility_to_acronym (MMModem3gppFacility  facility)
 MMModemAccessTechnology mm_string_to_access_tech (const gchar *string);
 
 void mm_3gpp_normalize_operator (gchar          **operator,
-                                 MMModemCharset   cur_charset);
+                                 MMModemCharset   cur_charset,
+                                 gpointer         log_object);
 
 gboolean mm_3gpp_parse_operator_id (const gchar *operator_id,
                                     guint16 *mcc,
