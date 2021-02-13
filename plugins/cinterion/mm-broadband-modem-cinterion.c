@@ -107,9 +107,6 @@ struct _MMBroadbandModemCinterionPrivate {
 
     /* Initial EPS bearer context number */
     gint initial_eps_bearer_cid;
-
-    /* Command sequence */
-    MMBaseModemAtCommandAlloc *cmds;
 };
 
 /*****************************************************************************/
@@ -2070,6 +2067,23 @@ load_current_bands (MMIfaceModem        *self,
 /*****************************************************************************/
 /* Set current bands (Modem interface) */
 
+typedef struct {
+    MMBaseModemAtCommandAlloc *cmds;
+} SetCurrentBandsContext;
+
+static void
+set_current_bands_context_free (SetCurrentBandsContext *ctx)
+{
+    if (ctx->cmds) {
+        guint i;
+
+        for (i = 0; ctx->cmds[i].command; i++)
+            mm_base_modem_at_command_alloc_clear (&ctx->cmds[i]);
+        g_free (ctx->cmds);
+    }
+    g_slice_free (SetCurrentBandsContext, ctx);
+}
+
 static gboolean
 set_current_bands_finish (MMIfaceModem  *self,
                           GAsyncResult  *res,
@@ -2093,23 +2107,17 @@ scfg_set_ready (MMBaseModem  *self,
 }
 
 static void
-scfg_set_ready_sequence (MMBaseModem  *_self,
+scfg_set_ready_sequence (MMBaseModem  *self,
                          GAsyncResult *res,
                          GTask        *task)
 {
     GError *error = NULL;
-    gpointer ctx = NULL;
-    guint i;
-    MMBroadbandModemCinterion *self;
 
-    self = g_task_get_source_object (task);
-    for (i = 0; self->priv->cmds[i].command; i++)
-        mm_base_modem_at_command_alloc_clear (&self->priv->cmds[i]);
-    g_free (self->priv->cmds);
-    self->priv->cmds = NULL;
-
-    mm_base_modem_at_sequence_finish (_self, res, &ctx, &error);
-    g_task_return_boolean (task, TRUE);
+    mm_base_modem_at_sequence_finish (self, res, NULL, &error);
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 
@@ -2158,6 +2166,11 @@ set_bands_3g (GTask  *task,
     }
 
     if (self->priv->rb_format == MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE) {
+        SetCurrentBandsContext *ctx;
+
+        ctx = g_slice_new0 (SetCurrentBandsContext);
+        g_task_set_task_data (task, ctx, (GDestroyNotify)set_current_bands_context_free);
+
         if (self->priv->modem_family == MM_CINTERION_MODEM_FAMILY_IMT) {
             g_autofree gchar *bandstr2G = NULL;
             g_autofree gchar *bandstr3G = NULL;
@@ -2203,21 +2216,21 @@ set_bands_3g (GTask  *task,
                 return;
             }
 
-            self->priv->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
-            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%s\"", bandstr2G_enc);
-            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%s\"", bandstr3G_enc);
-            self->priv->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%s\"", bandstr4G_enc);
-            self->priv->cmds[0].timeout = self->priv->cmds[1].timeout = self->priv->cmds[2].timeout = 60;
+            ctx->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
+            ctx->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%s\"", bandstr2G_enc);
+            ctx->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%s\"", bandstr3G_enc);
+            ctx->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%s\"", bandstr4G_enc);
+            ctx->cmds[0].timeout = ctx->cmds[1].timeout = ctx->cmds[2].timeout = 60;
         } else {
-            self->priv->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
-            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%08x\",,1", band[MM_CINTERION_RB_BLOCK_GSM]);
-            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%08x\",,1", band[MM_CINTERION_RB_BLOCK_UMTS]);
-            self->priv->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%08x\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_LTE_LOW], band[MM_CINTERION_RB_BLOCK_LTE_HIGH]);
-            self->priv->cmds[0].timeout = self->priv->cmds[1].timeout = self->priv->cmds[2].timeout = 15;
+            ctx->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
+            ctx->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%08x\",,1", band[MM_CINTERION_RB_BLOCK_GSM]);
+            ctx->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%08x\",,1", band[MM_CINTERION_RB_BLOCK_UMTS]);
+            ctx->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%08x\",\"%08x\",1", band[MM_CINTERION_RB_BLOCK_LTE_LOW], band[MM_CINTERION_RB_BLOCK_LTE_HIGH]);
+            ctx->cmds[0].timeout = ctx->cmds[1].timeout = ctx->cmds[2].timeout = 15;
         }
 
         mm_base_modem_at_sequence (MM_BASE_MODEM (self),
-                                   (const MMBaseModemAtCommand *)self->priv->cmds,
+                                   (const MMBaseModemAtCommand *)ctx->cmds,
                                    NULL,
                                    NULL,
                                    (GAsyncReadyCallback)scfg_set_ready_sequence,
