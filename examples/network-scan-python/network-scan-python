@@ -19,6 +19,7 @@
 #
 
 import sys
+import time
 
 import gi
 gi.require_version('ModemManager', '1.0')
@@ -43,6 +44,9 @@ if __name__ == "__main__":
 
     # Iterate modems and scan network with each one by one
     for obj in manager.get_objects():
+        modem = obj.get_modem()
+        modem.enable()
+        time.sleep(1)
         modem3gpp = obj.get_modem_3gpp()
         if not modem3gpp:
             sys.stderr.write('%s: skipping unusable modem...\n' %
