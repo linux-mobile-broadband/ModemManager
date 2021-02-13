@@ -317,58 +317,71 @@ test_gsm7_pack_7_chars_offset (void)
 }
 
 static void
-test_take_convert_ucs2_hex_utf8 (void)
+test_str_ucs2_to_from_utf8 (void)
 {
-    gchar *src, *converted, *utf8;
+    const gchar       *src = "0054002D004D006F00620069006C0065";
+    g_autofree gchar  *utf8 = NULL;
+    g_autofree gchar  *dst = NULL;
+    g_autoptr(GError)  error = NULL;
 
-    /* Ensure hex-encoded UCS-2 works */
-    src = g_strdup ("0054002d004d006f00620069006c0065");
-    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
-    g_assert_cmpstr (converted, ==, "T-Mobile");
-    utf8 = mm_utf8_take_and_convert_to_charset (converted, MM_MODEM_CHARSET_UCS2);
-    g_assert_cmpstr (utf8, ==, "0054002D004D006F00620069006C0065");
-    g_free (utf8);
-}
-
-static void
-test_take_convert_ucs2_bad_ascii (void)
-{
-    gchar *src, *converted;
-
-    /* Test that something mostly ASCII returns most of the original string */
-    src = g_strdup ("Orange\241");
-    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
-    g_assert_cmpstr (converted, ==, "Orange");
-    g_free (converted);
-}
-
-static void
-test_take_convert_ucs2_bad_ascii2 (void)
-{
-    gchar *src, *converted;
-
-    /* Ensure something completely screwed up doesn't crash */
-    src = g_strdup ("\241\255\254\250\244\234");
-    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_UCS2);
-    g_assert (converted == NULL);
-}
-
-static void
-test_take_convert_gsm_utf8 (void)
-{
-    /* NOTE: this is wrong, charset GSM may contain embedded NULs so we cannot convert
-     * from a plain UTF-8 string to a NUL-terminated string in GSM, as there is no
-     * such, thing. */
-#if 0
-    gchar *src, *converted, *utf8;
-
-    src = g_strdup ("T-Mobile");
-    converted = mm_charset_take_and_convert_to_utf8 (src, MM_MODEM_CHARSET_GSM);
-    g_assert_cmpstr (converted, ==, "T-Mobile");
-    utf8 = mm_utf8_take_and_convert_to_charset (converted, MM_MODEM_CHARSET_GSM);
+    utf8 = mm_modem_charset_str_to_utf8 (src, -1, MM_MODEM_CHARSET_UCS2, FALSE, &error);
+    g_assert_no_error (error);
     g_assert_cmpstr (utf8, ==, "T-Mobile");
-    g_free (utf8);
-#endif
+
+    dst = mm_modem_charset_str_from_utf8 (utf8, MM_MODEM_CHARSET_UCS2, FALSE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (dst, ==, src);
+}
+
+static void
+test_str_gsm_to_from_utf8 (void)
+{
+    const gchar       *src = "T-Mobile";
+    g_autofree gchar  *utf8 = NULL;
+    g_autofree gchar  *dst = NULL;
+    g_autoptr(GError)  error = NULL;
+
+    /* Note: as long as the GSM string doesn't contain the '@' character, str_to_utf8()
+     * and str_from_utf8() can safely be used */
+
+    utf8 = mm_modem_charset_str_to_utf8 (src, -1, MM_MODEM_CHARSET_GSM, FALSE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (utf8, ==, src);
+
+    dst = mm_modem_charset_str_from_utf8 (utf8, MM_MODEM_CHARSET_GSM, FALSE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (dst, ==, src);
+}
+
+static void
+test_str_gsm_to_from_utf8_with_at (void)
+{
+    /* The NULs are '@' chars, except for the trailing one which is always taken as end-of-string */
+    const gchar        src[] = { 'T', '-', 'M', 0x00, 'o', 'b', 'i', 0x00, 'l', 'e', 0x00 };
+    const gchar       *utf8_expected = "T-M@obi@le";
+    const gchar       *src_translit = "T-M?obi?le";
+    g_autofree gchar  *utf8 = NULL;
+    g_autofree gchar  *dst = NULL;
+    g_autoptr(GError)  error = NULL;
+
+    /* Note: as long as the GSM string doesn't contain the '@' character, str_to_utf8()
+     * and str_from_utf8() can safely be used */
+
+    utf8 = mm_modem_charset_str_to_utf8 (src, G_N_ELEMENTS (src), MM_MODEM_CHARSET_GSM, FALSE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (utf8, ==, utf8_expected);
+
+    /* if charset conversion from UTF-8 contains '@' chars, running without transliteration
+     * will return an error */
+    dst = mm_modem_charset_str_from_utf8 (utf8, MM_MODEM_CHARSET_GSM, FALSE, &error);
+    g_assert_nonnull (error);
+    g_assert_null (dst);
+    g_clear_error (&error);
+
+    /* with transliteration, '@'->'?' */
+    dst = mm_modem_charset_str_from_utf8 (utf8, MM_MODEM_CHARSET_GSM, TRUE, &error);
+    g_assert_no_error (error);
+    g_assert_cmpstr (dst, ==, src_translit);
 }
 
 struct charset_can_convert_to_test_s {
@@ -452,10 +465,9 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/charsets/gsm7/pack/last-septet-alone", test_gsm7_pack_last_septet_alone);
     g_test_add_func ("/MM/charsets/gsm7/pack/7-chars-offset",    test_gsm7_pack_7_chars_offset);
 
-    g_test_add_func ("/MM/charsets/take-convert/ucs2/hex",         test_take_convert_ucs2_hex_utf8);
-    g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii",   test_take_convert_ucs2_bad_ascii);
-    g_test_add_func ("/MM/charsets/take-convert/ucs2/bad-ascii-2", test_take_convert_ucs2_bad_ascii2);
-    g_test_add_func ("/MM/charsets/take-convert/gsm",              test_take_convert_gsm_utf8);
+    g_test_add_func ("/MM/charsets/str-from-to/ucs2",         test_str_ucs2_to_from_utf8);
+    g_test_add_func ("/MM/charsets/str-from-to/gsm",          test_str_gsm_to_from_utf8);
+    g_test_add_func ("/MM/charsets/str-from-to/gsm-with-at",  test_str_gsm_to_from_utf8_with_at);
 
     g_test_add_func ("/MM/charsets/can-convert-to", test_charset_can_covert_to);
 
