@@ -359,22 +359,35 @@ authenticate (GTask *task)
 
     /* Both user and password are required; otherwise firmware returns an error */
     if (user || password) {
-        gchar *command;
-        gchar *encoded_user;
-        gchar *encoded_password;
+        g_autofree gchar  *command = NULL;
+        g_autofree gchar  *user_enc = NULL;
+        g_autofree gchar  *password_enc = NULL;
+        GError            *error = NULL;
 
-        encoded_user = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (ctx->modem),
-                                                                               g_strdup (user));
-        encoded_password = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (ctx->modem),
-                                                                                   g_strdup (password));
+        user_enc = mm_modem_charset_str_from_utf8 (user,
+                                                   mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (ctx->modem)),
+                                                   FALSE,
+                                                   &error);
+        if (!user_enc) {
+            g_prefix_error (&error, "Couldn't convert user to current charset: ");
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+
+        password_enc = mm_modem_charset_str_from_utf8 (password,
+                                                       mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (ctx->modem)),
+                                                       FALSE,
+                                                       &error);
+        if (!password_enc) {
+            g_prefix_error (&error, "Couldn't convert password to current charset: ");
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
 
         command = g_strdup_printf ("AT*EIAAUW=%d,1,\"%s\",\"%s\"",
-                                   ctx->cid,
-                                   encoded_user ? encoded_user : "",
-                                   encoded_password ? encoded_password : "");
-        g_free (encoded_user);
-        g_free (encoded_password);
-
+                                   ctx->cid, user_enc, password_enc);
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
                                        command,
@@ -384,7 +397,6 @@ authenticate (GTask *task)
                                        g_task_get_cancellable (task),
                                        (GAsyncReadyCallback) authenticate_ready,
                                        task);
-        g_free (command);
         return;
     }
 

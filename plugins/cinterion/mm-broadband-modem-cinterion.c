@@ -2154,22 +2154,59 @@ set_bands_3g (GTask  *task,
                                   FALSE,
                                   (GAsyncReadyCallback)scfg_set_ready,
                                   task);
-    } else { /* self->priv->rb_format == MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE */
+        return;
+    }
+
+    if (self->priv->rb_format == MM_CINTERION_RADIO_BAND_FORMAT_MULTIPLE) {
         if (self->priv->modem_family == MM_CINTERION_MODEM_FAMILY_IMT) {
             g_autofree gchar *bandstr2G = NULL;
             g_autofree gchar *bandstr3G = NULL;
             g_autofree gchar *bandstr4G = NULL;
+            g_autofree gchar *bandstr2G_enc = NULL;
+            g_autofree gchar *bandstr3G_enc = NULL;
+            g_autofree gchar *bandstr4G_enc = NULL;
 
             bandstr2G = g_strdup_printf ("0x%08X", band[MM_CINTERION_RB_BLOCK_GSM]);
             bandstr3G = g_strdup_printf ("0x%08X", band[MM_CINTERION_RB_BLOCK_UMTS]);
             bandstr4G = g_strdup_printf ("0x%08X", band[MM_CINTERION_RB_BLOCK_LTE_LOW]);
-            bandstr2G = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr2G);
-            bandstr3G = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr3G);
-            bandstr4G = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr4G);
+
+            bandstr2G_enc = mm_modem_charset_str_from_utf8 (bandstr2G,
+                                                            mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
+                                                            FALSE,
+                                                            &error);
+            if (!bandstr2G_enc) {
+                g_prefix_error (&error, "Couldn't convert 2G band string to current charset: ");
+                g_task_return_error (task, error);
+                g_object_unref (task);
+                return;
+            }
+
+            bandstr3G_enc = mm_modem_charset_str_from_utf8 (bandstr3G,
+                                                            mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
+                                                            FALSE,
+                                                            &error);
+            if (!bandstr3G_enc) {
+                g_prefix_error (&error, "Couldn't convert 3G band string to current charset: ");
+                g_task_return_error (task, error);
+                g_object_unref (task);
+                return;
+            }
+
+            bandstr4G_enc = mm_modem_charset_str_from_utf8 (bandstr4G,
+                                                            mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
+                                                            FALSE,
+                                                            &error);
+            if (!bandstr4G_enc) {
+                g_prefix_error (&error, "Couldn't convert 4G band string to current charset: ");
+                g_task_return_error (task, error);
+                g_object_unref (task);
+                return;
+            }
+
             self->priv->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
-            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%s\"", bandstr2G);
-            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%s\"", bandstr3G);
-            self->priv->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%s\"", bandstr4G);
+            self->priv->cmds[0].command = g_strdup_printf ("^SCFG=\"Radio/Band/2G\",\"%s\"", bandstr2G_enc);
+            self->priv->cmds[1].command = g_strdup_printf ("^SCFG=\"Radio/Band/3G\",\"%s\"", bandstr3G_enc);
+            self->priv->cmds[2].command = g_strdup_printf ("^SCFG=\"Radio/Band/4G\",\"%s\"", bandstr4G_enc);
             self->priv->cmds[0].timeout = self->priv->cmds[1].timeout = self->priv->cmds[2].timeout = 60;
         } else {
             self->priv->cmds = g_new0 (MMBaseModemAtCommandAlloc, 3 + 1);
@@ -2185,8 +2222,10 @@ set_bands_3g (GTask  *task,
                                    NULL,
                                    (GAsyncReadyCallback)scfg_set_ready_sequence,
                                    task);
+        return;
     }
 
+    g_assert_not_reached ();
 }
 
 static void
@@ -2196,8 +2235,9 @@ set_bands_2g (GTask  *task,
     MMBroadbandModemCinterion *self;
     GError                    *error = NULL;
     guint                      band[MM_CINTERION_RB_BLOCK_N] = { 0 };
-    gchar                     *cmd;
-    gchar                     *bandstr;
+    g_autofree gchar          *cmd = NULL;
+    g_autofree gchar          *bandstr = NULL;
+    g_autofree gchar          *bandstr_enc = NULL;
 
     self = g_task_get_source_object (task);
 
@@ -2215,12 +2255,13 @@ set_bands_2g (GTask  *task,
 
     /* Build string with the value, in the proper charset */
     bandstr = g_strdup_printf ("%u", band[MM_CINTERION_RB_BLOCK_LEGACY]);
-    bandstr = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), bandstr);
-    if (!bandstr) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_UNSUPPORTED,
-                                 "Couldn't convert band set to current charset");
+    bandstr_enc = mm_modem_charset_str_from_utf8 (bandstr,
+                                                  mm_broadband_modem_get_current_charset (MM_BROADBAND_MODEM (self)),
+                                                  FALSE,
+                                                  &error);
+    if (!bandstr_enc) {
+        g_prefix_error (&error, "Couldn't convert band string to current charset: ");
+        g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
@@ -2231,17 +2272,13 @@ set_bands_2g (GTask  *task,
      * the modem to connect at that specific frequency only. Note that we will be
      * passing double-quote enclosed strings here!
      */
-    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",\"%s\",\"%s\"", bandstr, bandstr);
-
+    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",\"%s\",\"%s\"", bandstr_enc, bandstr_enc);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               15,
                               FALSE,
                               (GAsyncReadyCallback)scfg_set_ready,
                               task);
-
-    g_free (cmd);
-    g_free (bandstr);
 }
 
 static void

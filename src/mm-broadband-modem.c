@@ -4800,27 +4800,37 @@ cops_set_ready (MMBaseModem  *self,
 }
 
 static void
-cops_ascii_set_ready (MMBaseModem  *self,
+cops_ascii_set_ready (MMBaseModem  *_self,
                       GAsyncResult *res,
                       GTask        *task)
 {
-    GError *error = NULL;
+    MMBroadbandModem  *self = MM_BROADBAND_MODEM (_self);
+    g_autoptr(GError)  error = NULL;
 
-    if (!mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error)) {
+    if (!mm_base_modem_at_command_full_finish (_self, res, &error)) {
         /* If it failed with an unsupported error, retry with current modem charset */
         if (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
-            gchar *operator_id;
-            gchar *operator_id_current_charset;
+            g_autoptr(GError)  enc_error = NULL;
+            g_autofree gchar  *operator_id_enc = NULL;
+            gchar             *operator_id;
 
+            /* try to encode to current charset */
             operator_id = g_task_get_task_data (task);
-            operator_id_current_charset = mm_broadband_modem_take_and_convert_to_current_charset (MM_BROADBAND_MODEM (self), g_strdup (operator_id));
+            operator_id_enc = mm_modem_charset_str_from_utf8 (operator_id, self->priv->modem_current_charset, FALSE, &enc_error);
+            if (!operator_id_enc) {
+                mm_obj_dbg (self, "couldn't convert operator id to current charset: %s", enc_error->message);
+                g_task_return_error (task, g_steal_pointer (&error));
+                g_object_unref (task);
+                return;
+            }
 
-            if (g_strcmp0 (operator_id, operator_id_current_charset) != 0) {
-                gchar *command;
+            /* retry only if encoded string is different to the non-encoded one */
+            if (g_strcmp0 (operator_id, operator_id_enc) != 0) {
+                g_autofree gchar *command = NULL;
 
-                command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id_current_charset);
-                mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                               mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
+                command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id_enc);
+                mm_base_modem_at_command_full (_self,
+                                               mm_base_modem_peek_best_at_port (_self, NULL),
                                                command,
                                                120,
                                                FALSE,
@@ -4828,16 +4838,10 @@ cops_ascii_set_ready (MMBaseModem  *self,
                                                g_task_get_cancellable (task),
                                                (GAsyncReadyCallback)cops_set_ready,
                                                task);
-                g_error_free (error);
-                g_free (operator_id_current_charset);
-                g_free (command);
                 return;
             }
-            /* operator id string would be the same on the current charset,
-             * so fallback and return the not supported error */
-            g_free (operator_id_current_charset);
         }
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
     } else
         g_task_return_boolean (task, TRUE);
     g_object_unref (task);
@@ -7311,11 +7315,17 @@ sms_text_part_list_ready (MMBroadbandModem *self,
     ctx = g_task_get_task_data (task);
 
     while (g_match_info_matches (match_info)) {
-        MMSmsPart *part;
-        guint matches, idx;
-        gchar *number, *timestamp, *text, *ucs2_text, *stat;
-        gsize ucs2_len = 0;
-        GByteArray *raw;
+        MMSmsPart            *part;
+        guint                 matches;
+        guint                 idx;
+        g_autofree gchar      *number_enc = NULL;
+        g_autofree gchar      *number = NULL;
+        g_autofree gchar      *timestamp = NULL;
+        g_autofree gchar      *text_enc = NULL;
+        g_autofree gchar      *text = NULL;
+        g_autofree gchar      *stat = NULL;
+        g_autoptr(GByteArray)  raw = NULL;
+        g_autoptr(GError)      inner_error = NULL;
 
         matches = g_match_info_get_match_count (match_info);
         if (matches != 7) {
@@ -7336,39 +7346,44 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         }
 
         /* Get and parse number */
-        number = mm_get_string_unquoted_from_match_info (match_info, 3);
-        if (!number) {
+        number_enc = mm_get_string_unquoted_from_match_info (match_info, 3);
+        if (!number_enc) {
             mm_obj_dbg (self, "failed to get message sender number");
-            g_free (stat);
+            goto next;
+        }
+        number = mm_modem_charset_str_to_utf8 (number_enc, -1, self->priv->modem_current_charset, FALSE, &inner_error);
+        if (!number) {
+            mm_obj_dbg (self, "failed to convert message sender number to UTF-8: %s", inner_error->message);
             goto next;
         }
 
-        number = mm_broadband_modem_take_and_convert_to_utf8 (MM_BROADBAND_MODEM (self),
-                                                              number);
-
         /* Get and parse timestamp (always expected in ASCII) */
         timestamp = mm_get_string_unquoted_from_match_info (match_info, 5);
+        if (timestamp && !g_str_is_ascii (timestamp)) {
+            mm_obj_dbg (self, "failed to parse input timestamp as ASCII");
+            goto next;
+        }
 
         /* Get and parse text */
-        text = mm_broadband_modem_take_and_convert_to_utf8 (MM_BROADBAND_MODEM (self),
-                                                            g_match_info_fetch (match_info, 6));
+        text_enc = g_match_info_fetch (match_info, 6);
+        text = mm_modem_charset_str_to_utf8 (text_enc, -1, self->priv->modem_current_charset, FALSE, &inner_error);
+        if (!text) {
+            mm_obj_dbg (self, "failed to convert message text to UTF-8: %s", inner_error->message);
+            goto next;
+        }
 
         /* The raw SMS data can only be GSM, UCS2, or unknown (8-bit), so we
          * need to convert to UCS2 here.
          */
-        ucs2_text = g_convert (text, -1, "UCS-2BE//TRANSLIT", "UTF-8", NULL, &ucs2_len, NULL);
-        g_assert (ucs2_text);
-        raw = g_byte_array_sized_new (ucs2_len);
-        g_byte_array_append (raw, (const guint8 *) ucs2_text, ucs2_len);
-        g_free (ucs2_text);
+        raw = mm_modem_charset_bytearray_from_utf8 (text, MM_MODEM_CHARSET_UCS2, FALSE, NULL);
+        g_assert (raw);
 
         /* all take() methods pass ownership of the value as well */
-        part = mm_sms_part_new (idx,
-                                sms_pdu_type_from_str (stat));
-        mm_sms_part_take_number (part, number);
-        mm_sms_part_take_timestamp (part, timestamp);
-        mm_sms_part_take_text (part, text);
-        mm_sms_part_take_data (part, raw);
+        part = mm_sms_part_new (idx, sms_pdu_type_from_str (stat));
+        mm_sms_part_take_number (part, g_steal_pointer (&number));
+        mm_sms_part_take_timestamp (part, g_steal_pointer (&timestamp));
+        mm_sms_part_take_text (part, g_steal_pointer (&text));
+        mm_sms_part_take_data (part, g_steal_pointer (&raw));
         mm_sms_part_set_class (part, -1);
 
         mm_obj_dbg (self, "correctly parsed SMS list entry (%d)", idx);
@@ -7376,7 +7391,6 @@ sms_text_part_list_ready (MMBroadbandModem *self,
                                             part,
                                             sms_state_from_str (stat),
                                             ctx->list_storage);
-        g_free (stat);
 next:
         g_match_info_next (match_info, NULL);
     }
@@ -11890,34 +11904,13 @@ initialize (MMBaseModem *self,
 
 /*****************************************************************************/
 
-gchar *
-mm_broadband_modem_take_and_convert_to_utf8 (MMBroadbandModem *self,
-                                             gchar *str)
-{
-    /* should only be used AFTER current charset is set */
-    if (self->priv->modem_current_charset == MM_MODEM_CHARSET_UNKNOWN)
-        return str;
-
-    return mm_charset_take_and_convert_to_utf8 (str,
-                                                self->priv->modem_current_charset);
-}
-
-gchar *
-mm_broadband_modem_take_and_convert_to_current_charset (MMBroadbandModem *self,
-                                                        gchar *str)
-{
-    /* should only be used AFTER current charset is set */
-    if (self->priv->modem_current_charset == MM_MODEM_CHARSET_UNKNOWN)
-        return str;
-
-    return mm_utf8_take_and_convert_to_charset (str, self->priv->modem_current_charset);
-}
-
 MMModemCharset
 mm_broadband_modem_get_current_charset (MMBroadbandModem *self)
 {
     return self->priv->modem_current_charset;
 }
+
+/*****************************************************************************/
 
 gchar *
 mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
@@ -11939,7 +11932,6 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
                 mm_gdbus_modem_get_manufacturer (
                     MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton))));
 }
-
 
 /*****************************************************************************/
 

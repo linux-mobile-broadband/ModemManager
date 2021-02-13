@@ -100,18 +100,6 @@ MMBroadbandModem *mm_broadband_modem_new (const gchar *device,
                                           guint16 vendor_id,
                                           guint16 product_id);
 
-/* Convert the given string, which comes in the charset currently set in the
- * modem, to UTF-8. Given in the API so that subclasses can also use it directly.
- */
-gchar *mm_broadband_modem_take_and_convert_to_utf8 (MMBroadbandModem *self,
-                                                    gchar *str);
-
-/* Convert the given string, which comes in UTF-8, to the charset currently set
- * in the modem. Given in the API so that subclasses can also use it directly.
- */
-gchar *mm_broadband_modem_take_and_convert_to_current_charset (MMBroadbandModem *self,
-                                                               gchar *str);
-
 MMModemCharset mm_broadband_modem_get_current_charset (MMBroadbandModem *self);
 
 /* Create a unique device identifier string using the ATI and ATI1 replies and some
