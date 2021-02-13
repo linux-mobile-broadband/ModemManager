@@ -37,12 +37,15 @@ if __name__ == "__main__":
     connection = Gio.bus_get_sync (Gio.BusType.SYSTEM, None)
     manager = ModemManager.Manager.new_sync (connection, Gio.DBusObjectManagerClientFlags.DO_NOT_AUTO_START, None)
     if manager.get_name_owner() is None:
-        sys.stderr.write('ModemManager not found in bus')
+        sys.stderr.write('ModemManager not found in bus\n')
         sys.exit(2)
 
     # Iterate modems and scan network with each one by one
     for obj in manager.get_objects():
         modem3gpp = obj.get_modem_3gpp()
+        if modem3gpp is None:
+            sys.stderr.write('%s: skipping unusable modem...\n' % obj.get_object_path())
+            continue
         modem3gpp.set_default_timeout(300000)
         print('%s: starting network scan...' % modem3gpp.get_object_path())
         networks = modem3gpp.scan_sync()
