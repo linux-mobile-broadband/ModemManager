@@ -97,8 +97,8 @@ class ModemWatcher:
                modem.get_equipment_identifier(),
                obj.get_object_path()))
         if modem.get_state() == ModemManager.ModemState.FAILED:
-            print('[ModemWatcher,%s] ignoring failed modem' %
-                  modem_index(obj.get_object_path()))
+            print('[ModemWatcher] ignoring failed modem: %s' %
+                  obj.get_object_path())
 
     """
     Object removed
