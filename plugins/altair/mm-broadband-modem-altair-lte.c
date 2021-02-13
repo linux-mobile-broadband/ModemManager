@@ -1067,7 +1067,7 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
                                            error))
         return NULL;
 
-    mm_3gpp_normalize_operator (&operator_name, MM_MODEM_CHARSET_UNKNOWN);
+    mm_3gpp_normalize_operator (&operator_name, MM_MODEM_CHARSET_UNKNOWN, self);
     return operator_name;
 }
 
