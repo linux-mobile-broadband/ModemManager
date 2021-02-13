@@ -18,9 +18,11 @@
 # Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
 #
 
-import sys, signal
-import ModemWatcher
+import signal
+
 from gi.repository import GLib
+
+import ModemWatcher
 
 main_loop = None
 watcher = None

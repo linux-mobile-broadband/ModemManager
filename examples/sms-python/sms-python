@@ -18,10 +18,12 @@
 # Copyright (C) 2016 Aleksander Morgado <aleksander@aleksander.es>
 #
 
-import sys, signal, gi
+import sys
 
+import gi
 gi.require_version('ModemManager', '1.0')
-from gi.repository import GLib, GObject, Gio, ModemManager
+from gi.repository import Gio, GLib, GObject, ModemManager
+
 
 if __name__ == "__main__":
 

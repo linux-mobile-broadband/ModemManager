@@ -18,10 +18,10 @@
 # Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
 #
 
-import os, sys, gi
-
+import gi
 gi.require_version('ModemManager', '1.0')
-from gi.repository import GLib, GObject, Gio, ModemManager
+from gi.repository import Gio, GLib, GObject, ModemManager
+
 
 """
 The ModemWatcher class is responsible for monitoring ModemManager
