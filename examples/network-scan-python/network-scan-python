@@ -34,17 +34,19 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Connection to ModemManager
-    connection = Gio.bus_get_sync (Gio.BusType.SYSTEM, None)
-    manager = ModemManager.Manager.new_sync (connection, Gio.DBusObjectManagerClientFlags.DO_NOT_AUTO_START, None)
-    if manager.get_name_owner() is None:
+    connection = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    manager = ModemManager.Manager.new_sync(
+        connection, Gio.DBusObjectManagerClientFlags.DO_NOT_AUTO_START, None)
+    if not manager.get_name_owner():
         sys.stderr.write('ModemManager not found in bus\n')
         sys.exit(2)
 
     # Iterate modems and scan network with each one by one
     for obj in manager.get_objects():
         modem3gpp = obj.get_modem_3gpp()
-        if modem3gpp is None:
-            sys.stderr.write('%s: skipping unusable modem...\n' % obj.get_object_path())
+        if not modem3gpp:
+            sys.stderr.write('%s: skipping unusable modem...\n' %
+                             obj.get_object_path())
             continue
         modem3gpp.set_default_timeout(300000)
         print('%s: starting network scan...' % modem3gpp.get_object_path())
@@ -52,10 +54,12 @@ if __name__ == "__main__":
         if networks:
             for network in networks:
                 print('%s: %s - %s (%s, %s)' % (
-                      network.get_operator_code(),
-                      network.get_operator_short(),
-                      network.get_operator_short(),
-                      ModemManager.modem_access_technology_build_string_from_mask (network.get_access_technology()),
-                      ModemManager.Modem3gppNetworkAvailability.get_string(network.get_availability())))
+                    network.get_operator_code(),
+                    network.get_operator_short(),
+                    network.get_operator_short(),
+                    ModemManager.modem_access_technology_build_string_from_mask(
+                        network.get_access_technology()),
+                    ModemManager.Modem3gppNetworkAvailability.get_string(
+                        network.get_availability())))
         else:
             print('no networks found')
