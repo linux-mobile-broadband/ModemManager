@@ -87,47 +87,6 @@ mm_modem_charset_to_string (MMModemCharset charset)
     return settings ? settings->gsm_name : NULL;
 }
 
-static const gchar *
-charset_iconv_from (MMModemCharset charset)
-{
-    const CharsetSettings *settings;
-
-    settings = lookup_charset_settings (charset);
-    return settings ? settings->iconv_name : NULL;
-}
-
-gchar *
-mm_modem_charset_hex_to_utf8 (const gchar    *src,
-                              MMModemCharset  charset)
-{
-    const gchar       *iconv_from;
-    g_autofree guint8 *unconverted = NULL;
-    g_autofree gchar  *converted = NULL;
-    g_autoptr(GError)  error = NULL;
-    gsize              unconverted_len = 0;
-
-    g_return_val_if_fail (src != NULL, NULL);
-    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
-
-    iconv_from = charset_iconv_from (charset);
-    g_return_val_if_fail (iconv_from != NULL, FALSE);
-
-    unconverted = mm_utils_hexstr2bin (src, -1, &unconverted_len, NULL);
-    if (!unconverted)
-        return NULL;
-
-    if (charset == MM_MODEM_CHARSET_UTF8 || charset == MM_MODEM_CHARSET_IRA)
-        return g_steal_pointer (&unconverted);
-
-    converted = g_convert ((const gchar *)unconverted, unconverted_len,
-                           "UTF-8", iconv_from,
-                           NULL, NULL, &error);
-    if (!converted || error)
-        return NULL;
-
-    return g_steal_pointer (&converted);
-}
-
 /******************************************************************************/
 /* GSM 03.38 encoding conversion stuff */
 
