@@ -503,6 +503,102 @@ field_parser_double (void)
 }
 
 /**************************************************************/
+/* hexstr2bin & bin2hexstr */
+
+static void
+common_hexstr2bin_test_failure (const gchar *input_hex)
+{
+    g_autoptr(GError)  error = NULL;
+    g_autofree guint8 *bin = NULL;
+    gsize              bin_len = 0;
+
+    g_assert (mm_utils_ishexstr (input_hex) == FALSE);
+
+    bin = mm_utils_hexstr2bin (input_hex, -1, &bin_len, &error);
+    g_assert_null (bin);
+    g_assert_nonnull (error);
+}
+
+static void
+common_hexstr2bin_test_success_len (const gchar *input_hex,
+                                    gssize       input_hex_len)
+{
+    g_autoptr(GError)  error = NULL;
+    g_autofree guint8 *bin = NULL;
+    gsize              bin_len = 0;
+    g_autofree gchar  *hex = NULL;
+
+    bin = mm_utils_hexstr2bin (input_hex, input_hex_len, &bin_len, &error);
+    g_assert_nonnull (bin);
+    g_assert_no_error (error);
+
+    hex = mm_utils_bin2hexstr (bin, bin_len);
+    g_assert_nonnull (hex);
+
+    if (input_hex_len == -1)
+        g_assert (g_ascii_strcasecmp (input_hex, hex) == 0);
+    else
+        g_assert (g_ascii_strncasecmp (input_hex, hex, (gsize)input_hex_len) == 0);
+}
+
+static void
+common_hexstr2bin_test_success (const gchar *input_hex)
+{
+    gsize  input_hex_len;
+    gssize i;
+
+    g_assert (mm_utils_ishexstr (input_hex) == TRUE);
+
+    common_hexstr2bin_test_success_len (input_hex, -1);
+
+    input_hex_len = strlen (input_hex);
+    for (i = input_hex_len; i >= 2; i-=2)
+        common_hexstr2bin_test_success_len (input_hex, i);
+}
+
+static void
+hexstr_lower_case (void)
+{
+    common_hexstr2bin_test_success ("000123456789abcdefff");
+}
+
+static void
+hexstr_upper_case (void)
+{
+    common_hexstr2bin_test_success ("000123456789ABCDEFFF");
+}
+
+static void
+hexstr_mixed_case (void)
+{
+    common_hexstr2bin_test_success ("000123456789AbcDefFf");
+}
+
+static void
+hexstr_empty (void)
+{
+    common_hexstr2bin_test_failure ("");
+}
+
+static void
+hexstr_missing_digits (void)
+{
+    common_hexstr2bin_test_failure ("012");
+}
+
+static void
+hexstr_wrong_digits_all (void)
+{
+    common_hexstr2bin_test_failure ("helloworld");
+}
+
+static void
+hexstr_wrong_digits_some (void)
+{
+    common_hexstr2bin_test_failure ("012345k7");
+}
+
+/**************************************************************/
 
 int main (int argc, char **argv)
 {
@@ -539,6 +635,14 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/Common/FieldParsers/Int", field_parser_int);
     g_test_add_func ("/MM/Common/FieldParsers/Uint", field_parser_uint);
     g_test_add_func ("/MM/Common/FieldParsers/Double", field_parser_double);
+
+    g_test_add_func ("/MM/Common/HexStr/lower-case",        hexstr_lower_case);
+    g_test_add_func ("/MM/Common/HexStr/upper-case",        hexstr_upper_case);
+    g_test_add_func ("/MM/Common/HexStr/mixed-case",        hexstr_mixed_case);
+    g_test_add_func ("/MM/Common/HexStr/missing-empty",     hexstr_empty);
+    g_test_add_func ("/MM/Common/HexStr/missing-digits",    hexstr_missing_digits);
+    g_test_add_func ("/MM/Common/HexStr/wrong-digits-all",  hexstr_wrong_digits_all);
+    g_test_add_func ("/MM/Common/HexStr/wrong-digits-some", hexstr_wrong_digits_some);
 
     return g_test_run ();
 }
