@@ -321,7 +321,7 @@ mm_sms_part_cdma_new_from_pdu (guint         index,
     gsize              pdu_len;
 
     /* Convert PDU from hex to binary */
-    pdu = (guint8 *) mm_utils_hexstr2bin (hexpdu, -1, &pdu_len, error);
+    pdu = mm_utils_hexstr2bin (hexpdu, -1, &pdu_len, error);
     if (!pdu) {
         g_prefix_error (error, "Couldn't convert CDMA PDU from hex to binary: ");
         return NULL;

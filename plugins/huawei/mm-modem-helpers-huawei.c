@@ -157,14 +157,15 @@ mm_huawei_parse_ndisstatqry_response (const gchar *response,
 
 static gboolean
 match_info_to_ip4_addr (GMatchInfo *match_info,
-                        guint match_index,
-                        guint *out_addr)
+                        guint       match_index,
+                        guint      *out_addr)
 {
-    gchar *s, *bin = NULL;
-    gchar buf[9];
-    gsize len, bin_len;
-    gboolean success = FALSE;
-    guint32 aux;
+    g_autofree gchar  *s = NULL;
+    g_autofree guint8 *bin = NULL;
+    gchar              buf[9];
+    gsize              len;
+    gsize              bin_len;
+    guint32            aux;
 
     s = g_match_info_fetch (match_info, match_index);
     g_return_val_if_fail (s != NULL, FALSE);
@@ -172,11 +173,11 @@ match_info_to_ip4_addr (GMatchInfo *match_info,
     len = strlen (s);
     if (len == 1 && s[0] == '0') {
         *out_addr = 0;
-        success = TRUE;
-        goto done;
+        return TRUE;
     }
+
     if (len < 7 || len > 8)
-        goto done;
+        return FALSE;
 
     /* Handle possibly missing leading zero */
     memset (buf, 0, sizeof (buf));
@@ -190,16 +191,11 @@ match_info_to_ip4_addr (GMatchInfo *match_info,
 
     bin = mm_utils_hexstr2bin (buf, -1, &bin_len, NULL);
     if (!bin || bin_len != 4)
-        goto done;
+        return FALSE;
 
     memcpy (&aux, bin, 4);
     *out_addr = GUINT32_SWAP_LE_BE (aux);
-    success = TRUE;
-
-done:
-    g_free (s);
-    g_free (bin);
-    return success;
+    return TRUE;
 }
 
 gboolean

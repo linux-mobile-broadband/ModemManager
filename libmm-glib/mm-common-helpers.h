@@ -181,7 +181,7 @@ gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo  *match_info,
 const gchar *mm_sms_delivery_state_get_string_extended (guint delivery_state);
 
 gint      mm_utils_hex2byte   (const gchar *hex);
-gchar    *mm_utils_hexstr2bin (const gchar *hex, gssize len, gsize *out_len, GError **error);
+guint8   *mm_utils_hexstr2bin (const gchar *hex, gssize len, gsize *out_len, GError **error);
 gchar    *mm_utils_bin2hexstr (const guint8 *bin, gsize len);
 gboolean  mm_utils_ishexstr   (const gchar *hex);
 

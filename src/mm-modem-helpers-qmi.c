@@ -1815,7 +1815,7 @@ mm_firmware_unique_id_to_qmi_unique_id (const gchar  *unique_id,
         gsize              tmp_len;
 
         tmp_len = 0;
-        tmp = (guint8 *) mm_utils_hexstr2bin (unique_id, -1, &tmp_len, error);
+        tmp = mm_utils_hexstr2bin (unique_id, -1, &tmp_len, error);
         if (!tmp) {
             g_prefix_error (error, "Unexpected character found in unique id: ");
             return NULL;

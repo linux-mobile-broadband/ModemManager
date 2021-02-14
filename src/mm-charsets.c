@@ -157,11 +157,11 @@ gchar *
 mm_modem_charset_hex_to_utf8 (const gchar    *src,
                               MMModemCharset  charset)
 {
-    const gchar      *iconv_from;
-    g_autofree gchar *unconverted = NULL;
-    g_autofree gchar *converted = NULL;
-    g_autoptr(GError) error = NULL;
-    gsize             unconverted_len = 0;
+    const gchar       *iconv_from;
+    g_autofree guint8 *unconverted = NULL;
+    g_autofree gchar  *converted = NULL;
+    g_autoptr(GError)  error = NULL;
+    gsize              unconverted_len = 0;
 
     g_return_val_if_fail (src != NULL, NULL);
     g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
@@ -176,7 +176,7 @@ mm_modem_charset_hex_to_utf8 (const gchar    *src,
     if (charset == MM_MODEM_CHARSET_UTF8 || charset == MM_MODEM_CHARSET_IRA)
         return g_steal_pointer (&unconverted);
 
-    converted = g_convert (unconverted, unconverted_len,
+    converted = g_convert ((const gchar *)unconverted, unconverted_len,
                            "UTF-8//TRANSLIT", iconv_from,
                            NULL, NULL, &error);
     if (!converted || error)

@@ -1306,9 +1306,9 @@ parse_mnc_length (const gchar *response,
         (sw1 == 0x91) ||
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
-        gsize             buflen = 0;
-        guint32           mnc_len;
-        g_autofree gchar *bin = NULL;
+        gsize              buflen = 0;
+        guint32            mnc_len;
+        g_autofree guint8 *bin = NULL;
 
         /* Convert hex string to binary */
         bin = mm_utils_hexstr2bin (hex, -1, &buflen, error);
@@ -1323,7 +1323,7 @@ parse_mnc_length (const gchar *response,
         }
 
         /* MNC length is byte 4 of this SIM file */
-        mnc_len = bin[3] & 0xFF;
+        mnc_len = bin[3];
         if (mnc_len == 2 || mnc_len == 3)
             return mnc_len;
 
@@ -1412,8 +1412,8 @@ parse_spn (const gchar *response,
         (sw1 == 0x91) ||
         (sw1 == 0x92) ||
         (sw1 == 0x9f)) {
-        gsize             buflen = 0;
-        g_autofree gchar *bin = NULL;
+        gsize              buflen = 0;
+        g_autofree guint8 *bin = NULL;
 
         /* Convert hex string to binary */
         bin = mm_utils_hexstr2bin (hex, -1, &buflen, error);
@@ -1423,11 +1423,11 @@ parse_spn (const gchar *response,
         }
 
         /* Remove the FF filler at the end */
-        while (buflen > 1 && bin[buflen - 1] == (char)0xff)
+        while (buflen > 1 && bin[buflen - 1] == 0xff)
             buflen--;
 
         /* First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
-        return (gchar *)mm_charset_gsm_unpacked_to_utf8 ((guint8 *)bin + 1, buflen - 1);
+        return (gchar *)mm_charset_gsm_unpacked_to_utf8 (bin + 1, buflen - 1);
     }
 
     g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,

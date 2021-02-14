@@ -2330,7 +2330,7 @@ decode (MMIfaceModem3gppUssd *self,
         const gchar *reply,
         GError **error)
 {
-    g_autofree gchar  *bin = NULL;
+    g_autofree guint8 *bin = NULL;
     g_autofree guint8 *unpacked = NULL;
     gsize              bin_len = 0;
     guint32            unpacked_len;
@@ -2339,7 +2339,7 @@ decode (MMIfaceModem3gppUssd *self,
     if (!bin)
         return NULL;
 
-    unpacked = mm_charset_gsm_unpack ((guint8*) bin, (bin_len * 8) / 7, 0, &unpacked_len);
+    unpacked = mm_charset_gsm_unpack (bin, (bin_len * 8) / 7, 0, &unpacked_len);
     /* if the last character in a 7-byte block is padding, then drop it */
     if ((bin_len % 7 == 0) && (unpacked[unpacked_len - 1] == 0x0d))
         unpacked_len--;

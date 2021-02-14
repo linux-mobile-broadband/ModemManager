@@ -170,14 +170,14 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
     }
 
     while (g_match_info_matches (match_info)) {
-        guint             pco_cid;
-        g_autofree gchar *pco_id = NULL;
-        g_autofree gchar *pco_payload = NULL;
-        g_autofree gchar *pco_payload_bytes = NULL;
-        gsize             pco_payload_bytes_len;
-        guint8            pco_prefix[6];
-        GByteArray *pco_raw;
-        gsize             pco_raw_len;
+        guint              pco_cid;
+        g_autofree gchar  *pco_id = NULL;
+        g_autofree gchar  *pco_payload = NULL;
+        g_autofree guint8 *pco_payload_bytes = NULL;
+        gsize              pco_payload_bytes_len;
+        guint8             pco_prefix[6];
+        GByteArray        *pco_raw;
+        gsize              pco_raw_len;
 
         if (!mm_get_uint_from_match_info (match_info, 1, &pco_cid)) {
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -246,7 +246,7 @@ mm_altair_parse_vendor_pco_info (const gchar *pco_info, GError **error)
 
         pco_raw = g_byte_array_sized_new (pco_raw_len);
         g_byte_array_append (pco_raw, pco_prefix, sizeof (pco_prefix));
-        g_byte_array_append (pco_raw, (guint8 *)pco_payload_bytes, pco_payload_bytes_len);
+        g_byte_array_append (pco_raw, pco_payload_bytes, pco_payload_bytes_len);
 
         pco = mm_pco_new ();
         mm_pco_set_session_id (pco, pco_cid);
