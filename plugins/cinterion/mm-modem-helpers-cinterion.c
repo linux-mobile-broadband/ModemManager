@@ -217,20 +217,34 @@ parse_bands (guint                      bandlist,
 }
 
 static guint
-take_and_convert_from_matched_string (gchar                  *str,
-                                      MMModemCharset          charset,
-                                      MMCinterionModemFamily  modem_family)
+take_and_convert_from_matched_string (gchar                   *str,
+                                      MMModemCharset           charset,
+                                      MMCinterionModemFamily   modem_family,
+                                      GError                 **error)
 {
-    guint val = 0;
+    guint             val = 0;
+    g_autofree gchar *utf8 = NULL;
+    g_autofree gchar *taken_str = str;
 
-    if (!str)
+    if (!taken_str) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Couldn't convert to integer number: no input string");
         return 0;
+    }
 
-    if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT)
-        str = mm_charset_take_and_convert_to_utf8 (str, charset);
+    if (modem_family == MM_CINTERION_MODEM_FAMILY_IMT) {
+        utf8 = mm_modem_charset_str_to_utf8 (taken_str, -1, charset, FALSE, error);
+        if (!utf8) {
+            g_prefix_error (error, "Couldn't convert to integer number: ");
+            return 0;
+        }
+    }
 
-    mm_get_uint_from_hex_str (str, &val);
-    g_free (str);
+    if (!mm_get_uint_from_hex_str (utf8 ? utf8 : taken_str, &val)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't convert to integer number: wrong hex encoding: %s", utf8 ? utf8 : taken_str);
+        return 0;
+    }
 
     return val;
 }
@@ -292,12 +306,16 @@ mm_cinterion_parse_scfg_test (const gchar                 *response,
         goto finish;
     }
 
-    r2 = g_regex_new ("\\^SCFG:\\s*\"Radio/Band/([234]G)\",\\(\"?([0-9A-Fa-fx]*)\"?-\"?([0-9A-Fa-fx]*)\"?\\)(,*\\(\"?([0-9A-Fa-fx]*)\"?-\"?([0-9A-Fa-fx]*)\"?\\))?",
+    r2 = g_regex_new ("\\^SCFG:\\s*\"Radio/Band/([234]G)\","
+                      "\\(\"?([0-9A-Fa-fx]*)\"?-\"?([0-9A-Fa-fx]*)\"?\\)"
+                      "(,*\\(\"?([0-9A-Fa-fx]*)\"?-\"?([0-9A-Fa-fx]*)\"?\\))?",
                      0, 0, NULL);
     g_assert (r2 != NULL);
+
     g_regex_match_full (r2, response, strlen (response), 0, 0, &match_info2, &inner_error);
     if (inner_error)
         goto finish;
+
     while (g_match_info_matches (match_info2)) {
         g_autofree gchar *techstr = NULL;
         guint             maxband;
@@ -306,16 +324,28 @@ mm_cinterion_parse_scfg_test (const gchar                 *response,
 
         techstr = mm_get_string_unquoted_from_match_info (match_info2, 1);
         if (g_strcmp0 (techstr, "2G") == 0) {
-            maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 3), charset, modem_family);
+            maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 3),
+                                                            charset, modem_family, &inner_error);
+            if (inner_error)
+                break;
             parse_bands (maxband, &bands, MM_CINTERION_RB_BLOCK_GSM, modem_family);
         } else if (g_strcmp0 (techstr, "3G") == 0) {
-            maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 3), charset, modem_family);
+            maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 3),
+                                                            charset, modem_family, &inner_error);
+            if (inner_error)
+                break;
             parse_bands (maxband, &bands, MM_CINTERION_RB_BLOCK_UMTS, modem_family);
         } else if (g_strcmp0 (techstr, "4G") == 0) {
-            maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 3), charset, modem_family);
+            maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 3),
+                                                            charset, modem_family, &inner_error);
+            if (inner_error)
+                break;
             parse_bands (maxband, &bands, MM_CINTERION_RB_BLOCK_LTE_LOW, modem_family);
             if (modem_family == MM_CINTERION_MODEM_FAMILY_DEFAULT) {
-                maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 6), charset, modem_family);
+                maxband = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info2, 6),
+                                                                charset, modem_family, &inner_error);
+                if (inner_error)
+                    break;
                 parse_bands (maxband, &bands, MM_CINTERION_RB_BLOCK_LTE_HIGH, modem_family);
             }
         } else {
@@ -407,9 +437,11 @@ mm_cinterion_parse_scfg_response (const gchar                  *response,
     if (format == MM_CINTERION_RADIO_BAND_FORMAT_SINGLE) {
         r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*\"?([0-9a-fA-F]*)\"?", 0, 0, NULL);
         g_assert (r != NULL);
+
         g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
         if (inner_error)
             goto finish;
+
         if (g_match_info_matches (match_info)) {
             g_autofree gchar *currentstr = NULL;
             guint current = 0;
@@ -438,26 +470,40 @@ mm_cinterion_parse_scfg_response (const gchar                  *response,
         r = g_regex_new ("\\^SCFG:\\s*\"Radio/Band/([234]G)\",\"?([0-9A-Fa-fx]*)\"?,?\"?([0-9A-Fa-fx]*)?\"?",
                          0, 0, NULL);
         g_assert (r != NULL);
+
         g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
         if (inner_error)
             goto finish;
+
         while (g_match_info_matches (match_info)) {
             g_autofree gchar *techstr = NULL;
             guint current;
 
             techstr = mm_get_string_unquoted_from_match_info (match_info, 1);
-            if (g_strcmp0(techstr, "2G") == 0) {
-                current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 2), charset, modem_family);
+            if (g_strcmp0 (techstr, "2G") == 0) {
+                current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 2),
+                                                                charset, modem_family, &inner_error);
+                if (inner_error)
+                    break;
                 parse_bands (current, &bands, MM_CINTERION_RB_BLOCK_GSM, modem_family);
 
-            } else if (g_strcmp0(techstr, "3G") == 0) {
-                current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 2), charset, modem_family);
+            } else if (g_strcmp0 (techstr, "3G") == 0) {
+                current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 2),
+                                                                charset, modem_family, &inner_error);
+                if (inner_error)
+                    break;
                 parse_bands (current, &bands, MM_CINTERION_RB_BLOCK_UMTS, modem_family);
-            } else if (g_strcmp0(techstr, "4G") == 0) {
-                current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 2), charset, modem_family);
+            } else if (g_strcmp0 (techstr, "4G") == 0) {
+                current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 2),
+                                                                charset, modem_family, &inner_error);
+                if (inner_error)
+                    break;
                 parse_bands (current, &bands, MM_CINTERION_RB_BLOCK_LTE_LOW, modem_family);
                 if (modem_family == MM_CINTERION_MODEM_FAMILY_DEFAULT) {
-                    current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 3), charset, modem_family);
+                    current = take_and_convert_from_matched_string (mm_get_string_unquoted_from_match_info (match_info, 3),
+                                                                    charset, modem_family, &inner_error);
+                    if (inner_error)
+                        break;
                     parse_bands (current, &bands, MM_CINTERION_RB_BLOCK_LTE_HIGH, modem_family);
                 }
             } else {
