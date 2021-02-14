@@ -383,6 +383,8 @@ reprobe (MMDevice *self)
 {
     GError *error = NULL;
 
+    self->priv->reprobe_id = 0;
+
     mm_obj_dbg (self, "Reprobing modem...");
     if (!mm_device_create_modem (self, &error)) {
         mm_obj_warn (self, "could not recreate modem: %s", error->message);
