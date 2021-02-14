@@ -26,23 +26,25 @@
 #include "mm-charsets.h"
 #include "mm-log.h"
 
+/******************************************************************************/
+/* Expected charset settings */
+
 typedef struct {
+    MMModemCharset  charset;
     const gchar    *gsm_name;
     const gchar    *other_name;
-    const gchar    *iconv_from_name;
-    const gchar    *iconv_to_name;
-    MMModemCharset  charset;
-} CharsetEntry;
+    const gchar    *iconv_name;
+} CharsetSettings;
 
-static const CharsetEntry charset_map[] = {
-    { "UTF-8",   "UTF8",   "UTF-8",     "UTF-8//TRANSLIT",     MM_MODEM_CHARSET_UTF8    },
-    { "UCS2",    NULL,     "UCS-2BE",   "UCS-2BE//TRANSLIT",   MM_MODEM_CHARSET_UCS2    },
-    { "IRA",     "ASCII",  "ASCII",     "ASCII//TRANSLIT",     MM_MODEM_CHARSET_IRA     },
-    { "GSM",     NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_GSM     },
-    { "8859-1",  NULL,     "ISO8859-1", "ISO8859-1//TRANSLIT", MM_MODEM_CHARSET_8859_1  },
-    { "PCCP437", "CP437",  "CP437",     "CP437//TRANSLIT",     MM_MODEM_CHARSET_PCCP437 },
-    { "PCDN",    "CP850",  "CP850",     "CP850//TRANSLIT",     MM_MODEM_CHARSET_PCDN    },
-    { "UTF-16",  "UTF16",  "UTF-16BE",  "UTF-16BE//TRANSLIT",  MM_MODEM_CHARSET_UTF16   },
+static const CharsetSettings charset_settings[] = {
+    { MM_MODEM_CHARSET_UTF8,    "UTF-8",   "UTF8",   "UTF-8"     },
+    { MM_MODEM_CHARSET_UCS2,    "UCS2",    NULL,     "UCS-2BE"   },
+    { MM_MODEM_CHARSET_IRA,     "IRA",     "ASCII",  "ASCII"     },
+    { MM_MODEM_CHARSET_GSM,     "GSM",     NULL,     NULL        },
+    { MM_MODEM_CHARSET_8859_1,  "8859-1",  NULL,     "ISO8859-1" },
+    { MM_MODEM_CHARSET_PCCP437, "PCCP437", "CP437",  "CP437"     },
+    { MM_MODEM_CHARSET_PCDN,    "PCDN",    "CP850",  "CP850"     },
+    { MM_MODEM_CHARSET_UTF16,   "UTF-16",  "UTF16",  "UTF-16BE"  },
 };
 
 MMModemCharset
@@ -52,24 +54,24 @@ mm_modem_charset_from_string (const gchar *string)
 
     g_return_val_if_fail (string != NULL, MM_MODEM_CHARSET_UNKNOWN);
 
-    for (i = 0; i < G_N_ELEMENTS (charset_map); i++) {
-        if (strcasestr (string, charset_map[i].gsm_name))
-            return charset_map[i].charset;
-        if (charset_map[i].other_name && strcasestr (string, charset_map[i].other_name))
-            return charset_map[i].charset;
+    for (i = 0; i < G_N_ELEMENTS (charset_settings); i++) {
+        if (strcasestr (string, charset_settings[i].gsm_name))
+            return charset_settings[i].charset;
+        if (charset_settings[i].other_name && strcasestr (string, charset_settings[i].other_name))
+            return charset_settings[i].charset;
     }
     return MM_MODEM_CHARSET_UNKNOWN;
 }
 
-static const CharsetEntry *
-lookup_charset_by_id (MMModemCharset charset)
+static const CharsetSettings *
+lookup_charset_settings (MMModemCharset charset)
 {
     guint i;
 
     g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
-    for (i = 0; i < G_N_ELEMENTS (charset_map); i++) {
-        if (charset_map[i].charset == charset)
-            return &charset_map[i];
+    for (i = 0; i < G_N_ELEMENTS (charset_settings); i++) {
+        if (charset_settings[i].charset == charset)
+            return &charset_settings[i];
     }
     g_warn_if_reached ();
     return NULL;
@@ -78,28 +80,25 @@ lookup_charset_by_id (MMModemCharset charset)
 const gchar *
 mm_modem_charset_to_string (MMModemCharset charset)
 {
-    const CharsetEntry *entry;
+    const CharsetSettings *settings;
 
-    entry = lookup_charset_by_id (charset);
-    return entry ? entry->gsm_name : NULL;
-}
-
-static const gchar *
-charset_iconv_to (MMModemCharset charset)
-{
-    const CharsetEntry *entry;
-
-    entry = lookup_charset_by_id (charset);
-    return entry ? entry->iconv_to_name : NULL;
+    settings = lookup_charset_settings (charset);
+    return settings ? settings->gsm_name : NULL;
 }
 
 static const gchar *
 charset_iconv_from (MMModemCharset charset)
 {
-    const CharsetEntry *entry;
+    const CharsetSettings *settings;
 
-    entry = lookup_charset_by_id (charset);
-    return entry ? entry->iconv_from_name : NULL;
+    settings = lookup_charset_settings (charset);
+    return settings ? settings->iconv_name : NULL;
+}
+
+static const gchar *
+charset_iconv_to (MMModemCharset charset)
+{
+    return charset_iconv_from (charset);
 }
 
 gboolean
@@ -145,7 +144,7 @@ mm_modem_charset_byte_array_to_utf8 (GByteArray     *array,
     g_return_val_if_fail (iconv_from != NULL, FALSE);
 
     converted = g_convert ((const gchar *)array->data, array->len,
-                           "UTF-8//TRANSLIT", iconv_from,
+                           "UTF-8", iconv_from,
                            NULL, NULL, &error);
     if (!converted || error)
         return NULL;
@@ -177,7 +176,7 @@ mm_modem_charset_hex_to_utf8 (const gchar    *src,
         return g_steal_pointer (&unconverted);
 
     converted = g_convert ((const gchar *)unconverted, unconverted_len,
-                           "UTF-8//TRANSLIT", iconv_from,
+                           "UTF-8", iconv_from,
                            NULL, NULL, &error);
     if (!converted || error)
         return NULL;
@@ -772,7 +771,7 @@ mm_charset_take_and_convert_to_utf8 (gchar          *str,
 
         iconv_from = charset_iconv_from (charset);
         utf8 = g_convert (str, strlen (str),
-                          "UTF-8//TRANSLIT", iconv_from,
+                          "UTF-8", iconv_from,
                           NULL, NULL, &error);
         if (!utf8 || error) {
             g_clear_error (&error);
@@ -816,7 +815,7 @@ mm_charset_take_and_convert_to_utf8 (gchar          *str,
          * that is UTF-8, if any.
          */
         utf8 = g_convert (str, strlen (str),
-                          "UTF-8//TRANSLIT", "UTF-8//TRANSLIT",
+                          "UTF-8", "UTF-8",
                           &bread, &bwritten, NULL);
 
         /* Valid conversion, or we didn't get enough valid UTF-8 */
@@ -830,7 +829,7 @@ mm_charset_take_and_convert_to_utf8 (gchar          *str,
          */
         str[bread] = '\0';
         utf8 = g_convert (str, strlen (str),
-                          "UTF-8//TRANSLIT", "UTF-8//TRANSLIT",
+                          "UTF-8", "UTF-8",
                           NULL, NULL, NULL);
         g_free (str);
         break;
