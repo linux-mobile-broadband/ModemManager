@@ -984,15 +984,15 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
     }
 
     if (encoding == MM_SMS_ENCODING_GSM7) {
-        guint8 *unpacked, *packed;
-        guint32 unlen = 0, packlen = 0;
+        g_autoptr(GByteArray)  unpacked = NULL;
+        g_autofree guint8     *packed = NULL;
+        guint32                packlen = 0;
 
-        unpacked = mm_charset_utf8_to_unpacked_gsm (mm_sms_part_get_text (part), FALSE, &unlen, error);
+        unpacked = mm_modem_charset_bytearray_from_utf8 (mm_sms_part_get_text (part), MM_MODEM_CHARSET_GSM, FALSE, error);
         if (!unpacked)
             goto error;
 
-        if (unlen == 0) {
-            g_free (unpacked);
+        if (unpacked->len == 0) {
             g_set_error_literal (error,
                                  MM_MESSAGE_ERROR,
                                  MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
@@ -1003,15 +1003,13 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         /* Set real data length, in septets
          * If we had UDH, add 7 septets
          */
-        *udl_ptr = mm_sms_part_get_concat_sequence (part) ? (7 + unlen) : unlen;
+        *udl_ptr = mm_sms_part_get_concat_sequence (part) ? (7 + unpacked->len) : unpacked->len;
         mm_obj_dbg (log_object, "  user data length is %u septets (%s UDH)",
                     *udl_ptr,
                     mm_sms_part_get_concat_sequence (part) ? "with" : "without");
 
-        packed = mm_charset_gsm_pack (unpacked, unlen, shift, &packlen);
-        g_free (unpacked);
+        packed = mm_charset_gsm_pack (unpacked->data, unpacked->len, shift, &packlen);
         if (!packed || packlen == 0) {
-            g_free (packed);
             g_set_error_literal (error,
                                  MM_MESSAGE_ERROR,
                                  MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
@@ -1020,7 +1018,6 @@ mm_sms_part_3gpp_get_submit_pdu (MMSmsPart *part,
         }
 
         memcpy (&pdu[offset], packed, packlen);
-        g_free (packed);
         offset += packlen;
     } else if (encoding == MM_SMS_ENCODING_UCS2) {
         g_autoptr(GByteArray) array = NULL;

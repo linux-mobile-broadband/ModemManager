@@ -444,11 +444,11 @@ mm_charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
     return g_byte_array_free (g_steal_pointer (&utf8), FALSE);
 }
 
-guint8 *
-mm_charset_utf8_to_unpacked_gsm (const gchar  *utf8,
-                                 gboolean      translit,
-                                 guint32      *out_len,
-                                 GError      **error)
+static guint8 *
+charset_utf8_to_unpacked_gsm (const gchar  *utf8,
+                              gboolean      translit,
+                              guint32      *out_len,
+                              GError      **error)
 {
     g_autoptr(GByteArray)  gsm = NULL;
     const gchar           *c;
@@ -903,7 +903,8 @@ mm_utf8_take_and_convert_to_charset (gchar          *str,
         break;
 
     case MM_MODEM_CHARSET_GSM:
-        encoded = (gchar *) mm_charset_utf8_to_unpacked_gsm (str, FALSE, NULL, NULL);
+        /* This is WRONG! GSM may have embedded NULs (character @)! */
+        encoded = mm_modem_charset_str_from_utf8 (str, MM_MODEM_CHARSET_GSM, FALSE, NULL);
         g_free (str);
         break;
 
@@ -968,18 +969,15 @@ mm_utf8_take_and_convert_to_charset (gchar          *str,
 /* Main conversion functions */
 
 static guint8 *
-charset_iconv_from_utf8 (const gchar     *utf8,
-                         MMModemCharset   charset,
-                         gboolean         translit,
-                         guint           *out_size,
-                         GError         **error)
+charset_iconv_from_utf8 (const gchar            *utf8,
+                         const CharsetSettings  *settings,
+                         gboolean                translit,
+                         guint                  *out_size,
+                         GError                **error)
 {
     g_autoptr(GError)      inner_error = NULL;
-    const CharsetSettings *settings;
     gsize                  bytes_written = 0;
     g_autofree guint8     *encoded = NULL;
-
-    settings = lookup_charset_settings (charset);
 
     encoded = (guint8 *) g_convert (utf8, -1,
                                     settings->iconv_name, "UTF-8",
@@ -1015,8 +1013,11 @@ mm_modem_charset_bytearray_from_utf8 (const gchar     *utf8,
                                       gboolean         translit,
                                       GError         **error)
 {
-    guint8 *encoded = NULL;
-    guint   encoded_size = 0;
+    const CharsetSettings *settings;
+    guint8                *encoded = NULL;
+    guint                  encoded_size = 0;
+
+    settings = lookup_charset_settings (charset);
 
     if (charset == MM_MODEM_CHARSET_UNKNOWN) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
@@ -1026,7 +1027,7 @@ mm_modem_charset_bytearray_from_utf8 (const gchar     *utf8,
 
     switch (charset) {
         case MM_MODEM_CHARSET_GSM:
-            encoded = mm_charset_utf8_to_unpacked_gsm (utf8, translit, &encoded_size, error);
+            encoded = charset_utf8_to_unpacked_gsm (utf8, translit, &encoded_size, error);
             break;
         case MM_MODEM_CHARSET_IRA:
         case MM_MODEM_CHARSET_8859_1:
@@ -1035,7 +1036,7 @@ mm_modem_charset_bytearray_from_utf8 (const gchar     *utf8,
         case MM_MODEM_CHARSET_PCCP437:
         case MM_MODEM_CHARSET_PCDN:
         case MM_MODEM_CHARSET_UTF16:
-            encoded = charset_iconv_from_utf8 (utf8, charset, translit, &encoded_size, error);
+            encoded = charset_iconv_from_utf8 (utf8, settings, translit, &encoded_size, error);
             break;
         case MM_MODEM_CHARSET_UNKNOWN:
         default:
@@ -1095,15 +1096,12 @@ mm_modem_charset_str_from_utf8 (const gchar     *utf8,
 static gchar *
 charset_iconv_to_utf8 (const guint8           *data,
                        guint32                 len,
-                       MMModemCharset          charset,
+                       const CharsetSettings  *settings,
                        gboolean                translit,
                        GError                **error)
 {
-    g_autoptr(GError)      inner_error = NULL;
-    g_autofree gchar      *utf8 = NULL;
-    const CharsetSettings *settings;
-
-    settings = lookup_charset_settings (charset);
+    g_autoptr(GError)  inner_error = NULL;
+    g_autofree gchar  *utf8 = NULL;
 
     utf8 = g_convert ((const gchar *) data, len,
                       "UTF-8",
@@ -1144,6 +1142,7 @@ mm_modem_charset_bytearray_to_utf8 (GByteArray      *bytearray,
     }
 
     settings = lookup_charset_settings (charset);
+
     switch (charset) {
         case MM_MODEM_CHARSET_GSM:
             utf8 = (gchar *) mm_charset_gsm_unpacked_to_utf8 (bytearray->data,
@@ -1160,7 +1159,7 @@ mm_modem_charset_bytearray_to_utf8 (GByteArray      *bytearray,
         case MM_MODEM_CHARSET_UTF16:
             utf8 = charset_iconv_to_utf8 (bytearray->data,
                                           bytearray->len,
-                                          charset,
+                                          settings,
                                           translit,
                                           error);
             break;

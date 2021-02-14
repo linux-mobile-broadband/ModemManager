@@ -57,10 +57,6 @@ gchar *mm_modem_charset_byte_array_to_utf8 (GByteArray     *array,
 gchar *mm_modem_charset_hex_to_utf8 (const gchar    *src,
                                     MMModemCharset  charset);
 
-guint8 *mm_charset_utf8_to_unpacked_gsm (const gchar   *utf8,
-                                         gboolean       translit,
-                                         guint32       *out_len,
-                                         GError       **error);
 guint8 *mm_charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
                                          guint32        len,
                                          gboolean       translit,

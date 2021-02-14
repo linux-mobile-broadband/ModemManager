@@ -4771,20 +4771,17 @@ ussd_encode (const gchar  *command,
     g_autoptr(GByteArray) array = NULL;
 
     if (mm_charset_can_convert_to (command, MM_MODEM_CHARSET_GSM)) {
-        guint8  *gsm;
-        guint8  *packed;
-        guint32  len = 0;
-        guint32  packed_len = 0;
+        g_autoptr(GByteArray)  gsm = NULL;
+        guint8                *packed;
+        guint32                packed_len = 0;
 
         *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
-        gsm = mm_charset_utf8_to_unpacked_gsm (command, FALSE, &len, error);
+        gsm = mm_modem_charset_bytearray_from_utf8 (command, MM_MODEM_CHARSET_GSM, FALSE, error);
         if (!gsm) {
             g_prefix_error (error, "Failed to encode USSD command in GSM7 charset: ");
             return NULL;
         }
-        packed = mm_charset_gsm_pack (gsm, len, 0, &packed_len);
-        g_free (gsm);
-
+        packed = mm_charset_gsm_pack (gsm->data, gsm->len, 0, &packed_len);
         array = g_byte_array_new_take (packed, packed_len);
     } else {
         g_autoptr(GError) inner_error = NULL;

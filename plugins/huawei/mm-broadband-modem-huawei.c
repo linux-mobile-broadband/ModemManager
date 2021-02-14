@@ -2301,11 +2301,11 @@ encode (MMIfaceModem3gppUssd *self,
         guint *scheme,
         GError **error)
 {
-    gchar *hex;
-    guint8 *gsm, *packed;
-    guint32 len = 0, packed_len = 0;
+    g_autoptr(GByteArray)  gsm = NULL;
+    g_autofree guint8     *packed = NULL;
+    guint32                packed_len = 0;
 
-    gsm = mm_charset_utf8_to_unpacked_gsm (command, FALSE, &len, error);
+    gsm = mm_modem_charset_bytearray_from_utf8 (command, MM_MODEM_CHARSET_GSM, FALSE, error);
     if (!gsm)
         return NULL;
 
@@ -2314,18 +2314,14 @@ encode (MMIfaceModem3gppUssd *self,
     /* If command is a multiple of 7 characters long, Huawei firmwares
      * apparently want that padded.  Maybe all modems?
      */
-    if (len % 7 == 0) {
-        gsm = g_realloc (gsm, len + 1);
-        gsm[len] = 0x0d;
-        len++;
+    if (gsm->len % 7 == 0) {
+        static const guint8 padding = 0x0d;
+
+        g_byte_array_append (gsm, &padding, 1);
     }
 
-    packed = mm_charset_gsm_pack (gsm, len, 0, &packed_len);
-    hex = mm_utils_bin2hexstr (packed, packed_len);
-    g_free (packed);
-    g_free (gsm);
-
-    return hex;
+    packed = mm_charset_gsm_pack (gsm->data, gsm->len, 0, &packed_len);
+    return mm_utils_bin2hexstr (packed, packed_len);
 }
 
 static gchar *

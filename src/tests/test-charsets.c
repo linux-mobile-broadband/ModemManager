@@ -23,25 +23,23 @@
 static void
 common_test_gsm7 (const gchar *in_utf8)
 {
-    guint32 unpacked_gsm_len = 0;
     guint32 packed_gsm_len = 0;
     guint32 unpacked_gsm_len_2 = 0;
-    g_autofree guint8 *unpacked_gsm = NULL;
+    g_autoptr(GByteArray) unpacked_gsm = NULL;
     g_autofree guint8 *packed_gsm = NULL;
     g_autofree guint8 *unpacked_gsm_2 = NULL;
     g_autofree gchar *built_utf8 = NULL;
     g_autoptr(GError) error = NULL;
 
     /* Convert to GSM */
-    unpacked_gsm = mm_charset_utf8_to_unpacked_gsm (in_utf8, FALSE, &unpacked_gsm_len, &error);
+    unpacked_gsm = mm_modem_charset_bytearray_from_utf8 (in_utf8, MM_MODEM_CHARSET_GSM, FALSE, &error);
     g_assert_nonnull (unpacked_gsm);
     g_assert_no_error (error);
-    g_assert_cmpuint (unpacked_gsm_len, >, 0);
 
     /* Pack */
-    packed_gsm = mm_charset_gsm_pack (unpacked_gsm, unpacked_gsm_len, 0, &packed_gsm_len);
+    packed_gsm = mm_charset_gsm_pack (unpacked_gsm->data, unpacked_gsm->len, 0, &packed_gsm_len);
     g_assert_nonnull (packed_gsm);
-    g_assert_cmpuint (packed_gsm_len, <=, unpacked_gsm_len);
+    g_assert_cmpuint (packed_gsm_len, <=, unpacked_gsm->len);
 
 #if 0
     {
@@ -356,6 +354,10 @@ test_take_convert_ucs2_bad_ascii2 (void)
 static void
 test_take_convert_gsm_utf8 (void)
 {
+    /* NOTE: this is wrong, charset GSM may contain embedded NULs so we cannot convert
+     * from a plain UTF-8 string to a NUL-terminated string in GSM, as there is no
+     * such, thing. */
+#if 0
     gchar *src, *converted, *utf8;
 
     src = g_strdup ("T-Mobile");
@@ -364,6 +366,7 @@ test_take_convert_gsm_utf8 (void)
     utf8 = mm_utf8_take_and_convert_to_charset (converted, MM_MODEM_CHARSET_GSM);
     g_assert_cmpstr (utf8, ==, "T-Mobile");
     g_free (utf8);
+#endif
 }
 
 struct charset_can_convert_to_test_s {
