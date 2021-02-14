@@ -27,6 +27,9 @@
 #include "mm-charsets.h"
 #include "mm-log.h"
 
+/* Common fallback character when transliteration is enabled */
+static const gchar *translit_fallback = "?";
+
 /******************************************************************************/
 /* Expected charset settings */
 
@@ -209,13 +212,12 @@ utf8_to_gsm_def_char (const gchar *utf8,
 static gboolean
 translit_gsm_nul_byte (GByteArray *gsm)
 {
-    static const gchar *replacement = "?";
-    guint               i;
-    guint               n_replaces = 0;
+    guint i;
+    guint n_replaces = 0;
 
     for (i = 0; i < gsm->len; i++) {
         if (gsm->data[i] == 0x00) {
-            utf8_to_gsm_def_char (replacement, 1, &gsm->data[i]);
+            utf8_to_gsm_def_char (translit_fallback, strlen (translit_fallback), &gsm->data[i]);
             n_replaces++;
         }
     }
@@ -333,7 +335,7 @@ charset_gsm_unpacked_to_utf8 (const guint8  *gsm,
         if (ulen)
             g_byte_array_append (utf8, &uchars[0], ulen);
         else if (translit)
-            g_byte_array_append (utf8, (guint8 *) "?", 1);
+            g_byte_array_append (utf8, (guint8 *) translit_fallback, strlen (translit_fallback));
         else {
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                          "Invalid conversion from GSM7");
@@ -690,7 +692,7 @@ charset_iconv_from_utf8 (const gchar            *utf8,
     }
 
     encoded = (guint8 *) g_convert_with_fallback (utf8, -1,
-                                                  settings->iconv_name, "UTF-8", "?",
+                                                  settings->iconv_name, "UTF-8", translit_fallback,
                                                   NULL, &bytes_written, error);
     if (encoded) {
         if (out_size)
@@ -812,7 +814,7 @@ charset_iconv_to_utf8 (const guint8           *data,
     }
 
     utf8 = g_convert_with_fallback ((const gchar *) data, len,
-                                    "UTF-8", settings->iconv_name, "?",
+                                    "UTF-8", settings->iconv_name, translit_fallback,
                                     NULL, NULL, error);
     if (utf8)
         return g_steal_pointer (&utf8);
