@@ -57,11 +57,6 @@ guint8 *mm_charset_gsm_pack (const guint8 *src,
                              guint8        start_offset,  /* in bits */
                              guint32      *out_packed_len);
 
-gchar *mm_charset_take_and_convert_to_utf8 (gchar          *str,
-                                            MMModemCharset  charset);
-gchar *mm_utf8_take_and_convert_to_charset (gchar          *str,
-                                            MMModemCharset  charset);
-
 /*****************************************************************************************/
 
 /*
