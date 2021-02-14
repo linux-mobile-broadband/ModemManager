@@ -1523,9 +1523,15 @@ mm_cinterion_provcfg_response_to_cid (const gchar             *response,
 
     mno = mm_get_string_unquoted_from_match_info (match_info, 1);
     if (mno && modem_family == MM_CINTERION_MODEM_FAMILY_IMT) {
-        mno = mm_charset_take_and_convert_to_utf8 (mno, charset);
-        mm_obj_dbg (log_object, "current mno: %s", mno);
+        gchar *mno_utf8;
+
+        mno_utf8 = mm_modem_charset_str_to_utf8 (mno, -1, charset, FALSE, error);
+        if (!mno_utf8)
+            return FALSE;
+        g_free (mno);
+        mno = mno_utf8;
     }
+    mm_obj_dbg (log_object, "current mno: %s", mno ? mno : "none");
 
     /* for Cinterion LTE modules, some CID numbers have special meaning.
      * This is dictated by the chipset and by the MNO:
