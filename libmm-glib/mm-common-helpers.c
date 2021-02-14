@@ -1738,9 +1738,9 @@ mm_utils_ishexstr (const gchar *hex)
     gsize len;
     gsize i;
 
-    /* Length not multiple of 2? */
+    /* Empty string or length not multiple of 2? */
     len = strlen (hex);
-    if (len % 2 != 0)
+    if (len == 0 || (len % 2) != 0)
         return FALSE;
 
     for (i = 0; i < len; i++) {
