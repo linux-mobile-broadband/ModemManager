@@ -1701,6 +1701,12 @@ mm_utils_hexstr2bin (const gchar  *hex,
     if (len < 0)
         len = strlen (hex);
 
+    if (len == 0) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Hex conversion failed: empty string");
+        return NULL;
+    }
+
     /* Length must be a multiple of 2 */
     if ((len % 2) != 0) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
@@ -1708,7 +1714,7 @@ mm_utils_hexstr2bin (const gchar  *hex,
         return NULL;
     }
 
-    opos = buf = g_malloc0 ((len / 2) + 1);
+    opos = buf = g_malloc0 (len / 2);
     for (i = 0; i < len; i += 2) {
         a = mm_utils_hex2byte (ipos);
         if (a < 0) {
