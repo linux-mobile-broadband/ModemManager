@@ -182,6 +182,9 @@ main (int argc, char *argv[])
     mm_info ("ModemManager (version " MM_DIST_VERSION ") starting in %s bus...",
              mm_context_get_test_session () ? "session" : "system");
 
+    /* Detect runtime charset conversion support */
+    mm_modem_charsets_init ();
+
     /* Acquire name, don't allow replacement */
     name_id = g_bus_own_name (mm_context_get_test_session () ? G_BUS_TYPE_SESSION : G_BUS_TYPE_SYSTEM,
                               MM_DBUS_SERVICE,

@@ -108,4 +108,8 @@ gchar *mm_modem_charset_str_to_utf8 (const gchar     *str,
                                      gboolean         translit,
                                      GError         **error);
 
+/*****************************************************************************************/
+
+void mm_modem_charsets_init (void);
+
 #endif /* MM_CHARSETS_H */

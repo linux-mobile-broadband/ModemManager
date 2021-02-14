@@ -924,3 +924,46 @@ mm_modem_charset_str_to_utf8 (const gchar     *str,
 
     return mm_modem_charset_bytearray_to_utf8 (bytearray, charset, translit, error);
 }
+
+/******************************************************************************/
+/* Runtime charset support via iconv() */
+
+void
+mm_modem_charsets_init (void)
+{
+    /* As test string, something we can convert to/from all the encodings */
+    static const gchar *default_test_str = "ModemManager";
+    guint               i;
+
+    mm_obj_dbg (NULL, "[charsets] detecting platform iconv() support...");
+    for (i = 0; i < G_N_ELEMENTS (charset_settings); i++) {
+        g_autofree guint8 *enc = NULL;
+        guint              enc_size;
+        g_autofree gchar  *dec = NULL;
+
+        if (!charset_settings[i].iconv_name)
+            continue;
+
+        enc = charset_iconv_from_utf8 (default_test_str,
+                                       &charset_settings[i],
+                                       FALSE,
+                                       &enc_size,
+                                       NULL);
+        if (!enc) {
+            mm_obj_dbg (NULL, "[charsets]   %s: iconv conversion to charset not supported", charset_settings[i].iconv_name);
+            continue;
+        }
+
+        dec = charset_iconv_to_utf8 (enc,
+                                     enc_size,
+                                     &charset_settings[i],
+                                     FALSE,
+                                     NULL);
+        if (!enc) {
+            mm_obj_dbg (NULL, "[charsets]   %s: iconv conversion from charset not supported", charset_settings[i].iconv_name);
+            continue;
+        }
+
+        mm_obj_dbg (NULL, "[charsets]   %s: iconv conversion to/from charset is supported", charset_settings[i].iconv_name);
+    }
+}
