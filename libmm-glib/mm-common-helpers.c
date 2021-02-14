@@ -1686,18 +1686,18 @@ mm_utils_hex2byte (const gchar *hex)
     return (a << 4) | b;
 }
 
-gchar *
+guint8 *
 mm_utils_hexstr2bin (const gchar  *hex,
                      gssize        len,
                      gsize        *out_len,
                      GError      **error)
 {
     const gchar *ipos = hex;
-    g_autofree gchar *buf = NULL;
+    g_autofree guint8 *buf = NULL;
     gsize i;
     gint a;
-    gchar *opos
-;
+    guint8 *opos;
+
     if (len < 0)
         len = strlen (hex);
 
@@ -1723,7 +1723,7 @@ mm_utils_hexstr2bin (const gchar  *hex,
                          ipos[0], ipos[1]);
             return NULL;
         }
-        *opos++ = a;
+        *opos++ = (guint8)a;
         ipos += 2;
     }
     *out_len = len / 2;
