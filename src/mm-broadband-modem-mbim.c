@@ -98,6 +98,7 @@ struct _MMBroadbandModemMbimPrivate {
     /* Queried and cached capabilities */
     MbimCellularClass caps_cellular_class;
     MbimDataClass caps_data_class;
+    gchar *caps_custom_data_class;
     MbimSmsCaps caps_sms;
     guint caps_max_sessions;
     gchar *caps_device_id;
@@ -447,7 +448,7 @@ device_caps_query_ready (MbimDevice *device,
             &self->priv->caps_sms,
             NULL, /* ctrl_caps */
             &self->priv->caps_max_sessions,
-            NULL, /* custom_data_class */
+            &self->priv->caps_custom_data_class,
             &self->priv->caps_device_id,
             &self->priv->caps_firmware_info,
             &self->priv->caps_hardware_info,
@@ -458,7 +459,8 @@ device_caps_query_ready (MbimDevice *device,
     }
 
     ctx->current_mbim = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class,
-                                                                   self->priv->caps_data_class);
+                                                                   self->priv->caps_data_class,
+                                                                   self->priv->caps_custom_data_class);
     complete_current_capabilities (task);
 
 out:
@@ -561,7 +563,9 @@ load_supported_capabilities_mbim (GTask *task)
     self = g_task_get_source_object (task);
 
     /* Current capabilities should have been cached already, just assume them */
-    current = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class, self->priv->caps_data_class);
+    current = mm_modem_capability_from_mbim_device_caps (self->priv->caps_cellular_class,
+                                                         self->priv->caps_data_class,
+                                                         self->priv->caps_custom_data_class);
     if (current != 0) {
         supported = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 1);
         g_array_append_val (supported, current);
@@ -5622,6 +5626,7 @@ finalize (GObject *object)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
 
+    g_free (self->priv->caps_custom_data_class);
     g_free (self->priv->caps_device_id);
     g_free (self->priv->caps_firmware_info);
     g_free (self->priv->caps_hardware_info);

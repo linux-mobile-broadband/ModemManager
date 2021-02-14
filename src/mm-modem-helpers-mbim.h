@@ -24,8 +24,9 @@
 /*****************************************************************************/
 /* MBIM/BasicConnect to MM translations */
 
-MMModemCapability mm_modem_capability_from_mbim_device_caps (MbimCellularClass caps_cellular_class,
-                                                             MbimDataClass     caps_data_class);
+MMModemCapability mm_modem_capability_from_mbim_device_caps (MbimCellularClass  caps_cellular_class,
+                                                             MbimDataClass      caps_data_class,
+                                                             const gchar       *caps_custom_data_class);
 
 MMModemLock mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type);
 
