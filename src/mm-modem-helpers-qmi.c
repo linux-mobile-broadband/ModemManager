@@ -2209,3 +2209,56 @@ mm_qmi_uim_decode_eid (const gchar *eid, gsize eid_len)
 
     return mm_bcd_to_string ((const guint8 *) eid, eid_len, FALSE /* low_nybble_first */);
 }
+
+/*****************************************************************************/
+
+gboolean
+mm_qmi_uim_get_configuration_output_parse (gpointer                              log_object,
+                                           QmiMessageUimGetConfigurationOutput  *output,
+                                           MMModem3gppFacility                  *o_lock,
+                                           GError                              **error)
+{
+    QmiMessageUimGetConfigurationOutputPersonalizationStatusElement *element;
+    GArray *elements;
+    guint idx;
+
+    *o_lock = MM_MODEM_3GPP_FACILITY_NONE;
+
+    if (!qmi_message_uim_get_configuration_output_get_personalization_status (output, &elements, error)) {
+        g_prefix_error (error, "UIM Get Personalization Status failed: ");
+        return FALSE;
+    }
+
+    for (idx = 0; idx < elements->len; idx++) {
+        element = &g_array_index (elements,
+                                  QmiMessageUimGetConfigurationOutputPersonalizationStatusElement,
+                                  idx);
+        switch (element->feature) {
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK:
+            *o_lock |= MM_MODEM_3GPP_FACILITY_NET_PERS;
+            break;
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK_SUBSET:
+            *o_lock |= MM_MODEM_3GPP_FACILITY_NET_SUB_PERS;
+            break;
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SERVICE_PROVIDER:
+            *o_lock |= MM_MODEM_3GPP_FACILITY_PROVIDER_PERS;
+            break;
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_CORPORATE:
+            *o_lock |= MM_MODEM_3GPP_FACILITY_CORP_PERS;
+            break;
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_UIM:
+            *o_lock |= MM_MODEM_3GPP_FACILITY_PH_SIM;
+            break;
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_NETWORK_TYPE_1:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_NETWORK_TYPE_2:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_HRPD:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_SERVICE_PROVIDER:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_CORPORATE:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_RUIM:
+        case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN:
+        default:
+            mm_obj_warn (log_object, "Invalid UIM feature : %u", (guint)element->feature);
+        }
+    }
+    return TRUE;
+}
