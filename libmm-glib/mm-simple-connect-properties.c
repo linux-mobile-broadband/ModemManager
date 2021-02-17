@@ -364,6 +364,43 @@ mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self)
     return mm_bearer_properties_get_allow_roaming (self->priv->bearer_properties);
 }
 
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_rm_protocol:
+ * @self: a #MMSimpleConnectProperties.
+ * @protocol: a #MMModemCdmaRmProtocol.
+ *
+ * Sets the RM protocol requested by the user.
+ *
+ * Since: 1.16
+ */
+void
+mm_simple_connect_properties_set_rm_protocol (MMSimpleConnectProperties *self,
+                                              MMModemCdmaRmProtocol      protocol)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_rm_protocol (self->priv->bearer_properties, protocol);
+}
+
+/**
+ * mm_simple_connect_properties_get_rm_protocol:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Get the RM protocol requested by the user.
+ *
+ * Returns: a #MMModemCdmaRmProtocol.
+ *
+ * Since: 1.16
+ */
+MMModemCdmaRmProtocol
+mm_simple_connect_properties_get_rm_protocol (MMSimpleConnectProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN);
+
+    return mm_bearer_properties_get_rm_protocol (self->priv->bearer_properties);
+}
 
 /*****************************************************************************/
 
