@@ -80,7 +80,7 @@
         <varlistentry><term><literal>"rm-protocol"</literal></term>
           <listitem><para>Protocol of the Rm interface, given as a <link linkend="MMModemCdmaRmProtocol">MMModemCdmaRmProtocol</link> value (signature <literal>"u"</literal>). Optional in CDMA.</para></listitem></varlistentry>
         <varlistentry><term><literal>"number"</literal></term>
-          <listitem><para>Telephone number to dial, given as a string value (signature <literal>"s"</literal>). Required in POTS.</para></listitem></varlistentry>
+          <listitem><para>Number to dial for the data connection, given as a string value (signature <literal>"s"</literal>). Deprecated since version 1.10.0.</para></listitem></varlistentry>
         </variablelist>
 
         Some properties are only applicable to a bearer of certain access
