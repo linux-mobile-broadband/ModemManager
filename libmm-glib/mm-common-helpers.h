@@ -82,6 +82,9 @@ MMModem3gppEpsUeModeOperation mm_common_get_eps_ue_mode_operation_from_string (c
 MMModemAccessTechnology mm_common_get_access_technology_from_string (const gchar *str,
                                                                      GError **error);
 
+MMBearerMultiplexSupport mm_common_get_multiplex_support_from_string (const gchar  *str,
+                                                                      GError      **error);
+
 GArray          *mm_common_ports_variant_to_garray (GVariant *variant);
 MMModemPortInfo *mm_common_ports_variant_to_array  (GVariant *variant,
                                                  guint *n_ports);

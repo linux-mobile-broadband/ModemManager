@@ -109,6 +109,13 @@
               value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"multiplex"</literal></term>
+            <listitem>
+              Multiplex support requested by the user, given as a
+              <link linkend="MMBearerMultiplexSupport">MMBearerMultiplexSupport</link>
+              value (signature <literal>"u"</literal>). Since 1.18.
+            </listitem>
+          </varlistentry>
         </variablelist>
     -->
     <method name="Connect">

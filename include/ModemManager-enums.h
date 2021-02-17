@@ -1526,4 +1526,22 @@ typedef enum { /*< underscore_name=mm_modem_firmware_update_method >*/
     MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC  = 1 << 1,
 } MMModemFirmwareUpdateMethod;
 
+/**
+ * MMBearerMultiplexSupport:
+ * @MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN: Unknown.
+ * @MM_BEARER_MULTIPLEX_SUPPORT_NONE: No multiplex support should be used.
+ * @MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED: If available, multiplex support should be used.
+ * @MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED: Multiplex support must be used or otherwise the connection attempt will fail.
+ *
+ * Multiplex support requested by the user.
+ *
+ * Since: 1.18
+ */
+typedef enum { /*< underscore_name=mm_bearer_multiplex_support >*/
+    MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN   = 0,
+    MM_BEARER_MULTIPLEX_SUPPORT_NONE      = 1,
+    MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED = 2,
+    MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED  = 3,
+} MMBearerMultiplexSupport;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

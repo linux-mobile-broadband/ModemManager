@@ -1692,6 +1692,14 @@ _connect (MMBaseBearer *_self,
     GTask *task;
     GCancellable *operation_cancellable = NULL;
 
+    if (mm_bearer_properties_get_multiplex (mm_base_bearer_peek_config (_self)) == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+        g_task_report_new_error (
+            self, callback, user_data, _connect,
+            MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+            "Multiplex support not available");
+        goto out;
+    }
+
     g_object_get (self,
                   MM_BASE_BEARER_MODEM, &modem,
                   NULL);

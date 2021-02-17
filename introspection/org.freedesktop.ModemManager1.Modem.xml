@@ -81,6 +81,8 @@
           <listitem><para>Protocol of the Rm interface, given as a <link linkend="MMModemCdmaRmProtocol">MMModemCdmaRmProtocol</link> value (signature <literal>"u"</literal>). Optional in CDMA.</para></listitem></varlistentry>
         <varlistentry><term><literal>"number"</literal></term>
           <listitem><para>Number to dial for the data connection, given as a string value (signature <literal>"s"</literal>). Deprecated since version 1.10.0.</para></listitem></varlistentry>
+        <varlistentry><term><literal>"multiplex"</literal></term>
+          <listitem><para>Multiplex support requested by the user, given as a <link linkend="MMBearerMultiplexSupport">MMBearerMultiplexSupport</link> value (signature <literal>"u"</literal>). Since 1.18.</para></listitem></varlistentry>
         </variablelist>
 
         Some properties are only applicable to a bearer of certain access

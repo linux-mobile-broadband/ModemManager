@@ -404,6 +404,44 @@ mm_simple_connect_properties_get_rm_protocol (MMSimpleConnectProperties *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_simple_connect_properties_set_multiplex:
+ * @self: a #MMSimpleConnectProperties.
+ * @multiplex: a #MMBearerMultiplexSupport.
+ *
+ * Sets the multiplex support requested by the user.
+ *
+ * Since: 1.18
+ */
+void
+mm_simple_connect_properties_set_multiplex (MMSimpleConnectProperties *self,
+                                            MMBearerMultiplexSupport   multiplex)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_multiplex (self->priv->bearer_properties, multiplex);
+}
+
+/**
+ * mm_simple_connect_properties_get_multiplex:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Get the multiplex support requested by the user.
+ *
+ * Returns: a #MMBearerMultiplexSupport.
+ *
+ * Since: 1.18
+ */
+MMBearerMultiplexSupport
+mm_simple_connect_properties_get_multiplex (MMSimpleConnectProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN);
+
+    return mm_bearer_properties_get_multiplex (self->priv->bearer_properties);
+}
+
+/*****************************************************************************/
+
 #ifndef MM_DISABLE_DEPRECATED
 
 /**

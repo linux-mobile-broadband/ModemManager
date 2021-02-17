@@ -40,6 +40,7 @@ G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT);
 #define PROPERTY_IP_TYPE         "ip-type"
 #define PROPERTY_ALLOW_ROAMING   "allow-roaming"
 #define PROPERTY_RM_PROTOCOL     "rm-protocol"
+#define PROPERTY_MULTIPLEX       "multiplex"
 
 /* no longer used properties */
 #define DEPRECATED_PROPERTY_NUMBER "number"
@@ -60,6 +61,8 @@ struct _MMBearerPropertiesPrivate {
     gboolean allow_roaming;
     /* Protocol of the Rm interface */
     MMModemCdmaRmProtocol rm_protocol;
+    /* Multiplex support */
+    MMBearerMultiplexSupport multiplex;
 };
 
 /*****************************************************************************/
@@ -390,6 +393,44 @@ mm_bearer_properties_get_rm_protocol (MMBearerProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_bearer_properties_set_multiplex:
+ * @self: a #MMBearerProperties.
+ * @multiplex: a #MMBearerMultiplexSupport.
+ *
+ * Gets the type of multiplex support requested by the user.
+ *
+ * Since: 1.18
+ */
+void
+mm_bearer_properties_set_multiplex (MMBearerProperties       *self,
+                                    MMBearerMultiplexSupport  multiplex)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    self->priv->multiplex = multiplex;
+}
+
+/**
+ * mm_bearer_properties_get_multiplex:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the type of multiplex support requested by the user.
+ *
+ * Returns: a #MMBearerMultiplexSupport.
+ *
+ * Since: 1.18
+ */
+MMBearerMultiplexSupport
+mm_bearer_properties_get_multiplex (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN);
+
+    return self->priv->multiplex;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_properties_get_dictionary: (skip)
  */
 GVariant *
@@ -446,6 +487,12 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
                                "{sv}",
                                PROPERTY_RM_PROTOCOL,
                                g_variant_new_uint32 (self->priv->rm_protocol));
+
+    if (self->priv->multiplex)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_MULTIPLEX,
+                               g_variant_new_uint32 (self->priv->multiplex));
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
@@ -509,6 +556,16 @@ mm_bearer_properties_consume_string (MMBearerProperties *self,
             return FALSE;
         }
         mm_bearer_properties_set_rm_protocol (self, protocol);
+    } else if (g_str_equal (key, PROPERTY_MULTIPLEX)) {
+        GError *inner_error = NULL;
+        MMBearerMultiplexSupport multiplex;
+
+        multiplex = mm_common_get_multiplex_support_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_bearer_properties_set_multiplex (self, multiplex);
     } else if (g_str_equal (key, DEPRECATED_PROPERTY_NUMBER)) {
         /* NO-OP */
     } else {
@@ -606,6 +663,10 @@ mm_bearer_properties_consume_variant (MMBearerProperties *properties,
         mm_bearer_properties_set_rm_protocol (
             properties,
             g_variant_get_uint32 (value));
+    else if (g_str_equal (key, PROPERTY_MULTIPLEX))
+        mm_bearer_properties_set_multiplex (
+            properties,
+            g_variant_get_uint32 (value));
     else if (g_str_equal (key, DEPRECATED_PROPERTY_NUMBER)) {
         /* NO-OP */
     } else {
@@ -651,10 +712,7 @@ mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
     g_variant_iter_init (&iter, dictionary);
     while (!inner_error &&
            g_variant_iter_next (&iter, "{sv}", &key, &value)) {
-        mm_bearer_properties_consume_variant (properties,
-                                                     key,
-                                                     value,
-                                                     &inner_error);
+        mm_bearer_properties_consume_variant (properties, key, value, &inner_error);
         g_free (key);
         g_variant_unref (value);
     }
@@ -766,6 +824,8 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
     }
     if (a->priv->rm_protocol != b->priv->rm_protocol)
         return FALSE;
+    if (a->priv->multiplex != b->priv->multiplex)
+        return FALSE;
     return TRUE;
 }
 
@@ -799,6 +859,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
     self->priv->allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
     self->priv->ip_type = MM_BEARER_IP_FAMILY_NONE;
+    self->priv->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN;
 }
 
 static void

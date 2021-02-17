@@ -72,14 +72,17 @@ void mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
                                              gboolean allow_roaming);
 void mm_bearer_properties_set_rm_protocol   (MMBearerProperties *self,
                                              MMModemCdmaRmProtocol protocol);
+void mm_bearer_properties_set_multiplex     (MMBearerProperties       *self,
+                                             MMBearerMultiplexSupport  multiplex);
 
-const gchar           *mm_bearer_properties_get_apn           (MMBearerProperties *self);
-MMBearerAllowedAuth    mm_bearer_properties_get_allowed_auth  (MMBearerProperties *self);
-const gchar           *mm_bearer_properties_get_user          (MMBearerProperties *self);
-const gchar           *mm_bearer_properties_get_password      (MMBearerProperties *self);
-MMBearerIpFamily       mm_bearer_properties_get_ip_type       (MMBearerProperties *self);
-gboolean               mm_bearer_properties_get_allow_roaming (MMBearerProperties *self);
-MMModemCdmaRmProtocol  mm_bearer_properties_get_rm_protocol   (MMBearerProperties *self);
+const gchar              *mm_bearer_properties_get_apn           (MMBearerProperties *self);
+MMBearerAllowedAuth       mm_bearer_properties_get_allowed_auth  (MMBearerProperties *self);
+const gchar              *mm_bearer_properties_get_user          (MMBearerProperties *self);
+const gchar              *mm_bearer_properties_get_password      (MMBearerProperties *self);
+MMBearerIpFamily          mm_bearer_properties_get_ip_type       (MMBearerProperties *self);
+gboolean                  mm_bearer_properties_get_allow_roaming (MMBearerProperties *self);
+MMModemCdmaRmProtocol     mm_bearer_properties_get_rm_protocol   (MMBearerProperties *self);
+MMBearerMultiplexSupport  mm_bearer_properties_get_multiplex     (MMBearerProperties *self);
 
 #ifndef MM_DISABLE_DEPRECATED
 G_DEPRECATED
