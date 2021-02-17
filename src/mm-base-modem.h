@@ -29,8 +29,9 @@
 #include <mm-gdbus-modem.h>
 
 #include "mm-auth-provider.h"
-#include "mm-port.h"
 #include "mm-kernel-device.h"
+#include "mm-port.h"
+#include "mm-port-net.h"
 #include "mm-port-serial-at.h"
 #include "mm-port-serial-qcdm.h"
 #include "mm-port-serial-gps.h"

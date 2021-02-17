@@ -164,11 +164,7 @@ static MMPort *
 base_modem_create_net_port (MMBaseModem *self,
                             const gchar *name)
 {
-    return MM_PORT (g_object_new (MM_TYPE_PORT,
-                                  MM_PORT_DEVICE, name,
-                                  MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
-                                  MM_PORT_TYPE,   MM_PORT_TYPE_NET,
-                                  NULL));
+    return MM_PORT (mm_port_net_new (name));
 }
 
 static MMPort *
