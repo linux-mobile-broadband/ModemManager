@@ -602,6 +602,10 @@ mm_bearer_properties_consume_variant (MMBearerProperties *properties,
         mm_bearer_properties_set_allow_roaming (
             properties,
             g_variant_get_boolean (value));
+    else if (g_str_equal (key, PROPERTY_RM_PROTOCOL))
+        mm_bearer_properties_set_rm_protocol (
+            properties,
+            g_variant_get_uint32 (value));
     else if (g_str_equal (key, DEPRECATED_PROPERTY_NUMBER)) {
         /* NO-OP */
     } else {
