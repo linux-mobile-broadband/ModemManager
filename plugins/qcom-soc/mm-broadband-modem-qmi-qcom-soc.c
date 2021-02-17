@@ -92,7 +92,8 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
     }
 
     /* Set outputs */
-    *out_sio_port = sio_port_per_port_number[net_port_number];
+    if (out_sio_port)
+        *out_sio_port = sio_port_per_port_number[net_port_number];
     found = MM_PORT_QMI (rpmsg_qmi_ports->data);
 
     g_list_free_full (rpmsg_qmi_ports, g_object_unref);

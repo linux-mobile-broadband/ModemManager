@@ -286,7 +286,7 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
                      MM_CORE_ERROR_NOT_FOUND,
                      "Couldn't find associated QMI port for 'net/%s'",
                      mm_port_get_device (data));
-    else
+    else if (out_sio_port)
         *out_sio_port = QMI_SIO_PORT_NONE;
 
     return found;
