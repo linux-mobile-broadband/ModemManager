@@ -97,6 +97,19 @@ QmiDevice *mm_port_qmi_peek_device (MMPortQmi *self);
 QmiDataEndpointType mm_port_qmi_get_endpoint_type             (MMPortQmi *self);
 guint               mm_port_qmi_get_endpoint_interface_number (MMPortQmi *self);
 
-gboolean mm_port_qmi_llp_is_raw_ip (MMPortQmi *self);
+QmiWdaLinkLayerProtocol mm_port_qmi_get_link_layer_protocol (MMPortQmi *self);
+
+typedef enum {
+    MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_QUERY,
+    MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT,
+} MMPortQmiSetupDataFormatAction;
+
+void     mm_port_qmi_setup_data_format        (MMPortQmi                      *self,
+                                               MMPortQmiSetupDataFormatAction  action,
+                                               GAsyncReadyCallback             callback,
+                                               gpointer                        user_data);
+gboolean mm_port_qmi_setup_data_format_finish (MMPortQmi                      *self,
+                                               GAsyncResult                   *res,
+                                               GError                        **error);
 
 #endif /* MM_PORT_QMI_H */

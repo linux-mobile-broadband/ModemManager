@@ -28,20 +28,24 @@
 G_DEFINE_TYPE (MMPortQmi, mm_port_qmi, MM_TYPE_PORT)
 
 typedef struct {
-    QmiService service;
-    QmiClient *client;
-    MMPortQmiFlag flag;
+    QmiService     service;
+    QmiClient     *client;
+    MMPortQmiFlag  flag;
 } ServiceInfo;
 
 struct _MMPortQmiPrivate {
     gboolean   in_progress;
     QmiDevice *qmi_device;
     GList     *services;
-    gboolean   llp_is_raw_ip;
     /* endpoint info */
     gulong              endpoint_info_signal_id;
     QmiDataEndpointType endpoint_type;
     gint                endpoint_interface_number;
+    /* kernel data format */
+    QmiDeviceExpectedDataFormat kernel_data_format;
+    /* wda settings */
+    gboolean                wda_unsupported;
+    QmiWdaLinkLayerProtocol llp;
 };
 
 /*****************************************************************************/
@@ -270,10 +274,584 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
 
 /*****************************************************************************/
 
-gboolean
-mm_port_qmi_llp_is_raw_ip (MMPortQmi *self)
+QmiWdaLinkLayerProtocol
+mm_port_qmi_get_link_layer_protocol (MMPortQmi *self)
 {
-    return self->priv->llp_is_raw_ip;
+    return self->priv->llp;
+}
+
+/*****************************************************************************/
+
+static QmiDeviceExpectedDataFormat
+load_kernel_data_format_current (MMPortQmi *self,
+                                 QmiDevice *device)
+{
+    QmiDeviceExpectedDataFormat value;
+
+    /* For any driver other than qmi_wwan, assume raw-ip */
+    if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC)
+        return QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
+
+    /* If the expected data format is unknown, it means the kernel in use
+     * doesn't have support for querying it; therefore it's 802.3 */
+    value = qmi_device_get_expected_data_format (device, NULL);
+    if (value == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN)
+        value = QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3;
+
+    return value;
+}
+
+static void
+load_kernel_data_format_capabilities (MMPortQmi *self,
+                                      QmiDevice *device,
+                                      gboolean  *supports_802_3,
+                                      gboolean  *supports_raw_ip)
+{
+    /* For any driver other than qmi_wwan, assume raw-ip */
+    if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) {
+        *supports_802_3 = FALSE;
+        *supports_raw_ip = TRUE;
+        return;
+    }
+
+    *supports_802_3 = TRUE;
+    *supports_raw_ip = qmi_device_check_expected_data_format_supported (device,
+                                                                        QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP,
+                                                                        NULL);}
+
+/*****************************************************************************/
+
+typedef struct {
+    QmiDeviceExpectedDataFormat kernel_data_format;
+    QmiWdaLinkLayerProtocol     wda_llp;
+} DataFormatCombination;
+
+static const DataFormatCombination data_format_combinations[] = {
+    { QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP },
+    { QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3,  QMI_WDA_LINK_LAYER_PROTOCOL_802_3  },
+};
+
+typedef enum {
+    INTERNAL_SETUP_DATA_FORMAT_STEP_FIRST,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CAPABILITIES,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_RETRY,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CURRENT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_GET_WDA_DATA_FORMAT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_WDA_DATA_FORMAT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_KERNEL_DATA_FORMAT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_LAST,
+} InternalSetupDataFormatStep;
+
+typedef struct {
+    QmiDevice                      *device;
+    MMPortQmiSetupDataFormatAction  action;
+
+    InternalSetupDataFormatStep step;
+    gboolean                    use_endpoint;
+    gint                        data_format_combination_i;
+
+    /* configured kernel data format, mainly when using qmi_wwan */
+    QmiDeviceExpectedDataFormat kernel_data_format_current;
+    QmiDeviceExpectedDataFormat kernel_data_format_requested;
+    gboolean                    kernel_data_format_802_3_supported;
+    gboolean                    kernel_data_format_raw_ip_supported;
+
+    /* configured device data format */
+    QmiClient               *wda;
+    QmiWdaLinkLayerProtocol  wda_llp_current;
+    QmiWdaLinkLayerProtocol  wda_llp_requested;
+} InternalSetupDataFormatContext;
+
+static void
+internal_setup_data_format_context_free (InternalSetupDataFormatContext *ctx)
+{
+    if (ctx->wda && ctx->device)
+        qmi_device_release_client (ctx->device,
+                                   ctx->wda,
+                                   QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
+                                   3, NULL, NULL, NULL);
+    g_clear_object (&ctx->wda);
+    g_clear_object (&ctx->device);
+    g_slice_free (InternalSetupDataFormatContext, ctx);
+}
+
+static gboolean
+internal_setup_data_format_finish (MMPortQmi                    *self,
+                                   GAsyncResult                 *res,
+                                   QmiDeviceExpectedDataFormat  *out_kernel_data_format,
+                                   QmiWdaLinkLayerProtocol      *out_llp,
+                                   GError                      **error)
+{
+    InternalSetupDataFormatContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+    *out_kernel_data_format = ctx->kernel_data_format_current;
+    *out_llp = ctx->wda_llp_current;
+    return TRUE;
+}
+
+static void internal_setup_data_format_context_step (GTask *task);
+
+static void
+sync_kernel_data_format (GTask *task)
+{
+    MMPortQmi              *self;
+    InternalSetupDataFormatContext *ctx;
+    GError                 *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    mm_obj_dbg (self, "Updating kernel expected data format: %s -> %s",
+                qmi_device_expected_data_format_get_string (ctx->kernel_data_format_current),
+                qmi_device_expected_data_format_get_string (ctx->kernel_data_format_requested));
+
+    if (!qmi_device_set_expected_data_format (ctx->device,
+                                              ctx->kernel_data_format_requested,
+                                              &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* request reload */
+    ctx->kernel_data_format_current = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
+set_data_format_ready (QmiClientWda *client,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    InternalSetupDataFormatContext              *ctx;
+    g_autoptr(QmiMessageWdaSetDataFormatOutput)  output = NULL;
+    g_autoptr(GError)                            error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    output = qmi_client_wda_set_data_format_finish (client, res, &error);
+    if (!output || !qmi_message_wda_set_data_format_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* request reload */
+    ctx->wda_llp_current = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
+sync_wda_data_format (GTask *task)
+{
+    MMPortQmi                                  *self;
+    InternalSetupDataFormatContext             *ctx;
+    g_autoptr(QmiMessageWdaSetDataFormatInput)  input = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (ctx->wda_llp_current != ctx->wda_llp_requested)
+        mm_obj_dbg (self, "Updating device link layer protocol: %s -> %s",
+                    qmi_wda_link_layer_protocol_get_string (ctx->wda_llp_current),
+                    qmi_wda_link_layer_protocol_get_string (ctx->wda_llp_requested));
+
+    input = qmi_message_wda_set_data_format_input_new ();
+    qmi_message_wda_set_data_format_input_set_link_layer_protocol (input, ctx->wda_llp_requested, NULL);
+    qmi_message_wda_set_data_format_input_set_uplink_data_aggregation_protocol (input, QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED, NULL);
+    qmi_message_wda_set_data_format_input_set_downlink_data_aggregation_protocol (input, QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED, NULL);
+    if (ctx->use_endpoint)
+        qmi_message_wda_set_data_format_input_set_endpoint_info (input, self->priv->endpoint_type, self->priv->endpoint_interface_number, NULL);
+
+    qmi_client_wda_set_data_format (QMI_CLIENT_WDA (ctx->wda),
+                                    input,
+                                    10,
+                                    g_task_get_cancellable (task),
+                                    (GAsyncReadyCallback) set_data_format_ready,
+                                    task);
+}
+
+static gboolean
+setup_data_format_completed (GTask *task)
+{
+    InternalSetupDataFormatContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    /* check whether the current and requested ones are the same */
+    if ((ctx->kernel_data_format_current == ctx->kernel_data_format_requested) &&
+        (ctx->wda_llp_current            == ctx->wda_llp_requested)) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void
+check_data_format (GTask *task)
+{
+    MMPortQmi              *self;
+    InternalSetupDataFormatContext *ctx;
+    gboolean                first_iteration;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    first_iteration = (ctx->data_format_combination_i < 0);
+    if (!first_iteration && setup_data_format_completed (task))
+        return;
+
+    /* go on to the next supported combination */
+    for (++ctx->data_format_combination_i;
+         ctx->data_format_combination_i <= (gint)G_N_ELEMENTS (data_format_combinations);
+         ctx->data_format_combination_i++) {
+        const DataFormatCombination *combination;
+
+        combination = &data_format_combinations[ctx->data_format_combination_i];
+
+        if ((combination->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3) &&
+            !ctx->kernel_data_format_802_3_supported)
+            continue;
+        if ((combination->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP) &&
+            !ctx->kernel_data_format_raw_ip_supported)
+            continue;
+
+        mm_obj_dbg (self, "selected data format setup:");
+        mm_obj_dbg (self, "    kernel format: %s", qmi_device_expected_data_format_get_string (combination->kernel_data_format));
+        mm_obj_dbg (self, "    link layer protocol: %s", qmi_wda_link_layer_protocol_get_string (combination->wda_llp));
+
+        ctx->kernel_data_format_requested = combination->kernel_data_format;
+        ctx->wda_llp_requested            = combination->wda_llp;
+
+        if (first_iteration && setup_data_format_completed (task))
+            return;
+
+        /* Go on to next step */
+        ctx->step++;
+        internal_setup_data_format_context_step (task);
+        return;
+    }
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "No more data format combinations supported");
+    g_object_unref (task);
+}
+
+static gboolean
+process_data_format_output (MMPortQmi                         *self,
+                            QmiMessageWdaGetDataFormatOutput  *output,
+                            InternalSetupDataFormatContext    *ctx,
+                            GError                           **error)
+{
+    /* Let's consider the lack o the LLP TLV a hard error; it really would be strange
+     * a module supporting WDA Get Data Format but not containing the LLP info */
+    if (!qmi_message_wda_get_data_format_output_get_link_layer_protocol (output, &ctx->wda_llp_current, error))
+        return FALSE;
+
+    return TRUE;
+}
+
+static void
+get_data_format_ready (QmiClientWda *client,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMPortQmi                                   *self;
+    InternalSetupDataFormatContext              *ctx;
+    g_autoptr(QmiMessageWdaGetDataFormatOutput)  output = NULL;
+    g_autoptr(GError)                            error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    output = qmi_client_wda_get_data_format_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_wda_get_data_format_output_get_result (output, &error) ||
+        !process_data_format_output (self, output, ctx, &error)) {
+        /* A 'missing argument' error when querying data format is seen in new
+         * devices like the Quectel RM500Q, requiring the 'endpoint info' TLV.
+         * When this happens, retry the step with the missing TLV.
+         *
+         * Note that this is not an additional step, we're still in the
+         * GET_WDA_DATA_FORMAT step.
+         */
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_MISSING_ARGUMENT) &&
+            (self->priv->endpoint_type != QMI_DATA_ENDPOINT_TYPE_UNDEFINED)) {
+            /* retry same step with endpoint info */
+            ctx->use_endpoint = TRUE;
+            internal_setup_data_format_context_step (task);
+            return;
+        }
+
+        /* otherwise, fatal */
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
+allocate_client_wda_ready (QmiDevice    *device,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    InternalSetupDataFormatContext *ctx;
+    GError                         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->wda = qmi_device_allocate_client_finish (device, res, &error);
+    if (!ctx->wda) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
+internal_setup_data_format_context_step (GTask *task)
+{
+    MMPortQmi                      *self;
+    InternalSetupDataFormatContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_FIRST:
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CAPABILITIES:
+            /* Load kernel data format capabilities, only on first loop iteration */
+            load_kernel_data_format_capabilities (self,
+                                                  ctx->device,
+                                                  &ctx->kernel_data_format_802_3_supported,
+                                                  &ctx->kernel_data_format_raw_ip_supported);
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_RETRY:
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CURRENT:
+            /* Only reload kernel data format if it was updated or on first loop */
+            if (ctx->kernel_data_format_current == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN) {
+                ctx->kernel_data_format_current = load_kernel_data_format_current (self, ctx->device);
+            }
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT:
+            /* Only allocate new WDA client on first loop */
+            if (ctx->data_format_combination_i < 0) {
+                g_assert (!ctx->wda);
+                qmi_device_allocate_client (ctx->device,
+                                            QMI_SERVICE_WDA,
+                                            QMI_CID_NONE,
+                                            10,
+                                            g_task_get_cancellable (task),
+                                            (GAsyncReadyCallback) allocate_client_wda_ready,
+                                            task);
+                return;
+            }
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_GET_WDA_DATA_FORMAT:
+            /* Only reload WDA data format if it was updated or on first loop */
+            if (ctx->wda_llp_current == QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN) {
+                g_autoptr(QmiMessageWdaGetDataFormatInput) input = NULL;
+
+                if (ctx->use_endpoint) {
+                    input = qmi_message_wda_get_data_format_input_new ();
+                    qmi_message_wda_get_data_format_input_set_endpoint_info (input,
+                                                                             self->priv->endpoint_type,
+                                                                             self->priv->endpoint_interface_number,
+                                                                             NULL);
+                }
+                qmi_client_wda_get_data_format (QMI_CLIENT_WDA (ctx->wda),
+                                                input,
+                                                10,
+                                                g_task_get_cancellable (task),
+                                                (GAsyncReadyCallback) get_data_format_ready,
+                                                task);
+                return;
+            }
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE:
+            mm_obj_dbg (self, "current data format setup:");
+            mm_obj_dbg (self, "    kernel format: %s", qmi_device_expected_data_format_get_string (ctx->kernel_data_format_current));
+            mm_obj_dbg (self, "    link layer protocol: %s", qmi_wda_link_layer_protocol_get_string (ctx->wda_llp_current));
+
+            if (ctx->action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_QUERY) {
+                g_task_return_boolean (task, TRUE);
+                g_object_unref (task);
+                return;
+            }
+
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT:
+            /* This step is the one that may complete the async operation
+             * successfully */
+            check_data_format (task);
+            return;
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_WDA_DATA_FORMAT:
+            if (ctx->wda_llp_current != ctx->wda_llp_requested) {
+                sync_wda_data_format (task);
+                return;
+            }
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_KERNEL_DATA_FORMAT:
+            if (ctx->kernel_data_format_current != ctx->kernel_data_format_requested) {
+                sync_kernel_data_format (task);
+                return;
+            }
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_LAST:
+            /* jump back to first step to reload current state after
+             * the updates have been done */
+            ctx->step = INTERNAL_SETUP_DATA_FORMAT_STEP_RETRY;
+            internal_setup_data_format_context_step (task);
+            return;
+
+        default:
+            g_assert_not_reached ();
+    }
+}
+
+static void
+internal_setup_data_format (MMPortQmi                      *self,
+                            QmiDevice                      *device,
+                            MMPortQmiSetupDataFormatAction  action,
+                            GAsyncReadyCallback             callback,
+                            gpointer                        user_data)
+{
+    InternalSetupDataFormatContext *ctx;
+    GTask                          *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Port must be open to setup data format");
+        g_object_unref (task);
+        return;
+    }
+
+    if (self->priv->wda_unsupported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Setting up data format is not supported");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (InternalSetupDataFormatContext);
+    ctx->device = g_object_ref (device);
+    ctx->action = action;
+    ctx->step = INTERNAL_SETUP_DATA_FORMAT_STEP_FIRST;
+    ctx->data_format_combination_i = -1;
+    ctx->kernel_data_format_current = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
+    ctx->kernel_data_format_requested = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
+    ctx->wda_llp_current = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
+    ctx->wda_llp_requested = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) internal_setup_data_format_context_free);
+
+    internal_setup_data_format_context_step (task);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_port_qmi_setup_data_format_finish (MMPortQmi                *self,
+                                      GAsyncResult             *res,
+                                      GError                  **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+internal_setup_data_format_ready (MMPortQmi    *self,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!internal_setup_data_format_finish (self,
+                                            res,
+                                            &self->priv->kernel_data_format,
+                                            &self->priv->llp,
+                                            &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_port_qmi_setup_data_format (MMPortQmi                      *self,
+                               MMPortQmiSetupDataFormatAction  action,
+                               GAsyncReadyCallback             callback,
+                               gpointer                        user_data)
+{
+    GTask *task;
+
+    /* External calls are never query */
+    g_assert (action != MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_QUERY);
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->qmi_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Port not open");
+        g_object_unref (task);
+        return;
+    }
+
+    if (self->priv->wda_unsupported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED, "Setting up data format is unsupported");
+        g_object_unref (task);
+        return;
+    }
+
+    /* call internal method with the already open QmiDevice */
+    internal_setup_data_format (self,
+                                self->priv->qmi_device,
+                                action,
+                                (GAsyncReadyCallback)internal_setup_data_format_ready,
+                                task);
 }
 
 /*****************************************************************************/
@@ -284,11 +862,7 @@ typedef enum {
     PORT_OPEN_STEP_CHECK_ALREADY_OPEN,
     PORT_OPEN_STEP_DEVICE_NEW,
     PORT_OPEN_STEP_OPEN_WITHOUT_DATA_FORMAT,
-    PORT_OPEN_STEP_GET_KERNEL_DATA_FORMAT,
-    PORT_OPEN_STEP_ALLOCATE_WDA_CLIENT,
-    PORT_OPEN_STEP_GET_WDA_DATA_FORMAT,
-    PORT_OPEN_STEP_CHECK_DATA_FORMAT,
-    PORT_OPEN_STEP_SYNC_DATA_FORMAT,
+    PORT_OPEN_STEP_SETUP_DATA_FORMAT,
     PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT,
     PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT,
     PORT_OPEN_STEP_LAST
@@ -296,24 +870,16 @@ typedef enum {
 
 typedef struct {
     QmiDevice                   *device;
-    QmiClient                   *wda;
     GError                      *error;
     PortOpenStep                 step;
     gboolean                     set_data_format;
     QmiDeviceExpectedDataFormat  kernel_data_format;
-    QmiWdaLinkLayerProtocol      llp;
 } PortOpenContext;
 
 static void
 port_open_context_free (PortOpenContext *ctx)
 {
     g_assert (!ctx->error);
-    if (ctx->wda && ctx->device)
-        qmi_device_release_client (ctx->device,
-                                   ctx->wda,
-                                   QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
-                                   3, NULL, NULL, NULL);
-    g_clear_object (&ctx->wda);
     g_clear_object (&ctx->device);
     g_slice_free (PortOpenContext, ctx);
 }
@@ -372,14 +938,17 @@ qmi_device_open_second_ready (QmiDevice    *qmi_device,
 
     if (qmi_device_open_finish (qmi_device, res, &ctx->error)) {
         /* If the open with CTL data format is sucessful, update */
+        self->priv->kernel_data_format = ctx->kernel_data_format;
         if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP)
-            self->priv->llp_is_raw_ip = TRUE;
+            self->priv->llp = QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP;
+        else if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3)
+            self->priv->llp = QMI_WDA_LINK_LAYER_PROTOCOL_802_3;
         else
-            self->priv->llp_is_raw_ip = FALSE;
+            g_assert_not_reached ();
     }
 
     /* In both error and success, we go to last step */
-    ctx->step = PORT_OPEN_STEP_LAST;
+    ctx->step++;
     port_open_step (task);
 }
 
@@ -403,87 +972,28 @@ qmi_device_close_to_reopen_ready (QmiDevice    *qmi_device,
 }
 
 static void
-set_data_format_ready (QmiClientWda *client,
-                       GAsyncResult *res,
-                       GTask        *task)
+open_internal_setup_data_format_ready (MMPortQmi    *self,
+                                       GAsyncResult *res,
+                                       GTask        *task)
 {
-    MMPortQmi                                   *self;
-    PortOpenContext                             *ctx;
-    g_autoptr(QmiMessageWdaSetDataFormatOutput)  output = NULL;
-    g_autoptr(GError)                            error = NULL;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    output = qmi_client_wda_set_data_format_finish (client, res, &error);
-    if (!output || !qmi_message_wda_set_data_format_output_get_result (output, &error)) {
-        mm_obj_warn (self, "Couldn't set data format: %s", error->message);
-        /* If setting WDA data format fails, fallback to LLP requested via CTL */
-        ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
-    } else {
-        self->priv->llp_is_raw_ip = TRUE;
-        ctx->step = PORT_OPEN_STEP_LAST;
-    }
-
-    port_open_step (task);
-}
-
-static void
-get_data_format_ready (QmiClientWda *client,
-                       GAsyncResult *res,
-                       GTask        *task)
-{
-    MMPortQmi                                   *self;
-    PortOpenContext                             *ctx;
-    g_autoptr(QmiMessageWdaGetDataFormatOutput)  output = NULL;
-    g_autoptr(GError)                            error = NULL;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    output = qmi_client_wda_get_data_format_finish (client, res, NULL);
-    if (!output ||
-        !qmi_message_wda_get_data_format_output_get_result (output, &error) ||
-        !qmi_message_wda_get_data_format_output_get_link_layer_protocol (output, &ctx->llp, NULL)) {
-        /* A 'missing argument' error when querying data format is seen in new
-         * devices like the Quectel RM500Q, requiring the 'endpoint info' TLV.
-         * When this happens, assume the device supports only raw-ip and be done
-         * with it. */
-        if (error && g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_MISSING_ARGUMENT)) {
-            mm_obj_dbg (self, "Querying data format failed: '%s', assuming raw-ip is only supported", error->message);
-            ctx->llp = QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP;
-            ctx->step++;
-        } else {
-            /* If loading WDA data format fails, fallback to 802.3 requested via CTL */
-            ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
-        }
-    } else
-        /* Go on to next step */
-        ctx->step++;
-
-    port_open_step (task);
-}
-
-static void
-allocate_client_wda_ready (QmiDevice    *device,
-                           GAsyncResult *res,
-                           GTask        *task)
-{
-    PortOpenContext *ctx;
+    PortOpenContext   *ctx;
+    g_autoptr(GError)  error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    ctx->wda = qmi_device_allocate_client_finish (device, res, NULL);
-    if (!ctx->wda) {
-        /* If no WDA supported, then we just fallback to reopening explicitly
-         * requesting 802.3 in the CTL service. */
-        ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
-        port_open_step (task);
-        return;
+    if (!internal_setup_data_format_finish (self,
+                                            res,
+                                            &self->priv->kernel_data_format,
+                                            &self->priv->llp,
+                                            &error)) {
+        /* Continue with fallback to LLP requested via CTL */
+        mm_obj_warn (self, "Couldn't setup data format: %s", error->message);
+        self->priv->wda_unsupported = TRUE;
+        ctx->step++;
+    } else {
+        /* on success, we're done */
+        ctx->step = PORT_OPEN_STEP_LAST;
     }
-
-    /* Go on to next step */
-    ctx->step++;
     port_open_step (task);
 }
 
@@ -590,136 +1100,46 @@ port_open_step (GTask *task)
     }
 
     case PORT_OPEN_STEP_OPEN_WITHOUT_DATA_FORMAT:
-        /* Now open the QMI device without any data format CTL flag */
-        mm_obj_dbg (self, "Opening device without data format update...");
-        qmi_device_open (ctx->device,
-                         (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
-                          QMI_DEVICE_OPEN_FLAGS_PROXY),
-                         25,
-                         g_task_get_cancellable (task),
-                         (GAsyncReadyCallback) qmi_device_open_first_ready,
-                         task);
-        return;
-
-    case PORT_OPEN_STEP_GET_KERNEL_DATA_FORMAT:
-        /* Querying kernel data format is only expected when using qmi_wwan */
-        if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) {
-            mm_obj_dbg (self, "Querying kernel data format...");
-            /* Try to gather expected data format from the sysfs file */
-            ctx->kernel_data_format = qmi_device_get_expected_data_format (ctx->device, NULL);
-            /* If data format cannot be retrieved, we fallback to 802.3 via CTL */
-            if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN) {
-                ctx->step = PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT;
-                port_open_step (task);
-                return;
-            }
+        if (!self->priv->wda_unsupported) {
+            /* Now open the QMI device without any data format CTL flag */
+            mm_obj_dbg (self, "Opening device without data format update...");
+            qmi_device_open (ctx->device,
+                             (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
+                              QMI_DEVICE_OPEN_FLAGS_PROXY),
+                             25,
+                             g_task_get_cancellable (task),
+                             (GAsyncReadyCallback) qmi_device_open_first_ready,
+                             task);
+            return;
         }
-        /* For any driver other than qmi_wwan, assume raw-ip */
-        else {
-            ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
-            mm_obj_dbg (self, "Assuming default kernel data format: %s",
-                        qmi_device_expected_data_format_get_string (ctx->kernel_data_format));
-        }
-
         ctx->step++;
         /* Fall through */
 
-    case PORT_OPEN_STEP_ALLOCATE_WDA_CLIENT:
-        /* Allocate WDA client */
-        mm_obj_dbg (self, "Allocating WDA client...");
-        qmi_device_allocate_client (ctx->device,
-                                    QMI_SERVICE_WDA,
-                                    QMI_CID_NONE,
-                                    10,
-                                    g_task_get_cancellable (task),
-                                    (GAsyncReadyCallback) allocate_client_wda_ready,
-                                    task);
-        return;
-
-    case PORT_OPEN_STEP_GET_WDA_DATA_FORMAT:
-        /* If we have WDA client, query current data format */
-        mm_obj_dbg (self, "Querying device data format...");
-        qmi_client_wda_get_data_format (QMI_CLIENT_WDA (ctx->wda),
-                                        NULL,
-                                        10,
-                                        g_task_get_cancellable (task),
-                                        (GAsyncReadyCallback) get_data_format_ready,
+    case PORT_OPEN_STEP_SETUP_DATA_FORMAT:
+        if (qmi_device_is_open (ctx->device)) {
+            internal_setup_data_format (self,
+                                        ctx->device,
+                                        MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_QUERY,
+                                        (GAsyncReadyCallback) open_internal_setup_data_format_ready,
                                         task);
-        return;
-
-    case PORT_OPEN_STEP_CHECK_DATA_FORMAT:
-        /* We now have the WDA data format and the kernel data format, if they're
-         * equal, we're done */
-        mm_obj_dbg (self, "Checking data format: kernel %s, device %s",
-                    qmi_device_expected_data_format_get_string (ctx->kernel_data_format),
-                    qmi_wda_link_layer_protocol_get_string (ctx->llp));
-
-        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3 &&
-            ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3) {
-            self->priv->llp_is_raw_ip = FALSE;
-            ctx->step = PORT_OPEN_STEP_LAST;
-            port_open_step (task);
             return;
         }
-
-        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP &&
-            ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP) {
-            self->priv->llp_is_raw_ip = TRUE;
-            ctx->step = PORT_OPEN_STEP_LAST;
-            port_open_step (task);
-            return;
-        }
-
         ctx->step++;
         /* Fall through */
-
-    case PORT_OPEN_STEP_SYNC_DATA_FORMAT:
-        /* For drivers other than qmi_wwan, the kernel data format was raw-ip
-         * by default, we need to ask the module to switch to it */
-        if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) {
-            g_autoptr(QmiMessageWdaSetDataFormatInput) input = NULL;
-
-            g_assert (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP);
-            input = qmi_message_wda_set_data_format_input_new ();
-            qmi_message_wda_set_data_format_input_set_link_layer_protocol (input, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, NULL);
-            qmi_client_wda_set_data_format (QMI_CLIENT_WDA (ctx->wda),
-                                            input,
-                                            10,
-                                            g_task_get_cancellable (task),
-                                            (GAsyncReadyCallback) set_data_format_ready,
-                                            task);
-            return;
-        }
-
-        /* If using the qmi_wwan driver, we ask the kernel to sync with the
-         * data format requested by the module */
-        mm_obj_dbg (self, "Updating kernel data format: %s", qmi_wda_link_layer_protocol_get_string (ctx->llp));
-        if (ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_802_3) {
-            ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3;
-            self->priv->llp_is_raw_ip = FALSE;
-        } else if (ctx->llp == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP) {
-            ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
-            self->priv->llp_is_raw_ip = TRUE;
-        } else
-            g_assert_not_reached ();
-
-        /* Regardless of the output, we're done after this action */
-        qmi_device_set_expected_data_format (ctx->device,
-                                             ctx->kernel_data_format,
-                                             &ctx->error);
-        ctx->step = PORT_OPEN_STEP_LAST;
-        port_open_step (task);
-        return;
 
     case PORT_OPEN_STEP_CLOSE_BEFORE_OPEN_WITH_DATA_FORMAT:
         /* This fallback only applies when WDA unsupported */
-        mm_obj_dbg (self, "Closing device to reopen it right away...");
-        qmi_device_close_async (ctx->device,
-                                5,
-                                g_task_get_cancellable (task),
-                                (GAsyncReadyCallback) qmi_device_close_to_reopen_ready,
-                                task);
-        return;
+        if (qmi_device_is_open (ctx->device)) {
+            mm_obj_dbg (self, "Closing device to reopen it right away...");
+            qmi_device_close_async (ctx->device,
+                                    5,
+                                    g_task_get_cancellable (task),
+                                    (GAsyncReadyCallback) qmi_device_close_to_reopen_ready,
+                                    task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
 
     case PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT: {
         QmiDeviceOpenFlags open_flags;
@@ -729,11 +1149,19 @@ port_open_step (GTask *task)
                       QMI_DEVICE_OPEN_FLAGS_PROXY        |
                       QMI_DEVICE_OPEN_FLAGS_NET_NO_QOS_HEADER);
 
+        ctx->kernel_data_format = load_kernel_data_format_current (self, ctx->device);
+
         /* Need to reopen setting 802.3/raw-ip using CTL */
         if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP)
             open_flags |= QMI_DEVICE_OPEN_FLAGS_NET_RAW_IP;
-        else
+        else if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3)
             open_flags |= QMI_DEVICE_OPEN_FLAGS_NET_802_3;
+        else {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Unexpected kernel data format: cannot setup using CTL");
+            g_object_unref (task);
+            return;
+        }
 
         mm_obj_dbg (self, "Reopening device with data format: %s...",
                     qmi_device_expected_data_format_get_string (ctx->kernel_data_format));
@@ -792,7 +1220,6 @@ mm_port_qmi_open (MMPortQmi           *self,
     ctx = g_slice_new0 (PortOpenContext);
     ctx->step = PORT_OPEN_STEP_FIRST;
     ctx->set_data_format = set_data_format;
-    ctx->llp = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
     ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
 
     task = g_task_new (self, cancellable, callback, user_data);

@@ -406,6 +406,7 @@ static void cleanup_event_report_unsolicited_events (MMBearerQmi *self,
 typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_OPEN_QMI_PORT,
+    CONNECT_STEP_SETUP_DATA_FORMAT,
     CONNECT_STEP_IP_METHOD,
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
@@ -1284,6 +1285,30 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
 }
 
 static void
+setup_data_format_ready (MMPortQmi    *qmi,
+                         GAsyncResult *res,
+                         GTask        *task)
+{
+    ConnectContext    *ctx;
+    g_autoptr(GError)  error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_port_qmi_setup_data_format_finish (qmi, res, &error)) {
+        /* a failure here could indicate no support for WDA Set Data Format,
+         * if so, just go on with the plain CTL based support */
+        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            complete_connect (task, NULL, g_steal_pointer (&error));
+            return;
+        }
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static void
 qmi_port_open_ready (MMPortQmi *qmi,
                      GAsyncResult *res,
                      GTask *task)
@@ -1359,12 +1384,19 @@ connect_context_step (GTask *task)
         ctx->step++;
         /* fall through */
 
+    case CONNECT_STEP_SETUP_DATA_FORMAT:
+        mm_port_qmi_setup_data_format (ctx->qmi,
+                                       MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT,
+                                       (GAsyncReadyCallback) setup_data_format_ready,
+                                       task);
+        return;
+
     case CONNECT_STEP_IP_METHOD:
         /* Once the QMI port is open, we decide the IP method we're going
          * to request. If the LLP is raw-ip, we force Static IP, because not
          * all DHCP clients support the raw-ip interfaces; otherwise default
          * to DHCP as always. */
-        if (mm_port_qmi_llp_is_raw_ip (ctx->qmi))
+        if (mm_port_qmi_get_link_layer_protocol (ctx->qmi) == QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP)
             ctx->ip_method = MM_BEARER_IP_METHOD_STATIC;
         else
             ctx->ip_method = MM_BEARER_IP_METHOD_DHCP;
