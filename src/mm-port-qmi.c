@@ -22,6 +22,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-port-qmi.h"
+#include "mm-port-net.h"
 #include "mm-modem-helpers-qmi.h"
 #include "mm-log-object.h"
 
@@ -270,6 +271,212 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
                                 cancellable,
                                 (GAsyncReadyCallback)allocate_client_ready,
                                 task);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    QmiDevice *device;
+    MMPort    *data;
+} InternalResetContext;
+
+static void
+internal_reset_context_free (InternalResetContext *ctx)
+{
+    g_clear_object (&ctx->device);
+    g_clear_object (&ctx->data);
+    g_slice_free (InternalResetContext, ctx);
+}
+
+static gboolean
+internal_reset_finish (MMPortQmi     *self,
+                       GAsyncResult  *res,
+                       GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+delete_all_links_ready (QmiDevice    *device,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    MMPortQmi            *self;
+    InternalResetContext *ctx;
+    GError               *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    /* link deletion not fatal, it may happen if in 802.3 already */
+    if (!qmi_device_delete_all_links_finish (device, res, &error)) {
+        mm_obj_dbg (self, "couldn't delete all links: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    /* expected data format only applicable to qmi_wwan */
+    if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) {
+        mm_obj_dbg (self, "reseting expected kernel data format to 802.3 in data interface '%s'",
+                    mm_port_get_device (MM_PORT (ctx->data)));
+        if (!qmi_device_set_expected_data_format (ctx->device, QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3, &error)) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+net_link_down_ready (MMPortNet    *data,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    MMPortQmi            *self;
+    InternalResetContext *ctx;
+    GError               *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (!mm_port_net_link_setup_finish (data, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* first, delete all links found, if any */
+    mm_obj_dbg (self, "deleting all links in data interface '%s'",
+                mm_port_get_device (ctx->data));
+    qmi_device_delete_all_links (ctx->device,
+                                 mm_port_get_device (ctx->data),
+                                 NULL,
+                                 (GAsyncReadyCallback)delete_all_links_ready,
+                                 task);
+}
+
+static void
+internal_reset (MMPortQmi           *self,
+                MMPort              *data,
+                QmiDevice           *device,
+                GAsyncReadyCallback  callback,
+                gpointer             user_data)
+{
+    GTask                *task;
+    InternalResetContext *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (InternalResetContext);
+    ctx->data = g_object_ref (data);
+    ctx->device = g_object_ref (device);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) internal_reset_context_free);
+
+    /* first, bring down master interface */
+    mm_obj_dbg (self, "bringing down data interface '%s'",
+                mm_port_get_device (ctx->data));
+    mm_port_net_link_setup (MM_PORT_NET (ctx->data),
+                            FALSE,
+                            MM_PORT_NET_MTU_DEFAULT,
+                            NULL,
+                            (GAsyncReadyCallback) net_link_down_ready,
+                            task);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    QmiDevice *device;
+    MMPort    *data;
+} ResetContext;
+
+static void
+reset_context_free (ResetContext *ctx)
+{
+    g_clear_object (&ctx->device);
+    g_clear_object (&ctx->data);
+    g_slice_free (ResetContext, ctx);
+}
+
+gboolean
+mm_port_qmi_reset_finish (MMPortQmi     *self,
+                          GAsyncResult  *res,
+                          GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+internal_reset_ready (MMPortQmi    *self,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!internal_reset_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+reset_device_new_ready (GObject      *source,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    MMPortQmi    *self;
+    ResetContext *ctx;
+    GError       *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    ctx->device = qmi_device_new_finish (res, &error);
+    if (!ctx->device) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    internal_reset (self,
+                    ctx->data,
+                    ctx->device,
+                    (GAsyncReadyCallback) internal_reset_ready,
+                    task);
+}
+
+void
+mm_port_qmi_reset (MMPortQmi           *self,
+                   MMPort              *data,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
+{
+    GTask            *task;
+    ResetContext     *ctx;
+    g_autoptr(GFile)  file = NULL;
+    g_autofree gchar *fullpath = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->qmi_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Port is already open");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (ResetContext);
+    ctx->data = g_object_ref (data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) reset_context_free);
+
+    fullpath = g_strdup_printf ("/dev/%s", mm_port_get_device (MM_PORT (self)));
+    file = g_file_new_for_path (fullpath);
+
+    qmi_device_new (file, NULL,
+                    (GAsyncReadyCallback) reset_device_new_ready,
+                    task);
 }
 
 /*****************************************************************************/

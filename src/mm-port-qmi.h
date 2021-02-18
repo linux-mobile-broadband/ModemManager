@@ -112,4 +112,12 @@ gboolean mm_port_qmi_setup_data_format_finish (MMPortQmi                      *s
                                                GAsyncResult                   *res,
                                                GError                        **error);
 
+void     mm_port_qmi_reset        (MMPortQmi            *self,
+                                   MMPort               *data,
+                                   GAsyncReadyCallback   callback,
+                                   gpointer              user_data);
+gboolean mm_port_qmi_reset_finish (MMPortQmi            *self,
+                                   GAsyncResult         *res,
+                                   GError              **error);
+
 #endif /* MM_PORT_QMI_H */
