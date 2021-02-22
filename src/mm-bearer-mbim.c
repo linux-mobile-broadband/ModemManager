@@ -223,7 +223,8 @@ typedef struct {
     MMBearerProperties *properties;
     ConnectStep step;
     MMPort *data;
-    MbimContextIpType ip_type;
+    MbimContextIpType requested_ip_type;
+    MbimContextIpType activated_ip_type;
     MMBearerConnectResult *connect_result;
 } ConnectContext;
 
@@ -396,9 +397,11 @@ ip_configuration_query_ready (MbimDevice *device,
         /* Build connection results */
 
         /* Build IPv4 config */
-        if (ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4 ||
-            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
-            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+        if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4 ||
+            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
+            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+            gboolean address_set = FALSE;
+
             ipv4_config = mm_bearer_ip_config_new ();
 
             /* We assume that if we have an IP we can use static configuration.
@@ -416,6 +419,7 @@ ip_configuration_query_ready (MbimDevice *device,
                 mm_bearer_ip_config_set_address (ipv4_config, str);
                 g_free (str);
                 g_object_unref (addr);
+                address_set = TRUE;
 
                 /* Netmask */
                 mm_bearer_ip_config_set_prefix (ipv4_config, ipv4address[0]->on_link_prefix_length);
@@ -451,13 +455,23 @@ ip_configuration_query_ready (MbimDevice *device,
             /* MTU */
             if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU)
                 mm_bearer_ip_config_set_mtu (ipv4_config, ipv4mtu);
+
+            /* We requested IPv4, but it wasn't reported as activated. If there is no IP address
+             * provided by the modem, we assume the IPv4 bearer wasn't truly activated */
+            if (!address_set &&
+                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4 &&
+                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4V6 &&
+                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+                mm_obj_dbg (self, "IPv4 requested but no IPv4 activated and no IPv4 address set: ignoring");
+                g_clear_object (&ipv4_config);
+            }
         } else
             ipv4_config = NULL;
 
         /* Build IPv6 config */
-        if (ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
-            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
-            ctx->ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+        if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
+            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4V6 ||
+            ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
             gboolean address_set = FALSE;
             gboolean gateway_set = FALSE;
             gboolean dns_set = FALSE;
@@ -528,6 +542,16 @@ ip_configuration_query_ready (MbimDevice *device,
                 mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_STATIC);
             else
                 mm_bearer_ip_config_set_method (ipv6_config, MM_BEARER_IP_METHOD_DHCP);
+
+            /* We requested IPv6, but it wasn't reported as activated. If there is no IPv6 address
+             * provided by the modem, we assume the IPv6 bearer wasn't truly activated */
+            if (!address_set &&
+                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV6 &&
+                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4V6 &&
+                ctx->activated_ip_type != MBIM_CONTEXT_IP_TYPE_IPV4_AND_IPV6) {
+                mm_obj_dbg (self, "IPv6 requested but no IPv6 activated and no IPv6 address set: ignoring");
+                g_clear_object (&ipv6_config);
+            }
         } else
             ipv6_config = NULL;
 
@@ -570,7 +594,6 @@ connect_set_ready (MbimDevice *device,
     GError *error = NULL;
     MbimMessage *response;
     guint32 session_id;
-    MbimContextIpType ip_type;
     MbimActivationState activation_state;
     guint32 nw_error;
 
@@ -588,16 +611,16 @@ connect_set_ready (MbimDevice *device,
                 &session_id,
                 &activation_state,
                 NULL, /* voice_call_state */
-                &ip_type,
+                &ctx->activated_ip_type,
                 NULL, /* context_type */
                 &nw_error,
                 &inner_error)) {
             /* Report the IP type we asked for and the one returned by the modem */
-            mm_obj_dbg (self, "session ID '%u': %s (requested IP type: %s, received IP type: %s, nw error: %s)",
+            mm_obj_dbg (self, "session ID '%u': %s (requested IP type: %s, activated IP type: %s, nw error: %s)",
                         session_id,
                         mbim_activation_state_get_string (activation_state),
-                        mbim_context_ip_type_get_string (ctx->ip_type),
-                        mbim_context_ip_type_get_string (ip_type),
+                        mbim_context_ip_type_get_string (ctx->requested_ip_type),
+                        mbim_context_ip_type_get_string (ctx->activated_ip_type),
                         nw_error ? mbim_nw_error_get_string (nw_error) : "none");
             /* If the response reports an ACTIVATED state, we're good even if
              * there is a nw_error set (e.g. asking for IPv4v6 may return a
@@ -613,11 +636,6 @@ connect_set_ready (MbimDevice *device,
                                          "Unknown error: context activation failed");
                 }
             }
-            /* We're now connected, but we may have received an IP type different to the one
-             * requested (e.g. asking for IPv4v6 but received IPv4 only). Handle that, so that
-             * the next step getting IP details doesn't get confused. */
-            else if (ctx->ip_type != ip_type)
-                ctx->ip_type = ip_type;
         } else {
             /* Prefer the error from the result to the parsing error */
             if (!error)
@@ -995,14 +1013,15 @@ connect_context_step (GTask *task)
             g_free (str);
         }
 
-        ctx->ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_family, &error);
+        ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_family, &error);
         if (error) {
             g_task_return_error (task, error);
             g_object_unref (task);
             return;
         }
 
-        mm_obj_dbg (self, "launching %s connection with APN '%s'...", mbim_context_ip_type_get_string (ctx->ip_type), apn);
+        mm_obj_dbg (self, "launching %s connection with APN '%s'...",
+                    mbim_context_ip_type_get_string (ctx->requested_ip_type), apn);
         message = (mbim_message_connect_set_new (
                        self->priv->session_id,
                        MBIM_ACTIVATION_COMMAND_ACTIVATE,
@@ -1011,7 +1030,7 @@ connect_context_step (GTask *task)
                        password ? password : "",
                        MBIM_COMPRESSION_NONE,
                        auth,
-                       ctx->ip_type,
+                       ctx->requested_ip_type,
                        mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
                        &error));
         if (!message) {
@@ -1138,6 +1157,8 @@ _connect (MMBaseBearer *self,
     ctx->device = g_object_ref (device);;
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_STEP_FIRST;
+    ctx->requested_ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
+    ctx->activated_ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
 
     g_object_get (self,
                   MM_BASE_BEARER_CONFIG, &ctx->properties,
