@@ -115,6 +115,25 @@ gboolean mm_port_qmi_setup_data_format_finish (MMPortQmi                      *s
                                                GAsyncResult                   *res,
                                                GError                        **error);
 
+void   mm_port_qmi_setup_link        (MMPortQmi             *self,
+                                      MMPort                *data,
+                                      const gchar           *link_prefix_hint,
+                                      GAsyncReadyCallback    callback,
+                                      gpointer               user_data);
+gchar *mm_port_qmi_setup_link_finish (MMPortQmi             *self,
+                                      GAsyncResult          *res,
+                                      guint                 *mux_id,
+                                      GError               **error);
+
+void   mm_port_qmi_cleanup_link          (MMPortQmi            *self,
+                                          const gchar          *link_name,
+                                          guint                 mux_id,
+                                          GAsyncReadyCallback   callback,
+                                          gpointer              user_data);
+gboolean mm_port_qmi_cleanup_link_finish (MMPortQmi            *self,
+                                          GAsyncResult         *res,
+                                          GError              **error);
+
 void     mm_port_qmi_reset        (MMPortQmi            *self,
                                    MMPort               *data,
                                    GAsyncReadyCallback   callback,

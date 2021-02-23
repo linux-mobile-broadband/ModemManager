@@ -26,6 +26,8 @@
 #include "mm-modem-helpers-qmi.h"
 #include "mm-log-object.h"
 
+#define DEFAULT_LINK_PREALLOCATED_AMOUNT 4
+
 G_DEFINE_TYPE (MMPortQmi, mm_port_qmi, MM_TYPE_PORT)
 
 typedef struct {
@@ -48,6 +50,10 @@ struct _MMPortQmiPrivate {
     gboolean                      wda_unsupported;
     QmiWdaLinkLayerProtocol       llp;
     QmiWdaDataAggregationProtocol dap;
+    /* preallocated links */
+    MMPort   *preallocated_links_master;
+    GArray   *preallocated_links;
+    GList    *preallocated_links_setup_pending;
 };
 
 /*****************************************************************************/
@@ -272,6 +278,454 @@ mm_port_qmi_allocate_client (MMPortQmi *self,
                                 cancellable,
                                 (GAsyncReadyCallback)allocate_client_ready,
                                 task);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    gchar    *link_name;
+    guint     mux_id;
+    gboolean  setup;
+} PreallocatedLinkInfo;
+
+static void
+preallocated_link_info_clear (PreallocatedLinkInfo *info)
+{
+    g_free (info->link_name);
+}
+
+static void
+delete_preallocated_links (QmiDevice *qmi_device,
+                           GArray    *preallocated_links)
+{
+    guint i;
+
+    /* This link deletion cleanup may fail if the master interface is up
+     * (a limitation of qmi_wwan in some kernel versions). It's just a minor
+     * inconvenience really, if MM restarts they'll be all removed during
+     * initialization anyway */
+
+    for (i = 0; i < preallocated_links->len; i++) {
+        PreallocatedLinkInfo *info;
+
+        info = &g_array_index (preallocated_links, PreallocatedLinkInfo, i);
+        qmi_device_delete_link (qmi_device, info->link_name, info->mux_id,
+                                NULL, NULL, NULL);
+    }
+}
+
+static gboolean
+release_preallocated_link (MMPortQmi    *self,
+                           const gchar  *link_name,
+                           guint         mux_id,
+                           GError     **error)
+{
+    guint i;
+
+    for (i = 0; self->priv->preallocated_links && (i < self->priv->preallocated_links->len); i++) {
+        PreallocatedLinkInfo *info;
+
+        info = &g_array_index (self->priv->preallocated_links, PreallocatedLinkInfo, i);
+        if (!info->setup || (g_strcmp0 (info->link_name, link_name) != 0) || (info->mux_id != mux_id))
+            continue;
+
+        info->setup = FALSE;
+        return TRUE;
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "No preallocated link found to release");
+    return FALSE;
+}
+
+static gboolean
+acquire_preallocated_link (MMPortQmi  *self,
+                           MMPort     *master,
+                           gchar     **link_name,
+                           guint      *mux_id,
+                           GError    **error)
+{
+    guint i;
+
+    if (!self->priv->qmi_device) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                     "port is closed");
+        return FALSE;
+    }
+
+    if (!self->priv->preallocated_links || !self->priv->preallocated_links_master) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No preallocated links available");
+        return FALSE;
+    }
+
+    if ((master != self->priv->preallocated_links_master) &&
+        (g_strcmp0 (mm_port_get_device (master), mm_port_get_device (self->priv->preallocated_links_master)) != 0)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Preallocated links available in 'net/%s', not in 'net/%s'",
+                     mm_port_get_device (self->priv->preallocated_links_master),
+                     mm_port_get_device (master));
+        return FALSE;
+    }
+
+    for (i = 0; i < self->priv->preallocated_links->len; i++) {
+        PreallocatedLinkInfo *info;
+
+        info = &g_array_index (self->priv->preallocated_links, PreallocatedLinkInfo, i);
+        if (info->setup)
+            continue;
+
+        info->setup = TRUE;
+        *link_name = g_strdup (info->link_name);
+        *mux_id = info->mux_id;
+        return TRUE;
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "No more preallocated links available");
+    return FALSE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    QmiDevice *qmi_device;
+    MMPort    *data;
+    GArray    *preallocated_links;
+} InitializePreallocatedLinksContext;
+
+static void
+initialize_preallocated_links_context_free (InitializePreallocatedLinksContext *ctx)
+{
+    if (ctx->preallocated_links) {
+        delete_preallocated_links (ctx->qmi_device, ctx->preallocated_links);
+        g_array_unref (ctx->preallocated_links);
+    }
+    g_object_unref (ctx->qmi_device);
+    g_object_unref (ctx->data);
+    g_slice_free (InitializePreallocatedLinksContext, ctx);
+}
+
+static GArray *
+initialize_preallocated_links_finish (MMPortQmi     *self,
+                                      GAsyncResult  *res,
+                                      GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void initialize_preallocated_links_next (GTask *task);
+
+static void
+device_add_link_preallocated_ready (QmiDevice     *device,
+                                    GAsyncResult  *res,
+                                    GTask         *task)
+{
+    InitializePreallocatedLinksContext *ctx;
+    GError                             *error = NULL;
+    PreallocatedLinkInfo                info = { NULL, 0, FALSE };
+
+    ctx = g_task_get_task_data (task);
+
+    info.link_name = qmi_device_add_link_finish (device, res, &info.mux_id, &error);
+    if (!info.link_name) {
+        g_prefix_error (&error, "failed to add preallocated link (%u/%u) for device: ",
+                        ctx->preallocated_links->len + 1, DEFAULT_LINK_PREALLOCATED_AMOUNT);
+        g_task_return_error (task, error);
+        return;
+    }
+
+    g_array_append_val (ctx->preallocated_links, info);
+    initialize_preallocated_links_next (task);
+}
+
+static void
+initialize_preallocated_links_next (GTask *task)
+{
+    MMPortQmi                          *self;
+    InitializePreallocatedLinksContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    /* if we were closed while allocating, bad thing, abort */
+    if (!self->priv->qmi_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED, "port is closed");
+        g_object_unref (task);
+        return;
+    }
+
+    if (ctx->preallocated_links->len == DEFAULT_LINK_PREALLOCATED_AMOUNT) {
+        g_task_return_pointer (task, g_steal_pointer (&ctx->preallocated_links), (GDestroyNotify)g_array_unref);
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_device_add_link (self->priv->qmi_device,
+                         ctx->preallocated_links->len + 1,
+                         mm_kernel_device_get_name (mm_port_peek_kernel_device (ctx->data)),
+                         "ignored", /* n/a in qmi_wwan add_mux */
+                         NULL,
+                         (GAsyncReadyCallback) device_add_link_preallocated_ready,
+                         task);
+}
+
+static void
+initialize_preallocated_links (MMPortQmi           *self,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
+{
+    InitializePreallocatedLinksContext *ctx;
+    GTask                              *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (InitializePreallocatedLinksContext);
+    ctx->qmi_device = g_object_ref (self->priv->qmi_device);
+    ctx->data = g_object_ref (self->priv->preallocated_links_master);
+    ctx->preallocated_links = g_array_sized_new (FALSE, FALSE, sizeof (PreallocatedLinkInfo), DEFAULT_LINK_PREALLOCATED_AMOUNT);
+    g_array_set_clear_func (ctx->preallocated_links, (GDestroyNotify)preallocated_link_info_clear);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)initialize_preallocated_links_context_free);
+
+    initialize_preallocated_links_next (task);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MMPort *master;
+    gchar  *link_name;
+    guint   mux_id;
+} SetupLinkContext;
+
+static void
+setup_link_context_free (SetupLinkContext *ctx)
+{
+    g_free (ctx->link_name);
+    g_clear_object (&ctx->master);
+    g_slice_free (SetupLinkContext, ctx);
+}
+
+gchar *
+mm_port_qmi_setup_link_finish (MMPortQmi     *self,
+                               GAsyncResult  *res,
+                               guint         *mux_id,
+                               GError       **error)
+{
+    SetupLinkContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return NULL;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+    if (mux_id)
+        *mux_id = ctx->mux_id;
+    return g_steal_pointer (&ctx->link_name);
+}
+
+static void
+device_add_link_ready (QmiDevice    *device,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    SetupLinkContext *ctx;
+    GError           *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->link_name = qmi_device_add_link_finish (device, res, &ctx->mux_id, &error);
+    if (!ctx->link_name) {
+        g_prefix_error (&error, "failed to add link for device: ");
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+setup_preallocated_link (GTask *task)
+{
+    MMPortQmi        *self;
+    SetupLinkContext *ctx;
+    GError           *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (!acquire_preallocated_link (self, ctx->master, &ctx->link_name, &ctx->mux_id, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+initialize_preallocated_links_ready (MMPortQmi    *self,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    g_autoptr(GError) error = NULL;
+
+    g_assert (!self->priv->preallocated_links);
+    self->priv->preallocated_links = initialize_preallocated_links_finish (self, res, &error);
+    if (!self->priv->preallocated_links) {
+        /* We need to fail this task and all the additional tasks also pending */
+        g_task_return_error (task, g_error_copy (error));
+        g_object_unref (task);
+        while (self->priv->preallocated_links_setup_pending) {
+            g_task_return_error (self->priv->preallocated_links_setup_pending->data, g_error_copy (error));
+            g_object_unref (self->priv->preallocated_links_setup_pending->data);
+            self->priv->preallocated_links_setup_pending = g_list_delete_link (self->priv->preallocated_links_setup_pending,
+                                                                               self->priv->preallocated_links_setup_pending);
+        }
+        /* and reset back the master, because we're not really initialized */
+        g_clear_object (&self->priv->preallocated_links_master);
+        return;
+    }
+
+    /* Now we know preallocated links are available, complete our task and all the pending ones */
+    setup_preallocated_link (task);
+    while (self->priv->preallocated_links_setup_pending) {
+        setup_preallocated_link (self->priv->preallocated_links_setup_pending->data);
+        self->priv->preallocated_links_setup_pending = g_list_delete_link (self->priv->preallocated_links_setup_pending,
+                                                                           self->priv->preallocated_links_setup_pending);
+    }
+}
+
+void
+mm_port_qmi_setup_link (MMPortQmi           *self,
+                        MMPort              *data,
+                        const gchar         *link_prefix_hint,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    SetupLinkContext *ctx;
+    GTask            *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->qmi_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Port is not open");
+        g_object_unref (task);
+        return;
+    }
+
+    if ((self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) &&
+        (self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Aggregation not enabled");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (SetupLinkContext);
+    ctx->master = g_object_ref (data);
+    ctx->mux_id = QMI_DEVICE_MUX_ID_UNBOUND;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) setup_link_context_free);
+
+    /* For all drivers except for qmi_wwan, or when qmi_wwan is setup with
+     * qmap-pass-through, just try to add link in the QmiDevice */
+    if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
+        self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) {
+        qmi_device_add_link (self->priv->qmi_device,
+                             QMI_DEVICE_MUX_ID_AUTOMATIC,
+                             mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
+                             link_prefix_hint,
+                             NULL,
+                             (GAsyncReadyCallback) device_add_link_ready,
+                             task);
+        return;
+    }
+
+    /* For qmi_wwan, use preallocated links */
+    if (self->priv->preallocated_links) {
+        setup_preallocated_link (task);
+        return;
+    }
+
+    /* We must make sure we don't run this procedure in parallel (e.g. if multiple
+     * connection attempts reach at the same time), so if we're told the preallocated
+     * links are already being initialized (master is set) but the array didn't exist,
+     * queue our task for completion once we're fully initialized */
+    if (self->priv->preallocated_links_master) {
+        self->priv->preallocated_links_setup_pending = g_list_append (self->priv->preallocated_links_setup_pending, task);
+        return;
+    }
+
+    /* Store master to flag that we're initializing preallocated links */
+    self->priv->preallocated_links_master = g_object_ref (data);
+    initialize_preallocated_links (self,
+                                   (GAsyncReadyCallback) initialize_preallocated_links_ready,
+                                   task);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_port_qmi_cleanup_link_finish (MMPortQmi     *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+device_delete_link_ready (QmiDevice    *device,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!qmi_device_delete_link_finish (device, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_port_qmi_cleanup_link (MMPortQmi           *self,
+                          const gchar         *link_name,
+                          guint                mux_id,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+    GTask  *task;
+    GError *error = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->qmi_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Port is not open");
+        g_object_unref (task);
+        return;
+    }
+
+    if ((self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) &&
+        (self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Aggregation not enabled");
+        g_object_unref (task);
+        return;
+    }
+
+    /* For all drivers except for qmi_wwan, or when qmi_wwan is setup with
+     * qmap-pass-through, just try to delete link in the QmiDevice */
+    if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
+        self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) {
+        qmi_device_delete_link (self->priv->qmi_device,
+                                link_name,
+                                mux_id,
+                                NULL,
+                                (GAsyncReadyCallback) device_delete_link_ready,
+                                task);
+        return;
+    }
+
+    /* For qmi_wwan, use preallocated links */
+    if (!release_preallocated_link (self, link_name, mux_id, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -1724,6 +2178,13 @@ mm_port_qmi_close (MMPortQmi           *self,
     g_list_free_full (self->priv->services, g_free);
     self->priv->services = NULL;
 
+    /* Cleanup preallocated links, if any */
+    if (self->priv->preallocated_links) {
+        delete_preallocated_links (ctx->qmi_device, self->priv->preallocated_links);
+        g_clear_pointer (&self->priv->preallocated_links, g_array_unref);
+    }
+    g_clear_object (&self->priv->preallocated_links_master);
+
     qmi_device_close_async (ctx->qmi_device,
                             5,
                             NULL,
@@ -1780,6 +2241,12 @@ dispose (GObject *object)
     }
     g_list_free_full (self->priv->services, g_free);
     self->priv->services = NULL;
+
+    /* Cleanup preallocated links, if any */
+    if (self->priv->preallocated_links && self->priv->qmi_device)
+        delete_preallocated_links (self->priv->qmi_device, self->priv->preallocated_links);
+    g_clear_pointer (&self->priv->preallocated_links, g_array_unref);
+    g_clear_object (&self->priv->preallocated_links_master);
 
     /* Clear device object */
     g_clear_object (&self->priv->qmi_device);
