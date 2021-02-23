@@ -56,6 +56,8 @@ struct _MMBearerQmiPrivate {
     guint event_report_ipv6_indication_id;
 
     MMPort *data;
+    MMPort *link;
+    guint   mux_id;
     guint32 packet_data_handle_ipv4;
     guint32 packet_data_handle_ipv6;
 };
@@ -313,10 +315,15 @@ connection_status_context_step (GTask *task)
     switch (ctx->step) {
         case CONNECTION_STATUS_CONTEXT_STEP_FIRST:
             /* Connection status polling is an optional feature that must be
-             * enabled explicitly via udev tags. If not set, out as unsupported */
-            if (self->priv->data &&
-                !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (self->priv->data),
-                                                                  "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) {
+             * enabled explicitly via udev tags. If not set, out as unsupported.
+             * Note that when connected via a muxed link, the udev tag should be
+             * checked on the master interface (lower device) */
+            if ((self->priv->data &&
+                 !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (self->priv->data),
+                                                                   "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) ||
+                (self->priv->link &&
+                 !mm_kernel_device_get_global_property_as_boolean (mm_kernel_device_peek_lower_device (mm_port_peek_kernel_device (self->priv->link)),
+                                                                   "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE"))) {
                 g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                          "Connection status polling not required");
                 g_object_unref (task);
@@ -388,6 +395,8 @@ load_connection_status (MMBaseBearer        *self,
 /*****************************************************************************/
 /* Connect */
 
+#define WAIT_LINK_PORT_TIMEOUT_MS 2500
+
 static void common_setup_cleanup_packet_service_status_unsolicited_events (MMBearerQmi *self,
                                                                            QmiClientWds *client,
                                                                            gboolean enable,
@@ -407,6 +416,7 @@ typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_OPEN_QMI_PORT,
     CONNECT_STEP_SETUP_DATA_FORMAT,
+    CONNECT_STEP_SETUP_LINK,
     CONNECT_STEP_IP_METHOD,
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
@@ -431,12 +441,19 @@ typedef struct {
     MMPort *data;
     MMPortQmi *qmi;
     QmiSioPort sio_port;
+    MMBearerMultiplexSupport multiplex;
     gboolean explicit_qmi_open;
     gchar *user;
     gchar *password;
     gchar *apn;
     QmiWdsAuthentication auth;
     gboolean no_ip_family_preference;
+
+    QmiWdaDataAggregationProtocol  dap;
+    guint                          mux_id;
+    gchar                         *link_prefix_hint;
+    gchar                         *link_name;
+    MMPort                        *link;
 
     MMBearerIpMethod ip_method;
 
@@ -510,6 +527,13 @@ connect_context_free (ConnectContext *ctx)
         g_clear_object (&ctx->client_ipv6);
     }
 
+    if (ctx->link_name) {
+        mm_port_qmi_cleanup_link (ctx->qmi, ctx->link_name, ctx->mux_id, NULL, NULL);
+        g_free (ctx->link_name);
+    }
+    g_clear_object (&ctx->link);
+    g_free (ctx->link_prefix_hint);
+
     if (ctx->explicit_qmi_open)
         mm_port_qmi_close (ctx->qmi, NULL, NULL);
 
@@ -517,7 +541,8 @@ connect_context_free (ConnectContext *ctx)
     g_clear_error (&ctx->error_ipv6);
     g_clear_object (&ctx->ipv4_config);
     g_clear_object (&ctx->ipv6_config);
-    g_object_unref (ctx->data);
+
+    g_clear_object (&ctx->data);
     g_object_unref (ctx->qmi);
     g_object_unref (ctx->self);
     g_slice_free (ConnectContext, ctx);
@@ -1019,6 +1044,32 @@ bind_data_port_ready (QmiClientWds *client,
 }
 
 static void
+bind_mux_data_port_ready (QmiClientWds *client,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    ConnectContext                                *ctx;
+    GError                                        *error = NULL;
+    g_autoptr(QmiMessageWdsBindMuxDataPortOutput)  output = NULL;
+
+    ctx  = g_task_get_task_data (task);
+
+    g_assert (ctx->running_ipv4 || ctx->running_ipv6);
+    g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
+
+    output = qmi_client_wds_bind_mux_data_port_finish (client, res, &error);
+    if (!output || !qmi_message_wds_bind_mux_data_port_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't bind mux data port: ");
+        complete_connect (task, NULL, error);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static void
 set_ip_family_ready (QmiClientWds *client,
                      GAsyncResult *res,
                      GTask *task)
@@ -1285,6 +1336,64 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
 }
 
 static void
+wait_link_port_ready (MMBaseModem  *modem,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    ConnectContext *ctx;
+    GError         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->link = mm_base_modem_wait_link_port_finish (modem, res, &error);
+    if (!ctx->link) {
+        complete_connect (task, NULL, error);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static void
+setup_link_ready (MMPortQmi     *qmi,
+                  GAsyncResult  *res,
+                  GTask         *task)
+{
+    ConnectContext         *ctx;
+    GError                 *error = NULL;
+    g_autoptr(MMBaseModem)  modem  = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->link_name = mm_port_qmi_setup_link_finish (qmi, res, &ctx->mux_id, &error);
+    if (!ctx->link_name) {
+        g_prefix_error (&error, "failed to create net link for device: ");
+        complete_connect (task, NULL, error);
+        return;
+    }
+
+    /* From now on link_name will be set, and we'll use that to know
+     * whether we should cleanup the link upon a connection failure */
+    mm_obj_info (ctx->self, "net link %s created (mux id %u)", ctx->link_name, ctx->mux_id);
+
+    /* Wait for the data port with the given interface name, which will be
+     * added asynchronously */
+    g_object_get (ctx->self,
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+    g_assert (modem);
+
+    mm_base_modem_wait_link_port (modem,
+                                  "net",
+                                  ctx->link_name,
+                                  WAIT_LINK_PORT_TIMEOUT_MS,
+                                  (GAsyncReadyCallback) wait_link_port_ready,
+                                  task);
+}
+
+static void
 setup_data_format_ready (MMPortQmi    *qmi,
                          GAsyncResult *res,
                          GTask        *task)
@@ -1296,11 +1405,30 @@ setup_data_format_ready (MMPortQmi    *qmi,
 
     if (!mm_port_qmi_setup_data_format_finish (qmi, res, &error)) {
         /* a failure here could indicate no support for WDA Set Data Format,
-         * if so, just go on with the plain CTL based support */
+         * if so, just go on with the plain CTL based support (and data aggregation
+         * protocol disabled) */
         if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
             complete_connect (task, NULL, g_steal_pointer (&error));
             return;
         }
+        ctx->dap = QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED;
+    } else
+        ctx->dap = mm_port_qmi_get_data_aggregation_protocol (ctx->qmi);
+
+    if ((ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) &&
+        (ctx->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED)) {
+        complete_connect (task, NULL,
+                          g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                       "Cannot enable multiplex support"));
+        return;
+    }
+
+    if ((ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_NONE) &&
+        (ctx->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED)) {
+        complete_connect (task, NULL,
+                          g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                       "Cannot disable multiplex support"));
+        return;
     }
 
     /* Keep on */
@@ -1384,13 +1512,44 @@ connect_context_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case CONNECT_STEP_SETUP_DATA_FORMAT:
+    case CONNECT_STEP_SETUP_DATA_FORMAT: {
+        MMPortQmiSetupDataFormatAction action;
+
+        switch (ctx->multiplex) {
+            case MM_BEARER_MULTIPLEX_SUPPORT_NONE:
+                action = MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT;
+                break;
+            case MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED:
+            case MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED:
+                action = MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_MULTIPLEX;
+                break;
+            case MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN:
+            default:
+                g_assert_not_reached ();
+        }
         mm_port_qmi_setup_data_format (ctx->qmi,
                                        ctx->data,
-                                       MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT,
+                                       action,
                                        (GAsyncReadyCallback) setup_data_format_ready,
                                        task);
         return;
+    }
+
+    case CONNECT_STEP_SETUP_LINK:
+
+        /* if muxing has been enabled in the port, we need to create a new link
+         * interface. */
+        if (ctx->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
+            ctx->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP) {
+            mm_port_qmi_setup_link (ctx->qmi,
+                                    ctx->data,
+                                    ctx->link_prefix_hint,
+                                    (GAsyncReadyCallback) setup_link_ready,
+                                    task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
 
     case CONNECT_STEP_IP_METHOD:
         /* Once the QMI port is open, we decide the IP method we're going
@@ -1477,6 +1636,28 @@ connect_context_step (GTask *task)
                                            g_task_get_cancellable (task),
                                            (GAsyncReadyCallback)bind_data_port_ready,
                                            task);
+            return;
+        }
+
+        /* If mux id given, bind mux data port */
+        if (ctx->mux_id != QMI_DEVICE_MUX_ID_UNBOUND) {
+            g_autoptr(QmiMessageWdsBindMuxDataPortInput) input = NULL;
+
+            mm_obj_dbg (self, "binding to mux id %d", ctx->mux_id);
+            input = qmi_message_wds_bind_mux_data_port_input_new ();
+            qmi_message_wds_bind_mux_data_port_input_set_endpoint_info (
+                input,
+                mm_port_qmi_get_endpoint_type (ctx->qmi),
+                mm_port_qmi_get_endpoint_interface_number (ctx->qmi),
+                NULL);
+            qmi_message_wds_bind_mux_data_port_input_set_mux_id (input, ctx->mux_id, NULL);
+
+            qmi_client_wds_bind_mux_data_port (ctx->client_ipv4,
+                                               input,
+                                               10,
+                                               g_task_get_cancellable (task),
+                                               (GAsyncReadyCallback)bind_mux_data_port_ready,
+                                               task);
             return;
         }
 
@@ -1591,6 +1772,28 @@ connect_context_step (GTask *task)
             return;
         }
 
+        /* If mux id given, bind mux data port */
+        if (ctx->mux_id != QMI_DEVICE_MUX_ID_UNBOUND) {
+            g_autoptr(QmiMessageWdsBindMuxDataPortInput) input = NULL;
+
+            mm_obj_dbg (self, "binding to mux id %d", ctx->mux_id);
+            input = qmi_message_wds_bind_mux_data_port_input_new ();
+            qmi_message_wds_bind_mux_data_port_input_set_endpoint_info (
+                input,
+                mm_port_qmi_get_endpoint_type (ctx->qmi),
+                mm_port_qmi_get_endpoint_interface_number (ctx->qmi),
+                NULL);
+            qmi_message_wds_bind_mux_data_port_input_set_mux_id (input, ctx->mux_id, NULL);
+
+            qmi_client_wds_bind_mux_data_port (ctx->client_ipv6,
+                                               input,
+                                               10,
+                                               g_task_get_cancellable (task),
+                                               (GAsyncReadyCallback)bind_mux_data_port_ready,
+                                               task);
+            return;
+        }
+
         ctx->step++;
         /* fall through */
 
@@ -1631,7 +1834,9 @@ connect_context_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case CONNECT_STEP_LAST:
+    case CONNECT_STEP_LAST: {
+        MMBearerConnectResult *connect_result;
+
         /* If one of IPv4 or IPv6 succeeds, we're connected */
         if (!ctx->packet_data_handle_ipv4 && !ctx->packet_data_handle_ipv6) {
             GError *error;
@@ -1650,7 +1855,7 @@ connect_context_step (GTask *task)
         }
 
         /* Port is connected; update the state */
-        mm_port_set_connected (MM_PORT (ctx->data), TRUE);
+        mm_port_set_connected (ctx->link ? ctx->link : ctx->data, TRUE);
 
         /* Keep connection related data */
 
@@ -1662,7 +1867,14 @@ connect_context_step (GTask *task)
         }
 
         g_assert (ctx->self->priv->data == NULL);
-        ctx->self->priv->data = g_object_ref (ctx->data);
+        ctx->self->priv->data = ctx->data ? g_object_ref (ctx->data) : NULL;
+        g_assert (ctx->self->priv->link == NULL);
+        ctx->self->priv->link = ctx->link ? g_object_ref (ctx->link) : NULL;
+        g_assert (ctx->self->priv->mux_id == QMI_DEVICE_MUX_ID_UNBOUND);
+        ctx->self->priv->mux_id = ctx->mux_id;
+
+        /* reset the link name to avoid cleaning up the link on context free */
+        g_clear_pointer (&ctx->link_name, g_free);
 
         g_assert (ctx->self->priv->packet_data_handle_ipv4 == 0);
         g_assert (ctx->self->priv->client_ipv4 == NULL);
@@ -1688,12 +1900,14 @@ connect_context_step (GTask *task)
             ctx->self->priv->client_ipv6 = g_object_ref (ctx->client_ipv6);
         }
 
-        complete_connect (task,
-                          mm_bearer_connect_result_new (ctx->data,
-                                                        ctx->ipv4_config,
-                                                        ctx->ipv6_config),
-                          NULL);
+        connect_result = mm_bearer_connect_result_new (ctx->link ? ctx->link : ctx->data,
+                                                       ctx->ipv4_config,
+                                                       ctx->ipv6_config);
+        mm_bearer_connect_result_set_multiplexed (connect_result, !!ctx->link);
+
+        complete_connect (task, connect_result, NULL);
         return;
+    }
 
     default:
         g_assert_not_reached ();
@@ -1724,14 +1938,6 @@ _connect (MMBaseBearer *_self,
     const gchar *apn;
     GTask *task;
     GCancellable *operation_cancellable = NULL;
-
-    if (mm_bearer_properties_get_multiplex (mm_base_bearer_peek_config (_self)) == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
-        g_task_report_new_error (
-            self, callback, user_data, _connect,
-            MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-            "Multiplex support not available");
-        goto out;
-    }
 
     g_object_get (self,
                   MM_BASE_BEARER_MODEM, &modem,
@@ -1793,17 +1999,18 @@ _connect (MMBaseBearer *_self,
         goto out;
     }
 
-    mm_obj_dbg (self, "launching connection with QMI port (%s) and data port (%s)",
-                mm_port_get_device (MM_PORT (qmi)),
-                mm_port_get_device (data));
-
     ctx = g_slice_new0 (ConnectContext);
     ctx->self = g_object_ref (self);
     ctx->qmi = g_object_ref (qmi);
     ctx->sio_port = sio_port;
+    ctx->dap = mm_port_qmi_get_data_aggregation_protocol (ctx->qmi);
+    ctx->mux_id = QMI_DEVICE_MUX_ID_UNBOUND;
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_STEP_FIRST;
     ctx->ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
+
+    /* If no multiplex setting given by the user, assume none */
+    ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;
 
     g_object_get (self,
                   MM_BASE_BEARER_CONFIG, &properties,
@@ -1815,8 +2022,9 @@ _connect (MMBaseBearer *_self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)connect_context_free);
 
     if (properties) {
-        MMBearerAllowedAuth auth;
-        MMBearerIpFamily ip_family;
+        MMBearerAllowedAuth      auth;
+        MMBearerIpFamily         ip_family;
+        MMBearerMultiplexSupport multiplex;
 
         ctx->apn = g_strdup (mm_bearer_properties_get_apn (properties));
         ctx->user = g_strdup (mm_bearer_properties_get_user (properties));
@@ -1883,6 +2091,16 @@ _connect (MMBaseBearer *_self,
             g_free (str);
             goto out;
         }
+
+        multiplex = mm_bearer_properties_get_multiplex (properties);
+        if (multiplex != MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN)
+            ctx->multiplex = multiplex;
+    }
+
+    if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
+        ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+        /* the link prefix hint given must be modem-specific */
+        ctx->link_prefix_hint = g_strdup_printf ("qmapmux%u.", mm_base_modem_get_dbus_id (MM_BASE_MODEM (modem)));
     }
 
     /* setup network cancellable */
@@ -1902,6 +2120,10 @@ _connect (MMBaseBearer *_self,
                            g_object_unref);
 
     /* Run! */
+    mm_obj_dbg (self, "launching connection with QMI port (%s) and data port (%s) (multiplex %s)",
+                mm_port_get_device (MM_PORT (qmi)),
+                mm_port_get_device (data),
+                mm_bearer_multiplex_support_get_string (ctx->multiplex));
     connect_context_step (task);
 
  out:
@@ -1958,6 +2180,18 @@ disconnect_finish (MMBaseBearer *self,
 }
 
 static void
+cleanup_link_ready (MMPortQmi    *qmi,
+                    GAsyncResult *res,
+                    MMBearerQmi  *self) /* full reference */
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_port_qmi_cleanup_link_finish (qmi, res, &error))
+        mm_obj_warn (self, "couldn't cleanup link: %s", error->message);
+    g_object_unref (self);
+}
+
+static void
 reset_bearer_connection (MMBearerQmi *self,
                          gboolean reset_ipv4,
                          gboolean reset_ipv6)
@@ -1995,6 +2229,24 @@ reset_bearer_connection (MMBearerQmi *self,
     }
 
     if (!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) {
+        if (self->priv->data) {
+            /* Port is disconnected; update the state */
+            mm_port_set_connected (self->priv->data, FALSE);
+            g_clear_object (&self->priv->data);
+        }
+        if (self->priv->link) {
+            g_assert (self->priv->qmi);
+            /* Link is disconnected; update the state */
+            mm_port_set_connected (self->priv->link, FALSE);
+            mm_port_qmi_cleanup_link (self->priv->qmi,
+                                      mm_port_get_device (self->priv->link),
+                                      self->priv->mux_id,
+                                      (GAsyncReadyCallback) cleanup_link_ready,
+                                      g_object_ref (self));
+            g_clear_object (&self->priv->link);
+        }
+        self->priv->mux_id = QMI_DEVICE_MUX_ID_UNBOUND;
+
         /* Close port if we had it explicitly open for this connection */
         if (self->priv->qmi) {
             if (self->priv->explicit_qmi_open) {
@@ -2002,11 +2254,6 @@ reset_bearer_connection (MMBearerQmi *self,
                 mm_port_qmi_close (self->priv->qmi, NULL, NULL);
             }
             g_clear_object (&self->priv->qmi);
-        }
-        if (self->priv->data) {
-            /* Port is disconnected; update the state */
-            mm_port_set_connected (self->priv->data, FALSE);
-            g_clear_object (&self->priv->data);
         }
     }
 }
@@ -2173,7 +2420,7 @@ disconnect (MMBaseBearer *_self,
 
     if ((!self->priv->packet_data_handle_ipv4 && !self->priv->packet_data_handle_ipv6) ||
         (!self->priv->client_ipv4 && !self->priv->client_ipv6) ||
-        !self->priv->data ||
+        (!self->priv->data && !self->priv->link) ||
         !self->priv->qmi) {
         mm_obj_dbg (self, "no need to disconnect: QMI bearer is already disconnected");
         g_task_return_boolean (task, TRUE);
@@ -2239,9 +2486,8 @@ static void
 mm_bearer_qmi_init (MMBearerQmi *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_BEARER_QMI,
-                                              MMBearerQmiPrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BEARER_QMI, MMBearerQmiPrivate);
+    self->priv->mux_id = QMI_DEVICE_MUX_ID_UNBOUND;
 }
 
 static void
