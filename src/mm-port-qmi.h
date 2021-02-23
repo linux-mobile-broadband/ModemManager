@@ -94,6 +94,9 @@ QmiClient *mm_port_qmi_get_client  (MMPortQmi *self,
 
 QmiDevice *mm_port_qmi_peek_device (MMPortQmi *self);
 
+QmiDataEndpointType mm_port_qmi_get_endpoint_type             (MMPortQmi *self);
+guint               mm_port_qmi_get_endpoint_interface_number (MMPortQmi *self);
+
 gboolean mm_port_qmi_llp_is_raw_ip (MMPortQmi *self);
 
 #endif /* MM_PORT_QMI_H */

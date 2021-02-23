@@ -1539,6 +1539,27 @@ mm_bearer_ip_family_to_qmi_pdp_type (MMBearerIpFamily  ip_family,
 }
 
 /*****************************************************************************/
+/* QMI/WDA to MM translations */
+
+QmiDataEndpointType
+mm_port_subsys_to_qmi_endpoint_type (MMPortSubsys subsys)
+{
+    switch (subsys) {
+        case MM_PORT_SUBSYS_USBMISC:
+            return QMI_DATA_ENDPOINT_TYPE_HSUSB;
+        case MM_PORT_SUBSYS_RPMSG:
+            return QMI_DATA_ENDPOINT_TYPE_EMBEDDED;
+        case MM_PORT_SUBSYS_UNKNOWN:
+        case MM_PORT_SUBSYS_TTY:
+        case MM_PORT_SUBSYS_NET:
+        case MM_PORT_SUBSYS_UNIX:
+        default:
+            g_assert_not_reached ();
+            break;
+    }
+}
+
+/*****************************************************************************/
 
 /**
  * The only case where we need to apply some logic to decide what the current

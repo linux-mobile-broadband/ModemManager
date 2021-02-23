@@ -22,6 +22,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-port-qmi.h"
+#include "mm-modem-helpers-qmi.h"
 #include "mm-log-object.h"
 
 G_DEFINE_TYPE (MMPortQmi, mm_port_qmi, MM_TYPE_PORT)
@@ -33,10 +34,14 @@ typedef struct {
 } ServiceInfo;
 
 struct _MMPortQmiPrivate {
-    gboolean in_progress;
+    gboolean   in_progress;
     QmiDevice *qmi_device;
-    GList *services;
-    gboolean llp_is_raw_ip;
+    GList     *services;
+    gboolean   llp_is_raw_ip;
+    /* endpoint info */
+    gulong              endpoint_info_signal_id;
+    QmiDataEndpointType endpoint_type;
+    gint                endpoint_interface_number;
 };
 
 /*****************************************************************************/
@@ -94,6 +99,55 @@ mm_port_qmi_peek_device (MMPortQmi *self)
     g_return_val_if_fail (MM_IS_PORT_QMI (self), NULL);
 
     return self->priv->qmi_device;
+}
+
+/*****************************************************************************/
+
+static void
+initialize_endpoint_info (MMPortQmi *self)
+{
+    MMKernelDevice *kernel_device;
+
+    kernel_device = mm_port_peek_kernel_device (MM_PORT (self));
+
+    if (!kernel_device)
+        self->priv->endpoint_type = QMI_DATA_ENDPOINT_TYPE_UNDEFINED;
+    else
+        self->priv->endpoint_type = mm_port_subsys_to_qmi_endpoint_type (mm_port_get_subsys (MM_PORT (self)));
+
+    switch (self->priv->endpoint_type) {
+        case QMI_DATA_ENDPOINT_TYPE_HSUSB:
+            g_assert (kernel_device);
+            self->priv->endpoint_interface_number = mm_kernel_device_get_interface_number (kernel_device);
+            break;
+        case QMI_DATA_ENDPOINT_TYPE_EMBEDDED:
+            self->priv->endpoint_interface_number = 1;
+            break;
+        case QMI_DATA_ENDPOINT_TYPE_PCIE:
+        case QMI_DATA_ENDPOINT_TYPE_UNDEFINED:
+        case QMI_DATA_ENDPOINT_TYPE_HSIC:
+        case QMI_DATA_ENDPOINT_TYPE_BAM_DMUX:
+        case QMI_DATA_ENDPOINT_TYPE_UNKNOWN:
+        default:
+            self->priv->endpoint_interface_number = 0;
+            break;
+    }
+
+    mm_obj_dbg (self, "endpoint info updated: type '%s', interface number '%u'",
+                qmi_data_endpoint_type_get_string (self->priv->endpoint_type),
+                self->priv->endpoint_interface_number);
+}
+
+QmiDataEndpointType
+mm_port_qmi_get_endpoint_type (MMPortQmi *self)
+{
+    return self->priv->endpoint_type;
+}
+
+guint
+mm_port_qmi_get_endpoint_interface_number (MMPortQmi *self)
+{
+    return self->priv->endpoint_interface_number;
 }
 
 /*****************************************************************************/
@@ -859,11 +913,21 @@ MMPortQmi *
 mm_port_qmi_new (const gchar  *name,
                  MMPortSubsys  subsys)
 {
-    return MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
+    MMPortQmi *self;
+
+    self = MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, subsys,
                                       MM_PORT_TYPE, MM_PORT_TYPE_QMI,
                                       NULL));
+
+    /* load endpoint info as soon as kernel device is set */
+    self->priv->endpoint_info_signal_id = g_signal_connect (self,
+                                                            "notify::" MM_PORT_KERNEL_DEVICE,
+                                                            G_CALLBACK (initialize_endpoint_info),
+                                                            NULL);
+
+    return self;
 }
 
 static void
@@ -877,6 +941,11 @@ dispose (GObject *object)
 {
     MMPortQmi *self = MM_PORT_QMI (object);
     GList *l;
+
+    if (self->priv->endpoint_info_signal_id) {
+        g_signal_handler_disconnect (self, self->priv->endpoint_info_signal_id);
+        self->priv->endpoint_info_signal_id = 0;
+    }
 
     /* Deallocate all clients */
     for (l = self->priv->services; l; l = g_list_next (l)) {

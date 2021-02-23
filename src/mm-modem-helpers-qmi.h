@@ -21,6 +21,8 @@
 #include <ModemManager.h>
 #include <libqmi-glib.h>
 
+#include "mm-port.h"
+
 /*****************************************************************************/
 /* QMI/DMS to MM translations */
 
@@ -119,6 +121,11 @@ MMBearerIpFamily     mm_bearer_ip_family_from_qmi_ip_support_type   (QmiWdsIpSup
 MMBearerIpFamily     mm_bearer_ip_family_from_qmi_pdp_type          (QmiWdsPdpType pdp_type);
 gboolean             mm_bearer_ip_family_to_qmi_pdp_type            (MMBearerIpFamily  ip_family,
                                                                      QmiWdsPdpType    *out_pdp_type);
+
+/*****************************************************************************/
+/* QMI/WDA to MM translations */
+
+QmiDataEndpointType mm_port_subsys_to_qmi_endpoint_type (MMPortSubsys subsys);
 
 /*****************************************************************************/
 /* QMI/OMA to MM translations */
