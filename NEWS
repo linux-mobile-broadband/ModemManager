@@ -1,4 +1,149 @@
 
+ModemManager 1.16.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version now requires:
+   ** libqmi >= 1.28.0 (for the optional QMI support)
+
+ * The 1.16.x branch will be the last one supporting the 'LEGACY' and 'PARANOID'
+   filter modes; standard distributions are advised to use the default 'STRICT'
+   mode if they aren't using it already (i.e. running the daemon without any
+   explicit '--filter-policy' option).
+
+ * A new 'qcom-soc' plugin is implemented to be able to use ModemManager in
+   Qualcomm SoCs like the MSM8916 or MSM8974. This plugin uses a combination of
+   RPMSG based control ports plus BAM-DMUX based network ports. This plugin is
+   disabled by default, even when `--enable-all-plugins` is used, and if wanted
+   it must be explicitly enabled with `--enable-plugin-qcom-soc`. Systems
+   targeting this kind of SoCs, like postmarketos, should enable it. Standard
+   distributions may or may not include it, up to the targeted hardware in each
+   distribution.
+
+ * Gentoo's 'libelogind' library may now be used to detect the systemd
+   suspend/resume support.
+
+The API is backwards compatible with the previous releases, the only updates
+are the following:
+
+ * Modem interface:
+   ** Updated the 'Ports' property so that it exposes all ports that are
+      owned by the modem even if they are explicitly ignored and not used.
+   ** New 'SimSlots' property that exposes the available SIM slots in the modem,
+      including the SIM object paths in each of them if the cards are present.
+   ** New 'PrimarySimSlot' property indicating which of the slots in the
+      'SimSlots' array is the one currently active.
+   ** New 'SetPrimarySimSlot' method to select which SIM slot in the 'SimSlots'
+      array should be considered active. When the switch happens, the modem will
+      be fully re-probed.
+
+ * Signal interface:
+   ** New 'Nr5g' dictionary property including signal information for the 5GNR
+      access technology.
+
+ * SIM interface:
+   ** New 'Active' boolean property, indicating whether the SIM object is the
+      currently active one.
+   ** New 'Eid' string property, indicating the EID of the card, if any.
+
+ * New udev tags:
+   ** New 'ID_MM_PORT_TYPE_QMI' tag to explicitly flag a port as being QMI, when
+      there is no other way to guess the type of port; e.g. this tag is not
+      needed for ports exposed by the qmi_wwan driver.
+   ** New 'ID_MM_PORT_TYPE_MBIM' tag to explicitly flag a port as being MBIM,
+      when there is no other way to guess the type of port; e.g. this tag is not
+      needed for ports exposed by the cdc_mbim driver.
+
+The most important features and changes in this release are the following:
+
+ * Implemented support for Multi SIM Single Standby support, for systems that
+   have multiple SIM slots and they can select which of them (only one) is
+   active at any given time. Currently implemented for QMI modems only.
+
+ * If the modem enabling phase fails in a fatal way, an implicit disabling
+   sequence is now run, in order to avoid leaving the modem in an inconsistent
+   state.
+
+ * If the connection attempt includes user/password information but no explicit
+   authentication type, CHAP will now be used by default instead of PAP.
+
+ * Full USB device removal events reported via udev are no longer used. The
+   device removal logic relies exclusively on independent port removal events,
+   as that logic is supported for all subsystems and kernel device backends
+   (e.g. also working for non-USB devices and for systems without udev like
+   OpenWRT).
+
+ * Added support to monitor the 'rpmsg' subsystem, but only in plugins that
+   explicitly require its use (e.g. the 'qcom-soc' plugin).
+
+ * New options in the ModemManager daemon:
+   ** Added new '--test-no-suspend-resume' option to disable the runtime
+      suspend/resume support even if the daemon was built with it.
+   ** Added new '--test-no-udev' option to disable the runtime udev support even
+      if the daemon was built with it.
+
+ * Serial:
+   ** Also match OK or ERROR responses that are not at end of line.
+
+ * SIM:
+   ** Force reprobing the modem if a new SIM is detected in a modem that
+      initially started in Failed state without SIM.
+   ** Force reprobing the modem if the lock status cannot be read after sending
+      SIM-PUK, so that it transitions to the Failed state.
+   ** Force reprobing the modem if a PUK lock is discovered after sending
+      SIM-PIN, so that it transitions to the Failed state.
+
+ * QMI:
+   ** The logic no longer depends on the service version reported by each
+      client, the support for each feature is explicitly probed instead.
+   ** Implemented SIM profile (eUICC) change detection.
+   ** Support for QMI modems on kernels < 3.6 is dropped. Only kernels where the
+      QMI control ports are exposed in the 'usbmisc' subsystem are supported.
+   ** Implemented additional step in the connection logic to allow binding the
+      WDS client to a given SIO port, required in the BAM-DMUX driver setup.
+   ** Implemented support for the initial EPS bearer settings logic.
+   ** Disabled explicit signal and access technology polling if indications have
+      been correctly enabled.
+
+ * MBIM:
+   ** Enable SIM hot swap detection logic with QMI over MBIM.
+   ** Allow plugins to specify explicitly that QMI over MBIM is not supported.
+
+ * libmm-glib:
+   ** Added missing APIs to get/set RM protocol in the Simple connect settings.
+
+ * Plugins:
+   ** gosuncn: new plugin, for now just with port type hints for the GM800.
+   ** quectel: implemented GPS support with +QGPS.
+   ** quectel: implemented custom time support check to prefer +CTZU=3 instead
+      of +CTZU=1 so that the modem reports localtime instead of UTC in +CCLK.
+   ** sierra: added support for XMM-specific features (e.g. EM7345).
+   ** cinterion: implemented support for the initial EPS bearer settings logic.
+   ** cinterion: added SIM hot swap support to AT-based modems.
+   ** huawei: updated to avoid applying multiple port type hint methods.
+   ** huawei: updated the ^GETPORTMODE logic so that we don't assume the hints
+      in the response apply to specific USB interfaces.
+
+The following features which were backported to 1.14.x releases are also present
+in ModemManager 1.16.0:
+
+ * location: allow CID only updates.
+ * sms: allow sending/receiving UTF-16 as if it were UCS-2.
+ * modem: don't consider charset setup failure as fatal.
+ * QMI: fix reporting signal strength indications.
+ * QMI: fix parsing of USSD indications with UTF-16 data.
+ * QMI: run network registration with NAS Set System Selection Preference.
+ * QMI: when connection aborted, ensure network handles are released.
+ * MBIM: don't fail IPv4v6 connection attempt if only IPv4 succeeds.
+ * cinterion: improve user/password handling in AT^SGAUTH calls.
+ * cinterion: removed limitation to IPv4 only PDP contexts.
+ * cinterion: configure the PLAS9 to send URCs correctly.
+ * quectel: add support for MBIM devices.
+ * telit: add initial delay for AT ports to become responsive.
+
+
 ModemManager 1.14.0
 -------------------------------------------
 This is a new stable release of ModemManager.
