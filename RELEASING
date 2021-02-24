@@ -2,6 +2,14 @@
 
 The ModemManager releases are generated using the GNU autotools.
 
+0.1) For major releases:
+     * Increment mm_minor_version and reset mm_micro_version.
+     * Assuming API/ABI compatibility in libmm-glib, increment both
+       mm_glib_lt_current and mm_glib_lt_age.
+
+0.2) For stable branch releases:
+     * Increment mm_micro_version.
+
 1) Configure and build the whole project, making sure gtk-doc is enabled:
 
     $ NOCONFIGURE=1 ./autogen.sh
@@ -24,9 +32,44 @@ The ModemManager releases are generated using the GNU autotools.
     $ gpg --verify ModemManager-${VERSION}.tar.xz.asc ModemManager-${VERSION}.tar.xz
 
 5) Upload source tarball (.tar.xz) and signature (.tar.xz.asc) to
-   freedesktop.org
+   freedesktop.org.
+    $ scp ModemManager-${VERSION}.tar.xz* fd.o:${ModemManager}/
 
-TODO: manpages and gtk-doc references
+6) Create directories for the manpages and gtk-doc documentation in
+   freedesktop.org, and also update the 'latest' links:
+    $ ssh fd.o
+    [fd.o] $ cd ${ModemManager}/man/
+    [fd.o] $ rm latest
+    [fd.o] $ mkdir -p ${VERSION}
+    [fd.o] $ ln -s ${VERSION} latest
+    [fd.o] $ cd ${ModemManager}/doc/
+    [fd.o] $ rm latest
+    [fd.o] $ mkdir -p ${VERSION}/ModemManager
+    [fd.o] $ mkdir -p ${VERSION}/libmm-glib
+    [fd.o] $ ln -s ${VERSION} latest
+
+7) Generate HTML for the manpages:
+    $ roffit < docs/man/mmcli.1 > mmcli.1.html
+    $ roffit < docs/man/ModemManager.8 > ModemManager.8.html
+
+8) Upload manpages in HTML to freedesktop.org:
+    $ scp *.html fd.o:${ModemManager}/man/${VERSION}/
+
+9) Upload the gtk-doc in HTML available inside the source tarball to
+   freedesktop.org. It must be the one inside the tarball because it contains
+   the correct fixed refs to the online documentation of the dependencies
+   (e.g. the glib/gobject/gio documentation URLs in http://developer.gnome.org)
+    $ tar -Jxvf ModemManager-${VERSION}.tar.xz
+    $ scp ModemManager-${VERSION}/docs/reference/api/html/* fd.o:${ModemManager}/doc/${VERSION}/ModemManager/
+    $ scp ModemManager-${VERSION}/docs/reference/libmm-glib/html/* fd.o:${ModemManager}/doc/${VERSION}/libmm-glib/
+
+10.1) For major releases:
+     * Fork new stable branch (e.g. mm-${MAJOR}-${MINOR})
+     * Post-release version bump in the master branch, increment mm_minor_version.
+     * Post-release version bump in the stable branch, increment mm_micro_version.
+
+10.2) For stable branch releases:
+     * Post-release version bump, increment mm_micro_version.
 
 -------------------------------------------------------------------------------
 
@@ -34,4 +77,3 @@ TODO: manpages and gtk-doc references
    signed it, e.g.:
 
     $ curl https://www.freedesktop.org/software/ModemManager/0x3CAD53398973FFFA.asc | gpg --import
-
