@@ -417,6 +417,7 @@ typedef enum {
     CONNECT_STEP_OPEN_QMI_PORT,
     CONNECT_STEP_SETUP_DATA_FORMAT,
     CONNECT_STEP_SETUP_LINK,
+    CONNECT_STEP_SETUP_LINK_MASTER_UP,
     CONNECT_STEP_IP_METHOD,
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
@@ -1336,6 +1337,27 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
 }
 
 static void
+master_interface_up_ready (MMPortNet    *link,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    ConnectContext *ctx;
+    GError         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_port_net_link_setup_finish (link, res, &error)) {
+        g_prefix_error (&error, "Couldn't bring master interface up: ");
+        complete_connect (task, NULL, error);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static void
 wait_link_port_ready (MMBaseModem  *modem,
                       GAsyncResult *res,
                       GTask        *task)
@@ -1545,6 +1567,21 @@ connect_context_step (GTask *task)
                                     ctx->data,
                                     ctx->link_prefix_hint,
                                     (GAsyncReadyCallback) setup_link_ready,
+                                    task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case CONNECT_STEP_SETUP_LINK_MASTER_UP:
+        /* if the connection is done through a new link, we need to ifup the master interface */
+        if (ctx->link) {
+            mm_obj_dbg (self, "bringing master interface %s up...", mm_port_get_device (ctx->data));
+            mm_port_net_link_setup (MM_PORT_NET (ctx->data),
+                                    TRUE,
+                                    0, /* ignore */
+                                    g_task_get_cancellable (task),
+                                    (GAsyncReadyCallback) master_interface_up_ready,
                                     task);
             return;
         }
