@@ -133,6 +133,16 @@ gboolean  mm_base_modem_release_link_port (MMBaseModem         *self,
                                            const gchar         *name,
                                            GError             **error);
 
+void      mm_base_modem_wait_link_port        (MMBaseModem          *self,
+                                               const gchar          *subsystem,
+                                               const gchar          *name,
+                                               guint                 timeout_ms,
+                                               GAsyncReadyCallback   callback,
+                                               gpointer              user_data);
+MMPort   *mm_base_modem_wait_link_port_finish (MMBaseModem          *self,
+                                               GAsyncResult         *res,
+                                               GError              **error);
+
 gboolean  mm_base_modem_has_at_port  (MMBaseModem *self);
 
 gboolean  mm_base_modem_organize_ports (MMBaseModem *self,

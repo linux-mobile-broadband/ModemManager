@@ -441,6 +441,134 @@ mm_base_modem_release_link_port (MMBaseModem  *self,
 
 /******************************************************************************/
 
+typedef struct {
+    gchar  *name;
+    gulong  link_port_grabbed_id;
+    guint   timeout_id;
+} WaitLinkPortContext;
+
+static void
+wait_link_port_context_free (WaitLinkPortContext *ctx)
+{
+    g_assert (!ctx->link_port_grabbed_id);
+    g_assert (!ctx->timeout_id);
+    g_free (ctx->name);
+    g_slice_free (WaitLinkPortContext, ctx);
+}
+
+MMPort *
+mm_base_modem_wait_link_port_finish (MMBaseModem   *self,
+                                     GAsyncResult  *res,
+                                     GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static gboolean
+wait_link_port_timeout_cb (GTask *task)
+{
+    WaitLinkPortContext *ctx;
+    MMBaseModem         *self;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data     (task);
+
+    ctx->timeout_id = 0;
+    g_signal_handler_disconnect (self, ctx->link_port_grabbed_id);
+    ctx->link_port_grabbed_id = 0;
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                             "Timed out waiting for link port 'net/%s'",
+                             ctx->name);
+    g_object_unref (task);
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+wait_link_port_grabbed_cb (MMBaseModem *self,
+                           MMPort      *link_port,
+                           GTask       *task)
+{
+    WaitLinkPortContext *ctx;
+    MMPortSubsys         link_port_subsystem;
+    const gchar         *link_port_name;
+
+    ctx = g_task_get_task_data (task);
+
+    link_port_subsystem = mm_port_get_subsys (link_port);
+    link_port_name = mm_port_get_device (link_port);
+
+    if (link_port_subsystem != MM_PORT_SUBSYS_NET) {
+        mm_obj_warn (self, "unexpected link port subsystem grabbed: %s/%s",
+                     mm_port_subsys_get_string (link_port_subsystem),
+                     link_port_name);
+        return;
+    }
+
+    if (g_strcmp0 (link_port_name, ctx->name) != 0)
+        return;
+
+    /* we got it! */
+
+    g_source_remove (ctx->timeout_id);
+    ctx->timeout_id = 0;
+    g_signal_handler_disconnect (self, ctx->link_port_grabbed_id);
+    ctx->link_port_grabbed_id = 0;
+
+    g_task_return_pointer (task, g_object_ref (link_port), g_object_unref);
+    g_object_unref (task);
+}
+
+void
+mm_base_modem_wait_link_port (MMBaseModem         *self,
+                              const gchar         *subsystem,
+                              const gchar         *name,
+                              guint                timeout_ms,
+                              GAsyncReadyCallback  callback,
+                              gpointer             user_data)
+{
+    WaitLinkPortContext *ctx;
+    GTask               *task;
+    g_autofree gchar    *key = NULL;
+    MMPort              *port;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!g_str_equal (subsystem, "net")) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Cannot wait for port '%s/%s', unexpected link port subsystem", subsystem, name);
+        g_object_unref (task);
+        return;
+    }
+
+    key = g_strdup_printf ("%s%s", subsystem, name);
+    port = g_hash_table_lookup (self->priv->link_ports, key);
+    if (port) {
+        mm_obj_dbg (self, "no need to wait for port '%s/%s': already grabbed", subsystem, name);
+        g_task_return_pointer (task, g_object_ref (port), g_object_unref);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (WaitLinkPortContext);
+    ctx->name = g_strdup (name);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)wait_link_port_context_free);
+
+    /* task ownership shared between timeout and signal handler */
+    ctx->timeout_id = g_timeout_add (timeout_ms,
+                                     (GSourceFunc) wait_link_port_timeout_cb,
+                                     task);
+    ctx->link_port_grabbed_id = g_signal_connect (self,
+                                                  MM_BASE_MODEM_SIGNAL_LINK_PORT_GRABBED,
+                                                  G_CALLBACK (wait_link_port_grabbed_cb),
+                                                  task);
+
+    mm_obj_dbg (self, "waiting for port '%s/%s'...", subsystem, name);
+}
+
+/******************************************************************************/
+
 gboolean
 mm_base_modem_disable_finish (MMBaseModem   *self,
                               GAsyncResult  *res,
