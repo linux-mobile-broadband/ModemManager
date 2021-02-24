@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- Mode: python; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -25,7 +25,8 @@ gi.require_version('ModemManager', '1.0')
 from gi.repository import Gio, GLib, GObject, ModemManager
 
 
-if __name__ == "__main__":
+def main():
+    """Main routine."""
 
     # Process input arguments
     if len(sys.argv) != 3:
@@ -34,14 +35,15 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Prepare SMS properties
-    sms_properties = ModemManager.SmsProperties.new ()
+    sms_properties = ModemManager.SmsProperties.new()
     sms_properties.set_number(sys.argv[1])
     sms_properties.set_text(sys.argv[2])
 
     # Connection to ModemManager
-    connection = Gio.bus_get_sync (Gio.BusType.SYSTEM, None)
-    manager = ModemManager.Manager.new_sync (connection, Gio.DBusObjectManagerClientFlags.DO_NOT_AUTO_START, None)
-    if manager.get_name_owner() is None:
+    connection = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    manager = ModemManager.Manager.new_sync(
+        connection, Gio.DBusObjectManagerClientFlags.DO_NOT_AUTO_START, None)
+    if not manager.get_name_owner():
         sys.stderr.write('ModemManager not found in bus')
         sys.exit(2)
 
@@ -51,3 +53,7 @@ if __name__ == "__main__":
         sms = messaging.create_sync(sms_properties)
         sms.send_sync()
         print('%s: sms sent' % messaging.get_object_path())
+
+
+if __name__ == "__main__":
+    main()
