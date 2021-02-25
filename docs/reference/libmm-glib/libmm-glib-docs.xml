@@ -153,6 +153,7 @@
     <chapter>
       <title>The SIM object</title>
       <xi:include href="xml/mm-sim.xml"/>
+      <xi:include href="xml/mm-sim-preferred-network.xml"/>
     </chapter>
 
     <chapter>

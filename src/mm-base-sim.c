@@ -1141,6 +1141,101 @@ load_emergency_numbers (MMBaseSim           *self,
 }
 
 /*****************************************************************************/
+/* Preferred networks */
+
+static GList *
+parse_preferred_networks (const gchar  *response,
+                          GError      **error)
+{
+    gchar **entries;
+    gchar **iter;
+    GList  *result = NULL;
+
+    entries = g_strsplit_set (response, "\r\n", -1);
+    for (iter = entries; iter && *iter; iter++) {
+        gchar                   *operator_code = NULL;
+        gboolean                 gsm_act;
+        gboolean                 gsm_compact_act;
+        gboolean                 utran_act;
+        gboolean                 eutran_act;
+        gboolean                 ngran_act;
+        MMSimPreferredNetwork   *preferred_network = NULL;
+        MMModemAccessTechnology  act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+        g_strstrip (*iter);
+        if (strlen (*iter) == 0)
+            continue;
+
+        if (mm_sim_parse_cpol_query_response (*iter,
+                                              &operator_code,
+                                              &gsm_act,
+                                              &gsm_compact_act,
+                                              &utran_act,
+                                              &eutran_act,
+                                              &ngran_act,
+                                              error)) {
+            preferred_network = mm_sim_preferred_network_new ();
+            mm_sim_preferred_network_set_operator_code (preferred_network, operator_code);
+            if (gsm_act)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+            if (gsm_compact_act)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT;
+            if (utran_act)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+            if (eutran_act)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+            if (ngran_act)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_5GNR;
+            mm_sim_preferred_network_set_access_technology (preferred_network, act);
+            result = g_list_append (result, preferred_network);
+        } else
+            break;
+        g_free (operator_code);
+    }
+    g_strfreev (entries);
+
+    return result;
+}
+
+static GList *
+load_preferred_networks_finish (MMBaseSim     *self,
+                                GAsyncResult  *res,
+                                GError       **error)
+{
+    gchar *result;
+    GList *preferred_network_list;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return NULL;
+
+    preferred_network_list = parse_preferred_networks (result, error);
+    mm_obj_dbg (self, "loaded %u preferred networks", g_list_length (preferred_network_list));
+
+    g_free (result);
+
+    return preferred_network_list;
+}
+
+STR_REPLY_READY_FN (load_preferred_networks)
+
+static void
+load_preferred_networks (MMBaseSim           *self,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+    mm_obj_dbg (self, "loading preferred networks...");
+
+    mm_base_modem_at_command (
+        self->priv->modem,
+        "+CPOL?",
+        20,
+        FALSE,
+        (GAsyncReadyCallback)load_preferred_networks_command_ready,
+        g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
 /* ICCID */
 
 static gchar *
@@ -1525,6 +1620,7 @@ typedef enum {
     INITIALIZATION_STEP_OPERATOR_ID,
     INITIALIZATION_STEP_OPERATOR_NAME,
     INITIALIZATION_STEP_EMERGENCY_NUMBERS,
+    INITIALIZATION_STEP_PREFERRED_NETWORKS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1616,6 +1712,31 @@ init_load_emergency_numbers_ready (MMBaseSim    *self,
         mm_gdbus_sim_set_emergency_numbers (MM_GDBUS_SIM (self), (const gchar *const *) str_list);
         g_strfreev (str_list);
     }
+
+    /* Go on to next step */
+    ctx = g_task_get_task_data (task);
+    ctx->step++;
+    interface_initialization_step (task);
+}
+
+static void
+init_load_preferred_networks_ready (MMBaseSim    *self,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    InitAsyncContext *ctx;
+    GError           *error = NULL;
+    GList            *preferred_nets_list;
+
+    preferred_nets_list = MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks_finish (self, res, &error);
+    if (error) {
+        mm_obj_warn (self, "couldn't load list of preferred networks: %s", error->message);
+        g_error_free (error);
+    }
+
+    mm_gdbus_sim_set_preferred_networks (MM_GDBUS_SIM (self),
+                                         mm_sim_preferred_network_list_get_variant (preferred_nets_list));
+    g_list_free_full (preferred_nets_list, (GDestroyNotify) mm_sim_preferred_network_free);
 
     /* Go on to next step */
     ctx = g_task_get_task_data (task);
@@ -1792,6 +1913,18 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers (
                 self,
                 (GAsyncReadyCallback)init_load_emergency_numbers_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case INITIALIZATION_STEP_PREFERRED_NETWORKS:
+        if (MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks &&
+            MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks (
+                self,
+                (GAsyncReadyCallback)init_load_preferred_networks_ready,
                 task);
             return;
         }
@@ -2051,6 +2184,8 @@ mm_base_sim_class_init (MMBaseSimClass *klass)
     klass->load_operator_name_finish = load_operator_name_finish;
     klass->load_emergency_numbers = load_emergency_numbers;
     klass->load_emergency_numbers_finish = load_emergency_numbers_finish;
+    klass->load_preferred_networks = load_preferred_networks;
+    klass->load_preferred_networks_finish = load_preferred_networks_finish;
     klass->send_pin = send_pin;
     klass->send_pin_finish = common_send_pin_puk_finish;
     klass->send_puk = send_puk;

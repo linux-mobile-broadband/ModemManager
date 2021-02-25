@@ -521,6 +521,20 @@ gboolean mm_parse_supl_address (const gchar  *supl,
                                 GError      **error);
 
 /*****************************************************************************/
+/* SIM specific helpers and utilities */
+/*****************************************************************************/
+
+/* +CPOL? response parser (for a single entry) - accepts only numeric operator format*/
+gboolean mm_sim_parse_cpol_query_response (const gchar  *response,
+                                           gchar       **out_operator_code,
+                                           gboolean     *out_gsm_act,
+                                           gboolean     *out_gsm_compact_act,
+                                           gboolean     *out_utran_act,
+                                           gboolean     *out_eutran_act,
+                                           gboolean     *out_ngran_act,
+                                           GError      **error);
+
+/*****************************************************************************/
 
 /* Useful when clamp-ing an unsigned integer with implicit low limit set to 0,
  * and in order to avoid -Wtype-limits warnings. */

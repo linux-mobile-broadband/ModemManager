@@ -23,6 +23,7 @@
 
 #include "mm-helpers.h"
 #include "mm-sim.h"
+#include "mm-sim-preferred-network.h"
 
 /**
  * SECTION: mm-sim
@@ -856,6 +857,47 @@ mm_sim_change_pin_sync (MMSim *self,
                                                new_pin,
                                                cancellable,
                                                error));
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sim_get_preferred_networks:
+ * @self: A #MMSim.
+ *
+ * Gets the list of #MMSimPreferredNetwork objects exposed by this
+ * #MMSim.
+ *
+ * Returns: (transfer full) (element-type ModemManager.SimPreferredNetwork): a list of
+ * #MMSimPreferredNetwork objects, or #NULL. The returned value should
+ * be freed with g_list_free_full() using mm_sim_preferred_network_free() as #GDestroyNotify
+ * function.
+ *
+ * Since: 1.18
+ */
+GList *
+mm_sim_get_preferred_networks (MMSim *self)
+{
+    GList *network_list = NULL;
+    GVariant *container, *child;
+    GVariantIter iter;
+
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+
+    container = mm_gdbus_sim_get_preferred_networks (MM_GDBUS_SIM (self));
+    g_return_val_if_fail (g_variant_is_of_type (container, G_VARIANT_TYPE ("a(su)")), NULL);
+
+    g_variant_iter_init (&iter, container);
+    while ((child = g_variant_iter_next_value (&iter))) {
+        MMSimPreferredNetwork *preferred_net;
+
+        preferred_net = mm_sim_preferred_network_new_from_variant (child);
+        if (preferred_net)
+            network_list = g_list_append (network_list, preferred_net);
+        g_variant_unref (child);
+    }
+
+    return network_list;
 }
 
 /*****************************************************************************/

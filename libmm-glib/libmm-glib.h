@@ -80,6 +80,7 @@
 #include <mm-signal.h>
 #include <mm-kernel-event-properties.h>
 #include <mm-pco.h>
+#include <mm-sim-preferred-network.h>
 
 /* generated */
 #include <mm-errors-types.h>

@@ -89,6 +89,8 @@ libmm_glib_la_SOURCES = \
 	mm-pco.c \
 	mm-call-audio-format.h \
 	mm-call-audio-format.c \
+	mm-sim-preferred-network.h \
+	mm-sim-preferred-network.c \
 	$(NULL)
 
 libmm_glib_la_CPPFLAGS = \
@@ -160,6 +162,7 @@ include_HEADERS = \
 	mm-kernel-event-properties.h \
 	mm-pco.h \
 	mm-call-audio-format.h \
+	mm-sim-preferred-network.h \
 	$(NULL)
 
 CLEANFILES =

@@ -5126,3 +5126,87 @@ out:
     g_strfreev (split);
     return valid;
 }
+
+/*****************************************************************************/
+
+gboolean
+mm_sim_parse_cpol_query_response (const gchar  *response,
+                                  gchar       **out_operator_code,
+                                  gboolean     *out_gsm_act,
+                                  gboolean     *out_gsm_compact_act,
+                                  gboolean     *out_utran_act,
+                                  gboolean     *out_eutran_act,
+                                  gboolean     *out_ngran_act,
+                                  GError      **error)
+{
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GRegex)      r = NULL;
+    g_autofree gchar      *operator_code = NULL;
+    guint                  format = 0;
+    guint                  act = 0;
+    guint                  match_count;
+
+    r = g_regex_new ("\\+CPOL:\\s*\\d+,\\s*(\\d+),\\s*\"(\\d+)\""
+                     "(?:,\\s*(\\d+))?"     /* GSM_AcTn */
+                     "(?:,\\s*(\\d+))?"     /* GSM_Compact_AcTn */
+                     "(?:,\\s*(\\d+))?"     /* UTRAN_AcTn */
+                     "(?:,\\s*(\\d+))?"     /* E-UTRAN_AcTn */
+                     "(?:,\\s*(\\d+))?",    /* NG-RAN_AcTn */
+                     G_REGEX_RAW, 0, NULL);
+    g_regex_match (r, response, 0, &match_info);
+
+    if (!g_match_info_matches (match_info)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't parse +CPOL reply: %s", response);
+        return FALSE;
+    }
+
+    match_count = g_match_info_get_match_count (match_info);
+    /* Remember that g_match_info_get_match_count() includes match #0 */
+    g_assert (match_count >= 3);
+
+    if (!mm_get_uint_from_match_info (match_info, 1, &format) ||
+        !(operator_code = mm_get_string_unquoted_from_match_info (match_info, 2))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't parse +CPOL reply parameters: %s", response);
+        return FALSE;
+    }
+
+    if (format != 2) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "+CPOL reply not using numeric operator code: %s", response);
+        return FALSE;
+    }
+
+    if (out_operator_code) {
+        *out_operator_code = g_steal_pointer (&operator_code);
+    }
+    if (out_gsm_act)
+        *out_gsm_act = match_count >= 4 &&
+                       mm_get_uint_from_match_info (match_info, 3, &act) &&
+                       act != 0;
+    if (out_gsm_compact_act)
+        *out_gsm_compact_act = match_count >= 5 &&
+                               mm_get_uint_from_match_info (match_info, 4, &act) &&
+                               act != 0;
+    if (out_utran_act)
+        *out_utran_act = match_count >= 6 &&
+                         mm_get_uint_from_match_info (match_info, 5, &act) &&
+                         act != 0;
+    if (out_eutran_act)
+        *out_eutran_act = match_count >= 7 &&
+                          mm_get_uint_from_match_info (match_info, 6, &act) &&
+                          act != 0;
+    if (out_ngran_act)
+        *out_ngran_act = match_count >= 8 &&
+                         mm_get_uint_from_match_info (match_info, 7, &act) &&
+                         act != 0;
+
+    return TRUE;
+}

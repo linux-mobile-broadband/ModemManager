@@ -127,5 +127,19 @@
     -->
     <property name="EmergencyNumbers" type="as" access="read" />
 
+    <!--
+        PreferredNetworks:
+
+        List of preferred networks with access technologies configured in the SIM card.
+
+        Each entry contains an operator id string (<literal>"MCCMNC"</literal>)
+        consisting of 5 or 6 digits, and an
+        <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link> mask.
+        If the SIM card does not support access technology storage, the mask will be
+        set to <link linkend="MM-MODEM-ACCESS-TECHNOLOGY-UNKNOWN:CAPS">
+        MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN</link>.
+    -->
+    <property name="PreferredNetworks" type="a(su)" access="read" />
+
   </interface>
 </node>

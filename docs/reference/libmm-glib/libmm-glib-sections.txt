@@ -1215,6 +1215,25 @@ mm_bearer_properties_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-sim-preferred-network</FILE>
+<TITLE>MMSimPreferredNetwork</TITLE>
+MMSimPreferredNetwork
+mm_sim_preferred_network_get_operator_code
+mm_sim_preferred_network_get_access_technology
+mm_sim_preferred_network_free
+<SUBSECTION Private>
+mm_sim_preferred_network_new
+mm_sim_preferred_network_new_from_variant
+mm_sim_preferred_network_set_access_technology
+mm_sim_preferred_network_set_operator_code
+mm_sim_preferred_network_get_tuple
+mm_sim_preferred_network_list_get_variant
+<SUBSECTION Standard>
+MM_TYPE_SIM_PREFERRED_NETWORK
+mm_sim_preferred_network_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-sim</FILE>
 <TITLE>MMSim</TITLE>
 MMSim
@@ -1234,6 +1253,7 @@ mm_sim_get_operator_name
 mm_sim_dup_operator_name
 mm_sim_get_emergency_numbers
 mm_sim_dup_emergency_numbers
+mm_sim_get_preferred_networks
 <SUBSECTION Methods>
 mm_sim_send_pin
 mm_sim_send_pin_finish
@@ -3125,6 +3145,8 @@ mm_gdbus_sim_get_operator_name
 mm_gdbus_sim_dup_operator_name
 mm_gdbus_sim_get_emergency_numbers
 mm_gdbus_sim_dup_emergency_numbers
+mm_gdbus_sim_dup_preferred_networks
+mm_gdbus_sim_get_preferred_networks
 <SUBSECTION Methods>
 mm_gdbus_sim_call_send_pin
 mm_gdbus_sim_call_send_pin_finish
@@ -3146,6 +3168,7 @@ mm_gdbus_sim_set_operator_identifier
 mm_gdbus_sim_set_operator_name
 mm_gdbus_sim_set_sim_identifier
 mm_gdbus_sim_set_emergency_numbers
+mm_gdbus_sim_set_preferred_networks
 mm_gdbus_sim_complete_change_pin
 mm_gdbus_sim_complete_enable_pin
 mm_gdbus_sim_complete_send_pin
