@@ -418,6 +418,23 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Create Bearer List (Modem interface) */
+
+static MMBearerList *
+modem_create_bearer_list (MMIfaceModem *self)
+{
+    guint n;
+
+    /* The maximum number of available/connected modems is guessed from
+     * the size of the data ports list. */
+    n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (self)));
+    mm_obj_dbg (self, "allowed up to %u active bearers", n);
+
+    /* by default, no multiplexing support */
+    return mm_bearer_list_new (n, 0);
+}
+
+/*****************************************************************************/
 /* Create SIM (Modem interface) */
 
 static MMBaseSim *
@@ -12425,6 +12442,7 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_power_state_finish = modem_load_power_state_finish;
     iface->load_supported_ip_families = modem_load_supported_ip_families;
     iface->load_supported_ip_families_finish = modem_load_supported_ip_families_finish;
+    iface->create_bearer_list = modem_create_bearer_list;
 
     /* Enabling steps */
     iface->modem_power_up = modem_power_up;

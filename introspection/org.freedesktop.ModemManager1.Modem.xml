@@ -351,13 +351,27 @@
 
         The maximum number of active
         <link linkend="MM-BEARER-TYPE-DEFAULT:CAPS"><constant>MM_BEARER_TYPE_DEFAULT</constant></link>
-        bearers that may be explicitly enabled by the user.
+        bearers that may be explicitly enabled by the user without multiplexing support.
 
         POTS and CDMA2000-only devices support one active bearer, while GSM/UMTS
-        and LTE-capable devices (including LTE/CDMA devices) typically support
-        at least two active bearers.
+        and LTE/5GNR capable devices (including 3GPP+3GPP3 multimode devices) may support
+        one or more active bearers, depending on the amount of physical ports exposed
+        by the device.
     -->
     <property name="MaxActiveBearers" type="u" access="read" />
+
+    <!--
+        MaxActiveMultiplexedBearers:
+
+        The maximum number of active
+        <link linkend="MM-BEARER-TYPE-DEFAULT:CAPS"><constant>MM_BEARER_TYPE_DEFAULT</constant></link>
+        bearers that may be explicitly enabled by the user with multiplexing support
+        on one single network interface.
+
+        If the modem doesn't support multiplexing of data sessiones, a value of 0 will
+        be reported.
+    -->
+    <property name="MaxActiveMultiplexedBearers" type="u" access="read" />
 
     <!--
         Manufacturer:

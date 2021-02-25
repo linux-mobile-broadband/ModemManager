@@ -35,6 +35,7 @@ enum {
     PROP_0,
     PROP_NUM_BEARERS,
     PROP_MAX_ACTIVE_BEARERS,
+    PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS,
     PROP_LAST
 };
 
@@ -45,6 +46,7 @@ struct _MMBearerListPrivate {
     GList *bearers;
     /* Max number of active bearers */
     guint max_active_bearers;
+    guint max_active_multiplexed_bearers;
 };
 
 /*****************************************************************************/
@@ -53,6 +55,12 @@ guint
 mm_bearer_list_get_max_active (MMBearerList *self)
 {
     return self->priv->max_active_bearers;
+}
+
+guint
+mm_bearer_list_get_max_active_multiplexed (MMBearerList *self)
+{
+    return self->priv->max_active_multiplexed_bearers;
 }
 
 gboolean
@@ -238,11 +246,13 @@ mm_bearer_list_disconnect_all_bearers (MMBearerList *self,
 /*****************************************************************************/
 
 MMBearerList *
-mm_bearer_list_new (guint max_active_bearers)
+mm_bearer_list_new (guint max_active_bearers,
+                    guint max_active_multiplexed_bearers)
 {
     /* Create the object */
     return g_object_new  (MM_TYPE_BEARER_LIST,
                           MM_BEARER_LIST_MAX_ACTIVE_BEARERS, max_active_bearers,
+                          MM_BEARER_LIST_MAX_ACTIVE_MULTIPLEXED_BEARERS, max_active_multiplexed_bearers,
                           NULL);
 }
 
@@ -260,6 +270,9 @@ set_property (GObject *object,
         break;
     case PROP_MAX_ACTIVE_BEARERS:
         self->priv->max_active_bearers = g_value_get_uint (value);
+        break;
+    case PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS:
+        self->priv->max_active_multiplexed_bearers = g_value_get_uint (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -281,6 +294,9 @@ get_property (GObject *object,
         break;
     case PROP_MAX_ACTIVE_BEARERS:
         g_value_set_uint (value, self->priv->max_active_bearers);
+        break;
+    case PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS:
+        g_value_set_uint (value, self->priv->max_active_multiplexed_bearers);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -342,4 +358,13 @@ mm_bearer_list_class_init (MMBearerListClass *klass)
                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_MAX_ACTIVE_BEARERS, properties[PROP_MAX_ACTIVE_BEARERS]);
 
+    properties[PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS] =
+        g_param_spec_uint (MM_BEARER_LIST_MAX_ACTIVE_MULTIPLEXED_BEARERS,
+                           "Max active multiplexed bearers",
+                           "Maximum number of active multiplexed bearers the list can handle",
+                           1,
+                           G_MAXUINT,
+                           1,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS, properties[PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS]);
 }

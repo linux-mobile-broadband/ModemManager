@@ -26,6 +26,7 @@
 #include "mm-port-serial-at.h"
 #include "mm-base-bearer.h"
 #include "mm-base-sim.h"
+#include "mm-bearer-list.h"
 
 #define MM_TYPE_IFACE_MODEM            (mm_iface_modem_get_type ())
 #define MM_IFACE_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
@@ -372,6 +373,10 @@ struct _MMIfaceModem {
     MMBaseBearer * (*create_bearer_finish) (MMIfaceModem *self,
                                             GAsyncResult *res,
                                             GError **error);
+
+    /* Create new bearer list object */
+    MMBearerList * (* create_bearer_list) (MMIfaceModem *self);
+
     /* Setup SIM hot swap */
     void (*setup_sim_hot_swap) (MMIfaceModem *self,
                                 GAsyncReadyCallback callback,

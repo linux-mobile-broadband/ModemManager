@@ -94,7 +94,8 @@ G_DEPRECATED
 guint              mm_modem_get_max_bearers          (MMModem *self);
 #endif /* MM_DISABLE_DEPRECATED */
 
-guint              mm_modem_get_max_active_bearers   (MMModem *self);
+guint              mm_modem_get_max_active_bearers             (MMModem *self);
+guint              mm_modem_get_max_active_multiplexed_bearers (MMModem *self);
 
 const gchar * const *mm_modem_get_bearer_paths       (MMModem *self);
 gchar              **mm_modem_dup_bearer_paths       (MMModem *self);
