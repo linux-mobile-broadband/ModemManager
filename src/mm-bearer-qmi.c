@@ -1386,6 +1386,7 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_SETUP_DATA_FORMAT:
         mm_port_qmi_setup_data_format (ctx->qmi,
+                                       ctx->data,
                                        MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT,
                                        (GAsyncReadyCallback) setup_data_format_ready,
                                        task);

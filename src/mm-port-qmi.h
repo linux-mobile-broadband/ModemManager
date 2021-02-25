@@ -97,14 +97,17 @@ QmiDevice *mm_port_qmi_peek_device (MMPortQmi *self);
 QmiDataEndpointType mm_port_qmi_get_endpoint_type             (MMPortQmi *self);
 guint               mm_port_qmi_get_endpoint_interface_number (MMPortQmi *self);
 
-QmiWdaLinkLayerProtocol mm_port_qmi_get_link_layer_protocol (MMPortQmi *self);
+QmiWdaLinkLayerProtocol       mm_port_qmi_get_link_layer_protocol       (MMPortQmi *self);
+QmiWdaDataAggregationProtocol mm_port_qmi_get_data_aggregation_protocol (MMPortQmi *self);
 
 typedef enum {
     MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_QUERY,
     MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT,
+    MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_MULTIPLEX,
 } MMPortQmiSetupDataFormatAction;
 
 void     mm_port_qmi_setup_data_format        (MMPortQmi                      *self,
+                                               MMPort                         *data,
                                                MMPortQmiSetupDataFormatAction  action,
                                                GAsyncReadyCallback             callback,
                                                gpointer                        user_data);
