@@ -78,6 +78,8 @@ gboolean      mm_bearer_get_connected   (MMBearer *self);
 
 gboolean      mm_bearer_get_suspended   (MMBearer *self);
 
+gboolean      mm_bearer_get_multiplexed (MMBearer *self);
+
 guint         mm_bearer_get_ip_timeout  (MMBearer *self);
 
 MMBearerType  mm_bearer_get_bearer_type (MMBearer *self);

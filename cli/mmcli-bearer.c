@@ -146,10 +146,11 @@ print_bearer_info (MMBearer *bearer)
     mmcli_output_string      (MMC_F_BEARER_GENERAL_DBUS_PATH, mm_bearer_get_path (bearer));
     mmcli_output_string      (MMC_F_BEARER_GENERAL_TYPE,      mm_bearer_type_get_string (mm_bearer_get_bearer_type (bearer)));
 
-    mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTED,  mm_bearer_get_connected (bearer) ? "yes" : "no");
-    mmcli_output_string      (MMC_F_BEARER_STATUS_SUSPENDED,  mm_bearer_get_suspended (bearer) ? "yes" : "no");
-    mmcli_output_string      (MMC_F_BEARER_STATUS_INTERFACE,  mm_bearer_get_interface (bearer));
-    mmcli_output_string_take (MMC_F_BEARER_STATUS_IP_TIMEOUT, g_strdup_printf ("%u", mm_bearer_get_ip_timeout (bearer)));
+    mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTED,   mm_bearer_get_connected (bearer) ? "yes" : "no");
+    mmcli_output_string      (MMC_F_BEARER_STATUS_SUSPENDED,   mm_bearer_get_suspended (bearer) ? "yes" : "no");
+    mmcli_output_string      (MMC_F_BEARER_STATUS_MULTIPLEXED, mm_bearer_get_multiplexed (bearer) ? "yes" : "no");
+    mmcli_output_string      (MMC_F_BEARER_STATUS_INTERFACE,   mm_bearer_get_interface (bearer));
+    mmcli_output_string_take (MMC_F_BEARER_STATUS_IP_TIMEOUT,  g_strdup_printf ("%u", mm_bearer_get_ip_timeout (bearer)));
 
     /* Properties */
     {

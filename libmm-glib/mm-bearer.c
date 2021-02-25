@@ -203,6 +203,28 @@ mm_bearer_get_suspended (MMBearer *self)
 /*****************************************************************************/
 
 /**
+ * mm_bearer_get_multiplexed:
+ * @self: A #MMBearer.
+ *
+ * Checks whether or not the #MMBearer is connected through a multiplexed
+ * network likn.
+ *
+ * Returns: %TRUE if packet data service is connected via a multiplexed network
+ * link in the #MMBearer, #FALSE otherwise.
+ *
+ * Since: 1.18
+ */
+gboolean
+mm_bearer_get_multiplexed (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), FALSE);
+
+    return mm_gdbus_bearer_get_multiplexed (MM_GDBUS_BEARER (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_get_ip_timeout:
  * @self: A #MMBearer.
  *

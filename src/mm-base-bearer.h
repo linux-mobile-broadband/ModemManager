@@ -41,6 +41,11 @@ MMPort                *mm_bearer_connect_result_peek_data        (MMBearerConnec
 MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv4_config (MMBearerConnectResult *result);
 MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv6_config (MMBearerConnectResult *result);
 
+/* by default, if none specified, multiplexed=FALSE */
+void                   mm_bearer_connect_result_set_multiplexed  (MMBearerConnectResult *result,
+                                                                  gboolean               multiplexed);
+gboolean               mm_bearer_connect_result_get_multiplexed  (MMBearerConnectResult *result);
+
 /*****************************************************************************/
 
 /* Default timeout values to be used in the steps of a connection or

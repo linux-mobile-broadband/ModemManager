@@ -103,6 +103,14 @@
     <property name="Suspended" type="b" access="read" />
 
     <!--
+        Multiplexed:
+
+        This property will be %TRUE if the bearer is connected through a
+        multiplexed network link.
+    -->
+    <property name="Multiplexed" type="b" access="read" />
+
+    <!--
         Ip4Config:
 
         If the bearer was configured for IPv4 addressing, upon activation this

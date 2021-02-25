@@ -224,6 +224,7 @@ typedef enum {
     /* Bearer status section */
     MMC_F_BEARER_STATUS_CONNECTED,
     MMC_F_BEARER_STATUS_SUSPENDED,
+    MMC_F_BEARER_STATUS_MULTIPLEXED,
     MMC_F_BEARER_STATUS_INTERFACE,
     MMC_F_BEARER_STATUS_IP_TIMEOUT,
     /* Bearer properties section */

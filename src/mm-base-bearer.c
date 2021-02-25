@@ -410,6 +410,7 @@ bearer_stats_start (MMBaseBearer *self)
 static void
 bearer_reset_interface_status (MMBaseBearer *self)
 {
+    mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
@@ -465,11 +466,13 @@ bearer_update_status (MMBaseBearer *self,
 }
 
 static void
-bearer_update_status_connected (MMBaseBearer *self,
-                                const gchar *interface,
+bearer_update_status_connected (MMBaseBearer     *self,
+                                const gchar      *interface,
+                                gboolean          multiplexed,
                                 MMBearerIpConfig *ipv4_config,
                                 MMBearerIpConfig *ipv6_config)
 {
+    mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), multiplexed);
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), TRUE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), interface);
@@ -830,6 +833,7 @@ connect_ready (MMBaseBearer *self,
         bearer_update_status_connected (
             self,
             mm_port_get_device (mm_bearer_connect_result_peek_data (result)),
+            mm_bearer_connect_result_get_multiplexed (result),
             mm_bearer_connect_result_peek_ipv4_config (result),
             mm_bearer_connect_result_peek_ipv6_config (result));
         mm_bearer_connect_result_unref (result);
@@ -1535,6 +1539,7 @@ mm_base_bearer_init (MMBaseBearer *self)
 
     /* Set defaults */
     mm_gdbus_bearer_set_interface   (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_connected   (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended   (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_properties  (MM_GDBUS_BEARER (self), NULL);
@@ -1656,10 +1661,11 @@ mm_base_bearer_class_init (MMBaseBearerClass *klass)
 /* Helpers to implement connect() */
 
 struct _MMBearerConnectResult {
-    volatile gint ref_count;
-    MMPort *data;
+    volatile gint     ref_count;
+    MMPort           *data;
     MMBearerIpConfig *ipv4_config;
     MMBearerIpConfig *ipv6_config;
+    gboolean          multiplexed;
 };
 
 MMBearerConnectResult *
@@ -1701,8 +1707,21 @@ mm_bearer_connect_result_peek_ipv6_config (MMBearerConnectResult *result)
     return result->ipv6_config;
 }
 
+void
+mm_bearer_connect_result_set_multiplexed (MMBearerConnectResult *result,
+                                          gboolean               multiplexed)
+{
+    result->multiplexed = multiplexed;
+}
+
+gboolean
+mm_bearer_connect_result_get_multiplexed (MMBearerConnectResult *result)
+{
+    return result->multiplexed;
+}
+
 MMBearerConnectResult *
-mm_bearer_connect_result_new (MMPort *data,
+mm_bearer_connect_result_new (MMPort           *data,
                               MMBearerIpConfig *ipv4_config,
                               MMBearerIpConfig *ipv6_config)
 {
@@ -1718,5 +1737,6 @@ mm_bearer_connect_result_new (MMPort *data,
         result->ipv4_config = g_object_ref (ipv4_config);
     if (ipv6_config)
         result->ipv6_config = g_object_ref (ipv6_config);
+    result->multiplexed = FALSE; /* default */
     return result;
 }
