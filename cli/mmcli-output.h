@@ -290,6 +290,7 @@ typedef enum {
     MMC_F_SIM_PROPERTIES_OPERATOR_ID,
     MMC_F_SIM_PROPERTIES_OPERATOR_NAME,
     MMC_F_SIM_PROPERTIES_EMERGENCY_NUMBERS,
+    MMC_F_SIM_PROPERTIES_PREFERRED_NETWORKS,
     /* Lists */
     MMC_F_MODEM_LIST_DBUS_PATH,
     MMC_F_SMS_LIST_DBUS_PATH,
@@ -341,16 +342,17 @@ void mmcli_output_listitem              (MmcF           field,
 /******************************************************************************/
 /* Custom output management */
 
-void mmcli_output_signal_quality   (guint                      value,
-                                    gboolean                   recent);
-void mmcli_output_state            (MMModemState               state,
-                                    MMModemStateFailedReason   reason);
-void mmcli_output_sim_slots        (gchar                    **sim_slot_paths,
-                                    guint                      primary_sim_slot);
-void mmcli_output_scan_networks    (GList                     *network_list);
-void mmcli_output_firmware_list    (GList                     *firmware_list,
-                                    MMFirmwareProperties      *selected);
-void mmcli_output_pco_list         (GList                     *pco_list);
+void mmcli_output_signal_quality     (guint                      value,
+                                      gboolean                   recent);
+void mmcli_output_state              (MMModemState               state,
+                                      MMModemStateFailedReason   reason);
+void mmcli_output_sim_slots          (gchar                    **sim_slot_paths,
+                                      guint                      primary_sim_slot);
+void mmcli_output_scan_networks      (GList                     *network_list);
+void mmcli_output_firmware_list      (GList                     *firmware_list,
+                                      MMFirmwareProperties      *selected);
+void mmcli_output_pco_list           (GList                     *pco_list);
+void mmcli_output_preferred_networks (GList                     *preferred_nets_list);
 
 /******************************************************************************/
 /* Dump output */

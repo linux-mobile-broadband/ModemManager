@@ -273,6 +273,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_SIM_PROPERTIES_OPERATOR_ID]        = { "sim.properties.operator-code",                    "operator id",              MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_OPERATOR_NAME]      = { "sim.properties.operator-name",                    "operator name",            MMC_S_SIM_PROPERTIES,          },
     [MMC_F_SIM_PROPERTIES_EMERGENCY_NUMBERS]  = { "sim.properties.emergency-numbers",                "emergency numbers",        MMC_S_SIM_PROPERTIES,          },
+    [MMC_F_SIM_PROPERTIES_PREFERRED_NETWORKS] = { "sim.properties.preferred-networks",               "preferred networks",       MMC_S_SIM_PROPERTIES,          },
     [MMC_F_MODEM_LIST_DBUS_PATH]              = { "modem-list",                                      "modems",                   MMC_S_UNKNOWN,                 },
     [MMC_F_SMS_LIST_DBUS_PATH]                = { "modem.messaging.sms",                             "sms messages",             MMC_S_UNKNOWN,                 },
     [MMC_F_CALL_LIST_DBUS_PATH]               = { "modem.voice.call",                                "calls",                    MMC_S_UNKNOWN,                 },
@@ -795,6 +796,44 @@ mmcli_output_pco_list (GList *pco_list)
     g_ptr_array_add (aux, NULL);
 
     output_item_new_take_multiple (MMC_F_3GPP_PCO, (gchar **) g_ptr_array_free (aux, FALSE), TRUE);
+}
+
+/******************************************************************************/
+/* (Custom) Preferred networks output */
+
+void
+mmcli_output_preferred_networks (GList *preferred_nets_list)
+{
+    if (preferred_nets_list) {
+        GPtrArray *aux;
+
+        aux = g_ptr_array_new ();
+        for (;preferred_nets_list; preferred_nets_list = g_list_next (preferred_nets_list)) {
+            const MMSimPreferredNetwork *preferred_net;
+            gchar       *access_technologies;
+            gchar       *out;
+            const gchar *operator_code;
+
+            preferred_net = (const MMSimPreferredNetwork *)preferred_nets_list->data;
+            operator_code = mm_sim_preferred_network_get_operator_code (preferred_net);
+            access_technologies = mm_modem_access_technology_build_string_from_mask (mm_sim_preferred_network_get_access_technology (preferred_net));
+
+            if (selected_type == MMC_OUTPUT_TYPE_HUMAN)
+                out = g_strdup_printf ("%s (%s)",
+                                       operator_code,
+                                       access_technologies);
+            else
+                out = g_strdup_printf ("operator-code: %s, access-technologies: %s",
+                                       operator_code,
+                                       access_technologies);
+
+            g_ptr_array_add (aux, out);
+            g_free (access_technologies);
+        }
+        g_ptr_array_add (aux, NULL);
+
+        mmcli_output_string_array_take (MMC_F_SIM_PROPERTIES_PREFERRED_NETWORKS, (gchar **) g_ptr_array_free (aux, FALSE), TRUE);
+    }
 }
 
 /******************************************************************************/
