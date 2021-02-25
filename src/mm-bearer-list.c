@@ -34,7 +34,6 @@ G_DEFINE_TYPE (MMBearerList, mm_bearer_list, G_TYPE_OBJECT);
 enum {
     PROP_0,
     PROP_NUM_BEARERS,
-    PROP_MAX_BEARERS,
     PROP_MAX_ACTIVE_BEARERS,
     PROP_LAST
 };
@@ -44,8 +43,6 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMBearerListPrivate {
     /* List of bearers */
     GList *bearers;
-    /* Max number of bearers */
-    guint max_bearers;
     /* Max number of active bearers */
     guint max_active_bearers;
 };
@@ -53,27 +50,9 @@ struct _MMBearerListPrivate {
 /*****************************************************************************/
 
 guint
-mm_bearer_list_get_max (MMBearerList *self)
-{
-    return self->priv->max_bearers;
-}
-
-guint
 mm_bearer_list_get_max_active (MMBearerList *self)
 {
     return self->priv->max_active_bearers;
-}
-
-guint
-mm_bearer_list_get_count (MMBearerList *self)
-{
-    return g_list_length (self->priv->bearers);
-}
-
-guint
-mm_bearer_list_get_count_active (MMBearerList *self)
-{
-    return 0; /* TODO */
 }
 
 gboolean
@@ -81,16 +60,6 @@ mm_bearer_list_add_bearer (MMBearerList *self,
                            MMBaseBearer *bearer,
                            GError **error)
 {
-    /* Just in case, ensure we don't go off limits */
-    if (g_list_length (self->priv->bearers) == self->priv->max_bearers) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_TOO_MANY,
-                     "Cannot add new bearer: already reached maximum (%u)",
-                     self->priv->max_bearers);
-        return FALSE;
-    }
-
     /* Keep our own reference */
     self->priv->bearers = g_list_prepend (self->priv->bearers, g_object_ref (bearer));
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_NUM_BEARERS]);
@@ -269,12 +238,10 @@ mm_bearer_list_disconnect_all_bearers (MMBearerList *self,
 /*****************************************************************************/
 
 MMBearerList *
-mm_bearer_list_new (guint max_bearers,
-                    guint max_active_bearers)
+mm_bearer_list_new (guint max_active_bearers)
 {
     /* Create the object */
     return g_object_new  (MM_TYPE_BEARER_LIST,
-                          MM_BEARER_LIST_MAX_BEARERS, max_bearers,
                           MM_BEARER_LIST_MAX_ACTIVE_BEARERS, max_active_bearers,
                           NULL);
 }
@@ -290,9 +257,6 @@ set_property (GObject *object,
     switch (prop_id) {
     case PROP_NUM_BEARERS:
         g_assert_not_reached ();
-        break;
-    case PROP_MAX_BEARERS:
-        self->priv->max_bearers = g_value_get_uint (value);
         break;
     case PROP_MAX_ACTIVE_BEARERS:
         self->priv->max_active_bearers = g_value_get_uint (value);
@@ -314,9 +278,6 @@ get_property (GObject *object,
     switch (prop_id) {
     case PROP_NUM_BEARERS:
         g_value_set_uint (value, g_list_length (self->priv->bearers));
-        break;
-    case PROP_MAX_BEARERS:
-        g_value_set_uint (value, self->priv->max_bearers);
         break;
     case PROP_MAX_ACTIVE_BEARERS:
         g_value_set_uint (value, self->priv->max_active_bearers);
@@ -370,16 +331,6 @@ mm_bearer_list_class_init (MMBearerListClass *klass)
                            0,
                            G_PARAM_READABLE);
     g_object_class_install_property (object_class, PROP_NUM_BEARERS, properties[PROP_NUM_BEARERS]);
-
-    properties[PROP_MAX_BEARERS] =
-        g_param_spec_uint (MM_BEARER_LIST_MAX_BEARERS,
-                           "Max bearers",
-                           "Maximum number of bearers the list can handle",
-                           1,
-                           G_MAXUINT,
-                           1,
-                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_MAX_BEARERS, properties[PROP_MAX_BEARERS]);
 
     properties[PROP_MAX_ACTIVE_BEARERS] =
         g_param_spec_uint (MM_BEARER_LIST_MAX_ACTIVE_BEARERS,

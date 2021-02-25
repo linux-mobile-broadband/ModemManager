@@ -337,6 +337,12 @@
         while GSM/UMTS devices typically support three or more, and any
         LTE-capable device (whether LTE-only, GSM/UMTS-capable, and/or
         CDMA2000-capable) also typically support three or more.
+
+        Deprecated: 1.18.0. There is no way to query the modem how many bearers
+        it supports, so the value exposed in this property in all the different
+        implementations is always equal to the value in
+        #org.freedesktop.ModemManager1.Modem:MaxActiveBearers, so there is no
+        point in using this property.
     -->
     <property name="MaxBearers" type="u" access="read" />
 

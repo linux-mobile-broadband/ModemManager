@@ -31,7 +31,6 @@
 #define MM_BEARER_LIST_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BEARER_LIST, MMBearerListClass))
 
 #define MM_BEARER_LIST_NUM_BEARERS        "num-bearers"
-#define MM_BEARER_LIST_MAX_BEARERS        "max-bearers"
 #define MM_BEARER_LIST_MAX_ACTIVE_BEARERS "max-active-bearers"
 
 typedef struct _MMBearerList MMBearerList;
@@ -50,14 +49,9 @@ struct _MMBearerListClass {
 GType mm_bearer_list_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerList, g_object_unref)
 
-MMBearerList *mm_bearer_list_new (guint max_bearers,
-                                  guint max_active_bearers);
+MMBearerList *mm_bearer_list_new (guint max_active_bearers);
 
-GStrv mm_bearer_list_get_paths (MMBearerList *self);
-
-guint mm_bearer_list_get_count (MMBearerList *self);
-guint mm_bearer_list_get_count_active (MMBearerList *self);
-guint mm_bearer_list_get_max (MMBearerList *self);
+GStrv mm_bearer_list_get_paths      (MMBearerList *self);
 guint mm_bearer_list_get_max_active (MMBearerList *self);
 
 gboolean mm_bearer_list_add_bearer (MMBearerList *self,

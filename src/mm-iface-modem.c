@@ -670,17 +670,6 @@ mm_iface_modem_create_bearer (MMIfaceModem *self,
         return;
     }
 
-    if (mm_bearer_list_get_count (ctx->list) == mm_bearer_list_get_max (ctx->list)) {
-        g_task_return_new_error (
-            task,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_TOO_MANY,
-            "Cannot add new bearer: already reached maximum (%u)",
-            mm_bearer_list_get_count (ctx->list));
-        g_object_unref (task);
-        return;
-    }
-
     MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
         self,
         properties,
@@ -5109,10 +5098,10 @@ interface_initialization_step (GTask *task)
             /* The maximum number of available/connected modems is guessed from
              * the size of the data ports list. */
             n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (self)));
-            mm_obj_dbg (self, "allowed up to %u bearers", n);
+            mm_obj_dbg (self, "allowed up to %u active bearers", n);
 
             /* Create new default list */
-            list = mm_bearer_list_new (n, n);
+            list = mm_bearer_list_new (n);
             g_signal_connect (list,
                               "notify::" MM_BEARER_LIST_NUM_BEARERS,
                               G_CALLBACK (bearer_list_updated),
@@ -5122,14 +5111,17 @@ interface_initialization_step (GTask *task)
                           NULL);
         }
 
-        if (mm_gdbus_modem_get_max_bearers (ctx->skeleton) == 0)
-            mm_gdbus_modem_set_max_bearers (
-                ctx->skeleton,
-                mm_bearer_list_get_max (list));
         if (mm_gdbus_modem_get_max_active_bearers (ctx->skeleton) == 0)
             mm_gdbus_modem_set_max_active_bearers (
                 ctx->skeleton,
                 mm_bearer_list_get_max_active (list));
+
+        /* MaxBearers set equal to MaxActiveBearers */
+        if (mm_gdbus_modem_get_max_bearers (ctx->skeleton) == 0)
+            mm_gdbus_modem_set_max_bearers (
+                ctx->skeleton,
+                mm_gdbus_modem_get_max_active_bearers (ctx->skeleton));
+
         g_object_unref (list);
 
         ctx->step++;

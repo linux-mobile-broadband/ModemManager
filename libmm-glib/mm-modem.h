@@ -89,7 +89,10 @@ gboolean           mm_modem_get_supported_capabilities (MMModem *self,
 
 MMModemCapability  mm_modem_get_current_capabilities (MMModem *self);
 
+#ifndef MM_DISABLE_DEPRECATED
+G_DEPRECATED
 guint              mm_modem_get_max_bearers          (MMModem *self);
+#endif /* MM_DISABLE_DEPRECATED */
 
 guint              mm_modem_get_max_active_bearers   (MMModem *self);
 
