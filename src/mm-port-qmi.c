@@ -1053,6 +1053,7 @@ typedef enum {
     INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE,
     INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_WDA_DATA_FORMAT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_SETUP_MASTER_MTU,
     INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_KERNEL_DATA_FORMAT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_LAST,
 } InternalSetupDataFormatStep;
@@ -1155,6 +1156,72 @@ sync_kernel_data_format (GTask *task)
 }
 
 static void
+master_mtu_ready (MMPortNet    *data,
+                  GAsyncResult *res,
+                  GTask        *task)
+{
+    MMPortQmi                      *self;
+    InternalSetupDataFormatContext *ctx;
+    GError                         *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (!mm_port_net_link_setup_finish (data, res, &error)) {
+        mm_obj_dbg (self, "failed to setup master MTU: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    if ((ctx->kernel_data_format_current != QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3) &&
+        !qmi_device_set_expected_data_format (ctx->device, ctx->kernel_data_format_current, &error)) {
+        mm_obj_warn (self, "failed leaving 802.3 kernel data format after master mtu change: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
+setup_master_mtu (GTask *task)
+{
+    MMPortQmi                      *self;
+    InternalSetupDataFormatContext *ctx;
+    guint                           mtu = MM_PORT_NET_MTU_DEFAULT;
+    g_autoptr(GError)               error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data     (task);
+
+    if ((ctx->kernel_data_format_current != QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3) &&
+        !qmi_device_set_expected_data_format (ctx->device, QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3, &error))
+        mm_obj_warn (self, "failed setting up 802.3 kernel data format before master mtu change: %s", error->message);
+
+    if ((ctx->kernel_data_format_requested == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP) &&
+        (ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
+         ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP))
+        mtu = ctx->wda_dl_dap_max_size_current;
+
+    /* If no max aggregation size was specified by the modem (e.g. if we requested QMAP
+     * aggregation protocol but the modem doesn't support it), skip */
+    if (!mtu) {
+        mm_obj_dbg (self, "ignoring master mtu setup");
+        ctx->step++;
+        internal_setup_data_format_context_step (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "setting up master mtu: %u bytes", mtu);
+    mm_port_net_link_setup (MM_PORT_NET (ctx->data),
+                            FALSE,
+                            mtu,
+                            NULL,
+                            (GAsyncReadyCallback) master_mtu_ready,
+                            task);
+}
+
+static void
 set_data_format_ready (QmiClientWda *client,
                        GAsyncResult *res,
                        GTask        *task)
@@ -1171,6 +1238,9 @@ set_data_format_ready (QmiClientWda *client,
         g_object_unref (task);
         return;
     }
+
+    /* store max aggregation size so that the master MTU logic works */
+    qmi_message_wda_set_data_format_output_get_downlink_data_aggregation_max_size (output, &ctx->wda_dl_dap_max_size_current, NULL);
 
     /* request reload */
     ctx->wda_llp_current = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
@@ -1516,6 +1586,16 @@ internal_setup_data_format_context_step (GTask *task)
                 (ctx->wda_ul_dap_current != ctx->wda_ul_dap_requested) ||
                 (ctx->wda_dl_dap_current != ctx->wda_dl_dap_requested)) {
                 sync_wda_data_format (task);
+                return;
+            }
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_SETUP_MASTER_MTU:
+            /* qmi_wwan add_mux/del_mux based logic requires master MTU set to the maximum
+             * data aggregation size reported by the modem. At this point the  */
+            if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) {
+                setup_master_mtu (task);
                 return;
             }
             ctx->step++;
