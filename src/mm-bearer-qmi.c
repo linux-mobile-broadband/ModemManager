@@ -2046,8 +2046,8 @@ _connect (MMBaseBearer *_self,
     ctx->step = CONNECT_STEP_FIRST;
     ctx->ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
 
-    /* If no multiplex setting given by the user, assume none */
-    ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;
+    /* If no multiplex setting given by the user, assume requested */
+    ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
 
     g_object_get (self,
                   MM_BASE_BEARER_CONFIG, &properties,
