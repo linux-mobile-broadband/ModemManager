@@ -50,6 +50,7 @@ struct _MMPortQmiPrivate {
     gboolean                      wda_unsupported;
     QmiWdaLinkLayerProtocol       llp;
     QmiWdaDataAggregationProtocol dap;
+    guint                         max_multiplexed_links;
     /* preallocated links */
     MMPort   *preallocated_links_master;
     GArray   *preallocated_links;
@@ -965,6 +966,12 @@ mm_port_qmi_get_data_aggregation_protocol (MMPortQmi *self)
     return self->priv->dap;
 }
 
+guint
+mm_port_qmi_get_max_multiplexed_links (MMPortQmi *self)
+{
+    return self->priv->max_multiplexed_links;
+}
+
 /*****************************************************************************/
 
 static QmiDeviceExpectedDataFormat
@@ -999,12 +1006,14 @@ load_kernel_data_format_capabilities (MMPortQmi *self,
                                       QmiDevice *device,
                                       gboolean  *supports_802_3,
                                       gboolean  *supports_raw_ip,
+                                      gboolean  *supports_qmap_raw_ip,
                                       gboolean  *supports_qmap_pass_through)
 {
     /* For any driver other than qmi_wwan, assume raw-ip */
     if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) {
         *supports_802_3 = FALSE;
         *supports_raw_ip = TRUE;
+        *supports_qmap_raw_ip = TRUE;
         *supports_qmap_pass_through = FALSE;
         return;
     }
@@ -1014,9 +1023,18 @@ load_kernel_data_format_capabilities (MMPortQmi *self,
                                                                         QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP,
                                                                         NULL);
     if (!*supports_raw_ip) {
+        *supports_qmap_raw_ip = FALSE;
         *supports_qmap_pass_through = FALSE;
         return;
     }
+
+    /* We switch to raw-ip to see if we can do link management with qmi_wwan.
+     * This switch would not truly be required, but the logic afterwards is robust
+     * enough to support this, nothing to worry about */
+    if (qmi_device_set_expected_data_format (device, QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP, NULL))
+        *supports_qmap_raw_ip = qmi_device_check_link_supported (device, NULL);
+    else
+        *supports_qmap_raw_ip = FALSE;
 
     *supports_qmap_pass_through = qmi_device_check_expected_data_format_supported (device,
                                                                                    QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH,
@@ -1072,6 +1090,7 @@ typedef struct {
     QmiDeviceExpectedDataFormat kernel_data_format_requested;
     gboolean                    kernel_data_format_802_3_supported;
     gboolean                    kernel_data_format_raw_ip_supported;
+    gboolean                    kernel_data_format_qmap_raw_ip_supported;
     gboolean                    kernel_data_format_qmap_pass_through_supported;
     gboolean                    link_management_supported;
 
@@ -1108,6 +1127,7 @@ internal_setup_data_format_finish (MMPortQmi                      *self,
                                    QmiDeviceExpectedDataFormat    *out_kernel_data_format,
                                    QmiWdaLinkLayerProtocol        *out_llp,
                                    QmiWdaDataAggregationProtocol  *out_dap,
+                                   guint                          *out_max_multiplexed_links,
                                    GError                        **error)
 {
     InternalSetupDataFormatContext *ctx;
@@ -1120,6 +1140,32 @@ internal_setup_data_format_finish (MMPortQmi                      *self,
     *out_llp = ctx->wda_llp_current;
     g_assert (ctx->wda_dl_dap_current == ctx->wda_ul_dap_current);
     *out_dap = ctx->wda_dl_dap_current;
+
+    if (out_max_multiplexed_links) {
+        if (!ctx->wda_dap_supported) {
+            *out_max_multiplexed_links = 0;
+            mm_obj_dbg (self, "wda data aggregation protocol unsupported: no multiplexed bearers allowed");
+        } else {
+            /* if multiplex backend may be rmnet, MAX-MIN */
+            if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
+                ctx->kernel_data_format_qmap_pass_through_supported) {
+                *out_max_multiplexed_links = 1 + (QMI_DEVICE_MUX_ID_MAX - QMI_DEVICE_MUX_ID_MIN);
+                mm_obj_dbg (self, "rmnet link management supported: %u multiplexed bearers allowed",
+                            *out_max_multiplexed_links);
+            }
+            /* if multiplex backend may be qmi_wwan, the max preallocated amount :/  */
+            else if ((mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) &&
+                     ctx->kernel_data_format_qmap_raw_ip_supported) {
+                *out_max_multiplexed_links = DEFAULT_LINK_PREALLOCATED_AMOUNT;
+                mm_obj_dbg (self, "qmi_wwan link management supported: %u multiplexed bearers allowed",
+                            *out_max_multiplexed_links);
+            } else {
+                *out_max_multiplexed_links = 0;
+                mm_obj_dbg (self, "qmi_wwan link management unsupported: no multiplexed bearers allowed");
+            }
+        }
+    }
+
     return TRUE;
 }
 
@@ -1501,6 +1547,7 @@ internal_setup_data_format_context_step (GTask *task)
                                                   ctx->device,
                                                   &ctx->kernel_data_format_802_3_supported,
                                                   &ctx->kernel_data_format_raw_ip_supported,
+                                                  &ctx->kernel_data_format_qmap_raw_ip_supported,
                                                   &ctx->kernel_data_format_qmap_pass_through_supported);
             ctx->step++;
             /* Fall through */
@@ -1703,6 +1750,7 @@ internal_setup_data_format_ready (MMPortQmi    *self,
                                             &self->priv->kernel_data_format,
                                             &self->priv->llp,
                                             &self->priv->dap,
+                                            NULL, /* not expected to update */
                                             &error))
         g_task_return_error (task, error);
     else
@@ -1933,6 +1981,7 @@ qmi_device_open_second_ready (QmiDevice    *qmi_device,
         else
             g_assert_not_reached ();
         self->priv->dap = QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED;
+        self->priv->max_multiplexed_links = 0;
     }
 
     /* In both error and success, we go to last step */
@@ -1974,6 +2023,7 @@ open_internal_setup_data_format_ready (MMPortQmi    *self,
                                             &self->priv->kernel_data_format,
                                             &self->priv->llp,
                                             &self->priv->dap,
+                                            &self->priv->max_multiplexed_links,
                                             &error)) {
         /* Continue with fallback to LLP requested via CTL */
         mm_obj_warn (self, "Couldn't setup data format: %s", error->message);

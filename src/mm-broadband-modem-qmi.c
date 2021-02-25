@@ -333,6 +333,37 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Create Bearer List (Modem interface) */
+
+static MMBearerList *
+modem_create_bearer_list (MMIfaceModem *self)
+{
+    MMPortQmi *port;
+    guint      n;
+    guint      n_multiplexed;
+
+    /* The maximum number of available/connected modems is guessed from
+     * the size of the data ports list. */
+    n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (self)));
+    mm_obj_dbg (self, "allowed up to %u active bearers", n);
+
+    /* The maximum number of multiplexed links is retrieved from the
+     * MMPortQmi */
+
+    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self));
+    if (!port) {
+        mm_obj_warn (self, "no port to query maximum number of supported network links");
+        n_multiplexed = 0;
+    } else {
+        n_multiplexed = mm_port_qmi_get_max_multiplexed_links (port);
+        mm_obj_dbg (self, "allowed up to %u active multiplexed bearers", n_multiplexed);
+    }
+
+    /* by default, no multiplexing support */
+    return mm_bearer_list_new (n, n_multiplexed);
+}
+
+/*****************************************************************************/
 /* Manufacturer loading (Modem interface) */
 
 static gchar *
@@ -10379,9 +10410,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_sim_hot_swap = mm_shared_qmi_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = mm_shared_qmi_setup_sim_hot_swap_finish;
 
-    /* Create QMI-specific bearer */
+    /* Create QMI-specific bearer and bearer list */
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->create_bearer_list = modem_create_bearer_list;
 
     /* Other actions */
     iface->reset = mm_shared_qmi_reset;
