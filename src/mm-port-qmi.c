@@ -314,6 +314,23 @@ delete_preallocated_links (QmiDevice *qmi_device,
     }
 }
 
+static guint
+count_preallocated_links_setup (MMPortQmi *self)
+{
+    guint i;
+    guint count = 0;
+
+    for (i = 0; self->priv->preallocated_links && (i < self->priv->preallocated_links->len); i++) {
+        PreallocatedLinkInfo *info;
+
+        info = &g_array_index (self->priv->preallocated_links, PreallocatedLinkInfo, i);
+        if (info->setup)
+            count++;
+    }
+
+    return count;
+}
+
 static gboolean
 release_preallocated_link (MMPortQmi    *self,
                            const gchar  *link_name,
@@ -1639,6 +1656,31 @@ setup_data_format_internal_reset_ready (MMPortQmi    *self,
                                 task);
 }
 
+static guint
+count_links_setup (MMPortQmi *self,
+                   MMPort    *data)
+{
+    if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
+        self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) {
+        g_autoptr(GPtrArray) links = NULL;
+        g_autoptr(GError)    error = NULL;
+
+        if (!qmi_device_list_links (self->priv->qmi_device,
+                                    mm_port_get_device (data),
+                                    &links,
+                                    &error)) {
+            mm_obj_warn (self, "couldn't list links in %s: %s",
+                         mm_port_get_device (data),
+                         error->message);
+            return 0;
+        }
+
+        return links->len;
+    }
+
+    return count_preallocated_links_setup (self);
+}
+
 void
 mm_port_qmi_setup_data_format (MMPortQmi                      *self,
                                MMPort                         *data,
@@ -1685,6 +1727,23 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
+    }
+
+    /* support switching from multiplex to non-multiplex, but only if there are no active
+     * links allocated */
+    if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT) &&
+        (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
+         self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
+        guint n_links_setup;
+
+        n_links_setup = count_links_setup (self, data);
+        if (n_links_setup > 0) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                     "Cannot switch to non-multiplex setup: %u links already setup exist",
+                                     n_links_setup);
+            g_object_unref (task);
+            return;
+        }
     }
 
     ctx = g_slice_new0 (SetupDataFormatContext);
