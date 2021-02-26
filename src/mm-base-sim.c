@@ -1220,18 +1220,47 @@ load_preferred_networks_finish (MMBaseSim     *self,
 STR_REPLY_READY_FN (load_preferred_networks)
 
 static void
-load_preferred_networks (MMBaseSim           *self,
-                         GAsyncReadyCallback  callback,
-                         gpointer             user_data)
+load_preferred_networks_cpls_command_ready (MMBaseModem *modem,
+                                            GAsyncResult *res,
+                                            GTask *task)
 {
+    MMBaseSim *self;
+    GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    /* AT+CPLS may not be supported so we ignore any error and proceed even if it fails */
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_obj_dbg (self, "selecting user-defined preferred network list failed: '%s'", error->message);
+        g_error_free (error);
+    }
+
     mm_obj_dbg (self, "loading preferred networks...");
 
     mm_base_modem_at_command (
-        self->priv->modem,
+        modem,
         "+CPOL?",
         20,
         FALSE,
         (GAsyncReadyCallback)load_preferred_networks_command_ready,
+        task);
+}
+
+static void
+load_preferred_networks (MMBaseSim           *self,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+    /* Invoke AT+CPLS=0 first to make sure the correct (user-defined) preferred network list is selected */
+    mm_obj_dbg (self, "selecting user-defined preferred network list...");
+
+    mm_base_modem_at_command (
+        self->priv->modem,
+        "+CPLS=0",
+        20,
+        FALSE,
+        (GAsyncReadyCallback)load_preferred_networks_cpls_command_ready,
         g_task_new (self, NULL, callback, user_data));
 }
 
