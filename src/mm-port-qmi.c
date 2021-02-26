@@ -986,8 +986,13 @@ load_kernel_data_format_current (MMPortQmi *self,
      * on the current expected data format; i.e. if 802-3 is currently selected it
      * will say link management is unsupported, even if it would be supported once
      * we change it to raw-ip */
-    if (supports_links)
-        *supports_links = qmi_device_check_link_supported (device, NULL);
+    if (supports_links) {
+        /* For BAM-DMUX based setups, raw-ip only and no multiplexing */
+        if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0)
+            *supports_links = FALSE;
+        else
+            *supports_links = qmi_device_check_link_supported (device, NULL);
+    }
 
     /* For any driver other than qmi_wwan, assume raw-ip */
     if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC)
@@ -1010,6 +1015,15 @@ load_kernel_data_format_capabilities (MMPortQmi *self,
                                       gboolean  *supports_qmap_raw_ip,
                                       gboolean  *supports_qmap_pass_through)
 {
+    /* For BAM-DMUX based setups, raw-ip only and no multiplexing */
+    if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0) {
+        *supports_802_3 = FALSE;
+        *supports_raw_ip = TRUE;
+        *supports_qmap_raw_ip = FALSE;
+        *supports_qmap_pass_through = FALSE;
+        return;
+    }
+
     /* For any driver other than qmi_wwan, assume raw-ip */
     if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) {
         *supports_802_3 = FALSE;
@@ -1147,9 +1161,14 @@ internal_setup_data_format_finish (MMPortQmi                      *self,
             *out_max_multiplexed_links = 0;
             mm_obj_dbg (self, "wda data aggregation protocol unsupported: no multiplexed bearers allowed");
         } else {
+            /* if BAM-DMUX we already have multiple network interfaces, so no multiplexing */
+            if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0) {
+                *out_max_multiplexed_links = 0;
+                mm_obj_dbg (self, "bam-dmux link management disabled: no multiplexed bearers allowed");
+            }
             /* if multiplex backend may be rmnet, MAX-MIN */
-            if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
-                ctx->kernel_data_format_qmap_pass_through_supported) {
+            else if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
+                     ctx->kernel_data_format_qmap_pass_through_supported) {
                 *out_max_multiplexed_links = 1 + (QMI_DEVICE_MUX_ID_MAX - QMI_DEVICE_MUX_ID_MIN);
                 mm_obj_dbg (self, "rmnet link management supported: %u multiplexed bearers allowed",
                             *out_max_multiplexed_links);
