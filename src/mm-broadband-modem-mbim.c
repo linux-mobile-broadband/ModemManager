@@ -2765,6 +2765,99 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Facility locks disabling (3GPP interface) */
+
+static gboolean
+modem_3gpp_disable_facility_lock_finish (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+disable_facility_lock_ready (MbimDevice *device,
+                             GAsyncResult *res,
+                             GTask *task)
+{
+    MbimMessage *response = NULL;
+    guint32 remaining_attempts;
+    MbimPinState pin_state;
+    MbimPinType pin_type;
+    GError *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response,
+                                                        MBIM_MESSAGE_TYPE_COMMAND_DONE,
+                                                        &error)) {
+        g_task_return_error (task, error);
+    } else if (!mbim_message_pin_response_parse (response,
+                                                 &pin_type,
+                                                 &pin_state,
+                                                 &remaining_attempts,
+                                                 &error)) {
+        g_task_return_error (task, error);
+    } else if (pin_state == MBIM_PIN_STATE_LOCKED) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Disabling PIN lock %s failed, remaining attempts: %u",
+                                 mbim_pin_state_get_string (pin_state),
+                                 remaining_attempts);
+    } else
+        g_task_return_boolean (task, TRUE);
+
+    if (response)
+        mbim_message_unref (response);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
+                                  MMModem3gppFacility facility,
+                                  guint8 slot,
+                                  const gchar *key,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    MbimMessage *message;
+    MbimPinType pin_type;
+    MbimDevice *device;
+    GTask *task;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Set type of pin lock to disable */
+    pin_type = mbim_pin_type_from_mm_modem_3gpp_facility (facility);
+    if (pin_type == MBIM_PIN_TYPE_UNKNOWN) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                 "Not supported type of facility lock.");
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "Trying to disable %s lock using key: %s",
+                mbim_pin_type_get_string (pin_type), key);
+
+    message = mbim_message_pin_set_new (pin_type,
+                                        MBIM_PIN_OPERATION_DISABLE,
+                                        key,
+                                        NULL,
+                                        NULL);
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)disable_facility_lock_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 /* Initial EPS bearer info loading */
 
 static MMBearerProperties *
@@ -6360,6 +6453,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
     iface->scan_networks = modem_3gpp_scan_networks;
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
+    iface->disable_facility_lock = modem_3gpp_disable_facility_lock;
+    iface->disable_facility_lock_finish = modem_3gpp_disable_facility_lock_finish;
 }
 
 static void

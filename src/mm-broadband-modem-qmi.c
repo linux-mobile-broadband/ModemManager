@@ -2444,6 +2444,89 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Facility locks disabling (3GPP interface) */
+
+static gboolean
+modem_3gpp_disable_facility_lock_finish (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+disable_facility_lock_ready (QmiClientUim *client,
+                             GAsyncResult *res,
+                             GTask *task)
+{
+    QmiMessageUimDepersonalizationOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_uim_depersonalization_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_uim_depersonalization_output_get_result (output, &error)) {
+        g_prefix_error (&error, "QMI message Depersonalization failed: ");
+        g_task_return_error (task, error);
+    } else {
+        g_task_return_boolean (task, TRUE);
+    }
+
+    if (output)
+        qmi_message_uim_depersonalization_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
+                                  MMModem3gppFacility facility,
+                                  guint8 slot,
+                                  const gchar *key,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    QmiUimCardApplicationPersonalizationFeature feature;
+    QmiMessageUimDepersonalizationInput *input;
+    QmiClient *client = NULL;
+    GTask *task;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_UIM, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Choose facility to disable */
+    feature = qmi_personalization_feature_from_mm_modem_3gpp_facility (facility);
+    if (feature == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                 "Not supported type of facility lock.");
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "Trying to disable %s lock on slot %d using key: %s",
+                qmi_uim_card_application_personalization_feature_get_string (feature),
+                slot, key);
+
+    input = qmi_message_uim_depersonalization_input_new ();
+    qmi_message_uim_depersonalization_input_set_info (input,
+                                                      feature,
+                                                      QMI_UIM_DEPERSONALIZATION_OPERATION_DEACTIVATE,
+                                                      key,
+                                                      NULL);
+    qmi_message_uim_depersonalization_input_set_slot (input, slot, NULL);
+
+    qmi_client_uim_depersonalization (QMI_CLIENT_UIM (client),
+                                      input,
+                                      30,
+                                      NULL,
+                                      (GAsyncReadyCallback) disable_facility_lock_ready,
+                                      task);
+    qmi_message_uim_depersonalization_input_unref (input);
+}
+
+/*****************************************************************************/
 /* Scan networks (3GPP interface) */
 
 static GList *
@@ -11231,6 +11314,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_initial_eps_bearer_settings_finish = modem_3gpp_load_initial_eps_bearer_settings_finish;
     iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
     iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
+    iface->disable_facility_lock = modem_3gpp_disable_facility_lock;
+    iface->disable_facility_lock_finish = modem_3gpp_disable_facility_lock_finish;
 }
 
 static void
