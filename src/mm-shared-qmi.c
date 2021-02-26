@@ -212,7 +212,7 @@ register_in_network_cancelled (GCancellable *cancellable,
     g_signal_handler_disconnect (ctx->client, ctx->serving_system_indication_id);
     ctx->serving_system_indication_id = 0;
 
-    g_assert (g_task_return_error_if_cancelled (task));
+    g_task_return_error_if_cancelled (task);
     g_object_unref (task);
 }
 
