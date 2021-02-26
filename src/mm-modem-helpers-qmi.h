@@ -196,4 +196,6 @@ gboolean mm_qmi_uim_get_configuration_output_parse (gpointer                    
                                                     MMModem3gppFacility                  *o_lock,
                                                     GError                              **error);
 
+QmiUimCardApplicationPersonalizationFeature qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFacility facility);
+
 #endif  /* MM_MODEM_HELPERS_QMI_H */

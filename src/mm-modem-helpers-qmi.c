@@ -2262,3 +2262,28 @@ mm_qmi_uim_get_configuration_output_parse (gpointer                             
     }
     return TRUE;
 }
+
+/*****************************************************************************/
+
+QmiUimCardApplicationPersonalizationFeature
+qmi_personalization_feature_from_mm_modem_3gpp_facility (MMModem3gppFacility facility)
+{
+    switch (facility) {
+    case MM_MODEM_3GPP_FACILITY_NET_PERS:
+        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK;
+    case MM_MODEM_3GPP_FACILITY_NET_SUB_PERS:
+        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK_SUBSET;
+    case MM_MODEM_3GPP_FACILITY_PROVIDER_PERS:
+        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SERVICE_PROVIDER;
+    case MM_MODEM_3GPP_FACILITY_CORP_PERS:
+        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_CORPORATE;
+    case MM_MODEM_3GPP_FACILITY_PH_SIM:
+        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_UIM;
+    case MM_MODEM_3GPP_FACILITY_NONE:
+    case MM_MODEM_3GPP_FACILITY_SIM:
+    case MM_MODEM_3GPP_FACILITY_FIXED_DIALING:
+    case MM_MODEM_3GPP_FACILITY_PH_FSIM:
+    default:
+        return QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN;
+    }
+}

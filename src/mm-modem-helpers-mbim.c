@@ -207,6 +207,34 @@ mm_3gpp_network_info_list_from_mbim_providers (const MbimProvider *const *provid
 
 /*****************************************************************************/
 
+MbimPinType
+mbim_pin_type_from_mm_modem_3gpp_facility (MMModem3gppFacility facility)
+{
+    switch (facility) {
+    case MM_MODEM_3GPP_FACILITY_NET_PERS:
+        return MBIM_PIN_TYPE_NETWORK_PIN;
+    case MM_MODEM_3GPP_FACILITY_NET_SUB_PERS:
+        return MBIM_PIN_TYPE_NETWORK_SUBSET_PIN;
+    case MM_MODEM_3GPP_FACILITY_PROVIDER_PERS:
+        return MBIM_PIN_TYPE_SERVICE_PROVIDER_PIN;
+    case MM_MODEM_3GPP_FACILITY_CORP_PERS:
+        return MBIM_PIN_TYPE_CORPORATE_PIN;
+    case MM_MODEM_3GPP_FACILITY_SIM:
+        return MBIM_PIN_TYPE_PIN1;
+    case MM_MODEM_3GPP_FACILITY_FIXED_DIALING:
+        return MBIM_PIN_TYPE_PIN2;
+    case MM_MODEM_3GPP_FACILITY_PH_SIM:
+        return MBIM_PIN_TYPE_DEVICE_SIM_PIN;
+    case MM_MODEM_3GPP_FACILITY_PH_FSIM:
+        return MBIM_PIN_TYPE_DEVICE_FIRST_SIM_PIN;
+    case MM_MODEM_3GPP_FACILITY_NONE:
+    default:
+        return MBIM_PIN_TYPE_UNKNOWN;
+    }
+}
+
+/*****************************************************************************/
+
 GError *
 mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
 {
