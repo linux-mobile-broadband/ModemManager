@@ -28,6 +28,7 @@
 #include "mm-plugin-manager.h"
 #include "mm-plugin.h"
 #include "mm-shared.h"
+#include "mm-utils.h"
 #include "mm-log-object.h"
 
 #define SHARED_PREFIX "libmm-shared"

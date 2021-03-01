@@ -27,6 +27,7 @@
 #include "mm-kernel-device-generic.h"
 #include "mm-kernel-device-generic-rules.h"
 #include "mm-log-object.h"
+#include "mm-utils.h"
 
 #if !defined UDEVRULESDIR
 # error UDEVRULESDIR is not defined
