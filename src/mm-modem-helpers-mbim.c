@@ -19,6 +19,8 @@
 #include "mm-errors-types.h"
 #include "mm-log-object.h"
 
+#include <string.h>
+
 /*****************************************************************************/
 
 MMModemCapability
