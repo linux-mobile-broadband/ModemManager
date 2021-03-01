@@ -13,6 +13,7 @@
  * Copyright (C) 2012 Google, Inc.
  */
 
+#include <string.h>
 #include <glib-object.h>
 
 #include <libmm-glib.h>
