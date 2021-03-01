@@ -12,6 +12,8 @@
  *
  * Singleton support imported from NetworkManager.
  *     (C) Copyright 2014 Red Hat, Inc.
+ *
+ * GPtrArray lookup with GEqualFunc imported from GLib 2.48
  */
 
 #ifndef MM_UTILS_H
@@ -77,5 +79,17 @@
         return singleton_instance;                                      \
     }                                                                   \
     MM_DEFINE_SINGLETON_DESTRUCTOR(TYPE)
+
+
+#if !GLIB_CHECK_VERSION(2,54,0)
+
+/* Pointer Array lookup with a GEqualFunc, imported from GLib 2.54 */
+#define g_ptr_array_find_with_equal_func mm_ptr_array_find_with_equal_func
+gboolean mm_ptr_array_find_with_equal_func (GPtrArray     *haystack,
+                                            gconstpointer  needle,
+                                            GEqualFunc     equal_func,
+                                            guint         *index_);
+
+#endif
 
 #endif /* MM_UTILS_H */
