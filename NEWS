@@ -1,4 +1,11 @@
 
+ModemManager 1.16.2
+-------------------------------------------
+
+ * build: fixed with GLib < 2.54.
+ * qmi: fixed network regitration cancellation when asserts disabled.
+ * libmm-glib: fix allow-roaming setting comparison in bearer properties.
+
 ModemManager 1.16.0
 -------------------------------------------
 This is a new stable release of ModemManager.
