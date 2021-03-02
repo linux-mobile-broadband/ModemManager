@@ -110,6 +110,7 @@ struct _MMBroadbandModemQmiPrivate {
 #if defined WITH_NEWEST_QMI_COMMANDS
     guint system_info_indication_id;
 #endif /* WITH_NEWEST_QMI_COMMANDS */
+    guint network_reject_indication_id;
 
     /* CDMA activation helpers */
     MMModemCdmaActivationState activation_state;
@@ -3476,6 +3477,7 @@ common_enable_disable_unsolicited_registration_events_serving_system (GTask *tas
     ctx = g_task_get_task_data (task);
     input = qmi_message_nas_register_indications_input_new ();
     qmi_message_nas_register_indications_input_set_serving_system_events (input, ctx->enable, NULL);
+    qmi_message_nas_register_indications_input_set_network_reject_information (input, ctx->enable, FALSE, NULL);
     qmi_client_nas_register_indications (
         ctx->client,
         input,
@@ -3496,6 +3498,7 @@ common_enable_disable_unsolicited_registration_events_system_info (GTask *task)
     ctx = g_task_get_task_data (task);
     input = qmi_message_nas_register_indications_input_new ();
     qmi_message_nas_register_indications_input_set_system_info (input, ctx->enable, NULL);
+    qmi_message_nas_register_indications_input_set_network_reject_information (input, ctx->enable, FALSE, NULL);
     qmi_client_nas_register_indications (
         ctx->client,
         input,
@@ -4543,6 +4546,34 @@ serving_system_indication_cb (QmiClientNas *client,
 
 #endif
 
+/* network reject indications enabled in both with/without newest QMI commands */
+static void
+network_reject_indication_cb (QmiClientNas                        *client,
+                              QmiIndicationNasNetworkRejectOutput *output,
+                              MMBroadbandModemQmi                 *self)
+{
+    QmiNasNetworkServiceDomain service_domain = QMI_NAS_NETWORK_SERVICE_DOMAIN_UNKNOWN;
+    QmiNasRadioInterface       radio_interface = QMI_NAS_RADIO_INTERFACE_UNKNOWN;
+    QmiNasRejectCause          reject_cause = QMI_NAS_REJECT_CAUSE_NONE;
+    guint16                    mcc = 0;
+    guint16                    mnc = 0;
+    guint32                    closed_subscriber_group = 0;
+
+    mm_obj_warn (self, "network reject indication received");
+    if (qmi_indication_nas_network_reject_output_get_service_domain (output, &service_domain, NULL))
+        mm_obj_warn (self, "  service domain: %s", qmi_nas_network_service_domain_get_string (service_domain));
+    if (qmi_indication_nas_network_reject_output_get_radio_interface (output, &radio_interface, NULL))
+        mm_obj_warn (self, "  radio interface: %s", qmi_nas_radio_interface_get_string (radio_interface));
+    if (qmi_indication_nas_network_reject_output_get_reject_cause (output, &reject_cause, NULL))
+        mm_obj_warn (self, "  reject cause: %s", qmi_nas_reject_cause_get_string (reject_cause));
+    if (qmi_indication_nas_network_reject_output_get_plmn (output, &mcc, &mnc, NULL, NULL)) {
+        mm_obj_warn (self, "  mcc: %" G_GUINT16_FORMAT, mcc);
+        mm_obj_warn (self, "  mnc: %" G_GUINT16_FORMAT, mnc);
+    }
+    if (qmi_indication_nas_network_reject_output_get_closed_subscriber_group (output, &closed_subscriber_group, NULL))
+        mm_obj_warn (self, "  closed subscriber group: %u", closed_subscriber_group);
+}
+
 static void
 common_setup_cleanup_unsolicited_registration_events (MMBroadbandModemQmi *self,
                                                       gboolean enable,
@@ -4599,6 +4630,20 @@ common_setup_cleanup_unsolicited_registration_events (MMBroadbandModemQmi *self,
         self->priv->serving_system_indication_id = 0;
     }
 #endif /* WITH_NEWEST_QMI_COMMANDS */
+
+    /* Connect/Disconnect "Network Reject" indications */
+    if (enable) {
+        g_assert (self->priv->network_reject_indication_id == 0);
+        self->priv->network_reject_indication_id =
+            g_signal_connect (client,
+                              "network-reject",
+                              G_CALLBACK (network_reject_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->network_reject_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->network_reject_indication_id);
+        self->priv->network_reject_indication_id = 0;
+    }
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
