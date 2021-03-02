@@ -2978,7 +2978,11 @@ process_gsm_info (MMBroadbandModemQmi *self,
                 NULL, /* true_service_status */
                 NULL, /* preferred_data_path */
                 NULL) ||
+#if QMI_CHECK_VERSION(1,29,2)
+            !qmi_message_nas_get_system_info_output_get_gsm_system_info_v2 (
+#else
             !qmi_message_nas_get_system_info_output_get_gsm_system_info (
+#endif
                 response_output,
                 &domain_valid,         &domain,
                 NULL, NULL, /* service_capability */
@@ -3002,7 +3006,11 @@ process_gsm_info (MMBroadbandModemQmi *self,
                 NULL, /* true_service_status */
                 NULL, /* preferred_data_path */
                 NULL) ||
+#if QMI_CHECK_VERSION(1,29,2)
+            !qmi_indication_nas_system_info_output_get_gsm_system_info_v2 (
+#else
             !qmi_indication_nas_system_info_output_get_gsm_system_info (
+#endif
                 indication_output,
                 &domain_valid,         &domain,
                 NULL, NULL, /* service_capability */
@@ -3086,7 +3094,11 @@ process_wcdma_info (MMBroadbandModemQmi *self,
                 NULL, /* true_service_status */
                 NULL, /* preferred_data_path */
                 NULL) ||
+#if QMI_CHECK_VERSION(1,29,2)
+            !qmi_message_nas_get_system_info_output_get_wcdma_system_info_v2 (
+#else
             !qmi_message_nas_get_system_info_output_get_wcdma_system_info (
+#endif
                 response_output,
                 &domain_valid,         &domain,
                 NULL, NULL, /* service_capability */
@@ -3111,7 +3123,11 @@ process_wcdma_info (MMBroadbandModemQmi *self,
                 NULL, /* true_service_status */
                 NULL, /* preferred_data_path */
                 NULL) ||
+#if QMI_CHECK_VERSION(1,29,2)
+            !qmi_indication_nas_system_info_output_get_wcdma_system_info_v2 (
+#else
             !qmi_indication_nas_system_info_output_get_wcdma_system_info (
+#endif
                 indication_output,
                 &domain_valid,         &domain,
                 NULL, NULL, /* service_capability */
@@ -3198,7 +3214,11 @@ process_lte_info (MMBroadbandModemQmi *self,
                 NULL, /* true_service_status */
                 NULL, /* preferred_data_path */
                 NULL) ||
+#if QMI_CHECK_VERSION(1,29,2)
+            !qmi_message_nas_get_system_info_output_get_lte_system_info_v2 (
+#else
             !qmi_message_nas_get_system_info_output_get_lte_system_info (
+#endif
                 response_output,
                 &domain_valid,         &domain,
                 NULL, NULL, /* service_capability */
@@ -3221,7 +3241,12 @@ process_lte_info (MMBroadbandModemQmi *self,
                 NULL, /* true_service_status */
                 NULL, /* preferred_data_path */
                 NULL) ||
+#if QMI_CHECK_VERSION(1,29,2)
+            !qmi_indication_nas_system_info_output_get_lte_system_info_v2 (
+#else
             !qmi_indication_nas_system_info_output_get_lte_system_info (
+#endif
+
                 indication_output,
                 &domain_valid,         &domain,
                 NULL, NULL, /* service_capability */
