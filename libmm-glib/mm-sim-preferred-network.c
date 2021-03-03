@@ -89,7 +89,13 @@ mm_sim_preferred_network_get_access_technology (const MMSimPreferredNetwork *sel
 }
 
 /**
- * mm_sim_preferred_network_set_operator_code: (skip)
+ * mm_sim_preferred_network_set_operator_code:
+ * @self: A #MMSimPreferredNetwork.
+ * @operator_code: Operator code
+ *
+ * Set the operator code (MCCMNC) of this preferred network.
+ *
+ * Since: 1.18
  */
 void
 mm_sim_preferred_network_set_operator_code (MMSimPreferredNetwork *self,
@@ -102,7 +108,13 @@ mm_sim_preferred_network_set_operator_code (MMSimPreferredNetwork *self,
 }
 
 /**
- * mm_sim_preferred_network_set_access_technology: (skip)
+ * mm_sim_preferred_network_set_access_technology:
+ * @self: A #MMSimPreferredNetwork.
+ * @access_technology: A #MMModemAccessTechnology mask.
+ *
+ * Set the desired access technologies of this preferred network entry.
+ *
+ * Since: 1.18
  */
 void
 mm_sim_preferred_network_set_access_technology (MMSimPreferredNetwork *self,
@@ -114,7 +126,14 @@ mm_sim_preferred_network_set_access_technology (MMSimPreferredNetwork *self,
 }
 
 /**
- * mm_sim_preferred_network_new: (skip)
+ * mm_sim_preferred_network_new:
+ *
+ * Creates a new empty #MMSimPreferredNetwork.
+ *
+ * Returns: (transfer full): a #MMSimPreferredNetwork. The returned value should be freed
+ * with mm_sim_preferred_network_free().
+ *
+ * Since: 1.18
  */
 MMSimPreferredNetwork *
 mm_sim_preferred_network_new (void)
@@ -164,4 +183,29 @@ mm_sim_preferred_network_list_get_variant (const GList *preferred_network_list)
                                      mm_sim_preferred_network_get_tuple ((const MMSimPreferredNetwork *) iter->data));
     }
     return g_variant_builder_end (&builder);
+}
+
+/**
+ * mm_sim_preferred_network_list_new_from_variant: (skip)
+ */
+GList *
+mm_sim_preferred_network_list_new_from_variant (GVariant *variant)
+{
+    GList *network_list = NULL;
+    GVariant *child;
+    GVariantIter iter;
+
+    g_return_val_if_fail (g_variant_is_of_type (variant, G_VARIANT_TYPE ("a(su)")), NULL);
+
+    g_variant_iter_init (&iter, variant);
+    while ((child = g_variant_iter_next_value (&iter))) {
+        MMSimPreferredNetwork *preferred_net;
+
+        preferred_net = mm_sim_preferred_network_new_from_variant (child);
+        if (preferred_net)
+            network_list = g_list_append (network_list, preferred_net);
+        g_variant_unref (child);
+    }
+
+    return network_list;
 }

@@ -965,6 +965,104 @@ handle_send_puk (MMBaseSim *self,
 }
 
 /*****************************************************************************/
+/* SET PREFERRED NETWORKS (DBus call handling) */
+
+typedef struct {
+    MMBaseSim             *self;
+    GDBusMethodInvocation *invocation;
+    GVariant              *networks;
+} HandleSetPreferredNetworksContext;
+
+static void
+handle_set_preferred_networks_context_free (HandleSetPreferredNetworksContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_variant_unref (ctx->networks);
+    g_free (ctx);
+}
+
+static void
+handle_set_preferred_networks_ready (MMBaseSim *self,
+                                     GAsyncResult *res,
+                                     HandleSetPreferredNetworksContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_BASE_SIM_GET_CLASS (self)->set_preferred_networks_finish (self, res, &error);
+    if (error) {
+        mm_obj_warn (self, "couldn't set preferred networks: %s", error->message);
+        g_dbus_method_invocation_take_error (ctx->invocation, g_steal_pointer (&error));
+    } else {
+        mm_gdbus_sim_set_preferred_networks (MM_GDBUS_SIM (self), ctx->networks);
+        mm_gdbus_sim_complete_set_preferred_networks (MM_GDBUS_SIM (self), ctx->invocation);
+    }
+
+    handle_set_preferred_networks_context_free (ctx);
+}
+
+static void
+handle_set_preferred_networks_auth_ready (MMBaseModem *modem,
+                                          GAsyncResult *res,
+                                          HandleSetPreferredNetworksContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_preferred_networks_context_free (ctx);
+        return;
+    }
+
+    if (!mm_gdbus_sim_get_active (MM_GDBUS_SIM (ctx->self))) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set preferred networks: "
+                                               "SIM not currently active");
+        handle_set_preferred_networks_context_free (ctx);
+        return;
+    }
+
+    if (!MM_BASE_SIM_GET_CLASS (ctx->self)->set_preferred_networks ||
+        !MM_BASE_SIM_GET_CLASS (ctx->self)->set_preferred_networks_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set preferred networks: "
+                                               "not implemented");
+        handle_set_preferred_networks_context_free (ctx);
+        return;
+    }
+
+    MM_BASE_SIM_GET_CLASS (ctx->self)->set_preferred_networks (
+            ctx->self,
+            mm_sim_preferred_network_list_new_from_variant (ctx->networks),
+            (GAsyncReadyCallback)handle_set_preferred_networks_ready,
+            ctx);
+}
+
+static gboolean
+handle_set_preferred_networks (MMBaseSim *self,
+                               GDBusMethodInvocation *invocation,
+                               GVariant *networks_variant)
+{
+    HandleSetPreferredNetworksContext *ctx;
+
+    ctx = g_new0 (HandleSetPreferredNetworksContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->networks = g_variant_ref (networks_variant);
+
+    mm_base_modem_authorize (self->priv->modem,
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_set_preferred_networks_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 
 static void
 sim_dbus_export (MMBaseSim *self)
@@ -987,6 +1085,10 @@ sim_dbus_export (MMBaseSim *self)
     g_signal_connect (self,
                       "handle-send-puk",
                       G_CALLBACK (handle_send_puk),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-set-preferred-networks",
+                      G_CALLBACK (handle_set_preferred_networks),
                       NULL);
 
     if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self),

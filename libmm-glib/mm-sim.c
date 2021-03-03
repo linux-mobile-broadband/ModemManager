@@ -879,25 +879,119 @@ GList *
 mm_sim_get_preferred_networks (MMSim *self)
 {
     GList *network_list = NULL;
-    GVariant *container, *child;
-    GVariantIter iter;
+    GVariant *container;
 
     g_return_val_if_fail (MM_IS_SIM (self), NULL);
 
     container = mm_gdbus_sim_get_preferred_networks (MM_GDBUS_SIM (self));
-    g_return_val_if_fail (g_variant_is_of_type (container, G_VARIANT_TYPE ("a(su)")), NULL);
-
-    g_variant_iter_init (&iter, container);
-    while ((child = g_variant_iter_next_value (&iter))) {
-        MMSimPreferredNetwork *preferred_net;
-
-        preferred_net = mm_sim_preferred_network_new_from_variant (child);
-        if (preferred_net)
-            network_list = g_list_append (network_list, preferred_net);
-        g_variant_unref (child);
-    }
+    network_list = mm_sim_preferred_network_list_new_from_variant (container);
 
     return network_list;
+}
+
+/**
+ * mm_sim_set_preferred_networks_finish:
+ * @self: A #MMSim.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_sim_set_preferred_networks().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sim_set_preferred_networks().
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.18
+ */
+gboolean
+mm_sim_set_preferred_networks_finish (MMSim *self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
+
+    return mm_gdbus_sim_call_set_preferred_networks_finish (MM_GDBUS_SIM (self), res, error);
+}
+
+/**
+ * mm_sim_set_preferred_networks:
+ * @self: A #MMSim.
+ * @preferred_networks: (element-type ModemManager.SimPreferredNetwork):
+ *  A list of #MMSimPreferredNetwork objects
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously sets the preferred network list of this #MMSim.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_sim_set_preferred_networks_finish() to get the result of
+ * the operation.
+ *
+ * Since: 1.18
+ */
+void
+mm_sim_set_preferred_networks (MMSim *self,
+                               const GList *preferred_networks,
+                               GCancellable *cancellable,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GVariant *networks_list;
+
+    g_return_if_fail (MM_IS_SIM (self));
+
+    networks_list = mm_sim_preferred_network_list_get_variant (preferred_networks);
+
+    mm_gdbus_sim_call_set_preferred_networks (MM_GDBUS_SIM (self),
+                                              networks_list,
+                                              cancellable,
+                                              callback,
+                                              user_data);
+}
+
+/**
+ * mm_sim_set_preferred_networks_sync:
+ * @self: A #MMSim.
+ * @preferred_networks: (element-type ModemManager.SimPreferredNetwork):
+ *  A list of #MMSimPreferredNetwork objects
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously sets the preferred network list of this #MMSim.
+ *
+ * The calling thread is blocked until a reply is received. See
+ * mm_sim_set_preferred_networks() for the asynchronous
+ * version of this method.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_sim_set_preferred_networks_finish() to get the result of
+ * the operation.
+ *
+ * Since: 1.18
+ */
+gboolean
+mm_sim_set_preferred_networks_sync (MMSim *self,
+                                    const GList *preferred_networks,
+                                    GCancellable *cancellable,
+                                    GError **error)
+{
+    gboolean  result;
+    GVariant *networks_list;
+
+    g_return_if_fail (MM_IS_SIM (self));
+
+    networks_list = mm_sim_preferred_network_list_get_variant (preferred_networks);
+
+    result = mm_gdbus_sim_call_set_preferred_networks_sync (MM_GDBUS_SIM (self),
+                                                            networks_list,
+                                                            cancellable,
+                                                            error);
+    return result;
 }
 
 /*****************************************************************************/

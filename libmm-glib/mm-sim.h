@@ -159,6 +159,19 @@ gboolean mm_sim_change_pin_sync   (MMSim *self,
                                    GCancellable *cancellable,
                                    GError **error);
 
+void     mm_sim_set_preferred_networks        (MMSim *self,
+                                               const GList *preferred_networks,
+                                               GCancellable *cancellable,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data);
+gboolean mm_sim_set_preferred_networks_finish (MMSim *self,
+                                               GAsyncResult *res,
+                                               GError **error);
+gboolean mm_sim_set_preferred_networks_sync   (MMSim *self,
+                                               const GList *preferred_networks,
+                                               GCancellable *cancellable,
+                                               GError **error);
+
 G_END_DECLS
 
 #endif /* _MM_SIM_H_ */

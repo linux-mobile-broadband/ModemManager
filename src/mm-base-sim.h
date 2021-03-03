@@ -158,6 +158,15 @@ struct _MMBaseSimClass {
     GList * (* load_preferred_networks_finish) (MMBaseSim *self,
                                                 GAsyncResult *res,
                                                 GError **error);
+
+    /* Set preferred networks (async) */
+    void  (* set_preferred_networks)           (MMBaseSim *self,
+                                                const GList *preferred_network_list,
+                                                GAsyncReadyCallback callback,
+                                                gpointer user_data);
+    gboolean (* set_preferred_networks_finish) (MMBaseSim *self,
+                                                GAsyncResult *res,
+                                                GError **error);
 };
 
 GType mm_base_sim_get_type (void);

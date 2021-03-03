@@ -36,8 +36,15 @@ typedef struct _MMSimPreferredNetwork MMSimPreferredNetwork;
 #define MM_TYPE_SIM_PREFERRED_NETWORK (mm_sim_preferred_network_get_type ())
 GType mm_sim_preferred_network_get_type (void);
 
+MMSimPreferredNetwork *         mm_sim_preferred_network_new                   (void);
+
 const gchar                    *mm_sim_preferred_network_get_operator_code     (const MMSimPreferredNetwork *self);
 MMModemAccessTechnology         mm_sim_preferred_network_get_access_technology (const MMSimPreferredNetwork *self);
+
+void                            mm_sim_preferred_network_set_operator_code     (MMSimPreferredNetwork *self,
+                                                                                const gchar *operator_code);
+void                            mm_sim_preferred_network_set_access_technology (MMSimPreferredNetwork *self,
+                                                                                MMModemAccessTechnology access_technology);
 
 void                            mm_sim_preferred_network_free                  (MMSimPreferredNetwork *self);
 
@@ -50,16 +57,11 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSimPreferredNetwork, mm_sim_preferred_network_f
     defined (_LIBMM_INSIDE_MMCLI) || \
     defined (LIBMM_GLIB_COMPILATION)
 
-MMSimPreferredNetwork *         mm_sim_preferred_network_new                   (void);
 MMSimPreferredNetwork *         mm_sim_preferred_network_new_from_variant      (GVariant *variant);
 
-void                            mm_sim_preferred_network_set_operator_code     (MMSimPreferredNetwork *self,
-                                                                                const gchar *operator_code);
-void                            mm_sim_preferred_network_set_access_technology (MMSimPreferredNetwork *self,
-                                                                                MMModemAccessTechnology access_technology);
-
-GVariant *mm_sim_preferred_network_get_tuple        (const MMSimPreferredNetwork *self);
-GVariant *mm_sim_preferred_network_list_get_variant (const GList *preferred_network_list);
+GVariant *mm_sim_preferred_network_get_tuple             (const MMSimPreferredNetwork *self);
+GVariant *mm_sim_preferred_network_list_get_variant      (const GList *preferred_network_list);
+GList    *mm_sim_preferred_network_list_new_from_variant (GVariant *variant);
 
 #endif
 
