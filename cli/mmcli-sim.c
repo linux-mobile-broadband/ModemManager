@@ -51,6 +51,7 @@ static gchar *puk_str;
 static gboolean enable_pin_flag;
 static gboolean disable_pin_flag;
 static gchar *change_pin_str;
+static gchar *set_preferred_networks_str;
 
 static GOptionEntry entries[] = {
     { "pin", 0, 0, G_OPTION_ARG_STRING, &pin_str,
@@ -72,6 +73,10 @@ static GOptionEntry entries[] = {
     { "change-pin", 0, 0, G_OPTION_ARG_STRING, &change_pin_str,
       "Change the PIN in a given SIM (must send the current PIN with --pin).",
       "[New PIN]"
+    },
+    { "sim-set-preferred-networks", 0, 0, G_OPTION_ARG_STRING, &set_preferred_networks_str,
+      "Set preferred network list stored in a given SIM.",
+      "[[MCCMNC[,access_tech]],...]"
     },
     { NULL }
 };
@@ -104,10 +109,11 @@ mmcli_sim_options_enabled (void)
     n_actions = (!!puk_str +
                  enable_pin_flag +
                  disable_pin_flag +
-                 !!change_pin_str);
+                 !!change_pin_str +
+                 !!set_preferred_networks_str);
 
     if (n_actions == 1) {
-        if (!pin_str) {
+        if (!pin_str && !set_preferred_networks_str) {
             g_printerr ("error: action requires also the PIN code\n");
             exit (EXIT_FAILURE);
         }
@@ -310,6 +316,77 @@ change_pin_ready (MMSim        *sim,
 }
 
 static void
+parse_preferred_networks (GList **preferred_networks)
+{
+    gchar **parts;
+    GList  *preferred_nets_list = NULL;
+    GError *error = NULL;
+
+    parts = g_strsplit (set_preferred_networks_str, ",", -1);
+    if (parts) {
+        guint i;
+
+        for (i = 0; parts[i]; i++) {
+            MMModemAccessTechnology access_tech = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+            MMSimPreferredNetwork *preferred_net;
+            const gchar *mccmnc;
+
+            mccmnc = parts[i];
+            if (!mm_is_string_mccmnc (mccmnc)) {
+                g_printerr ("error: couldn't parse MCCMNC for preferred network: '%s'\n",
+                            mccmnc);
+                exit (EXIT_FAILURE);
+            }
+            /* if the next item is MCCMNC or is missing, omit the access technology */
+            if (parts[i + 1] && !mm_is_string_mccmnc (parts[i + 1])) {
+                i++;
+                access_tech = mm_common_get_access_technology_from_string (parts[i], &error);
+                if (error) {
+                    g_printerr ("error: %s\n", error->message);
+                    g_error_free (error);
+                    exit (EXIT_FAILURE);
+                }
+            }
+
+            preferred_net = mm_sim_preferred_network_new ();
+            mm_sim_preferred_network_set_operator_code (preferred_net, mccmnc);
+            mm_sim_preferred_network_set_access_technology (preferred_net, access_tech);
+            preferred_nets_list = g_list_append (preferred_nets_list, preferred_net);
+        }
+    }
+    g_strfreev (parts);
+
+    *preferred_networks = preferred_nets_list;
+}
+
+static void
+set_preferred_networks_process_reply (gboolean      result,
+                                      const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set preferred networks: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set preferred networks\n");
+}
+
+static void
+set_preferred_networks_ready (MMSim        *sim,
+                              GAsyncResult *result,
+                              gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_sim_set_preferred_networks_finish (sim, result, &error);
+    set_preferred_networks_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_sim_ready (GObject      *source,
                GAsyncResult *result,
                gpointer      none)
@@ -363,6 +440,20 @@ get_sim_ready (GObject      *source,
                          ctx->cancellable,
                          (GAsyncReadyCallback)send_puk_ready,
                          NULL);
+        return;
+    }
+
+    /* Requesting to set preferred networks? */
+    if (set_preferred_networks_str) {
+        GList *preferred_networks = NULL;
+
+        parse_preferred_networks (&preferred_networks);
+        mm_sim_set_preferred_networks (ctx->sim,
+                                       preferred_networks,
+                                       ctx->cancellable,
+                                       (GAsyncReadyCallback)set_preferred_networks_ready,
+                                       NULL);
+        g_list_free_full (preferred_networks, (GDestroyNotify) mm_sim_preferred_network_free);
         return;
     }
 
@@ -465,6 +556,21 @@ mmcli_sim_run_synchronous (GDBusConnection *connection)
                                                  NULL,
                                                  &error);
         send_puk_process_reply (operation_result, error);
+        return;
+    }
+
+    /* Requesting to set preferred networks? */
+    if (set_preferred_networks_str) {
+        gboolean  operation_result;
+        GList    *preferred_networks = NULL;
+
+        parse_preferred_networks (&preferred_networks);
+        operation_result = mm_sim_set_preferred_networks_sync (ctx->sim,
+                                                               preferred_networks,
+                                                               NULL,
+                                                               &error);
+        g_list_free_full (preferred_networks, (GDestroyNotify) mm_sim_preferred_network_free);
+        set_preferred_networks_process_reply (operation_result, error);
         return;
     }
 

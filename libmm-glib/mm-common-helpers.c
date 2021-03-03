@@ -1313,6 +1313,56 @@ mm_common_parse_key_value_string (const gchar *str,
     return TRUE;
 }
 
+MMModemAccessTechnology
+mm_common_get_access_technology_from_string (const gchar *str,
+                                             GError **error)
+{
+    GError *inner_error = NULL;
+    MMModemAccessTechnology technologies;
+    gchar **technology_strings;
+    GFlagsClass *flags_class;
+
+    technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
+    technology_strings = g_strsplit (str, "|", -1);
+
+    if (technology_strings) {
+        guint i;
+
+        for (i = 0; technology_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (technology_strings[i], flags_class->values[j].value_nick)) {
+                    technologies |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMModemAccessTechnology value",
+                    technology_strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    }
+
+    g_type_class_unref (flags_class);
+    g_strfreev (technology_strings);
+    return technologies;
+}
+
 /*****************************************************************************/
 
 gboolean
@@ -1610,6 +1660,26 @@ mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
     }
 
     return str;
+}
+
+gboolean
+mm_is_string_mccmnc (const gchar *str)
+{
+    gsize len;
+    guint i;
+
+    if (!str)
+        return FALSE;
+
+    len = strlen (str);
+    if (len < 5 || len > 6)
+        return FALSE;
+
+    for (i = 0; i < len; i++)
+        if (str[i] < '0' || str[i] > '9')
+            return FALSE;
+
+    return TRUE;
 }
 
 /*****************************************************************************/

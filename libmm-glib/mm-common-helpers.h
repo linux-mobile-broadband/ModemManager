@@ -79,6 +79,9 @@ MMOmaSessionType      mm_common_get_oma_session_type_from_string (const gchar *s
 MMModem3gppEpsUeModeOperation mm_common_get_eps_ue_mode_operation_from_string (const gchar  *str,
                                                                                GError      **error);
 
+MMModemAccessTechnology mm_common_get_access_technology_from_string (const gchar *str,
+                                                                     GError **error);
+
 GArray          *mm_common_ports_variant_to_garray (GVariant *variant);
 MMModemPortInfo *mm_common_ports_variant_to_array  (GVariant *variant,
                                                  guint *n_ports);
@@ -177,6 +180,8 @@ gboolean  mm_get_double_from_match_info          (GMatchInfo  *match_info,
                                                   gdouble     *out);
 gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo  *match_info,
                                                   guint32      match_index);
+
+gboolean mm_is_string_mccmnc (const gchar *str);
 
 const gchar *mm_sms_delivery_state_get_string_extended (guint delivery_state);
 
