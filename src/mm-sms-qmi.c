@@ -437,7 +437,7 @@ sms_send_generic (GTask *task)
 
     qmi_client_wms_raw_send (ctx->client,
                              input,
-                             30,
+                             MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
                              NULL,
                              (GAsyncReadyCallback)send_generic_ready,
                              task);
@@ -565,7 +565,7 @@ sms_send_from_storage (GTask *task)
     qmi_client_wms_send_from_memory_storage (
         ctx->client,
         input,
-        30,
+        MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
         NULL,
         (GAsyncReadyCallback)send_from_storage_ready,
         task);

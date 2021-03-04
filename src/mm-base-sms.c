@@ -1145,7 +1145,7 @@ send_generic_ready (MMBaseModem *modem,
      * sent right away (not queued after other AT commands). */
     mm_base_modem_at_command_raw (ctx->modem,
                                   ctx->msg_data,
-                                  60,
+                                  MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
                                   FALSE,
                                   (GAsyncReadyCallback)send_generic_msg_data_ready,
                                   task);
@@ -1219,7 +1219,7 @@ sms_send_next_part (GTask *task)
                                mm_sms_part_get_index ((MMSmsPart *)ctx->current->data));
         mm_base_modem_at_command (ctx->modem,
                                   cmd,
-                                  60,
+                                  MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
                                   FALSE,
                                   (GAsyncReadyCallback)send_from_storage_ready,
                                   task);
@@ -1245,9 +1245,11 @@ sms_send_next_part (GTask *task)
 
     g_assert (cmd != NULL);
     g_assert (ctx->msg_data != NULL);
+
+    /* no network involved in this initial AT command, so lower timeout */
     mm_base_modem_at_command (ctx->modem,
                               cmd,
-                              60,
+                              10,
                               FALSE,
                               (GAsyncReadyCallback)send_generic_ready,
                               task);

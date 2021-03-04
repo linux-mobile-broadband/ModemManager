@@ -27,6 +27,14 @@
 #include "mm-sms-part.h"
 #include "mm-base-modem.h"
 
+/*****************************************************************************/
+
+/* Default timeout value to be used when sending a SMS, long enough so that the
+ * operation succeeds or fails under low signal conditions. */
+#define MM_BASE_SMS_DEFAULT_SEND_TIMEOUT 180
+
+/*****************************************************************************/
+
 #define MM_TYPE_BASE_SMS            (mm_base_sms_get_type ())
 #define MM_BASE_SMS(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_SMS, MMBaseSms))
 #define MM_BASE_SMS_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_BASE_SMS, MMBaseSmsClass))

@@ -175,7 +175,7 @@ sms_send_next_part (GTask *task)
                                              NULL);
     mbim_device_command (ctx->device,
                          message,
-                         30,
+                         MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
                          NULL,
                          (GAsyncReadyCallback)sms_send_set_ready,
                          task);
