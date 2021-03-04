@@ -2903,6 +2903,9 @@ mm_broadband_modem_cinterion_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         /* Generic bearer (TTY) or Cinterion bearer (NET) supported */
+                         MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
+                         MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
                          NULL);

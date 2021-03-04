@@ -54,15 +54,17 @@ typedef struct _MMBaseModem MMBaseModem;
 typedef struct _MMBaseModemClass MMBaseModemClass;
 typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 
-#define MM_BASE_MODEM_CONNECTION     "base-modem-connection"
-#define MM_BASE_MODEM_MAX_TIMEOUTS   "base-modem-max-timeouts"
-#define MM_BASE_MODEM_VALID          "base-modem-valid"
-#define MM_BASE_MODEM_DEVICE         "base-modem-device"
-#define MM_BASE_MODEM_DRIVERS        "base-modem-drivers"
-#define MM_BASE_MODEM_PLUGIN         "base-modem-plugin"
-#define MM_BASE_MODEM_VENDOR_ID      "base-modem-vendor-id"
-#define MM_BASE_MODEM_PRODUCT_ID     "base-modem-product-id"
-#define MM_BASE_MODEM_REPROBE        "base-modem-reprobe"
+#define MM_BASE_MODEM_CONNECTION         "base-modem-connection"
+#define MM_BASE_MODEM_MAX_TIMEOUTS       "base-modem-max-timeouts"
+#define MM_BASE_MODEM_VALID              "base-modem-valid"
+#define MM_BASE_MODEM_DEVICE             "base-modem-device"
+#define MM_BASE_MODEM_DRIVERS            "base-modem-drivers"
+#define MM_BASE_MODEM_PLUGIN             "base-modem-plugin"
+#define MM_BASE_MODEM_VENDOR_ID          "base-modem-vendor-id"
+#define MM_BASE_MODEM_PRODUCT_ID         "base-modem-product-id"
+#define MM_BASE_MODEM_REPROBE            "base-modem-reprobe"
+#define MM_BASE_MODEM_DATA_NET_SUPPORTED "base-modem-data-net-supported"
+#define MM_BASE_MODEM_DATA_TTY_SUPPORTED "base-modem-data-tty-supported"
 
 struct _MMBaseModem {
     MmGdbusObjectSkeleton parent;

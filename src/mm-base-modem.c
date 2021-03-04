@@ -56,6 +56,8 @@ enum {
     PROP_PRODUCT_ID,
     PROP_CONNECTION,
     PROP_REPROBE,
+    PROP_DATA_NET_SUPPORTED,
+    PROP_DATA_TTY_SUPPORTED,
     PROP_LAST
 };
 
@@ -92,7 +94,10 @@ struct _MMBaseModemPrivate {
     MMPortSerialAt *primary;
     MMPortSerialAt *secondary;
     MMPortSerialQcdm *qcdm;
-    GList *data;
+
+    GList    *data;
+    gboolean  data_net_supported;
+    gboolean  data_tty_supported;
 
     /* GPS-enabled modems will have an AT port for control, and a raw serial
      * port to receive all GPS traces */
@@ -1167,16 +1172,36 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     self->priv->gps_control = (gps_control ? g_object_ref (gps_control) : NULL);
     self->priv->gps = (gps ? g_object_ref (gps) : NULL);
 
-    /* Build the final list of data ports, NET ports preferred */
+    /* Append net ports to the final list of data ports, but only if the modem
+     * supports them */
     if (data_net) {
-        g_list_foreach (data_net, (GFunc)g_object_ref, NULL);
-        self->priv->data = g_list_concat (self->priv->data, data_net);
+        if (self->priv->data_net_supported) {
+            g_list_foreach (data_net, (GFunc)g_object_ref, NULL);
+            self->priv->data = g_list_concat (self->priv->data, data_net);
+        } else
+            mm_obj_dbg (self, "net ports available but ignored");
     }
-    if (data_at_primary)
-        self->priv->data = g_list_append (self->priv->data, g_object_ref (data_at_primary));
-    if (data_at) {
-        g_list_foreach (data_at, (GFunc)g_object_ref, NULL);
-        self->priv->data = g_list_concat (self->priv->data, data_at);
+
+    /* Append tty ports to the final list of data ports, but only if the modem
+     * supports them */
+    if (data_at_primary || data_at) {
+        if (self->priv->data_tty_supported) {
+            if (data_at_primary)
+                self->priv->data = g_list_append (self->priv->data, g_object_ref (data_at_primary));
+            if (data_at) {
+                g_list_foreach (data_at, (GFunc)g_object_ref, NULL);
+                self->priv->data = g_list_concat (self->priv->data, data_at);
+            }
+        } else
+            mm_obj_dbg (self, "at data ports available but ignored");
+    }
+
+    /* Fail if we haven't added any single data port; this is probably a plugin
+     * misconfiguration */
+    if (!self->priv->data) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Failed to find a data port in the modem");
+        return FALSE;
     }
 
 #if defined WITH_QMI
@@ -1483,6 +1508,12 @@ set_property (GObject *object,
         g_clear_object (&self->priv->connection);
         self->priv->connection = g_value_dup_object (value);
         break;
+    case PROP_DATA_NET_SUPPORTED:
+        self->priv->data_net_supported = g_value_get_boolean (value);
+        break;
+    case PROP_DATA_TTY_SUPPORTED:
+        self->priv->data_tty_supported = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1524,6 +1555,12 @@ get_property (GObject *object,
         break;
     case PROP_CONNECTION:
         g_value_set_object (value, self->priv->connection);
+        break;
+    case PROP_DATA_NET_SUPPORTED:
+        g_value_set_boolean (value, self->priv->data_net_supported);
+        break;
+    case PROP_DATA_TTY_SUPPORTED:
+        g_value_set_boolean (value, self->priv->data_tty_supported);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1683,4 +1720,20 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                               FALSE,
                               G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_REPROBE, properties[PROP_REPROBE]);
+
+    properties[PROP_DATA_NET_SUPPORTED] =
+        g_param_spec_boolean (MM_BASE_MODEM_DATA_NET_SUPPORTED,
+                              "Data NET supported",
+                              "Whether the modem supports connection via a NET port.",
+                              FALSE,
+                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_DATA_NET_SUPPORTED, properties[PROP_DATA_NET_SUPPORTED]);
+
+    properties[PROP_DATA_TTY_SUPPORTED] =
+        g_param_spec_boolean (MM_BASE_MODEM_DATA_TTY_SUPPORTED,
+                              "Data TTY supported",
+                              "Whether the modem supports connection via a TTY port.",
+                              FALSE,
+                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_DATA_TTY_SUPPORTED, properties[PROP_DATA_TTY_SUPPORTED]);
 }

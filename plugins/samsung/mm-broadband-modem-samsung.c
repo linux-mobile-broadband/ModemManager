@@ -72,6 +72,9 @@ mm_broadband_modem_samsung_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         /* Generic bearer (AT) and Icera bearer (NET) supported */
+                         MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
+                         MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
                          /* We want to use DHCP always! */
                          MM_BROADBAND_MODEM_ICERA_DEFAULT_IP_METHOD, MM_BEARER_IP_METHOD_DHCP,
                          NULL);

@@ -351,6 +351,9 @@ mm_broadband_modem_iridium_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         /* Iridium bearer supports TTY only */
+                         MM_BASE_MODEM_DATA_NET_SUPPORTED, FALSE,
+                         MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
                          /* Allow only up to 3 consecutive timeouts in the serial port */
                          MM_BASE_MODEM_MAX_TIMEOUTS, 3,
                          /* Only CS network is supported by the Iridium modem */

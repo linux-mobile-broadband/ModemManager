@@ -52,6 +52,9 @@ mm_broadband_modem_quectel_new (const gchar  *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         /* Generic bearer supports TTY only */
+                         MM_BASE_MODEM_DATA_NET_SUPPORTED, FALSE,
+                         MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
                          NULL);
 }
 
