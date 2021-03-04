@@ -877,6 +877,16 @@ mm_common_get_apn_type_from_string (const gchar *str,
                                error);
 }
 
+MMModem3gppFacility
+mm_common_get_3gpp_facility_from_string (const gchar  *str,
+                                         GError      **error)
+{
+    return _flags_from_string (MM_TYPE_MODEM_3GPP_FACILITY,
+                               str,
+                               MM_MODEM_3GPP_FACILITY_NONE,
+                               error);
+}
+
 GArray *
 mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *variant)
 {

@@ -88,6 +88,9 @@ MMBearerMultiplexSupport mm_common_get_multiplex_support_from_string (const gcha
 MMBearerApnType mm_common_get_apn_type_from_string (const gchar *str,
                                                     GError **error);
 
+MMModem3gppFacility mm_common_get_3gpp_facility_from_string (const gchar *str,
+                                                             GError **error);
+
 GArray          *mm_common_ports_variant_to_garray (GVariant *variant);
 MMModemPortInfo *mm_common_ports_variant_to_array  (GVariant *variant,
                                                  guint *n_ports);
