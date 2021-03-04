@@ -2670,6 +2670,11 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
 
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
+        if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
+            mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
+        if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
+            mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_3gpp);
+
         mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0, 0);
         /* request to reload operator info explicitly, so that the new
