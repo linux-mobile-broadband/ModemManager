@@ -209,3 +209,12 @@ mm_sim_preferred_network_list_new_from_variant (GVariant *variant)
 
     return network_list;
 }
+
+/**
+ * mm_sim_preferred_network_list_copy: (skip)
+ */
+GList *
+mm_sim_preferred_network_list_copy (GList *preferred_network_list)
+{
+    return g_list_copy_deep (preferred_network_list, (GCopyFunc) mm_sim_preferred_network_copy, NULL);
+}

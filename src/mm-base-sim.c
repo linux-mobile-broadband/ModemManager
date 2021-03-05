@@ -965,6 +965,443 @@ handle_send_puk (MMBaseSim *self,
 }
 
 /*****************************************************************************/
+/* SET PREFERRED NETWORKS (Generic implementation) */
+
+/* Setting preferred network list with AT+CPOL is a complicated procedure with
+ * the following steps:
+ * 1. Using AT+CPOL=? to get SIM capacity; the capacity is checked to ensure
+ *    that the list is not too large for the SIM card.
+ * 2. Reading existing preferred networks from SIM with AT+CPOL?.
+ * 3. Clearing existing networks with a series of AT+CPOL=<index> commands.
+ * 4. Setting the new list by invoking AT+CPOL for each network.
+ *
+ * There are some complications with AT+CPOL handling which makes the work more
+ * difficult for us. It seems that modems can only handle a certain exact number
+ * of access technology identifiers - and this cannot be certainly known in
+ * advance.
+ *
+ * If AT+CPOL? in step 2 returns anything, we can deduce the number of supported
+ * identifiers there. But if there were no networks configured earlier, we must
+ * start with a default based on modem capacity and work our way down from there
+ * if the AT+CPOL command fails.
+ */
+
+static void set_preferred_networks_set_next   (MMBaseSim  *self,
+                                               GTask      *task);
+static void set_preferred_networks_clear_next (MMBaseSim  *self,
+                                               GTask      *task);
+
+typedef struct {
+    GList    *set_list;
+    /* AT+CPOL indices that must be cleared before setting the networks. */
+    GArray   *clear_index;
+    /* Number of access technology identifiers we will set. */
+    guint     act_count;
+    /* If TRUE, we know that act_count is something the modem can handle */
+    gboolean  act_count_verified;
+    /* Index of preferred network currently being set (0 = first) */
+    guint     current_write_index;
+    /* Operation error code */
+    GError   *error;
+} SetPreferredNetworksContext;
+
+static void
+set_preferred_network_context_free (SetPreferredNetworksContext *ctx)
+{
+    g_list_free_full (ctx->set_list, (GDestroyNotify) mm_sim_preferred_network_free);
+    g_clear_error (&ctx->error);
+    g_array_free (ctx->clear_index, TRUE);
+    g_slice_free (SetPreferredNetworksContext, ctx);
+}
+
+static gboolean
+set_preferred_networks_finish (MMBaseSim *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+parse_old_preferred_networks (const gchar *response,
+                              SetPreferredNetworksContext *ctx)
+{
+    gchar **entries;
+    gchar **iter;
+
+    entries = g_strsplit_set (response, "\r\n", -1);
+    for (iter = entries; iter && *iter; iter++) {
+        guint index;
+        guint act_count = 0;
+
+        g_strstrip (*iter);
+        if (strlen (*iter) == 0)
+            continue;
+
+        if (mm_sim_parse_cpol_query_response (*iter,
+                                              &index,
+                                              NULL, NULL, NULL, NULL, NULL, NULL,
+                                              &act_count,
+                                              NULL) && index > 0) {
+            /* Remember how many access technologies the modem/SIM can take */
+            if (!ctx->act_count_verified || act_count > ctx->act_count) {
+                ctx->act_count = act_count;
+                ctx->act_count_verified = TRUE;
+            }
+
+            /* Store the index to be cleared */
+            g_array_append_val (ctx->clear_index, index);
+        }
+    }
+    g_strfreev (entries);
+}
+
+/* This function is called only in error case, after reloading the network list from SIM. */
+static void
+set_preferred_networks_reload_ready (MMBaseSim    *self,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    GError                      *error = NULL;
+    GList                       *preferred_nets_list;
+    SetPreferredNetworksContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    preferred_nets_list = MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks_finish (self, res, &error);
+    if (error) {
+        mm_obj_warn (self, "couldn't load list of preferred networks: %s", error->message);
+        g_error_free (error);
+    }
+
+    mm_gdbus_sim_set_preferred_networks (MM_GDBUS_SIM (self),
+                                         mm_sim_preferred_network_list_get_variant (preferred_nets_list));
+    g_list_free_full (preferred_nets_list, (GDestroyNotify) mm_sim_preferred_network_free);
+
+    /* Return the original error stored in our context */
+    g_task_return_error (task, g_steal_pointer (&ctx->error));
+    g_object_unref (task);
+}
+
+
+static gboolean
+set_preferred_networks_retry_command (MMBaseSim                   *self,
+                                      SetPreferredNetworksContext *ctx)
+{
+    /* If we haven't yet determined the number of access technology parameters supported by
+     * the modem, try reducing the count if possible and retry with the reduced count.
+     */
+    if (!ctx->act_count_verified && ctx->act_count > 0) {
+        ctx->act_count--;
+        mm_obj_dbg (self, "retrying operation with %u access technologies", ctx->act_count);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static void
+set_preferred_network_reload_and_return_error (MMBaseSim *self,
+                                               GTask     *task,
+                                               GError    *error)
+{
+    SetPreferredNetworksContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    /* Reload the complete list from SIM card to ensure that the PreferredNetworks
+     * property matches with whatever is actually on the SIM.
+     */
+    if (MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks &&
+        MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks_finish) {
+        ctx->error = error;
+        MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks (
+            self,
+            (GAsyncReadyCallback)set_preferred_networks_reload_ready,
+            task);
+    } else {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+    }
+}
+
+static void
+set_preferred_networks_set_ready (MMBaseModem *modem,
+                                  GAsyncResult *res,
+                                  GTask *task)
+{
+    MMBaseSim                   *self;
+    SetPreferredNetworksContext *ctx;
+    GError                      *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    /* The command may fail; check if we can retry */
+    if (error) {
+        if (!set_preferred_networks_retry_command (self, ctx)) {
+            /* Retrying not possible, failing... */
+            mm_obj_warn (self, "failed to set preferred networks: '%s'", error->message);
+            set_preferred_network_reload_and_return_error (self, task, error);
+            return;
+        }
+        /* Retrying possible */
+        g_clear_error (&error);
+    } else {
+        /* Last set operation was successful, so we know for sure how many access technologies
+         * the modem can take.
+         */
+        ctx->act_count_verified = TRUE;
+        ctx->current_write_index++;
+    }
+
+    set_preferred_networks_set_next (self, task);
+}
+
+static gboolean
+set_preferred_networks_check_support (MMBaseSim                    *self,
+                                      SetPreferredNetworksContext  *ctx,
+                                      MMSimPreferredNetwork        *network,
+                                      GError                      **error)
+{
+    MMModemAccessTechnology requested_act;
+    MMModemAccessTechnology supported_act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    requested_act = mm_sim_preferred_network_get_access_technology (network);
+    if (ctx->act_count >= 1)
+        supported_act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    if (ctx->act_count >= 2)
+        supported_act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT;
+    if (ctx->act_count >= 3)
+        supported_act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    if (ctx->act_count >= 4)
+        supported_act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    if (ctx->act_count >= 5)
+        supported_act |= MM_MODEM_ACCESS_TECHNOLOGY_5GNR;
+
+    if (requested_act & ~supported_act) {
+        g_autofree gchar *act_string = NULL;
+
+        act_string = mm_modem_access_technology_build_string_from_mask (requested_act & ~supported_act);
+        mm_obj_warn (self, "cannot set preferred net '%s'; access technology '%s' not supported by modem/SIM",
+                     mm_sim_preferred_network_get_operator_code (network), act_string);
+
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Access technology unsupported by modem or SIM");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+/* Set next preferred network in queue */
+static void
+set_preferred_networks_set_next (MMBaseSim  *self,
+                                 GTask      *task)
+{
+    SetPreferredNetworksContext *ctx;
+    g_autofree gchar            *command = NULL;
+    MMSimPreferredNetwork       *current_network;
+    const gchar                 *operator_code;
+    MMModemAccessTechnology      act;
+    GError                      *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    current_network = (MMSimPreferredNetwork *) g_list_nth_data (ctx->set_list, ctx->current_write_index);
+    if (current_network == NULL) {
+        /* No more networks to set; we are done. */
+        mm_obj_dbg (self, "setting preferred networks completed.");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!set_preferred_networks_check_support (self, ctx, current_network, &error)) {
+        set_preferred_network_reload_and_return_error (self, task, error);
+        return;
+    }
+
+    operator_code = mm_sim_preferred_network_get_operator_code (current_network);
+    act = mm_sim_preferred_network_get_access_technology (current_network);
+
+    /* Assemble the command to set the network */
+    command = g_strdup_printf ("+CPOL=%u,2,\"%s\"%s%s%s%s%s", ctx->current_write_index + 1, operator_code,
+                               ctx->act_count == 0 ? "" : ((act & MM_MODEM_ACCESS_TECHNOLOGY_GSM) ? ",1" : ",0"),
+                               ctx->act_count <= 1 ? "" : ((act & MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT) ? ",1" : ",0"),
+                               ctx->act_count <= 2 ? "" : ((act & MM_MODEM_ACCESS_TECHNOLOGY_UMTS) ? ",1" : ",0"),
+                               ctx->act_count <= 3 ? "" : ((act & MM_MODEM_ACCESS_TECHNOLOGY_LTE) ? ",1" : ",0"),
+                               ctx->act_count <= 4 ? "" : ((act & MM_MODEM_ACCESS_TECHNOLOGY_5GNR) ? ",1" : ",0"));
+    mm_base_modem_at_command (
+        self->priv->modem,
+        command,
+        20,
+        FALSE,
+        (GAsyncReadyCallback)set_preferred_networks_set_ready,
+        task);
+}
+
+static void
+set_preferred_networks_clear_ready (MMBaseModem *modem,
+                                    GAsyncResult *res,
+                                    GTask *task)
+{
+    MMBaseSim *self;
+    GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_obj_warn (self, "couldn't clear preferred network entry: '%s'", error->message);
+        set_preferred_network_reload_and_return_error (self, task, error);
+        return;
+    }
+
+    set_preferred_networks_clear_next (self, task);
+}
+
+/* Clear one of the networks in the clear list */
+static void
+set_preferred_networks_clear_next (MMBaseSim  *self,
+                                   GTask      *task)
+{
+    SetPreferredNetworksContext *ctx;
+    g_autofree gchar            *command = NULL;
+    guint                        current_clear_index;
+
+    ctx = g_task_get_task_data (task);
+
+    /* Clear from last index to first, since some modems (e.g. u-blox) may shift up items
+     * following the cleared ones.
+     */
+    if (ctx->clear_index->len > 0) {
+        current_clear_index = g_array_index (ctx->clear_index, guint, ctx->clear_index->len - 1);
+        g_array_remove_index (ctx->clear_index, ctx->clear_index->len - 1);
+        command = g_strdup_printf ("+CPOL=%u", current_clear_index);
+        mm_base_modem_at_command (
+            self->priv->modem,
+            command,
+            20,
+            FALSE,
+            (GAsyncReadyCallback)set_preferred_networks_clear_ready,
+            task);
+        return;
+    }
+    /* All clear operations done; start setting new networks */
+    set_preferred_networks_set_next (self, task);
+}
+
+static void
+set_preferred_networks_load_existing_ready (MMBaseModem *modem,
+                                            GAsyncResult *res,
+                                            GTask *task)
+{
+    MMBaseSim *self;
+    GError *error = NULL;
+    SetPreferredNetworksContext *ctx;
+    const gchar *response;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_obj_warn (self, "couldn't load existing preferred network list: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    parse_old_preferred_networks (response, ctx);
+    set_preferred_networks_clear_next (self, task);
+}
+
+static void
+set_preferred_networks_query_sim_capacity_ready (MMBaseModem *modem,
+                                                 GAsyncResult *res,
+                                                 GTask *task)
+{
+    MMBaseSim                   *self;
+    GError                      *error = NULL;
+    SetPreferredNetworksContext *ctx;
+    const gchar                 *response;
+    guint                        max_index;
+    guint                        networks_count;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_obj_warn (self, "couldn't query preferred network list capacity: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!mm_sim_parse_cpol_test_response (response, NULL, &max_index, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Compare the number of networks to maximum index returned by AT+CPOL=? */
+    networks_count = g_list_length (ctx->set_list);
+    if (networks_count > max_index) {
+        mm_obj_warn (self, "can't set %u preferred networks; SIM capacity: %u", networks_count, max_index);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_TOO_MANY,
+                                 "Too many networks; SIM capacity %u", max_index);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "setting %u preferred networks, SIM capacity: %u", networks_count, max_index);
+    mm_base_modem_at_command (
+        self->priv->modem,
+        "+CPOL?",
+        20,
+        FALSE,
+        (GAsyncReadyCallback)set_preferred_networks_load_existing_ready,
+        task);
+}
+
+static void
+set_preferred_networks (MMBaseSim *self,
+                        GList *preferred_network_list,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GTask *task;
+    SetPreferredNetworksContext *ctx;
+
+    mm_obj_dbg (self, "set preferred networks: loading existing networks...");
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (SetPreferredNetworksContext);
+    ctx->set_list = mm_sim_preferred_network_list_copy (preferred_network_list);
+    ctx->clear_index = g_array_new (FALSE, TRUE, sizeof (guint));
+    if (mm_iface_modem_is_5g (MM_IFACE_MODEM (self->priv->modem)))
+        ctx->act_count = 5;
+    else if (mm_iface_modem_is_4g (MM_IFACE_MODEM (self->priv->modem)))
+        ctx->act_count = 4;
+    else if (mm_iface_modem_is_3g (MM_IFACE_MODEM (self->priv->modem)))
+        ctx->act_count = 3;
+    else if (mm_iface_modem_is_2g (MM_IFACE_MODEM (self->priv->modem)))
+        ctx->act_count = 2;
+    g_task_set_task_data (task, ctx, (GDestroyNotify) set_preferred_network_context_free);
+
+    /* Query SIM capacity first to find out how many preferred networks it can take */
+    mm_base_modem_at_command (
+        self->priv->modem,
+        "+CPOL=?",
+        20,
+        FALSE, /* Do not cache, the response depends on SIM card properties */
+        (GAsyncReadyCallback)set_preferred_networks_query_sim_capacity_ready,
+        task);
+}
+
+/*****************************************************************************/
 /* SET PREFERRED NETWORKS (DBus call handling) */
 
 typedef struct {
@@ -1269,12 +1706,14 @@ parse_preferred_networks (const gchar  *response,
             continue;
 
         if (mm_sim_parse_cpol_query_response (*iter,
+                                              NULL,
                                               &operator_code,
                                               &gsm_act,
                                               &gsm_compact_act,
                                               &utran_act,
                                               &eutran_act,
                                               &ngran_act,
+                                              NULL,
                                               error)) {
             preferred_network = mm_sim_preferred_network_new ();
             mm_sim_preferred_network_set_operator_code (preferred_network, operator_code);
@@ -2317,6 +2756,8 @@ mm_base_sim_class_init (MMBaseSimClass *klass)
     klass->load_emergency_numbers_finish = load_emergency_numbers_finish;
     klass->load_preferred_networks = load_preferred_networks;
     klass->load_preferred_networks_finish = load_preferred_networks_finish;
+    klass->set_preferred_networks = set_preferred_networks;
+    klass->set_preferred_networks_finish = set_preferred_networks_finish;
     klass->send_pin = send_pin;
     klass->send_pin_finish = common_send_pin_puk_finish;
     klass->send_puk = send_puk;
