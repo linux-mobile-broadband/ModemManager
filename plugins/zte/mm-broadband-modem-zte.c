@@ -702,6 +702,7 @@ mm_broadband_modem_zte_new (const gchar *device,
                          /* Generic bearer supports TTY only */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, FALSE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
+                         MM_BROADBAND_MODEM_INDICATORS_DISABLED, TRUE,
                          NULL);
 }
 
