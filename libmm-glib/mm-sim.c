@@ -983,7 +983,7 @@ mm_sim_set_preferred_networks_sync (MMSim *self,
     gboolean  result;
     GVariant *networks_list;
 
-    g_return_if_fail (MM_IS_SIM (self));
+    g_return_val_if_fail (MM_IS_SIM (self), FALSE);
 
     networks_list = mm_sim_preferred_network_list_get_variant (preferred_networks);
 
