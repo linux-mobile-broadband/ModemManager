@@ -74,7 +74,10 @@
         and an <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link> mask
         to store to SIM card if supported.
 
-        This method removes any pre-existing entries of the preferred network list.
+        This method removes any pre-existing entries of the preferred network list. Note
+        that even if this operation fails, the preferred network list on the SIM card may
+        have changed. Read the <link linkend="gdbus-property-org-freedesktop-ModemManager1-Sim.PreferredNetworks">
+        PreferredNetworks</link> property to get the up-to-date list.
     -->
     <method name="SetPreferredNetworks">
       <arg name="preferred_networks" type="a(su)" direction="in" />

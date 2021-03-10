@@ -218,3 +218,12 @@ mm_sim_preferred_network_list_copy (GList *preferred_network_list)
 {
     return g_list_copy_deep (preferred_network_list, (GCopyFunc) mm_sim_preferred_network_copy, NULL);
 }
+
+/**
+ * mm_sim_preferred_network_list_free: (skip)
+ */
+void
+mm_sim_preferred_network_list_free (GList *preferred_network_list)
+{
+    g_list_free_full (preferred_network_list, (GDestroyNotify) mm_sim_preferred_network_free);
+}

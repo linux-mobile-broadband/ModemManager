@@ -63,6 +63,7 @@ GVariant *mm_sim_preferred_network_get_tuple             (const MMSimPreferredNe
 GVariant *mm_sim_preferred_network_list_get_variant      (const GList *preferred_network_list);
 GList    *mm_sim_preferred_network_list_new_from_variant (GVariant *variant);
 GList    *mm_sim_preferred_network_list_copy             (GList *preferred_network_list);
+void      mm_sim_preferred_network_list_free             (GList *preferred_network_list);
 #endif
 
 G_END_DECLS

@@ -728,6 +728,331 @@ load_operator_name (MMBaseSim           *self,
 }
 
 /*****************************************************************************/
+/* Load preferred networks */
+
+static GList *
+load_preferred_networks_finish (MMBaseSim     *self,
+                                GAsyncResult  *res,
+                                GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static GList *
+parse_get_preferred_networks (QmiMessageNasGetPreferredNetworksOutput *output)
+{
+    GList  *result = NULL;
+    GArray *preferred_nets_array = NULL;
+    GArray *preferred_nets_mnc_pcs_digit_array = NULL;
+    guint   i;
+
+    if (qmi_message_nas_get_preferred_networks_output_get_preferred_networks (output,
+                                                                              &preferred_nets_array,
+                                                                              NULL)) {
+        qmi_message_nas_get_preferred_networks_output_get_mnc_pcs_digit_include_status (output,
+                                                                                        &preferred_nets_mnc_pcs_digit_array,
+                                                                                        NULL);
+        for (i = 0; i < preferred_nets_array->len; i++) {
+            QmiMessageNasGetPreferredNetworksOutputPreferredNetworksElement        *net;
+            QmiMessageNasGetPreferredNetworksOutputMncPcsDigitIncludeStatusElement *mnc_pcs_digit = NULL;
+            MMSimPreferredNetwork   *new_item;
+            g_autofree gchar        *operator_code = NULL;
+            MMModemAccessTechnology  act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+            net = &g_array_index (preferred_nets_array,
+                                  QmiMessageNasGetPreferredNetworksOutputPreferredNetworksElement, i);
+            if (preferred_nets_mnc_pcs_digit_array && i < preferred_nets_mnc_pcs_digit_array->len)
+                mnc_pcs_digit = &g_array_index (preferred_nets_mnc_pcs_digit_array,
+                                                QmiMessageNasGetPreferredNetworksOutputMncPcsDigitIncludeStatusElement, i);
+
+            new_item = mm_sim_preferred_network_new ();
+
+            if (net->mnc > 99 || (mnc_pcs_digit != NULL && mnc_pcs_digit->includes_pcs_digit))
+                operator_code = g_strdup_printf ("%03d%03d", net->mcc, net->mnc);
+            else
+                operator_code = g_strdup_printf ("%03d%02d", net->mcc, net->mnc);
+            mm_sim_preferred_network_set_operator_code (new_item, operator_code);
+
+            if (net->radio_access_technology & QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_GSM)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+            if (net->radio_access_technology & QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_GSM_COMPACT)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT;
+            if (net->radio_access_technology & QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_UTRAN)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+            if (net->radio_access_technology & QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_EUTRAN)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+            if (net->radio_access_technology & QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_NGRAN)
+                act |= MM_MODEM_ACCESS_TECHNOLOGY_5GNR;
+            mm_sim_preferred_network_set_access_technology (new_item, act);
+
+            result = g_list_append (result, new_item);
+        }
+    }
+
+    return result;
+}
+
+static void
+load_preferred_networks_ready (QmiClientNas *client,
+                               GAsyncResult *res,
+                               GTask        *task)
+{
+    QmiMessageNasGetPreferredNetworksOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_nas_get_preferred_networks_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_nas_get_preferred_networks_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get preferred networks: ");
+        g_task_return_error (task, error);
+    } else
+        g_task_return_pointer (task, parse_get_preferred_networks (output), (GDestroyNotify) mm_sim_preferred_network_list_free);
+
+    if (output)
+        qmi_message_nas_get_preferred_networks_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+load_preferred_networks (MMBaseSim           *self,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+    GTask     *task;
+    QmiClient *client = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_NAS, &client))
+        return;
+
+    mm_obj_dbg (self, "loading preferred network list...");
+    qmi_client_nas_get_preferred_networks (QMI_CLIENT_NAS (client),
+                                           NULL,
+                                           5,
+                                           NULL,
+                                           (GAsyncReadyCallback)load_preferred_networks_ready,
+                                           task);
+}
+
+/*****************************************************************************/
+/* Set preferred networks */
+
+typedef struct {
+    /* Preferred network list to be set, used for after-check comparison */
+    GList    *set_list;
+} SetPreferredNetworksContext;
+
+static void
+set_preferred_network_context_free (SetPreferredNetworksContext *ctx)
+{
+    g_list_free_full (ctx->set_list, (GDestroyNotify) mm_sim_preferred_network_free);
+    g_slice_free (SetPreferredNetworksContext, ctx);
+}
+
+static gboolean
+set_preferred_networks_finish (MMBaseSim *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_preferred_networks_reload_ready (MMBaseSim    *self,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    GError                      *error = NULL;
+    GList                       *loaded_list;
+    GList                       *loaded_iter;
+    GList                       *set_iter;
+    SetPreferredNetworksContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    loaded_list = load_preferred_networks_finish (self, res, &error);
+    if (error) {
+        mm_obj_warn (self, "couldn't reload list of preferred networks: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Compare the set and loaded network list for differences */
+    loaded_iter = loaded_list;
+    set_iter = ctx->set_list;
+
+    while (loaded_iter && set_iter) {
+        const gchar             *loaded_op_code;
+        const gchar             *set_op_code;
+        MMModemAccessTechnology  loaded_act;
+        MMModemAccessTechnology  set_act;
+
+        loaded_op_code = mm_sim_preferred_network_get_operator_code (loaded_iter->data);
+        set_op_code = mm_sim_preferred_network_get_operator_code (set_iter->data);
+        loaded_act = mm_sim_preferred_network_get_access_technology (loaded_iter->data);
+        set_act = mm_sim_preferred_network_get_access_technology (set_iter->data);
+
+        /* Operator code mismatch is never expected, but check it just in case */
+        if (g_strcmp0 (loaded_op_code, set_op_code)) {
+            mm_obj_warn (self, "operator code mismatch, expected '%s' loaded '%s'",
+                         set_op_code, loaded_op_code);
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Mismatch in requested and set operator code");
+            break;
+        }
+        /* Check if there are access technology bits requested but unset */
+        if ((loaded_act & set_act) != set_act) {
+            MMModemAccessTechnology unset = set_act & ~loaded_act;
+
+            mm_obj_warn (self, "access technologies '%s' not set for operator code '%s'",
+                         mm_modem_access_technology_build_string_from_mask (unset),
+                         set_op_code);
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Access technology unsupported by modem or SIM");
+            break;
+        }
+        loaded_iter = g_list_next (loaded_iter);
+        set_iter = g_list_next (set_iter);
+    }
+    if (!error && loaded_iter == NULL && set_iter != NULL) {
+        /* Not all networks were written; some modems silently discard networks
+         * that exceed the SIM card capacity.
+         */
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_TOO_MANY,
+                             "Too many networks; %u networks written",
+                             g_list_length (loaded_list));
+    }
+
+    if (error) {
+        /* Update the PreferredNetworks property to real SIM contents */
+        mm_gdbus_sim_set_preferred_networks (MM_GDBUS_SIM (self),
+                                             mm_sim_preferred_network_list_get_variant (loaded_list));
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
+
+    g_list_free_full (loaded_list, (GDestroyNotify) mm_sim_preferred_network_free);
+    g_object_unref (task);
+}
+
+static void
+set_preferred_networks_ready (QmiClientNas *client,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    QmiMessageNasSetPreferredNetworksOutput *output;
+    GError                                  *error = NULL;
+    MMBaseSim                               *self;
+
+    self = g_task_get_source_object (task);
+
+    output = qmi_client_nas_set_preferred_networks_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_nas_set_preferred_networks_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't set preferred networks: ");
+        g_task_return_error (task, error);
+    } else {
+        /* Reload the networks from modem to check whether everything was written */
+        load_preferred_networks (self, (GAsyncReadyCallback) set_preferred_networks_reload_ready, task);
+        qmi_message_nas_set_preferred_networks_output_unref (output);
+        return;
+    }
+
+    if (output)
+        qmi_message_nas_set_preferred_networks_output_unref (output);
+    g_object_unref (task);
+}
+
+static void
+set_preferred_networks (MMBaseSim *self,
+                        GList *preferred_network_list,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GTask                                  *task;
+    QmiMessageNasSetPreferredNetworksInput *input;
+    QmiClient                              *client = NULL;
+    GArray                                 *preferred_nets_array;
+    GArray                                 *preferred_nets_mnc_pcs_digit_array;
+    SetPreferredNetworksContext            *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    if (!ensure_qmi_client (task,
+                            MM_SIM_QMI (self),
+                            QMI_SERVICE_NAS, &client))
+        return;
+
+    ctx = g_slice_new0 (SetPreferredNetworksContext);
+    ctx->set_list = mm_sim_preferred_network_list_copy (preferred_network_list);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) set_preferred_network_context_free);
+
+    mm_obj_dbg (self, "setting preferred networks...");
+
+    input = qmi_message_nas_set_preferred_networks_input_new ();
+
+    preferred_nets_array = g_array_new (FALSE, TRUE, sizeof (QmiMessageNasSetPreferredNetworksInputPreferredNetworksElement));
+    preferred_nets_mnc_pcs_digit_array = g_array_new (FALSE, TRUE, sizeof (QmiMessageNasSetPreferredNetworksInputMncPcsDigitIncludeStatusElement));
+
+    while (preferred_network_list) {
+        QmiMessageNasSetPreferredNetworksInputPreferredNetworksElement         preferred_nets_element;
+        QmiMessageNasSetPreferredNetworksInputMncPcsDigitIncludeStatusElement  pcs_digit_element;
+        const gchar                                                           *operator_code;
+        MMModemAccessTechnology                                                act;
+
+        memset (&preferred_nets_element, 0, sizeof (preferred_nets_element));
+        memset (&pcs_digit_element, 0, sizeof (pcs_digit_element));
+
+        operator_code = mm_sim_preferred_network_get_operator_code (preferred_network_list->data);
+        act = mm_sim_preferred_network_get_access_technology (preferred_network_list->data);
+        if (mm_3gpp_parse_operator_id (operator_code, &preferred_nets_element.mcc, &preferred_nets_element.mnc, NULL)) {
+            pcs_digit_element.mcc = preferred_nets_element.mcc;
+            pcs_digit_element.mnc = preferred_nets_element.mnc;
+            pcs_digit_element.includes_pcs_digit = strlen(operator_code) > 5;
+
+            preferred_nets_element.radio_access_technology = QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_UNSPECIFIED;
+            if (act & MM_MODEM_ACCESS_TECHNOLOGY_GSM)
+                preferred_nets_element.radio_access_technology |= QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_GSM;
+            if (act & MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT)
+                preferred_nets_element.radio_access_technology |= QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_GSM_COMPACT;
+            if (act & MM_MODEM_ACCESS_TECHNOLOGY_UMTS)
+                preferred_nets_element.radio_access_technology |= QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_UTRAN;
+            if (act & MM_MODEM_ACCESS_TECHNOLOGY_LTE)
+                preferred_nets_element.radio_access_technology |= QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_EUTRAN;
+            if (act & MM_MODEM_ACCESS_TECHNOLOGY_5GNR)
+                preferred_nets_element.radio_access_technology |= QMI_NAS_PLMN_ACCESS_TECHNOLOGY_IDENTIFIER_NGRAN;
+
+            g_array_append_val (preferred_nets_array, preferred_nets_element);
+            g_array_append_val (preferred_nets_mnc_pcs_digit_array, pcs_digit_element);
+        }
+
+        preferred_network_list = g_list_next (preferred_network_list);
+    }
+
+    qmi_message_nas_set_preferred_networks_input_set_preferred_networks (input, preferred_nets_array, NULL);
+    qmi_message_nas_set_preferred_networks_input_set_mnc_pcs_digit_include_status (input, preferred_nets_mnc_pcs_digit_array, NULL);
+    /* Always clear any pre-existing networks */
+    qmi_message_nas_set_preferred_networks_input_set_clear_previous_preferred_networks (input, TRUE, NULL);
+
+    qmi_client_nas_set_preferred_networks (QMI_CLIENT_NAS (client),
+                                           input,
+                                           5,
+                                           NULL,
+                                           (GAsyncReadyCallback)set_preferred_networks_ready,
+                                           task);
+
+    qmi_message_nas_set_preferred_networks_input_unref (input);
+    g_array_unref (preferred_nets_array);
+    g_array_unref (preferred_nets_mnc_pcs_digit_array);
+}
+
+/*****************************************************************************/
 /* Send PIN */
 
 static GError *
@@ -1547,6 +1872,10 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
     base_sim_class->load_operator_identifier_finish = load_operator_identifier_finish;
     base_sim_class->load_operator_name = load_operator_name;
     base_sim_class->load_operator_name_finish = load_operator_name_finish;
+    base_sim_class->load_preferred_networks = load_preferred_networks;
+    base_sim_class->load_preferred_networks_finish = load_preferred_networks_finish;
+    base_sim_class->set_preferred_networks = set_preferred_networks;
+    base_sim_class->set_preferred_networks_finish = set_preferred_networks_finish;
     base_sim_class->send_pin = send_pin;
     base_sim_class->send_pin_finish = send_pin_finish;
     base_sim_class->send_puk = send_puk;
