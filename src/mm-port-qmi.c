@@ -40,6 +40,7 @@ struct _MMPortQmiPrivate {
     gboolean   in_progress;
     QmiDevice *qmi_device;
     GList     *services;
+    gchar     *net_driver;
     /* endpoint info */
     gulong              endpoint_info_signal_id;
     QmiDataEndpointType endpoint_type;
@@ -2279,6 +2280,17 @@ mm_port_qmi_is_open (MMPortQmi *self)
 
 /*****************************************************************************/
 
+void
+mm_port_qmi_set_net_driver (MMPortQmi   *self,
+                            const gchar *net_driver)
+{
+    g_assert (MM_IS_PORT_QMI (self));
+    g_assert (!self->priv->net_driver);
+    self->priv->net_driver = g_strdup (net_driver);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     QmiDevice *qmi_device;
 } PortQmiCloseContext;
@@ -2439,6 +2451,8 @@ dispose (GObject *object)
 
     /* Clear device object */
     g_clear_object (&self->priv->qmi_device);
+
+    g_clear_pointer (&self->priv->net_driver, g_free);
 
     G_OBJECT_CLASS (mm_port_qmi_parent_class)->dispose (object);
 }

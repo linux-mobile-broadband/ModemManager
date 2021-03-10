@@ -1440,6 +1440,16 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
 #if defined WITH_QMI
     if (qmi) {
+        /* The first item in the data list must be a net port, because
+         * QMI modems only expect net ports */
+        g_assert (MM_IS_PORT_NET (self->priv->data->data));
+        /* let the MMPortQmi know which net driver is being used, taken
+         * from the first item in the net port list */
+        g_list_foreach (qmi,
+                        (GFunc)mm_port_qmi_set_net_driver,
+                        (gpointer) mm_kernel_device_get_driver (
+                            mm_port_peek_kernel_device (
+                                MM_PORT (self->priv->data->data))));
         g_list_foreach (qmi, (GFunc)g_object_ref, NULL);
         self->priv->qmi = qmi;
     }
