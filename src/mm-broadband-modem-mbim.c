@@ -2077,6 +2077,113 @@ create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Reset data interfaces during initialization */
+
+typedef struct {
+    GList      *ports;
+    MMPort     *data;
+    MMPortMbim *mbim;
+} ResetPortsContext;
+
+static void
+reset_ports_context_free (ResetPortsContext *ctx)
+{
+    g_assert (!ctx->data);
+    g_assert (!ctx->mbim);
+    g_list_free_full (ctx->ports, g_object_unref);
+    g_slice_free (ResetPortsContext, ctx);
+}
+
+static gboolean
+reset_ports_finish (MMBroadbandModemMbim  *self,
+                    GAsyncResult          *res,
+                    GError               **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void reset_next_port (GTask *task);
+
+static void
+port_mbim_reset_ready (MMPortMbim   *mbim,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    MMBroadbandModemMbim *self;
+    ResetPortsContext   *ctx;
+    g_autoptr(GError)    error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (!mm_port_mbim_reset_finish (mbim, res, &error))
+        mm_obj_warn (self, "couldn't reset MBIM port '%s' with data interface '%s': %s",
+                     mm_port_get_device (MM_PORT (ctx->mbim)),
+                     mm_port_get_device (ctx->data),
+                     error->message);
+
+    g_clear_object (&ctx->data);
+    g_clear_object (&ctx->mbim);
+    reset_next_port (task);
+}
+
+static void
+reset_next_port (GTask *task)
+{
+    MMBroadbandModemMbim *self;
+    ResetPortsContext    *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (!ctx->ports) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    /* steal full data port reference from list head */
+    ctx->data = ctx->ports->data;
+    ctx->ports = g_list_delete_link (ctx->ports, ctx->ports);
+
+    ctx->mbim = mm_broadband_modem_mbim_get_port_mbim_for_data (self, ctx->data, NULL);
+    if (!ctx->mbim) {
+        mm_obj_dbg (self, "no MBIM port associated to data port '%s': ignoring data interface reset",
+                    mm_port_get_device (ctx->data));
+        g_clear_object (&ctx->data);
+        reset_next_port (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "running MBIM port '%s' reset with data interface '%s'",
+                mm_port_get_device (MM_PORT (ctx->mbim)), mm_port_get_device (ctx->data));
+
+    mm_port_mbim_reset (ctx->mbim,
+                        ctx->data,
+                        (GAsyncReadyCallback) port_mbim_reset_ready,
+                        task);
+}
+
+static void
+reset_ports (MMBroadbandModemMbim *self,
+             GAsyncReadyCallback   callback,
+             gpointer              user_data)
+{
+    GTask             *task;
+    ResetPortsContext *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (ResetPortsContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)reset_ports_context_free);
+
+    ctx->ports = mm_base_modem_find_ports (MM_BASE_MODEM (self),
+                                           MM_PORT_SUBSYS_UNKNOWN,
+                                           MM_PORT_TYPE_NET);
+
+    reset_next_port (task);
+}
+
+/*****************************************************************************/
 /* First enabling step */
 
 static gboolean
@@ -2434,15 +2541,74 @@ mbim_port_open_ready (MMPortMbim   *mbim,
 }
 
 static void
+initialization_open_port (GTask *task)
+{
+    InitializationStartedContext *ctx;
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    MMBroadbandModemMbim         *self;
+    gboolean                      qmi_unsupported = FALSE;
+#endif
+
+    ctx = g_task_get_task_data (task);
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    self = g_task_get_source_object (task);
+    g_object_get (self,
+                  MM_BROADBAND_MODEM_MBIM_QMI_UNSUPPORTED, &qmi_unsupported,
+                  NULL);
+#endif
+
+    /* Now open our MBIM port */
+    mm_port_mbim_open (ctx->mbim,
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+                       ! qmi_unsupported, /* With QMI over MBIM support if available */
+#endif
+                       NULL,
+                       (GAsyncReadyCallback)mbim_port_open_ready,
+                       task);
+}
+
+static void
+reset_ports_ready (MMBroadbandModemMbim *self,
+                   GAsyncResult         *res,
+                   GTask                *task)
+{
+    GError *error = NULL;
+
+    if (!reset_ports_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    initialization_open_port (task);
+}
+
+static void
+initialization_reset_ports (GTask *task)
+{
+    MMBroadbandModemMbim *self;
+
+    self = g_task_get_source_object (task);
+
+    /* reseting the data interfaces is really only needed if the device
+     * hasn't been hotplugged */
+    if (mm_base_modem_get_hotplugged (MM_BASE_MODEM (self))) {
+        mm_obj_dbg (self, "not running data interface reset procedure: device is hotplugged");
+        initialization_open_port (task);
+        return;
+    }
+
+    reset_ports (self, (GAsyncReadyCallback)reset_ports_ready, task);
+}
+
+static void
 initialization_started (MMBroadbandModem    *self,
                         GAsyncReadyCallback  callback,
                         gpointer             user_data)
 {
     InitializationStartedContext *ctx;
     GTask                        *task;
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    gboolean                      qmi_unsupported = FALSE;
-#endif
 
     ctx = g_slice_new0 (InitializationStartedContext);
     ctx->mbim = mm_broadband_modem_mbim_get_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
@@ -2468,20 +2634,7 @@ initialization_started (MMBroadbandModem    *self,
         return;
     }
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    g_object_get (self,
-                  MM_BROADBAND_MODEM_MBIM_QMI_UNSUPPORTED, &qmi_unsupported,
-                  NULL);
-#endif
-
-    /* Now open our MBIM port */
-    mm_port_mbim_open (ctx->mbim,
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-                       ! qmi_unsupported, /* With QMI over MBIM support if available */
-#endif
-                       NULL,
-                       (GAsyncReadyCallback)mbim_port_open_ready,
-                       task);
+    initialization_reset_ports (task);
 }
 
 /*****************************************************************************/
