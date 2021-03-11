@@ -1197,6 +1197,7 @@ typedef struct {
 static void
 disconnect_context_free (DisconnectContext *ctx)
 {
+    g_object_unref (ctx->device);
     g_object_unref (ctx->data);
     g_slice_free (DisconnectContext, ctx);
 }
