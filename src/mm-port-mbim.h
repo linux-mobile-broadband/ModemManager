@@ -92,6 +92,24 @@ gboolean   mm_port_mbim_allocate_qmi_client_finish (MMPortMbim           *self,
 
 MbimDevice *mm_port_mbim_peek_device (MMPortMbim *self);
 
+void   mm_port_mbim_setup_link        (MMPortMbim            *self,
+                                       MMPort                *data,
+                                       const gchar           *link_prefix_hint,
+                                       GAsyncReadyCallback    callback,
+                                       gpointer               user_data);
+gchar *mm_port_mbim_setup_link_finish (MMPortMbim            *self,
+                                       GAsyncResult          *res,
+                                       guint                 *session_id,
+                                       GError               **error);
+
+void   mm_port_mbim_cleanup_link          (MMPortMbim           *self,
+                                           const gchar          *link_name,
+                                           GAsyncReadyCallback   callback,
+                                           gpointer              user_data);
+gboolean mm_port_mbim_cleanup_link_finish (MMPortMbim           *self,
+                                           GAsyncResult         *res,
+                                           GError              **error);
+
 void     mm_port_mbim_reset        (MMPortMbim           *self,
                                     MMPort               *data,
                                     GAsyncReadyCallback   callback,

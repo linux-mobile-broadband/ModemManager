@@ -157,6 +157,134 @@ mm_port_mbim_allocate_qmi_client (MMPortMbim           *self,
 /*****************************************************************************/
 
 typedef struct {
+    gchar *link_name;
+    guint  session_id;
+} SetupLinkResult;
+
+static void
+setup_link_result_free (SetupLinkResult *ctx)
+{
+    g_free (ctx->link_name);
+    g_slice_free (SetupLinkResult, ctx);
+}
+
+gchar *
+mm_port_mbim_setup_link_finish (MMPortMbim    *self,
+                                GAsyncResult  *res,
+                                guint         *session_id,
+                                GError       **error)
+{
+    SetupLinkResult *result;
+    gchar           *link_name;
+
+    result = g_task_propagate_pointer (G_TASK (res), error);
+    if (!result)
+        return NULL;
+
+    if (session_id)
+        *session_id = result->session_id;
+    link_name = g_steal_pointer (&result->link_name);
+    setup_link_result_free (result);
+
+    return link_name;
+}
+
+static void
+device_add_link_ready (MbimDevice   *device,
+                       GAsyncResult *res,
+                       GTask        *task)
+{
+    SetupLinkResult *result;
+    GError          *error = NULL;
+
+    result = g_slice_new0 (SetupLinkResult);
+
+    result->link_name = mbim_device_add_link_finish (device, res, &result->session_id, &error);
+    if (!result->link_name) {
+        g_prefix_error (&error, "failed to add link for device: ");
+        g_task_return_error (task, error);
+        setup_link_result_free (result);
+    } else
+        g_task_return_pointer (task, result, (GDestroyNotify)setup_link_result_free);
+    g_object_unref (task);
+}
+
+void
+mm_port_mbim_setup_link (MMPortMbim          *self,
+                         MMPort              *data,
+                         const gchar         *link_prefix_hint,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->mbim_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Port is not open");
+        g_object_unref (task);
+        return;
+    }
+
+    mbim_device_add_link (self->priv->mbim_device,
+                          MBIM_DEVICE_SESSION_ID_AUTOMATIC,
+                          mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
+                          link_prefix_hint,
+                          NULL,
+                          (GAsyncReadyCallback) device_add_link_ready,
+                          task);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_port_mbim_cleanup_link_finish (MMPortMbim    *self,
+                                  GAsyncResult  *res,
+                                  GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+device_delete_link_ready (MbimDevice   *device,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mbim_device_delete_link_finish (device, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_port_mbim_cleanup_link (MMPortMbim          *self,
+                           const gchar         *link_name,
+                           GAsyncReadyCallback  callback,
+                           gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->mbim_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Port is not open");
+        g_object_unref (task);
+        return;
+    }
+
+    mbim_device_delete_link (self->priv->mbim_device,
+                             link_name,
+                             NULL,
+                             (GAsyncReadyCallback) device_delete_link_ready,
+                             task);
+}
+
+/*****************************************************************************/
+
+typedef struct {
     MbimDevice *device;
     MMPort    *data;
 } ResetContext;
