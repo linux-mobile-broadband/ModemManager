@@ -52,20 +52,20 @@ struct _MMBearerMbimPrivate {
 /*****************************************************************************/
 
 static gboolean
-peek_ports (gpointer self,
-            MbimDevice **o_device,
-            MMPort **o_data,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+peek_ports (gpointer              self,
+            MMPortMbim          **o_mbim,
+            MMPort              **o_data,
+            GAsyncReadyCallback   callback,
+            gpointer              user_data)
 {
-    MMBaseModem *modem = NULL;
+    g_autoptr(MMBaseModem) modem = NULL;
 
     g_object_get (G_OBJECT (self),
                   MM_BASE_BEARER_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
-    if (o_device) {
+    if (o_mbim) {
         MMPortMbim *port;
 
         port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (modem));
@@ -77,11 +77,10 @@ peek_ports (gpointer self,
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_FAILED,
                                      "Couldn't peek MBIM port");
-            g_object_unref (modem);
             return FALSE;
         }
 
-        *o_device = mm_port_mbim_peek_device (port);
+        *o_mbim = port;
     }
 
     if (o_data) {
@@ -97,14 +96,12 @@ peek_ports (gpointer self,
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_NOT_FOUND,
                                      "No valid data port found to launch connection");
-            g_object_unref (modem);
             return FALSE;
         }
 
         *o_data = port;
     }
 
-    g_object_unref (modem);
     return TRUE;
 }
 
@@ -117,11 +114,11 @@ typedef struct {
 } ReloadStatsResult;
 
 static gboolean
-reload_stats_finish (MMBaseBearer *bearer,
-                     guint64 *rx_bytes,
-                     guint64 *tx_bytes,
-                     GAsyncResult *res,
-                     GError **error)
+reload_stats_finish (MMBaseBearer  *bearer,
+                     guint64       *rx_bytes,
+                     guint64       *tx_bytes,
+                     GAsyncResult  *res,
+                     GError       **error)
 {
     ReloadStatsResult *stats;
 
@@ -139,14 +136,14 @@ reload_stats_finish (MMBaseBearer *bearer,
 }
 
 static void
-packet_statistics_query_ready (MbimDevice *device,
+packet_statistics_query_ready (MbimDevice   *device,
                                GAsyncResult *res,
-                               GTask *task)
+                               GTask        *task)
 {
-    GError      *error = NULL;
-    MbimMessage *response;
-    guint64      in_octets = 0;
-    guint64      out_octets = 0;
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+    guint64                 in_octets = 0;
+    guint64                 out_octets = 0;
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -176,32 +173,28 @@ packet_statistics_query_ready (MbimDevice *device,
         g_task_return_error (task, error);
 
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
-reload_stats (MMBaseBearer *self,
-              GAsyncReadyCallback callback,
-              gpointer user_data)
+reload_stats (MMBaseBearer        *self,
+              GAsyncReadyCallback  callback,
+              gpointer             user_data)
 {
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
+    MMPortMbim             *mbim;
+    GTask                  *task;
+    g_autoptr(MbimMessage)  message = NULL;
 
-    if (!peek_ports (self, &device, NULL, callback, user_data))
+    if (!peek_ports (self, &mbim, NULL, callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
     message = (mbim_message_packet_statistics_query_new (NULL));
-    mbim_device_command (device,
+    mbim_device_command (mm_port_mbim_peek_device (mbim),
                          message,
                          5,
                          NULL,
                          (GAsyncReadyCallback)packet_statistics_query_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
@@ -219,12 +212,12 @@ typedef enum {
 } ConnectStep;
 
 typedef struct {
-    MbimDevice *device;
-    MMBearerProperties *properties;
-    ConnectStep step;
-    MMPort *data;
-    MbimContextIpType requested_ip_type;
-    MbimContextIpType activated_ip_type;
+    MMPortMbim            *mbim;
+    MMBearerProperties    *properties;
+    ConnectStep            step;
+    MMPort                *data;
+    MbimContextIpType      requested_ip_type;
+    MbimContextIpType      activated_ip_type;
     MMBearerConnectResult *connect_result;
 } ConnectContext;
 
@@ -235,14 +228,14 @@ connect_context_free (ConnectContext *ctx)
         mm_bearer_connect_result_unref (ctx->connect_result);
     g_object_unref (ctx->data);
     g_object_unref (ctx->properties);
-    g_object_unref (ctx->device);
+    g_object_unref (ctx->mbim);
     g_slice_free (ConnectContext, ctx);
 }
 
 static MMBearerConnectResult *
-connect_finish (MMBaseBearer *self,
-                GAsyncResult *res,
-                GError **error)
+connect_finish (MMBaseBearer  *self,
+                GAsyncResult  *res,
+                GError       **error)
 {
     return g_task_propagate_pointer (G_TASK (res), error);
 }
@@ -250,28 +243,28 @@ connect_finish (MMBaseBearer *self,
 static void connect_context_step (GTask *task);
 
 static void
-ip_configuration_query_ready (MbimDevice *device,
+ip_configuration_query_ready (MbimDevice   *device,
                               GAsyncResult *res,
-                              GTask *task)
+                              GTask        *task)
 {
-    MMBearerMbim *self;
-    ConnectContext *ctx;
-    GError *error = NULL;
-    MbimMessage *response;
-    MbimIPConfigurationAvailableFlag ipv4configurationavailable;
-    MbimIPConfigurationAvailableFlag ipv6configurationavailable;
-    guint32 ipv4addresscount;
-    MbimIPv4Element **ipv4address;
-    guint32 ipv6addresscount;
-    MbimIPv6Element **ipv6address;
-    const MbimIPv4 *ipv4gateway;
-    const MbimIPv6 *ipv6gateway;
-    guint32 ipv4dnsservercount;
-    MbimIPv4 *ipv4dnsserver;
-    guint32 ipv6dnsservercount;
-    MbimIPv6 *ipv6dnsserver;
-    guint32 ipv4mtu;
-    guint32 ipv6mtu;
+    MMBearerMbim                     *self;
+    ConnectContext                   *ctx;
+    GError                           *error = NULL;
+    g_autoptr(MbimMessage)            response = NULL;
+    MbimIPConfigurationAvailableFlag  ipv4configurationavailable;
+    MbimIPConfigurationAvailableFlag  ipv6configurationavailable;
+    guint32                           ipv4addresscount;
+    g_autoptr(MbimIPv4ElementArray)   ipv4address = NULL;
+    guint32                           ipv6addresscount;
+    g_autoptr(MbimIPv6ElementArray)   ipv6address = NULL;
+    const MbimIPv4                   *ipv4gateway;
+    const MbimIPv6                   *ipv6gateway;
+    guint32                           ipv4dnsservercount;
+    g_autofree MbimIPv4              *ipv4dnsserver = NULL;
+    guint32                           ipv6dnsservercount;
+    g_autofree MbimIPv6              *ipv6dnsserver = NULL;
+    guint32                           ipv4mtu;
+    guint32                           ipv6mtu;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -297,36 +290,37 @@ ip_configuration_query_ready (MbimDevice *device,
             &ipv4mtu,
             &ipv6mtu,
             &error)) {
-        gchar *str;
-        GInetAddress *addr;
-        MMBearerIpConfig *ipv4_config;
-        MMBearerIpConfig *ipv6_config;
+        g_autofree gchar            *ipv4configurationavailable_str = NULL;
+        g_autofree gchar            *ipv6configurationavailable_str = NULL;
+        g_autoptr(MMBearerIpConfig)  ipv4_config = NULL;
+        g_autoptr(MMBearerIpConfig)  ipv6_config = NULL;
 
         /* IPv4 info */
 
-        str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv4configurationavailable);
-        mm_obj_dbg (self, "IPv4 configuration available: '%s'", str);
-        g_free (str);
+        ipv4configurationavailable_str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv4configurationavailable);
+        mm_obj_dbg (self, "IPv4 configuration available: '%s'", ipv4configurationavailable_str);
 
         if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv4addresscount) {
             guint i;
 
             mm_obj_dbg (self, "  IP addresses (%u)", ipv4addresscount);
             for (i = 0; i < ipv4addresscount; i++) {
+                g_autoptr(GInetAddress)  addr = NULL;
+                g_autofree gchar        *str = NULL;
+
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[i]->ipv4_address, G_SOCKET_FAMILY_IPV4);
                 str = g_inet_address_to_string (addr);
                 mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv4address[i]->on_link_prefix_length);
-                g_free (str);
-                g_object_unref (addr);
             }
         }
 
         if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv4gateway) {
+            g_autoptr(GInetAddress)  addr = NULL;
+            g_autofree gchar        *str = NULL;
+
             addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
             str = g_inet_address_to_string (addr);
             mm_obj_dbg (self, "  gateway: '%s'", str);
-            g_free (str);
-            g_object_unref (addr);
         }
 
         if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv4dnsservercount) {
@@ -334,45 +328,47 @@ ip_configuration_query_ready (MbimDevice *device,
 
             mm_obj_dbg (self, "  DNS addresses (%u)", ipv4dnsservercount);
             for (i = 0; i < ipv4dnsservercount; i++) {
+                g_autoptr(GInetAddress)  addr = NULL;
+
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
                 if (!g_inet_address_get_is_any (addr)) {
+                    g_autofree gchar *str = NULL;
+
                     str = g_inet_address_to_string (addr);
                     mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
-                    g_free (str);
                 }
-                g_object_unref (addr);
             }
         }
 
-        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv4mtu) {
+        if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv4mtu)
             mm_obj_dbg (self, "  MTU: '%u'", ipv4mtu);
-        }
 
         /* IPv6 info */
 
-        str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv6configurationavailable);
-        mm_obj_dbg (self, "IPv6 configuration available: '%s'", str);
-        g_free (str);
+        ipv6configurationavailable_str = mbim_ip_configuration_available_flag_build_string_from_mask (ipv6configurationavailable);
+        mm_obj_dbg (self, "IPv6 configuration available: '%s'", ipv6configurationavailable_str);
 
         if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && ipv6addresscount) {
             guint i;
 
             mm_obj_dbg (self, "  IP addresses (%u)", ipv6addresscount);
             for (i = 0; i < ipv6addresscount; i++) {
+                g_autoptr(GInetAddress)  addr = NULL;
+                g_autofree gchar        *str = NULL;
+
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[i]->ipv6_address, G_SOCKET_FAMILY_IPV6);
                 str = g_inet_address_to_string (addr);
                 mm_obj_dbg (self, "    IP [%u]: '%s/%u'", i, str, ipv6address[i]->on_link_prefix_length);
-                g_free (str);
-                g_object_unref (addr);
             }
         }
 
         if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) && ipv6gateway) {
+            g_autoptr(GInetAddress)  addr = NULL;
+            g_autofree gchar        *str = NULL;
+
             addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
             str = g_inet_address_to_string (addr);
             mm_obj_dbg (self, "  gateway: '%s'", str);
-            g_free (str);
-            g_object_unref (addr);
         }
 
         if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && ipv6dnsservercount) {
@@ -380,8 +376,12 @@ ip_configuration_query_ready (MbimDevice *device,
 
             mm_obj_dbg (self, "  DNS addresses (%u)", ipv6dnsservercount);
             for (i = 0; i < ipv6dnsservercount; i++) {
+                g_autoptr(GInetAddress)  addr = NULL;
+
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
                 if (!g_inet_address_get_is_any (addr)) {
+                    g_autofree gchar *str = NULL;
+
                     str = g_inet_address_to_string (addr);
                     mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
                     g_free (str);
@@ -390,9 +390,8 @@ ip_configuration_query_ready (MbimDevice *device,
             }
         }
 
-        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv6mtu) {
+        if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_MTU) && ipv6mtu)
             mm_obj_dbg (self, "  MTU: '%u'", ipv6mtu);
-        }
 
         /* Build connection results */
 
@@ -409,16 +408,16 @@ ip_configuration_query_ready (MbimDevice *device,
              * gateway, and not all modems support DHCP either. The IP management
              * daemon/script just has to deal with this...
              */
-            if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS &&
-                ipv4addresscount > 0) {
+            if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && (ipv4addresscount > 0)) {
+                g_autoptr(GInetAddress)  addr = NULL;
+                g_autofree gchar        *str = NULL;
+
                 mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_STATIC);
 
                 /* IP address, pick the first one */
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4address[0]->ipv4_address, G_SOCKET_FAMILY_IPV4);
                 str = g_inet_address_to_string (addr);
                 mm_bearer_ip_config_set_address (ipv4_config, str);
-                g_free (str);
-                g_object_unref (addr);
                 address_set = TRUE;
 
                 /* Netmask */
@@ -426,30 +425,31 @@ ip_configuration_query_ready (MbimDevice *device,
 
                 /* Gateway */
                 if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
-                    addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
-                    str = g_inet_address_to_string (addr);
-                    mm_bearer_ip_config_set_gateway (ipv4_config, str);
-                    g_free (str);
-                    g_object_unref (addr);
+                    g_autoptr(GInetAddress)  gw_addr = NULL;
+                    g_autofree gchar        *gw_str = NULL;
+
+                    gw_addr = g_inet_address_new_from_bytes ((guint8 *)ipv4gateway, G_SOCKET_FAMILY_IPV4);
+                    gw_str = g_inet_address_to_string (gw_addr);
+                    mm_bearer_ip_config_set_gateway (ipv4_config, gw_str);
                 }
             } else
                 mm_bearer_ip_config_set_method (ipv4_config, MM_BEARER_IP_METHOD_DHCP);
 
             /* DNS */
-            if (ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
-                ipv4dnsservercount > 0) {
-                gchar **strarr;
-                guint i, n;
+            if ((ipv4configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && (ipv4dnsservercount > 0)) {
+                g_auto(GStrv) strarr = NULL;
+                guint         i;
+                guint         n;
 
                 strarr = g_new0 (gchar *, ipv4dnsservercount + 1);
                 for (i = 0, n = 0; i < ipv4dnsservercount; i++) {
+                    g_autoptr(GInetAddress) addr = NULL;
+
                     addr = g_inet_address_new_from_bytes ((guint8 *)&ipv4dnsserver[i], G_SOCKET_FAMILY_IPV4);
                     if (!g_inet_address_get_is_any (addr))
                         strarr[n++] = g_inet_address_to_string (addr);
-                    g_object_unref (addr);
                 }
                 mm_bearer_ip_config_set_dns (ipv4_config, (const gchar **)strarr);
-                g_strfreev (strarr);
             }
 
             /* MTU */
@@ -465,8 +465,7 @@ ip_configuration_query_ready (MbimDevice *device,
                 mm_obj_dbg (self, "IPv4 requested but no IPv4 activated and no IPv4 address set: ignoring");
                 g_clear_object (&ipv4_config);
             }
-        } else
-            ipv4_config = NULL;
+        }
 
         /* Build IPv6 config */
         if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_IPV6 ||
@@ -478,14 +477,14 @@ ip_configuration_query_ready (MbimDevice *device,
 
             ipv6_config = mm_bearer_ip_config_new ();
 
-            if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS &&
-                ipv6addresscount > 0) {
+            if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_ADDRESS) && (ipv6addresscount > 0)) {
+                g_autoptr(GInetAddress)  addr = NULL;
+                g_autofree gchar        *str = NULL;
 
                 /* IP address, pick the first one */
                 addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6address[0]->ipv6_address, G_SOCKET_FAMILY_IPV6);
                 str = g_inet_address_to_string (addr);
                 mm_bearer_ip_config_set_address (ipv6_config, str);
-                g_free (str);
                 address_set = TRUE;
 
                 /* If the address is a link-local one, then SLAAC or DHCP must be used
@@ -495,38 +494,36 @@ ip_configuration_query_ready (MbimDevice *device,
                 if (g_inet_address_get_is_link_local (addr))
                     address_set = FALSE;
 
-                g_object_unref (addr);
-
                 /* Netmask */
                 mm_bearer_ip_config_set_prefix (ipv6_config, ipv6address[0]->on_link_prefix_length);
 
                 /* Gateway */
                 if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_GATEWAY) {
-                    addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
-                    str = g_inet_address_to_string (addr);
-                    mm_bearer_ip_config_set_gateway (ipv6_config, str);
-                    g_free (str);
-                    g_object_unref (addr);
+                    g_autoptr(GInetAddress)  gw_addr = NULL;
+                    g_autofree gchar        *gw_str = NULL;
+
+                    gw_addr = g_inet_address_new_from_bytes ((guint8 *)ipv6gateway, G_SOCKET_FAMILY_IPV6);
+                    gw_str = g_inet_address_to_string (gw_addr);
+                    mm_bearer_ip_config_set_gateway (ipv6_config, gw_str);
                     gateway_set = TRUE;
                 }
             }
 
-            if (ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS &&
-                ipv6dnsservercount > 0) {
-                gchar **strarr;
-                guint i, n;
+            if ((ipv6configurationavailable & MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_DNS) && (ipv6dnsservercount > 0)) {
+                g_auto(GStrv) strarr = NULL;
+                guint         i;
+                guint         n;
 
                 /* DNS */
                 strarr = g_new0 (gchar *, ipv6dnsservercount + 1);
                 for (i = 0, n = 0; i < ipv6dnsservercount; i++) {
+                    g_autoptr(GInetAddress) addr = NULL;
+
                     addr = g_inet_address_new_from_bytes ((guint8 *)&ipv6dnsserver[i], G_SOCKET_FAMILY_IPV6);
                     if (!g_inet_address_get_is_any (addr))
                         strarr[n++] = g_inet_address_to_string (addr);
-                    g_object_unref (addr);
                 }
                 mm_bearer_ip_config_set_dns (ipv6_config, (const gchar **)strarr);
-                g_strfreev (strarr);
-
                 dns_set = TRUE;
             }
 
@@ -552,26 +549,11 @@ ip_configuration_query_ready (MbimDevice *device,
                 mm_obj_dbg (self, "IPv6 requested but no IPv6 activated and no IPv6 address set: ignoring");
                 g_clear_object (&ipv6_config);
             }
-        } else
-            ipv6_config = NULL;
+        }
 
         /* Store result */
-        ctx->connect_result = mm_bearer_connect_result_new (ctx->data,
-                                                            ipv4_config,
-                                                            ipv6_config);
-
-        if (ipv4_config)
-            g_object_unref (ipv4_config);
-        if (ipv6_config)
-            g_object_unref (ipv6_config);
-        mbim_ipv4_element_array_free (ipv4address);
-        mbim_ipv6_element_array_free (ipv6address);
-        g_free (ipv4dnsserver);
-        g_free (ipv6dnsserver);
+        ctx->connect_result = mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config);
     }
-
-    if (response)
-        mbim_message_unref (response);
 
     if (error) {
         g_task_return_error (task, error);
@@ -585,17 +567,17 @@ ip_configuration_query_ready (MbimDevice *device,
 }
 
 static void
-connect_set_ready (MbimDevice *device,
+connect_set_ready (MbimDevice   *device,
                    GAsyncResult *res,
-                   GTask *task)
+                   GTask        *task)
 {
-    MMBearerMbim *self;
-    ConnectContext *ctx;
-    GError *error = NULL;
-    MbimMessage *response;
-    guint32 session_id;
-    MbimActivationState activation_state;
-    guint32 nw_error;
+    MMBearerMbim           *self;
+    ConnectContext         *ctx;
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+    guint32                 session_id;
+    MbimActivationState     activation_state;
+    guint32                 nw_error;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -604,7 +586,7 @@ connect_set_ready (MbimDevice *device,
     if (response &&
         (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
          error->code == MBIM_STATUS_ERROR_FAILURE)) {
-        GError *inner_error = NULL;
+        g_autoptr(GError) inner_error = NULL;
 
         if (mbim_message_connect_response_parse (
                 response,
@@ -639,14 +621,9 @@ connect_set_ready (MbimDevice *device,
         } else {
             /* Prefer the error from the result to the parsing error */
             if (!error)
-                error = inner_error;
-            else
-                g_error_free (inner_error);
+                error = g_steal_pointer (&inner_error);
         }
     }
-
-    if (response)
-        mbim_message_unref (response);
 
     if (error) {
         g_task_return_error (task, error);
@@ -664,15 +641,13 @@ ensure_disconnected_ready (MbimDevice   *device,
                            GAsyncResult *res,
                            GTask        *task)
 {
-    ConnectContext *ctx;
-    MbimMessage *response;
+    ConnectContext         *ctx;
+    g_autoptr(MbimMessage)  response = NULL;
 
     ctx = g_task_get_task_data (task);
 
     /* Ignore all errors, just go on */
     response = mbim_device_command_finish (device, res, NULL);
-    if (response)
-        mbim_message_unref (response);
 
     /* Keep on */
     ctx->step++;
@@ -684,12 +659,12 @@ check_disconnected_ready (MbimDevice   *device,
                           GAsyncResult *res,
                           GTask        *task)
 {
-    MMBearerMbim *self;
-    ConnectContext *ctx;
-    GError *error = NULL;
-    MbimMessage *response;
-    guint32 session_id;
-    MbimActivationState activation_state;
+    MMBearerMbim           *self;
+    ConnectContext         *ctx;
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+    guint32                 session_id;
+    MbimActivationState     activation_state;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -709,9 +684,6 @@ check_disconnected_ready (MbimDevice   *device,
         mm_obj_dbg (self, "session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
     } else
         activation_state = MBIM_ACTIVATION_STATE_UNKNOWN;
-
-    if (response)
-        mbim_message_unref (response);
 
     /* Some modem (e.g. Huawei ME936) reports MBIM_ACTIVATION_STATE_UNKNOWN
      * when being queried for the activation state before an IP session has
@@ -733,12 +705,12 @@ provisioned_contexts_query_ready (MbimDevice *device,
                                   GAsyncResult *res,
                                   GTask *task)
 {
-    MMBearerMbim *self;
-    ConnectContext *ctx;
-    GError *error = NULL;
-    MbimMessage *response;
-    guint32 provisioned_contexts_count;
-    MbimProvisionedContextElement **provisioned_contexts;
+    MMBearerMbim           *self;
+    ConnectContext         *ctx;
+    g_autoptr(GError)       error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+    guint32                 provisioned_contexts_count;
+    g_autoptr(MbimProvisionedContextElementArray) provisioned_contexts = NULL;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -756,7 +728,7 @@ provisioned_contexts_query_ready (MbimDevice *device,
         mm_obj_dbg (self, "provisioned contexts found (%u):", provisioned_contexts_count);
         for (i = 0; i < provisioned_contexts_count; i++) {
             MbimProvisionedContextElement *el = provisioned_contexts[i];
-            gchar *uuid_str;
+            g_autofree gchar              *uuid_str = NULL;
 
             uuid_str = mbim_uuid_get_printable (&el->context_type);
             mm_obj_dbg (self, "[%u] context type: %s", el->context_id, mbim_context_type_get_string (mbim_uuid_to_context_type (&el->context_type)));
@@ -766,17 +738,9 @@ provisioned_contexts_query_ready (MbimDevice *device,
             mm_obj_dbg (self, "         password: %s", el->password ? el->password : "");
             mm_obj_dbg (self, "      compression: %s", mbim_compression_get_string (el->compression));
             mm_obj_dbg (self, "             auth: %s", mbim_auth_protocol_get_string (el->auth_protocol));
-            g_free (uuid_str);
         }
-
-        mbim_provisioned_context_element_array_free (provisioned_contexts);
-    } else {
+    } else
         mm_obj_dbg (self, "error listing provisioned contexts: %s", error->message);
-        g_error_free (error);
-    }
-
-    if (response)
-        mbim_message_unref (response);
 
     /* Keep on */
     ctx->step++;
@@ -788,24 +752,24 @@ packet_service_set_ready (MbimDevice *device,
                           GAsyncResult *res,
                           GTask *task)
 {
-    MMBearerMbim *self;
-    ConnectContext *ctx;
-    GError *error = NULL;
-    MbimMessage *response;
-    guint32 nw_error;
-    MbimPacketServiceState packet_service_state;
-    MbimDataClass highest_available_data_class;
-    guint64 uplink_speed;
-    guint64 downlink_speed;
+    MMBearerMbim           *self;
+    ConnectContext         *ctx;
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+    guint32                 nw_error;
+    MbimPacketServiceState  packet_service_state;
+    MbimDataClass           highest_available_data_class;
+    guint64                 uplink_speed;
+    guint64                 downlink_speed;
 
     self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
+    ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
          error->code == MBIM_STATUS_ERROR_FAILURE)) {
-        GError *inner_error = NULL;
+        g_autoptr(GError) inner_error = NULL;
 
         if (mbim_message_packet_service_response_parse (
                 response,
@@ -816,11 +780,10 @@ packet_service_set_ready (MbimDevice *device,
                 &downlink_speed,
                 &inner_error)) {
             if (nw_error) {
-                if (error)
-                    g_error_free (error);
+                g_clear_error (&error);
                 error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
             } else {
-                gchar *str;
+                g_autofree gchar *str = NULL;
 
                 str = mbim_data_class_build_string_from_mask (highest_available_data_class);
                 mm_obj_dbg (self, "packet service update:");
@@ -828,19 +791,13 @@ packet_service_set_ready (MbimDevice *device,
                 mm_obj_dbg (self, "    data class: '%s'", str);
                 mm_obj_dbg (self, "        uplink: '%" G_GUINT64_FORMAT "' bps", uplink_speed);
                 mm_obj_dbg (self, "      downlink: '%" G_GUINT64_FORMAT "' bps", downlink_speed);
-                g_free (str);
             }
         } else {
             /* Prefer the error from the result to the parsing error */
             if (!error)
-                error = inner_error;
-            else
-                g_error_free (inner_error);
+                error = g_steal_pointer (&inner_error);
         }
     }
-
-    if (response)
-        mbim_message_unref (response);
 
     if (error) {
         /* Don't make NoDeviceSupport errors fatal; just try to keep on the
@@ -864,9 +821,9 @@ packet_service_set_ready (MbimDevice *device,
 static void
 connect_context_step (GTask *task)
 {
-    MMBearerMbim *self;
-    ConnectContext *ctx;
-    MbimMessage *message;
+    MMBearerMbim           *self;
+    ConnectContext         *ctx;
+    g_autoptr(MbimMessage)  message = NULL;
 
     /* If cancelled, complete */
     if (g_task_return_error_if_cancelled (task)) {
@@ -875,112 +832,81 @@ connect_context_step (GTask *task)
     }
 
     self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
+    ctx  = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case CONNECT_STEP_FIRST:
         ctx->step++;
         /* Fall through */
 
-    case CONNECT_STEP_PACKET_SERVICE: {
-        GError *error = NULL;
-
+    case CONNECT_STEP_PACKET_SERVICE:
         mm_obj_dbg (self, "activating packet service...");
-        message = (mbim_message_packet_service_set_new (
-                       MBIM_PACKET_SERVICE_ACTION_ATTACH,
-                       &error));
-        if (!message) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mbim_device_command (ctx->device,
+        message = mbim_message_packet_service_set_new (MBIM_PACKET_SERVICE_ACTION_ATTACH, NULL);
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              30,
                              NULL,
                              (GAsyncReadyCallback)packet_service_set_ready,
                              task);
-        mbim_message_unref (message);
         return;
-    }
 
     case CONNECT_STEP_PROVISIONED_CONTEXTS:
         mm_obj_dbg (self, "listing provisioned contexts...");
         message = mbim_message_provisioned_contexts_query_new (NULL);
-        mbim_device_command (ctx->device,
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              10,
                              NULL,
                              (GAsyncReadyCallback)provisioned_contexts_query_ready,
                              task);
-        mbim_message_unref (message);
         return;
 
-    case CONNECT_STEP_CHECK_DISCONNECTED: {
-        GError *error = NULL;
-
-        message = (mbim_message_connect_query_new (
-                       self->priv->session_id,
-                       MBIM_ACTIVATION_STATE_UNKNOWN,
-                       MBIM_VOICE_CALL_STATE_NONE,
-                       MBIM_CONTEXT_IP_TYPE_DEFAULT,
-                       mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                       0,
-                       &error));
-        if (!message) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mbim_device_command (ctx->device,
+    case CONNECT_STEP_CHECK_DISCONNECTED:
+        mm_obj_dbg (self, "checking if session is disconnected...");
+        message = mbim_message_connect_query_new (
+                      self->priv->session_id,
+                      MBIM_ACTIVATION_STATE_UNKNOWN,
+                      MBIM_VOICE_CALL_STATE_NONE,
+                      MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                      mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                      0,
+                      NULL);
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              10,
                              NULL,
                              (GAsyncReadyCallback)check_disconnected_ready,
                              task);
-        mbim_message_unref (message);
         return;
-    }
 
-    case CONNECT_STEP_ENSURE_DISCONNECTED: {
-        GError *error = NULL;
-
-        message = (mbim_message_connect_set_new (
-                       self->priv->session_id,
-                       MBIM_ACTIVATION_COMMAND_DEACTIVATE,
-                       "",
-                       "",
-                       "",
-                       MBIM_COMPRESSION_NONE,
-                       MBIM_AUTH_PROTOCOL_NONE,
-                       MBIM_CONTEXT_IP_TYPE_DEFAULT,
-                       mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                       &error));
-        if (!message) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mbim_device_command (ctx->device,
+    case CONNECT_STEP_ENSURE_DISCONNECTED:
+        mm_obj_dbg (self, "ensuring session is disconnected...");
+        message = mbim_message_connect_set_new (
+                      self->priv->session_id,
+                      MBIM_ACTIVATION_COMMAND_DEACTIVATE,
+                      "",
+                      "",
+                      "",
+                      MBIM_COMPRESSION_NONE,
+                      MBIM_AUTH_PROTOCOL_NONE,
+                      MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                      mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                      NULL);
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                              NULL,
                              (GAsyncReadyCallback)ensure_disconnected_ready,
                              task);
-        mbim_message_unref (message);
         return;
-    }
 
     case CONNECT_STEP_CONNECT: {
-        const gchar *apn;
-        const gchar *user;
-        const gchar *password;
-        MbimAuthProtocol auth;
-        MMBearerIpFamily ip_family;
-        GError *error = NULL;
+        const gchar      *apn;
+        const gchar      *user;
+        const gchar      *password;
+        MbimAuthProtocol  auth;
+        MMBearerIpFamily  ip_family;
+        GError           *error = NULL;
 
         /* Setup parameters to use */
 
@@ -1022,69 +948,52 @@ connect_context_step (GTask *task)
 
         mm_obj_dbg (self, "launching %s connection with APN '%s'...",
                     mbim_context_ip_type_get_string (ctx->requested_ip_type), apn);
-        message = (mbim_message_connect_set_new (
-                       self->priv->session_id,
-                       MBIM_ACTIVATION_COMMAND_ACTIVATE,
-                       apn ? apn : "",
-                       user ? user : "",
-                       password ? password : "",
-                       MBIM_COMPRESSION_NONE,
-                       auth,
-                       ctx->requested_ip_type,
-                       mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                       &error));
-        if (!message) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mbim_device_command (ctx->device,
+        message = mbim_message_connect_set_new (
+                      self->priv->session_id,
+                      MBIM_ACTIVATION_COMMAND_ACTIVATE,
+                      apn ? apn : "",
+                      user ? user : "",
+                      password ? password : "",
+                      MBIM_COMPRESSION_NONE,
+                      auth,
+                      ctx->requested_ip_type,
+                      mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                      NULL);
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
                              NULL,
                              (GAsyncReadyCallback)connect_set_ready,
                              task);
-        mbim_message_unref (message);
         return;
     }
 
-    case CONNECT_STEP_IP_CONFIGURATION: {
-        GError *error = NULL;
-
+    case CONNECT_STEP_IP_CONFIGURATION:
         mm_obj_dbg (self, "querying IP configuration...");
-        message = (mbim_message_ip_configuration_query_new (
-                       self->priv->session_id,
-                       MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv4configurationavailable */
-                       MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv6configurationavailable */
-                       0, /* ipv4addresscount */
-                       NULL, /* ipv4address */
-                       0, /* ipv6addresscount */
-                       NULL, /* ipv6address */
-                       NULL, /* ipv4gateway */
-                       NULL, /* ipv6gateway */
-                       0, /* ipv4dnsservercount */
-                       NULL, /* ipv4dnsserver */
-                       0, /* ipv6dnsservercount */
-                       NULL, /* ipv6dnsserver */
-                       0, /* ipv4mtu */
-                       0, /* ipv6mtu */
-                       &error));
-        if (!message) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mbim_device_command (ctx->device,
+        message = mbim_message_ip_configuration_query_new (
+                      self->priv->session_id,
+                      MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv4configurationavailable */
+                      MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv6configurationavailable */
+                      0, /* ipv4addresscount */
+                      NULL, /* ipv4address */
+                      0, /* ipv6addresscount */
+                      NULL, /* ipv6address */
+                      NULL, /* ipv4gateway */
+                      NULL, /* ipv6gateway */
+                      0, /* ipv4dnsservercount */
+                      NULL, /* ipv4dnsserver */
+                      0, /* ipv6dnsservercount */
+                      NULL, /* ipv6dnsserver */
+                      0, /* ipv4mtu */
+                      0, /* ipv6mtu */
+                      NULL);
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              60,
                              NULL,
                              (GAsyncReadyCallback)ip_configuration_query_ready,
                              task);
-        mbim_message_unref (message);
         return;
-    }
 
     case CONNECT_STEP_LAST:
         /* Port is connected; update the state */
@@ -1110,28 +1019,20 @@ connect_context_step (GTask *task)
 }
 
 static void
-_connect (MMBaseBearer *self,
-          GCancellable *cancellable,
-          GAsyncReadyCallback callback,
-          gpointer user_data)
+_connect (MMBaseBearer        *self,
+          GCancellable        *cancellable,
+          GAsyncReadyCallback  callback,
+          gpointer             user_data)
 {
-    ConnectContext *ctx;
-    MMPort *data;
-    MbimDevice *device;
-    MMBaseModem *modem  = NULL;
-    const gchar *apn;
-    GTask *task;
+    ConnectContext         *ctx;
+    MMPort                 *data;
+    MMPortMbim             *mbim;
+    const gchar            *apn;
+    GTask                  *task;
+    g_autoptr(MMBaseModem)  modem  = NULL;
 
-    if (!peek_ports (self, &device, &data, callback, user_data))
+    if (!peek_ports (self, &mbim, &data, callback, user_data))
         return;
-
-    if (mm_bearer_properties_get_multiplex (mm_base_bearer_peek_config (self)) == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
-        g_task_report_new_error (
-            self, callback, user_data, _connect,
-            MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-            "Multiplex support not available");
-        return;
-    }
 
     g_object_get (self,
                   MM_BASE_BEARER_MODEM, &modem,
@@ -1151,18 +1052,15 @@ _connect (MMBaseBearer *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_INVALID_ARGS,
             "3GPP connection logic requires APN setting");
-        g_object_unref (modem);
         return;
     }
-
-    g_object_unref (modem);
 
     mm_obj_dbg (self, "launching connection with data port (%s/%s)",
             mm_port_subsys_get_string (mm_port_get_subsys (data)),
             mm_port_get_device (data));
 
     ctx = g_slice_new0 (ConnectContext);
-    ctx->device = g_object_ref (device);;
+    ctx->mbim = g_object_ref (mbim);
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_STEP_FIRST;
     ctx->requested_ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
@@ -1189,23 +1087,23 @@ typedef enum {
 } DisconnectStep;
 
 typedef struct {
-    MbimDevice *device;
-    MMPort *data;
-    DisconnectStep step;
+    MMPortMbim     *mbim;
+    MMPort         *data;
+    DisconnectStep  step;
 } DisconnectContext;
 
 static void
 disconnect_context_free (DisconnectContext *ctx)
 {
-    g_object_unref (ctx->device);
+    g_object_unref (ctx->mbim);
     g_object_unref (ctx->data);
     g_slice_free (DisconnectContext, ctx);
 }
 
 static gboolean
-disconnect_finish (MMBaseBearer *self,
-                   GAsyncResult *res,
-                   GError **error)
+disconnect_finish (MMBaseBearer  *self,
+                   GAsyncResult  *res,
+                   GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
 }
@@ -1222,19 +1120,20 @@ reset_bearer_connection (MMBearerMbim *self)
 static void disconnect_context_step (GTask *task);
 
 static void
-disconnect_set_ready (MbimDevice *device,
+disconnect_set_ready (MbimDevice   *device,
                       GAsyncResult *res,
-                      GTask *task)
+                      GTask        *task)
 {
-    MMBearerMbim *self;
-    DisconnectContext *ctx;
-    GError *error = NULL;
-    MbimMessage *response;
-    guint32 session_id;
-    MbimActivationState activation_state;
-    guint32 nw_error;
-    GError *inner_error = NULL;
-    gboolean result = FALSE, parsed_result = FALSE;
+    MMBearerMbim           *self;
+    DisconnectContext      *ctx;
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+    guint32                 session_id;
+    MbimActivationState     activation_state;
+    guint32                 nw_error;
+    g_autoptr(GError)       inner_error = NULL;
+    gboolean                result = FALSE;
+    gboolean                parsed_result = FALSE;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -1292,14 +1191,9 @@ disconnect_set_ready (MbimDevice *device,
 
     /* Give precedence to original error over parsing error */
     if (!error && inner_error)
-        error = g_error_copy (inner_error);
-    g_clear_error (&inner_error);
+        error = g_steal_pointer (&inner_error);
 
 out:
-
-    if (response)
-        mbim_message_unref (response);
-
     if (error) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1314,11 +1208,11 @@ out:
 static void
 disconnect_context_step (GTask *task)
 {
-    MMBearerMbim *self;
+    MMBearerMbim      *self;
     DisconnectContext *ctx;
 
     self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
+    ctx  = g_task_get_task_data (task);
 
     switch (ctx->step) {
     case DISCONNECT_STEP_FIRST:
@@ -1326,33 +1220,25 @@ disconnect_context_step (GTask *task)
         /* Fall through */
 
     case DISCONNECT_STEP_DISCONNECT: {
-        MbimMessage *message;
-        GError *error = NULL;
+        g_autoptr(MbimMessage) message = NULL;
 
-        message = (mbim_message_connect_set_new (
-                       self->priv->session_id,
-                       MBIM_ACTIVATION_COMMAND_DEACTIVATE,
-                       "",
-                       "",
-                       "",
-                       MBIM_COMPRESSION_NONE,
-                       MBIM_AUTH_PROTOCOL_NONE,
-                       MBIM_CONTEXT_IP_TYPE_DEFAULT,
-                       mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
-                       &error));
-        if (!message) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mbim_device_command (ctx->device,
+        message = mbim_message_connect_set_new (
+                      self->priv->session_id,
+                      MBIM_ACTIVATION_COMMAND_DEACTIVATE,
+                      "",
+                      "",
+                      "",
+                      MBIM_COMPRESSION_NONE,
+                      MBIM_AUTH_PROTOCOL_NONE,
+                      MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                      mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                      NULL);
+        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
                              MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
                              NULL,
                              (GAsyncReadyCallback)disconnect_set_ready,
                              task);
-        mbim_message_unref (message);
         return;
     }
 
@@ -1370,16 +1256,16 @@ disconnect_context_step (GTask *task)
 }
 
 static void
-disconnect (MMBaseBearer *_self,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+disconnect (MMBaseBearer        *_self,
+            GAsyncReadyCallback  callback,
+            gpointer             user_data)
 {
-    MMBearerMbim *self = MM_BEARER_MBIM (_self);
-    MbimDevice *device;
+    MMBearerMbim      *self = MM_BEARER_MBIM (_self);
+    MMPortMbim        *mbim;
     DisconnectContext *ctx;
-    GTask *task;
+    GTask             *task;
 
-    if (!peek_ports (self, &device, NULL, callback, user_data))
+    if (!peek_ports (self, &mbim, NULL, callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
@@ -1396,7 +1282,7 @@ disconnect (MMBaseBearer *_self,
                 mm_port_get_device (self->priv->data));
 
     ctx = g_slice_new0 (DisconnectContext);
-    ctx->device = g_object_ref (device);
+    ctx->mbim = g_object_ref (mbim);
     ctx->data = g_object_ref (self->priv->data);
     ctx->step = DISCONNECT_STEP_FIRST;
 
@@ -1495,9 +1381,7 @@ static void
 mm_bearer_mbim_init (MMBearerMbim *self)
 {
     /* Initialize private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_BEARER_MBIM,
-                                              MMBearerMbimPrivate);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BEARER_MBIM, MMBearerMbimPrivate);
 }
 
 static void
