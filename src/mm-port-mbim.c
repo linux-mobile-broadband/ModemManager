@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2013-2018 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2013-2021 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <config.h>
@@ -26,6 +26,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-port-mbim.h"
+#include "mm-port-net.h"
 #include "mm-log-object.h"
 
 G_DEFINE_TYPE (MMPortMbim, mm_port_mbim, MM_TYPE_PORT)
@@ -152,6 +153,109 @@ mm_port_mbim_allocate_qmi_client (MMPortMbim           *self,
 }
 
 #endif
+
+/*****************************************************************************/
+
+typedef struct {
+    MbimDevice *device;
+    MMPort    *data;
+} ResetContext;
+
+static void
+reset_context_free (ResetContext *ctx)
+{
+    g_clear_object (&ctx->device);
+    g_clear_object (&ctx->data);
+    g_slice_free (ResetContext, ctx);
+}
+
+gboolean
+mm_port_mbim_reset_finish (MMPortMbim    *self,
+                           GAsyncResult  *res,
+                           GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+delete_all_links_ready (MbimDevice   *device,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    MMPortMbim *self;
+    GError     *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    /* link deletion not fatal */
+    if (!mbim_device_delete_all_links_finish (device, res, &error)) {
+        mm_obj_dbg (self, "couldn't delete all links: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+reset_device_new_ready (GObject      *source,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    MMPortMbim   *self;
+    ResetContext *ctx;
+    GError       *error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    ctx->device = mbim_device_new_finish (res, &error);
+    if (!ctx->device) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* first, delete all links found, if any */
+    mm_obj_dbg (self, "deleting all links in data interface '%s'",
+                mm_port_get_device (ctx->data));
+    mbim_device_delete_all_links (ctx->device,
+                                  mm_port_get_device (ctx->data),
+                                  NULL,
+                                  (GAsyncReadyCallback)delete_all_links_ready,
+                                  task);
+}
+
+void
+mm_port_mbim_reset (MMPortMbim          *self,
+                    MMPort              *data,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    GTask            *task;
+    ResetContext     *ctx;
+    g_autoptr(GFile)  file = NULL;
+    g_autofree gchar *fullpath = NULL;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->mbim_device) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Port is already open");
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_slice_new0 (ResetContext);
+    ctx->data = g_object_ref (data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) reset_context_free);
+
+    fullpath = g_strdup_printf ("/dev/%s", mm_port_get_device (MM_PORT (self)));
+    file = g_file_new_for_path (fullpath);
+
+    mbim_device_new (file, NULL,
+                     (GAsyncReadyCallback) reset_device_new_ready,
+                     task);
+}
 
 /*****************************************************************************/
 

@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2013-2021 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #ifndef MM_PORT_MBIM_H
@@ -91,5 +91,13 @@ gboolean   mm_port_mbim_allocate_qmi_client_finish (MMPortMbim           *self,
 #endif
 
 MbimDevice *mm_port_mbim_peek_device (MMPortMbim *self);
+
+void     mm_port_mbim_reset        (MMPortMbim           *self,
+                                    MMPort               *data,
+                                    GAsyncReadyCallback   callback,
+                                    gpointer              user_data);
+gboolean mm_port_mbim_reset_finish (MMPortMbim           *self,
+                                    GAsyncResult         *res,
+                                    GError              **error);
 
 #endif /* MM_PORT_MBIM_H */
