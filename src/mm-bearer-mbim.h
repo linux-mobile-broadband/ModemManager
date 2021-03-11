@@ -53,8 +53,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerMbim, g_object_unref)
 /* MBIM bearer creation implementation.
  * NOTE it is *not* a broadband bearer, so not async-initable */
 MMBaseBearer *mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
-                                  MMBearerProperties *config,
-                                  guint32 session_id);
+                                  MMBearerProperties   *config);
 
 guint32 mm_bearer_mbim_get_session_id (MMBearerMbim *self);
 

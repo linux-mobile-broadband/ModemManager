@@ -1806,93 +1806,29 @@ modem_reset (MMIfaceModem        *_self,
 /* Create Bearer (Modem interface) */
 
 static MMBaseBearer *
-modem_create_bearer_finish (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GError **error)
+modem_create_bearer_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
 {
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
-typedef struct {
-    guint32 session_id;
-    gboolean found;
-} FindSessionId;
-
 static void
-bearer_list_session_id_foreach (MMBaseBearer *bearer,
-                                gpointer user_data)
+modem_create_bearer (MMIfaceModem        *self,
+                     MMBearerProperties  *properties,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
-    FindSessionId *ctx = user_data;
-
-    if (!ctx->found &&
-        MM_IS_BEARER_MBIM (bearer) &&
-        mm_bearer_mbim_get_session_id (MM_BEARER_MBIM (bearer)) == ctx->session_id)
-        ctx->found = TRUE;
-}
-
-static gint
-find_next_bearer_session_id (MMBroadbandModemMbim *self)
-{
-    MMBearerList *bearer_list;
-    guint i;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
-                  NULL);
-
-    if (!bearer_list)
-        return 0;
-
-    for (i = 0; i <= 255; i++) {
-        FindSessionId ctx;
-
-        ctx.session_id = i;
-        ctx.found = FALSE;
-
-        mm_bearer_list_foreach (bearer_list,
-                                bearer_list_session_id_foreach,
-                                &ctx);
-
-        if (!ctx.found) {
-            g_object_unref (bearer_list);
-            return (gint)i;
-        }
-    }
-
-    /* no valid session id found */
-    g_object_unref (bearer_list);
-    return -1;
-}
-
-static void
-modem_create_bearer (MMIfaceModem *_self,
-                     MMBearerProperties *properties,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
-{
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
     MMBaseBearer *bearer;
-    GTask *task;
-    gint session_id;
+    GTask        *task;
+
+    /* Note: the session id to be used by the bearer will always be 0
+     * for non-multiplexed sessions, bound to the non-VLAN-tagged traffic
+     * managed by the master network interface */
 
     task = g_task_new (self, NULL, callback, user_data);
-
-    /* Find a new session ID */
-    session_id = find_next_bearer_session_id (self);
-    if (session_id < 0) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Not enough session IDs");
-        g_object_unref (task);
-        return;
-    }
-
-    /* We just create a MMBearerMbim */
     mm_obj_dbg (self, "creating MBIM bearer in MBIM modem");
-    bearer = mm_bearer_mbim_new (self,
-                                 properties,
-                                 (guint)session_id);
+    bearer = mm_bearer_mbim_new (MM_BROADBAND_MODEM_MBIM (self), properties);
     g_task_return_pointer (task, bearer, g_object_unref);
     g_object_unref (task);
 }
