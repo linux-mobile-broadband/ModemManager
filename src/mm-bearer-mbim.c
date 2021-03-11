@@ -35,9 +35,10 @@
 G_DEFINE_TYPE (MMBearerMbim, mm_bearer_mbim, MM_TYPE_BASE_BEARER)
 
 struct _MMBearerMbimPrivate {
-    /* The session ID for this bearer */
-    guint32 session_id;
-    MMPort *data;
+    MMPortMbim *mbim;
+    MMPort     *data;
+    MMPort     *link;
+    guint32     session_id;
 };
 
 /*****************************************************************************/
@@ -191,10 +192,14 @@ reload_stats (MMBaseBearer        *self,
 /*****************************************************************************/
 /* Connect */
 
+#define WAIT_LINK_PORT_TIMEOUT_MS 2500
+
 typedef enum {
     CONNECT_STEP_FIRST,
     CONNECT_STEP_PACKET_SERVICE,
     CONNECT_STEP_PROVISIONED_CONTEXTS,
+    CONNECT_STEP_SETUP_LINK,
+    CONNECT_STEP_SETUP_LINK_MASTER_UP,
     CONNECT_STEP_CHECK_DISCONNECTED,
     CONNECT_STEP_ENSURE_DISCONNECTED,
     CONNECT_STEP_CONNECT,
@@ -210,14 +215,26 @@ typedef struct {
     MbimContextIpType      requested_ip_type;
     MbimContextIpType      activated_ip_type;
     MMBearerConnectResult *connect_result;
+    /* multiplex support */
+    guint                  session_id;
+    gchar                 *link_prefix_hint;
+    gchar                 *link_name;
+    MMPort                *link;
 } ConnectContext;
 
 static void
 connect_context_free (ConnectContext *ctx)
 {
-    if (ctx->connect_result)
-        mm_bearer_connect_result_unref (ctx->connect_result);
-    g_object_unref (ctx->data);
+    if (ctx->link_name) {
+        mm_port_mbim_cleanup_link (ctx->mbim, ctx->link_name, NULL, NULL);
+        g_free (ctx->link_name);
+    }
+    g_clear_object (&ctx->link);
+    g_free (ctx->link_prefix_hint);
+
+    g_clear_pointer (&ctx->connect_result, (GDestroyNotify)mm_bearer_connect_result_unref);
+
+    g_clear_object (&ctx->data);
     g_object_unref (ctx->properties);
     g_object_unref (ctx->mbim);
     g_slice_free (ConnectContext, ctx);
@@ -543,7 +560,10 @@ ip_configuration_query_ready (MbimDevice   *device,
         }
 
         /* Store result */
-        ctx->connect_result = mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config);
+        ctx->connect_result = mm_bearer_connect_result_new (ctx->link ? ctx->link : ctx->data,
+                                                            ipv4_config,
+                                                            ipv6_config);
+        mm_bearer_connect_result_set_multiplexed (ctx->connect_result, !!ctx->link);
     }
 
     if (error) {
@@ -689,6 +709,90 @@ check_disconnected_ready (MbimDevice   *device,
         ctx->step = CONNECT_STEP_CONNECT;
 
     connect_context_step (task);
+}
+
+static void
+master_interface_up_ready (MMPortNet    *link,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    ConnectContext *ctx;
+    GError         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_port_net_link_setup_finish (link, res, &error)) {
+        g_prefix_error (&error, "Couldn't bring master interface up: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static void
+wait_link_port_ready (MMBaseModem  *modem,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    ConnectContext *ctx;
+    GError         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->link = mm_base_modem_wait_link_port_finish (modem, res, &error);
+    if (!ctx->link) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
+static void
+setup_link_ready (MMPortMbim    *mbim,
+                  GAsyncResult  *res,
+                  GTask         *task)
+{
+    MMBearerMbim           *self;
+    ConnectContext         *ctx;
+    GError                 *error = NULL;
+    g_autoptr(MMBaseModem)  modem  = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    ctx->link_name = mm_port_mbim_setup_link_finish (mbim, res, &ctx->session_id, &error);
+    if (!ctx->link_name) {
+        g_prefix_error (&error, "failed to create net link for device: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* From now on link_name will be set, and we'll use that to know
+     * whether we should cleanup the link upon a connection failure */
+    mm_obj_info (self, "net link %s created (session id %u)", ctx->link_name, ctx->session_id);
+
+    /* Wait for the data port with the given interface name, which will be
+     * added asynchronously */
+    g_object_get (self,
+                  MM_BASE_BEARER_MODEM, &modem,
+                  NULL);
+    g_assert (modem);
+
+    mm_base_modem_wait_link_port (modem,
+                                  "net",
+                                  ctx->link_name,
+                                  WAIT_LINK_PORT_TIMEOUT_MS,
+                                  (GAsyncReadyCallback) wait_link_port_ready,
+                                  task);
 }
 
 static void
@@ -852,10 +956,40 @@ connect_context_step (GTask *task)
                              task);
         return;
 
+    case CONNECT_STEP_SETUP_LINK:
+        /* if a link prefix hint is available, it's because we should be doing
+         * multiplexing */
+        if (ctx->link_prefix_hint) {
+            mm_obj_dbg (self, "setting up new multiplexed link...");
+            mm_port_mbim_setup_link (ctx->mbim,
+                                     ctx->data,
+                                     ctx->link_prefix_hint,
+                                     (GAsyncReadyCallback) setup_link_ready,
+                                     task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case CONNECT_STEP_SETUP_LINK_MASTER_UP:
+        /* if the connection is done through a new link, we need to ifup the master interface */
+        if (ctx->link) {
+            mm_obj_dbg (self, "bringing master interface %s up...", mm_port_get_device (ctx->data));
+            mm_port_net_link_setup (MM_PORT_NET (ctx->data),
+                                    TRUE,
+                                    0, /* ignore */
+                                    g_task_get_cancellable (task),
+                                    (GAsyncReadyCallback) master_interface_up_ready,
+                                    task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
     case CONNECT_STEP_CHECK_DISCONNECTED:
-        mm_obj_dbg (self, "checking if session is disconnected...");
+        mm_obj_dbg (self, "checking if session %u is disconnected...", ctx->session_id);
         message = mbim_message_connect_query_new (
-                      self->priv->session_id,
+                      ctx->session_id,
                       MBIM_ACTIVATION_STATE_UNKNOWN,
                       MBIM_VOICE_CALL_STATE_NONE,
                       MBIM_CONTEXT_IP_TYPE_DEFAULT,
@@ -871,9 +1005,9 @@ connect_context_step (GTask *task)
         return;
 
     case CONNECT_STEP_ENSURE_DISCONNECTED:
-        mm_obj_dbg (self, "ensuring session is disconnected...");
+        mm_obj_dbg (self, "ensuring session %u is disconnected...", ctx->session_id);
         message = mbim_message_connect_set_new (
-                      self->priv->session_id,
+                      ctx->session_id,
                       MBIM_ACTIVATION_COMMAND_DEACTIVATE,
                       "",
                       "",
@@ -937,10 +1071,10 @@ connect_context_step (GTask *task)
             return;
         }
 
-        mm_obj_dbg (self, "launching %s connection with APN '%s'...",
-                    mbim_context_ip_type_get_string (ctx->requested_ip_type), apn);
+        mm_obj_dbg (self, "launching %s connection with APN '%s' in session %u...",
+                    mbim_context_ip_type_get_string (ctx->requested_ip_type), apn, ctx->session_id);
         message = mbim_message_connect_set_new (
-                      self->priv->session_id,
+                      ctx->session_id,
                       MBIM_ACTIVATION_COMMAND_ACTIVATE,
                       apn ? apn : "",
                       user ? user : "",
@@ -962,7 +1096,7 @@ connect_context_step (GTask *task)
     case CONNECT_STEP_IP_CONFIGURATION:
         mm_obj_dbg (self, "querying IP configuration...");
         message = mbim_message_ip_configuration_query_new (
-                      self->priv->session_id,
+                      ctx->session_id,
                       MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv4configurationavailable */
                       MBIM_IP_CONFIGURATION_AVAILABLE_FLAG_NONE, /* ipv6configurationavailable */
                       0, /* ipv4addresscount */
@@ -988,11 +1122,20 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_LAST:
         /* Port is connected; update the state */
-        mm_port_set_connected (MM_PORT (ctx->data), TRUE);
+        mm_port_set_connected (ctx->link ? ctx->link : ctx->data, TRUE);
 
-        /* Keep the data port */
+        /* Keep connection related data */
+        g_assert (self->priv->mbim == NULL);
+        self->priv->mbim = g_object_ref (ctx->mbim);
         g_assert (self->priv->data == NULL);
-        self->priv->data = g_object_ref (ctx->data);
+        self->priv->data = ctx->data ? g_object_ref (ctx->data) : NULL;
+        g_assert (self->priv->link == NULL);
+        self->priv->link = ctx->link ? g_object_ref (ctx->link) : NULL;
+        g_assert (!self->priv->session_id);
+        self->priv->session_id = ctx->session_id;
+
+        /* reset the link name to avoid cleaning up the link on context free */
+        g_clear_pointer (&ctx->link_name, g_free);
 
         /* Set operation result */
         g_task_return_pointer (
@@ -1015,12 +1158,13 @@ _connect (MMBaseBearer        *self,
           GAsyncReadyCallback  callback,
           gpointer             user_data)
 {
-    ConnectContext         *ctx;
-    MMPort                 *data;
-    MMPortMbim             *mbim;
-    const gchar            *apn;
-    GTask                  *task;
-    g_autoptr(MMBaseModem)  modem  = NULL;
+    ConnectContext           *ctx;
+    MMPort                   *data;
+    MMPortMbim               *mbim;
+    const gchar              *apn;
+    GTask                    *task;
+    MMBearerMultiplexSupport  multiplex;
+    g_autoptr(MMBaseModem)    modem  = NULL;
 
     if (!peek_ports (self, &mbim, &data, callback, user_data))
         return;
@@ -1046,10 +1190,6 @@ _connect (MMBaseBearer        *self,
         return;
     }
 
-    mm_obj_dbg (self, "launching connection with data port (%s/%s)",
-            mm_port_subsys_get_string (mm_port_get_subsys (data)),
-            mm_port_get_device (data));
-
     ctx = g_slice_new0 (ConnectContext);
     ctx->mbim = g_object_ref (mbim);
     ctx->data = g_object_ref (data);
@@ -1060,6 +1200,18 @@ _connect (MMBaseBearer        *self,
     g_object_get (self,
                   MM_BASE_BEARER_CONFIG, &ctx->properties,
                   NULL);
+
+    multiplex = mm_bearer_properties_get_multiplex (ctx->properties);
+    if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
+        multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+        /* the link prefix hint given must be modem-specific */
+        ctx->link_prefix_hint = g_strdup_printf ("mbimmux%u.", mm_base_modem_get_dbus_id (MM_BASE_MODEM (modem)));
+    }
+
+    mm_obj_dbg (self, "launching %sconnection with data port (%s/%s)",
+                ctx->link_prefix_hint ? "multiplexed " : "",
+                mm_port_subsys_get_string (mm_port_get_subsys (data)),
+                mm_port_get_device (data));
 
     task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)connect_context_free);
@@ -1079,7 +1231,7 @@ typedef enum {
 
 typedef struct {
     MMPortMbim     *mbim;
-    MMPort         *data;
+    guint           session_id;
     DisconnectStep  step;
 } DisconnectContext;
 
@@ -1087,7 +1239,6 @@ static void
 disconnect_context_free (DisconnectContext *ctx)
 {
     g_object_unref (ctx->mbim);
-    g_object_unref (ctx->data);
     g_slice_free (DisconnectContext, ctx);
 }
 
@@ -1106,6 +1257,19 @@ reset_bearer_connection (MMBearerMbim *self)
         mm_port_set_connected (self->priv->data, FALSE);
         g_clear_object (&self->priv->data);
     }
+
+    if (self->priv->link) {
+        g_assert (self->priv->mbim);
+        /* Link is disconnected; update the state */
+        mm_port_set_connected (self->priv->link, FALSE);
+        mm_port_mbim_cleanup_link (self->priv->mbim,
+                                   mm_port_get_device (self->priv->link),
+                                   NULL,
+                                   NULL);
+        g_clear_object (&self->priv->link);
+    }
+    self->priv->session_id = 0;
+    g_clear_object (&self->priv->mbim);
 }
 
 static void disconnect_context_step (GTask *task);
@@ -1214,7 +1378,7 @@ disconnect_context_step (GTask *task)
         g_autoptr(MbimMessage) message = NULL;
 
         message = mbim_message_connect_set_new (
-                      self->priv->session_id,
+                      ctx->session_id,
                       MBIM_ACTIVATION_COMMAND_DEACTIVATE,
                       "",
                       "",
@@ -1252,16 +1416,13 @@ disconnect (MMBaseBearer        *_self,
             gpointer             user_data)
 {
     MMBearerMbim      *self = MM_BEARER_MBIM (_self);
-    MMPortMbim        *mbim;
     DisconnectContext *ctx;
     GTask             *task;
 
-    if (!peek_ports (self, &mbim, NULL, callback, user_data))
-        return;
-
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (!self->priv->data) {
+    if ((!self->priv->data && !self->priv->link) ||
+        !self->priv->mbim) {
         mm_obj_dbg (self, "no need to disconnect: MBIM bearer is already disconnected");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -1273,8 +1434,8 @@ disconnect (MMBaseBearer        *_self,
                 mm_port_get_device (self->priv->data));
 
     ctx = g_slice_new0 (DisconnectContext);
-    ctx->mbim = g_object_ref (mbim);
-    ctx->data = g_object_ref (self->priv->data);
+    ctx->mbim = g_object_ref (self->priv->mbim);
+    ctx->session_id = self->priv->session_id;
     ctx->step = DISCONNECT_STEP_FIRST;
 
     g_task_set_task_data (task, ctx, (GDestroyNotify)disconnect_context_free);
@@ -1341,7 +1502,7 @@ dispose (GObject *object)
 {
     MMBearerMbim *self = MM_BEARER_MBIM (object);
 
-    g_clear_object (&self->priv->data);
+    reset_bearer_connection (self);
 
     G_OBJECT_CLASS (mm_bearer_mbim_parent_class)->dispose (object);
 }
