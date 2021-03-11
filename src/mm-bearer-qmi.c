@@ -2217,18 +2217,6 @@ disconnect_finish (MMBaseBearer *self,
 }
 
 static void
-cleanup_link_ready (MMPortQmi    *qmi,
-                    GAsyncResult *res,
-                    MMBearerQmi  *self) /* full reference */
-{
-    g_autoptr(GError) error = NULL;
-
-    if (!mm_port_qmi_cleanup_link_finish (qmi, res, &error))
-        mm_obj_warn (self, "couldn't cleanup link: %s", error->message);
-    g_object_unref (self);
-}
-
-static void
 reset_bearer_connection (MMBearerQmi *self,
                          gboolean reset_ipv4,
                          gboolean reset_ipv6)
@@ -2278,8 +2266,8 @@ reset_bearer_connection (MMBearerQmi *self,
             mm_port_qmi_cleanup_link (self->priv->qmi,
                                       mm_port_get_device (self->priv->link),
                                       self->priv->mux_id,
-                                      (GAsyncReadyCallback) cleanup_link_ready,
-                                      g_object_ref (self));
+                                      NULL,
+                                      NULL);
             g_clear_object (&self->priv->link);
         }
         self->priv->mux_id = QMI_DEVICE_MUX_ID_UNBOUND;
