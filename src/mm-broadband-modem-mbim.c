@@ -1990,6 +1990,28 @@ modem_create_bearer (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Create Bearer List (Modem interface) */
+
+static MMBearerList *
+modem_create_bearer_list (MMIfaceModem *self)
+{
+    guint n;
+    guint n_multiplexed;
+
+    /* The maximum number of available/connected modems is guessed from
+     * the size of the data ports list. */
+    n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (self)));
+    mm_obj_dbg (self, "allowed up to %u active bearers", n);
+
+    /* The maximum number of multiplexed links is defined by the MBIM protocol */
+    n_multiplexed = (MBIM_DEVICE_SESSION_ID_MAX - MBIM_DEVICE_SESSION_ID_MIN + 1);
+    mm_obj_dbg (self, "allowed up to %u active multiplexed bearers", n_multiplexed);
+
+    /* by default, no multiplexing support */
+    return mm_bearer_list_new (n, n_multiplexed);
+}
+
+/*****************************************************************************/
 /* Create SIM (Modem interface) */
 
 static MMBaseSim *
@@ -5803,9 +5825,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_primary_sim_slot_finish = mm_shared_qmi_set_primary_sim_slot_finish;
 #endif
 
-    /* Create MBIM-specific bearer */
+    /* Create MBIM-specific bearer and bearer list */
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->create_bearer_list = modem_create_bearer_list;
 
     /* SIM hot swapping */
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
