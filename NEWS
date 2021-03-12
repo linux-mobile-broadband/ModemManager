@@ -1,4 +1,16 @@
 
+ModemManager 1.14.12
+-------------------------------------------
+This is a new bugfix release of ModemManager.
+
+ * MBIM:
+   ** Plug memleak in disconnection logic.
+   ** Don't fail IPv4v6 connection attempt if only IPv4 succeeds.
+
+ * QMI:
+   ** Fix network registration cancellation logic with asserts disabled.
+
+
 ModemManager 1.14.10
 -------------------------------------------
 This is a new bugfix release of ModemManager.
