@@ -10,6 +10,9 @@ SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInte
 # Netgear AC341U: enable connection status polling explicitly
 ATTRS{idVendor}=="1199", ATTRS{idProduct}=="9057", ENV{ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE}="1"
 
+# EM7345: disable CPOL based features
+ATTRS{idVendor}=="1199", ATTRS{idProduct}=="a001", ENV{ID_MM_PREFERRED_NETWORKS_CPOL_DISABLED}="1"
+
 # MC74XX: Add port hints
 #  if 03: primary port
 #  if 02: raw NMEA port
