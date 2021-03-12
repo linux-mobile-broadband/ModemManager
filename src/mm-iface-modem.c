@@ -1416,7 +1416,7 @@ get_signal_check_context (MMIfaceModem *self)
 static void     periodic_signal_check_disable (MMIfaceModem *self,
                                                gboolean      clear);
 static gboolean periodic_signal_check_cb      (MMIfaceModem *self);
-static void     peridic_signal_check_step     (MMIfaceModem *self);
+static void     periodic_signal_check_step    (MMIfaceModem *self);
 
 static void
 access_technologies_check_ready (MMIfaceModem *self,
@@ -1449,7 +1449,7 @@ access_technologies_check_ready (MMIfaceModem *self,
 
     /* Go on */
     ctx->running_step++;
-    peridic_signal_check_step (self);
+    periodic_signal_check_step (self);
 }
 
 static void
@@ -1479,11 +1479,11 @@ signal_quality_check_ready (MMIfaceModem *self,
 
     /* Go on */
     ctx->running_step++;
-    peridic_signal_check_step (self);
+    periodic_signal_check_step (self);
 }
 
 static void
-peridic_signal_check_step (MMIfaceModem *self)
+periodic_signal_check_step (MMIfaceModem *self)
 {
     SignalCheckContext *ctx;
 
@@ -1585,7 +1585,7 @@ periodic_signal_check_cb (MMIfaceModem *self)
     ctx->signal_quality           = 0;
     ctx->access_technologies      = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     ctx->access_technologies_mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
-    peridic_signal_check_step (self);
+    periodic_signal_check_step (self);
 
     /* Remove the timeout and clear the source id */
     if (ctx->timeout_source)
