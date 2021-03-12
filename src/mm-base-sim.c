@@ -965,6 +965,26 @@ handle_send_puk (MMBaseSim *self,
 }
 
 /*****************************************************************************/
+/* Check if preferred networks is supported.
+ *
+ * Modems like the Intel-based EM7345 fail very badly when CPOL? is run, even
+ * completely blocking the AT port after that. We need to avoid running any
+ * CPOL related command in these modules.
+ */
+
+static gboolean
+check_preferred_networks_disabled (MMBaseSim *self)
+{
+    MMPort *primary;
+
+    primary = MM_PORT (mm_base_modem_peek_port_primary (self->priv->modem));
+    return (primary ?
+            mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (primary),
+                                                             "ID_MM_PREFERRED_NETWORKS_CPOL_DISABLED") :
+            FALSE);
+}
+
+/*****************************************************************************/
 /* SET PREFERRED NETWORKS (Generic implementation) */
 
 /* Setting preferred network list with AT+CPOL is a complicated procedure with
@@ -1374,9 +1394,16 @@ set_preferred_networks (MMBaseSim *self,
     GTask *task;
     SetPreferredNetworksContext *ctx;
 
-    mm_obj_dbg (self, "set preferred networks: loading existing networks...");
-
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (check_preferred_networks_disabled (self)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "setting preferred networks is unsupported");
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "set preferred networks: loading existing networks...");
 
     ctx = g_slice_new0 (SetPreferredNetworksContext);
     ctx->set_list = mm_sim_preferred_network_list_copy (preferred_network_list);
@@ -1822,6 +1849,17 @@ load_preferred_networks (MMBaseSim           *self,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
 {
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (check_preferred_networks_disabled (self)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "setting preferred networks is unsupported");
+        g_object_unref (task);
+        return;
+    }
+
     /* Invoke AT+CPLS=0 first to make sure the correct (user-defined) preferred network list is selected */
     mm_obj_dbg (self, "selecting user-defined preferred network list...");
 
@@ -1831,7 +1869,7 @@ load_preferred_networks (MMBaseSim           *self,
         20,
         FALSE,
         (GAsyncReadyCallback)load_preferred_networks_cpls_command_ready,
-        g_task_new (self, NULL, callback, user_data));
+        task);
 }
 
 /*****************************************************************************/
