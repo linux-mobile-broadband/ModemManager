@@ -1761,6 +1761,34 @@ load_preferred_networks_finish (MMBaseSim     *self,
 STR_REPLY_READY_FN (load_preferred_networks)
 
 static void
+load_preferred_networks_set_format_ready (MMBaseModem *modem,
+                                          GAsyncResult *res,
+                                          GTask *task)
+{
+    MMBaseSim *self;
+    GError *error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    /* Ignore error */
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_obj_dbg (self, "setting preferred network list format failed: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    mm_obj_dbg (self, "loading preferred networks...");
+
+    mm_base_modem_at_command (
+        modem,
+        "+CPOL?",
+        20,
+        FALSE,
+        (GAsyncReadyCallback)load_preferred_networks_command_ready,
+        task);
+}
+
+static void
 load_preferred_networks_cpls_command_ready (MMBaseModem *modem,
                                             GAsyncResult *res,
                                             GTask *task)
@@ -1777,14 +1805,15 @@ load_preferred_networks_cpls_command_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    mm_obj_dbg (self, "loading preferred networks...");
+    mm_obj_dbg (self, "setting preferred networks format...");
 
+    /* Request numeric MCCMNC format */
     mm_base_modem_at_command (
         modem,
-        "+CPOL?",
+        "+CPOL=,2",
         20,
         FALSE,
-        (GAsyncReadyCallback)load_preferred_networks_command_ready,
+        (GAsyncReadyCallback)load_preferred_networks_set_format_ready,
         task);
 }
 
