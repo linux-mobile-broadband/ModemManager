@@ -11943,6 +11943,7 @@ enable (MMBaseModem *self,
 
 typedef enum {
     SYNCING_STEP_FIRST,
+    SYNCING_STEP_IFACE_3GPP,
     SYNCING_STEP_IFACE_TIME,
     SYNCING_STEP_LAST,
 } SyncingStep;
@@ -11980,6 +11981,24 @@ iface_modem_time_sync_ready (MMIfaceModemTime *self,
 }
 
 static void
+iface_modem_3gpp_sync_ready (MMBroadbandModem *self,
+                             GAsyncResult     *res,
+                             GTask            *task)
+{
+    SyncingContext    *ctx;
+    g_autoptr(GError) error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_iface_modem_3gpp_sync_finish (MM_IFACE_MODEM_3GPP (self), res, &error))
+        mm_obj_warn (self, "3GPP interface synchronization failed: %s", error->message);
+
+    /* Go on to next step */
+    ctx->step++;
+    syncing_step (task);
+}
+
+static void
 syncing_step (GTask *task)
 {
     MMBroadbandModem *self;
@@ -11992,6 +12011,18 @@ syncing_step (GTask *task)
     case SYNCING_STEP_FIRST:
         ctx->step++;
         /* fall through */
+
+    case SYNCING_STEP_IFACE_3GPP:
+        /*
+         * Start interface 3GPP synchronization.
+         * We hardly depend on the registration and bearer status,
+         * therefore we cannot continue with the other steps until
+         * this one is finished.
+         */
+        mm_obj_info (self, "resume synchronization state (%d/%d): 3GPP interface sync",
+                     ctx->step, SYNCING_STEP_LAST);
+        mm_iface_modem_3gpp_sync (MM_IFACE_MODEM_3GPP (self), (GAsyncReadyCallback)iface_modem_3gpp_sync_ready, task);
+        return;
 
     case SYNCING_STEP_IFACE_TIME:
         /*

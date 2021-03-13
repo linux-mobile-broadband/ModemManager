@@ -2501,6 +2501,183 @@ mm_iface_modem_3gpp_enable (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+typedef struct _SyncingContext SyncingContext;
+static void interface_syncing_step (GTask *task);
+
+typedef enum {
+    SYNCING_STEP_FIRST,
+    SYNCING_STEP_REFRESH_3GPP_REGISTRATION,
+    SYNCING_STEP_REFRESH_EPS_BEARER,
+    SYNCING_STEP_LAST
+} SyncingStep;
+
+struct _SyncingContext {
+    SyncingStep step;
+};
+
+gboolean
+mm_iface_modem_3gpp_sync_finish (MMIfaceModem3gpp  *self,
+                                 GAsyncResult      *res,
+                                 GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+sync_eps_bearer_ready (MMIfaceModem3gpp *self,
+                       GAsyncResult     *res,
+                       GTask            *task)
+{
+    MMBearerProperties  *properties;
+    SyncingContext      *ctx;
+    g_autoptr (GError)   error = NULL;
+
+    mm_obj_dbg (self, "EPS bearer sync ready");
+    ctx = g_task_get_task_data (task);
+
+    properties = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_finish (self, res, &error);
+    if (!properties) {
+        mm_obj_dbg (self, "couldn't refresh EPS bearer properties: %s", error->message);
+    } else {
+        mm_iface_modem_3gpp_update_initial_eps_bearer (self, properties);
+        g_object_unref (properties);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_syncing_step (task);
+}
+
+static void
+sync_eps_bearer (MMIfaceModem3gpp    *self,
+                 GAsyncReadyCallback  callback,
+                 GTask               *task)
+{
+    SyncingContext *ctx;
+    gboolean        eps_supported = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_EPS_NETWORK_SUPPORTED, &eps_supported,
+                  NULL);
+
+    /* Refresh EPS bearer if supported */
+    if (eps_supported &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_finish) {
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer (
+            self,
+            callback,
+            task);
+        return;
+    }
+
+    /* If EPS is unsupported, just go to the next step */
+    ctx = g_task_get_task_data (task);
+    ctx->step++;
+    interface_syncing_step (task);
+}
+
+static void
+sync_registration_ready (MMIfaceModem3gpp *self,
+                         GAsyncResult     *res,
+                         GTask            *task)
+{
+    SyncingContext     *ctx;
+    g_autoptr (GError)  error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    mm_iface_modem_3gpp_run_registration_checks_finish (self, res, &error);
+    if (error) {
+        mm_obj_dbg (self, "Synchronizing 3GPP registration failed: %s", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_syncing_step(task);
+}
+
+static void
+interface_syncing_step (GTask *task)
+{
+    MMIfaceModem3gpp *self;
+    SyncingContext   *ctx;
+
+    /* Don't run new steps if we're cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case SYNCING_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_REFRESH_3GPP_REGISTRATION:
+        /*
+         * Refresh registration info to verify that the modem is still registered.
+         * Wait until registration checks are complete before going to the next step.
+         */
+        mm_iface_modem_3gpp_run_registration_checks (
+            self,
+            (GAsyncReadyCallback)sync_registration_ready,
+            task);
+        return;
+
+    case SYNCING_STEP_REFRESH_EPS_BEARER:
+        /*
+         * Refresh EPS bearer and wait until complete.
+         * We want to make sure that the modem is fully enabled again
+         * when we refresh the mobile data connection bearers.
+         */
+        sync_eps_bearer (
+            self,
+            (GAsyncReadyCallback)sync_eps_bearer_ready,
+            task);
+        return;
+
+    case SYNCING_STEP_LAST:
+        /* We are done without errors! */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        break;
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_iface_modem_3gpp_sync (MMIfaceModem3gpp    *self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+    SyncingContext *ctx;
+    GTask          *task;
+
+    /* Create SyncingContext */
+    ctx = g_new0 (SyncingContext, 1);
+    ctx->step = SYNCING_STEP_FIRST;
+
+    /* Create sync steps task and execute it */
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+    interface_syncing_step (task);
+}
+
+#endif
+
+/*****************************************************************************/
+
 typedef struct _InitializationContext InitializationContext;
 static void interface_initialization_step (GTask *task);
 
