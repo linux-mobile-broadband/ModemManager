@@ -1594,12 +1594,28 @@ periodic_signal_check_cb (MMIfaceModem *self)
 }
 
 void
-mm_iface_modem_refresh_signal (MMIfaceModem *self)
+mm_iface_modem_refresh_signal (MMIfaceModem *self,
+                               gboolean      enforce)
 {
     SignalCheckContext *ctx;
 
-    /* Don't refresh polling if we're not enabled */
     ctx = get_signal_check_context (self);
+
+    /*
+     * If enforced, poll once explicitly to make sure the signal strength
+     * and access technologies are updated.
+     *
+     * Modems with signal indication support block periodic polling scheduling.
+     * With enforce == TRUE, the periodic polling logic can run once as
+     * it override once the periodic polling prohibition.
+     * When the polling is complete, the periodic polling scheduling
+     * is blocked again to avoid that modems with signal indication support
+     * are periodic polled for their signal status.
+     */
+    if (enforce)
+        ctx->enabled = TRUE;
+
+    /* Don't refresh polling if we're not enabled */
     if (!ctx->enabled) {
         mm_obj_dbg (self, "periodic signal check refresh ignored: checks not enabled");
         return;
@@ -1678,7 +1694,7 @@ periodic_signal_check_enable (MMIfaceModem *self)
     }
 
     /* And refresh, which will trigger the first check at high frequency */
-    mm_iface_modem_refresh_signal (self);
+    mm_iface_modem_refresh_signal (self, FALSE);
 }
 
 /*****************************************************************************/
@@ -2352,7 +2368,7 @@ set_current_capabilities_ready (MMIfaceModem *self,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Capabilities updated: explicitly refresh signal and access technology */
-        mm_iface_modem_refresh_signal (self);
+        mm_iface_modem_refresh_signal (self, FALSE);
         mm_gdbus_modem_complete_set_current_capabilities (ctx->skeleton, ctx->invocation);
     }
 
@@ -2842,7 +2858,7 @@ handle_set_current_bands_ready (MMIfaceModem *self,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Bands updated: explicitly refresh signal and access technology */
-        mm_iface_modem_refresh_signal (self);
+        mm_iface_modem_refresh_signal (self, FALSE);
         mm_gdbus_modem_complete_set_current_bands (ctx->skeleton, ctx->invocation);
     }
 
@@ -3229,7 +3245,7 @@ handle_set_current_modes_ready (MMIfaceModem *self,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         /* Modes updated: explicitly refresh signal and access technology */
-        mm_iface_modem_refresh_signal (self);
+        mm_iface_modem_refresh_signal (self, FALSE);
         mm_gdbus_modem_complete_set_current_modes (ctx->skeleton, ctx->invocation);
     }
 
@@ -4204,6 +4220,155 @@ mm_iface_modem_enable (MMIfaceModem *self,
 
     interface_enabling_step (task);
 }
+
+/*****************************************************************************/
+/* MODEM SYNCHRONIZATION */
+
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+typedef struct _SyncingContext SyncingContext;
+static void interface_syncing_step (GTask *task);
+
+typedef enum {
+    SYNCING_STEP_FIRST,
+    SYNCING_STEP_DETECT_SIM_SWAP,
+    SYNCING_STEP_REFRESH_SIM_LOCK,
+    SYNCING_STEP_REFRESH_SIGNAL_STRENGTH,
+    SYNCING_STEP_LAST
+} SyncingStep;
+
+struct _SyncingContext {
+    SyncingStep step;
+};
+
+gboolean
+mm_iface_modem_sync_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+sync_sim_lock_ready (MMIfaceModem *self,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    SyncingContext     *ctx;
+    g_autoptr (GError)  error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self, res, &error))
+        mm_obj_warn (self, "checking sim lock status failed: %s", error->message);
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_syncing_step (task);
+}
+
+static void
+sync_detect_sim_swap_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    SyncingContext     *ctx;
+    g_autoptr (GError)  error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_iface_modem_check_for_sim_swap_finish (self, res, &error))
+        mm_obj_warn (self, "checking sim swap failed: %s", error->message);
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_syncing_step (task);
+}
+
+static void
+interface_syncing_step (GTask *task)
+{
+    MMIfaceModem   *self;
+    SyncingContext *ctx;
+
+    /* Don't run new steps if we're cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case SYNCING_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_DETECT_SIM_SWAP:
+        /*
+         * Detect possible SIM swaps.
+         * Checking lock status in all cases after possible SIM swaps are detected.
+         */
+        mm_iface_modem_check_for_sim_swap (
+            self,
+            0,
+            NULL,
+            (GAsyncReadyCallback)sync_detect_sim_swap_ready,
+            task);
+        return;
+
+    case SYNCING_STEP_REFRESH_SIM_LOCK:
+        /*
+         * Refresh SIM lock status and wait until complete.
+         */
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required (
+            self,
+            FALSE,
+            (GAsyncReadyCallback)sync_sim_lock_ready,
+            task);
+        return;
+
+    case SYNCING_STEP_REFRESH_SIGNAL_STRENGTH:
+        /*
+         * Start a signal strength and access technologies refresh sequence.
+         */
+        mm_iface_modem_refresh_signal (self, TRUE);
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_LAST:
+        /* We are done without errors! */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        break;
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_iface_modem_sync (MMIfaceModem        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    SyncingContext *ctx;
+    GTask          *task;
+
+    /* Create SyncingContext */
+    ctx = g_new0 (SyncingContext, 1);
+    ctx->step = SYNCING_STEP_FIRST;
+
+    /* Create sync steps task and execute it */
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+    interface_syncing_step (task);
+}
+
+#endif
 
 /*****************************************************************************/
 /* MODEM INITIALIZATION */

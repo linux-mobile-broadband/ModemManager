@@ -482,6 +482,17 @@ void mm_iface_modem_shutdown (MMIfaceModem *self);
 gboolean mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *self,
                                                                GDBusMethodInvocation *invocation,
                                                                MMModemState           minimum_required);
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+/* Sync Modem interface (async) */
+void     mm_iface_modem_sync           (MMIfaceModem *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+gboolean mm_iface_modem_sync_finish    (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error);
+
+#endif
 
 /* Allow setting power state */
 void     mm_iface_modem_set_power_state        (MMIfaceModem *self,
@@ -546,7 +557,7 @@ void mm_iface_modem_update_signal_quality (MMIfaceModem *self,
                                            guint signal_quality);
 
 /* Allow requesting to refresh signal via polling */
-void mm_iface_modem_refresh_signal (MMIfaceModem *self);
+void mm_iface_modem_refresh_signal (MMIfaceModem *self, gboolean enforce);
 
 /* Allow setting allowed modes */
 void     mm_iface_modem_set_current_modes        (MMIfaceModem *self,

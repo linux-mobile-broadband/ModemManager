@@ -11943,6 +11943,7 @@ enable (MMBaseModem *self,
 
 typedef enum {
     SYNCING_STEP_FIRST,
+    SYNCING_STEP_IFACE_MODEM,
     SYNCING_STEP_IFACE_3GPP,
     SYNCING_STEP_IFACE_TIME,
     SYNCING_STEP_LAST,
@@ -11999,6 +12000,36 @@ iface_modem_3gpp_sync_ready (MMIfaceModem3gpp *self,
 }
 
 static void
+iface_modem_sync_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        GTask        *task)
+{
+    SyncingContext     *ctx;
+    MMModemLock         lock;
+    g_autoptr (GError)  error = NULL;
+
+    ctx = g_task_get_task_data (task);
+    lock = mm_iface_modem_get_unlock_required (self);
+
+    if (!mm_iface_modem_sync_finish (self, res, &error)) {
+        mm_obj_warn (self, "synchronizing Modem interface failed: %s", error->message);
+    }
+
+    /* SIM is locked, skip synchronization */
+    if (lock == MM_MODEM_LOCK_UNKNOWN || lock == MM_MODEM_LOCK_SIM_PIN || lock == MM_MODEM_LOCK_SIM_PUK) {
+        mm_obj_warn (self, "SIM is locked... Synchronization skipped");
+        ctx->step = SYNCING_STEP_LAST;
+        syncing_step (task);
+    }
+
+    /* Not locked, go on to next step */
+    mm_obj_dbg (self, "modem unlocked, continue synchronization");
+    ctx->step++;
+    syncing_step (task);
+    return;
+}
+
+static void
 syncing_step (GTask *task)
 {
     MMBroadbandModem *self;
@@ -12011,6 +12042,19 @@ syncing_step (GTask *task)
     case SYNCING_STEP_FIRST:
         ctx->step++;
         /* fall through */
+
+    case SYNCING_STEP_IFACE_MODEM:
+        /*
+         * Start interface Modem synchronization.
+         * We want to make sure that the SIM is unlocked and not swapped before
+         * synchronizing other interfaces.
+         */
+        mm_obj_info (self, "resume synchronization state (%d/%d): Modem interface sync",
+                     ctx->step, SYNCING_STEP_LAST);
+        mm_iface_modem_sync (MM_IFACE_MODEM (self),
+                             (GAsyncReadyCallback)iface_modem_sync_ready,
+                             task);
+        return;
 
     case SYNCING_STEP_IFACE_3GPP:
         /*
