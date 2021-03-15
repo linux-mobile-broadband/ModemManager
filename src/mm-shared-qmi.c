@@ -874,7 +874,7 @@ load_current_capabilities_get_technology_preference_ready (QmiClientNas *client,
     } else if (!qmi_message_nas_get_technology_preference_output_get_result (output, &error)) {
         mm_obj_dbg (self, "couldn't get technology preference: %s", error->message);
         g_error_free (error);
-        priv->feature_nas_tp = FEATURE_SUPPORTED;
+        priv->feature_nas_tp = FEATURE_UNSUPPORTED;
     } else {
         qmi_message_nas_get_technology_preference_output_get_active (
             output,
@@ -914,7 +914,7 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
     } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
         mm_obj_dbg (self, "couldn't get system selection preference: %s", error->message);
         g_error_free (error);
-        priv->feature_nas_ssp = FEATURE_SUPPORTED;
+        priv->feature_nas_ssp = FEATURE_UNSUPPORTED;
     } else {
         qmi_message_nas_get_system_selection_preference_output_get_mode_preference (
             output,
