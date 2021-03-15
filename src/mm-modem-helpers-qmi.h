@@ -66,11 +66,10 @@ QmiNasRatModePreference mm_modem_mode_to_qmi_rat_mode_preference (MMModemMode mo
 MMModemCapability mm_modem_capability_from_qmi_rat_mode_preference (QmiNasRatModePreference qmi);
 QmiNasRatModePreference mm_modem_capability_to_qmi_rat_mode_preference (MMModemCapability caps);
 
-GArray *mm_modem_capability_to_qmi_acquisition_order_preference (MMModemCapability caps);
-GArray *mm_modem_mode_to_qmi_acquisition_order_preference       (MMModemMode       allowed,
-                                                                 MMModemMode       preferred,
-                                                                 gboolean          is_cdma,
-                                                                 gboolean          is_3gpp);
+GArray *mm_modem_capability_to_qmi_acquisition_order_preference (MMModemCapability  caps);
+GArray *mm_modem_mode_to_qmi_acquisition_order_preference       (MMModemMode        allowed,
+                                                                 MMModemMode        preferred,
+                                                                 GArray            *all);
 
 MMModemCapability mm_modem_capability_from_qmi_radio_technology_preference (QmiNasRadioTechnologyPreference qmi);
 QmiNasRadioTechnologyPreference mm_modem_capability_to_qmi_radio_technology_preference (MMModemCapability caps);
