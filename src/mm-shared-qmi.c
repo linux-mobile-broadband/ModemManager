@@ -143,6 +143,7 @@ get_private (MMSharedQmi *self)
 
         priv->feature_nas_tp = FEATURE_UNKNOWN;
         priv->feature_nas_ssp = FEATURE_UNKNOWN;
+        priv->feature_nas_ssp_extended_lte_band_preference = FEATURE_UNKNOWN;
         priv->config_active_i = -1;
 
         /* Setup parent class' MMIfaceModemLocation */
