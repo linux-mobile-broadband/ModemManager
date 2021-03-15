@@ -921,21 +921,28 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
     ctx  = g_task_get_task_data (task);
     priv = get_private (MM_SHARED_QMI (self));
 
+    priv->feature_nas_ssp = FEATURE_UNSUPPORTED;
+    priv->feature_nas_ssp_extended_lte_band_preference = FEATURE_UNSUPPORTED;
+
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output) {
         mm_obj_dbg (self, "QMI operation failed: %s", error->message);
         g_error_free (error);
-        priv->feature_nas_ssp = FEATURE_UNSUPPORTED;
     } else if (!qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
         mm_obj_dbg (self, "couldn't get system selection preference: %s", error->message);
         g_error_free (error);
-        priv->feature_nas_ssp = FEATURE_UNSUPPORTED;
     } else {
+        GArray *acquisition_order_preference_array = NULL;
+
+        /* SSP is supported, perform feature checks */
+        priv->feature_nas_ssp = FEATURE_SUPPORTED;
+        if (qmi_message_nas_get_system_selection_preference_output_get_extended_lte_band_preference (output, NULL, NULL, NULL, NULL, NULL))
+            priv->feature_nas_ssp_extended_lte_band_preference = FEATURE_SUPPORTED;
+
         qmi_message_nas_get_system_selection_preference_output_get_mode_preference (
             output,
             &ctx->capabilities_context.nas_ssp_mode_preference_mask,
             NULL);
-        priv->feature_nas_ssp = FEATURE_SUPPORTED;
     }
 
     if (output)
@@ -1460,6 +1467,7 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
                                                       GTask        *task)
 {
     MMSharedQmi                                     *self;
+    Private                                         *priv;
     LoadCurrentModesResult                          *result = NULL;
     QmiMessageNasGetSystemSelectionPreferenceOutput *output = NULL;
     GError                                          *error = NULL;
@@ -1467,6 +1475,7 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
     MMModemMode                                      allowed;
 
     self = g_task_get_source_object (task);
+    priv = get_private (self);
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output || !qmi_message_nas_get_system_selection_preference_output_get_result (output, &error)) {
@@ -1858,7 +1867,8 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
         &lte_band_preference_mask,
         NULL);
 
-    if (qmi_message_nas_get_system_selection_preference_output_get_extended_lte_band_preference (
+    if ((priv->feature_nas_ssp_extended_lte_band_preference == FEATURE_SUPPORTED) &&
+        qmi_message_nas_get_system_selection_preference_output_get_extended_lte_band_preference (
             output,
             &extended_lte_band_preference[0],
             &extended_lte_band_preference[1],
@@ -1866,9 +1876,6 @@ load_bands_get_system_selection_preference_ready (QmiClientNas *client,
             &extended_lte_band_preference[3],
             NULL))
         extended_lte_band_preference_size = G_N_ELEMENTS (extended_lte_band_preference);
-
-    if (G_UNLIKELY (priv->feature_nas_ssp_extended_lte_band_preference == FEATURE_UNKNOWN))
-        priv->feature_nas_ssp_extended_lte_band_preference = extended_lte_band_preference_size ? FEATURE_SUPPORTED : FEATURE_UNSUPPORTED;
 
     mm_bands = mm_modem_bands_from_qmi_band_preference (band_preference_mask,
                                                         lte_band_preference_mask,
