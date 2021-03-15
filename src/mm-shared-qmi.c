@@ -74,6 +74,8 @@ typedef struct {
     Feature            feature_nas_tp;
     Feature            feature_nas_ssp;
     Feature            feature_nas_ssp_extended_lte_band_preference;
+    Feature            feature_nas_ssp_acquisition_order_preference;
+    GArray            *feature_nas_ssp_acquisition_order_preference_array;
     gboolean           disable_4g_only_mode;
     GArray            *supported_bands;
 
@@ -125,6 +127,8 @@ private_free (Private *priv)
         g_object_unref (priv->uim_client);
     if (priv->uim_refresh_start_timeout_id)
         g_source_remove (priv->uim_refresh_start_timeout_id);
+    if (priv->feature_nas_ssp_acquisition_order_preference_array)
+        g_array_unref (priv->feature_nas_ssp_acquisition_order_preference_array);
     g_strfreev (priv->loc_assistance_data_servers);
     g_slice_free (Private, priv);
 }
@@ -144,6 +148,7 @@ get_private (MMSharedQmi *self)
         priv->feature_nas_tp = FEATURE_UNKNOWN;
         priv->feature_nas_ssp = FEATURE_UNKNOWN;
         priv->feature_nas_ssp_extended_lte_band_preference = FEATURE_UNKNOWN;
+        priv->feature_nas_ssp_acquisition_order_preference = FEATURE_UNKNOWN;
         priv->config_active_i = -1;
 
         /* Setup parent class' MMIfaceModemLocation */
@@ -923,6 +928,7 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
 
     priv->feature_nas_ssp = FEATURE_UNSUPPORTED;
     priv->feature_nas_ssp_extended_lte_band_preference = FEATURE_UNSUPPORTED;
+    priv->feature_nas_ssp_acquisition_order_preference = FEATURE_UNSUPPORTED;
 
     output = qmi_client_nas_get_system_selection_preference_finish (client, res, &error);
     if (!output) {
@@ -938,6 +944,12 @@ load_current_capabilities_get_system_selection_preference_ready (QmiClientNas *c
         priv->feature_nas_ssp = FEATURE_SUPPORTED;
         if (qmi_message_nas_get_system_selection_preference_output_get_extended_lte_band_preference (output, NULL, NULL, NULL, NULL, NULL))
             priv->feature_nas_ssp_extended_lte_band_preference = FEATURE_SUPPORTED;
+        if (qmi_message_nas_get_system_selection_preference_output_get_acquisition_order_preference (output, &acquisition_order_preference_array, NULL) &&
+            acquisition_order_preference_array &&
+            acquisition_order_preference_array->len) {
+            priv->feature_nas_ssp_acquisition_order_preference = FEATURE_SUPPORTED;
+            priv->feature_nas_ssp_acquisition_order_preference_array = g_array_ref (acquisition_order_preference_array);
+        }
 
         qmi_message_nas_get_system_selection_preference_output_get_mode_preference (
             output,
@@ -1259,11 +1271,13 @@ static void
 set_current_modes_system_selection_preference (GTask *task)
 {
     MMIfaceModem                                   *self;
+    Private                                        *priv;
     SetCurrentModesContext                         *ctx;
     QmiMessageNasSetSystemSelectionPreferenceInput *input;
     QmiNasRatModePreference                         pref;
 
     self = g_task_get_source_object (task);
+    priv = get_private (MM_SHARED_QMI (self));
     ctx  = g_task_get_task_data (task);
 
     input = qmi_message_nas_set_system_selection_preference_input_new ();
@@ -1272,16 +1286,17 @@ set_current_modes_system_selection_preference (GTask *task)
     /* Preferred modes */
 
     if (ctx->preferred != MM_MODEM_MODE_NONE) {
-        GArray *array;
+        if (priv->feature_nas_ssp_acquisition_order_preference == FEATURE_SUPPORTED) {
+            GArray *array;
 
-        /* Acquisition order array */
-        array = mm_modem_mode_to_qmi_acquisition_order_preference (ctx->allowed,
-                                                                   ctx->preferred,
-                                                                   mm_iface_modem_is_cdma (self),
-                                                                   mm_iface_modem_is_3gpp (self));
-        g_assert (array);
-        qmi_message_nas_set_system_selection_preference_input_set_acquisition_order_preference (input, array, NULL);
-        g_array_unref (array);
+            /* Acquisition order array */
+            array = mm_modem_mode_to_qmi_acquisition_order_preference (ctx->allowed,
+                                                                       ctx->preferred,
+                                                                       priv->feature_nas_ssp_acquisition_order_preference_array);
+            g_assert (array);
+            qmi_message_nas_set_system_selection_preference_input_set_acquisition_order_preference (input, array, NULL);
+            g_array_unref (array);
+        }
 
         /* Only set GSM/WCDMA acquisition order preference if both 2G and 3G given as allowed */
         if (mm_iface_modem_is_3gpp (self) && ((ctx->allowed & (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G))) {
@@ -1508,24 +1523,11 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
     result->allowed = allowed;
     result->preferred = MM_MODEM_MODE_NONE;
 
-    /* For 2G+3G only rely on the GSM/WCDMA acquisition order preference TLV */
-    if (mode_preference_mask == (QMI_NAS_RAT_MODE_PREFERENCE_GSM | QMI_NAS_RAT_MODE_PREFERENCE_UMTS)) {
-        QmiNasGsmWcdmaAcquisitionOrderPreference gsm_or_wcdma;
-
-        if (qmi_message_nas_get_system_selection_preference_output_get_gsm_wcdma_acquisition_order_preference (
-                output,
-                &gsm_or_wcdma,
-                NULL))
-            result->preferred = mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (gsm_or_wcdma, self);
-    }
-    /* Otherwise, rely on the acquisition order array TLV */
-    else {
+    /* If acquisition order preference is available, always use that first */
+    if (priv->feature_nas_ssp_acquisition_order_preference == FEATURE_SUPPORTED) {
         GArray *array;
 
-        if (qmi_message_nas_get_system_selection_preference_output_get_acquisition_order_preference (
-                output,
-                &array,
-                NULL) &&
+        if (qmi_message_nas_get_system_selection_preference_output_get_acquisition_order_preference (output, &array, NULL) &&
             array->len > 0) {
             guint i;
 
@@ -1545,6 +1547,16 @@ load_current_modes_system_selection_preference_ready (QmiClientNas *client,
                 }
             }
         }
+    }
+    /* For 2G+3G only rely on the GSM/WCDMA acquisition order preference TLV */
+    else if (mode_preference_mask == (QMI_NAS_RAT_MODE_PREFERENCE_GSM | QMI_NAS_RAT_MODE_PREFERENCE_UMTS)) {
+        QmiNasGsmWcdmaAcquisitionOrderPreference gsm_or_wcdma;
+
+        if (qmi_message_nas_get_system_selection_preference_output_get_gsm_wcdma_acquisition_order_preference (
+                output,
+                &gsm_or_wcdma,
+                NULL))
+            result->preferred = mm_modem_mode_from_qmi_gsm_wcdma_acquisition_order_preference (gsm_or_wcdma, self);
     }
 
     g_task_return_pointer (task, result, g_free);
