@@ -1106,66 +1106,74 @@ mm_modem_capability_to_qmi_acquisition_order_preference (MMModemCapability caps)
     return array;
 }
 
+static gboolean
+radio_interface_array_contains (GArray               *array,
+                                QmiNasRadioInterface  act)
+{
+    guint i;
+
+    for (i = 0; i < array->len; i++) {
+        QmiNasRadioInterface value;
+
+        value = g_array_index (array, QmiNasRadioInterface, i);
+        if (value == act)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static void
+radio_interface_array_add_missing (GArray *array,
+                                   GArray *all)
+{
+    guint i;
+
+    for (i = 0; i < all->len; i++) {
+        QmiNasRadioInterface value;
+
+        value = g_array_index (all, QmiNasRadioInterface, i);
+        if (!radio_interface_array_contains (array, value))
+            g_array_append_val (array, value);
+    }
+}
+
 GArray *
-mm_modem_mode_to_qmi_acquisition_order_preference (MMModemMode allowed,
-                                                   MMModemMode preferred,
-                                                   gboolean    is_cdma,
-                                                   gboolean    is_3gpp)
+mm_modem_mode_to_qmi_acquisition_order_preference (MMModemMode  allowed,
+                                                   MMModemMode  preferred,
+                                                   GArray      *all)
 {
     GArray               *array;
+    QmiNasRadioInterface  preferred_radio = QMI_NAS_RADIO_INTERFACE_UNKNOWN;
     QmiNasRadioInterface  value;
 
-    array = g_array_new (FALSE, FALSE, sizeof (QmiNasRadioInterface));
+    array = g_array_sized_new (FALSE, FALSE, sizeof (QmiNasRadioInterface), all->len);
 
-    if (allowed & MM_MODEM_MODE_5G) {
-        value = QMI_NAS_RADIO_INTERFACE_5GNR;
-        if (preferred == MM_MODEM_MODE_5G)
-            g_array_prepend_val (array, value);
-        else
-            g_array_append_val (array, value);
+#define PROCESS_ALLOWED_PREFERRED_MODE(MODE,RADIO)                      \
+    if ((allowed & MODE) && (radio_interface_array_contains (all, RADIO))) { \
+        if ((preferred == MODE) && (preferred_radio == QMI_NAS_RADIO_INTERFACE_UNKNOWN)) \
+            preferred_radio = RADIO;                                    \
+        else {                                                          \
+            value = RADIO;                                              \
+            g_array_append_val (array, value);                          \
+        }                                                               \
     }
 
-    if (allowed & MM_MODEM_MODE_4G) {
-        value = QMI_NAS_RADIO_INTERFACE_LTE;
-        if (preferred == MM_MODEM_MODE_4G)
-            g_array_prepend_val (array, value);
-        else
-            g_array_append_val (array, value);
-    }
+    PROCESS_ALLOWED_PREFERRED_MODE (MM_MODEM_MODE_5G, QMI_NAS_RADIO_INTERFACE_5GNR);
+    PROCESS_ALLOWED_PREFERRED_MODE (MM_MODEM_MODE_4G, QMI_NAS_RADIO_INTERFACE_LTE);
+    PROCESS_ALLOWED_PREFERRED_MODE (MM_MODEM_MODE_3G, QMI_NAS_RADIO_INTERFACE_UMTS);
+    PROCESS_ALLOWED_PREFERRED_MODE (MM_MODEM_MODE_3G, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO);
+    PROCESS_ALLOWED_PREFERRED_MODE (MM_MODEM_MODE_2G, QMI_NAS_RADIO_INTERFACE_GSM);
+    PROCESS_ALLOWED_PREFERRED_MODE (MM_MODEM_MODE_2G, QMI_NAS_RADIO_INTERFACE_CDMA_1X);
 
-    if (allowed & MM_MODEM_MODE_3G) {
-        if (is_cdma) {
-            value = QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO;
-            if (preferred == MM_MODEM_MODE_3G)
-                g_array_prepend_val (array, value);
-            else
-                g_array_append_val (array, value);
-        }
-        if (is_3gpp) {
-            value = QMI_NAS_RADIO_INTERFACE_UMTS;
-            if (preferred == MM_MODEM_MODE_3G)
-                g_array_prepend_val (array, value);
-            else
-                g_array_append_val (array, value);
-        }
-    }
+#undef PROCESS_ALLOWED_PREFERRED_MODE
 
-    if (allowed & MM_MODEM_MODE_2G) {
-        if (is_cdma) {
-            value = QMI_NAS_RADIO_INTERFACE_CDMA_1X;
-            if (preferred == MM_MODEM_MODE_2G)
-                g_array_prepend_val (array, value);
-            else
-                g_array_append_val (array, value);
-        }
-        if (is_3gpp) {
-            value = QMI_NAS_RADIO_INTERFACE_GSM;
-            if (preferred == MM_MODEM_MODE_2G)
-                g_array_prepend_val (array, value);
-            else
-                g_array_append_val (array, value);
-        }
-    }
+    if (preferred_radio != QMI_NAS_RADIO_INTERFACE_UNKNOWN)
+        g_array_prepend_val (array, preferred_radio);
+
+    /* the acquisition order preference is a TLV that must ALWAYS contain the
+     * same list of QmiNasRadioInterface values, just with a different order. */
+    radio_interface_array_add_missing (array, all);
+    g_assert_cmpuint (array->len, ==, all->len);
 
     return array;
 }
