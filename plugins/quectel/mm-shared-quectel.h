@@ -37,11 +37,14 @@ typedef struct _MMSharedQuectel MMSharedQuectel;
 
 struct _MMSharedQuectel {
     GTypeInterface g_iface;
-    MMIfaceModem         *  (* peek_parent_modem_interface)          (MMSharedQuectel *self);
-    MMIfaceModemLocation *  (* peek_parent_modem_location_interface) (MMSharedQuectel *self);
+    MMBroadbandModemClass * (* peek_parent_broadband_modem_class)    (MMSharedQuectel *self);
+    MMIfaceModem          * (* peek_parent_modem_interface)          (MMSharedQuectel *self);
+    MMIfaceModemLocation  * (* peek_parent_modem_location_interface) (MMSharedQuectel *self);
 };
 
 GType mm_shared_quectel_get_type (void);
+
+void                      mm_shared_quectel_setup_ports                          (MMBroadbandModem *self);
 
 void                      mm_shared_quectel_firmware_load_update_settings        (MMIfaceModemFirmware  *self,
                                                                                   GAsyncReadyCallback    callback,

@@ -78,6 +78,12 @@ peek_parent_modem_interface (MMSharedQuectel *self)
     return iface_modem_parent;
 }
 
+static MMBroadbandModemClass *
+peek_parent_broadband_modem_class (MMSharedQuectel *self)
+{
+    return MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_qmi_quectel_parent_class);
+}
+
 static void
 iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 {
@@ -116,9 +122,13 @@ shared_quectel_init (MMSharedQuectel *iface)
 {
     iface->peek_parent_modem_interface          = peek_parent_modem_interface;
     iface->peek_parent_modem_location_interface = peek_parent_modem_location_interface;
+    iface->peek_parent_broadband_modem_class    = peek_parent_broadband_modem_class;
 }
 
 static void
 mm_broadband_modem_qmi_quectel_class_init (MMBroadbandModemQmiQuectelClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->setup_ports = mm_shared_quectel_setup_ports;
 }

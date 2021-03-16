@@ -43,12 +43,21 @@ typedef enum {
 } FeatureSupport;
 
 typedef struct {
+    MMBroadbandModemClass *broadband_modem_class_parent;
     MMIfaceModem          *iface_modem_parent;
     MMIfaceModemLocation  *iface_modem_location_parent;
     MMModemLocationSource  provided_sources;
     MMModemLocationSource  enabled_sources;
     FeatureSupport         qgps_supported;
+    GRegex                *qgpsurc_regex;
 } Private;
+
+static void
+private_free (Private *priv)
+{
+    g_regex_unref (priv->qgpsurc_regex);
+    g_slice_free (Private, priv);
+}
 
 static Private *
 get_private (MMSharedQuectel *self)
@@ -65,6 +74,10 @@ get_private (MMSharedQuectel *self)
         priv->provided_sources  = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->enabled_sources   = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->qgps_supported    = FEATURE_SUPPORT_UNKNOWN;
+        priv->qgpsurc_regex     = g_regex_new ("\\r\\n\\+QGPSURC:.*", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+        g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class);
+        priv->broadband_modem_class_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class (self);
 
         g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_location_interface (self);
@@ -72,9 +85,42 @@ get_private (MMSharedQuectel *self)
         g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_interface);
         priv->iface_modem_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_modem_interface (self);
 
-        g_object_set_qdata (G_OBJECT (self), private_quark, priv);
+        g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
     return priv;
+}
+
+/*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+void
+mm_shared_quectel_setup_ports (MMBroadbandModem *self)
+{
+    Private        *priv;
+    MMPortSerialAt *ports[2];
+    guint           i;
+
+    priv = get_private (MM_SHARED_QUECTEL (self));
+    g_assert (priv->broadband_modem_class_parent);
+    g_assert (priv->broadband_modem_class_parent->setup_ports);
+
+    /* Parent setup always first */
+    priv->broadband_modem_class_parent->setup_ports (self);
+
+    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable/disable unsolicited events in given port */
+    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
+        if (!ports[i])
+            continue;
+
+        /* Ignore +QGPSURC */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            priv->qgpsurc_regex,
+            NULL, NULL, NULL);
+    }
 }
 
 /*****************************************************************************/
