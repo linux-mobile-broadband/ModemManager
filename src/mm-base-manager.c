@@ -236,7 +236,8 @@ device_removed (MMBaseManager *self,
 {
     g_autoptr(MMDevice) device = NULL;
 
-    g_assert (subsystem && name);
+    g_assert (subsystem);
+    g_assert (name);
     device = find_device_by_port_name (self, subsystem, name);
     if (!device) {
         /* If the device was inhibited and the port is gone, untrack it.
