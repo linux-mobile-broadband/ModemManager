@@ -41,31 +41,17 @@ static const QmiSioPort sio_port_per_port_number[] = {
 };
 
 static MMPortQmi *
-peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
-                        MMPort               *data,
-                        QmiSioPort           *out_sio_port,
-                        GError              **error)
+peek_port_qmi_for_data_bam_dmux (MMBroadbandModemQmi  *self,
+                                 MMPort               *data,
+                                 QmiSioPort           *out_sio_port,
+                                 GError              **error)
 {
     GList          *rpmsg_qmi_ports;
     MMPortQmi      *found = NULL;
     MMKernelDevice *net_port;
-    const gchar    *net_port_driver;
     gint            net_port_number;
 
-    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
-    g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
-
     net_port = mm_port_peek_kernel_device (data);
-    net_port_driver = mm_kernel_device_get_driver (net_port);
-    if (g_strcmp0 (net_port_driver, "bam-dmux") != 0) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Unsupported QMI kernel driver for 'net/%s': %s",
-                     mm_port_get_device (data),
-                     net_port_driver);
-        return NULL;
-    }
 
     /* The dev_port notified by the bam-dmux driver indicates which SIO port we should be using */
     net_port_number = mm_kernel_device_get_attribute_as_int (net_port, "dev_port");
@@ -99,6 +85,62 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
     g_list_free_full (rpmsg_qmi_ports, g_object_unref);
 
     return found;
+}
+
+static MMPortQmi *
+peek_port_qmi_for_data_ipa (MMBroadbandModemQmi  *self,
+                            MMPort               *data,
+                            QmiSioPort           *out_sio_port,
+                            GError              **error)
+{
+    MMPortQmi *found = NULL;
+
+    /* when using IPA, we have a master network interface that will be multiplexed
+     * to create link interfaces. We can assume any of the available QMI ports is
+     * able to manage that. */
+
+    found = mm_broadband_modem_qmi_peek_port_qmi (self);
+
+    if (!found)
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NOT_FOUND,
+                     "Couldn't find any QMI port for 'net/%s'",
+                     mm_port_get_device (data));
+    else if (out_sio_port)
+        *out_sio_port = QMI_SIO_PORT_NONE;
+
+    return found;
+}
+
+static MMPortQmi *
+peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
+                        MMPort               *data,
+                        QmiSioPort           *out_sio_port,
+                        GError              **error)
+{
+    MMKernelDevice *net_port;
+    const gchar    *net_port_driver;
+
+    g_assert (MM_IS_BROADBAND_MODEM_QMI (self));
+    g_assert (mm_port_get_subsys (data) == MM_PORT_SUBSYS_NET);
+
+    net_port = mm_port_peek_kernel_device (data);
+    net_port_driver = mm_kernel_device_get_driver (net_port);
+
+    if (g_strcmp0 (net_port_driver, "ipa") == 0)
+        return peek_port_qmi_for_data_ipa (self, data, out_sio_port, error);
+
+    if (g_strcmp0 (net_port_driver, "bam-dmux") == 0)
+        return peek_port_qmi_for_data_bam_dmux (self, data, out_sio_port, error);
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Unsupported QMI kernel driver for 'net/%s': %s",
+                 mm_port_get_device (data),
+                 net_port_driver);
+    return NULL;
 }
 
 /*****************************************************************************/
