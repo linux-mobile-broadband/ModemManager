@@ -192,6 +192,10 @@ PORT_ENUMS_INPUTS = \
 	$(srcdir)/mm-port-serial-at.h \
 	$(NULL)
 
+if WITH_QMI
+PORT_ENUMS_INPUTS += $(srcdir)/mm-port-qmi.h
+endif
+
 PORT_ENUMS_GENERATED = \
 	mm-port-enums-types.h \
 	mm-port-enums-types.c \
@@ -199,7 +203,7 @@ PORT_ENUMS_GENERATED = \
 
 mm-port-enums-types.h: Makefile.am $(PORT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
-		--fhead "#include \"mm-port.h\"\n#include \"mm-port-serial-at.h\"\n#ifndef __MM_PORT_ENUMS_TYPES_H__\n#define __MM_PORT_ENUMS_TYPES_H__\n" \
+		--fhead "#include \"config.h\"\n#include \"mm-port.h\"\n#include \"mm-port-serial-at.h\"\n#if defined WITH_QMI\n#include \"mm-port-qmi.h\"\n#endif\n#ifndef __MM_PORT_ENUMS_TYPES_H__\n#define __MM_PORT_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_PORT_ENUMS_TYPES_H__ */\n" \
 		$(PORT_ENUMS_INPUTS) > $@

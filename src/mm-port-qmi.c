@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012-2021 Google, Inc.
+ * Copyright (C) 2021 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <stdio.h>
@@ -23,6 +24,7 @@
 
 #include "mm-port-qmi.h"
 #include "mm-port-net.h"
+#include "mm-port-enums-types.h"
 #include "mm-modem-helpers-qmi.h"
 #include "mm-log-object.h"
 
@@ -45,8 +47,8 @@ struct _MMPortQmiPrivate {
     gulong              endpoint_info_signal_id;
     QmiDataEndpointType endpoint_type;
     gint                endpoint_interface_number;
-    /* kernel data format */
-    QmiDeviceExpectedDataFormat kernel_data_format;
+    /* kernel data mode */
+    MMPortQmiKernelDataMode kernel_data_modes;
     /* wda settings */
     gboolean                      wda_unsupported;
     QmiWdaLinkLayerProtocol       llp;
@@ -629,6 +631,12 @@ mm_port_qmi_setup_link (MMPortQmi           *self,
         return;
     }
 
+    if (!(self->priv->kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN))) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Multiplex support not available in kernel");
+        g_object_unref (task);
+        return;
+    }
+
     if ((self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) &&
         (self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Aggregation not enabled");
@@ -641,10 +649,8 @@ mm_port_qmi_setup_link (MMPortQmi           *self,
     ctx->mux_id = QMI_DEVICE_MUX_ID_UNBOUND;
     g_task_set_task_data (task, ctx, (GDestroyNotify) setup_link_context_free);
 
-    /* For all drivers except for qmi_wwan, or when qmi_wwan is setup with
-     * qmap-pass-through, just try to add link in the QmiDevice */
-    if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
-        self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) {
+    /* When using rmnet, just try to add link in the QmiDevice */
+    if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET) {
         qmi_device_add_link (self->priv->qmi_device,
                              QMI_DEVICE_MUX_ID_AUTOMATIC,
                              mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
@@ -656,25 +662,30 @@ mm_port_qmi_setup_link (MMPortQmi           *self,
     }
 
     /* For qmi_wwan, use preallocated links */
-    if (self->priv->preallocated_links) {
-        setup_preallocated_link (task);
+    if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN) {
+        if (self->priv->preallocated_links) {
+            setup_preallocated_link (task);
+            return;
+        }
+
+        /* We must make sure we don't run this procedure in parallel (e.g. if multiple
+         * connection attempts reach at the same time), so if we're told the preallocated
+         * links are already being initialized (master is set) but the array didn't exist,
+         * queue our task for completion once we're fully initialized */
+        if (self->priv->preallocated_links_master) {
+            self->priv->preallocated_links_setup_pending = g_list_append (self->priv->preallocated_links_setup_pending, task);
+            return;
+        }
+
+        /* Store master to flag that we're initializing preallocated links */
+        self->priv->preallocated_links_master = g_object_ref (data);
+        initialize_preallocated_links (self,
+                                       (GAsyncReadyCallback) initialize_preallocated_links_ready,
+                                       task);
         return;
     }
 
-    /* We must make sure we don't run this procedure in parallel (e.g. if multiple
-     * connection attempts reach at the same time), so if we're told the preallocated
-     * links are already being initialized (master is set) but the array didn't exist,
-     * queue our task for completion once we're fully initialized */
-    if (self->priv->preallocated_links_master) {
-        self->priv->preallocated_links_setup_pending = g_list_append (self->priv->preallocated_links_setup_pending, task);
-        return;
-    }
-
-    /* Store master to flag that we're initializing preallocated links */
-    self->priv->preallocated_links_master = g_object_ref (data);
-    initialize_preallocated_links (self,
-                                   (GAsyncReadyCallback) initialize_preallocated_links_ready,
-                                   task);
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -719,6 +730,12 @@ mm_port_qmi_cleanup_link (MMPortQmi           *self,
         return;
     }
 
+    if (!(self->priv->kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN))) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Multiplex support not available in kernel");
+        g_object_unref (task);
+        return;
+    }
+
     if ((self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) &&
         (self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Aggregation not enabled");
@@ -726,10 +743,8 @@ mm_port_qmi_cleanup_link (MMPortQmi           *self,
         return;
     }
 
-    /* For all drivers except for qmi_wwan, or when qmi_wwan is setup with
-     * qmap-pass-through, just try to delete link in the QmiDevice */
-    if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
-        self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) {
+    /* When using rmnet, just try to add link in the QmiDevice */
+    if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET) {
         qmi_device_delete_link (self->priv->qmi_device,
                                 link_name,
                                 mux_id,
@@ -740,11 +755,16 @@ mm_port_qmi_cleanup_link (MMPortQmi           *self,
     }
 
     /* For qmi_wwan, use preallocated links */
-    if (!release_preallocated_link (self, link_name, mux_id, &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
+    if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN) {
+        if (!release_preallocated_link (self, link_name, mux_id, &error))
+            g_task_return_error (task, error);
+        else
+            g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -789,7 +809,7 @@ delete_all_links_ready (QmiDevice    *device,
     }
 
     /* expected data format only applicable to qmi_wwan */
-    if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) {
+    if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
         mm_obj_dbg (self, "reseting expected kernel data format to 802.3 in data interface '%s'",
                     mm_port_get_device (MM_PORT (ctx->data)));
         if (!qmi_device_set_expected_data_format (ctx->device, QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3, &error)) {
@@ -955,6 +975,12 @@ mm_port_qmi_reset (MMPortQmi           *self,
 
 /*****************************************************************************/
 
+MMPortQmiKernelDataMode
+mm_port_qmi_get_kernel_data_modes (MMPortQmi *self)
+{
+    return self->priv->kernel_data_modes;
+}
+
 QmiWdaLinkLayerProtocol
 mm_port_qmi_get_link_layer_protocol (MMPortQmi *self)
 {
@@ -975,85 +1001,70 @@ mm_port_qmi_get_max_multiplexed_links (MMPortQmi *self)
 
 /*****************************************************************************/
 
-static QmiDeviceExpectedDataFormat
-load_kernel_data_format_current (MMPortQmi *self,
-                                 QmiDevice *device,
-                                 gboolean  *supports_links)
-{
-    QmiDeviceExpectedDataFormat value;
-
-    /* The flag specifying depending whether link management is supported DEPENDS
-     * on the current expected data format; i.e. if 802-3 is currently selected it
-     * will say link management is unsupported, even if it would be supported once
-     * we change it to raw-ip */
-    if (supports_links) {
-        /* For BAM-DMUX based setups, raw-ip only and no multiplexing */
-        if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0)
-            *supports_links = FALSE;
-        else
-            *supports_links = qmi_device_check_link_supported (device, NULL);
-    }
-
-    /* For any driver other than qmi_wwan, assume raw-ip */
-    if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC)
-        return QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
-
-    /* If the expected data format is unknown, it means the kernel in use
-     * doesn't have support for querying it; therefore it's 802.3 */
-    value = qmi_device_get_expected_data_format (device, NULL);
-    if (value == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN)
-        value = QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3;
-
-    return value;
-}
-
-static void
-load_kernel_data_format_capabilities (MMPortQmi *self,
-                                      QmiDevice *device,
-                                      gboolean  *supports_802_3,
-                                      gboolean  *supports_raw_ip,
-                                      gboolean  *supports_qmap_raw_ip,
-                                      gboolean  *supports_qmap_pass_through)
+static MMPortQmiKernelDataMode
+load_current_kernel_data_modes (MMPortQmi *self,
+                                QmiDevice *device)
 {
     /* For BAM-DMUX based setups, raw-ip only and no multiplexing */
-    if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0) {
-        *supports_802_3 = FALSE;
-        *supports_raw_ip = TRUE;
-        *supports_qmap_raw_ip = FALSE;
-        *supports_qmap_pass_through = FALSE;
-        return;
+    if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0)
+        return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
+
+    /* For USB based setups, query kernel */
+    if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
+        switch (qmi_device_get_expected_data_format (device, NULL)) {
+        case QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH:
+            return MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET;
+        case QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP:
+            if (qmi_device_check_link_supported (device, NULL))
+                return (MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN);
+            return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
+        case QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN:
+            /* If the expected data format is unknown, it means the kernel in use
+             * doesn't have support for querying it; therefore it's 802.3 */
+        case QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3:
+            return MM_PORT_QMI_KERNEL_DATA_MODE_802_3;
+        default:
+            g_assert_not_reached ();
+            return MM_PORT_QMI_KERNEL_DATA_MODE_NONE;
+        }
     }
 
-    /* For any driver other than qmi_wwan, assume raw-ip */
-    if (mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) {
-        *supports_802_3 = FALSE;
-        *supports_raw_ip = TRUE;
-        *supports_qmap_raw_ip = TRUE;
-        *supports_qmap_pass_through = FALSE;
-        return;
+    /* For any driver, assume raw-ip only */
+    return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
+}
+
+static MMPortQmiKernelDataMode
+load_supported_kernel_data_modes (MMPortQmi *self,
+                                  QmiDevice *device)
+{
+    /* For BAM-DMUX based setups, raw-ip only and no multiplexing */
+    if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0)
+        return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
+
+    /* For USB based setups, we may have all supported */
+    if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
+        MMPortQmiKernelDataMode supported = MM_PORT_QMI_KERNEL_DATA_MODE_802_3;
+
+        /* If raw-ip is not supported, muxing is also not supported */
+        if (qmi_device_check_expected_data_format_supported (device, QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP, NULL)) {
+            supported |= MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
+
+            /* We switch to raw-ip to see if we can do link management with qmi_wwan.
+             * This switch would not truly be required, but the logic afterwards is robust
+             * enough to support this, nothing to worry about */
+            if (qmi_device_set_expected_data_format (device, QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP, NULL) &&
+                qmi_device_check_link_supported (device, NULL))
+                supported |= MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN;
+
+            if (qmi_device_check_expected_data_format_supported (device, QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH, NULL))
+                supported |= MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET;
+        }
+
+        return supported;
     }
 
-    *supports_802_3 = TRUE;
-    *supports_raw_ip = qmi_device_check_expected_data_format_supported (device,
-                                                                        QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP,
-                                                                        NULL);
-    if (!*supports_raw_ip) {
-        *supports_qmap_raw_ip = FALSE;
-        *supports_qmap_pass_through = FALSE;
-        return;
-    }
-
-    /* We switch to raw-ip to see if we can do link management with qmi_wwan.
-     * This switch would not truly be required, but the logic afterwards is robust
-     * enough to support this, nothing to worry about */
-    if (qmi_device_set_expected_data_format (device, QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP, NULL))
-        *supports_qmap_raw_ip = qmi_device_check_link_supported (device, NULL);
-    else
-        *supports_qmap_raw_ip = FALSE;
-
-    *supports_qmap_pass_through = qmi_device_check_expected_data_format_supported (device,
-                                                                                   QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH,
-                                                                                   NULL);
+    /* For any driver, assume raw-ip only */
+    return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
 }
 
 /*****************************************************************************/
@@ -1062,32 +1073,32 @@ load_kernel_data_format_capabilities (MMPortQmi *self,
 #define DEFAULT_DOWNLINK_DATA_AGGREGATION_MAX_DATAGRAMS 32
 
 typedef struct {
-    QmiDeviceExpectedDataFormat   kernel_data_format;
+    MMPortQmiKernelDataMode       kernel_data_mode;
     QmiWdaLinkLayerProtocol       wda_llp;
     QmiWdaDataAggregationProtocol wda_dap;
 } DataFormatCombination;
 
 static const DataFormatCombination data_format_combinations[] = {
-    { QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5   },
-    { QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP     },
-    { QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP,            QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5   },
-    { QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP,            QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP     },
-    { QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP,            QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED },
-    { QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3,             QMI_WDA_LINK_LAYER_PROTOCOL_802_3,  QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED },
+    { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET,   QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5   },
+    { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET,   QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP     },
+    { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5   },
+    { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP     },
+    { MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP,      QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED },
+    { MM_PORT_QMI_KERNEL_DATA_MODE_802_3,       QMI_WDA_LINK_LAYER_PROTOCOL_802_3,  QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED },
 };
 
 typedef enum {
     INTERNAL_SETUP_DATA_FORMAT_STEP_FIRST,
-    INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CAPABILITIES,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_SUPPORTED_KERNEL_DATA_MODES,
     INTERNAL_SETUP_DATA_FORMAT_STEP_RETRY,
-    INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CURRENT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_CURRENT_KERNEL_DATA_MODES,
     INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_GET_WDA_DATA_FORMAT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE,
-    INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT_COMBINATION,
     INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_WDA_DATA_FORMAT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_SETUP_MASTER_MTU,
-    INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_KERNEL_DATA_FORMAT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_KERNEL_DATA_MODE,
     INTERNAL_SETUP_DATA_FORMAT_STEP_LAST,
 } InternalSetupDataFormatStep;
 
@@ -1100,14 +1111,10 @@ typedef struct {
     gboolean                    use_endpoint;
     gint                        data_format_combination_i;
 
-    /* configured kernel data format, mainly when using qmi_wwan */
-    QmiDeviceExpectedDataFormat kernel_data_format_current;
-    QmiDeviceExpectedDataFormat kernel_data_format_requested;
-    gboolean                    kernel_data_format_802_3_supported;
-    gboolean                    kernel_data_format_raw_ip_supported;
-    gboolean                    kernel_data_format_qmap_raw_ip_supported;
-    gboolean                    kernel_data_format_qmap_pass_through_supported;
-    gboolean                    link_management_supported;
+    /* kernel data modes */
+    MMPortQmiKernelDataMode kernel_data_modes_current;
+    MMPortQmiKernelDataMode kernel_data_modes_requested;
+    MMPortQmiKernelDataMode kernel_data_modes_supported;
 
     /* configured device data format */
     QmiClient                     *wda;
@@ -1139,7 +1146,7 @@ internal_setup_data_format_context_free (InternalSetupDataFormatContext *ctx)
 static gboolean
 internal_setup_data_format_finish (MMPortQmi                      *self,
                                    GAsyncResult                   *res,
-                                   QmiDeviceExpectedDataFormat    *out_kernel_data_format,
+                                   MMPortQmiKernelDataMode        *out_kernel_data_modes,
                                    QmiWdaLinkLayerProtocol        *out_llp,
                                    QmiWdaDataAggregationProtocol  *out_dap,
                                    guint                          *out_max_multiplexed_links,
@@ -1151,7 +1158,7 @@ internal_setup_data_format_finish (MMPortQmi                      *self,
         return FALSE;
 
     ctx = g_task_get_task_data (G_TASK (res));
-    *out_kernel_data_format = ctx->kernel_data_format_current;
+    *out_kernel_data_modes = ctx->kernel_data_modes_current;
     *out_llp = ctx->wda_llp_current;
     g_assert (ctx->wda_dl_dap_current == ctx->wda_ul_dap_current);
     *out_dap = ctx->wda_dl_dap_current;
@@ -1161,27 +1168,20 @@ internal_setup_data_format_finish (MMPortQmi                      *self,
             *out_max_multiplexed_links = 0;
             mm_obj_dbg (self, "wda data aggregation protocol unsupported: no multiplexed bearers allowed");
         } else {
-            /* if BAM-DMUX we already have multiple network interfaces, so no multiplexing */
-            if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0) {
-                *out_max_multiplexed_links = 0;
-                mm_obj_dbg (self, "bam-dmux link management disabled: no multiplexed bearers allowed");
-            }
             /* if multiplex backend may be rmnet, MAX-MIN */
-            else if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
-                     ctx->kernel_data_format_qmap_pass_through_supported) {
+            if (ctx->kernel_data_modes_supported & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET) {
                 *out_max_multiplexed_links = 1 + (QMI_DEVICE_MUX_ID_MAX - QMI_DEVICE_MUX_ID_MIN);
                 mm_obj_dbg (self, "rmnet link management supported: %u multiplexed bearers allowed",
                             *out_max_multiplexed_links);
             }
             /* if multiplex backend may be qmi_wwan, the max preallocated amount :/  */
-            else if ((mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) &&
-                     ctx->kernel_data_format_qmap_raw_ip_supported) {
+            else if (ctx->kernel_data_modes_supported & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN) {
                 *out_max_multiplexed_links = DEFAULT_LINK_PREALLOCATED_AMOUNT;
                 mm_obj_dbg (self, "qmi_wwan link management supported: %u multiplexed bearers allowed",
                             *out_max_multiplexed_links);
             } else {
                 *out_max_multiplexed_links = 0;
-                mm_obj_dbg (self, "qmi_wwan link management unsupported: no multiplexed bearers allowed");
+                mm_obj_dbg (self, "link management unsupported: no multiplexed bearers allowed");
             }
         }
     }
@@ -1192,29 +1192,43 @@ internal_setup_data_format_finish (MMPortQmi                      *self,
 static void internal_setup_data_format_context_step (GTask *task);
 
 static void
-sync_kernel_data_format (GTask *task)
+sync_kernel_data_mode (GTask *task)
 {
-    MMPortQmi              *self;
+    MMPortQmi                      *self;
     InternalSetupDataFormatContext *ctx;
-    GError                 *error = NULL;
+    GError                         *error = NULL;
+    g_autofree gchar               *kernel_data_modes_current_str = NULL;
+    g_autofree gchar               *kernel_data_modes_requested_str = NULL;
+    QmiDeviceExpectedDataFormat     expected_data_format_requested = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
-    mm_obj_dbg (self, "Updating kernel expected data format: %s -> %s",
-                qmi_device_expected_data_format_get_string (ctx->kernel_data_format_current),
-                qmi_device_expected_data_format_get_string (ctx->kernel_data_format_requested));
+    kernel_data_modes_current_str = mm_port_qmi_kernel_data_mode_build_string_from_mask (ctx->kernel_data_modes_current);
+    kernel_data_modes_requested_str = mm_port_qmi_kernel_data_mode_build_string_from_mask (ctx->kernel_data_modes_requested);
 
-    if (!qmi_device_set_expected_data_format (ctx->device,
-                                              ctx->kernel_data_format_requested,
-                                              &error)) {
+    mm_obj_dbg (self, "Updating kernel expected data format: %s -> %s",
+                kernel_data_modes_current_str, kernel_data_modes_requested_str);
+
+    if (ctx->kernel_data_modes_requested & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET)
+        expected_data_format_requested = QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH;
+    else if (ctx->kernel_data_modes_requested & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)
+        expected_data_format_requested = QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
+    else if (ctx->kernel_data_modes_requested & MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP)
+        expected_data_format_requested = QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP;
+    else if (ctx->kernel_data_modes_requested & MM_PORT_QMI_KERNEL_DATA_MODE_802_3)
+        expected_data_format_requested = QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3;
+    else
+        g_assert_not_reached ();
+
+    if (!qmi_device_set_expected_data_format (ctx->device, expected_data_format_requested, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
     /* request reload */
-    ctx->kernel_data_format_current = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
+    ctx->kernel_data_modes_current = MM_PORT_QMI_KERNEL_DATA_MODE_NONE;
 
     /* Go on to next step */
     ctx->step++;
@@ -1238,12 +1252,6 @@ master_mtu_ready (MMPortNet    *data,
         g_clear_error (&error);
     }
 
-    if ((ctx->kernel_data_format_current != QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3) &&
-        !qmi_device_set_expected_data_format (ctx->device, ctx->kernel_data_format_current, &error)) {
-        mm_obj_warn (self, "failed leaving 802.3 kernel data format after master mtu change: %s", error->message);
-        g_clear_error (&error);
-    }
-
     /* Go on to next step */
     ctx->step++;
     internal_setup_data_format_context_step (task);
@@ -1255,27 +1263,40 @@ setup_master_mtu (GTask *task)
     MMPortQmi                      *self;
     InternalSetupDataFormatContext *ctx;
     guint                           mtu = MM_PORT_NET_MTU_DEFAULT;
-    g_autoptr(GError)               error = NULL;
+    GError                         *error = NULL;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data     (task);
 
-    if ((ctx->kernel_data_format_current != QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3) &&
-        !qmi_device_set_expected_data_format (ctx->device, QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3, &error))
-        mm_obj_warn (self, "failed setting up 802.3 kernel data format before master mtu change: %s", error->message);
+    /* qmi_wwan add_mux/del_mux based logic requires master mtu set to the maximum data
+     * aggregation size */
+    if (ctx->kernel_data_modes_requested & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN) {
+        /* Load current max datagram size supported */
+        if (ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
+            ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)
+            mtu = ctx->wda_dl_dap_max_size_current;
 
-    if ((ctx->kernel_data_format_requested == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP) &&
-        (ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
-         ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP))
-        mtu = ctx->wda_dl_dap_max_size_current;
+        /* If no max aggregation size was specified by the modem (e.g. if we requested QMAP
+         * aggregation protocol but the modem doesn't support it), skip */
+        if (!mtu) {
+            mm_obj_dbg (self, "ignoring master mtu setup");
+            ctx->step++;
+            internal_setup_data_format_context_step (task);
+            return;
+        }
+    }
 
-    /* If no max aggregation size was specified by the modem (e.g. if we requested QMAP
-     * aggregation protocol but the modem doesn't support it), skip */
-    if (!mtu) {
-        mm_obj_dbg (self, "ignoring master mtu setup");
-        ctx->step++;
-        internal_setup_data_format_context_step (task);
-        return;
+    /* Master MTU change can only be changed while in 802-3 */
+    if (!(ctx->kernel_data_modes_current & MM_PORT_QMI_KERNEL_DATA_MODE_802_3)) {
+        mm_obj_dbg (self, "Updating kernel expected data format to 802-3 temporarily for master mtu setup");
+        if (!qmi_device_set_expected_data_format (ctx->device, QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3, &error)) {
+            g_prefix_error (&error, "Failed setting up 802.3 kernel data format before master mtu change: ");
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+        /* the sync kernel data mode step will fix this appropriately */
+        ctx->kernel_data_modes_current = MM_PORT_QMI_KERNEL_DATA_MODE_802_3;
     }
 
     mm_obj_dbg (self, "setting up master mtu: %u bytes", mtu);
@@ -1375,16 +1396,16 @@ setup_data_format_completed (GTask *task)
      * case of old qmi_wwan drivers where add_mux/del_mux wasn't available yet  */
     if (((ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) ||
          (ctx->wda_ul_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) &&
-        !ctx->link_management_supported) {
+        (!(ctx->kernel_data_modes_current & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)))) {
         mm_obj_dbg (self, "cannot enable data aggregation: link management unsupported");
         return FALSE;
     }
 
     /* check whether the current and requested ones are the same */
-    if ((ctx->kernel_data_format_current == ctx->kernel_data_format_requested) &&
-        (ctx->wda_llp_current            == ctx->wda_llp_requested) &&
-        (ctx->wda_ul_dap_current         == ctx->wda_ul_dap_requested) &&
-        (ctx->wda_dl_dap_current         == ctx->wda_dl_dap_requested)) {
+    if ((ctx->kernel_data_modes_current & ctx->kernel_data_modes_requested) &&
+        (ctx->wda_llp_current    == ctx->wda_llp_requested) &&
+        (ctx->wda_ul_dap_current == ctx->wda_ul_dap_requested) &&
+        (ctx->wda_dl_dap_current == ctx->wda_dl_dap_requested)) {
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return TRUE;
@@ -1394,7 +1415,7 @@ setup_data_format_completed (GTask *task)
 }
 
 static void
-check_data_format (GTask *task)
+check_data_format_combination (GTask *task)
 {
     MMPortQmi              *self;
     InternalSetupDataFormatContext *ctx;
@@ -1412,17 +1433,11 @@ check_data_format (GTask *task)
          ctx->data_format_combination_i <= (gint)G_N_ELEMENTS (data_format_combinations);
          ctx->data_format_combination_i++) {
         const DataFormatCombination *combination;
+        g_autofree gchar            *kernel_data_mode_str = NULL;
 
         combination = &data_format_combinations[ctx->data_format_combination_i];
 
-        if ((combination->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3) &&
-            !ctx->kernel_data_format_802_3_supported)
-            continue;
-        if ((combination->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP) &&
-            !ctx->kernel_data_format_raw_ip_supported)
-            continue;
-        if ((combination->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) &&
-            !ctx->kernel_data_format_qmap_pass_through_supported)
+        if (!(ctx->kernel_data_modes_supported & combination->kernel_data_mode))
             continue;
 
         if (((combination->wda_dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) ||
@@ -1431,15 +1446,16 @@ check_data_format (GTask *task)
              (ctx->action != MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_MULTIPLEX)))
             continue;
 
+        kernel_data_mode_str = mm_port_qmi_kernel_data_mode_build_string_from_mask (combination->kernel_data_mode);
         mm_obj_dbg (self, "selected data format setup:");
-        mm_obj_dbg (self, "    kernel format: %s", qmi_device_expected_data_format_get_string (combination->kernel_data_format));
+        mm_obj_dbg (self, "    kernel data mode: %s", kernel_data_mode_str);
         mm_obj_dbg (self, "    link layer protocol: %s", qmi_wda_link_layer_protocol_get_string (combination->wda_llp));
         mm_obj_dbg (self, "    aggregation protocol: %s", qmi_wda_data_aggregation_protocol_get_string (combination->wda_dap));
 
-        ctx->kernel_data_format_requested = combination->kernel_data_format;
-        ctx->wda_llp_requested            = combination->wda_llp;
-        ctx->wda_ul_dap_requested         = combination->wda_dap;
-        ctx->wda_dl_dap_requested         = combination->wda_dap;
+        ctx->kernel_data_modes_requested = combination->kernel_data_mode;
+        ctx->wda_llp_requested           = combination->wda_llp;
+        ctx->wda_ul_dap_requested        = combination->wda_dap;
+        ctx->wda_dl_dap_requested        = combination->wda_dap;
 
         if (first_iteration && setup_data_format_completed (task))
             return;
@@ -1561,14 +1577,9 @@ internal_setup_data_format_context_step (GTask *task)
             ctx->step++;
             /* Fall through */
 
-        case INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CAPABILITIES:
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_SUPPORTED_KERNEL_DATA_MODES:
             /* Load kernel data format capabilities, only on first loop iteration */
-            load_kernel_data_format_capabilities (self,
-                                                  ctx->device,
-                                                  &ctx->kernel_data_format_802_3_supported,
-                                                  &ctx->kernel_data_format_raw_ip_supported,
-                                                  &ctx->kernel_data_format_qmap_raw_ip_supported,
-                                                  &ctx->kernel_data_format_qmap_pass_through_supported);
+            ctx->kernel_data_modes_supported = load_supported_kernel_data_modes (self, ctx->device);
             ctx->step++;
             /* Fall through */
 
@@ -1576,13 +1587,10 @@ internal_setup_data_format_context_step (GTask *task)
             ctx->step++;
             /* Fall through */
 
-        case INTERNAL_SETUP_DATA_FORMAT_STEP_KERNEL_DATA_FORMAT_CURRENT:
-            /* Only reload kernel data format if it was updated or on first loop */
-            if (ctx->kernel_data_format_current == QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN) {
-                ctx->kernel_data_format_current = load_kernel_data_format_current (self,
-                                                                                   ctx->device,
-                                                                                   &ctx->link_management_supported);
-            }
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_CURRENT_KERNEL_DATA_MODES:
+            /* Only reload kernel data modes if it was updated or on first loop */
+            if (ctx->kernel_data_modes_current == MM_PORT_QMI_KERNEL_DATA_MODE_NONE)
+                ctx->kernel_data_modes_current = load_current_kernel_data_modes (self, ctx->device);
             ctx->step++;
             /* Fall through */
 
@@ -1625,11 +1633,13 @@ internal_setup_data_format_context_step (GTask *task)
             ctx->step++;
             /* Fall through */
 
-        case INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE:
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE: {
+            g_autofree gchar *kernel_data_modes_str = NULL;
+
+            kernel_data_modes_str = mm_port_qmi_kernel_data_mode_build_string_from_mask (ctx->kernel_data_modes_current);
             mm_obj_dbg (self, "current data format setup:");
-            mm_obj_dbg (self, "    kernel format: %s", qmi_device_expected_data_format_get_string (ctx->kernel_data_format_current));
+            mm_obj_dbg (self, "    kernel data modes: %s", kernel_data_modes_str);
             mm_obj_dbg (self, "    link layer protocol: %s", qmi_wda_link_layer_protocol_get_string (ctx->wda_llp_current));
-            mm_obj_dbg (self, "    link management: %s", ctx->link_management_supported ? "supported" : "unsupported");
             mm_obj_dbg (self, "    aggregation protocol ul: %s", qmi_wda_data_aggregation_protocol_get_string (ctx->wda_ul_dap_current));
             mm_obj_dbg (self, "    aggregation protocol dl: %s", qmi_wda_data_aggregation_protocol_get_string (ctx->wda_dl_dap_current));
 
@@ -1640,12 +1650,12 @@ internal_setup_data_format_context_step (GTask *task)
             }
 
             ctx->step++;
-            /* Fall through */
+        } /* Fall through */
 
-        case INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT:
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT_COMBINATION:
             /* This step is the one that may complete the async operation
              * successfully */
-            check_data_format (task);
+            check_data_format_combination (task);
             return;
 
         case INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_WDA_DATA_FORMAT:
@@ -1660,17 +1670,17 @@ internal_setup_data_format_context_step (GTask *task)
 
         case INTERNAL_SETUP_DATA_FORMAT_STEP_SETUP_MASTER_MTU:
             /* qmi_wwan add_mux/del_mux based logic requires master MTU set to the maximum
-             * data aggregation size reported by the modem. At this point the  */
-            if (mm_port_get_subsys (MM_PORT (self)) == MM_PORT_SUBSYS_USBMISC) {
+             * data aggregation size reported by the modem.  */
+            if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
                 setup_master_mtu (task);
                 return;
             }
             ctx->step++;
             /* Fall through */
 
-        case INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_KERNEL_DATA_FORMAT:
-            if (ctx->kernel_data_format_current != ctx->kernel_data_format_requested) {
-                sync_kernel_data_format (task);
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_SYNC_KERNEL_DATA_MODE:
+            if (!(ctx->kernel_data_modes_current & ctx->kernel_data_modes_requested)) {
+                sync_kernel_data_mode (task);
                 return;
             }
             ctx->step++;
@@ -1721,8 +1731,9 @@ internal_setup_data_format (MMPortQmi                      *self,
     ctx->action = action;
     ctx->step = INTERNAL_SETUP_DATA_FORMAT_STEP_FIRST;
     ctx->data_format_combination_i = -1;
-    ctx->kernel_data_format_current = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
-    ctx->kernel_data_format_requested = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
+    ctx->kernel_data_modes_current = MM_PORT_QMI_KERNEL_DATA_MODE_NONE;
+    ctx->kernel_data_modes_requested = MM_PORT_QMI_KERNEL_DATA_MODE_NONE;
+    ctx->kernel_data_modes_supported = MM_PORT_QMI_KERNEL_DATA_MODE_NONE;
     ctx->wda_llp_current = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
     ctx->wda_llp_requested = QMI_WDA_LINK_LAYER_PROTOCOL_UNKNOWN;
     ctx->wda_ul_dap_current = QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED;
@@ -1767,7 +1778,7 @@ internal_setup_data_format_ready (MMPortQmi    *self,
 
     if (!internal_setup_data_format_finish (self,
                                             res,
-                                            &self->priv->kernel_data_format,
+                                            &self->priv->kernel_data_modes,
                                             &self->priv->llp,
                                             &self->priv->dap,
                                             NULL, /* not expected to update */
@@ -1808,8 +1819,7 @@ static guint
 count_links_setup (MMPortQmi *self,
                    MMPort    *data)
 {
-    if ((mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_USBMISC) ||
-        self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) {
+    if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET) {
         g_autoptr(GPtrArray) links = NULL;
         g_autoptr(GError)    error = NULL;
 
@@ -1826,7 +1836,10 @@ count_links_setup (MMPortQmi *self,
         return links->len;
     }
 
-    return count_preallocated_links_setup (self);
+    if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)
+        return count_preallocated_links_setup (self);
+
+    return 0;
 }
 
 void
@@ -1858,8 +1871,7 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
     }
 
     if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_MULTIPLEX) &&
-        (self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP ||
-         self->priv->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) &&
+        (self->priv->kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)) &&
         (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
          self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
         mm_obj_dbg (self, "multiplex support already available when setting up data format");
@@ -1869,7 +1881,7 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
     }
 
     if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT) &&
-        (self->priv->kernel_data_format != QMI_DEVICE_EXPECTED_DATA_FORMAT_QMAP_PASS_THROUGH) &&
+        (!(self->priv->kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN))) &&
         (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED)) {
         mm_obj_dbg (self, "multiplex support already disabled when setting up data format");
         g_task_return_boolean (task, TRUE);
@@ -1922,11 +1934,11 @@ typedef enum {
 } PortOpenStep;
 
 typedef struct {
-    QmiDevice                   *device;
-    GError                      *error;
-    PortOpenStep                 step;
-    gboolean                     set_data_format;
-    QmiDeviceExpectedDataFormat  kernel_data_format;
+    QmiDevice               *device;
+    GError                  *error;
+    PortOpenStep             step;
+    gboolean                 set_data_format;
+    MMPortQmiKernelDataMode  kernel_data_modes;
 } PortOpenContext;
 
 static void
@@ -1993,10 +2005,10 @@ qmi_device_open_second_ready (QmiDevice    *qmi_device,
         /* If the open with CTL data format is sucessful, update all settings
          * that we would have received with the internal setup data format
          * process */
-        self->priv->kernel_data_format = ctx->kernel_data_format;
-        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP)
+        self->priv->kernel_data_modes = ctx->kernel_data_modes;
+        if (ctx->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP)
             self->priv->llp = QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP;
-        else if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3)
+        else if (ctx->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_802_3)
             self->priv->llp = QMI_WDA_LINK_LAYER_PROTOCOL_802_3;
         else
             g_assert_not_reached ();
@@ -2040,7 +2052,7 @@ open_internal_setup_data_format_ready (MMPortQmi    *self,
 
     if (!internal_setup_data_format_finish (self,
                                             res,
-                                            &self->priv->kernel_data_format,
+                                            &self->priv->kernel_data_modes,
                                             &self->priv->llp,
                                             &self->priv->dap,
                                             &self->priv->max_multiplexed_links,
@@ -2160,11 +2172,15 @@ port_open_step (GTask *task)
 
     case PORT_OPEN_STEP_OPEN_WITHOUT_DATA_FORMAT:
         if (!self->priv->wda_unsupported) {
+            QmiDeviceOpenFlags  open_flags;
+            g_autofree gchar   *open_flags_str = NULL;
+
             /* Now open the QMI device without any data format CTL flag */
-            mm_obj_dbg (self, "Opening device without data format update...");
+            open_flags = (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO | QMI_DEVICE_OPEN_FLAGS_PROXY);
+            open_flags_str = qmi_device_open_flags_build_string_from_mask (open_flags);
+            mm_obj_dbg (self, "Opening device with flags: %s...", open_flags_str);
             qmi_device_open (ctx->device,
-                             (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
-                              QMI_DEVICE_OPEN_FLAGS_PROXY),
+                             open_flags,
                              25,
                              g_task_get_cancellable (task),
                              (GAsyncReadyCallback) qmi_device_open_first_ready,
@@ -2202,29 +2218,31 @@ port_open_step (GTask *task)
         /* Fall through */
 
     case PORT_OPEN_STEP_OPEN_WITH_DATA_FORMAT: {
-        QmiDeviceOpenFlags open_flags;
+        QmiDeviceOpenFlags  open_flags;
+        g_autofree gchar   *open_flags_str = NULL;
 
         /* Common open flags */
         open_flags = (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
                       QMI_DEVICE_OPEN_FLAGS_PROXY        |
                       QMI_DEVICE_OPEN_FLAGS_NET_NO_QOS_HEADER);
 
-        ctx->kernel_data_format = load_kernel_data_format_current (self, ctx->device, NULL);
+        ctx->kernel_data_modes = load_current_kernel_data_modes (self, ctx->device);
 
         /* Need to reopen setting 802.3/raw-ip using CTL */
-        if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_RAW_IP)
+        if (ctx->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP)
             open_flags |= QMI_DEVICE_OPEN_FLAGS_NET_RAW_IP;
-        else if (ctx->kernel_data_format == QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3)
+        else if (ctx->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_802_3)
             open_flags |= QMI_DEVICE_OPEN_FLAGS_NET_802_3;
         else {
             g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "Unexpected kernel data format: cannot setup using CTL");
+                                     "Unexpected kernel data mode: cannot setup using CTL");
             g_object_unref (task);
             return;
         }
 
-        mm_obj_dbg (self, "Reopening device with data format: %s...",
-                    qmi_device_expected_data_format_get_string (ctx->kernel_data_format));
+        open_flags_str = qmi_device_open_flags_build_string_from_mask (open_flags);
+        mm_obj_dbg (self, "Reopening device with flags: %s...", open_flags_str);
+
         qmi_device_open (ctx->device,
                          open_flags,
                          10,
@@ -2280,7 +2298,7 @@ mm_port_qmi_open (MMPortQmi           *self,
     ctx = g_slice_new0 (PortOpenContext);
     ctx->step = PORT_OPEN_STEP_FIRST;
     ctx->set_data_format = set_data_format;
-    ctx->kernel_data_format = QMI_DEVICE_EXPECTED_DATA_FORMAT_UNKNOWN;
+    ctx->kernel_data_modes = MM_PORT_QMI_KERNEL_DATA_MODE_NONE;
 
     task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)port_open_context_free);

@@ -24,6 +24,18 @@
 
 #include "mm-port.h"
 
+typedef enum { /*< underscore_name=mm_port_qmi_kernel_data_mode >*/
+    MM_PORT_QMI_KERNEL_DATA_MODE_NONE = 0,
+    /* ethernet packets over the master network interface */
+    MM_PORT_QMI_KERNEL_DATA_MODE_802_3 = 1 << 0,
+    /* raw-ip packets over the master network interface */
+    MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP = 1 << 1,
+    /* multiplexing support setup with rmnet */
+    MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET = 1 << 2,
+    /* multiplexing support setup with qmi_wwan add_mux/del_mux */
+    MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN = 1 << 3,
+} MMPortQmiKernelDataMode;
+
 #define MM_TYPE_PORT_QMI            (mm_port_qmi_get_type ())
 #define MM_PORT_QMI(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_QMI, MMPortQmi))
 #define MM_PORT_QMI_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_QMI, MMPortQmiClass))
@@ -100,6 +112,7 @@ QmiDevice *mm_port_qmi_peek_device (MMPortQmi *self);
 QmiDataEndpointType mm_port_qmi_get_endpoint_type             (MMPortQmi *self);
 guint               mm_port_qmi_get_endpoint_interface_number (MMPortQmi *self);
 
+MMPortQmiKernelDataMode       mm_port_qmi_get_kernel_data_modes         (MMPortQmi *self);
 QmiWdaLinkLayerProtocol       mm_port_qmi_get_link_layer_protocol       (MMPortQmi *self);
 QmiWdaDataAggregationProtocol mm_port_qmi_get_data_aggregation_protocol (MMPortQmi *self);
 guint                         mm_port_qmi_get_max_multiplexed_links     (MMPortQmi *self);
