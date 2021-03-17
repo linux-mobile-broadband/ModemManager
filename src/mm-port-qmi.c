@@ -1009,6 +1009,10 @@ load_current_kernel_data_modes (MMPortQmi *self,
     if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0)
         return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
 
+    /* For IPA based setups, always rmnet multiplexing */
+    if (g_strcmp0 (self->priv->net_driver, "ipa") == 0)
+        return MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET;
+
     /* For USB based setups, query kernel */
     if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
         switch (qmi_device_get_expected_data_format (device, NULL)) {
@@ -1040,6 +1044,10 @@ load_supported_kernel_data_modes (MMPortQmi *self,
     /* For BAM-DMUX based setups, raw-ip only and no multiplexing */
     if (g_strcmp0 (self->priv->net_driver, "bam-dmux") == 0)
         return MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
+
+    /* For IPA based setups, always rmnet multiplexing */
+    if (g_strcmp0 (self->priv->net_driver, "ipa") == 0)
+        return MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET;
 
     /* For USB based setups, we may have all supported */
     if (g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) {
