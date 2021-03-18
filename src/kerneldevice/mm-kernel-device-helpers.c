@@ -41,7 +41,6 @@ mm_kernel_device_get_lower_device_name (const gchar *sysfs_path)
         g_autofree gchar *filename = NULL;
         g_autofree gchar *link_path = NULL;
         g_autofree gchar *real_path = NULL;
-        g_autofree gchar *basename = NULL;
 
         if (!g_file_enumerator_iterate (direnum, &info, NULL, NULL, NULL) || !info)
             break;
