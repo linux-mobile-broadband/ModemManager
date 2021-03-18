@@ -569,7 +569,7 @@ device_add_link_ready (QmiDevice    *device,
 
     ctx = g_task_get_task_data (task);
 
-    ctx->link_name = qmi_device_add_link_finish (device, res, &ctx->mux_id, &error);
+    ctx->link_name = qmi_device_add_link_with_flags_finish (device, res, &ctx->mux_id, &error);
     if (!ctx->link_name) {
         g_prefix_error (&error, "failed to add link for device: ");
         g_task_return_error (task, error);
@@ -665,13 +665,26 @@ mm_port_qmi_setup_link (MMPortQmi           *self,
 
     /* When using rmnet, just try to add link in the QmiDevice */
     if (self->priv->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET) {
-        qmi_device_add_link (self->priv->qmi_device,
-                             QMI_DEVICE_MUX_ID_AUTOMATIC,
-                             mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
-                             link_prefix_hint,
-                             NULL,
-                             (GAsyncReadyCallback) device_add_link_ready,
-                             task);
+        QmiDeviceAddLinkFlags flags = QMI_DEVICE_ADD_LINK_FLAGS_NONE;
+
+        /* This may not be fully right, but it's the only way forward we know
+         * right now for the Qualcomm SoCs based on QRTR+IPA, where QMAPV4 is
+         * used and the device has checksum offload enabled by default, so we
+         * should create the link with special flags. Ideally, we would have a
+         * way to know in advance whether the checksum offload flags are needed
+         * or not.
+         */
+        if (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV4)
+            flags = (QMI_DEVICE_ADD_LINK_FLAGS_INGRESS_MAP_CKSUMV4 | QMI_DEVICE_ADD_LINK_FLAGS_EGRESS_MAP_CKSUMV4);
+
+        qmi_device_add_link_with_flags (self->priv->qmi_device,
+                                        QMI_DEVICE_MUX_ID_AUTOMATIC,
+                                        mm_kernel_device_get_name (mm_port_peek_kernel_device (data)),
+                                        link_prefix_hint,
+                                        flags,
+                                        NULL,
+                                        (GAsyncReadyCallback) device_add_link_ready,
+                                        task);
         return;
     }
 
@@ -1101,6 +1114,7 @@ typedef struct {
 
 static const DataFormatCombination data_format_combinations[] = {
     { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET,   QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5   },
+    { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET,   QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV4   },
     { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET,   QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP     },
     { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5   },
     { MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN, QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP, QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP     },

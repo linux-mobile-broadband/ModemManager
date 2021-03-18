@@ -38,6 +38,7 @@ typedef enum { /*< underscore_name=mm_port_qmi_kernel_data_mode >*/
 
 #define MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP(dap)          \
     (dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 || \
+     dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV4 || \
      dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)
 
 #define MM_TYPE_PORT_QMI            (mm_port_qmi_get_type ())
