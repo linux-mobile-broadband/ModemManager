@@ -36,6 +36,10 @@ typedef enum { /*< underscore_name=mm_port_qmi_kernel_data_mode >*/
     MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN = 1 << 3,
 } MMPortQmiKernelDataMode;
 
+#define MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP(dap)          \
+    (dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 || \
+     dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)
+
 #define MM_TYPE_PORT_QMI            (mm_port_qmi_get_type ())
 #define MM_PORT_QMI(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_QMI, MMPortQmi))
 #define MM_PORT_QMI_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_QMI, MMPortQmiClass))

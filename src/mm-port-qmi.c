@@ -652,8 +652,7 @@ mm_port_qmi_setup_link (MMPortQmi           *self,
         return;
     }
 
-    if ((self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) &&
-        (self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
+    if (!MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (self->priv->dap)) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Aggregation not enabled");
         g_object_unref (task);
         return;
@@ -751,8 +750,7 @@ mm_port_qmi_cleanup_link (MMPortQmi           *self,
         return;
     }
 
-    if ((self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) &&
-        (self->priv->dap != QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
+    if (!MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (self->priv->dap)) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Aggregation not enabled");
         g_object_unref (task);
         return;
@@ -1295,8 +1293,7 @@ setup_master_mtu (GTask *task)
      * aggregation size */
     if (ctx->kernel_data_modes_requested & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN) {
         /* Load current max datagram size supported */
-        if (ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
-            ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)
+        if (MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (ctx->wda_dl_dap_requested))
             mtu = ctx->wda_dl_dap_max_size_current;
 
         /* If no max aggregation size was specified by the modem (e.g. if we requested QMAP
@@ -1417,8 +1414,7 @@ setup_data_format_completed (GTask *task)
 
     /* if aggregation enabled we require link management supported; this covers the
      * case of old qmi_wwan drivers where add_mux/del_mux wasn't available yet  */
-    if (((ctx->wda_dl_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) ||
-         (ctx->wda_ul_dap_requested == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) &&
+    if ((MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (ctx->wda_dl_dap_requested)) &&
         (!(ctx->kernel_data_modes_current & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)))) {
         mm_obj_dbg (self, "cannot enable data aggregation: link management unsupported");
         return FALSE;
@@ -1463,8 +1459,7 @@ check_data_format_combination (GTask *task)
         if (!(ctx->kernel_data_modes_supported & combination->kernel_data_mode))
             continue;
 
-        if (((combination->wda_dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5) ||
-             (combination->wda_dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) &&
+        if ((MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (combination->wda_dap)) &&
             ((!ctx->wda_dap_supported) ||
              (ctx->action != MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_MULTIPLEX)))
             continue;
@@ -1899,8 +1894,7 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
 
     if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_MULTIPLEX) &&
         (self->priv->kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)) &&
-        (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
-         self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
+        MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (self->priv->dap)) {
         mm_obj_dbg (self, "multiplex support already available when setting up data format");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -1909,7 +1903,7 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
 
     if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT) &&
         (!(self->priv->kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN))) &&
-        (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_DISABLED)) {
+        !MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (self->priv->dap)) {
         mm_obj_dbg (self, "multiplex support already disabled when setting up data format");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -1919,8 +1913,7 @@ mm_port_qmi_setup_data_format (MMPortQmi                      *self,
     /* support switching from multiplex to non-multiplex, but only if there are no active
      * links allocated */
     if ((action == MM_PORT_QMI_SETUP_DATA_FORMAT_ACTION_SET_DEFAULT) &&
-        (self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
-         self->priv->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP)) {
+        MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (self->priv->dap)) {
         guint n_links_setup;
 
         n_links_setup = count_links_setup (self, data);

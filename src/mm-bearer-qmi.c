@@ -1561,8 +1561,7 @@ connect_context_step (GTask *task)
 
         /* if muxing has been enabled in the port, we need to create a new link
          * interface. */
-        if (ctx->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAPV5 ||
-            ctx->dap == QMI_WDA_DATA_AGGREGATION_PROTOCOL_QMAP) {
+        if (MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (ctx->dap)) {
             mm_port_qmi_setup_link (ctx->qmi,
                                     ctx->data,
                                     ctx->link_prefix_hint,
