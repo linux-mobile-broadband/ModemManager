@@ -912,15 +912,17 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMPortSerialGps *gps = NULL;
     MMPortSerial *audio = NULL;
     MMPortSerialAt *data_at_primary = NULL;
-    GList *data_at = NULL;
-    GList *data_net = NULL;
+    GList *l;
+    /* These lists don't keep full references, so they should be
+     * g_list_free()-ed on error exits */
+    g_autoptr(GList) data_at = NULL;
+    g_autoptr(GList) data_net = NULL;
 #if defined WITH_QMI
-    GList *qmi = NULL;
+    g_autoptr(GList) qmi = NULL;
 #endif
 #if defined WITH_MBIM
-    GList *mbim = NULL;
+    g_autoptr(GList) mbim = NULL;
 #endif
-    GList *l;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
 
@@ -1144,26 +1146,27 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     /* Build the final list of data ports, NET ports preferred */
     if (data_net) {
         g_list_foreach (data_net, (GFunc)g_object_ref, NULL);
-        self->priv->data = g_list_concat (self->priv->data, data_net);
+        self->priv->data = g_list_concat (self->priv->data, g_steal_pointer (&data_net));
     }
+
     if (data_at_primary)
         self->priv->data = g_list_append (self->priv->data, g_object_ref (data_at_primary));
     if (data_at) {
         g_list_foreach (data_at, (GFunc)g_object_ref, NULL);
-        self->priv->data = g_list_concat (self->priv->data, data_at);
+        self->priv->data = g_list_concat (self->priv->data, g_steal_pointer (&data_at));
     }
 
 #if defined WITH_QMI
     if (qmi) {
         g_list_foreach (qmi, (GFunc)g_object_ref, NULL);
-        self->priv->qmi = qmi;
+        self->priv->qmi = g_steal_pointer (&qmi);
     }
 #endif
 
 #if defined WITH_MBIM
     if (mbim) {
         g_list_foreach (mbim, (GFunc)g_object_ref, NULL);
-        self->priv->mbim = mbim;
+        self->priv->mbim = g_steal_pointer (&mbim);
     }
 #endif
 
