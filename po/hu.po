@@ -1,21 +1,24 @@
-# Hungarian translation for modemmanager
-# Copyright (C) 2017. Free Software Foundation, Inc.
+# Hungarian translation for modemmanager.
+# Copyright (C) 2017, 2021. Free Software Foundation, Inc.
 # This file is distributed under the same license as the modemmanager package.
-# Gabor Kelemen <kelemeng at ubuntu dot com>, 2017.
 #
+# Gabor Kelemen <kelemeng at ubuntu dot com>, 2017.
+# Balázs Úr <ur.balazs at fsf dot hu>, 2021.
 msgid ""
 msgstr ""
 "Project-Id-Version: modemmanager master\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2020-09-18 10:30+0200\n"
-"PO-Revision-Date: 2017-09-26 22:02+0000\n"
-"Last-Translator: Gabor Kelemen <kelemeng@openscope.org>\n"
-"Language-Team: Hungarian <hu@li.org>\n"
+"POT-Creation-Date: 2020-09-18 15:29+0000\n"
+"PO-Revision-Date: 2021-03-17 00:52+0100\n"
+"Last-Translator: Balázs Úr <ur.balazs at fsf dot hu>\n"
+"Language-Team: Hungarian <gnome-hu-list at gnome dot org>\n"
 "Language: hu\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Lokalize 19.12.3\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
@@ -68,14 +71,13 @@ msgstr "A rendszer házirendje nem teszi lehetővé a hívásokat."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:58
 msgid "Query network time and timezone information"
-msgstr ""
+msgstr "Hálózati idő és időzóna-információk lekérdezése"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:59
-#, fuzzy
 msgid "System policy prevents querying network time information."
 msgstr ""
-"A rendszer házirendje nem teszi lehetővé a hálózati információk és "
-"szolgáltatások lekérdezését és használatát."
+"A rendszer házirendje nem teszi lehetővé a hálózati idő információinak "
+"lekérdezését."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
