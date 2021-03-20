@@ -4219,6 +4219,7 @@ typedef enum {
     SYNCING_STEP_DETECT_SIM_SWAP,
     SYNCING_STEP_REFRESH_SIM_LOCK,
     SYNCING_STEP_REFRESH_SIGNAL_STRENGTH,
+    SYNCING_STEP_REFRESH_BEARERS,
     SYNCING_STEP_LAST
 } SyncingStep;
 
@@ -4271,6 +4272,22 @@ sync_detect_sim_swap_ready (MMIfaceModem *self,
 }
 
 static void
+reload_bearers (MMIfaceModem *self)
+{
+    g_autoptr(MMBearerList) list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    if (list) {
+        mm_bearer_list_foreach (list,
+                               (MMBearerListForeachFunc)mm_base_bearer_sync,
+                                NULL);
+    }
+}
+
+static void
 interface_syncing_step (GTask *task)
 {
     MMIfaceModem   *self;
@@ -4313,6 +4330,14 @@ interface_syncing_step (GTask *task)
          * Restart the signal strength and access technologies refresh sequence.
          */
         mm_iface_modem_refresh_signal (self);
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_REFRESH_BEARERS:
+        /*
+         * Refresh bearers.
+         */
+        reload_bearers (self);
         ctx->step++;
         /* fall through */
 

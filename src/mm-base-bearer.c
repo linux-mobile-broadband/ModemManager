@@ -1486,6 +1486,130 @@ mm_base_bearer_report_connection_status_detailed (MMBaseBearer             *self
 
 /*****************************************************************************/
 
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+typedef struct _SyncingContext SyncingContext;
+static void interface_syncing_step (GTask *task);
+
+typedef enum {
+    SYNCING_STEP_FIRST,
+    SYNCING_STEP_REFRESH_CONNECTION,
+    SYNCING_STEP_LAST
+} SyncingStep;
+
+struct _SyncingContext {
+    SyncingStep step;
+};
+
+gboolean
+mm_base_bearer_sync_finish (MMBaseBearer  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static gboolean
+reload_connection_status_finish (MMBaseBearer  *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+reload_connection_status_ready (MMBaseBearer *self,
+                                GAsyncResult *res,
+                                GTask        *task)
+{
+    SyncingContext    *ctx;
+    g_autoptr(GError)  error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    reload_connection_status_finish (self, res, &error);
+    if (error)
+        mm_obj_warn (self, "reloading connection status failed: %s", error->message);
+
+    /* Go on to the next step */
+    ctx->step++;
+    interface_syncing_step (task);
+}
+
+static void
+interface_syncing_step (GTask *task)
+{
+    MMBaseBearer   *self;
+    SyncingContext *ctx;
+
+    /* Don't run new steps if we're cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case SYNCING_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_REFRESH_CONNECTION:
+        /*
+         * AT+PPP based connections should not be synced.
+         * When a AT+PPP connection bearer is connected, the 'ignore_disconnection_reports' flag is set.
+         */
+        if (!self->priv->ignore_disconnection_reports) {
+            if (!MM_BASE_BEARER_GET_CLASS (self)->reload_connection_status)
+                mm_obj_warn (self, "unable to reload connection status, method not implemented");
+            else {
+                mm_obj_dbg (self, "refreshing connection status");
+                MM_BASE_BEARER_GET_CLASS (self)->reload_connection_status (self,
+                                                                           (GAsyncReadyCallback) reload_connection_status_ready,
+                                                                           task);
+                return;
+            }
+        }
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_LAST:
+        /* We are done without errors! */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        break;
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_base_bearer_sync (MMBaseBearer        *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    SyncingContext *ctx;
+    GTask          *task;
+
+    /* Create SyncingContext */
+    ctx = g_new0 (SyncingContext, 1);
+    ctx->step = SYNCING_STEP_FIRST;
+
+    /* Create sync steps task and execute it */
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+    interface_syncing_step (task);
+}
+
+#endif
+
+/*****************************************************************************/
+
 static gchar *
 log_object_build_id (MMLogObject *_self)
 {
