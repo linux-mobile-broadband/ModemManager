@@ -1602,45 +1602,57 @@ test_smoni_response_to_signal (void)
 typedef struct {
     const gchar            *str;
     MMCinterionModemFamily  modem_family;
-    gdouble                 expected_cid;
+    gboolean                success;
+    guint                   expected_cid;
 } ProvcfgResponseTest;
-
 
 static const ProvcfgResponseTest provcfg_response_tests[] = {
     {
 
         .str          = "^SCFG: \"MEopMode/Prov/Cfg\",\"vdfde\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .success      = TRUE,
         .expected_cid = 1,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"attus\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_IMT,
+        .success      = TRUE,
         .expected_cid = 1,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"2\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .success      = TRUE,
         .expected_cid = 3,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"vzwdcus\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .success      = TRUE,
         .expected_cid = 3,
     },
     {
 
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"tmode\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .success      = TRUE,
         .expected_cid = 2,
     },
     {
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"fallback*\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .success      = TRUE,
         .expected_cid = 1,
+    },
+    {
+        /* commas not allowed by the regex */
+        .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"something,with,commas\"",
+        .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .success      = FALSE,
     }
 };
 
@@ -1660,9 +1672,14 @@ test_provcfg_response (void)
                                                        NULL,
                                                        &cid,
                                                        &error);
-        g_assert_no_error (error);
-        g_assert (result);
-        g_assert_cmpuint (cid, ==, provcfg_response_tests[i].expected_cid);
+        if (provcfg_response_tests[i].success) {
+            g_assert_no_error (error);
+            g_assert (result);
+            g_assert_cmpuint (cid, ==, provcfg_response_tests[i].expected_cid);
+        } else {
+            g_assert (error);
+            g_assert (!result);
+        }
     }
 }
 
