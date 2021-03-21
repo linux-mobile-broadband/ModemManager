@@ -1636,6 +1636,11 @@ static const ProvcfgResponseTest provcfg_response_tests[] = {
         .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"tmode\"",
         .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
         .expected_cid = 2,
+    },
+    {
+        .str          = "* ^SCFG: \"MEopMode/Prov/Cfg\",\"fallback*\"",
+        .modem_family = MM_CINTERION_MODEM_FAMILY_DEFAULT,
+        .expected_cid = 1,
     }
 };
 
