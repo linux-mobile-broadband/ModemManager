@@ -2444,27 +2444,23 @@ MMPortQmi *
 mm_port_qmi_new (const gchar  *name,
                  MMPortSubsys  subsys)
 {
-    MMPortQmi *self;
-
-    self = MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
+    return MM_PORT_QMI (g_object_new (MM_TYPE_PORT_QMI,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, subsys,
                                       MM_PORT_TYPE, MM_PORT_TYPE_QMI,
                                       NULL));
-
-    /* load endpoint info as soon as kernel device is set */
-    self->priv->endpoint_info_signal_id = g_signal_connect (self,
-                                                            "notify::" MM_PORT_KERNEL_DEVICE,
-                                                            G_CALLBACK (initialize_endpoint_info),
-                                                            NULL);
-
-    return self;
 }
 
 static void
 mm_port_qmi_init (MMPortQmi *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_PORT_QMI, MMPortQmiPrivate);
+
+    /* load endpoint info as soon as kernel device is set */
+    self->priv->endpoint_info_signal_id = g_signal_connect (self,
+                                                            "notify::" MM_PORT_KERNEL_DEVICE,
+                                                            G_CALLBACK (initialize_endpoint_info),
+                                                            NULL);
 }
 
 static void
