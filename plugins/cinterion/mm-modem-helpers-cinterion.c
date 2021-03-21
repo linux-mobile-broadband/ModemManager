@@ -940,19 +940,23 @@ mm_cinterion_parse_sgauth_response (const gchar          *response,
 /*****************************************************************************/
 /* ^SMONG response parser */
 
-static MMModemAccessTechnology
-get_access_technology_from_smong_gprs_status (guint    gprs_status,
-                                              GError **error)
+static gboolean
+get_access_technology_from_smong_gprs_status (guint                     gprs_status,
+                                              MMModemAccessTechnology  *out,
+                                              GError                  **error)
 {
     switch (gprs_status) {
     case 0:
-        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        *out = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+        return TRUE;
     case 1:
     case 2:
-        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+        *out = MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+        return TRUE;
     case 3:
     case 4:
-        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+        *out = MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+        return TRUE;
     default:
         break;
     }
@@ -963,7 +967,7 @@ get_access_technology_from_smong_gprs_status (guint    gprs_status,
                  "Couldn't get network capabilities, "
                  "unsupported GPRS status value: '%u'",
                  gprs_status);
-    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    return FALSE;
 }
 
 gboolean
@@ -971,9 +975,10 @@ mm_cinterion_parse_smong_response (const gchar              *response,
                                    MMModemAccessTechnology  *access_tech,
                                    GError                  **error)
 {
-    GError     *inner_error = NULL;
-    GMatchInfo *match_info = NULL;
-    GRegex     *regex;
+    guint                  value = 0;
+    GError                *inner_error = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autoptr(GRegex)      regex;
 
     /* The AT^SMONG command returns a cell info table, where the second
      * column identifies the "GPRS status", which is exactly what we want.
@@ -992,26 +997,21 @@ mm_cinterion_parse_smong_response (const gchar              *response,
                          0, NULL);
     g_assert (regex);
 
-    if (g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, &inner_error)) {
-        guint value = 0;
-
-        if (!mm_get_uint_from_match_info (match_info, 2, &value))
-            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                       "Couldn't read 'GPRS status' field from AT^SMONG response");
-        else if (access_tech)
-            *access_tech = get_access_technology_from_smong_gprs_status (value, &inner_error);
-    }
-
-    g_match_info_free (match_info);
-    g_regex_unref (regex);
+    g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, &inner_error);
 
     if (inner_error) {
+        g_prefix_error (&inner_error, "Failed to match AT^SMONG response: ");
         g_propagate_error (error, inner_error);
         return FALSE;
     }
 
-    g_assert (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-    return TRUE;
+    if (!g_match_info_matches (match_info) || !mm_get_uint_from_match_info (match_info, 2, &value)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't read 'GPRS status' field from AT^SMONG response");
+        return FALSE;
+    }
+
+    return get_access_technology_from_smong_gprs_status (value, access_tech, error);
 }
 
 /*****************************************************************************/
