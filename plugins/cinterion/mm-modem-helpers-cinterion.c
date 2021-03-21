@@ -1514,12 +1514,24 @@ mm_cinterion_provcfg_response_to_cid (const gchar             *response,
     g_autoptr(GRegex)      r = NULL;
     g_autoptr(GMatchInfo)  match_info = NULL;
     g_autofree gchar      *mno = NULL;
+    GError                *inner_error = NULL;
 
     r = g_regex_new ("\\^SCFG:\\s*\"MEopMode/Prov/Cfg\",\\s*\"([0-9a-zA-Z*]*)\"", 0, 0, NULL);
     g_assert (r != NULL);
 
-    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, error))
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+
+    if (inner_error) {
+        g_prefix_error (&inner_error, "Failed to match Prov/Cfg response: ");
+        g_propagate_error (error, inner_error);
         return FALSE;
+    }
+
+    if (!g_match_info_matches (match_info)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Couldn't match Prov/Cfg response");
+        return FALSE;
+    }
 
     mno = mm_get_string_unquoted_from_match_info (match_info, 1);
     if (mno && modem_family == MM_CINTERION_MODEM_FAMILY_IMT) {
