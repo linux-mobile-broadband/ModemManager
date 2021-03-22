@@ -63,31 +63,8 @@
         This request may fail if the modem does not support additional bearers,
         if too many bearers are already defined, or if properties are invalid.
 
-        Allowed properties are:
-        <variablelist>
-        <varlistentry><term><literal>"apn"</literal></term>
-          <listitem><para>Access Point Name, given as a string value (signature <literal>"s"</literal>). Required in 3GPP.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"ip-type"</literal></term>
-          <listitem><para>Addressing type, given as a <link linkend="MMBearerIpFamily">MMBearerIpFamily</link> value (signature <literal>"u"</literal>). Optional in 3GPP and CDMA.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"allowed-auth"</literal></term>
-          <listitem><para>The authentication method to use, given as a <link linkend="MMBearerAllowedAuth">MMBearerAllowedAuth</link> value (signature <literal>"u"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"user"</literal></term>
-          <listitem><para>User name (if any) required by the network, given as a string value (signature <literal>"s"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"password"</literal></term>
-          <listitem><para>Password (if any) required by the network, given as a string value (signature <literal>"s"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"allow-roaming"</literal></term>
-          <listitem><para>Flag to tell whether connection is allowed during roaming, given as a boolean value (signature <literal>"b"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"rm-protocol"</literal></term>
-          <listitem><para>Protocol of the Rm interface, given as a <link linkend="MMModemCdmaRmProtocol">MMModemCdmaRmProtocol</link> value (signature <literal>"u"</literal>). Optional in CDMA.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"number"</literal></term>
-          <listitem><para>Number to dial for the data connection, given as a string value (signature <literal>"s"</literal>). Deprecated since version 1.10.0.</para></listitem></varlistentry>
-        <varlistentry><term><literal>"multiplex"</literal></term>
-          <listitem><para>Multiplex support requested by the user, given as a <link linkend="MMBearerMultiplexSupport">MMBearerMultiplexSupport</link> value (signature <literal>"u"</literal>). Since 1.18.</para></listitem></varlistentry>
-        </variablelist>
-
-        Some properties are only applicable to a bearer of certain access
-        technologies, for example the <literal>"apn"</literal> property is not
-        applicable to CDMA2000 Packet Data Session bearers.
+        The properties allowed are any of the ones defined in the
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Properties">bearer properties</link>.
     -->
     <method name="CreateBearer">
       <arg name="properties" type="a{sv}" direction="in"  />

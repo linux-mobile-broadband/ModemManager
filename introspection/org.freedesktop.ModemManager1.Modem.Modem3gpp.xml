@@ -106,19 +106,11 @@
 
         Updates the default settings to be used in the initial default EPS bearer when registering to the LTE network.
 
-        Allowed properties are:
-        <variablelist>
-        <varlistentry><term><literal>"apn"</literal></term>
-          <listitem><para>Access Point Name, given as a string value (signature <literal>"s"</literal>).</para></listitem></varlistentry>
-        <varlistentry><term><literal>"ip-type"</literal></term>
-          <listitem><para>Addressing type, given as a <link linkend="MMBearerIpFamily">MMBearerIpFamily</link> value (signature <literal>"u"</literal>).</para></listitem></varlistentry>
-        <varlistentry><term><literal>"allowed-auth"</literal></term>
-          <listitem><para>The authentication method to use, given as a <link linkend="MMBearerAllowedAuth">MMBearerAllowedAuth</link> value (signature <literal>"u"</literal>).</para></listitem></varlistentry>
-        <varlistentry><term><literal>"user"</literal></term>
-          <listitem><para>User name (if any) required by the network, given as a string value (signature <literal>"s"</literal>).</para></listitem></varlistentry>
-        <varlistentry><term><literal>"password"</literal></term>
-          <listitem><para>Password (if any) required by the network, given as a string value (signature <literal>"s"</literal>).</para></listitem></varlistentry>
-        </variablelist>
+        The allowed properties in this method are all the 3GPP-specific ones specified
+        in the <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Properties">bearer properties</link>;
+        i.e.: <literal>"apn"</literal>, <literal>"ip-type"</literal>,
+        <literal>"allowed-auth"</literal>, <literal>"user"</literal>, and
+        <literal>"password"</literal>.
     -->
     <method name="SetInitialEpsBearerSettings">
       <arg name="settings" type="a{sv}" direction="in" />

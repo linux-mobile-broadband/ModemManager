@@ -340,7 +340,95 @@
     <!--
         Properties:
 
-        List of properties used when creating the bearer.
+        List of settings used to create the bearer.
+
+        Bearers may be implicitly created (e.g. the default initial EPS bearer
+        created during the network registration process in 4G and 5G networks)
+        or explicitly created by the user (e.g. via the
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer()</link>
+        or <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">Connect()</link>
+        calls).
+
+        The following settings apply to 3GPP (GSM/UMTS/LTE/5GNR) devices:
+
+        <variablelist>
+          <varlistentry><term><literal>"apn"</literal></term>
+            <listitem><para>
+              The Access Point Name to use in the connection, given as a string
+              value (signature <literal>"s"</literal>).
+            </para></listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"ip-type"</literal></term>
+            <listitem>
+              The IP addressing type to use, given as a
+<link linkend="MMBearerIpFamily">MMBearerIpFamily</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"allowed-auth"</literal></term>
+            <listitem>
+              The authentication method to use, given as a
+              <link linkend="MMBearerAllowedAuth">MMBearerAllowedAuth</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"user"</literal></term>
+            <listitem>
+              The user name (if any) required by the network, given as a string
+              value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"password"</literal></term>
+            <listitem>
+              The password (if any) required by the network, given as a string
+              value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        The following settings apply to 3GPP2 (CDMA/EVDO) devices:
+
+        <variablelist>
+          <varlistentry><term><literal>"rm-protocol"</literal></term>
+            <listitem>
+              The protocol of the Rm interface, given as a
+              <link linkend="MMModemCdmaRmProtocol">MMModemCdmaRmProtocol</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        The following settings apply to all devices types:
+
+        <variablelist>
+          <varlistentry><term><literal>"allow-roaming"</literal></term>
+            <listitem>
+              Specifies whether the connections are allowed even when the device
+              is registered in a roaming network, given as a boolean value (signature
+              <literal>"b"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"multiplex"</literal></term>
+            <listitem>
+              The multiplex support requested by the user, given as a
+              <link linkend="MMBearerMultiplexSupport">MMBearerMultiplexSupport</link>
+              value (signature <literal>"u"</literal>). Since 1.18.
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        The following settings are no longer supported, but they are kept on the
+        interface for compatibility purposes:
+
+        <variablelist>
+          <varlistentry><term><literal>"number"</literal></term>
+            <listitem>
+              Number to dial for the data connection, given as a string value
+              (signature <literal>"s"</literal>).
+              Deprecated since version 1.10.0.
+            </listitem>
+          </varlistentry>
+        </variablelist>
     -->
     <property name="Properties" type="a{sv}" access="read" />
 
