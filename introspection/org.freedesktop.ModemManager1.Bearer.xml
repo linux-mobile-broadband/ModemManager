@@ -384,7 +384,7 @@
           <varlistentry><term><literal>"ip-type"</literal></term>
             <listitem>
               The IP addressing type to use, given as a
-<link linkend="MMBearerIpFamily">MMBearerIpFamily</link>
+              <link linkend="MMBearerIpFamily">MMBearerIpFamily</link>
               value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
