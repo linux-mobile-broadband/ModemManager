@@ -867,6 +867,16 @@ mm_common_get_multiplex_support_from_string (const gchar  *str,
                               error);
 }
 
+MMBearerApnType
+mm_common_get_apn_type_from_string (const gchar *str,
+                                    GError **error)
+{
+    return _flags_from_string (MM_TYPE_BEARER_APN_TYPE,
+                               str,
+                               MM_BEARER_APN_TYPE_NONE,
+                               error);
+}
+
 GArray *
 mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *variant)
 {

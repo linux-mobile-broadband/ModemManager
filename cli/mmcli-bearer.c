@@ -155,6 +155,7 @@ print_bearer_info (MMBearer *bearer)
     /* Properties */
     {
         const gchar *apn = NULL;
+        gchar       *apn_type_str = NULL;
         const gchar *roaming = NULL;
         gchar       *ip_family_str = NULL;
         const gchar *user = NULL;
@@ -164,6 +165,7 @@ print_bearer_info (MMBearer *bearer)
 
         if (properties) {
             apn              = mm_bearer_properties_get_apn (properties);
+            apn_type_str     = (properties ? mm_bearer_apn_type_build_string_from_mask (mm_bearer_properties_get_apn_type (properties)) : NULL);
             ip_family_str    = (properties ? mm_bearer_ip_family_build_string_from_mask (mm_bearer_properties_get_ip_type (properties)) : NULL);
             allowed_auth_str = (properties ? mm_bearer_allowed_auth_build_string_from_mask (mm_bearer_properties_get_allowed_auth (properties)) : NULL);
             user             = mm_bearer_properties_get_user (properties);
@@ -175,6 +177,7 @@ print_bearer_info (MMBearer *bearer)
         }
 
         mmcli_output_string           (MMC_F_BEARER_PROPERTIES_APN,          apn);
+        mmcli_output_string_take      (MMC_F_BEARER_PROPERTIES_APN_TYPE,     apn_type_str);
         mmcli_output_string           (MMC_F_BEARER_PROPERTIES_ROAMING,      roaming);
         mmcli_output_string_take      (MMC_F_BEARER_PROPERTIES_IP_TYPE,      ip_family_str);
         mmcli_output_string           (MMC_F_BEARER_PROPERTIES_USER,         user);

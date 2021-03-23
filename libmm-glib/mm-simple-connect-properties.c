@@ -327,6 +327,44 @@ mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_simple_connect_properties_set_apn_type:
+ * @self: a #MMSimpleConnectProperties.
+ * @apn_type: a mask of #MMBearerApnType values.
+ *
+ * Sets the APN types to use.
+ *
+ * Since: 1.18
+ */
+void
+mm_simple_connect_properties_set_apn_type (MMSimpleConnectProperties *self,
+                                           MMBearerApnType            apn_type)
+{
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
+    mm_bearer_properties_set_apn_type (self->priv->bearer_properties, apn_type);
+}
+
+/**
+ * mm_simple_connect_properties_get_apn_type:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the APN types to use.
+ *
+ * Returns: a mask of #MMBearerApnType values.
+ *
+ * Since: 1.18
+ */
+MMBearerApnType
+mm_simple_connect_properties_get_apn_type (MMSimpleConnectProperties *self)
+{
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), MM_BEARER_APN_TYPE_NONE);
+
+    return mm_bearer_properties_get_apn_type (self->priv->bearer_properties);
+}
+
+/*****************************************************************************/
+
+/**
  * mm_simple_connect_properties_set_allow_roaming:
  * @self: a #MMSimpleConnectProperties.
  * @allow_roaming: boolean value.

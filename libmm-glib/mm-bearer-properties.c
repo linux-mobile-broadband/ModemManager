@@ -38,6 +38,7 @@ G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT);
 #define PROPERTY_USER            "user"
 #define PROPERTY_PASSWORD        "password"
 #define PROPERTY_IP_TYPE         "ip-type"
+#define PROPERTY_APN_TYPE        "apn-type"
 #define PROPERTY_ALLOW_ROAMING   "allow-roaming"
 #define PROPERTY_RM_PROTOCOL     "rm-protocol"
 #define PROPERTY_MULTIPLEX       "multiplex"
@@ -50,6 +51,8 @@ struct _MMBearerPropertiesPrivate {
     gchar *apn;
     /* IP type */
     MMBearerIpFamily ip_type;
+    /* APN type */
+    MMBearerApnType apn_type;
     /* Allowed auth */
     MMBearerAllowedAuth allowed_auth;
     /* User */
@@ -267,6 +270,44 @@ mm_bearer_properties_get_ip_type (MMBearerProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_bearer_properties_set_apn_type:
+ * @self: a #MMBearerProperties.
+ * @apn_type: a mask of #MMBearerApnType values.
+ *
+ * Sets the APN types to use.
+ *
+ * Since: 1.18
+ */
+void
+mm_bearer_properties_set_apn_type (MMBearerProperties *self,
+                                   MMBearerApnType apn_type)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    self->priv->apn_type = apn_type;
+}
+
+/**
+ * mm_bearer_properties_get_apn_type:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the APN types to use.
+ *
+ * Returns: a mask of #MMBearerApnType values.
+ *
+ * Since: 1.18
+ */
+MMBearerApnType
+mm_bearer_properties_get_apn_type (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_APN_TYPE_NONE);
+
+    return self->priv->apn_type;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_properties_set_allow_roaming:
  * @self: a #MMBearerProperties.
  * @allow_roaming: boolean value.
@@ -476,6 +517,12 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
                                PROPERTY_IP_TYPE,
                                g_variant_new_uint32 (self->priv->ip_type));
 
+    if (self->priv->apn_type != MM_BEARER_APN_TYPE_NONE)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_APN_TYPE,
+                               g_variant_new_uint32 (self->priv->apn_type));
+
     if (self->priv->allow_roaming_set)
         g_variant_builder_add (&builder,
                                "{sv}",
@@ -536,6 +583,16 @@ mm_bearer_properties_consume_string (MMBearerProperties *self,
             return FALSE;
         }
         mm_bearer_properties_set_ip_type (self, ip_type);
+    } else if (g_str_equal (key, PROPERTY_APN_TYPE)) {
+        GError *inner_error = NULL;
+        MMBearerApnType apn_type;
+
+        apn_type = mm_common_get_apn_type_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_bearer_properties_set_apn_type (self, apn_type);
     } else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
         GError *inner_error = NULL;
         gboolean allow_roaming;
@@ -655,6 +712,10 @@ mm_bearer_properties_consume_variant (MMBearerProperties *properties,
         mm_bearer_properties_set_ip_type (
             properties,
             g_variant_get_uint32 (value));
+    else if (g_str_equal (key, PROPERTY_APN_TYPE))
+        mm_bearer_properties_set_apn_type (
+            properties,
+            g_variant_get_uint32 (value));
     else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING))
         mm_bearer_properties_set_allow_roaming (
             properties,
@@ -763,6 +824,23 @@ cmp_ip_type (MMBearerIpFamily           a,
 }
 
 static gboolean
+cmp_apn_type (MMBearerApnType            a,
+              MMBearerApnType            b,
+              MMBearerPropertiesCmpFlags flags)
+{
+    /* Strict match */
+    if (a == b)
+        return TRUE;
+    /* Additional loose match NONE == DEFAULT */
+    if (flags & MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE) {
+        if ((a == MM_BEARER_APN_TYPE_NONE && b == MM_BEARER_APN_TYPE_DEFAULT) ||
+            (b == MM_BEARER_APN_TYPE_NONE && a == MM_BEARER_APN_TYPE_DEFAULT))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean
 cmp_allowed_auth (MMBearerAllowedAuth        a,
                   MMBearerAllowedAuth        b,
                   MMBearerPropertiesCmpFlags flags)
@@ -813,8 +891,11 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
     if (!cmp_allowed_auth (a->priv->allowed_auth, b->priv->allowed_auth, flags))
         return FALSE;
     if (!cmp_str (a->priv->user, b->priv->user, flags))
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE) &&
+        !cmp_apn_type (a->priv->apn_type, b->priv->apn_type, flags))
         return FALSE;
-    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD) && !cmp_str (a->priv->password, b->priv->password, flags))
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD) &&
+        !cmp_str (a->priv->password, b->priv->password, flags))
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING)) {
         if (a->priv->allow_roaming != b->priv->allow_roaming)
@@ -861,6 +942,7 @@ mm_bearer_properties_init (MMBearerProperties *self)
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
     self->priv->allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
     self->priv->ip_type = MM_BEARER_IP_FAMILY_NONE;
+    self->priv->apn_type = MM_BEARER_APN_TYPE_NONE;
     self->priv->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN;
 }
 

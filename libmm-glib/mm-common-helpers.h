@@ -85,6 +85,9 @@ MMModemAccessTechnology mm_common_get_access_technology_from_string (const gchar
 MMBearerMultiplexSupport mm_common_get_multiplex_support_from_string (const gchar  *str,
                                                                       GError      **error);
 
+MMBearerApnType mm_common_get_apn_type_from_string (const gchar *str,
+                                                    GError **error);
+
 GArray          *mm_common_ports_variant_to_garray (GVariant *variant);
 MMModemPortInfo *mm_common_ports_variant_to_array  (GVariant *variant,
                                                  guint *n_ports);

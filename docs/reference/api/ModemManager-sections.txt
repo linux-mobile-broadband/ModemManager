@@ -15,6 +15,7 @@ MMBearerIpFamily
 MMBearerIpMethod
 MMBearerAllowedAuth
 MMBearerMultiplexSupport
+MMBearerApnType
 MMCallDirection
 MMCallState
 MMCallStateReason

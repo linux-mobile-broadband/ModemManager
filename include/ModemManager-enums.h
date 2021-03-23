@@ -1544,4 +1544,55 @@ typedef enum { /*< underscore_name=mm_bearer_multiplex_support >*/
     MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED  = 3,
 } MMBearerMultiplexSupport;
 
+/**
+ * MMBearerApnType:
+ * @MM_BEARER_APN_TYPE_NONE: Unknown or unsupported.
+ * @MM_BEARER_APN_TYPE_INITIAL: APN used for the initial attach procedure.
+ * @MM_BEARER_APN_TYPE_DEFAULT: Default connection APN providing access to the Internet.
+ * @MM_BEARER_APN_TYPE_IMS: APN providing access to IMS services.
+ * @MM_BEARER_APN_TYPE_MMS: APN providing access to MMS services.
+ * @MM_BEARER_APN_TYPE_MANAGEMENT: APN providing access to over-the-air device management procedures.
+ * @MM_BEARER_APN_TYPE_VOICE: APN providing access to voice-over-IP services.
+ * @MM_BEARER_APN_TYPE_EMERGENCY: APN providing access to emergency services.
+ * @MM_BEARER_APN_TYPE_PRIVATE: APN providing access to private networks.
+ *
+ * Purpose of the APN used in a given Bearer.
+ *
+ * This information may be stored in the device configuration (e.g. if carrier
+ * specific configurations have been enabled for the SIM in use), or provided
+ * explicitly by the user.
+ *
+ * If the mask of types includes %MM_BEARER_APN_TYPE_DEFAULT, it is expected
+ * that the connection manager will include a default route through the specific
+ * bearer connection to the public Internet.
+ *
+ * For any other mask type, it is expected that the connection manager will
+ * not setup a default route and will therefore require additional custom
+ * routing rules to provide access to the different services. E.g. a bearer
+ * connected with %MM_BEARER_APN_TYPE_MMS will probably require an explicit
+ * additional route in the host to access the MMSC server at the address
+ * specified by the operator. If this address relies on a domain name instead
+ * of a fixed IP address, the name resolution should be performed using the
+ * DNS servers specified in the corresponding bearer connection settings.
+ *
+ * If not explicitly specified during a connection attempt, the connection
+ * manager should be free to treat it with its own logic. E.g. a good default
+ * could be to treat the first connection as %MM_BEARER_APN_TYPE_DEFAULT (with
+ * a default route) and any other additional connection as
+ * %MM_BEARER_APN_TYPE_PRIVATE (without a default route).
+ *
+ * Since: 1.18
+ */
+typedef enum { /*< underscore_name=mm_bearer_apn_type >*/
+    MM_BEARER_APN_TYPE_NONE       = 0,
+    MM_BEARER_APN_TYPE_INITIAL    = 1 << 0,
+    MM_BEARER_APN_TYPE_DEFAULT    = 1 << 1,
+    MM_BEARER_APN_TYPE_IMS        = 1 << 2,
+    MM_BEARER_APN_TYPE_MMS        = 1 << 3,
+    MM_BEARER_APN_TYPE_MANAGEMENT = 1 << 4,
+    MM_BEARER_APN_TYPE_VOICE      = 1 << 5,
+    MM_BEARER_APN_TYPE_EMERGENCY  = 1 << 6,
+    MM_BEARER_APN_TYPE_PRIVATE    = 1 << 7,
+} MMBearerApnType;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

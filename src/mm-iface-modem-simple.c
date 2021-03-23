@@ -691,6 +691,7 @@ connect_auth_ready (MMBaseModem *self,
     {
         MMBearerMultiplexSupport  multiplex;
         MMBearerAllowedAuth       allowed_auth;
+        MMBearerApnType           apn_type;
         gchar                    *str;
         MMBearerIpFamily          ip_family;
 
@@ -700,6 +701,14 @@ connect_auth_ready (MMBaseModem *self,
         mm_obj_dbg (self, "   operator ID: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_operator_id (ctx->properties)));
         mm_obj_dbg (self, "   allowed roaming: %s", mm_simple_connect_properties_get_allow_roaming (ctx->properties) ? "yes" : "no");
         mm_obj_dbg (self, "   APN: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_apn (ctx->properties)));
+
+        apn_type = mm_simple_connect_properties_get_apn_type (ctx->properties);
+        if (apn_type != MM_BEARER_APN_TYPE_NONE) {
+            str = mm_bearer_apn_type_build_string_from_mask (apn_type);
+            mm_obj_dbg (self, "   APN type: %s", str);
+            g_free (str);
+        } else
+            mm_obj_dbg (self, "   APN type: %s", VALIDATE_UNSPECIFIED (NULL));
 
         ip_family = mm_simple_connect_properties_get_ip_type (ctx->properties);
         if (ip_family != MM_BEARER_IP_FAMILY_NONE) {

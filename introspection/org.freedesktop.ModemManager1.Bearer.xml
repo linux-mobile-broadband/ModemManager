@@ -388,6 +388,13 @@
               value (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"apn-type"</literal></term>
+            <listitem>
+              The purposes of the specified APN, given as a
+              <link linkend="MMBearerApnType">MMBearerApnType</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
           <varlistentry><term><literal>"allowed-auth"</literal></term>
             <listitem>
               The authentication method to use, given as a
