@@ -3033,6 +3033,77 @@ mm_gdbus_modem_voice_skeleton_get_type
 </SECTION>
 
 <SECTION>
+<FILE>MmGdbusModemSar</FILE>
+<TITLE>MmGdbusModemSar</TITLE>
+MmGdbusModemSar
+MmGdbusModemSarIface
+<SUBSECTION Getters>
+mm_gdbus_modem_sar_get_power_level
+mm_gdbus_modem_sar_get_state
+<SUBSECTION Methods>
+mm_gdbus_modem_sar_call_enable
+mm_gdbus_modem_sar_call_enable_finish
+mm_gdbus_modem_sar_call_enable_sync
+mm_gdbus_modem_sar_call_set_power_level
+mm_gdbus_modem_sar_call_set_power_level_finish
+mm_gdbus_modem_sar_call_set_power_level_sync
+<SUBSECTION Private>
+mm_gdbus_modem_sar_set_power_level
+mm_gdbus_modem_sar_set_state
+mm_gdbus_modem_sar_interface_info
+mm_gdbus_modem_sar_override_properties
+mm_gdbus_modem_sar_complete_enable
+mm_gdbus_modem_sar_complete_set_power_level
+<SUBSECTION Standard>
+MM_GDBUS_IS_MODEM_SAR
+MM_GDBUS_MODEM_SAR
+MM_GDBUS_MODEM_SAR_GET_IFACE
+MM_GDBUS_TYPE_MODEM_SAR
+mm_gdbus_modem_sar_get_type
+</SECTION>
+
+<SECTION>
+<FILE>MmGdbusModemSarProxy</FILE>
+<TITLE>MmGdbusModemSarProxy</TITLE>
+MmGdbusModemSarProxy
+<SUBSECTION New>
+mm_gdbus_modem_sar_proxy_new
+mm_gdbus_modem_sar_proxy_new_finish
+mm_gdbus_modem_sar_proxy_new_for_bus
+mm_gdbus_modem_sar_proxy_new_for_bus_finish
+mm_gdbus_modem_sar_proxy_new_for_bus_sync
+mm_gdbus_modem_sar_proxy_new_sync
+<SUBSECTION Standard>
+MmGdbusModemSarProxyClass
+MM_GDBUS_IS_MODEM_SAR_PROXY
+MM_GDBUS_IS_MODEM_SAR_PROXY_CLASS
+MM_GDBUS_MODEM_SAR_PROXY
+MM_GDBUS_MODEM_SAR_PROXY_CLASS
+MM_GDBUS_MODEM_SAR_PROXY_GET_CLASS
+MM_GDBUS_TYPE_MODEM_SAR_PROXY
+MmGdbusModemSarProxyPrivate
+mm_gdbus_modem_sar_proxy_get_type
+</SECTION>
+
+<SECTION>
+<FILE>MmGdbusModemSarSkeleton</FILE>
+<TITLE>MmGdbusModemSarSkeleton</TITLE>
+MmGdbusModemSarSkeleton
+<SUBSECTION New>
+mm_gdbus_modem_sar_skeleton_new
+<SUBSECTION Standard>
+MmGdbusModemSarSkeletonClass
+MM_GDBUS_IS_MODEM_SAR_SKELETON
+MM_GDBUS_IS_MODEM_SAR_SKELETON_CLASS
+MM_GDBUS_MODEM_SAR_SKELETON
+MM_GDBUS_MODEM_SAR_SKELETON_CLASS
+MM_GDBUS_MODEM_SAR_SKELETON_GET_CLASS
+MM_GDBUS_TYPE_MODEM_SAR_SKELETON
+MmGdbusModemSarSkeletonPrivate
+mm_gdbus_modem_sar_skeleton_get_type
+</SECTION>
+
+<SECTION>
 <FILE>MmGdbusObject</FILE>
 <TITLE>MmGdbusObject</TITLE>
 MmGdbusObject
@@ -3062,6 +3133,8 @@ mm_gdbus_object_peek_modem_signal
 mm_gdbus_object_get_modem_signal
 mm_gdbus_object_peek_modem_voice
 mm_gdbus_object_get_modem_voice
+mm_gdbus_object_peek_modem_sar
+mm_gdbus_object_get_modem_sar
 <SUBSECTION Methods>
 <SUBSECTION Private>
 <SUBSECTION Standard>
@@ -3109,6 +3182,7 @@ mm_gdbus_object_skeleton_set_modem_simple
 mm_gdbus_object_skeleton_set_modem_time
 mm_gdbus_object_skeleton_set_modem_signal
 mm_gdbus_object_skeleton_set_modem_voice
+mm_gdbus_object_skeleton_set_modem_sar
 <SUBSECTION Standard>
 MmGdbusObjectSkeletonClass
 MM_GDBUS_IS_OBJECT_SKELETON
