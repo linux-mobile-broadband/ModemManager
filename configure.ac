@@ -222,7 +222,7 @@ dnl-----------------------------------------------------------------------------
 dnl udev support (enabled by default)
 dnl
 
-GUDEV_VERSION=147
+GUDEV_VERSION=232
 
 AC_ARG_WITH(udev, AS_HELP_STRING([--without-udev], [Build without udev support]), [], [with_udev=yes])
 AM_CONDITIONAL(WITH_UDEV, test "x$with_udev" = "xyes")
