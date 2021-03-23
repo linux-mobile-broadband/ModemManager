@@ -35,6 +35,8 @@
         retrieved either by listening for the
         #org.freedesktop.ModemManager1.Modem.Messaging::Added signal,
         or by querying the specific SMS object of interest.
+
+        Since: 1.0
     -->
     <method name="List">
       <arg name="result" type="ao" direction="out" />
@@ -45,6 +47,8 @@
         @path: The object path of the SMS to delete.
 
         Delete an SMS message.
+
+        Since: 1.0
     -->
     <method name="Delete">
       <arg name="path" type="o" direction="in" />
@@ -65,6 +69,8 @@
 
         If the SMSC is not specified and one is required, the default SMSC is
         used.
+
+        Since: 1.0
     -->
     <method name="Create">
       <arg name="properties" type="a{sv}" direction="in"  />
@@ -84,6 +90,8 @@
         Check the
         '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.State">State</link>'
         property to determine if the message is complete.
+
+        Since: 1.0
     -->
     <signal name="Added">
       <arg name="path" type="o" />
@@ -95,6 +103,8 @@
         @path: Object path of the now deleted SMS.
 
         Emitted when a message has been deleted.
+
+        Since: 1.0
     -->
     <signal name="Deleted">
       <arg name="path" type="o" />
@@ -104,6 +114,8 @@
         Messages:
 
         The list of SMS object paths.
+
+        Since: 1.2
     -->
     <property name="Messages" type="ao" access="read" />
 
@@ -113,6 +125,8 @@
         A list of <link linkend="MMSmsStorage">MMSmsStorage</link> values,
         specifying the storages supported by this modem for storing and
         receiving SMS.
+
+        Since: 1.0
     -->
     <property name="SupportedStorages" type="au" access="read" />
 
@@ -121,6 +135,8 @@
 
         A <link linkend="MMSmsStorage">MMSmsStorage</link> value,
         specifying the storage to be used when receiving or storing SMS.
+
+        Since: 1.0
     -->
     <property name="DefaultStorage" type="u" access="read" />
 

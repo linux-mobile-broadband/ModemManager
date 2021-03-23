@@ -34,6 +34,8 @@
 
         When disabled, the modem enters low-power state and no network-related
         operations are available.
+
+        Since: 1.0
     -->
     <method name="Enable">
       <arg name="enable" type="b" direction="in" />
@@ -45,6 +47,8 @@
 
         List configured packet data bearers (EPS Bearers, PDP Contexts, or
         CDMA2000 Packet Data Sessions).
+
+        Since: 1.0
 
         Deprecated: 1.10.0. Use #org.freedesktop.ModemManager1.Modem:Bearers
         property instead.
@@ -65,6 +69,8 @@
 
         The properties allowed are any of the ones defined in the
         <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Properties">bearer properties</link>.
+
+        Since: 1.0
     -->
     <method name="CreateBearer">
       <arg name="properties" type="a{sv}" direction="in"  />
@@ -79,6 +85,8 @@
 
         If the bearer is currently active and providing packet data server, it
         will be disconnected and that packet data service will terminate.
+
+        Since: 1.0
     -->
     <method name="DeleteBearer">
       <arg name="bearer" type="o" direction="in" />
@@ -91,6 +99,8 @@
         a newly-powered-on state.
 
         This command may power-cycle the device.
+
+        Since: 1.0
     -->
     <method name="Reset" />
 
@@ -104,6 +114,8 @@
         If not required by the modem, @code may be ignored.
 
         This command may or may not power-cycle the device.
+
+        Since: 1.0
     -->
     <method name="FactoryReset">
       <arg name="code" type="s" direction="in" />
@@ -116,6 +128,8 @@
         Set the power state of the modem. This action can only be run when the
         modem is in <link linkend="MM-MODEM-STATE-DISABLED:CAPS"><constant>MM_MODEM_STATE_DISABLED</constant></link>
         state.
+
+        Since: 1.0
     -->
     <method name="SetPowerState">
       <arg name="state" type="u" direction="in" />
@@ -131,6 +145,8 @@
         #org.freedesktop.ModemManager1.Modem:SupportedCapabilities property.
 
         This command may power-cycle the device.
+
+        Since: 1.0
     -->
     <method name="SetCurrentCapabilities">
       <arg name="capabilities" type="u" direction="in" />
@@ -145,6 +161,8 @@
 
         The given combination should be supported by the modem, as specified in the
         #org.freedesktop.ModemManager1.Modem:SupportedModes property.
+
+        Since: 1.0
     -->
     <method name="SetCurrentModes">
       <arg name="modes" type="(uu)" direction="in" />
@@ -156,6 +174,8 @@
 
         Set the radio frequency and technology bands the device is currently
         allowed to use when connecting to a network.
+
+        Since: 1.0
     -->
     <method name="SetCurrentBands">
       <arg name="bands" type="au" direction="in" />
@@ -174,22 +194,26 @@
 
         There is no limitation on which SIM slot to select, so the user may also set as
 	primary a slot that doesn't currently have any valid SIM card inserted.
+
+        Since: 1.16
     -->
     <method name="SetPrimarySimSlot">
       <arg name="sim_slot" type="u" direction="in" />
     </method>
 
     <!--
-       Command:
-       @cmd: The command string, e.g. "AT+GCAP" or "+GCAP" (leading AT is inserted if necessary).
-       @timeout: The number of seconds to wait for a response.
-       @response: The modem's response.
+        Command:
+        @cmd: The command string, e.g. "AT+GCAP" or "+GCAP" (leading AT is inserted if necessary).
+        @timeout: The number of seconds to wait for a response.
+        @response: The modem's response.
 
-       Send an arbitrary AT command to a modem and get the response.
+        Send an arbitrary AT command to a modem and get the response.
 
-       Note that using this interface call is only allowed when running
-       ModemManager in debug mode or if the project was built using
-       the <literal>with-at-command-via-dbus</literal> configure option.
+        Note that using this interface call is only allowed when running
+        ModemManager in debug mode or if the project was built using
+        the <literal>with-at-command-via-dbus</literal> configure option.
+
+        Since: 1.0
       -->
     <method name="Command">
       <arg name="cmd"      type="s" direction="in"  />
@@ -204,6 +228,8 @@
         @reason: A <link linkend="MMModemStateChangeReason">MMModemStateChangeReason</link> value, specifying the reason for this state change.
 
         The modem's state (see #org.freedesktop.ModemManager1.Modem:State) changed.
+
+        Since: 1.0
     -->
     <signal name="StateChanged">
       <arg name="old"    type="i" />
@@ -224,6 +250,8 @@
         supported, the #org.freedesktop.ModemManager1.Modem.PrimarySimSlot
         index value specifies which is the slot number where this SIM card
         is available.
+
+        Since: 1.0
     -->
     <property name="Sim" type="o" access="read" />
 
@@ -241,6 +269,8 @@
         This list includes the SIM object considered as primary active SIM slot
         (#org.freedesktop.ModemManager1.Modem.Sim) at index
         #org.freedesktop.ModemManager1.Modem.ActiveSimSlot.
+
+        Since: 1.16
     -->
     <property name="SimSlots" type="ao" access="read" />
 
@@ -260,6 +290,8 @@
         In a Multi SIM Multi Standby setup, this index identifies the active SIM
         that is considered primary, i.e. the one that will be used when a data
         connection is setup.
+
+        Since: 1.16
     -->
     <property name="PrimarySimSlot" type="u" access="read" />
 
@@ -271,6 +303,8 @@
 
         This list does not include the initial EPS bearer details (see
         #org.freedesktop.ModemManager1.Modem.Modem3gpp:InitialEpsBearer).
+
+        Since: 1.2
     -->
     <property name="Bearers" type="ao" access="read" />
 
@@ -288,6 +322,8 @@
         Only multimode devices implementing both 3GPP (GSM/UMTS/LTE/5GNR) and
         3GPP2 (CDMA/EVDO) specs will report more than one combination of
         capabilities.
+
+        Since: 1.0
     -->
     <property name="SupportedCapabilities" type="au" access="read" />
 
@@ -300,6 +336,8 @@
 
         This bitmask will be one of the ones listed in
         #org.freedesktop.ModemManager1.Modem:SupportedCapabilities.
+
+        Since: 1.0
     -->
     <property name="CurrentCapabilities" type="u" access="read" />
 
@@ -320,6 +358,8 @@
         implementations is always equal to the value in
         #org.freedesktop.ModemManager1.Modem:MaxActiveBearers, so there is no
         point in using this property.
+
+        Since: 1.0
     -->
     <property name="MaxBearers" type="u" access="read" />
 
@@ -334,6 +374,8 @@
         and LTE/5GNR capable devices (including 3GPP+3GPP3 multimode devices) may support
         one or more active bearers, depending on the amount of physical ports exposed
         by the device.
+
+        Since: 1.0
     -->
     <property name="MaxActiveBearers" type="u" access="read" />
 
@@ -347,6 +389,8 @@
 
         If the modem doesn't support multiplexing of data sessiones, a value of 0 will
         be reported.
+
+        Since: 1.18
     -->
     <property name="MaxActiveMultiplexedBearers" type="u" access="read" />
 
@@ -354,6 +398,8 @@
         Manufacturer:
 
         The equipment manufacturer, as reported by the modem.
+
+        Since: 1.0
     -->
     <property name="Manufacturer" type="s" access="read" />
 
@@ -361,6 +407,8 @@
         Model:
 
         The equipment model, as reported by the modem.
+
+        Since: 1.0
     -->
     <property name="Model" type="s" access="read" />
 
@@ -368,6 +416,8 @@
         Revision:
 
         The revision identification of the software, as reported by the modem.
+
+        Since: 1.0
     -->
     <property name="Revision" type="s" access="read" />
 
@@ -375,6 +425,8 @@
         CarrierConfiguration:
 
         The description of the carrier-specific configuration (MCFG) in use by the modem.
+
+        Since: 1.12
     -->
     <property name="CarrierConfiguration" type="s" access="read" />
 
@@ -382,6 +434,8 @@
         CarrierConfigurationRevision:
 
         The revision identification of the carrier-specific configuration (MCFG) in use by the modem.
+
+        Since: 1.12
     -->
     <property name="CarrierConfigurationRevision" type="s" access="read" />
 
@@ -389,6 +443,8 @@
         HardwareRevision:
 
         The revision identification of the hardware, as reported by the modem.
+
+        Since: 1.8
     -->
     <property name="HardwareRevision" type="s" access="read" />
 
@@ -405,6 +461,8 @@
 
         This is not the device's IMEI or ESN since those may not be available
         before unlocking the device via a PIN.
+
+        Since: 1.0
     -->
     <property name="DeviceIdentifier" type="s" access="read" />
 
@@ -419,6 +477,8 @@
 
         This value may also be set by the user using the MM_ID_PHYSDEV_UID udev
         tag (e.g. binding the tag to a specific sysfs path).
+
+        Since: 1.0
     -->
     <property name="Device" type="s" access="read" />
 
@@ -427,6 +487,8 @@
 
         The Operating System device drivers handling communication with the modem
         hardware.
+
+        Since: 1.0
     -->
     <property name="Drivers" type="as" access="read" />
 
@@ -434,6 +496,8 @@
         Plugin:
 
         The name of the plugin handling this modem.
+
+        Since: 1.0
     -->
     <property name="Plugin" type="s" access="read" />
 
@@ -441,6 +505,8 @@
         PrimaryPort:
 
         The name of the primary port using to control the modem.
+
+        Since: 1.0
     -->
     <property name="PrimaryPort" type="s" access="read" />
 
@@ -451,6 +517,8 @@
         integer pairs. The string is the port name or path, and the integer is
         the port type given as a
         <link linkend="MMModemPortType">MMModemPortType</link> value.
+
+        Since: 1.0
     -->
     <property name="Ports" type="a(su)" access="read" />
 
@@ -461,6 +529,8 @@
 
         This will be the IMEI number for GSM devices and the hex-format ESN/MEID
         for CDMA devices.
+
+        Since: 1.0
     -->
     <property name="EquipmentIdentifier" type="s" access="read" />
 
@@ -469,6 +539,8 @@
 
         Current lock state of the device, given as a
         <link linkend="MMModemLock">MMModemLock</link> value.
+
+        Since: 1.0
     -->
     <property name="UnlockRequired" type="u" access="read" />
 
@@ -480,6 +552,8 @@
         before the code becomes blocked (requiring a PUK) or permanently blocked. Dictionary
         entries exist only for the codes for which the modem is able to report retry
         counts.
+
+        Since: 1.0
      -->
     <property name="UnlockRetries" type="a{uu}" access="read" />
 
@@ -492,6 +566,8 @@
         If the device's state cannot be determined,
         <link linkend="MM-MODEM-STATE-UNKNOWN:CAPS"><constant>MM_MODEM_STATE_UNKNOWN</constant></link>
         will be reported.
+
+        Since: 1.0
     -->
     <property name="State" type="i" access="read" />
 
@@ -502,6 +578,8 @@
         <link linkend="MM-MODEM-STATE-FAILED:CAPS"><constant>MM_MODEM_STATE_FAILED</constant></link>
         state, given as a
         <link linkend="MMModemStateFailedReason">MMModemStateFailedReason</link> value.
+
+        Since: 1.0
     -->
     <property name="StateFailedReason" type="u" access="read" />
 
@@ -515,6 +593,8 @@
         If the device's access technology cannot be determined,
         <link linkend="MM-MODEM-ACCESS-TECHNOLOGY-UNKNOWN:CAPS"><constant>MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN</constant></link>
         will be reported.
+
+        Since: 1.0
     -->
     <property name="AccessTechnologies" type="u" access="read" />
 
@@ -527,6 +607,8 @@
 
         The additional boolean value indicates if the quality value given was
         recently taken.
+
+        Since: 1.0
     -->
     <property name="SignalQuality" type="(ub)" access="read" />
 
@@ -535,6 +617,8 @@
 
         List of numbers (e.g. MSISDN in 3GPP) being currently handled by this
         modem.
+
+        Since: 1.0
     -->
     <property name="OwnNumbers" type="as" access="read" />
 
@@ -543,6 +627,8 @@
 
         A <link linkend="MMModemPowerState">MMModemPowerState</link> value
         specifying the current power state of the modem.
+
+        Since: 1.0
     -->
     <property name="PowerState" type="u" access="read" />
 
@@ -566,6 +652,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <property name="SupportedModes" type="a(uu)" access="read" />
 
@@ -579,6 +667,8 @@
 
         The pair must be one of those specified in
         #org.freedesktop.ModemManager1.Modem:SupportedModes.
+
+        Since: 1.0
     -->
     <property name="CurrentModes" type="(uu)" access="read" />
 
@@ -592,6 +682,8 @@
         For POTS devices, only the
         <link linkend="MM-MODEM-BAND-ANY:CAPS"><constant>MM_MODEM_BAND_ANY</constant></link>
         mode will be returned.
+
+        Since: 1.0
     -->
     <property name="SupportedBands" type="au" access="read" />
 
@@ -603,6 +695,8 @@
         currently using when connecting to a network.
 
         It must be a subset of #org.freedesktop.ModemManager1.Modem:SupportedBands.
+
+        Since: 1.0
     -->
     <property name="CurrentBands" type="au" access="read" />
 
@@ -611,6 +705,8 @@
 
         Bitmask of <link linkend="MMBearerIpFamily">MMBearerIpFamily</link> values,
         specifying the IP families supported by the device.
+
+        Since: 1.0
     -->
     <property name="SupportedIpFamilies" type="u" access="read" />
 

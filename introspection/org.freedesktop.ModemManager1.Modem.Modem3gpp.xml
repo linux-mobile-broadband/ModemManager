@@ -30,6 +30,8 @@
         @operator_id: The operator ID (ie, <literal>"MCCMNC"</literal>, like <literal>"310260"</literal>) to register. An empty string can be used to register to the home network.
 
         Request registration with a given mobile network.
+
+        Since: 1.0
     -->
     <method name="Register">
       <arg name="operator_id" type="s" direction="in" />
@@ -85,6 +87,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <method name="Scan">
       <arg name="results" type="aa{sv}" direction="out" />
@@ -95,6 +99,8 @@
         @mode: a <link linkend="MMModem3gppEpsUeModeOperation">MMModem3gppEpsUeModeOperation</link>.
 
         Sets the UE mode of operation for EPS.
+
+        Since: 1.10
     -->
     <method name="SetEpsUeModeOperation">
       <arg name="mode" type="u" direction="in" />
@@ -111,6 +117,8 @@
         i.e.: <literal>"apn"</literal>, <literal>"ip-type"</literal>,
         <literal>"allowed-auth"</literal>, <literal>"user"</literal>, and
         <literal>"password"</literal>.
+
+        Since: 1.10
     -->
     <method name="SetInitialEpsBearerSettings">
       <arg name="settings" type="a{sv}" direction="in" />
@@ -120,6 +128,8 @@
         Imei:
 
         The <ulink url="http://en.wikipedia.org/wiki/Imei">IMEI</ulink> of the device.
+
+        Since: 1.0
     -->
     <property name="Imei" type="s" access="read" />
 
@@ -129,6 +139,8 @@
         A <link linkend="MMModem3gppRegistrationState">MMModem3gppRegistrationState</link>
         value specifying the mobile registration status as defined in 3GPP TS 27.007
         section 10.1.19.
+
+        Since: 1.0
     -->
     <property name="RegistrationState" type="u" access="read" />
 
@@ -145,6 +157,8 @@
         If the <literal>MCC</literal> and <literal>MNC</literal> are not known
         or the mobile is not registered to a mobile network, this property will
         be a zero-length (blank) string.
+
+        Since: 1.0
     -->
     <property name="OperatorCode" type="s" access="read" />
 
@@ -156,6 +170,8 @@
         If the operator name is not known or the mobile is not
         registered to a mobile network, this property will be a zero-length
         (blank) string.
+
+        Since: 1.0
     -->
     <property name="OperatorName" type="s" access="read" />
 
@@ -164,6 +180,8 @@
 
         Bitmask of <link linkend="MMModem3gppFacility">MMModem3gppFacility</link> values
         for which PIN locking is enabled.
+
+        Since: 1.0
     -->
     <property name="EnabledFacilityLocks" type="u" access="read" />
 
@@ -173,6 +191,8 @@
         A <link linkend="MMModem3gppSubscriptionState">MMModem3gppSubscriptionState</link>
         value representing the subscription status of the account and whether there
         is any data remaining, given as an unsigned integer (signature <literal>"u"</literal>).
+
+        Since: 1.2
 
         Deprecated: 1.10.0. The value of this property can only be obtained with operator
         specific logic (e.g. processing specific PCO info), and therefore it doesn't make sense
@@ -186,6 +206,8 @@
         A <link linkend="MMModem3gppEpsUeModeOperation">MMModem3gppEpsUeModeOperation</link>
         value representing the UE mode of operation for EPS, given as an unsigned integer
         (signature <literal>"u"</literal>).
+
+        Since: 1.10
     -->
     <property name="EpsUeModeOperation" type="u" access="read" />
 
@@ -211,6 +233,8 @@
             <literal>"ay"</literal>).
           </listitem>
         </orderedlist>
+
+        Since: 1.10
     -->
     <property name="Pco" type="a(ubay)" access="read" />
 
@@ -218,6 +242,8 @@
         InitialEpsBearer:
 
         The object path for the initial default EPS bearer.
+
+        Since: 1.10
     -->
     <property name="InitialEpsBearer" type="o" access="read" />
 
@@ -236,6 +262,8 @@
         This is a read-only property, updating these settings should be done using the
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp.SetInitialEpsBearerSettings">SetInitialEpsBearerSettings()</link>
         method.
+
+        Since: 1.10
     -->
     <property name="InitialEpsBearerSettings" type="a{sv}" access="read" />
 

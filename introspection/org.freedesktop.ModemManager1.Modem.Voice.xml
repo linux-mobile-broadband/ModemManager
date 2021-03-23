@@ -33,6 +33,8 @@
         retrieved either by listening for the
         #org.freedesktop.ModemManager1.Modem.Voice::Added signal,
         or by querying the specific Call object of interest.
+
+        Since: 1.6
     -->
     <method name="ListCalls">
       <arg name="result" type="ao" direction="out" />
@@ -45,6 +47,8 @@
         Delete a Call from the list of calls.
 
         The call will be hangup if it is still active.
+
+        Since: 1.6
     -->
     <method name="DeleteCall">
       <arg name="path" type="o" direction="in" />
@@ -59,6 +63,8 @@
 
         The '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Call.Number">Number</link>' is the only
         expected property to set by the user.
+
+        Since: 1.6
     -->
     <method name="CreateCall">
       <arg name="properties" type="a{sv}" direction="in" />
@@ -79,6 +85,8 @@
         calls to be reported of which one becomes active.
 
         No error is returned if there are no waiting or held calls.
+
+        Since: 1.12
     -->
     <method name="HoldAndAccept" />
 
@@ -98,6 +106,8 @@
         In this case, this method would be equivalent to calling
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Call.Hangup">Hangup()</link>
         on the active call.
+
+        Since: 1.12
     -->
     <method name="HangupAndAccept" />
 
@@ -110,6 +120,8 @@
         hold or in waiting state may also be terminated.
 
         No error is returned if there are no ongoing calls.
+
+        Since: 1.12
     -->
     <method name="HangupAll" />
 
@@ -121,6 +133,8 @@
 
         The affected calls will be considered terminated from the point of
         view of the subscriber.
+
+        Since: 1.12
     -->
     <method name="Transfer" />
 
@@ -132,6 +146,8 @@
 
         This operation requires communication with the network in order to
         complete, so the modem must be successfully registered.
+
+        Since: 1.12
     -->
     <method name="CallWaitingSetup">
       <arg name="enable" type="b" direction="in" />
@@ -145,6 +161,8 @@
 
         This operation requires communication with the network in order to
         complete, so the modem must be successfully registered.
+
+        Since: 1.12
     -->
     <method name="CallWaitingQuery">
       <arg name="status" type="b" direction="out" />
@@ -155,6 +173,8 @@
         @path: Object path of the new call.
 
         Emitted when a call has been added.
+
+        Since: 1.6
     -->
     <signal name="CallAdded">
       <arg name="path" type="o" />
@@ -165,6 +185,8 @@
         @path: Object path of the now deleted Call.
 
         Emitted when a call has been deleted.
+
+        Since: 1.6
     -->
     <signal name="CallDeleted">
       <arg name="path" type="o" />
@@ -174,6 +196,8 @@
         Calls:
 
         The list of calls object paths.
+
+        Since: 1.6
     -->
     <property name="Calls" type="ao" access="read" />
 
@@ -184,6 +208,8 @@
 
         If this flag is set, users should only attempt voice calls to
         emergency numbers, as standard voice calls will likely fail.
+
+        Since: 1.12
     -->
     <property name="EmergencyOnly" type="b" access="read" />
 

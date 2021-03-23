@@ -65,6 +65,8 @@
 
         There are no settings specific to this call that would apply to 3GPP2
         (CDMA/EVDO) devices.
+
+        Since: 1.0
     -->
     <method name="Connect">
       <arg name="properties" type="a{sv}" direction="in"  />
@@ -78,6 +80,8 @@
         disconnect all active packet data bearers.
 
         Disconnect an active packet data connection.
+
+        Since: 1.0
     -->
     <method name="Disconnect">
       <arg name="bearer" type="o" direction="in" />
@@ -168,6 +172,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <method name="GetStatus">
       <arg name="properties" type="a{sv}" direction="out" />

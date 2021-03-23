@@ -24,6 +24,8 @@
         @pin: A string containing the PIN code.
 
         Send the PIN to unlock the SIM card.
+
+        Since: 1.0
     -->
     <method name="SendPin">
       <arg name="pin" type="s" direction="in" />
@@ -35,6 +37,8 @@
         @pin: A string containing the PIN code.
 
         Send the PUK and a new PIN to unlock the SIM card.
+
+        Since: 1.0
     -->
     <method name="SendPuk">
       <arg name="puk" type="s" direction="in" />
@@ -47,6 +51,8 @@
         @enabled: %TRUE to enable PIN checking, %FALSE otherwise.
 
         Enable or disable the PIN checking.
+
+        Since: 1.0
     -->
     <method name="EnablePin">
       <arg name="pin"     type="s" direction="in" />
@@ -59,6 +65,8 @@
         @new_pin: A string containing the new PIN code.
 
         Change the PIN code.
+
+        Since: 1.0
     -->
     <method name="ChangePin">
       <arg name="old_pin" type="s" direction="in" />
@@ -78,6 +86,8 @@
         that even if this operation fails, the preferred network list on the SIM card may
         have changed. Read the <link linkend="gdbus-property-org-freedesktop-ModemManager1-Sim.PreferredNetworks">
         PreferredNetworks</link> property to get the up-to-date list.
+
+        Since: 1.18
     -->
     <method name="SetPreferredNetworks">
       <arg name="preferred_networks" type="a(su)" direction="in" />
@@ -93,6 +103,8 @@
 
         On systems that support Multi SIM Multi Standby, more than one SIM may
         be active at any given time, but only one of them is considered primary.
+
+        Since: 1.16
     -->
     <property name="Active" type="b" access="read" />
 
@@ -103,6 +115,8 @@
 
         This may be available before the PIN has been entered depending
         on the device itself.
+
+        Since: 1.0
     -->
     <property name="SimIdentifier" type="s" access="read" />
 
@@ -110,6 +124,8 @@
         Imsi:
 
         The IMSI of the SIM card, if any.
+
+        Since: 1.0
     -->
     <property name="Imsi" type="s" access="read" />
 
@@ -117,6 +133,8 @@
         Eid:
 
         The EID of the SIM card, if any.
+
+        Since: 1.16
     -->
     <property name="Eid" type="s" access="read" />
 
@@ -125,6 +143,8 @@
 
         The ID of the network operator that issued the SIM card,
         formatted as a 5 or 6-digit MCC/MNC code (e.g. <literal>"310410"</literal>).
+
+        Since: 1.0
     -->
     <property name="OperatorIdentifier" type="s" access="read" />
 
@@ -132,6 +152,8 @@
         OperatorName:
 
         The name of the network operator, as given by the SIM card, if known.
+
+        Since: 1.0
     -->
     <property name="OperatorName" type="s" access="read" />
 
@@ -142,6 +164,8 @@
 
         These numbers should be treated as numbers for emergency calls in
         addition to 112 and 911.
+
+        Since: 1.12
     -->
     <property name="EmergencyNumbers" type="as" access="read" />
 
@@ -156,6 +180,8 @@
         If the SIM card does not support access technology storage, the mask will be
         set to <link linkend="MM-MODEM-ACCESS-TECHNOLOGY-UNKNOWN:CAPS">
         MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN</link>.
+
+        Since: 1.18
     -->
     <property name="PreferredNetworks" type="a(su)" access="read" />
 

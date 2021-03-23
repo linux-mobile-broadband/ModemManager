@@ -35,6 +35,8 @@
         This method will only work if the modem tracks, or can request, the
         current network time; it will not attempt to use previously-received
         network time updates on the host to guess the current network time.
+
+        Since: 1.0
     -->
     <method name="GetNetworkTime">
       <arg name="time" type="s" direction="out" />
@@ -66,6 +68,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <property name="NetworkTimezone" type="a{sv}" access="read" />
 
@@ -74,6 +78,8 @@
         @time: A string containing date and time in ISO 8601 format.
 
         Sent when the network time is updated.
+
+        Since: 1.0
     -->
     <signal name="NetworkTimeChanged">
       <arg name="time" type="s" />

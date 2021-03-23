@@ -30,6 +30,8 @@
         @features: Bitmask of <link linkend="MMModemOmaFeature">MMModemOmaFeature</link> flags, specifying which device management features should get enabled or disabled. <link linkend="MM-OMA-FEATURE-NONE:CAPS">MM_OMA_FEATURE_NONE</link> will disable all features.
 
         Configures which OMA device management features should be enabled.
+
+        Since: 1.2
     -->
     <method name="Setup">
       <arg name="features" type="u" direction="in" />
@@ -40,6 +42,8 @@
         @session_type: Type of client-initiated device management session,given as a <link linkend="MMModemOmaSessionType">MMModemOmaSessionType</link>
 
         Starts a client-initiated device management session.
+
+        Since: 1.2
     -->
     <method name="StartClientInitiatedSession">
       <arg name="session_type" type="u" direction="in" />
@@ -51,6 +55,8 @@
         @accept: Boolean specifying whether the session is accepted or rejected.
 
         Accepts or rejects a network-initiated device management session.
+
+        Since: 1.2
     -->
     <method name="AcceptNetworkInitiatedSession">
       <arg name="session_id" type="u" direction="in" />
@@ -61,6 +67,8 @@
         CancelSession:
 
         Cancels the current on-going device management session.
+
+        Since: 1.2
     -->
     <method name="CancelSession" />
 
@@ -70,6 +78,8 @@
         Bitmask of <link linkend="MMModemOmaFeature">MMModemOmaFeature</link>
         flags, specifying which device management features are enabled or
         disabled.
+
+        Since: 1.2
     -->
     <property name="Features" type="u" access="read" />
 
@@ -91,6 +101,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.2
     -->
     <property name="PendingNetworkInitiatedSessions" type="a(uu)" access="read" />
 
@@ -99,6 +111,8 @@
 
         Type of the current on-going device management session, given as a
         <link linkend="MMOmaSessionType">MMOmaSessionType</link>.
+
+        Since: 1.2
     -->
     <property name="SessionType" type="u" access="read" />
 
@@ -107,6 +121,8 @@
 
         State of the current on-going device management session, given as a
         <link linkend="MMOmaSessionState">MMOmaSessionState</link>.
+
+        Since: 1.2
     -->
     <property name="SessionState" type="i" access="read" />
 
@@ -117,6 +133,8 @@
         @session_state_failed_reason: Reason of failure, given as a  <link linkend="MMOmaSessionStateFailedReason">MMOmaSessionStateFailedReason</link>, if @session_state is <link linkend="MM-OMA-SESSION-STATE-FAILED:CAPS">MM_OMA_SESSION_STATE_FAILED</link>.
 
         The session state changed.
+
+        Since: 1.2
     -->
     <signal name="SessionStateChanged">
       <arg name="old_session_state"           type="i" />

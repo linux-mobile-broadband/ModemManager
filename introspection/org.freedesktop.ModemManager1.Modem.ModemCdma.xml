@@ -34,6 +34,8 @@
         activation functionality, if any.
 
         Some modems will reboot after this call is made.
+
+        Since: 1.0
     -->
     <method name="Activate">
       <arg name="carrier_code" type="s" direction="in" />
@@ -115,6 +117,8 @@
         @status_changes: Properties that have changed as a result of this activation state change, including <literal>"mdn"</literal> and <literal>"min"</literal>. The dictionary may be empty if the changed properties are unknown.
 
         The device activation state changed.
+
+        Since: 1.0
     -->
     <signal name="ActivationStateChanged">
       <arg name="activation_state" type="u"     />
@@ -127,6 +131,8 @@
 
         A <link linkend="MMModemCdmaActivationState">MMModemCdmaActivationState</link>
         value specifying the state of the activation in the 3GPP2 network.
+
+        Since: 1.0
     -->
     <property name="ActivationState" type="u" access="read" />
 
@@ -134,6 +140,8 @@
         Meid:
 
         The modem's <ulink url="http://en.wikipedia.org/wiki/MEID">Mobile Equipment Identifier</ulink>.
+
+        Since: 1.0
     -->
     <property name="Meid" type="s" access="read" />
 
@@ -144,6 +152,8 @@
         The modem's
         <ulink url="http://en.wikipedia.org/wiki/Electronic_serial_number">Electronic Serial Number</ulink>
         (superceded by MEID but still used by older devices).
+
+        Since: 1.0
     -->
     <property name="Esn" type="s" access="read" />
 
@@ -157,6 +167,8 @@
 
         See <ulink url="http://ifast.org">ifast.org</ulink> or the mobile
         broadband provider database for mappings of SIDs to network providers.
+
+        Since: 1.0
     -->
     <property name="Sid" type="u" access="read" />
 
@@ -167,6 +179,8 @@
         <ulink url="http://en.wikipedia.org/wiki/Network_Identification_Number">Network Identifier</ulink>
         of the serving CDMA 1x network, if known, and
         if the modem is registered with a CDMA 1x network.
+
+        Since: 1.0
     -->
     <property name="Nid" type="u" access="read" />
 
@@ -175,6 +189,8 @@
 
         A <link linkend="MMModemCdmaRegistrationState">MMModemCdmaRegistrationState</link>
         value specifying the CDMA 1x registration state.
+
+        Since: 1.0
     -->
     <property name="Cdma1xRegistrationState" type="u" access="read" />
 
@@ -183,6 +199,8 @@
 
         A <link linkend="MMModemCdmaRegistrationState">MMModemCdmaRegistrationState</link>
         value specifying the EVDO registration state.
+
+        Since: 1.0
     -->
     <property name="EvdoRegistrationState" type="u" access="read" />
 

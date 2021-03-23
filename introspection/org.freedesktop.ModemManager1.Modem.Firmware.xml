@@ -95,6 +95,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <method name="List">
       <arg name="selected"  type="s"      direction="out" />
@@ -114,6 +116,8 @@
         or if the image could not be selected for some reason.
 
         Installed images can be selected non-destructively.
+
+        Since: 1.0
     -->
     <method name="Select">
       <arg name="uniqueid" type="s" direction="in" />
@@ -177,6 +181,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.10
     -->
     <property name="UpdateSettings" type="(ua{sv})" access="read" />
 

@@ -33,6 +33,8 @@
         #org.freedesktop.ModemManager1.Bearer:Ip6Config
         properties become valid and may contain IP configuration information for
         the data interface associated with this bearer.
+
+        Since: 1.0
     -->
     <method name="Connect" />
 
@@ -43,6 +45,8 @@
 
         Any ongoing data session will be terminated and IP addresses become
         invalid when this method is called.
+
+        Since: 1.0
     -->
     <method name="Disconnect" />
 
@@ -82,6 +86,8 @@
         <link linkend="MM-BEARER-IP-METHOD-PPP:CAPS">MM_BEARER_IP_METHOD_PPP</link>
         method is given, the interface
         will be a serial TTY which must then have PPP run over it.
+
+        Since: 1.0
     -->
     <property name="Interface" type="s" access="read" />
 
@@ -90,6 +96,8 @@
 
         Indicates whether or not the bearer is connected and thus whether
         packet data communication using this bearer is possible.
+
+        Since: 1.0
     -->
     <property name="Connected" type="b" access="read" />
 
@@ -99,6 +107,8 @@
         In some devices, packet data service will be suspended while the device
         is handling other communication, like a voice call. If packet data
         service is suspended (but not deactivated) this property will be %TRUE.
+
+        Since: 1.0
     -->
     <property name="Suspended" type="b" access="read" />
 
@@ -107,6 +117,8 @@
 
         This property will be %TRUE if the bearer is connected through a
         multiplexed network link.
+
+        Since: 1.18
     -->
     <property name="Multiplexed" type="b" access="read" />
 
@@ -174,6 +186,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <property name="Ip4Config" type="a{sv}" access="read" />
 
@@ -242,10 +256,12 @@
         <variablelist>
           <varlistentry><term><literal>"mtu"</literal></term>
             <listitem>
-              Maximum transmission unit (MTU), given as an unsigned integer value (signature <literal>"u"</literal>).
+              Maximum transmission unit (MTU), given as an unsigned integer value (signature <literal>"u"</literal>). Since 1.4.
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <property name="Ip6Config" type="a{sv}" access="read" />
 
@@ -289,37 +305,40 @@
             <listitem>
               Total number of connection attempts done with this bearer, given
               as an unsigned integer value (signature <literal>"u"</literal>).
+              Since 1.14.
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"failed-attempts"</literal></term>
             <listitem>
               Number of failed connection attempts done with this bearer,
               given as an unsigned integer value (signature
-              <literal>"u"</literal>).
+              <literal>"u"</literal>). Since 1.14.
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"total-rx-bytes"</literal></term>
             <listitem>
               Total number of bytes received without error in all the successful
               connection establishments, given as an unsigned 64-bit integer
-              value (signature <literal>"t"</literal>).
+              value (signature <literal>"t"</literal>). Since 1.14.
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"total-tx-bytes"</literal></term>
             <listitem>
               Total number of bytes transmitted without error in all the
               successful connection establishments, given as an unsigned 64-bit
-              integer value (signature <literal>"t"</literal>).
+              integer value (signature <literal>"t"</literal>). Since 1.14.
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"total-duration"</literal></term>
             <listitem>
               Total duration of all the successful connection establishments, in
               seconds, given as an unsigned integer value (signature
-              <literal>"u"</literal>).
+              <literal>"u"</literal>). Since 1.14.
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.6
     -->
     <property name="Stats" type="a{sv}" access="read" />
 
@@ -327,6 +346,8 @@
         IpTimeout:
 
         Maximum time to wait for a successful IP establishment, when PPP is used.
+
+        Since: 1.0
     -->
     <property name="IpTimeout" type="u" access="read" />
 
@@ -334,6 +355,8 @@
         BearerType:
 
         A <link linkend="MMBearerType">MMBearerType</link>
+
+        Since: 1.10
     -->
     <property name="BearerType" type="u" access="read" />
 
@@ -429,6 +452,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <property name="Properties" type="a{sv}" access="read" />
 

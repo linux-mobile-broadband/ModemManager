@@ -25,6 +25,8 @@
 
         Applicable only if state is <link linkend="MM-CALL-STATE-UNKNOWN:CAPS"><constant>MM_CALL_STATE_UNKNOWN</constant></link> and direction is
         <link linkend="MM-CALL-DIRECTION-OUTGOING:CAPS"><constant>MM_CALL_DIRECTION_OUTGOING</constant></link>.
+
+        Since: 1.6
     -->
     <method name="Start" />
 
@@ -35,6 +37,8 @@
 
         Applicable only if state is <link linkend="MM-CALL-STATE-RINGING-IN:CAPS"><constant>MM_CALL_STATE_RINGING_IN</constant></link> and direction is
         <link linkend="MM-CALL-DIRECTION-INCOMING:CAPS"><constant>MM_CALL_DIRECTION_INCOMING</constant></link>.
+
+        Since: 1.6
     -->
     <method name="Accept" />
 
@@ -48,6 +52,8 @@
         Applicable only if state is <link linkend="MM-CALL-STATE-RINGING-IN:CAPS"><constant>MM_CALL_STATE_RINGING_IN</constant></link> or
         <link linkend="MM-CALL-STATE-WAITING:CAPS"><constant>MM_CALL_STATE_WAITING</constant></link> and direction is
         <link linkend="MM-CALL-DIRECTION-INCOMING:CAPS"><constant>MM_CALL_DIRECTION_INCOMING</constant></link>.
+
+        Since: 1.12
     -->
     <method name="Deflect">
       <arg name="number" type="s" />
@@ -64,6 +70,8 @@
         property while they are part of the multiparty call.
 
         Applicable only if state is <link linkend="MM-CALL-STATE-HELD:CAPS"><constant>MM_CALL_STATE_HELD</constant></link>.
+
+        Since: 1.12
     -->
     <method name="JoinMultiparty" />
 
@@ -77,6 +85,8 @@
         Applicable only if state is <link linkend="MM-CALL-STATE-ACTIVE:CAPS"><constant>MM_CALL_STATE_ACTIVE</constant></link> or
         <link linkend="MM-CALL-STATE-HELD:CAPS"><constant>MM_CALL_STATE_HELD</constant></link> and
         the call is a multiparty call.
+
+        Since: 1.12
     -->
     <method name="LeaveMultiparty"/>
 
@@ -86,6 +96,8 @@
         Hangup the active call.
 
         Applicable only if state is <link linkend="MM-CALL-STATE-UNKNOWN:CAPS"><constant>MM_CALL_STATE_UNKNOWN</constant></link>.
+
+        Since: 1.6
     -->
     <method name="Hangup"/>
 
@@ -96,6 +108,8 @@
         Send a DTMF tone (Dual Tone Multi-Frequency) (only on supported modem).
 
         Applicable only if state is <link linkend="MM-CALL-STATE-ACTIVE:CAPS"><constant>MM_CALL_STATE_ACTIVE</constant></link>.
+
+        Since: 1.6
     -->
     <method name="SendDtmf">
       <arg name="dtmf" type="s" direction="in"/>
@@ -106,6 +120,8 @@
         @dtmf: DTMF tone identifier [0-9A-D*#].
 
         Emitted when a DTMF tone is received (only on supported modem)
+
+        Since: 1.6
     -->
     <signal name="DtmfReceived">
       <arg name="dtmf" type="s" />
@@ -118,6 +134,8 @@
         @reason: A <link linkend="MMCallStateReason">MMCallStateReason</link> value, specifying the reason for this state change.
 
         Emitted when call changes state
+
+        Since: 1.6
     -->
     <signal name="StateChanged">
       <arg name="old" type="i" />
@@ -130,6 +148,8 @@
 
         A <link linkend="MMCallState">MMCallState</link> value,
         describing the state of the call.
+
+        Since: 1.6
     -->
     <property name="State" type="i" access="read" />
 
@@ -137,6 +157,8 @@
         StateReason:
 
         A <link linkend="MMCallStateReason">MMCallStateReason</link> value, describing why the state is changed.
+
+        Since: 1.6
     -->
     <property name="StateReason" type="i" access="read" />
 
@@ -145,6 +167,8 @@
 
         A <link linkend="MMCallDirection">MMCallDirection</link> value,
         describing the direction of the call.
+
+        Since: 1.6
     -->
     <property name="Direction" type="i" access="read" />
 
@@ -152,6 +176,8 @@
         Number:
 
         The remote phone number.
+
+        Since: 1.6
     -->
     <property name="Number" type="s" access="read" />
 
@@ -159,6 +185,8 @@
         Multiparty:
 
         Whether the call is currently part of a multiparty conference call.
+
+        Since: 1.12
     -->
     <property name="Multiparty" type="b" access="read" />
 
@@ -169,6 +197,8 @@
         provides the audio.  For example, with certain Huawei USB modems, this
         property might be "ttyUSB2" indicating audio is available via ttyUSB2 in
         the format described by the AudioFormat property.
+
+        Since: 1.10
     -->
     <property name="AudioPort" type="s" access="read" />
 
@@ -198,6 +228,8 @@
             </listitem>
           </varlistentry>
         </variablelist>
+
+        Since: 1.10
     -->
     <property name="AudioFormat" type="a{sv}" access="read" />
   </interface>

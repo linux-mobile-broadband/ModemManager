@@ -35,6 +35,8 @@
         response or an appropriate error. The network may be awaiting further
         response from the ME after returning from this method and no new command
         can be initiated until this one is cancelled or ended.
+
+        Since: 1.0
     -->
     <method name="Initiate">
       <arg name="command" type="s" direction="in"  />
@@ -50,6 +52,8 @@
         or that is awaiting further input after
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp-Ussd.Initiate">Initiate()</link>
         was called.
+
+        Since: 1.0
     -->
     <method name="Respond">
       <arg name="response" type="s" direction="in"  />
@@ -60,6 +64,8 @@
         Cancel:
 
         Cancel an ongoing USSD session, either mobile or network initiated.
+
+        Since: 1.0
     -->
     <method name="Cancel" />
 
@@ -68,6 +74,8 @@
 
         A <link linkend="MMModem3gppUssdSessionState">MMModem3gppUssdSessionState</link> value,
         indicating the state of any ongoing USSD session.
+
+        Since: 1.0
     -->
     <property name="State" type="u" access="read" />
 
@@ -79,6 +87,8 @@
 
         When no USSD session is active, or when there is no network-
         initiated request, this property will be a zero-length string.
+
+        Since: 1.0
     -->
     <property name="NetworkNotification" type="s" access="read" />
 
@@ -92,6 +102,8 @@
 
         When no USSD session is active, or when there is no pending
         network-initiated request, this property will be a zero-length string.
+
+        Since: 1.0
     -->
     <property name="NetworkRequest" type="s" access="read" />
 

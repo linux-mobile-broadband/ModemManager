@@ -69,6 +69,7 @@
         <link linkend="MM-MODEM-LOCATION-SOURCE-AGPS-MSB:CAPS">MM_MODEM_LOCATION_SOURCE_AGPS_MSB</link>
         cannot be given at the same time, and if none given, standalone GPS is assumed.
 
+        Since: 1.0
     -->
     <method name="Setup">
       <arg name="sources"         type="u" direction="in" />
@@ -85,6 +86,8 @@
         for more information on the dictionary returned at @location.
 
         This method may require the client to authenticate itself.
+
+        Since: 1.0
     -->
     <method name="GetLocation">
       <arg name="Location" type="a{uv}" direction="out" />
@@ -95,6 +98,8 @@
         @supl: SUPL server configuration, given either as IP:PORT or as FQDN:PORT.
 
         Configure the SUPL server for A-GPS.
+
+        Since: 1.6
     -->
     <method name="SetSuplServer">
       <arg name="supl" type="s" direction="in" />
@@ -117,6 +122,8 @@
         itself, and therefore it cannot use any A-GPS server to improve the accuracy of the
         position. In this case, the user can instead download the assistance data files using
         a WiFi or LAN network, and inject them to the GNSS engine manually.
+
+        Since: 1.10
     -->
     <method name="InjectAssistanceData">
       <arg name="data" type="ay" direction="in">
@@ -133,6 +140,8 @@
 
         The refresh rate can be set to 0 to disable it, so that every update reported by
         the modem is published in the interface.
+
+        Since: 1.6
     -->
     <method name="SetGpsRefreshRate">
       <arg name="rate" type="u" direction="in" />
@@ -143,6 +152,8 @@
 
         Bitmask of <link linkend="MMModemLocationSource">MMModemLocationSource</link>
         values, specifying the supported location sources.
+
+        Since: 1.0
     -->
     <property name="Capabilities" type="u" access="read" />
 
@@ -151,6 +162,8 @@
 
         Bitmask of <link linkend="MMModemLocationAssistanceDataType">MMModemLocationAssistanceDataType</link>
         values, specifying the supported types of assistance data.
+
+        Since: 1.10
     -->
     <property name="SupportedAssistanceData" type="u" access="read" />
 
@@ -160,6 +173,8 @@
         Bitmask specifying which of the supported
         <link linkend="MMModemLocationSource">MMModemLocationSource</link>
         location sources is currently enabled in the device.
+
+        Since: 1.0
     -->
     <property name="Enabled" type="u" access="read" />
 
@@ -172,6 +187,8 @@
         See the
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.Setup">Setup()</link>
         method for more information.
+
+        Since: 1.0
     -->
     <property name="SignalsLocation" type="b" access="read" />
 
@@ -242,7 +259,7 @@
                   This is the two-byte Location Area Code of the LTE base
                   station with which the mobile is registered, in upper-case
                   hexadecimal format without leading zeros, as specified in
-                  3GPP TS 27.007. E.g. <literal>"6FFE"</literal>.
+                  3GPP TS 27.007. E.g. <literal>"6FFE"</literal>. Since 1.10.
                 </listitem>
               </varlistentry>
             </variablelist>
@@ -362,6 +379,8 @@
           </listitem>
         </varlistentry>
         </variablelist>
+
+        Since: 1.0
     -->
     <property name="Location" type="a{uv}" access="read" />
 
@@ -369,6 +388,8 @@
         SuplServer:
 
         SUPL server configuration for A-GPS, given either as IP:PORT or FQDN:PORT.
+
+        Since: 1.6
     -->
     <property name="SuplServer" type="s" access="read" />
 
@@ -377,6 +398,8 @@
 
         URLs from where the user can download assistance data files to inject with
         <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.InjectAssistanceData">InjectAssistanceData()</link>.
+
+        Since: 1.10
     -->
     <property name="AssistanceDataServers" type="as" access="read" />
 
@@ -384,6 +407,8 @@
         GpsRefreshRate:
 
         Rate of refresh of the GPS information in the interface.
+
+        Since: 1.6
     -->
     <property name="GpsRefreshRate" type="u" access="read" />
 
