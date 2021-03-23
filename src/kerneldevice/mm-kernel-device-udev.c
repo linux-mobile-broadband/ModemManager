@@ -81,7 +81,7 @@ static void
 preload_contents_platform (MMKernelDeviceUdev *self,
                            const gchar        *platform)
 {
-    g_autoptr(GUdevDevice) iter = NULL;
+    GUdevDevice *iter;
 
     iter = g_object_ref (self->priv->device);
     while (iter) {
@@ -102,17 +102,19 @@ preload_contents_platform (MMKernelDeviceUdev *self,
         g_clear_object (&iter);
         iter = parent;
     }
+
+    g_clear_object (&iter);
 }
 
 static void
 preload_contents_pcmcia (MMKernelDeviceUdev *self)
 {
-    g_autoptr(GUdevDevice) iter = NULL;
-    gboolean               pcmcia_subsystem_found = FALSE;
+    GUdevDevice *iter;
+    gboolean     pcmcia_subsystem_found = FALSE;
 
     iter = g_object_ref (self->priv->device);
     while (iter) {
-        g_autoptr(GUdevDevice) parent = NULL;
+        GUdevDevice *parent;
 
         /* Store the first driver found */
         if (!self->priv->driver)
@@ -133,18 +135,21 @@ preload_contents_pcmcia (MMKernelDeviceUdev *self)
             self->priv->product = udev_device_get_sysfs_attr_as_hex (iter, "card_id");
             self->priv->physdev = g_object_ref (iter);
             /* stop traversing as soon as the physical device is found */
+            g_clear_object (&parent);
             break;
         }
 
         g_clear_object (&iter);
-        iter = g_steal_pointer (&parent);
+        iter = parent;
     }
+
+    g_clear_object (&iter);
 }
 
 static void
 preload_contents_pci (MMKernelDeviceUdev *self)
 {
-    g_autoptr(GUdevDevice) iter = NULL;
+    GUdevDevice *iter;
 
     iter = g_object_ref (self->priv->device);
     while (iter) {
@@ -170,12 +175,14 @@ preload_contents_pci (MMKernelDeviceUdev *self)
         g_clear_object (&iter);
         iter = parent;
     }
+
+    g_clear_object (&iter);
 }
 
 static void
 preload_contents_usb (MMKernelDeviceUdev *self)
 {
-    g_autoptr(GUdevDevice) iter = NULL;
+    GUdevDevice *iter;
 
     iter = g_object_ref (self->priv->device);
     while (iter) {
@@ -204,12 +211,14 @@ preload_contents_usb (MMKernelDeviceUdev *self)
         g_clear_object (&iter);
         iter = parent;
     }
+
+    g_clear_object (&iter);
 }
 
 static gchar *
 find_device_bus_subsystem (MMKernelDeviceUdev *self)
 {
-    g_autoptr(GUdevDevice) iter = NULL;
+    GUdevDevice *iter;
 
     iter = g_object_ref (self->priv->device);
     while (iter) {
@@ -224,8 +233,10 @@ find_device_bus_subsystem (MMKernelDeviceUdev *self)
             (g_strcmp0 (subsys, "pci") == 0)      ||
             (g_strcmp0 (subsys, "platform") == 0) ||
             (g_strcmp0 (subsys, "pnp") == 0)      ||
-            (g_strcmp0 (subsys, "sdio") == 0))
+            (g_strcmp0 (subsys, "sdio") == 0)) {
+            g_clear_object (&iter);
             return g_strdup (subsys);
+        }
 
         parent = g_udev_device_get_parent (iter);
         g_clear_object (&iter);
@@ -233,6 +244,7 @@ find_device_bus_subsystem (MMKernelDeviceUdev *self)
     }
 
     /* no more parents to check */
+    g_clear_object (&iter);
     return NULL;
 }
 
