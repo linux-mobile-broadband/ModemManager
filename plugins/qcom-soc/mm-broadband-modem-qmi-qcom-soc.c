@@ -23,6 +23,7 @@
 
 #include "ModemManager.h"
 #include "mm-log.h"
+#include "mm-iface-modem.h"
 #include "mm-broadband-modem-qmi-qcom-soc.h"
 
 G_DEFINE_TYPE (MMBroadbandModemQmiQcomSoc, mm_broadband_modem_qmi_qcom_soc, MM_TYPE_BROADBAND_MODEM_QMI)
@@ -161,6 +162,8 @@ mm_broadband_modem_qmi_qcom_soc_new (const gchar  *device,
                          /* QMI bearer supports NET only */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, FALSE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,  TRUE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
                          NULL);
 }
 
