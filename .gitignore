@@ -102,6 +102,7 @@ Makefile.in
 /docs/reference/api/ModemManager.interfaces
 /docs/reference/api/ModemManager.prerequisites
 /docs/reference/api/ModemManager.signals
+/docs/reference/api/ModemManager.actions
 /docs/reference/api/*.stamp
 /docs/reference/api/*.txt
 /docs/reference/api/html
