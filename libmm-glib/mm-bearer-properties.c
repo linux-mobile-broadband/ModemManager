@@ -810,7 +810,7 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
         return FALSE;
     if (!cmp_ip_type (a->priv->ip_type, b->priv->ip_type, flags))
         return FALSE;
-    if (!cmp_allowed_auth (a->priv->allowed_auth, a->priv->allowed_auth, flags))
+    if (!cmp_allowed_auth (a->priv->allowed_auth, b->priv->allowed_auth, flags))
         return FALSE;
     if (!cmp_str (a->priv->user, b->priv->user, flags))
         return FALSE;
