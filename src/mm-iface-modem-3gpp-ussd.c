@@ -45,61 +45,6 @@ mm_iface_modem_3gpp_ussd_bind_simple_status (MMIfaceModem3gppUssd *self,
 
 /*****************************************************************************/
 
-static gboolean
-ensure_enabled (MMBaseModem *self,
-                GError **error)
-{
-    MMModemState modem_state;
-
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-
-    switch (modem_state) {
-    case MM_MODEM_STATE_FAILED:
-    case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_LOCKED:
-        /* We should never have such request (interface wasn't exported yet) */
-        g_assert_not_reached ();
-        return FALSE;
-
-    case MM_MODEM_STATE_INITIALIZING:
-    case MM_MODEM_STATE_ENABLING:
-    case MM_MODEM_STATE_DISABLED:
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_WRONG_STATE,
-                     "Cannot perform USSD action: "
-                     "device not enabled yet");
-        return FALSE;
-
-    case MM_MODEM_STATE_DISABLING:
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_WRONG_STATE,
-                     "Cannot perform USSD action: "
-                     "currently being disabled");
-        return FALSE;
-
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        break;
-
-    default:
-        g_assert_not_reached ();
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-/*****************************************************************************/
-
 typedef struct {
     MmGdbusModem3gppUssd *skeleton;
     GDBusMethodInvocation *invocation;
@@ -137,9 +82,15 @@ handle_cancel_auth_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error) ||
-        !ensure_enabled (self, &error)) {
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_cancel_context_free (ctx);
+        return;
+    }
+
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              ctx->invocation,
+                                                              MM_MODEM_STATE_ENABLED)) {
         handle_cancel_context_free (ctx);
         return;
     }
@@ -219,9 +170,15 @@ handle_respond_auth_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error) ||
-        !ensure_enabled (self, &error)) {
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_respond_context_free (ctx);
+        return;
+    }
+
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              ctx->invocation,
+                                                              MM_MODEM_STATE_ENABLED)) {
         handle_respond_context_free (ctx);
         return;
     }
@@ -325,9 +282,15 @@ handle_initiate_auth_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_authorize_finish (self, res, &error) ||
-        !ensure_enabled (self, &error)) {
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_initiate_context_free (ctx);
+        return;
+    }
+
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              ctx->invocation,
+                                                              MM_MODEM_STATE_ENABLED)) {
         handle_initiate_context_free (ctx);
         return;
     }
