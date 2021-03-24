@@ -3670,15 +3670,25 @@ mm_iface_modem_update_lock_info (MMIfaceModem *self,
     GTask *task;
 
     ctx = g_slice_new0 (UpdateLockInfoContext);
-    g_object_get (self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
 
     /* If the given lock is known, we will avoid re-asking for it */
     ctx->lock = known_lock;
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)update_lock_info_context_free);
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+
+    if (!ctx->skeleton) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't get interface skeleton");
+        g_object_unref (task);
+        return;
+    }
 
     update_lock_info_context_step (task);
 }
