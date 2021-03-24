@@ -320,14 +320,11 @@ mm_iface_modem_wait_for_final_state (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* Helper to return an error when the modem is in failed state and so it
- * cannot process a given method invocation
- */
 
-static gboolean
-abort_invocation_if_state_not_reached (MMIfaceModem          *self,
-                                       GDBusMethodInvocation *invocation,
-                                       MMModemState           minimum_required)
+gboolean
+mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *self,
+                                                      GDBusMethodInvocation *invocation,
+                                                      MMModemState           minimum_required)
 {
     MMModemState state = MM_MODEM_STATE_UNKNOWN;
 
@@ -736,7 +733,7 @@ handle_create_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
         handle_create_bearer_context_free (ctx);
         return;
     }
@@ -944,7 +941,7 @@ handle_delete_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
         handle_delete_bearer_context_free (ctx);
         return;
     }
@@ -1010,7 +1007,7 @@ handle_list_bearers (MmGdbusModem *skeleton,
     GStrv paths;
     MMBearerList *list = NULL;
 
-    if (abort_invocation_if_state_not_reached (self, invocation, MM_MODEM_STATE_LOCKED))
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (self, invocation, MM_MODEM_STATE_LOCKED))
         return TRUE;
 
     g_object_get (self,
@@ -1975,7 +1972,7 @@ handle_enable_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_LOCKED)) {
         handle_enable_context_free (ctx);
         return;
     }
@@ -2845,7 +2842,7 @@ handle_set_current_bands_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_DISABLED)) {
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_DISABLED)) {
         handle_set_current_bands_context_free (ctx);
         return;
     }
@@ -3231,7 +3228,7 @@ handle_set_current_modes_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_DISABLED)) {
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_DISABLED)) {
         handle_set_current_modes_context_free (ctx);
         return;
     }
