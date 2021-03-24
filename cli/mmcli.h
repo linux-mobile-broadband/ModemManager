@@ -53,6 +53,14 @@ void          mmcli_modem_3gpp_run_asynchronous   (GDBusConnection *connection,
 void          mmcli_modem_3gpp_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_3gpp_shutdown           (void);
 
+/* 3GPP USSD group */
+GOptionGroup *mmcli_modem_3gpp_ussd_get_option_group   (void);
+gboolean      mmcli_modem_3gpp_ussd_options_enabled    (void);
+void          mmcli_modem_3gpp_ussd_run_asynchronous   (GDBusConnection *connection,
+                                                        GCancellable    *cancellable);
+void          mmcli_modem_3gpp_ussd_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_3gpp_ussd_shutdown           (void);
+
 /* CDMA group */
 GOptionGroup *mmcli_modem_cdma_get_option_group   (void);
 gboolean      mmcli_modem_cdma_options_enabled    (void);

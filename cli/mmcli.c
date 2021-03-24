@@ -211,6 +211,8 @@ main (gint argc, gchar **argv)
     g_option_context_add_group (context,
                                 mmcli_modem_3gpp_get_option_group ());
     g_option_context_add_group (context,
+                                mmcli_modem_3gpp_ussd_get_option_group ());
+    g_option_context_add_group (context,
                                 mmcli_modem_cdma_get_option_group ());
     g_option_context_add_group (context,
                                 mmcli_modem_simple_get_option_group ());
@@ -334,6 +336,13 @@ main (gint argc, gchar **argv)
         else
             mmcli_modem_3gpp_run_synchronous (connection);
     }
+    /* Modem 3GPP USSD options? */
+    else if (mmcli_modem_3gpp_ussd_options_enabled ()) {
+        if (async_flag)
+            mmcli_modem_3gpp_ussd_run_asynchronous (connection, cancellable);
+        else
+            mmcli_modem_3gpp_ussd_run_synchronous (connection);
+    }
     /* Modem CDMA options? */
     else if (mmcli_modem_cdma_options_enabled ()) {
         if (async_flag)
@@ -421,6 +430,8 @@ main (gint argc, gchar **argv)
         mmcli_manager_shutdown ();
     } else if (mmcli_modem_3gpp_options_enabled ()) {
         mmcli_modem_3gpp_shutdown ();
+    } else if (mmcli_modem_3gpp_ussd_options_enabled ()) {
+        mmcli_modem_3gpp_ussd_shutdown ();
     } else if (mmcli_modem_cdma_options_enabled ()) {
         mmcli_modem_cdma_shutdown ();
     } else if (mmcli_modem_simple_options_enabled ()) {
