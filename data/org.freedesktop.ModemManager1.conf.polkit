@@ -184,6 +184,21 @@
            send_interface="org.freedesktop.ModemManager1.Bearer"
            send_member="Disconnect"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager"
+           send_member="List"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager"
+           send_member="Set"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager"
+           send_member="Delete"/>
+
     <!-- org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml -->
 
     <!-- Protected by the USSD policy rule -->
