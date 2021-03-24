@@ -98,7 +98,14 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
                       MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                       NULL);
 
-        g_assert (skeleton);
+        if (!skeleton) {
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Couldn't get interface skeleton");
+            g_object_unref (task);
+            return;
+        }
 
         primary_slot = mm_gdbus_modem_get_primary_sim_slot (MM_GDBUS_MODEM (skeleton));
         g_object_unref (skeleton);
