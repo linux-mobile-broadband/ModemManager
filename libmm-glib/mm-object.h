@@ -42,6 +42,7 @@
 #include "mm-modem-voice.h"
 #include "mm-modem-time.h"
 #include "mm-modem-firmware.h"
+#include "mm-modem-sar.h"
 #include "mm-modem-signal.h"
 #include "mm-modem-oma.h"
 
@@ -91,6 +92,7 @@ MMModemMessaging           *mm_object_get_modem_messaging             (MMObject 
 MMModemVoice               *mm_object_get_modem_voice                 (MMObject *self);
 MMModemTime                *mm_object_get_modem_time                  (MMObject *self);
 MMModemFirmware            *mm_object_get_modem_firmware              (MMObject *self);
+MMModemSar                 *mm_object_get_modem_sar                   (MMObject *self);
 MMModemSignal              *mm_object_get_modem_signal                (MMObject *self);
 MMModemOma                 *mm_object_get_modem_oma                   (MMObject *self);
 
@@ -105,6 +107,7 @@ MMModemMessaging           *mm_object_peek_modem_messaging            (MMObject 
 MMModemVoice               *mm_object_peek_modem_voice                (MMObject *self);
 MMModemTime                *mm_object_peek_modem_time                 (MMObject *self);
 MMModemFirmware            *mm_object_peek_modem_firmware             (MMObject *self);
+MMModemSar                 *mm_object_peek_modem_sar                  (MMObject *self);
 MMModemSignal              *mm_object_peek_modem_signal               (MMObject *self);
 MMModemOma                 *mm_object_peek_modem_oma                  (MMObject *self);
 

@@ -861,6 +861,33 @@ mm_modem_simple_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-modem-sar</FILE>
+<TITLE>MMModemSar</TITLE>
+MMModemSar
+<SUBSECTION Getters>
+mm_modem_sar_get_path
+mm_modem_sar_dup_path
+<SUBSECTION Methods>
+mm_modem_sar_enable
+mm_modem_sar_enable_finish
+mm_modem_sar_enable_sync
+mm_modem_sar_set_power_level
+mm_modem_sar_set_power_level_finish
+mm_modem_sar_set_power_level_sync
+mm_modem_sar_get_state
+mm_modem_sar_get_power_level
+<SUBSECTION Standard>
+MMModemSarClass
+MM_IS_MODEM_SAR
+MM_IS_MODEM_SAR_CLASS
+MM_MODEM_SAR
+MM_MODEM_SAR_CLASS
+MM_MODEM_SAR_GET_CLASS
+MM_TYPE_MODEM_SAR
+mm_modem_sar_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-simple-connect-properties</FILE>
 <TITLE>MMSimpleConnectProperties</TITLE>
 MMSimpleConnectProperties
