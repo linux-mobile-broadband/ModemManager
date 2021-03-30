@@ -125,12 +125,21 @@ input_callback (GIOChannel   *channel,
     status = g_io_channel_read_line (channel, &line, NULL, NULL, &error);
 
     switch (status) {
-    case G_IO_STATUS_NORMAL:
+    case G_IO_STATUS_NORMAL: {
+        gsize line_len = 0;
+
+        /* remove \r\n before running as AT command */
+        line_len = strlen (line);
+        while (line_len > 0 && (line[line_len - 1] == '\r' || line[line_len - 1] == '\n')) {
+            line[line_len - 1] = '\0';
+            line_len--;
+        }
+
         mm_port_serial_at_command (port, line, 60, FALSE, FALSE, NULL,
                                    (GAsyncReadyCallback) at_command_ready, NULL);
         g_free (line);
         return TRUE;
-
+    }
     case G_IO_STATUS_ERROR:
         g_printerr ("error: %s\n", error->message);
         g_error_free (error);
