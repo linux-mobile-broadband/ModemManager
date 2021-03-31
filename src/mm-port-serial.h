@@ -38,8 +38,8 @@
 #define MM_PORT_SERIAL_FLOW_CONTROL "flowcontrol"
 #define MM_PORT_SERIAL_SEND_DELAY   "send-delay"
 #define MM_PORT_SERIAL_FD           "fd" /* Construct-only */
-#define MM_PORT_SERIAL_SPEW_CONTROL "spew-control" /* Construct-only */
-#define MM_PORT_SERIAL_FLASH_OK     "flash-ok" /* Construct-only */
+#define MM_PORT_SERIAL_SPEW_CONTROL "spew-control"
+#define MM_PORT_SERIAL_FLASH_OK     "flash-ok"
 
 typedef enum {
     MM_PORT_SERIAL_RESPONSE_NONE,
