@@ -2164,7 +2164,7 @@ mm_port_serial_class_init (MMPortSerialClass *klass)
                                "Flashing the port (0 baud for a short period) "
                                "is allowed.",
                                TRUE,
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+                               G_PARAM_READWRITE));
 
     /* Signals */
     signals[BUFFER_FULL] =
