@@ -1054,16 +1054,7 @@ connect_context_step (GTask *task)
         }
 
         ip_family = mm_bearer_properties_get_ip_type (ctx->properties);
-        if (ip_family == MM_BEARER_IP_FAMILY_NONE ||
-            ip_family == MM_BEARER_IP_FAMILY_ANY) {
-            gchar * str;
-
-            ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (self));
-            str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-            mm_obj_dbg (self, "no specific IP family requested, defaulting to %s", str);
-            g_free (str);
-        }
-
+        mm_3gpp_normalize_ip_family (&ip_family, self);
         ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_family, &error);
         if (error) {
             g_task_return_error (task, error);

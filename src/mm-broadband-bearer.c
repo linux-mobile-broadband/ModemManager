@@ -81,26 +81,6 @@ mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
 }
 
 /*****************************************************************************/
-
-static MMBearerIpFamily
-select_bearer_ip_family (MMBroadbandBearer *self)
-{
-    MMBearerIpFamily ip_family;
-
-    ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-    if (ip_family == MM_BEARER_IP_FAMILY_NONE || ip_family == MM_BEARER_IP_FAMILY_ANY) {
-        gchar *default_family;
-
-        ip_family = mm_base_bearer_get_default_ip_family (MM_BASE_BEARER (self));
-        default_family = mm_bearer_ip_family_build_string_from_mask (ip_family);
-        mm_obj_dbg (self, "no specific IP family requested, defaulting to %s", default_family);
-        g_free (default_family);
-    }
-
-    return ip_family;
-}
-
-/*****************************************************************************/
 /* Detailed connect context, used in both CDMA and 3GPP sequences */
 
 typedef struct {
@@ -150,7 +130,9 @@ detailed_connect_context_new (MMBroadbandBearer *self,
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
     ctx->secondary = (secondary ? g_object_ref (secondary) : NULL);
-    ctx->ip_family = select_bearer_ip_family (self);
+
+    ctx->ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    mm_3gpp_normalize_ip_family (&ctx->ip_family, self);
 
     return ctx;
 }
@@ -924,7 +906,10 @@ cid_selection_3gpp (MMBroadbandBearer   *self,
     ctx->modem       = g_object_ref (modem);
     ctx->primary     = g_object_ref (primary);
     ctx->cancellable = g_object_ref (cancellable);
-    ctx->ip_family   = select_bearer_ip_family (self);
+
+    ctx->ip_family   = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    mm_3gpp_normalize_ip_family (&ctx->ip_family, self);
+
     g_task_set_task_data (task, ctx, (GDestroyNotify) cid_selection_3gpp_context_free);
 
     /* Validate PDP type */

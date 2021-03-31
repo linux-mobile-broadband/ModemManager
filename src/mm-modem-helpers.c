@@ -4099,6 +4099,20 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
     return MM_BEARER_IP_FAMILY_NONE;
 }
 
+gboolean
+mm_3gpp_normalize_ip_family (MMBearerIpFamily *family,
+                             gpointer          log_object)
+{
+    /* if nothing specific requested, default to IPv4 */
+    if (*family == MM_BEARER_IP_FAMILY_NONE || *family == MM_BEARER_IP_FAMILY_ANY) {
+        *family = MM_BEARER_IP_FAMILY_IPV4;
+        return TRUE;
+    }
+
+    /* no need to normalize */
+    return FALSE;
+}
+
 /*************************************************************************/
 /* ICCID validation */
 /*

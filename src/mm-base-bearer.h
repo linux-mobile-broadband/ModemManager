@@ -70,12 +70,11 @@ typedef struct _MMBaseBearer MMBaseBearer;
 typedef struct _MMBaseBearerClass MMBaseBearerClass;
 typedef struct _MMBaseBearerPrivate MMBaseBearerPrivate;
 
-#define MM_BASE_BEARER_PATH              "bearer-path"
-#define MM_BASE_BEARER_CONNECTION        "bearer-connection"
-#define MM_BASE_BEARER_MODEM             "bearer-modem"
-#define MM_BASE_BEARER_STATUS            "bearer-status"
-#define MM_BASE_BEARER_CONFIG            "bearer-config"
-#define MM_BASE_BEARER_DEFAULT_IP_FAMILY "bearer-default-ip-family"
+#define MM_BASE_BEARER_PATH       "bearer-path"
+#define MM_BASE_BEARER_CONNECTION "bearer-connection"
+#define MM_BASE_BEARER_MODEM      "bearer-modem"
+#define MM_BASE_BEARER_STATUS     "bearer-status"
+#define MM_BASE_BEARER_CONFIG     "bearer-config"
 
 typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_DISCONNECTED,
@@ -148,12 +147,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseBearer, g_object_unref)
 
 void         mm_base_bearer_export   (MMBaseBearer *self);
 
-const gchar        *mm_base_bearer_get_path              (MMBaseBearer *self);
-MMBearerStatus      mm_base_bearer_get_status            (MMBaseBearer *self);
-MMBearerProperties *mm_base_bearer_peek_config           (MMBaseBearer *self);
-MMBearerProperties *mm_base_bearer_get_config            (MMBaseBearer *self);
-MMBearerIpFamily    mm_base_bearer_get_default_ip_family (MMBaseBearer *self);
-
+const gchar        *mm_base_bearer_get_path    (MMBaseBearer *self);
+MMBearerStatus      mm_base_bearer_get_status  (MMBaseBearer *self);
+MMBearerProperties *mm_base_bearer_peek_config (MMBaseBearer *self);
+MMBearerProperties *mm_base_bearer_get_config  (MMBaseBearer *self);
 
 void     mm_base_bearer_connect        (MMBaseBearer *self,
                                         GAsyncReadyCallback callback,

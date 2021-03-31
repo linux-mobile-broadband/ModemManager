@@ -437,8 +437,10 @@ gboolean mm_3gpp_parse_operator_id (const gchar *operator_id,
                                     guint16 *mnc,
                                     GError **error);
 
-const gchar      *mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily family);
-MMBearerIpFamily  mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type);
+const gchar      *mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily  family);
+MMBearerIpFamily  mm_3gpp_get_ip_family_from_pdp_type (const gchar      *pdp_type);
+gboolean          mm_3gpp_normalize_ip_family         (MMBearerIpFamily *family,
+                                                       gpointer          log_object);
 
 char *mm_3gpp_parse_iccid (const char *raw_iccid, GError **error);
 

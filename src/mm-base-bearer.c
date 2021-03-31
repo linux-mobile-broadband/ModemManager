@@ -70,7 +70,6 @@ enum {
     PROP_MODEM,
     PROP_STATUS,
     PROP_CONFIG,
-    PROP_DEFAULT_IP_FAMILY,
     PROP_LAST
 };
 
@@ -92,8 +91,6 @@ struct _MMBaseBearerPrivate {
     gboolean ignore_disconnection_reports;
     /* Configuration of the bearer */
     MMBearerProperties *config;
-    /* Default IP family of this bearer */
-    MMBearerIpFamily default_ip_family;
 
     /* Cancellable for connect() */
     GCancellable *connect_cancellable;
@@ -1289,12 +1286,6 @@ mm_base_bearer_get_config (MMBaseBearer *self)
             NULL);
 }
 
-MMBearerIpFamily
-mm_base_bearer_get_default_ip_family (MMBaseBearer *self)
-{
-    return self->priv->default_ip_family;
-}
-
 /*****************************************************************************/
 
 static void
@@ -1481,9 +1472,6 @@ set_property (GObject *object,
             g_variant_unref (dictionary);
         break;
     }
-    case PROP_DEFAULT_IP_FAMILY:
-        self->priv->default_ip_family = g_value_get_flags (value);
-        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1514,9 +1502,6 @@ get_property (GObject *object,
     case PROP_CONFIG:
         g_value_set_object (value, self->priv->config);
         break;
-    case PROP_DEFAULT_IP_FAMILY:
-        g_value_set_flags (value, self->priv->default_ip_family);
-        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1539,7 +1524,6 @@ mm_base_bearer_init (MMBaseBearer *self)
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
     self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
-    self->priv->default_ip_family = MM_BEARER_IP_FAMILY_IPV4;
     self->priv->stats = mm_bearer_stats_new ();
 
     /* Set defaults */
@@ -1651,15 +1635,6 @@ mm_base_bearer_class_init (MMBaseBearerClass *klass)
                              MM_TYPE_BEARER_PROPERTIES,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_CONFIG, properties[PROP_CONFIG]);
-
-    properties[PROP_DEFAULT_IP_FAMILY] =
-        g_param_spec_flags (MM_BASE_BEARER_DEFAULT_IP_FAMILY,
-                            "Bearer default IP family",
-                            "IP family to use for this bearer when no IP family is specified",
-                            MM_TYPE_BEARER_IP_FAMILY,
-                            MM_BEARER_IP_FAMILY_IPV4,
-                            G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_DEFAULT_IP_FAMILY, properties[PROP_DEFAULT_IP_FAMILY]);
 }
 
 /*****************************************************************************/
