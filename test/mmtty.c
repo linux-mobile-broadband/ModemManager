@@ -42,6 +42,7 @@ static gchar    *device_str;
 static gboolean  no_flash_flag;
 static gboolean  no_echo_removal_flag;
 static gint64    send_delay = -1;
+static gboolean  send_lf_flag;
 static gboolean  verbose_flag;
 static gboolean  version_flag;
 
@@ -61,6 +62,10 @@ static GOptionEntry main_entries[] = {
     { "send-delay", 0, 0, G_OPTION_ARG_INT64, &send_delay,
       "Send delay for each byte in microseconds (default=1000)",
       "[DELAY]"
+    },
+    { "send-lf", 0, 0, G_OPTION_ARG_NONE, &send_lf_flag,
+      "Send <CR><LF> (default <CR> only)",
+      NULL
     },
     { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose_flag,
       "Run action with verbose logs",
@@ -210,6 +215,12 @@ start_cb (void)
     if (no_echo_removal_flag) {
         g_print ("disabling echo removal...\n");
         g_object_set (port, MM_PORT_SERIAL_AT_REMOVE_ECHO, FALSE, NULL);
+    }
+
+    /* Setup LF */
+    if (send_lf_flag) {
+        g_print ("enabling LF...\n");
+        g_object_set (port, MM_PORT_SERIAL_AT_SEND_LF, TRUE, NULL);
     }
 
     /* Set common response parser */
