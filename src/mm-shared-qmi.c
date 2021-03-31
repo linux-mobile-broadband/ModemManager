@@ -3365,7 +3365,7 @@ check_final_slot_status (GTask *task)
                     "Waiting for final slot status indication...");
         ctx->final_slot_status_timeout_id = g_timeout_add_seconds (FINAL_SLOT_STATUS_TIMEOUT,
                                                                    (GSourceFunc) hotswap_while_loading_slots,
-                                                                   self);
+                                                                   task);
     }
 }
 
