@@ -41,6 +41,7 @@ static guint           input_watch_id;
 static gchar    *device_str;
 static gboolean  no_flash_flag;
 static gboolean  no_echo_removal_flag;
+static gboolean  spew_control_flag;
 static gint64    send_delay = -1;
 static gboolean  send_lf_flag;
 static gboolean  verbose_flag;
@@ -57,6 +58,10 @@ static GOptionEntry main_entries[] = {
     },
     { "no-echo-removal", 0, 0, G_OPTION_ARG_NONE, &no_echo_removal_flag,
       "Avoid logic to remove echo",
+      NULL
+    },
+    { "spew-control", 0, 0, G_OPTION_ARG_NONE, &spew_control_flag,
+      "Enable spew control logic",
       NULL
     },
     { "send-delay", 0, 0, G_OPTION_ARG_INT64, &send_delay,
@@ -215,6 +220,12 @@ start_cb (void)
     if (no_echo_removal_flag) {
         g_print ("disabling echo removal...\n");
         g_object_set (port, MM_PORT_SERIAL_AT_REMOVE_ECHO, FALSE, NULL);
+    }
+
+    /* Setup spew control */
+    if (spew_control_flag) {
+        g_print ("enabling spew control...\n");
+        g_object_set (port, MM_PORT_SERIAL_SPEW_CONTROL, TRUE, NULL);
     }
 
     /* Setup LF */
