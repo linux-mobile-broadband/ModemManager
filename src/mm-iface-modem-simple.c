@@ -689,9 +689,10 @@ connect_auth_ready (MMBaseModem *self,
 
     /* Log about all the parameters being used for the simple connect */
     {
-        MMBearerAllowedAuth allowed_auth;
-        gchar *str;
-        MMBearerIpFamily ip_family;
+        MMBearerMultiplexSupport  multiplex;
+        MMBearerAllowedAuth       allowed_auth;
+        gchar                    *str;
+        MMBearerIpFamily          ip_family;
 
 #define VALIDATE_UNSPECIFIED(str) (str ? str : "unspecified")
 
@@ -718,6 +719,11 @@ connect_auth_ready (MMBaseModem *self,
 
         mm_obj_dbg (self, "   user: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_user (ctx->properties)));
         mm_obj_dbg (self, "   password: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_password (ctx->properties)));
+
+        multiplex = mm_simple_connect_properties_get_multiplex (ctx->properties);
+        mm_obj_dbg (self, "   multiplex: %s", VALIDATE_UNSPECIFIED (multiplex != MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN ?
+                                                                    mm_bearer_multiplex_support_get_string (multiplex) :
+                                                                    NULL));
 
 #undef VALIDATE_UNSPECIFIED
     }
