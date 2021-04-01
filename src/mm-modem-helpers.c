@@ -4100,8 +4100,7 @@ mm_3gpp_get_ip_family_from_pdp_type (const gchar *pdp_type)
 }
 
 gboolean
-mm_3gpp_normalize_ip_family (MMBearerIpFamily *family,
-                             gpointer          log_object)
+mm_3gpp_normalize_ip_family (MMBearerIpFamily *family)
 {
     /* if nothing specific requested, default to IPv4 */
     if (*family == MM_BEARER_IP_FAMILY_NONE || *family == MM_BEARER_IP_FAMILY_ANY) {

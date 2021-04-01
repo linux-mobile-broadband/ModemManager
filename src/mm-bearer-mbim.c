@@ -1054,7 +1054,7 @@ connect_context_step (GTask *task)
         }
 
         ip_family = mm_bearer_properties_get_ip_type (ctx->properties);
-        mm_3gpp_normalize_ip_family (&ip_family, self);
+        mm_3gpp_normalize_ip_family (&ip_family);
         ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_family, &error);
         if (error) {
             g_task_return_error (task, error);

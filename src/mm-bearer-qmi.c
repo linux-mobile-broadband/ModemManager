@@ -2068,7 +2068,7 @@ _connect (MMBaseBearer *_self,
         ctx->password = g_strdup (mm_bearer_properties_get_password (properties));
 
         ip_family = mm_bearer_properties_get_ip_type (properties);
-        if (mm_3gpp_normalize_ip_family (&ip_family, self))
+        if (mm_3gpp_normalize_ip_family (&ip_family))
             ctx->no_ip_family_preference = TRUE;
 
         if (ip_family & MM_BEARER_IP_FAMILY_IPV4)

@@ -345,7 +345,7 @@ connect_3gpp_context_step (GTask *task)
         MMBearerIpFamily ip_family;
 
         ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-        mm_3gpp_normalize_ip_family (&ip_family, self);
+        mm_3gpp_normalize_ip_family (&ip_family);
         if (ip_family != MM_BEARER_IP_FAMILY_IPV4) {
             g_task_return_new_error (task,
                                      MM_CORE_ERROR,
