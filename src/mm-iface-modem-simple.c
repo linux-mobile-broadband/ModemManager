@@ -716,8 +716,8 @@ connect_auth_ready (MMBaseModem *self,
         } else
             mm_obj_dbg (self, "   allowed authentication: %s", VALIDATE_UNSPECIFIED (NULL));
 
-        mm_obj_dbg (self, "   User: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_user (ctx->properties)));
-        mm_obj_dbg (self, "   Password: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_password (ctx->properties)));
+        mm_obj_dbg (self, "   user: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_user (ctx->properties)));
+        mm_obj_dbg (self, "   password: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_password (ctx->properties)));
 
 #undef VALIDATE_UNSPECIFIED
     }
