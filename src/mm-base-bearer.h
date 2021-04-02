@@ -37,6 +37,9 @@ MMBearerConnectResult *mm_bearer_connect_result_new              (MMPort *data,
                                                                   MMBearerIpConfig *ipv6_config);
 void                   mm_bearer_connect_result_unref            (MMBearerConnectResult *result);
 MMBearerConnectResult *mm_bearer_connect_result_ref              (MMBearerConnectResult *result);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerConnectResult, mm_bearer_connect_result_unref)
+
 MMPort                *mm_bearer_connect_result_peek_data        (MMBearerConnectResult *result);
 MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv4_config (MMBearerConnectResult *result);
 MMBearerIpConfig      *mm_bearer_connect_result_peek_ipv6_config (MMBearerConnectResult *result);
