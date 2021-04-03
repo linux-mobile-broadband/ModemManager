@@ -155,6 +155,22 @@ mm_bearer_list_find_by_path (MMBearerList *self,
     return NULL;
 }
 
+MMBaseBearer *
+mm_bearer_list_find_by_profile_id (MMBearerList *self,
+                                   gint          profile_id)
+{
+    GList *l;
+
+    g_assert (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
+
+    for (l = self->priv->bearers; l; l = g_list_next (l)) {
+        if (mm_base_bearer_get_profile_id (MM_BASE_BEARER (l->data)) == profile_id)
+            return g_object_ref (l->data);
+    }
+
+    return NULL;
+}
+
 /*****************************************************************************/
 
 typedef struct {

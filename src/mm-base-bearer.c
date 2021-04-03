@@ -1290,6 +1290,12 @@ mm_base_bearer_get_config (MMBaseBearer *self)
             NULL);
 }
 
+gint
+mm_base_bearer_get_profile_id (MMBaseBearer *self)
+{
+    return mm_gdbus_bearer_get_profile_id (MM_GDBUS_BEARER (self));
+}
+
 /*****************************************************************************/
 
 static void

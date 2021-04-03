@@ -155,10 +155,11 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBaseBearer, g_object_unref)
 
 void         mm_base_bearer_export   (MMBaseBearer *self);
 
-const gchar        *mm_base_bearer_get_path    (MMBaseBearer *self);
-MMBearerStatus      mm_base_bearer_get_status  (MMBaseBearer *self);
-MMBearerProperties *mm_base_bearer_peek_config (MMBaseBearer *self);
-MMBearerProperties *mm_base_bearer_get_config  (MMBaseBearer *self);
+const gchar        *mm_base_bearer_get_path       (MMBaseBearer *self);
+MMBearerStatus      mm_base_bearer_get_status     (MMBaseBearer *self);
+MMBearerProperties *mm_base_bearer_peek_config    (MMBaseBearer *self);
+MMBearerProperties *mm_base_bearer_get_config     (MMBaseBearer *self);
+gint                mm_base_bearer_get_profile_id (MMBaseBearer *self);
 
 void     mm_base_bearer_connect        (MMBaseBearer *self,
                                         GAsyncReadyCallback callback,
