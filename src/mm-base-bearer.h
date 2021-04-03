@@ -49,6 +49,11 @@ void                   mm_bearer_connect_result_set_multiplexed  (MMBearerConnec
                                                                   gboolean               multiplexed);
 gboolean               mm_bearer_connect_result_get_multiplexed  (MMBearerConnectResult *result);
 
+/* profile id, if known */
+void                   mm_bearer_connect_result_set_profile_id   (MMBearerConnectResult *result,
+                                                                  gint                   profile_id);
+gint                   mm_bearer_connect_result_get_profile_id   (MMBearerConnectResult *result);
+
 /*****************************************************************************/
 
 /* Default timeout values to be used in the steps of a connection or

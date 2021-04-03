@@ -407,6 +407,7 @@ bearer_stats_start (MMBaseBearer *self)
 static void
 bearer_reset_interface_status (MMBaseBearer *self)
 {
+    mm_gdbus_bearer_set_profile_id (MM_GDBUS_BEARER (self), MM_3GPP_PROFILE_ID_UNKNOWN);
     mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
@@ -466,9 +467,11 @@ static void
 bearer_update_status_connected (MMBaseBearer     *self,
                                 const gchar      *interface,
                                 gboolean          multiplexed,
+                                gint              profile_id,
                                 MMBearerIpConfig *ipv4_config,
                                 MMBearerIpConfig *ipv6_config)
 {
+    mm_gdbus_bearer_set_profile_id (MM_GDBUS_BEARER (self), profile_id);
     mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), multiplexed);
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), TRUE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
@@ -831,6 +834,7 @@ connect_ready (MMBaseBearer *self,
             self,
             mm_port_get_device (mm_bearer_connect_result_peek_data (result)),
             mm_bearer_connect_result_get_multiplexed (result),
+            mm_bearer_connect_result_get_profile_id (result),
             mm_bearer_connect_result_peek_ipv4_config (result),
             mm_bearer_connect_result_peek_ipv6_config (result));
         mm_bearer_connect_result_unref (result);
@@ -1529,6 +1533,7 @@ mm_base_bearer_init (MMBaseBearer *self)
     /* Set defaults */
     mm_gdbus_bearer_set_interface   (MM_GDBUS_BEARER (self), NULL);
     mm_gdbus_bearer_set_multiplexed (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_profile_id  (MM_GDBUS_BEARER (self), MM_3GPP_PROFILE_ID_UNKNOWN);
     mm_gdbus_bearer_set_connected   (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended   (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_properties  (MM_GDBUS_BEARER (self), NULL);
@@ -1646,6 +1651,7 @@ struct _MMBearerConnectResult {
     MMBearerIpConfig *ipv4_config;
     MMBearerIpConfig *ipv6_config;
     gboolean          multiplexed;
+    gint              profile_id;
 };
 
 MMBearerConnectResult *
@@ -1700,6 +1706,19 @@ mm_bearer_connect_result_get_multiplexed (MMBearerConnectResult *result)
     return result->multiplexed;
 }
 
+void
+mm_bearer_connect_result_set_profile_id (MMBearerConnectResult *result,
+                                         gint                   profile_id)
+{
+    result->profile_id = profile_id;
+}
+
+gint
+mm_bearer_connect_result_get_profile_id (MMBearerConnectResult *result)
+{
+    return result->profile_id;
+}
+
 MMBearerConnectResult *
 mm_bearer_connect_result_new (MMPort           *data,
                               MMBearerIpConfig *ipv4_config,
@@ -1718,5 +1737,6 @@ mm_bearer_connect_result_new (MMPort           *data,
     if (ipv6_config)
         result->ipv6_config = g_object_ref (ipv6_config);
     result->multiplexed = FALSE; /* default */
+    result->profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
     return result;
 }
