@@ -137,11 +137,16 @@ print_bearer_info (MMBearer *bearer)
     MMBearerIpConfig   *ipv6_config;
     MMBearerProperties *properties;
     MMBearerStats      *stats;
+    gint                profile_id;
+    gchar              *profile_id_str;
 
     ipv4_config = mm_bearer_get_ipv4_config (bearer);
     ipv6_config = mm_bearer_get_ipv6_config (bearer);
     properties  = mm_bearer_get_properties (bearer);
     stats       = mm_bearer_get_stats (bearer);
+    profile_id  = mm_bearer_get_profile_id (bearer);
+
+    profile_id_str = (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) ? g_strdup_printf ("%d", profile_id) : NULL;
 
     mmcli_output_string      (MMC_F_BEARER_GENERAL_DBUS_PATH, mm_bearer_get_path (bearer));
     mmcli_output_string      (MMC_F_BEARER_GENERAL_TYPE,      mm_bearer_type_get_string (mm_bearer_get_bearer_type (bearer)));
@@ -151,6 +156,7 @@ print_bearer_info (MMBearer *bearer)
     mmcli_output_string      (MMC_F_BEARER_STATUS_MULTIPLEXED, mm_bearer_get_multiplexed (bearer) ? "yes" : "no");
     mmcli_output_string      (MMC_F_BEARER_STATUS_INTERFACE,   mm_bearer_get_interface (bearer));
     mmcli_output_string_take (MMC_F_BEARER_STATUS_IP_TIMEOUT,  g_strdup_printf ("%u", mm_bearer_get_ip_timeout (bearer)));
+    mmcli_output_string_take (MMC_F_BEARER_STATUS_PROFILE_ID,  profile_id_str);
 
     /* Properties */
     {

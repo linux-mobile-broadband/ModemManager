@@ -361,6 +361,20 @@
     <property name="BearerType" type="u" access="read" />
 
     <!--
+        ProfileId:
+
+        The profile ID this bearer object is associated with, only applicable if
+        the modem supports profile management operations, and if the bearer is
+        connected.
+
+        If the bearer is disconnected, or if profile management operations are
+        not supported, -1 will be reported.
+
+        Since: 1.18
+    -->
+    <property name="ProfileId" type="i" access="read" />
+
+    <!--
         Properties:
 
         List of settings used to create the bearer.

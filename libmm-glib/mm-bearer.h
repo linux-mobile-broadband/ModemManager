@@ -84,6 +84,8 @@ guint         mm_bearer_get_ip_timeout  (MMBearer *self);
 
 MMBearerType  mm_bearer_get_bearer_type (MMBearer *self);
 
+gint          mm_bearer_get_profile_id  (MMBearer *self);
+
 void     mm_bearer_connect        (MMBearer *self,
                                    GCancellable *cancellable,
                                    GAsyncReadyCallback callback,

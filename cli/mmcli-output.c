@@ -214,6 +214,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_BEARER_STATUS_MULTIPLEXED]         = { "bearer.status.multiplexed",                       "multiplexed",              MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_STATUS_INTERFACE]           = { "bearer.status.interface",                         "interface",                MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_STATUS_IP_TIMEOUT]          = { "bearer.status.ip-timeout",                        "ip timeout",               MMC_S_BEARER_STATUS,              },
+    [MMC_F_BEARER_STATUS_PROFILE_ID]          = { "bearer.status.profile-id",                        "profile id",               MMC_S_BEARER_STATUS,              },
     [MMC_F_BEARER_PROPERTIES_APN]             = { "bearer.properties.apn",                           "apn",                      MMC_S_BEARER_PROPERTIES,          },
     [MMC_F_BEARER_PROPERTIES_APN_TYPE]        = { "bearer.properties.apn-type",                      "apn type",                 MMC_S_BEARER_PROPERTIES,          },
     [MMC_F_BEARER_PROPERTIES_ROAMING]         = { "bearer.properties.roaming",                       "roaming",                  MMC_S_BEARER_PROPERTIES,          },

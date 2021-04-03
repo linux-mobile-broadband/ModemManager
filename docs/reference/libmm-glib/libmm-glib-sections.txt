@@ -1082,6 +1082,7 @@ mm_bearer_get_suspended
 mm_bearer_get_multiplexed
 mm_bearer_get_ip_timeout
 mm_bearer_get_bearer_type
+mm_bearer_get_profile_id
 mm_bearer_peek_ipv4_config
 mm_bearer_get_ipv4_config
 mm_bearer_peek_ipv6_config
@@ -1837,6 +1838,7 @@ mm_gdbus_bearer_get_connected
 mm_gdbus_bearer_get_suspended
 mm_gdbus_bearer_get_multiplexed
 mm_gdbus_bearer_get_bearer_type
+mm_gdbus_bearer_get_profile_id
 mm_gdbus_bearer_get_stats
 mm_gdbus_bearer_dup_stats
 <SUBSECTION Methods>
@@ -1856,6 +1858,7 @@ mm_gdbus_bearer_set_ip_timeout
 mm_gdbus_bearer_set_properties
 mm_gdbus_bearer_set_suspended
 mm_gdbus_bearer_set_bearer_type
+mm_gdbus_bearer_set_profile_id
 mm_gdbus_bearer_set_stats
 mm_gdbus_bearer_set_multiplexed
 mm_gdbus_bearer_override_properties

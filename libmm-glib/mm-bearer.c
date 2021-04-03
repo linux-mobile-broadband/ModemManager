@@ -264,6 +264,28 @@ mm_bearer_get_bearer_type (MMBearer *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_bearer_get_profile_id:
+ * @self: A #MMBearer.
+ *
+ * Gets profile ID associated to the bearer connection, if known.
+ *
+ * If the bearer is disconnected or the modem doesn't support profile management
+ * features, %MM_3GPP_PROFILE_ID_UNKNOWN.
+ *
+ * Returns: a profile id.
+ *
+ * Since: 1.18
+ */
+gint
+mm_bearer_get_profile_id (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), MM_3GPP_PROFILE_ID_UNKNOWN);
+
+    return mm_gdbus_bearer_get_profile_id (MM_GDBUS_BEARER (self));
+}
+/*****************************************************************************/
+
 static void
 ipv4_config_updated (MMBearer *self,
                      GParamSpec *pspec)
