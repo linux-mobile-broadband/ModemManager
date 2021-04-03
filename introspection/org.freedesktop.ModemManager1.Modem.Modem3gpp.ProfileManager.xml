@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 1.0 Interface Specification
+
+   Copyright (C) 2021 Google Inc.
+   Copyright (C) 2021 Aleksander Morgado
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager:
+      @short_description: The ModemManager 3GPP profile management interface.
+
+      This interface provides access to actions with connection profiles.
+
+      This interface will only be available once the modem is ready to be
+      registered in the cellular network. 3GPP devices will require a valid
+      unlocked SIM card before any of the features in the interface can be
+      used.
+
+      The user of the interface can optionally choose to use the new profile
+      management methods to manage the connection setup, e.g by using the new
+      <literal>"profile-id"</literal> setting in either the
+      <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer</link>
+      or the
+      <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">Connect</link>
+      methods. If that's the case, it is suggested that the legacy approach of
+      not using the profiles is completely avoided. If both approaches are
+      used at the same time, it may happen that a connection attempt not using
+      the <literal>"profile-id"</literal> implicitly updates a given profile
+      (without emitting
+      <link linkend="gdbus-signal-org-freedesktop-ModemManager1-Modem-Modem3gpp-ProfileManager.Updated">Updated</link>),
+      as the amount of profiles implemented in modems may be fixed.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager">
+
+    <!--
+        List:
+        @profiles: An array of dictionaries containing the properties of the provisioned profiles.
+
+        Lists the available profiles or contexts provisioned on the modem.
+
+        Profiles are represented as dictionaries of properties, and any of the
+        3GPP-specific properties defined in the
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Properties">bearer properties</link>
+        are allowed.
+
+        Depending on the implementation, the settings applicable to the initial
+        EPS bearer given in
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Modem-Modem3gpp.InitialEpsBearerSettings">bearer properties</link>
+        may also be reported as an item in the returned list, identified by the
+        %MM_BEARER_APN_TYPE_INITIAL <literal>"apn-type"</literal> flag.
+
+        Since: 1.18
+    -->
+    <method name="List">
+      <arg name="profiles" type="aa{sv}" direction="out" />
+    </method>
+
+    <!--
+        Set:
+        @requested_properties: the requested profile properties.
+        @stored_properties: the stored profile properties.
+
+        Creates or updates a connection profile on this modem. If
+        <literal>"profile-id"</literal> is not given, a new profile will be
+        created; otherwise, the profile with the given ID will be updated.
+
+        Profiles are represented as dictionaries of properties, and any of the
+        3GPP-specific properties defined in the
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Properties">bearer properties</link>
+        are allowed. The real list of supported properties really depends on the
+        underlying protocol and implementation, though; e.g. in AT-based modems
+        setting <literal>"apn-type"</literal> won't be supported, and instead the
+        user should give that setting explicitly when creating the bearer object.
+
+        The operation may fail if it is attempting to update an existing
+        profile for which connected bearer objects already exist. In this case,
+        the user should make sure these bearer objects are already disconnected
+        before attempting to change the profile settings.
+
+        The operation may also fail if it is attempting to update the profile
+        associated to the settings of the initial EPS bearer, identified by the
+        %MM_BEARER_APN_TYPE_INITIAL <literal>"apn-type"</literal> flag. In this
+        case, <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp.SetInitialEpsBearerSettings">SetInitialEpsBearerSettings()</link>
+        should be used instead.
+
+        The output @stored_properties will contain the settings that were
+        successfully stored, including the new <literal>"profile-id"</literal>
+        if the operation was creating a new profile.
+
+        Since: 1.18
+    -->
+    <method name="Set">
+      <arg name="requested_properties" type="a{sv}" direction="in"  />
+      <arg name="stored_properties"    type="a{sv}" direction="out" />
+    </method>
+
+    <!--
+        Delete:
+        @properties: the profile properties.
+
+        Deletes the profile with the <literal>"profile-id"</literal> given in @properties.
+
+        If additional settings are given in @properties they are ignored. This
+        allows the user to easily request the deletion of a profile that has been
+        provided in the List() operation.
+
+        This method may just clear the existing profiles (i.e. reseting all the
+        properties to defaults) instead of fully removing them if the profiles
+        cannot be fully removed. In this case, the method will succeed, but the
+        size of the list of profiles will not change.
+
+        This method will fail if <literal>"profile-id"</literal> is not given.
+
+        The operation may fail if it is attempting to delete a profile
+        for which connected bearer objects already exist. In this case,
+        the user should make sure these bearer objects are already disconnected
+        before attempting to delete the profile.
+
+        The operation may also fail if it is attempting to delete the profile
+        associated to the settings of the initial EPS bearer, identified by the
+        %MM_BEARER_APN_TYPE_INITIAL <literal>"apn-type"</literal> flag. In this
+        case, <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp.SetInitialEpsBearerSettings">SetInitialEpsBearerSettings()</link>
+        may be used instead to clear these settings.
+
+        Since: 1.18
+    -->
+    <method name="Delete">
+      <arg name="properties" type="a{sv}" direction="in" />
+    </method>
+
+    <!--
+        Updated:
+
+        Emitted when the profiles are updated by the network through OTA
+        procedures.
+
+        Since: 1.18
+    -->
+    <signal name="Updated" />
+
+  </interface>
+</node>

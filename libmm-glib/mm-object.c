@@ -184,6 +184,52 @@ mm_object_peek_modem_3gpp (MMObject *self)
 /*****************************************************************************/
 
 /**
+ * mm_object_get_modem_3gpp_profile_manager:
+ * @self: A #MMObject.
+ *
+ * Gets the #MMModem3gppProfileManager instance for the D-Bus interface
+ * org.freedesktop.ModemManager1.Modem.Modem3gpp-ProfileManager on @self, if any.
+ *
+ * Returns: (transfer full): A #MMModem3gppProfileManager that must be freed with
+ * g_object_unref() or %NULL if @self does not implement the interface.
+ *
+ * Since: 1.18
+ */
+MMModem3gppProfileManager *
+mm_object_get_modem_3gpp_profile_manager (MMObject *self)
+{
+    g_return_val_if_fail (MM_IS_OBJECT (MM_GDBUS_OBJECT (self)), NULL);
+
+    return (MMModem3gppProfileManager *)mm_gdbus_object_get_modem3gpp_profile_manager (MM_GDBUS_OBJECT (self));
+}
+
+/**
+ * mm_object_peek_modem_3gpp_profile_manager: (skip)
+ * @self: A #MMObject.
+ *
+ * Like mm_object_get_modem_3gpp_profile_manager() but doesn't increase the reference count
+ * on the returned object.
+ *
+ * <warning>It is not safe to use the returned object if you are on another
+ * thread than the one where the #MMManager is running.</warning>
+ *
+ * Returns: (transfer none): A #MMModem3gppProfileManager or %NULL if @self does not
+ * implement the interface. Do not free the returned object, it is owned by
+ * @self.
+ *
+ * Since: 1.18
+ */
+MMModem3gppProfileManager *
+mm_object_peek_modem_3gpp_profile_manager (MMObject *self)
+{
+    g_return_val_if_fail (MM_IS_OBJECT (MM_GDBUS_OBJECT (self)), NULL);
+
+    return (MMModem3gppProfileManager *)mm_gdbus_object_peek_modem3gpp_profile_manager (MM_GDBUS_OBJECT (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_object_get_modem_3gpp_ussd:
  * @self: A #MMObject.
  *

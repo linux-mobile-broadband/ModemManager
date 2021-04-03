@@ -18,6 +18,8 @@ libmm_glib_la_SOURCES = \
 	mm-modem.c \
 	mm-modem-3gpp.h \
 	mm-modem-3gpp.c \
+	mm-modem-3gpp-profile-manager.h \
+	mm-modem-3gpp-profile-manager.c \
 	mm-modem-3gpp-ussd.h \
 	mm-modem-3gpp-ussd.c \
 	mm-modem-cdma.h \
@@ -129,6 +131,7 @@ include_HEADERS = \
 	mm-object.h \
 	mm-modem.h \
 	mm-modem-3gpp.h \
+	mm-modem-3gpp-profile-manager.h \
 	mm-modem-3gpp-ussd.h \
 	mm-modem-cdma.h \
 	mm-modem-messaging.h \

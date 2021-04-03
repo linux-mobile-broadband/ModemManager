@@ -105,6 +105,7 @@
       </section>
       <section>
         <title>Profile management support</title>
+        <xi:include href="xml/mm-modem-3gpp-profile-manager.xml"/>
         <xi:include href="xml/mm-3gpp-profile.xml"/>
       </section>
       <section>
@@ -196,6 +197,10 @@
     <xi:include href="xml/MmGdbusModem3gpp.xml"/>
     <xi:include href="xml/MmGdbusModem3gppProxy.xml"/>
     <xi:include href="xml/MmGdbusModem3gppSkeleton.xml"/>
+
+    <xi:include href="xml/MmGdbusModem3gppProfileManager.xml"/>
+    <xi:include href="xml/MmGdbusModem3gppProfileManagerProxy.xml"/>
+    <xi:include href="xml/MmGdbusModem3gppProfileManagerSkeleton.xml"/>
 
     <xi:include href="xml/MmGdbusModem3gppUssd.xml"/>
     <xi:include href="xml/MmGdbusModem3gppUssdProxy.xml"/>

@@ -71,6 +71,7 @@ expand_content_files = \
 	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Oma.xml \
 	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
 	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager.xml \
 	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
 	$(top_builddir)/libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml \

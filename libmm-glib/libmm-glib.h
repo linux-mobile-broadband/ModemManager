@@ -40,6 +40,7 @@
 # include <mm-bearer.h>
 # include <mm-modem.h>
 # include <mm-modem-3gpp.h>
+# include <mm-modem-3gpp-profile-manager.h>
 # include <mm-modem-3gpp-ussd.h>
 # include <mm-modem-cdma.h>
 # include <mm-modem-simple.h>

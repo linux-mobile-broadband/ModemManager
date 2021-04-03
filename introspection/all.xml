@@ -10,6 +10,7 @@
   <xi:include href="org.freedesktop.ModemManager1.Modem.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Voice.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Modem3gpp.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.ModemCdma.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Messaging.xml"/>

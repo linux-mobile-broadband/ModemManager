@@ -44,6 +44,7 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Oma.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Sar.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
@@ -119,6 +120,7 @@ mm_gdbus_modem_generated = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Oma.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Sar.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
@@ -134,6 +136,7 @@ mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Oma.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Sar.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Simple.xml \
@@ -149,6 +152,7 @@ mm-gdbus-modem.c: $(mm_gdbus_modem_deps)
 		--annotate "org.freedesktop.ModemManager1.Modem.ModemCdma" org.gtk.GDBus.C.Name ModemCdma \
 		--annotate "org.freedesktop.ModemManager1.Modem.Modem3gpp" org.gtk.GDBus.C.Name Modem3gpp \
 		--annotate "org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd" org.gtk.GDBus.C.Name Modem3gppUssd \
+		--annotate "org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager" org.gtk.GDBus.C.Name Modem3gppProfileManager \
 		$^ \
 		$(NULL)
 $(filter-out mm-gdbus-modem.c, $(mm_gdbus_modem_generated)): $(mm_gdbus_modem_deps) mm-gdbus-modem.c
