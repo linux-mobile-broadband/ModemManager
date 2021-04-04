@@ -470,6 +470,31 @@ gboolean mm_3gpp_rssnr_level_to_rssnr (gint      rssnr_level,
 
 GStrv mm_3gpp_parse_emergency_numbers (const char *raw, GError **error);
 
+/* PDP context -> profile */
+MM3gppProfile *mm_3gpp_profile_new_from_pdp_context (MM3gppPdpContext *pdp_context);
+
+/* Profile list operations */
+GList *mm_3gpp_profile_list_new_from_pdp_context_list (GList *pdp_context_list);
+void   mm_3gpp_profile_list_free                      (GList *profile_list);
+
+gint   mm_3gpp_profile_list_find_empty (GList                  *profile_list,
+                                        gint                    min_profile_id,
+                                        gint                    max_profile_id,
+                                        GError                **error);
+gint   mm_3gpp_profile_list_find_best  (GList                  *profile_list,
+                                        MM3gppProfile          *requested,
+                                        GEqualFunc              cmp_apn,
+                                        MM3gppProfileCmpFlags   cmp_flags,
+                                        gint                    min_profile_id,
+                                        gint                    max_profile_id,
+                                        gpointer                log_object,
+                                        MM3gppProfile         **out_reused,
+                                        gboolean               *out_overwritten);
+
+MM3gppProfile *mm_3gpp_profile_list_find_by_profile_id (GList   *profile_list,
+                                                        gint     profile_id,
+                                                        GError **error);
+
 /*****************************************************************************/
 /* CDMA specific helpers and utilities */
 /*****************************************************************************/

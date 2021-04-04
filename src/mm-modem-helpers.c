@@ -1613,6 +1613,203 @@ mm_3gpp_select_best_cid (const gchar      *apn,
 
 /*************************************************************************/
 
+MM3gppProfile *
+mm_3gpp_profile_new_from_pdp_context (MM3gppPdpContext *pdp_context)
+{
+    MM3gppProfile *profile;
+
+    profile = mm_3gpp_profile_new ();
+    mm_3gpp_profile_set_profile_id (profile, pdp_context->cid);
+    mm_3gpp_profile_set_apn        (profile, pdp_context->apn);
+    mm_3gpp_profile_set_ip_type    (profile, pdp_context->pdp_type);
+    return profile;
+}
+
+GList *
+mm_3gpp_profile_list_new_from_pdp_context_list (GList *pdp_context_list)
+{
+    GList *profile_list = NULL;
+    GList *l;
+
+    for (l = pdp_context_list; l; l = g_list_next (l)) {
+        MM3gppPdpContext *pdp_context;
+        MM3gppProfile    *profile;
+
+        pdp_context = (MM3gppPdpContext *)l->data;
+        profile = mm_3gpp_profile_new_from_pdp_context (pdp_context);
+        profile_list = g_list_append (profile_list, profile);
+    }
+    return profile_list;
+}
+
+void
+mm_3gpp_profile_list_free (GList *profile_list)
+{
+    g_list_free_full (profile_list, g_object_unref);
+}
+
+MM3gppProfile *
+mm_3gpp_profile_list_find_by_profile_id (GList   *profile_list,
+                                         gint     profile_id,
+                                         GError **error)
+{
+    GList *l;
+
+    for (l = profile_list; l; l = g_list_next (l)) {
+        MM3gppProfile *iter_profile = l->data;
+
+        if (mm_3gpp_profile_get_profile_id (iter_profile) == profile_id)
+            return g_object_ref (iter_profile);
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                 "Profile '%d' not found", profile_id);
+    return NULL;
+}
+
+gint
+mm_3gpp_profile_list_find_empty (GList   *profile_list,
+                                 gint     min_profile_id,
+                                 gint     max_profile_id,
+                                 GError **error)
+{
+    GList *l;
+    gint   profile_id;
+
+    profile_id = min_profile_id;
+    for (l = profile_list; l; l = g_list_next (l)) {
+        MM3gppProfile *iter_profile = l->data;
+        gint           iter_profile_id;
+
+        iter_profile_id = mm_3gpp_profile_get_profile_id (iter_profile);
+        if (iter_profile_id > profile_id)
+            break;
+        if (iter_profile_id == profile_id)
+            profile_id++;
+    }
+
+    if (profile_id > max_profile_id) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                     "No empty profile available");
+        return MM_3GPP_PROFILE_ID_UNKNOWN;
+    }
+
+    return profile_id;
+}
+
+gint
+mm_3gpp_profile_list_find_best (GList                  *profile_list,
+                                MM3gppProfile          *requested,
+                                GEqualFunc              cmp_apn,
+                                MM3gppProfileCmpFlags   cmp_flags,
+                                gint                    min_profile_id,
+                                gint                    max_profile_id,
+                                gpointer                log_object,
+                                MM3gppProfile         **out_reused,
+                                gboolean               *out_overwritten)
+{
+    GList            *l;
+    MMBearerIpFamily  requested_ip_type;
+    gint              prev_profile_id = 0;
+    gint              unused_profile_id = 0;
+    gint              max_found_profile_id = 0;
+    gint              max_allowed_profile_id = 0;
+    gint              blank_profile_id = 0;
+
+    g_assert (out_reused);
+    g_assert (out_overwritten);
+
+    requested_ip_type = mm_3gpp_profile_get_ip_type (requested);
+
+    /* When looking for exact profile matches we should not compare
+     * the profile id, as the requested profile won't have one set */
+    cmp_flags |= MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_ID;
+
+    /* Look for the exact PDP context we want */
+    for (l = profile_list; l; l = g_list_next (l)) {
+        MM3gppProfile    *iter_profile = l->data;
+        MMBearerIpFamily  iter_ip_type;
+        const gchar      *iter_apn;
+        gint              iter_profile_id;
+
+        iter_profile_id = mm_3gpp_profile_get_profile_id (iter_profile);
+
+        /* Always prefer an exact match; compare all supported fields except for profile id */
+        if (mm_3gpp_profile_cmp (iter_profile, requested, cmp_apn, cmp_flags)) {
+            mm_obj_dbg (log_object, "found exact context at profile %d", iter_profile_id);
+            *out_reused = g_object_ref (iter_profile);
+            *out_overwritten = FALSE;
+            return iter_profile_id;
+        }
+
+        /* Same PDP type but with no APN set? we may use that one if no exact match found */
+        iter_ip_type = mm_3gpp_profile_get_ip_type (iter_profile);
+        iter_apn     = mm_3gpp_profile_get_apn     (iter_profile);
+        if ((iter_ip_type == requested_ip_type) && (!iter_apn || !iter_apn[0]) && !blank_profile_id)
+            blank_profile_id = iter_profile_id;
+
+        /* If an unused CID was not found yet and the previous CID is not (CID - 1),
+         * this means that (previous CID + 1) is an unused CID that can be used.
+         * This logic will allow us using unused CIDs that are available in the gaps
+         * between already defined contexts.
+         */
+        if (!unused_profile_id && prev_profile_id && ((prev_profile_id + 1) < iter_profile_id))
+            unused_profile_id = prev_profile_id + 1;
+
+        /* Update previous CID value to the current CID for use in the next loop,
+         * unless an unused CID was already found.
+         */
+        if (!unused_profile_id)
+            prev_profile_id = iter_profile_id;
+
+        /* Update max CID if we found a bigger one */
+        if (max_found_profile_id < iter_profile_id)
+            max_found_profile_id = iter_profile_id;
+    }
+
+    /* Try to use an unused CID detected in between the already defined contexts */
+    if (unused_profile_id) {
+        mm_obj_dbg (log_object, "found unused profile %d", unused_profile_id);
+        *out_reused = NULL;
+        *out_overwritten = FALSE;
+        return unused_profile_id;
+    }
+
+    /* If the max existing CID found during CGDCONT? is below the max allowed
+     * CID, then we can use the next available CID because it's an unused one. */
+    max_allowed_profile_id = max_profile_id;
+    if (max_found_profile_id && (max_found_profile_id < max_allowed_profile_id)) {
+        mm_obj_dbg (log_object, "found unused profile %d (<%d)", max_found_profile_id + 1, max_allowed_profile_id);
+        *out_reused = NULL;
+        *out_overwritten = FALSE;
+        return (max_found_profile_id + 1);
+    }
+
+    /* Rewrite a context defined with no APN, if any */
+    if (blank_profile_id) {
+        mm_obj_dbg (log_object, "rewriting profile %d with empty APN", blank_profile_id);
+        *out_reused = NULL;
+        *out_overwritten = TRUE;
+        return blank_profile_id;
+    }
+
+    /* Rewrite the last existing one found */
+    if (max_found_profile_id) {
+        mm_obj_dbg (log_object, "rewriting last profile %d detected", max_found_profile_id);
+        *out_reused = NULL;
+        *out_overwritten = TRUE;
+        return max_found_profile_id;
+    }
+
+    /* Otherwise, just fallback to min CID */
+    mm_obj_dbg (log_object, "falling back to profile %d", min_profile_id);
+    *out_reused = NULL;
+    *out_overwritten = TRUE;
+    return min_profile_id;
+}
+
+/*************************************************************************/
+
 static void
 mm_3gpp_pdp_context_format_free (MM3gppPdpContextFormat *format)
 {

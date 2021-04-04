@@ -2758,12 +2758,12 @@ typedef struct {
     MMBearerIpFamily  ip_family;
     const gchar      *cgdcont_test;
     const gchar      *cgdcont_query;
-    guint             expected_cid;
-    gboolean          expected_cid_reused;
-    gboolean          expected_cid_overwritten;
-} CidSelectionTest;
+    gint              expected_profile_id;
+    gboolean          expected_profile_id_reused;
+    gboolean          expected_profile_id_overwritten;
+} ProfileSelectionTest;
 
-static const CidSelectionTest cid_selection_tests[] = {
+static const ProfileSelectionTest profile_selection_tests[] = {
     /* Test: exact APN match */
     {
         .apn           = "ac.vodafone.es",
@@ -2774,9 +2774,9 @@ static const CidSelectionTest cid_selection_tests[] = {
         .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 2,\"IP\",\"ac.vodafone.es\",\"\",0,0\r\n"
                          "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 2,
-        .expected_cid_reused      = TRUE,
-        .expected_cid_overwritten = FALSE
+        .expected_profile_id             = 2,
+        .expected_profile_id_reused      = TRUE,
+        .expected_profile_id_overwritten = FALSE
     },
     /* Test: exact APN match reported as activated */
     {
@@ -2788,9 +2788,9 @@ static const CidSelectionTest cid_selection_tests[] = {
         .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 2,\"IP\",\"ac.vodafone.es.MNC001.MCC214.GPRS\",\"\",0,0\r\n"
                          "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 2,
-        .expected_cid_reused      = TRUE,
-        .expected_cid_overwritten = FALSE
+        .expected_profile_id             = 2,
+        .expected_profile_id_reused      = TRUE,
+        .expected_profile_id_overwritten = FALSE
     },
     /* Test: first empty slot in between defined contexts */
     {
@@ -2801,9 +2801,9 @@ static const CidSelectionTest cid_selection_tests[] = {
                          "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
         .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 10,\"IP\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 2,
-        .expected_cid_reused      = FALSE,
-        .expected_cid_overwritten = FALSE
+        .expected_profile_id             = 2,
+        .expected_profile_id_reused      = FALSE,
+        .expected_profile_id_overwritten = FALSE
     },
     /* Test: first empty slot in between defined contexts, different PDP types */
     {
@@ -2814,9 +2814,9 @@ static const CidSelectionTest cid_selection_tests[] = {
                          "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
         .cgdcont_query = "+CGDCONT: 1,\"IPV6\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 10,\"IP\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 2,
-        .expected_cid_reused      = FALSE,
-        .expected_cid_overwritten = FALSE
+        .expected_profile_id             = 2,
+        .expected_profile_id_reused      = FALSE,
+        .expected_profile_id_overwritten = FALSE
     },
     /* Test: first empty slot after last context found */
     {
@@ -2827,9 +2827,9 @@ static const CidSelectionTest cid_selection_tests[] = {
                          "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
         .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 2,\"IP\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 3,
-        .expected_cid_reused      = FALSE,
-        .expected_cid_overwritten = FALSE
+        .expected_profile_id             = 3,
+        .expected_profile_id_reused      = FALSE,
+        .expected_profile_id_overwritten = FALSE
     },
     /* Test: first empty slot after last context found, different PDP types */
     {
@@ -2840,9 +2840,9 @@ static const CidSelectionTest cid_selection_tests[] = {
                          "+CGDCONT: (1-10),\"IPV4V6\",,,(0,1),(0,1)\r\n",
         .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 2,\"IPV6\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 3,
-        .expected_cid_reused      = FALSE,
-        .expected_cid_overwritten = FALSE
+        .expected_profile_id             = 3,
+        .expected_profile_id_reused      = FALSE,
+        .expected_profile_id_overwritten = FALSE
     },
     /* Test: no empty slot, rewrite context with empty APN */
     {
@@ -2854,9 +2854,9 @@ static const CidSelectionTest cid_selection_tests[] = {
         .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 2,\"IP\",\"\",\"\",0,0\r\n"
                          "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 2,
-        .expected_cid_reused      = FALSE,
-        .expected_cid_overwritten = TRUE
+        .expected_profile_id             = 2,
+        .expected_profile_id_reused      = FALSE,
+        .expected_profile_id_overwritten = TRUE
     },
     /* Test: no empty slot, rewrite last context found */
     {
@@ -2868,9 +2868,9 @@ static const CidSelectionTest cid_selection_tests[] = {
         .cgdcont_query = "+CGDCONT: 1,\"IP\",\"telefonica.es\",\"\",0,0\r\n"
                          "+CGDCONT: 2,\"IP\",\"vzwinternet\",\"\",0,0\r\n"
                          "+CGDCONT: 3,\"IP\",\"inet.es\",\"\",0,0\r\n",
-        .expected_cid             = 3,
-        .expected_cid_reused      = FALSE,
-        .expected_cid_overwritten = TRUE
+        .expected_profile_id             = 3,
+        .expected_profile_id_reused      = FALSE,
+        .expected_profile_id_overwritten = TRUE
     },
     /* Test: CGDCONT? and CGDCONT=? failures, fallback to CID=1 (a.g. some Android phones) */
     {
@@ -2878,39 +2878,58 @@ static const CidSelectionTest cid_selection_tests[] = {
         .ip_family     = MM_BEARER_IP_FAMILY_IPV4,
         .cgdcont_test  = NULL,
         .cgdcont_query = NULL,
-        .expected_cid             = 1,
-        .expected_cid_reused      = FALSE,
-        .expected_cid_overwritten = TRUE
+        .expected_profile_id             = 1,
+        .expected_profile_id_reused      = FALSE,
+        .expected_profile_id_overwritten = TRUE
     },
 };
 
 static void
-test_cid_selection (void)
+test_profile_selection (void)
 {
     guint i;
 
-    for (i = 0; i < G_N_ELEMENTS (cid_selection_tests); i++) {
-        const CidSelectionTest *test;
-        GList                  *context_list;
-        GList                  *context_format_list;
-        guint                   cid;
-        gboolean                cid_reused;
-        gboolean                cid_overwritten;
+    for (i = 0; i < G_N_ELEMENTS (profile_selection_tests); i++) {
+        const ProfileSelectionTest *test;
+        GList                      *context_format_list;
+        GList                      *context_list;
+        GList                      *profile_list;
+        gint                        profile_id;
+        guint                       min_allowed_cid = 1;
+        guint                       max_allowed_cid = G_MAXINT - 1;
+        g_autoptr(MM3gppProfile)    requested = NULL;
+        g_autoptr(MM3gppProfile)    reused = NULL;
+        gboolean                    profile_id_overwritten;
 
-        test = &cid_selection_tests[i];
+        test = &profile_selection_tests[i];
+
+        requested = mm_3gpp_profile_new ();
+        mm_3gpp_profile_set_apn (requested, test->apn);
+        mm_3gpp_profile_set_ip_type (requested, test->ip_family);
 
         context_format_list = test->cgdcont_test ? mm_3gpp_parse_cgdcont_test_response (test->cgdcont_test, NULL, NULL) : NULL;
+        mm_3gpp_pdp_context_format_list_find_range (context_format_list, test->ip_family, &min_allowed_cid, &max_allowed_cid);
+
         context_list = test->cgdcont_query ? mm_3gpp_parse_cgdcont_read_response (test->cgdcont_query, NULL) : NULL;
+        profile_list = mm_3gpp_profile_list_new_from_pdp_context_list (context_list);
 
-        cid = mm_3gpp_select_best_cid (test->apn, test->ip_family,
-                                       context_list, context_format_list,
-                                       NULL,
-                                       &cid_reused, &cid_overwritten);
+        profile_id = mm_3gpp_profile_list_find_best  (profile_list,
+                                                      requested,
+                                                      (GEqualFunc)mm_3gpp_cmp_apn_name,
+                                                      (MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_ID |
+                                                       MM_3GPP_PROFILE_CMP_FLAGS_NO_AUTH |
+                                                       MM_3GPP_PROFILE_CMP_FLAGS_NO_APN_TYPE),
+                                                      min_allowed_cid,
+                                                      max_allowed_cid,
+                                                      NULL, /* log_object */
+                                                      &reused,
+                                                      &profile_id_overwritten);
 
-        g_assert_cmpuint (cid, ==, test->expected_cid);
-        g_assert_cmpuint (cid_reused, ==, test->expected_cid_reused);
-        g_assert_cmpuint (cid_overwritten, ==, test->expected_cid_overwritten);
+        g_assert_cmpuint (profile_id, ==, test->expected_profile_id);
+        g_assert_cmpuint (!!reused, ==, test->expected_profile_id_reused);
+        g_assert_cmpuint (profile_id_overwritten, ==, test->expected_profile_id_overwritten);
 
+        mm_3gpp_profile_list_free (profile_list);
         mm_3gpp_pdp_context_format_list_free (context_format_list);
         mm_3gpp_pdp_context_list_free (context_list);
     }
@@ -4646,7 +4665,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_nokia, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgdcont_read_response_samsung, NULL));
 
-    g_test_suite_add (suite, TESTCASE (test_cid_selection, NULL));
+    g_test_suite_add (suite, TESTCASE (test_profile_selection, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cgact_read_response_none, NULL));
     g_test_suite_add (suite, TESTCASE (test_cgact_read_response_single_inactive, NULL));
