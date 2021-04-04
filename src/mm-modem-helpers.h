@@ -185,6 +185,11 @@ GList *mm_3gpp_parse_cgdcont_test_response (const gchar  *reply,
                                             gpointer      log_object,
                                             GError      **error);
 
+gboolean mm_3gpp_pdp_context_format_list_find_range (GList            *pdp_format_list,
+                                                     MMBearerIpFamily  ip_family,
+                                                     guint            *out_min_cid,
+                                                     guint            *out_max_cid);
+
 /* AT+CGDCONT? (PDP context query) response parser */
 typedef struct {
     guint cid;

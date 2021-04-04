@@ -1477,20 +1477,27 @@ mm_3gpp_cmp_apn_name (const gchar *requested,
 
 /*************************************************************************/
 
-static guint
-find_max_allowed_cid (GList            *context_format_list,
-                      MMBearerIpFamily  ip_family)
+gboolean
+mm_3gpp_pdp_context_format_list_find_range (GList            *pdp_format_list,
+                                            MMBearerIpFamily  ip_family,
+                                            guint            *out_min_cid,
+                                            guint            *out_max_cid)
 {
     GList *l;
 
-    for (l = context_format_list; l; l = g_list_next (l)) {
+    for (l = pdp_format_list; l; l = g_list_next (l)) {
         MM3gppPdpContextFormat *format = l->data;
 
         /* Found exact PDP type? */
-        if (format->pdp_type == ip_family)
-            return format->max_cid;
+        if (format->pdp_type == ip_family) {
+            if (out_min_cid)
+                *out_min_cid = format->min_cid;
+            if (out_max_cid)
+                *out_max_cid = format->max_cid;
+            return TRUE;
+        }
     }
-    return 0;
+    return FALSE;
 }
 
 guint
@@ -1573,7 +1580,7 @@ mm_3gpp_select_best_cid (const gchar      *apn,
 
     /* If the max existing CID found during CGDCONT? is below the max allowed
      * CID, then we can use the next available CID because it's an unused one. */
-    max_allowed_cid = find_max_allowed_cid (context_format_list, ip_family);
+    mm_3gpp_pdp_context_format_list_find_range (context_format_list, ip_family, NULL, &max_allowed_cid);
     if (max_cid && (max_cid < max_allowed_cid)) {
         mm_obj_dbg (log_object, "found unused context at CID %u (<%u)", max_cid + 1, max_allowed_cid);
         *out_cid_reused = FALSE;
