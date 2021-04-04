@@ -414,6 +414,18 @@
               value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"profile-id"</literal></term>
+            <listitem>
+              The ID of the 3GPP profile to connect to (signature
+              <literal>"i"</literal>), as given in the
+              <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp-ProfileManager.List">profile list</link>.
+              In this case, if additional profile settings are given in the properties
+              and they already exist in the profile (e.g. <literal>"apn"</literal>),
+              the new settings will be explicitly ignored; the settings stored in the
+              profile itself always take preference. The value -1 is used to
+	      indicate an invalid or uninitialized profile id. Since 1.18.
+            </listitem>
+          </varlistentry>
         </variablelist>
 
         The following settings apply to 3GPP2 (CDMA/EVDO) devices:

@@ -76,6 +76,8 @@ void mm_simple_connect_properties_set_ip_type       (MMSimpleConnectProperties *
                                                      MMBearerIpFamily ip_type);
 void mm_simple_connect_properties_set_apn_type      (MMSimpleConnectProperties *self,
                                                      MMBearerApnType apn_type);
+void mm_simple_connect_properties_set_profile_id    (MMSimpleConnectProperties *self,
+                                                     gint profile_id);
 void mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
                                                      gboolean allow_roaming);
 void mm_simple_connect_properties_set_rm_protocol   (MMSimpleConnectProperties *self,
@@ -91,6 +93,7 @@ const gchar              *mm_simple_connect_properties_get_user          (MMSimp
 const gchar              *mm_simple_connect_properties_get_password      (MMSimpleConnectProperties *self);
 MMBearerIpFamily          mm_simple_connect_properties_get_ip_type       (MMSimpleConnectProperties *self);
 MMBearerApnType           mm_simple_connect_properties_get_apn_type      (MMSimpleConnectProperties *self);
+gint                      mm_simple_connect_properties_get_profile_id    (MMSimpleConnectProperties *self);
 gboolean                  mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self);
 MMModemCdmaRmProtocol     mm_simple_connect_properties_get_rm_protocol   (MMSimpleConnectProperties *self);
 MMBearerMultiplexSupport  mm_simple_connect_properties_get_multiplex     (MMSimpleConnectProperties *self);

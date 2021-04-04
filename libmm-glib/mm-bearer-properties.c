@@ -31,34 +31,19 @@
  * mm_modem_create_bearer() or mm_modem_create_bearer_sync().
  */
 
-G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT)
 
-#define PROPERTY_APN             "apn"
-#define PROPERTY_ALLOWED_AUTH    "allowed-auth"
-#define PROPERTY_USER            "user"
-#define PROPERTY_PASSWORD        "password"
-#define PROPERTY_IP_TYPE         "ip-type"
-#define PROPERTY_APN_TYPE        "apn-type"
-#define PROPERTY_ALLOW_ROAMING   "allow-roaming"
-#define PROPERTY_RM_PROTOCOL     "rm-protocol"
-#define PROPERTY_MULTIPLEX       "multiplex"
+#define PROPERTY_ALLOW_ROAMING "allow-roaming"
+#define PROPERTY_RM_PROTOCOL   "rm-protocol"
+#define PROPERTY_MULTIPLEX     "multiplex"
 
 /* no longer used properties */
 #define DEPRECATED_PROPERTY_NUMBER "number"
 
 struct _MMBearerPropertiesPrivate {
-    /* APN */
-    gchar *apn;
-    /* IP type */
-    MMBearerIpFamily ip_type;
-    /* APN type */
-    MMBearerApnType apn_type;
-    /* Allowed auth */
-    MMBearerAllowedAuth allowed_auth;
-    /* User */
-    gchar *user;
-    /* Password */
-    gchar *password;
+    /* The 3GPP profile is a subset of the bearer properties */
+    MM3gppProfile *profile;
+
     /* Roaming allowance */
     gboolean allow_roaming_set;
     gboolean allow_roaming;
@@ -81,12 +66,11 @@ struct _MMBearerPropertiesPrivate {
  */
 void
 mm_bearer_properties_set_apn (MMBearerProperties *self,
-                              const gchar *apn)
+                              const gchar        *apn)
 {
     g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
 
-    g_free (self->priv->apn);
-    self->priv->apn = g_strdup (apn);
+    mm_3gpp_profile_set_apn (self->priv->profile, apn);
 }
 
 /**
@@ -105,7 +89,7 @@ mm_bearer_properties_get_apn (MMBearerProperties *self)
 {
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
 
-    return self->priv->apn;
+    return mm_3gpp_profile_get_apn (self->priv->profile);
 }
 
 /*****************************************************************************/
@@ -122,12 +106,12 @@ mm_bearer_properties_get_apn (MMBearerProperties *self)
  * Since: 1.0
  */
 void
-mm_bearer_properties_set_allowed_auth (MMBearerProperties *self,
-                                       MMBearerAllowedAuth allowed_auth)
+mm_bearer_properties_set_allowed_auth (MMBearerProperties  *self,
+                                       MMBearerAllowedAuth  allowed_auth)
 {
     g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
 
-    self->priv->allowed_auth = allowed_auth;
+    mm_3gpp_profile_set_allowed_auth (self->priv->profile, allowed_auth);
 }
 
 /**
@@ -146,7 +130,7 @@ mm_bearer_properties_get_allowed_auth (MMBearerProperties *self)
 {
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_ALLOWED_AUTH_UNKNOWN);
 
-    return self->priv->allowed_auth;
+    return mm_3gpp_profile_get_allowed_auth (self->priv->profile);
 }
 
 /*****************************************************************************/
@@ -162,12 +146,11 @@ mm_bearer_properties_get_allowed_auth (MMBearerProperties *self)
  */
 void
 mm_bearer_properties_set_user (MMBearerProperties *self,
-                               const gchar *user)
+                               const gchar        *user)
 {
     g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
 
-    g_free (self->priv->user);
-    self->priv->user = g_strdup (user);
+    mm_3gpp_profile_set_user (self->priv->profile, user);
 }
 
 /**
@@ -186,7 +169,7 @@ mm_bearer_properties_get_user (MMBearerProperties *self)
 {
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
 
-    return self->priv->user;
+    return mm_3gpp_profile_get_user (self->priv->profile);
 }
 
 /*****************************************************************************/
@@ -202,12 +185,11 @@ mm_bearer_properties_get_user (MMBearerProperties *self)
  */
 void
 mm_bearer_properties_set_password (MMBearerProperties *self,
-                                   const gchar *password)
+                                   const gchar        *password)
 {
     g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
 
-    g_free (self->priv->password);
-    self->priv->password = g_strdup (password);
+    mm_3gpp_profile_set_password (self->priv->profile, password);
 }
 
 /**
@@ -226,7 +208,7 @@ mm_bearer_properties_get_password (MMBearerProperties *self)
 {
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
 
-    return self->priv->password;
+    return mm_3gpp_profile_get_password (self->priv->profile);
 }
 
 /*****************************************************************************/
@@ -242,11 +224,11 @@ mm_bearer_properties_get_password (MMBearerProperties *self)
  */
 void
 mm_bearer_properties_set_ip_type (MMBearerProperties *self,
-                                  MMBearerIpFamily ip_type)
+                                  MMBearerIpFamily    ip_type)
 {
     g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
 
-    self->priv->ip_type = ip_type;
+    mm_3gpp_profile_set_ip_type (self->priv->profile, ip_type);
 }
 
 /**
@@ -264,7 +246,7 @@ mm_bearer_properties_get_ip_type (MMBearerProperties *self)
 {
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_IP_FAMILY_NONE);
 
-    return self->priv->ip_type;
+    return mm_3gpp_profile_get_ip_type (self->priv->profile);
 }
 
 /*****************************************************************************/
@@ -280,11 +262,11 @@ mm_bearer_properties_get_ip_type (MMBearerProperties *self)
  */
 void
 mm_bearer_properties_set_apn_type (MMBearerProperties *self,
-                                   MMBearerApnType apn_type)
+                                   MMBearerApnType     apn_type)
 {
     g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
 
-    self->priv->apn_type = apn_type;
+    mm_3gpp_profile_set_apn_type (self->priv->profile, apn_type);
 }
 
 /**
@@ -302,7 +284,45 @@ mm_bearer_properties_get_apn_type (MMBearerProperties *self)
 {
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_APN_TYPE_NONE);
 
-    return self->priv->apn_type;
+    return mm_3gpp_profile_get_apn_type (self->priv->profile);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_profile_id:
+ * @self: a #MMBearerProperties.
+ * @profile_id: a profile id.
+ *
+ * Sets the profile ID to use.
+ *
+ * Since: 1.18
+ */
+void
+mm_bearer_properties_set_profile_id (MMBearerProperties *self,
+                                     gint                profile_id)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    mm_3gpp_profile_set_profile_id (self->priv->profile, profile_id);
+}
+
+/**
+ * mm_bearer_properties_get_profile_id:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the profile ID to use.
+ *
+ * Returns: the profile id.
+ *
+ * Since: 1.18
+ */
+gint
+mm_bearer_properties_get_profile_id (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_3GPP_PROFILE_ID_UNKNOWN);
+
+    return mm_3gpp_profile_get_profile_id (self->priv->profile);
 }
 
 /*****************************************************************************/
@@ -472,12 +492,27 @@ mm_bearer_properties_get_multiplex (MMBearerProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_bearer_properties_peek_3gpp_profile: (skip)
+ */
+MM3gppProfile *
+mm_bearer_properties_peek_3gpp_profile (MMBearerProperties *self)
+{
+    return self->priv->profile;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_properties_get_dictionary: (skip)
  */
 GVariant *
 mm_bearer_properties_get_dictionary (MMBearerProperties *self)
 {
-    GVariantBuilder builder;
+    GVariantBuilder  builder;
+    GVariantIter     iter;
+    gchar           *key;
+    GVariant        *value;
+    GVariant        *profile_dictionary;
 
     /* We do allow NULL */
     if (!self)
@@ -486,42 +521,6 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-
-    if (self->priv->apn)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_APN,
-                               g_variant_new_string (self->priv->apn));
-
-    if (self->priv->allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_ALLOWED_AUTH,
-                               g_variant_new_uint32 (self->priv->allowed_auth));
-
-    if (self->priv->user)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_USER,
-                               g_variant_new_string (self->priv->user));
-
-    if (self->priv->password)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_PASSWORD,
-                               g_variant_new_string (self->priv->password));
-
-    if (self->priv->ip_type != MM_BEARER_IP_FAMILY_NONE)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_IP_TYPE,
-                               g_variant_new_uint32 (self->priv->ip_type));
-
-    if (self->priv->apn_type != MM_BEARER_APN_TYPE_NONE)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_APN_TYPE,
-                               g_variant_new_uint32 (self->priv->apn_type));
 
     if (self->priv->allow_roaming_set)
         g_variant_builder_add (&builder,
@@ -541,6 +540,16 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
                                PROPERTY_MULTIPLEX,
                                g_variant_new_uint32 (self->priv->multiplex));
 
+    /* Merge dictionaries */
+    profile_dictionary = mm_3gpp_profile_get_dictionary (self->priv->profile);
+    g_variant_iter_init (&iter, profile_dictionary);
+    while (g_variant_iter_next (&iter, "{sv}", &key, &value)) {
+        g_variant_builder_add (&builder, "{sv}", key, value);
+        g_variant_unref (value);
+        g_free (key);
+    }
+    g_variant_unref (profile_dictionary);
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -550,87 +559,56 @@ mm_bearer_properties_get_dictionary (MMBearerProperties *self)
  * mm_bearer_properties_consume_string: (skip)
  */
 gboolean
-mm_bearer_properties_consume_string (MMBearerProperties *self,
-                                     const gchar *key,
-                                     const gchar *value,
-                                     GError **error)
+mm_bearer_properties_consume_string (MMBearerProperties  *self,
+                                     const gchar         *key,
+                                     const gchar         *value,
+                                     GError             **error)
 {
+    GError *inner_error = NULL;
+
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), FALSE);
 
-    if (g_str_equal (key, PROPERTY_APN))
-        mm_bearer_properties_set_apn (self, value);
-    else if (g_str_equal (key, PROPERTY_ALLOWED_AUTH)) {
-        GError *inner_error = NULL;
-        MMBearerAllowedAuth allowed_auth;
+    /* First, check if we can consume this as bearer properties */
+    if (mm_3gpp_profile_consume_string (self->priv->profile, key, value, &inner_error))
+        return TRUE;
 
-        allowed_auth = mm_common_get_allowed_auth_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-        mm_bearer_properties_set_allowed_auth (self, allowed_auth);
-    } else if (g_str_equal (key, PROPERTY_USER))
-        mm_bearer_properties_set_user (self, value);
-    else if (g_str_equal (key, PROPERTY_PASSWORD))
-        mm_bearer_properties_set_password (self, value);
-    else if (g_str_equal (key, PROPERTY_IP_TYPE)) {
-        GError *inner_error = NULL;
-        MMBearerIpFamily ip_type;
+    /* Unknown keys are reported as unsupported. Any other error is right away
+     * fatal (e.g. an invalid value given to a known profile property) */
+    if (!g_error_matches (inner_error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
 
-        ip_type = mm_common_get_ip_type_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-        mm_bearer_properties_set_ip_type (self, ip_type);
-    } else if (g_str_equal (key, PROPERTY_APN_TYPE)) {
-        GError *inner_error = NULL;
-        MMBearerApnType apn_type;
+    /* On unsupported errors, try with the bearer specific properties */
+    g_clear_error (&inner_error);
 
-        apn_type = mm_common_get_apn_type_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-        mm_bearer_properties_set_apn_type (self, apn_type);
-    } else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
-        GError *inner_error = NULL;
+    if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
         gboolean allow_roaming;
 
         allow_roaming = mm_common_get_boolean_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-        mm_bearer_properties_set_allow_roaming (self, allow_roaming);
+        if (!inner_error)
+            mm_bearer_properties_set_allow_roaming (self, allow_roaming);
     } else if (g_str_equal (key, PROPERTY_RM_PROTOCOL)) {
-        GError *inner_error = NULL;
         MMModemCdmaRmProtocol protocol;
 
         protocol = mm_common_get_rm_protocol_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-        mm_bearer_properties_set_rm_protocol (self, protocol);
+        if (!inner_error)
+            mm_bearer_properties_set_rm_protocol (self, protocol);
     } else if (g_str_equal (key, PROPERTY_MULTIPLEX)) {
-        GError *inner_error = NULL;
         MMBearerMultiplexSupport multiplex;
 
         multiplex = mm_common_get_multiplex_support_from_string (value, &inner_error);
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            return FALSE;
-        }
-        mm_bearer_properties_set_multiplex (self, multiplex);
+        if (!inner_error)
+            mm_bearer_properties_set_multiplex (self, multiplex);
     } else if (g_str_equal (key, DEPRECATED_PROPERTY_NUMBER)) {
         /* NO-OP */
     } else {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_UNSUPPORTED,
-                     "Invalid properties string, unsupported key '%s'",
-                     key);
+        inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                   "Invalid properties string, unsupported key '%s'", key);
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return FALSE;
     }
 
@@ -639,12 +617,12 @@ mm_bearer_properties_consume_string (MMBearerProperties *self,
 
 typedef struct {
     MMBearerProperties *properties;
-    GError *error;
+    GError             *error;
 } ParseKeyValueContext;
 
 static gboolean
-key_value_foreach (const gchar *key,
-                   const gchar *value,
+key_value_foreach (const gchar          *key,
+                   const gchar          *value,
                    ParseKeyValueContext *ctx)
 {
     return mm_bearer_properties_consume_string (ctx->properties,
@@ -685,58 +663,29 @@ mm_bearer_properties_new_from_string (const gchar *str,
  * mm_bearer_properties_consume_variant: (skip)
  */
 gboolean
-mm_bearer_properties_consume_variant (MMBearerProperties *properties,
-                                      const gchar *key,
-                                      GVariant *value,
-                                      GError **error)
+mm_bearer_properties_consume_variant (MMBearerProperties  *self,
+                                      const gchar         *key,
+                                      GVariant            *value,
+                                      GError             **error)
 {
-    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (properties), FALSE);
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), FALSE);
 
-    if (g_str_equal (key, PROPERTY_APN))
-        mm_bearer_properties_set_apn (
-            properties,
-            g_variant_get_string (value, NULL));
-    else if (g_str_equal (key, PROPERTY_ALLOWED_AUTH))
-        mm_bearer_properties_set_allowed_auth (
-            properties,
-            g_variant_get_uint32 (value));
-    else if (g_str_equal (key, PROPERTY_USER))
-        mm_bearer_properties_set_user (
-            properties,
-            g_variant_get_string (value, NULL));
-    else if (g_str_equal (key, PROPERTY_PASSWORD))
-        mm_bearer_properties_set_password (
-            properties,
-            g_variant_get_string (value, NULL));
-    else if (g_str_equal (key, PROPERTY_IP_TYPE))
-        mm_bearer_properties_set_ip_type (
-            properties,
-            g_variant_get_uint32 (value));
-    else if (g_str_equal (key, PROPERTY_APN_TYPE))
-        mm_bearer_properties_set_apn_type (
-            properties,
-            g_variant_get_uint32 (value));
-    else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING))
-        mm_bearer_properties_set_allow_roaming (
-            properties,
-            g_variant_get_boolean (value));
+    /* First, check if we can consume this as profile properties */
+    if (mm_3gpp_profile_consume_variant (self->priv->profile, key, value, NULL))
+        return TRUE;
+
+    if (g_str_equal (key, PROPERTY_ALLOW_ROAMING))
+        mm_bearer_properties_set_allow_roaming (self, g_variant_get_boolean (value));
     else if (g_str_equal (key, PROPERTY_RM_PROTOCOL))
-        mm_bearer_properties_set_rm_protocol (
-            properties,
-            g_variant_get_uint32 (value));
+        mm_bearer_properties_set_rm_protocol (self, g_variant_get_uint32 (value));
     else if (g_str_equal (key, PROPERTY_MULTIPLEX))
-        mm_bearer_properties_set_multiplex (
-            properties,
-            g_variant_get_uint32 (value));
+        mm_bearer_properties_set_multiplex (self, g_variant_get_uint32 (value));
     else if (g_str_equal (key, DEPRECATED_PROPERTY_NUMBER)) {
         /* NO-OP */
     } else {
         /* Set error */
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Invalid properties dictionary, unexpected key '%s'",
-                     key);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid properties dictionary, unexpected key '%s'", key);
         return FALSE;
     }
 
@@ -884,18 +833,23 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
                           MMBearerProperties         *b,
                           MMBearerPropertiesCmpFlags  flags)
 {
-    if (!cmp_str (a->priv->apn, b->priv->apn, flags))
+    /* we don't have any other need to compare profiles, so just compare the properties here */
+    if (!cmp_str (mm_3gpp_profile_get_apn (a->priv->profile), mm_3gpp_profile_get_apn (b->priv->profile), flags))
         return FALSE;
-    if (!cmp_ip_type (a->priv->ip_type, b->priv->ip_type, flags))
+    if (!cmp_ip_type (mm_3gpp_profile_get_ip_type (a->priv->profile), mm_3gpp_profile_get_ip_type (b->priv->profile), flags))
         return FALSE;
-    if (!cmp_allowed_auth (a->priv->allowed_auth, b->priv->allowed_auth, flags))
+    if (!cmp_allowed_auth (mm_3gpp_profile_get_allowed_auth (a->priv->profile), mm_3gpp_profile_get_allowed_auth (b->priv->profile), flags))
         return FALSE;
-    if (!cmp_str (a->priv->user, b->priv->user, flags))
-    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE) &&
-        !cmp_apn_type (a->priv->apn_type, b->priv->apn_type, flags))
+    if (!cmp_str (mm_3gpp_profile_get_user (a->priv->profile), mm_3gpp_profile_get_user (b->priv->profile), flags))
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD) &&
-        !cmp_str (a->priv->password, b->priv->password, flags))
+        !cmp_str (mm_3gpp_profile_get_password (a->priv->profile), mm_3gpp_profile_get_password (b->priv->profile), flags))
+        return FALSE;
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE) &&
+        !cmp_apn_type (mm_3gpp_profile_get_apn_type (a->priv->profile), mm_3gpp_profile_get_apn_type (b->priv->profile), flags))
+        return FALSE;
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID) &&
+        (mm_3gpp_profile_get_profile_id (a->priv->profile) != mm_3gpp_profile_get_profile_id (b->priv->profile)))
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING)) {
         if (a->priv->allow_roaming != b->priv->allow_roaming)
@@ -910,6 +864,24 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
     if (a->priv->multiplex != b->priv->multiplex)
         return FALSE;
     return TRUE;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_new_from_profile: (skip)
+ */
+MMBearerProperties *
+mm_bearer_properties_new_from_profile (MM3gppProfile  *profile,
+                                       GError        **error)
+{
+    MMBearerProperties *self;
+
+    self = mm_bearer_properties_new ();
+    g_clear_object (&self->priv->profile);
+    self->priv->profile = g_object_ref (profile);
+
+    return self;
 }
 
 /*****************************************************************************/
@@ -938,11 +910,9 @@ mm_bearer_properties_init (MMBearerProperties *self)
                                               MMBearerPropertiesPrivate);
 
     /* Some defaults */
+    self->priv->profile = mm_3gpp_profile_new ();
     self->priv->allow_roaming = TRUE;
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
-    self->priv->allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
-    self->priv->ip_type = MM_BEARER_IP_FAMILY_NONE;
-    self->priv->apn_type = MM_BEARER_APN_TYPE_NONE;
     self->priv->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN;
 }
 
@@ -951,9 +921,7 @@ finalize (GObject *object)
 {
     MMBearerProperties *self = MM_BEARER_PROPERTIES (object);
 
-    g_free (self->priv->apn);
-    g_free (self->priv->user);
-    g_free (self->priv->password);
+    g_object_unref (self->priv->profile);
 
     G_OBJECT_CLASS (mm_bearer_properties_parent_class)->finalize (object);
 }

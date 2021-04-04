@@ -218,6 +218,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_BEARER_PROPERTIES_ALLOWED_AUTH]    = { "bearer.properties.allowed-auth",                  "allowed-auth",             MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_USER]            = { "bearer.properties.user",                          "user",                     MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_PASSWORD]        = { "bearer.properties.password",                      "password",                 MMC_S_BEARER_PROPERTIES,       },
+    [MMC_F_BEARER_PROPERTIES_PROFILE_ID]      = { "bearer.properties.profile-id",                    "profile id",               MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_NUMBER]          = { "bearer.properties.number",                        "number",                   MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_PROPERTIES_RM_PROTOCOL]     = { "bearer.properties.rm-protocol",                   "rm protocol",              MMC_S_BEARER_PROPERTIES,       },
     [MMC_F_BEARER_IPV4_CONFIG_METHOD]         = { "bearer.ipv4-config.method",                       "method",                   MMC_S_BEARER_IPV4_CONFIG,      },

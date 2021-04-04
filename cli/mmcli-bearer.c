@@ -162,12 +162,19 @@ print_bearer_info (MMBearer *bearer)
         const gchar *password = NULL;
         const gchar *rm_protocol = NULL;
         gchar       *allowed_auth_str = NULL;
+        gchar       *properties_profile_id_str = NULL;
 
         if (properties) {
+            gint properties_profile_id;
+
+            properties_profile_id = mm_bearer_properties_get_profile_id (properties);
+            if (properties_profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
+                properties_profile_id_str = g_strdup_printf ("%d", properties_profile_id);
+
             apn              = mm_bearer_properties_get_apn (properties);
-            apn_type_str     = (properties ? mm_bearer_apn_type_build_string_from_mask (mm_bearer_properties_get_apn_type (properties)) : NULL);
-            ip_family_str    = (properties ? mm_bearer_ip_family_build_string_from_mask (mm_bearer_properties_get_ip_type (properties)) : NULL);
-            allowed_auth_str = (properties ? mm_bearer_allowed_auth_build_string_from_mask (mm_bearer_properties_get_allowed_auth (properties)) : NULL);
+            apn_type_str     = mm_bearer_apn_type_build_string_from_mask (mm_bearer_properties_get_apn_type (properties));
+            ip_family_str    = mm_bearer_ip_family_build_string_from_mask (mm_bearer_properties_get_ip_type (properties));
+            allowed_auth_str = mm_bearer_allowed_auth_build_string_from_mask (mm_bearer_properties_get_allowed_auth (properties));
             user             = mm_bearer_properties_get_user (properties);
             password         = mm_bearer_properties_get_password (properties);
             if (mm_bearer_get_bearer_type (bearer) != MM_BEARER_TYPE_DEFAULT_ATTACH) {
@@ -176,6 +183,7 @@ print_bearer_info (MMBearer *bearer)
             }
         }
 
+        mmcli_output_string_take      (MMC_F_BEARER_PROPERTIES_PROFILE_ID,   properties_profile_id_str);
         mmcli_output_string           (MMC_F_BEARER_PROPERTIES_APN,          apn);
         mmcli_output_string_take      (MMC_F_BEARER_PROPERTIES_APN_TYPE,     apn_type_str);
         mmcli_output_string           (MMC_F_BEARER_PROPERTIES_ROAMING,      roaming);

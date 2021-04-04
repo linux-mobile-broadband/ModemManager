@@ -694,8 +694,15 @@ connect_auth_ready (MMBaseModem *self,
         MMBearerApnType           apn_type;
         gchar                    *str;
         MMBearerIpFamily          ip_family;
+        gint                      profile_id;
 
 #define VALIDATE_UNSPECIFIED(str) (str ? str : "unspecified")
+
+        profile_id = mm_simple_connect_properties_get_profile_id (ctx->properties);
+        if (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
+            mm_obj_dbg (self, "   profile ID: %d", profile_id);
+        else
+            mm_obj_dbg (self, "   profile ID: %s", VALIDATE_UNSPECIFIED (NULL));
 
         mm_obj_dbg (self, "   PIN: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_pin (ctx->properties)));
         mm_obj_dbg (self, "   operator ID: %s", VALIDATE_UNSPECIFIED (mm_simple_connect_properties_get_operator_id (ctx->properties)));
