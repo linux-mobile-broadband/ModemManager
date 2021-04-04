@@ -30,22 +30,27 @@
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-time.h"
 #include "mm-base-modem-at.h"
 #include "mm-bearer-list.h"
 #include "mm-broadband-bearer-icera.h"
 #include "mm-broadband-modem-icera.h"
+#include "mm-modem-helpers-icera.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
-static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
-static void iface_modem_time_init (MMIfaceModemTime *iface);
+static void iface_modem_init                      (MMIfaceModem                   *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
+static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
+static void iface_modem_time_init                 (MMIfaceModemTime               *iface);
 
-static MMIfaceModem *iface_modem_parent;
-static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModem                   *iface_modem_parent;
+static MMIfaceModem3gpp               *iface_modem_3gpp_parent;
+static MMIfaceModem3gppProfileManager *iface_modem_3gpp_profile_manager_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIcera, mm_broadband_modem_icera, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init))
 
 enum {
@@ -1676,6 +1681,424 @@ modem_time_load_network_timezone (MMIfaceModemTime *self,
 }
 
 /*****************************************************************************/
+/* List profiles (3GPP profile management interface) */
+
+typedef struct {
+    GList *profiles;
+} ListProfilesContext;
+
+static void
+list_profiles_context_free (ListProfilesContext *ctx)
+{
+    mm_3gpp_profile_list_free (ctx->profiles);
+    g_slice_free (ListProfilesContext, ctx);
+}
+
+static gboolean
+modem_3gpp_profile_manager_list_profiles_finish (MMIfaceModem3gppProfileManager  *self,
+                                                 GAsyncResult                    *res,
+                                                 GList                          **out_profiles,
+                                                 GError                         **error)
+{
+    ListProfilesContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+    if (out_profiles)
+        *out_profiles = g_steal_pointer (&ctx->profiles);
+    return TRUE;
+}
+
+static void
+profile_manager_ipdpcfg_query_ready (MMBaseModem  *self,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    ListProfilesContext *ctx;
+    const gchar         *response;
+    g_autoptr(GError)    error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (self, res, &error);
+    if (!response)
+        mm_obj_warn (self, "couldn't load PDP context auth settings: %s", error->message);
+    else if (!mm_icera_parse_ipdpcfg_query_response (response, ctx->profiles, self, &error))
+        mm_obj_warn (self, "couldn't update profile list with PDP context auth settings: %s", error->message);
+
+    /* complete successfully anyway */
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+profile_manager_parent_list_profiles_ready (MMIfaceModem3gppProfileManager *self,
+                                            GAsyncResult                   *res,
+                                            GTask                          *task)
+{
+    ListProfilesContext *ctx;
+    GError              *error = NULL;
+
+    ctx = g_slice_new0 (ListProfilesContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) list_profiles_context_free);
+
+    if (!iface_modem_3gpp_profile_manager_parent->list_profiles_finish (self, res, &ctx->profiles, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!ctx->profiles) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "%IPDPCFG?",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)profile_manager_ipdpcfg_query_ready,
+        task);
+}
+
+static void
+modem_3gpp_profile_manager_list_profiles (MMIfaceModem3gppProfileManager *self,
+                                          GAsyncReadyCallback             callback,
+                                          gpointer                        user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    iface_modem_3gpp_profile_manager_parent->list_profiles (
+        self,
+        (GAsyncReadyCallback)profile_manager_parent_list_profiles_ready,
+        task);
+}
+
+typedef struct {
+    gboolean              new_id;
+    gint                  min_profile_id;
+    gint                  max_profile_id;
+    GEqualFunc            apn_cmp;
+    MM3gppProfileCmpFlags profile_cmp_flags;
+} CheckFormatContext;
+
+static void
+check_format_context_free (CheckFormatContext *ctx)
+{
+    g_slice_free (CheckFormatContext, ctx);
+}
+
+static gboolean
+modem_3gpp_profile_manager_check_format_finish (MMIfaceModem3gppProfileManager  *self,
+                                                GAsyncResult                    *res,
+                                                gboolean                        *new_id,
+                                                gint                            *min_profile_id,
+                                                gint                            *max_profile_id,
+                                                GEqualFunc                      *apn_cmp,
+                                                MM3gppProfileCmpFlags           *profile_cmp_flags,
+                                                GError                         **error)
+{
+    CheckFormatContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+    if (new_id)
+        *new_id = ctx->new_id;
+    if (min_profile_id)
+        *min_profile_id = (gint) ctx->min_profile_id;
+    if (max_profile_id)
+        *max_profile_id = (gint) ctx->max_profile_id;
+    if (apn_cmp)
+        *apn_cmp = ctx->apn_cmp;
+    if (profile_cmp_flags)
+        *profile_cmp_flags = ctx->profile_cmp_flags;
+    return TRUE;
+}
+
+static void
+profile_manager_parent_check_format_ready (MMIfaceModem3gppProfileManager *self,
+                                           GAsyncResult                   *res,
+                                           GTask                          *task)
+{
+    GError             *error = NULL;
+    CheckFormatContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!iface_modem_3gpp_profile_manager_parent->check_format_finish (self,
+                                                                       res,
+                                                                       &ctx->new_id,
+                                                                       &ctx->min_profile_id,
+                                                                       &ctx->max_profile_id,
+                                                                       &ctx->apn_cmp,
+                                                                       &ctx->profile_cmp_flags,
+                                                                       &error)) {
+        g_task_return_error (task, error);
+    } else {
+        /* the icera implementation supports AUTH, so unset that cmp flag */
+        ctx->profile_cmp_flags &= ~MM_3GPP_PROFILE_CMP_FLAGS_NO_AUTH;
+        g_task_return_boolean (task, TRUE);
+    }
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_profile_manager_check_format (MMIfaceModem3gppProfileManager *self,
+                                         MMBearerIpFamily                ip_type,
+                                         GAsyncReadyCallback             callback,
+                                         gpointer                        user_data)
+{
+    GTask              *task;
+    CheckFormatContext *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (CheckFormatContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)check_format_context_free);
+
+    iface_modem_3gpp_profile_manager_parent->check_format (
+        self,
+        ip_type,
+        (GAsyncReadyCallback)profile_manager_parent_check_format_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Deactivate profile (3GPP profile management interface) */
+
+static gboolean
+modem_3gpp_profile_manager_deactivate_profile_finish (MMIfaceModem3gppProfileManager  *self,
+                                                      GAsyncResult                    *res,
+                                                      GError                         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+deactivate_profile_ipdpact_set_ready (MMBaseModem  *self,
+                                      GAsyncResult *res,
+                                      GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_profile_manager_deactivate_profile (MMIfaceModem3gppProfileManager *self,
+                                               MM3gppProfile                  *profile,
+                                               GAsyncReadyCallback             callback,
+                                               gpointer                        user_data)
+{
+    GTask            *task;
+    g_autofree gchar *cmd = NULL;
+    gint              profile_id;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    profile_id = mm_3gpp_profile_get_profile_id (profile);
+    mm_obj_dbg (self, "deactivating profile '%d'...", profile_id);
+
+    cmd = g_strdup_printf ("%%IPDPACT=%d,0", profile_id);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        cmd,
+        MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
+        FALSE,
+        (GAsyncReadyCallback)deactivate_profile_ipdpact_set_ready,
+        task);
+}
+
+/*****************************************************************************/
+/* Set profile (3GPP profile management interface) */
+
+#define IPDPCFG_SET_MAX_ATTEMPTS       3
+#define IPDPCFG_SET_RETRY_TIMEOUT_SECS 1
+
+typedef struct {
+    MM3gppProfile       *profile;
+    gchar               *cmd;
+    gint                 profile_id;
+    guint                n_attempts;
+} StoreProfileContext;
+
+static void
+store_profile_context_free (StoreProfileContext *ctx)
+{
+    g_free (ctx->cmd);
+    g_clear_object (&ctx->profile);
+    g_slice_free (StoreProfileContext, ctx);
+}
+
+static gint
+modem_3gpp_profile_manager_store_profile_finish (MMIfaceModem3gppProfileManager  *self,
+                                                 GAsyncResult                    *res,
+                                                 GError                         **error)
+{
+    StoreProfileContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return MM_3GPP_PROFILE_ID_UNKNOWN;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+    return ctx->profile_id;
+}
+
+static void profile_manager_store_profile_auth_settings (GTask *task);
+
+static gboolean
+profile_manager_ipdpcfg_set_retry (GTask *task)
+{
+    profile_manager_store_profile_auth_settings (task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+profile_manager_ipdpcfg_set_ready (MMBaseModem  *self,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    StoreProfileContext *ctx;
+    g_autoptr(GError)    error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        /* Retry configuring the context. It sometimes fails with a 583
+         * error ["a profile (CID) is currently active"] if a connect
+         * is attempted too soon after a disconnect. */
+        if (ctx->n_attempts < IPDPCFG_SET_MAX_ATTEMPTS) {
+            mm_obj_dbg (self, "couldn't store auth settings in profile '%d': %s; retrying...",
+                        ctx->profile_id, error->message);
+            g_timeout_add_seconds (IPDPCFG_SET_RETRY_TIMEOUT_SECS, (GSourceFunc)profile_manager_ipdpcfg_set_retry, task);
+            return;
+        }
+        g_task_return_error (task, g_steal_pointer (&error));
+    } else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+profile_manager_store_profile_auth_settings (GTask *task)
+{
+    MMIfaceModem3gppProfileManager *self;
+    StoreProfileContext            *ctx;
+    g_autofree gchar               *cmd = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (!ctx->cmd) {
+        const gchar         *user;
+        const gchar         *password;
+        MMBearerAllowedAuth  allowed_auth;
+
+        user = mm_3gpp_profile_get_user (ctx->profile);
+        password = mm_3gpp_profile_get_password (ctx->profile);
+        allowed_auth = mm_3gpp_profile_get_allowed_auth (ctx->profile);
+
+        /* Both user and password are required; otherwise firmware returns an error */
+        if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
+            mm_obj_dbg (self, "not using authentication");
+            ctx->cmd = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->profile_id);
+        } else {
+            g_autofree gchar *quoted_user = NULL;
+            g_autofree gchar *quoted_password = NULL;
+            guint             icera_auth;
+
+            if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+                mm_obj_dbg (self, "using default (CHAP) authentication method");
+                icera_auth = 2;
+            } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
+                mm_obj_dbg (self, "using CHAP authentication method");
+                icera_auth = 2;
+            } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
+                mm_obj_dbg (self, "using PAP authentication method");
+                icera_auth = 1;
+            } else {
+                g_autofree gchar *str = NULL;
+
+                str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
+                g_task_return_new_error (task,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "Cannot use any of the specified authentication methods (%s)",
+                                         str);
+                g_object_unref (task);
+                return;
+            }
+
+            quoted_user     = mm_port_serial_at_quote_string (user);
+            quoted_password = mm_port_serial_at_quote_string (password);
+            ctx->cmd = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
+                                        ctx->profile_id,
+                                        icera_auth,
+                                        quoted_user,
+                                        quoted_password);
+        }
+    }
+
+    ctx->n_attempts++;
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              ctx->cmd,
+                              6,
+                              FALSE,
+                              (GAsyncReadyCallback)profile_manager_ipdpcfg_set_ready,
+                              task);
+}
+
+static void
+profile_manager_parent_store_profile_ready (MMIfaceModem3gppProfileManager *self,
+                                            GAsyncResult                   *res,
+                                            GTask                          *task)
+{
+    GError *error = NULL;
+
+    if (iface_modem_3gpp_profile_manager_parent->store_profile_finish (self, res, &error) == MM_3GPP_PROFILE_ID_UNKNOWN) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    profile_manager_store_profile_auth_settings (task);
+}
+
+static void
+modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager  *self,
+                                          MM3gppProfile                   *profile,
+                                          GAsyncReadyCallback              callback,
+                                          gpointer                         user_data)
+{
+    StoreProfileContext *ctx;
+    GTask               *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_slice_new0 (StoreProfileContext);
+    ctx->profile = g_object_ref (profile);
+    ctx->profile_id = mm_3gpp_profile_get_profile_id (ctx->profile);
+    g_assert (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) store_profile_context_free);
+
+    iface_modem_3gpp_profile_manager_parent->store_profile (
+        self,
+        profile,
+        (GAsyncReadyCallback)profile_manager_parent_store_profile_ready,
+        task);
+}
+
+/*****************************************************************************/
 /* Load network time (Time interface) */
 
 static gchar *
@@ -1881,6 +2304,23 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->enable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
     iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
     iface->disable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
+}
+
+static void
+iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
+{
+    iface_modem_3gpp_profile_manager_parent = g_type_interface_peek_parent (iface);
+
+    iface->list_profiles = modem_3gpp_profile_manager_list_profiles;
+    iface->list_profiles_finish = modem_3gpp_profile_manager_list_profiles_finish;
+    iface->check_format = modem_3gpp_profile_manager_check_format;
+    iface->check_format_finish = modem_3gpp_profile_manager_check_format_finish;
+    /* note: the parent check_activated_profile() implementation using +CGACT? seems to
+     * be perfectly valid. */
+    iface->deactivate_profile = modem_3gpp_profile_manager_deactivate_profile;
+    iface->deactivate_profile_finish = modem_3gpp_profile_manager_deactivate_profile_finish;
+    iface->store_profile = modem_3gpp_profile_manager_store_profile;
+    iface->store_profile_finish = modem_3gpp_profile_manager_store_profile_finish;
 }
 
 static void

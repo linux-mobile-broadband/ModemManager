@@ -25,4 +25,10 @@ gboolean mm_icera_parse_ipdpaddr_response (const gchar *response,
                                            MMBearerIpConfig **out_ip6_config,
                                            GError **error);
 
+/* %IPDPCFG? response parser */
+gboolean mm_icera_parse_ipdpcfg_query_response (const gchar  *response,
+                                                GList        *profiles,
+                                                gpointer      log_object,
+                                                GError      **error);
+
 #endif  /* MM_MODEM_HELPERS_HUAWEI_H */

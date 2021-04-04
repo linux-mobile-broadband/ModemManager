@@ -25,6 +25,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-icera.h"
 
@@ -283,4 +284,106 @@ out:
     *out_ip4_config = ip4_config;
     *out_ip6_config = ip6_config;
     return success;
+}
+
+/*****************************************************************************/
+/* %IPDPCFG? response parser.
+ * Modifies the input list of profiles in place
+ *
+ * AT%IPDPCFG?
+ *   %IPDPCFG: 1,0,0,,,0
+ *   %IPDPCFG: 2,0,0,,,0
+ *   %IPDPCFG: 3,0,2,"user","pass",0
+ *   %IPDPCFG: 4,0,0,,,0
+ *   OK
+ */
+
+gboolean
+mm_icera_parse_ipdpcfg_query_response (const gchar  *str,
+                                       GList        *profiles,
+                                       gpointer      log_object,
+                                       GError      **error)
+{
+    g_autoptr(GRegex)     r = NULL;
+    g_autoptr(GError)     inner_error = NULL;
+    g_autoptr(GMatchInfo) match_info  = NULL;
+    guint                 n_updates = 0;
+    guint                 n_profiles;
+
+    n_profiles = g_list_length (profiles);
+
+    r = g_regex_new ("%IPDPCFG:\\s*(\\d+),(\\d+),(\\d+),([^,]*),([^,]*),(\\d+)",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                     0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, str, strlen (str), 0, 0, &match_info, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    /* Parse the results */
+    while (g_match_info_matches (match_info)) {
+        guint                cid;
+        guint                auth;
+        MMBearerAllowedAuth  allowed_auth;
+        g_autofree gchar    *user = NULL;
+        g_autofree gchar    *password = NULL;
+        GList               *l;
+
+        if (!mm_get_uint_from_match_info (match_info, 1, &cid)) {
+            mm_obj_warn (log_object, "couldn't parse cid from %%IPDPCFG line");
+            goto next;
+        }
+
+        if (!mm_get_uint_from_match_info (match_info, 3, &auth)) {
+            mm_obj_warn (log_object, "couldn't parse auth from %%IPDPCFG line");
+            goto next;
+        }
+
+        switch (auth) {
+            case 0:
+                allowed_auth = MM_BEARER_ALLOWED_AUTH_NONE;
+                break;
+            case 1:
+                allowed_auth = MM_BEARER_ALLOWED_AUTH_PAP;
+                break;
+            case 2:
+                allowed_auth = MM_BEARER_ALLOWED_AUTH_CHAP;
+                break;
+            default:
+                mm_obj_warn (log_object, "unexpected icera auth setting: %u", auth);
+                goto next;
+        }
+
+        user = mm_get_string_unquoted_from_match_info (match_info, 4);
+        password = mm_get_string_unquoted_from_match_info (match_info, 5);
+
+        mm_obj_dbg (log_object, "found icera auth settings for profile with id '%u'", cid);
+
+        /* Find profile and update in place */
+        for (l = profiles; l; l = g_list_next (l)) {
+            MM3gppProfile *iter = l->data;
+
+            if (mm_3gpp_profile_get_profile_id (iter) == (gint) cid) {
+                n_updates++;
+                mm_3gpp_profile_set_allowed_auth (iter, allowed_auth);
+                mm_3gpp_profile_set_user (iter, user);
+                mm_3gpp_profile_set_password (iter, password);
+                break;
+            }
+        }
+        if (!l)
+            mm_obj_warn (log_object, "couldn't update auth settings in profile with id '%d': not found", cid);
+
+    next:
+        g_match_info_next (match_info, NULL);
+    }
+
+    if (n_updates != n_profiles)
+        mm_obj_warn (log_object, "couldn't update auth settings in all profiles: %u/%u updated",
+                     n_updates, n_profiles);
+
+    return TRUE;
 }

@@ -174,6 +174,80 @@ test_ipdpaddr (void)
 }
 
 /*****************************************************************************/
+/* Test %IPDPCFG responses */
+
+static void
+test_ipdpcfg (void)
+{
+    MM3gppProfile *profile;
+    GList         *profiles = NULL;
+    GList         *l;
+    GError        *error = NULL;
+    gboolean       result;
+    gboolean       cid_1_validated = FALSE;
+    gboolean       cid_2_validated = FALSE;
+    gboolean       cid_5_validated = FALSE;
+    const gchar   *response =
+        "%IPDPCFG: 1,0,0,,,0\r\n"
+        "%IPDPCFG: 2,0,1,\"aaaa\",\"bbbbb\",0\r\n"
+        "%IPDPCFG: 5,0,2,\"user\",\"pass\",0"; /* last line without CRLF */
+
+    profile = mm_3gpp_profile_new ();
+    mm_3gpp_profile_set_profile_id (profile, 1);
+    mm_3gpp_profile_set_apn (profile, "internet");
+    mm_3gpp_profile_set_ip_type (profile, MM_BEARER_IP_FAMILY_IPV4);
+    profiles = g_list_append (profiles, profile);
+
+    profile = mm_3gpp_profile_new ();
+    mm_3gpp_profile_set_profile_id (profile, 2);
+    mm_3gpp_profile_set_apn (profile, "internet2");
+    mm_3gpp_profile_set_ip_type (profile, MM_BEARER_IP_FAMILY_IPV4V6);
+    profiles = g_list_append (profiles, profile);
+
+    profile = mm_3gpp_profile_new ();
+    mm_3gpp_profile_set_profile_id (profile, 5);
+    mm_3gpp_profile_set_apn (profile, "internet3");
+    mm_3gpp_profile_set_ip_type (profile, MM_BEARER_IP_FAMILY_IPV6);
+    profiles = g_list_append (profiles, profile);
+
+    result = mm_icera_parse_ipdpcfg_query_response (response, profiles, NULL, &error);
+    g_assert_no_error (error);
+    g_assert (result);
+
+    for (l = profiles; l; l = g_list_next (l)) {
+        MM3gppProfile *iter = l->data;
+
+        switch (mm_3gpp_profile_get_profile_id (iter)) {
+            case 1:
+                cid_1_validated = TRUE;
+                g_assert_cmpuint (mm_3gpp_profile_get_allowed_auth (iter), ==, MM_BEARER_ALLOWED_AUTH_NONE);
+                g_assert (!mm_3gpp_profile_get_user (iter));
+                g_assert (!mm_3gpp_profile_get_password (iter));
+                break;
+            case 2:
+                cid_2_validated = TRUE;
+                g_assert_cmpuint (mm_3gpp_profile_get_allowed_auth (iter), ==, MM_BEARER_ALLOWED_AUTH_PAP);
+                g_assert_cmpstr (mm_3gpp_profile_get_user (iter), ==, "aaaa");
+                g_assert_cmpstr (mm_3gpp_profile_get_password (iter), ==, "bbbbb");
+                break;
+            case 5:
+                cid_5_validated = TRUE;
+                g_assert_cmpuint (mm_3gpp_profile_get_allowed_auth (iter), ==, MM_BEARER_ALLOWED_AUTH_CHAP);
+                g_assert_cmpstr (mm_3gpp_profile_get_user (iter), ==, "user");
+                g_assert_cmpstr (mm_3gpp_profile_get_password (iter), ==, "pass");
+                break;
+            default:
+                g_assert_not_reached ();
+        }
+    }
+    g_assert (cid_1_validated);
+    g_assert (cid_2_validated);
+    g_assert (cid_5_validated);
+
+    g_list_free_full (profiles, (GDestroyNotify)g_object_unref);
+}
+
+/*****************************************************************************/
 
 int main (int argc, char **argv)
 {
@@ -182,6 +256,7 @@ int main (int argc, char **argv)
     g_test_init (&argc, &argv, NULL);
 
     g_test_add_func ("/MM/icera/ipdpaddr", test_ipdpaddr);
+    g_test_add_func ("/MM/icera/ipdpcfg",  test_ipdpcfg);
 
     return g_test_run ();
 }

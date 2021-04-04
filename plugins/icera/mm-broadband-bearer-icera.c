@@ -640,187 +640,6 @@ activate_ready (MMBaseModem            *modem,
     g_object_unref (self);
 }
 
-static void authenticate (GTask *task);
-
-static gboolean
-retry_authentication_cb (GTask *task)
-{
-    authenticate (task);
-    return G_SOURCE_REMOVE;
-}
-
-static void
-authenticate_ready (MMBaseModem  *modem,
-                    GAsyncResult *res,
-                    GTask        *task)
-{
-    MMBroadbandBearerIcera *self;
-    Dial3gppContext        *ctx;
-    GError                 *error = NULL;
-    gchar                  *command;
-
-    /* If cancelled, complete */
-    if (g_task_return_error_if_cancelled (task)) {
-        g_object_unref (task);
-        return;
-    }
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data     (task);
-
-    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
-        /* Retry configuring the context. It sometimes fails with a 583
-         * error ["a profile (CID) is currently active"] if a connect
-         * is attempted too soon after a disconnect. */
-        if (++ctx->authentication_retries < 3) {
-            mm_obj_dbg (self, "authentication failed: %s; retrying...", error->message);
-            g_error_free (error);
-            g_timeout_add_seconds (1, (GSourceFunc)retry_authentication_cb, task);
-            return;
-        }
-
-        /* Return an error */
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    /* The unsolicited response to %IPDPACT may come before the OK does.
-     * We will keep the connection context in the bearer private data so
-     * that it is accessible from the unsolicited message handler. Note
-     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
-     * may not be valid any more when the callback is called (it may be
-     * already completed in the unsolicited handling) */
-    g_assert (self->priv->connect_pending == NULL);
-    self->priv->connect_pending = task;
-
-    command = g_strdup_printf ("%%IPDPACT=%d,1", ctx->cid);
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   command,
-                                   MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   NULL, /* cancellable */
-                                   (GAsyncReadyCallback) activate_ready,
-                                   g_object_ref (self)); /* we pass the bearer object! */
-    g_free (command);
-}
-
-static void
-authenticate (GTask *task)
-{
-    MMBroadbandBearerIcera *self;
-    Dial3gppContext        *ctx;
-    gchar                  *command;
-    const gchar            *user;
-    const gchar            *password;
-    MMBearerAllowedAuth     allowed_auth;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data     (task);
-
-    user         = mm_bearer_properties_get_user         (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-    password     = mm_bearer_properties_get_password     (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-    allowed_auth = mm_bearer_properties_get_allowed_auth (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-
-    /* Both user and password are required; otherwise firmware returns an error */
-    if (!user || !password || allowed_auth == MM_BEARER_ALLOWED_AUTH_NONE) {
-        mm_obj_dbg (self, "not using authentication");
-        command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", ctx->cid);
-    } else {
-        gchar *quoted_user;
-        gchar *quoted_password;
-        guint  icera_auth;
-
-        if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-            mm_obj_dbg (self, "using default (CHAP) authentication method");
-            icera_auth = 2;
-        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_CHAP) {
-            mm_obj_dbg (self, "using CHAP authentication method");
-            icera_auth = 2;
-        } else if (allowed_auth & MM_BEARER_ALLOWED_AUTH_PAP) {
-            mm_obj_dbg (self, "using PAP authentication method");
-            icera_auth = 1;
-        } else {
-            gchar *str;
-
-            str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
-            g_task_return_new_error (task,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNSUPPORTED,
-                                     "Cannot use any of the specified authentication methods (%s)",
-                                     str);
-            g_object_unref (task);
-            g_free (str);
-            return;
-        }
-
-        quoted_user     = mm_port_serial_at_quote_string (user);
-        quoted_password = mm_port_serial_at_quote_string (password);
-        command = g_strdup_printf ("%%IPDPCFG=%d,0,%u,%s,%s",
-                                   ctx->cid,
-                                   icera_auth,
-                                   quoted_user,
-                                   quoted_password);
-        g_free (quoted_user);
-        g_free (quoted_password);
-    }
-
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   command,
-                                   60,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   NULL, /* cancellable */
-                                   (GAsyncReadyCallback)authenticate_ready,
-                                   task);
-    g_free (command);
-}
-
-static void
-deactivate_ready (MMBaseModem  *modem,
-                  GAsyncResult *res,
-                  GTask        *task)
-{
-    /*
-     * Ignore any error here; %IPDPACT=ctx,0 will produce an error 767
-     * if the context is not, in fact, connected. This is annoying but
-     * harmless.
-     */
-    mm_base_modem_at_command_full_finish (modem, res, NULL);
-
-    authenticate (task);
-}
-
-static void
-connect_deactivate (GTask *task)
-{
-    Dial3gppContext *ctx;
-    gchar           *command;
-
-    ctx = g_task_get_task_data (task);
-
-    /* Deactivate the context we want to use before we try to activate
-     * it. This handles the case where ModemManager crashed while
-     * connected and is now trying to reconnect. (Should some part of
-     * the core or modem driver have made sure of this already?)
-     */
-    command = g_strdup_printf ("%%IPDPACT=%d,0", ctx->cid);
-    mm_base_modem_at_command_full (
-        ctx->modem,
-        ctx->primary,
-        command,
-        MM_BASE_BEARER_DEFAULT_DISCONNECTION_TIMEOUT,
-        FALSE,
-        FALSE, /* raw */
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)deactivate_ready,
-        task);
-    g_free (command);
-}
-
 static void
 dial_3gpp (MMBroadbandBearer   *_self,
            MMBaseModem         *modem,
@@ -833,6 +652,7 @@ dial_3gpp (MMBroadbandBearer   *_self,
     MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (_self);
     GTask                  *task;
     Dial3gppContext        *ctx;
+    g_autofree gchar       *cmd = NULL;
 
     g_assert (primary != NULL);
 
@@ -855,7 +675,25 @@ dial_3gpp (MMBroadbandBearer   *_self,
         return;
     }
 
-    connect_deactivate (task);
+    /* The unsolicited response to %IPDPACT may come before the OK does.
+     * We will keep the connection context in the bearer private data so
+     * that it is accessible from the unsolicited message handler. Note
+     * also that we do NOT pass the ctx to the GAsyncReadyCallback, as it
+     * may not be valid any more when the callback is called (it may be
+     * already completed in the unsolicited handling) */
+    g_assert (self->priv->connect_pending == NULL);
+    self->priv->connect_pending = task;
+
+    cmd = g_strdup_printf ("%%IPDPACT=%d,1", ctx->cid);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   cmd,
+                                   MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
+                                   FALSE,
+                                   FALSE, /* raw */
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback) activate_ready,
+                                   g_object_ref (self)); /* we pass the bearer object! */
 }
 
 /*****************************************************************************/
