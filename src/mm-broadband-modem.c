@@ -2839,15 +2839,13 @@ static void
 bearer_report_disconnected (MMBaseBearer *bearer,
                             gpointer      user_data)
 {
-    guint cid;
+    gint profile_id;
 
-    cid = GPOINTER_TO_UINT (user_data);
+    profile_id = GPOINTER_TO_INT (user_data);
 
     /* If we're told to disconnect a single context and this is not the
      * bearer associated to that context, ignore operation */
-    if (cid > 0 &&
-        MM_IS_BROADBAND_BEARER (bearer) &&
-        mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != cid)
+    if ((profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) && (mm_base_bearer_get_profile_id (bearer) != profile_id))
         return;
 
     /* If already disconnected, ignore operation */
@@ -2860,20 +2858,17 @@ bearer_report_disconnected (MMBaseBearer *bearer,
 
 static void
 bearer_list_report_disconnections (MMBroadbandModem *self,
-                                   guint             cid)
+                                   gint              profile_id)
 {
-    MMBearerList *list = NULL;
+    g_autoptr(MMBearerList) list = NULL;
 
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
 
     /* If empty bearer list, nothing else to do */
-    if (!list)
-        return;
-
-    mm_bearer_list_foreach (list, (MMBearerListForeachFunc)bearer_report_disconnected, GUINT_TO_POINTER (cid));
-    g_object_unref (list);
+    if (list)
+        mm_bearer_list_foreach (list, (MMBearerListForeachFunc)bearer_report_disconnected, GINT_TO_POINTER (profile_id));
 }
 
 static void
@@ -2882,13 +2877,13 @@ cgev_process_detach (MMBroadbandModem *self,
 {
     if (type == MM_3GPP_CGEV_NW_DETACH) {
         mm_obj_info (self, "network forced PS detach: all contexts have been deactivated");
-        bearer_list_report_disconnections (self, 0);
+        bearer_list_report_disconnections (self, MM_3GPP_PROFILE_ID_UNKNOWN);
         return;
     }
 
     if (type == MM_3GPP_CGEV_ME_DETACH) {
         mm_obj_info (self, "mobile equipment forced PS detach: all contexts have been deactivated");
-        bearer_list_report_disconnections (self, 0);
+        bearer_list_report_disconnections (self, MM_3GPP_PROFILE_ID_UNKNOWN);
         return;
     }
 
@@ -2918,11 +2913,11 @@ cgev_process_primary (MMBroadbandModem *self,
         break;
     case MM_3GPP_CGEV_NW_DEACT_PRIMARY:
         mm_obj_info (self, "network request to deactivate context (cid %u)", cid);
-        bearer_list_report_disconnections (self, cid);
+        bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_ME_DEACT_PRIMARY:
         mm_obj_info (self, "mobile equipment request to deactivate context (cid %u)", cid);
-        bearer_list_report_disconnections (self, cid);
+        bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_UNKNOWN:
     case MM_3GPP_CGEV_NW_DETACH:
@@ -2969,11 +2964,11 @@ cgev_process_secondary (MMBroadbandModem *self,
         break;
     case MM_3GPP_CGEV_NW_DEACT_SECONDARY:
         mm_obj_info (self, "network request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
-        bearer_list_report_disconnections (self, cid);
+        bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_ME_DEACT_SECONDARY:
         mm_obj_info (self, "mobile equipment request to deactivate secondary context (cid %u, primary cid %u)", cid, p_cid);
-        bearer_list_report_disconnections (self, cid);
+        bearer_list_report_disconnections (self, (gint)cid);
         break;
     case MM_3GPP_CGEV_UNKNOWN:
     case MM_3GPP_CGEV_NW_DETACH:
@@ -3026,14 +3021,14 @@ cgev_process_pdp (MMBroadbandModem *self,
     case MM_3GPP_CGEV_NW_DEACT_PDP:
         if (cid) {
             mm_obj_info (self, "network request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
-            bearer_list_report_disconnections (self, cid);
+            bearer_list_report_disconnections (self, (gint)cid);
         } else
             mm_obj_info (self, "network request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
         break;
     case MM_3GPP_CGEV_ME_DEACT_PDP:
         if (cid) {
             mm_obj_info (self, "mobile equipment request to deactivate context (type %s, address %s, cid %u)", pdp_type, pdp_addr, cid);
-            bearer_list_report_disconnections (self, cid);
+            bearer_list_report_disconnections (self, (gint)cid);
         } else
             mm_obj_info (self, "mobile equipment request to deactivate context (type %s, address %s, cid unknown)", pdp_type, pdp_addr);
         break;

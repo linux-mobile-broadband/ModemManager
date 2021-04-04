@@ -132,14 +132,21 @@ out:
 
 static void
 load_connection_status_by_cid (MMBroadbandBearerCinterion *bearer,
-                               guint                       cid,
+                               gint                        cid,
                                GAsyncReadyCallback         callback,
                                gpointer                    user_data)
 {
-    GTask       *task;
-    MMBaseModem *modem;
+    GTask                  *task;
+    g_autoptr(MMBaseModem)  modem = NULL;
 
     task = g_task_new (bearer, NULL, callback, user_data);
+    if (cid == MM_3GPP_PROFILE_ID_UNKNOWN) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unknown profile id to check connection status");
+        g_object_unref (task);
+        return;
+    }
+
     g_task_set_task_data (task, GUINT_TO_POINTER (cid), NULL);
 
     g_object_get (bearer,
@@ -152,7 +159,6 @@ load_connection_status_by_cid (MMBroadbandBearerCinterion *bearer,
                               FALSE,
                               (GAsyncReadyCallback) swwan_check_status_ready,
                               task);
-    g_object_unref (modem);
 }
 
 static void
@@ -161,7 +167,7 @@ load_connection_status (MMBaseBearer        *bearer,
                         gpointer             user_data)
 {
     load_connection_status_by_cid (MM_BROADBAND_BEARER_CINTERION (bearer),
-                                   mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)),
+                                   mm_base_bearer_get_profile_id (bearer),
                                    callback,
                                    user_data);
 }
@@ -358,7 +364,7 @@ dial_3gpp_context_step (GTask *task)
         mm_obj_dbg (self, "dial step %u/%u: checking SWWAN interface %u status...",
                     ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         load_connection_status_by_cid (ctx->self,
-                                       ctx->cid,
+                                       (gint) ctx->cid,
                                        (GAsyncReadyCallback) dial_connection_status_ready,
                                        task);
         return;
@@ -556,7 +562,7 @@ disconnect_3gpp_context_step (GTask *task)
                     ctx->step, DISCONNECT_3GPP_CONTEXT_STEP_LAST,
                     usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         load_connection_status_by_cid (MM_BROADBAND_BEARER_CINTERION (ctx->self),
-                                       ctx->cid,
+                                       (gint) ctx->cid,
                                        (GAsyncReadyCallback) disconnect_connection_status_ready,
                                        task);
          return;

@@ -119,7 +119,7 @@ load_connection_status (MMBaseBearer        *self,
     GTask          *task;
     MMBaseModem    *modem = NULL;
     MMPortSerialAt *port;
-    guint           cid;
+    gint            profile_id;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -128,14 +128,14 @@ load_connection_status (MMBaseBearer        *self,
                   NULL);
 
     /* If CID not defined, error out */
-    cid = mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (self));
-    if (!cid) {
+    profile_id = mm_base_bearer_get_profile_id (self);
+    if (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Couldn't load connection status: cid not defined");
+                                 "Couldn't load connection status: profile id not defined");
         g_object_unref (task);
         goto out;
     }
-    g_task_set_task_data (task, GUINT_TO_POINTER (cid), NULL);
+    g_task_set_task_data (task, GUINT_TO_POINTER ((guint)profile_id), NULL);
 
     /* If no control port available, error out */
     port = mm_base_modem_peek_best_at_port (modem, NULL);

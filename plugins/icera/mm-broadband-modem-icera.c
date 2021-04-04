@@ -399,7 +399,7 @@ static void
 bearer_list_report_status_foreach (MMBaseBearer *bearer,
                                    BearerListReportStatusForeachContext *ctx)
 {
-    if (mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != ctx->cid)
+    if (mm_base_bearer_get_profile_id (bearer) != (gint)ctx->cid)
         return;
 
     if (!MM_IS_BROADBAND_BEARER_ICERA (bearer))

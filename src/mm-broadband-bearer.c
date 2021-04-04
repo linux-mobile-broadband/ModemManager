@@ -30,6 +30,7 @@
 #include "mm-broadband-bearer.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-base-modem-at.h"
 #include "mm-log-object.h"
@@ -69,16 +70,8 @@ struct _MMBroadbandBearerPrivate {
 
     /*-- 3GPP specific --*/
     /* CID of the PDP context */
-    guint cid;
+    gint profile_id;
 };
-
-/*****************************************************************************/
-
-guint
-mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
-{
-    return self->priv->cid;
-}
 
 /*****************************************************************************/
 /* Detailed connect context, used in both CDMA and 3GPP sequences */
@@ -580,352 +573,104 @@ dial_3gpp (MMBroadbandBearer *self,
 /*****************************************************************************/
 /* 3GPP cid selection (sub-step of the 3GPP Connection sequence) */
 
-typedef enum {
-    CID_SELECTION_3GPP_STEP_FIRST,
-    CID_SELECTION_3GPP_STEP_FORMAT,
-    CID_SELECTION_3GPP_STEP_CURRENT,
-    CID_SELECTION_3GPP_STEP_SELECT_CONTEXT,
-    CID_SELECTION_3GPP_STEP_INITIALIZE_CONTEXT,
-    CID_SELECTION_3GPP_STEP_LAST,
-} CidSelection3gppStep;
-
 typedef struct {
-    CidSelection3gppStep  step;
-    MMBaseModem          *modem;
-    MMPortSerialAt       *primary;
-    GCancellable         *cancellable;
-    GList                *context_list;
-    GList                *context_format_list;
-    guint                 cid;
-    gboolean              cid_reused;
-    gboolean              cid_overwritten;
-    MMBearerIpFamily      ip_family;
-    const gchar          *pdp_type;
-} CidSelection3gppContext;
+    MMBaseModem  *modem;
+    GCancellable *cancellable;
+    gint          profile_id;
+} SelectProfile3gppContext;
 
 static void
-cid_selection_3gpp_context_free (CidSelection3gppContext *ctx)
+select_profile_3gpp_context_free (SelectProfile3gppContext *ctx)
 {
-    mm_3gpp_pdp_context_format_list_free (ctx->context_format_list);
-    mm_3gpp_pdp_context_list_free (ctx->context_list);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->primary);
     g_object_unref (ctx->cancellable);
-    g_slice_free (CidSelection3gppContext, ctx);
+    g_slice_free (SelectProfile3gppContext, ctx);
 }
 
-static guint
-cid_selection_3gpp_finish (MMBroadbandBearer  *self,
-                           GAsyncResult       *res,
-                           GError            **error)
+static gint
+select_profile_3gpp_finish (MMBroadbandBearer  *self,
+                            GAsyncResult       *res,
+                            GError            **error)
 {
-    gssize cid;
+    gint profile_id;
 
-    /* We return 0 as an invalid CID, not -1 */
-    cid = g_task_propagate_int (G_TASK (res), error);
-    return (guint) (cid < 0 ? 0 : cid);
+    /* returns -1 on failure */
+    profile_id = (gint) g_task_propagate_int (G_TASK (res), error);
+    return (profile_id < 0) ? MM_3GPP_PROFILE_ID_UNKNOWN : profile_id;
 }
-
-static void cid_selection_3gpp_context_step (GTask *task);
 
 static void
-cgdcont_set_ready (MMBaseModem  *modem,
-                   GAsyncResult *res,
-                   GTask        *task)
+select_profile_3gpp_set_profile_ready (MMIfaceModem3gppProfileManager *modem,
+                                       GAsyncResult                   *res,
+                                       GTask                          *task)
 {
-    MMBroadbandBearer       *self;
-    CidSelection3gppContext *ctx;
-    GError                  *error = NULL;
+    GError                   *error = NULL;
+    g_autoptr(MM3gppProfile)  profile = NULL;
 
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (error) {
-        mm_obj_warn (self, "couldn't initialize context: %s", error->message);
+    profile = mm_iface_modem_3gpp_profile_manager_set_profile_finish (modem, res, &error);
+    if (!profile)
         g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    ctx->step++;
-    cid_selection_3gpp_context_step (task);
+    else
+        g_task_return_int (task, mm_3gpp_profile_get_profile_id (profile));
+    g_object_unref (task);
 }
 
 static void
-cid_selection_3gpp_initialize_context (GTask *task)
+select_profile_3gpp_get_profile_ready (MMIfaceModem3gppProfileManager *modem,
+                                       GAsyncResult                   *res,
+                                       GTask                          *task)
 {
-    MMBroadbandBearer       *self;
-    CidSelection3gppContext *ctx;
-    const gchar             *apn;
-    gchar                   *quoted_apn;
-    gchar                   *cmd;
-
-    self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
-    g_assert (ctx->cid != 0);
-    g_assert (!ctx->cid_reused);
-
-    /* Initialize a PDP context with our APN and PDP type */
-    apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-    mm_obj_dbg (self, "%s context with APN '%s' and PDP type '%s'",
-                ctx->cid_overwritten ? "overwriting" : "initializing",
-                apn, ctx->pdp_type);
-    quoted_apn = mm_port_serial_at_quote_string (apn);
-    cmd = g_strdup_printf ("+CGDCONT=%u,\"%s\",%s", ctx->cid, ctx->pdp_type, quoted_apn);
-    g_free (quoted_apn);
-
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   cmd,
-                                   3,
-                                   FALSE,
-                                   FALSE, /* raw */
-                                   NULL, /* cancellable */
-                                   (GAsyncReadyCallback) cgdcont_set_ready,
-                                   task);
-    g_free (cmd);
-}
-
-static void
-cid_selection_3gpp_select_context (GTask *task)
-{
-    MMBroadbandBearer       *self;
-    CidSelection3gppContext *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
-
-    ctx->cid = mm_3gpp_select_best_cid (mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (self))),
-                                        ctx->ip_family,
-                                        ctx->context_list,
-                                        ctx->context_format_list,
-                                        self,
-                                        &ctx->cid_reused,
-                                        &ctx->cid_overwritten);
-
-    /* At this point, CID must ALWAYS be set */
-    g_assert (ctx->cid);
-
-    /* If we're reusing an existing one, no need to initialize it, so we're done */
-    if (ctx->cid_reused) {
-        g_assert (!ctx->cid_overwritten);
-        ctx->step = CID_SELECTION_3GPP_STEP_LAST;
-    } else
-        ctx->step++;
-    cid_selection_3gpp_context_step (task);
-}
-
-static void
-cgdcont_query_ready (MMBaseModem  *modem,
-                     GAsyncResult *res,
-                     GTask        *task)
-{
-    MMBroadbandBearer       *self;
-    CidSelection3gppContext *ctx;
-    GError                  *error = NULL;
-    const gchar             *response;
-    GList                   *l;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    response = mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (!response) {
-        /* Ignore errors */
-        mm_obj_dbg (self, "failed checking currently defined contexts: %s", error->message);
-        g_clear_error (&error);
-        goto out;
-    }
-
-    /* Build context list */
-    ctx->context_list = mm_3gpp_parse_cgdcont_read_response (response, &error);
-    if (!ctx->context_list) {
-        if (error) {
-            mm_obj_dbg (self, "failed parsing currently defined contexts: %s", error->message);
-            g_clear_error (&error);
-        } else
-            mm_obj_dbg (self, "no contexts currently defined");
-        goto out;
-    }
-
-    /* Show all found PDP contexts in debug log */
-    mm_obj_dbg (self, "found %u PDP contexts", g_list_length (ctx->context_list));
-    for (l = ctx->context_list; l; l = g_list_next (l)) {
-        MM3gppPdpContext *pdp = l->data;
-        gchar            *ip_family_str;
-
-        ip_family_str = mm_bearer_ip_family_build_string_from_mask (pdp->pdp_type);
-        mm_obj_dbg (self, "  PDP context [cid=%u] [type='%s'] [apn='%s']",
-                    pdp->cid,
-                    ip_family_str,
-                    pdp->apn ? pdp->apn : "");
-        g_free (ip_family_str);
-    }
-
-out:
-    ctx->step++;
-    cid_selection_3gpp_context_step (task);
-}
-
-static void
-cid_selection_3gpp_query_current (GTask *task)
-{
-    MMBroadbandBearer       *self;
-    CidSelection3gppContext *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    mm_obj_dbg (self, "checking currently defined contexts...");
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   "+CGDCONT?",
-                                   3,
-                                   FALSE, /* cached */
-                                   FALSE, /* raw */
-                                   ctx->cancellable,
-                                   (GAsyncReadyCallback)cgdcont_query_ready,
-                                   task);
-}
-
-static void
-cgdcont_test_ready (MMBaseModem  *modem,
-                    GAsyncResult *res,
-                    GTask        *task)
-{
-    MMBroadbandBearer       *self;
-    CidSelection3gppContext *ctx;
-    GError                  *error = NULL;
-    const gchar             *response;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    response = mm_base_modem_at_command_full_finish (modem, res, &error);
-    if (!response) {
-        /* Ignore errors */
-        mm_obj_dbg (self, "failed checking context definition format: %s", error->message);
-        g_clear_error (&error);
-        goto out;
-    }
-
-    ctx->context_format_list = mm_3gpp_parse_cgdcont_test_response (response, self, &error);
-    if (error) {
-        mm_obj_dbg (self, "error parsing +CGDCONT test response: %s", error->message);
-        g_clear_error (&error);
-        goto out;
-    }
-
-out:
-    ctx->step++;
-    cid_selection_3gpp_context_step (task);
-}
-
-static void
-cid_selection_3gpp_query_format (GTask *task)
-{
-    MMBroadbandBearer       *self;
-    CidSelection3gppContext *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    mm_obj_dbg (self, "checking context definition format...");
-    mm_base_modem_at_command_full (ctx->modem,
-                                   ctx->primary,
-                                   "+CGDCONT=?",
-                                   3,
-                                   TRUE, /* cached */
-                                   FALSE, /* raw */
-                                   ctx->cancellable,
-                                   (GAsyncReadyCallback)cgdcont_test_ready,
-                                   task);
-}
-
-static void
-cid_selection_3gpp_context_step (GTask *task)
-{
-    CidSelection3gppContext *ctx;
+    SelectProfile3gppContext *ctx;
+    GError                   *error = NULL;
+    g_autoptr(MM3gppProfile)  profile = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    /* Abort if we've been cancelled */
-    if (g_task_return_error_if_cancelled (task)) {
-        g_object_unref (task);
-        return;
-    }
-
-    switch (ctx->step) {
-    case CID_SELECTION_3GPP_STEP_FIRST:
-        ctx->step++;
-        /* Fall through */
-
-    case CID_SELECTION_3GPP_STEP_FORMAT:
-        cid_selection_3gpp_query_format (task);
-        return;
-
-    case CID_SELECTION_3GPP_STEP_CURRENT:
-        cid_selection_3gpp_query_current (task);
-        return;
-
-    case CID_SELECTION_3GPP_STEP_SELECT_CONTEXT:
-        cid_selection_3gpp_select_context (task);
-        return;
-
-    case CID_SELECTION_3GPP_STEP_INITIALIZE_CONTEXT:
-        cid_selection_3gpp_initialize_context (task);
-        return;
-
-    case CID_SELECTION_3GPP_STEP_LAST:
-        g_assert (ctx->cid != 0);
-        g_task_return_int (task, (gssize) ctx->cid);
-        g_object_unref (task);
-        return;
-
-    default:
-        g_assert_not_reached ();
-    }
+    profile = mm_iface_modem_3gpp_profile_manager_get_profile_finish (modem, res, &error);
+    if (!profile)
+        g_task_return_error (task, error);
+    else
+        g_task_return_int (task, ctx->profile_id);
+    g_object_unref (task);
 }
 
 static void
-cid_selection_3gpp (MMBroadbandBearer   *self,
-                    MMBaseModem         *modem,
-                    MMPortSerialAt      *primary,
-                    GCancellable        *cancellable,
-                    GAsyncReadyCallback  callback,
-                    gpointer             user_data)
+select_profile_3gpp (MMBroadbandBearer   *self,
+                     MMBaseModem         *modem,
+                     GCancellable        *cancellable,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
 {
-    GTask                   *task;
-    CidSelection3gppContext *ctx;
+    GTask                    *task;
+    SelectProfile3gppContext *ctx;
+    MMBearerProperties       *bearer_properties;
 
     task = g_task_new (self, cancellable, callback, user_data);
 
-    ctx = g_slice_new0 (CidSelection3gppContext);
-    ctx->step        = CID_SELECTION_3GPP_STEP_FIRST;
+    ctx = g_slice_new0 (SelectProfile3gppContext);
     ctx->modem       = g_object_ref (modem);
-    ctx->primary     = g_object_ref (primary);
     ctx->cancellable = g_object_ref (cancellable);
 
-    ctx->ip_family   = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-    mm_3gpp_normalize_ip_family (&ctx->ip_family);
+    bearer_properties = mm_base_bearer_peek_config (MM_BASE_BEARER (self));
+    ctx->profile_id = mm_bearer_properties_get_profile_id (bearer_properties);
 
-    g_task_set_task_data (task, ctx, (GDestroyNotify) cid_selection_3gpp_context_free);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)select_profile_3gpp_context_free);
 
-    /* Validate PDP type */
-    ctx->pdp_type = mm_3gpp_get_pdp_type_from_ip_family (ctx->ip_family);
-    if (!ctx->pdp_type) {
-        gchar * str;
-
-        str = mm_bearer_ip_family_build_string_from_mask (ctx->ip_family);
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                 "Unsupported IP type requested: '%s'", str);
-        g_object_unref (task);
-        g_free (str);
+    if (ctx->profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
+        mm_iface_modem_3gpp_profile_manager_set_profile (
+            MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (modem),
+            mm_bearer_properties_peek_3gpp_profile (bearer_properties),
+            FALSE, /* not strict! */
+            (GAsyncReadyCallback)select_profile_3gpp_set_profile_ready,
+            task);
         return;
     }
 
-    cid_selection_3gpp_context_step (task);
+    mm_iface_modem_3gpp_profile_manager_get_profile (
+        MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (modem),
+        ctx->profile_id,
+        (GAsyncReadyCallback)select_profile_3gpp_get_profile_ready,
+        task);
 }
 
 /*****************************************************************************/
@@ -948,17 +693,16 @@ get_ip_config_3gpp_ready (MMBroadbandBearer *self,
                           GAsyncResult      *res,
                           GTask             *task)
 {
-    DetailedConnectContext *ctx;
-    MMBearerIpConfig *ipv4_config = NULL;
-    MMBearerIpConfig *ipv6_config = NULL;
-    GError *error = NULL;
+    DetailedConnectContext           *ctx;
+    GError                           *error = NULL;
+    g_autoptr(MMBearerConnectResult)  result = NULL;
+    g_autoptr(MMBearerIpConfig)       ipv4_config = NULL;
+    g_autoptr(MMBearerIpConfig)       ipv6_config = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    if (!MM_BROADBAND_BEARER_GET_CLASS (self)->get_ip_config_3gpp_finish (self,
-                                                                          res,
-                                                                          &ipv4_config,
-                                                                          &ipv6_config,
+    if (!MM_BROADBAND_BEARER_GET_CLASS (self)->get_ip_config_3gpp_finish (self, res,
+                                                                          &ipv4_config, &ipv6_config,
                                                                           &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -969,16 +713,11 @@ get_ip_config_3gpp_ready (MMBroadbandBearer *self,
     if (MM_IS_PORT_SERIAL_AT (ctx->data))
         ctx->close_data_on_exit = FALSE;
 
-    g_task_return_pointer (
-        task,
-        mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config),
-        (GDestroyNotify)mm_bearer_connect_result_unref);
-    g_object_unref (task);
+    result = mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config);
+    mm_bearer_connect_result_set_profile_id (result, self->priv->profile_id);
 
-    if (ipv4_config)
-        g_object_unref (ipv4_config);
-    if (ipv6_config)
-        g_object_unref (ipv6_config);
+    g_task_return_pointer (task, g_steal_pointer (&result), (GDestroyNotify)mm_bearer_connect_result_unref);
+    g_object_unref (task);
 }
 
 static void
@@ -986,18 +725,19 @@ dial_3gpp_ready (MMBroadbandBearer *self,
                  GAsyncResult      *res,
                  GTask             *task)
 {
-    DetailedConnectContext *ctx;
-    MMBearerIpMethod ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
-    MMBearerIpConfig *ipv4_config = NULL;
-    MMBearerIpConfig *ipv6_config = NULL;
-    GError *error = NULL;
+    DetailedConnectContext           *ctx;
+    MMBearerIpMethod                  ip_method = MM_BEARER_IP_METHOD_UNKNOWN;
+    GError                           *error = NULL;
+    g_autoptr(MMBearerConnectResult)  result = NULL;
+    g_autoptr(MMBearerIpConfig)       ipv4_config = NULL;
+    g_autoptr(MMBearerIpConfig)       ipv6_config = NULL;
 
     ctx = g_task_get_task_data (task);
 
     ctx->data = MM_BROADBAND_BEARER_GET_CLASS (self)->dial_3gpp_finish (self, res, &error);
     if (!ctx->data) {
         /* Clear CID when it failed to connect. */
-        self->priv->cid = 0;
+        self->priv->profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1017,7 +757,7 @@ dial_3gpp_ready (MMBroadbandBearer *self,
             ctx->primary,
             ctx->secondary,
             ctx->data,
-            self->priv->cid,
+            (guint)self->priv->profile_id,
             ctx->ip_family,
             (GAsyncReadyCallback)get_ip_config_3gpp_ready,
             task);
@@ -1048,30 +788,26 @@ dial_3gpp_ready (MMBroadbandBearer *self,
     }
     g_assert (ipv4_config || ipv6_config);
 
-    g_task_return_pointer (
-        task,
-        mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config),
-        (GDestroyNotify)mm_bearer_connect_result_unref);
+    result = mm_bearer_connect_result_new (ctx->data, ipv4_config, ipv6_config);
+    mm_bearer_connect_result_set_profile_id (result, self->priv->profile_id);
+    g_task_return_pointer (task, g_steal_pointer (&result), (GDestroyNotify)mm_bearer_connect_result_unref);
     g_object_unref (task);
-
-    g_clear_object (&ipv4_config);
-    g_clear_object (&ipv6_config);
 }
 
 static void
-cid_selection_3gpp_ready (MMBroadbandBearer *self,
-                          GAsyncResult      *res,
-                          GTask             *task)
+select_profile_3gpp_ready (MMBroadbandBearer *self,
+                           GAsyncResult      *res,
+                           GTask             *task)
 {
     DetailedConnectContext *ctx;
-    GError *error = NULL;
+    GError                 *error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     /* Keep CID around after initializing the PDP context in order to
      * handle corresponding unsolicited PDP activation responses. */
-    self->priv->cid = MM_BROADBAND_BEARER_GET_CLASS (self)->cid_selection_3gpp_finish (self, res, &error);
-    if (!self->priv->cid) {
+    self->priv->profile_id = select_profile_3gpp_finish (self, res, &error);
+    if (self->priv->profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1080,7 +816,7 @@ cid_selection_3gpp_ready (MMBroadbandBearer *self,
     MM_BROADBAND_BEARER_GET_CLASS (self)->dial_3gpp (self,
                                                      ctx->modem,
                                                      ctx->primary,
-                                                     self->priv->cid,
+                                                     (guint) self->priv->profile_id,
                                                      g_task_get_cancellable (task),
                                                      (GAsyncReadyCallback) dial_3gpp_ready,
                                                      task);
@@ -1101,19 +837,18 @@ connect_3gpp (MMBroadbandBearer   *self,
     g_assert (primary != NULL);
 
     /* Clear CID on every connection attempt */
-    self->priv->cid = 0;
+    self->priv->profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
 
     ctx = detailed_connect_context_new (self, modem, primary, secondary);
 
     task = g_task_new (self, cancellable, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)detailed_connect_context_free);
 
-    MM_BROADBAND_BEARER_GET_CLASS (self)->cid_selection_3gpp (self,
-                                                              ctx->modem,
-                                                              ctx->primary,
-                                                              cancellable,
-                                                              (GAsyncReadyCallback)cid_selection_3gpp_ready,
-                                                              task);
+    select_profile_3gpp (self,
+                         ctx->modem,
+                         cancellable,
+                         (GAsyncReadyCallback)select_profile_3gpp_ready,
+                         task);
 }
 
 /*****************************************************************************/
@@ -1195,21 +930,19 @@ connect (MMBaseBearer *self,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
-    MMBaseModem *modem = NULL;
-    MMPortSerialAt *primary;
-    const gchar *apn;
-    GTask *task;
+    MMPortSerialAt         *primary;
+    const gchar            *apn;
+    gint                    profile_id;
+    GTask                  *task;
+    g_autoptr(MMBaseModem)  modem = NULL;
+
+    task = g_task_new (self, cancellable, callback, user_data);
 
     /* Don't try to connect if already connected */
     if (MM_BROADBAND_BEARER (self)->priv->port) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            connect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_CONNECTED,
-            "Couldn't connect: this bearer is already connected");
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
+                                 "Couldn't connect: this bearer is already connected");
+        g_object_unref (task);
         return;
     }
 
@@ -1222,88 +955,65 @@ connect (MMBaseBearer *self,
     /* We will launch the ATD call in the primary port... */
     primary = mm_base_modem_peek_port_primary (modem);
     if (!primary) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            connect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_CONNECTED,
-            "Couldn't connect: couldn't get primary port");
-        g_object_unref (modem);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
+                                 "Couldn't connect: couldn't get primary port");
+        g_object_unref (task);
         return;
     }
 
     /* ...only if not already connected */
     if (mm_port_get_connected (MM_PORT (primary))) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            connect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_CONNECTED,
-            "Couldn't connect: primary AT port is already connected");
-        g_object_unref (modem);
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
+                                 "Couldn't connect: primary AT port is already connected");
+        g_object_unref (task);
         return;
     }
 
     /* Default bearer connection logic
      *
      * 1) 3GPP-only modem:
-     *     1a) If no APN given, error.
-     *     1b) If APN given, run 3GPP connection logic.
+     *     1a) If no profile id or APN given, error.
+     *     1b) If APN or profile id given, run 3GPP connection logic.
      *     1c) If APN given, but empty (""), run 3GPP connection logic and try
      *         to use default subscription APN.
      *
      * 2) 3GPP2-only modem:
-     *     2a) If no APN given, run CDMA connection logic.
-     *     2b) If APN given, error.
+     *     2a) If no APN or profile id given, run CDMA connection logic.
+     *     2b) If APN or profile id given, error.
      *
      * 3) 3GPP and 3GPP2 modem:
-     *     3a) If no APN given, run CDMA connection logic.
+     *     3a) If no profile id or APN given, run CDMA connection logic.
      *     3b) If APN given, run 3GPP connection logic.
-     *     1c) If APN given, but empty (""), run 3GPP connection logic and try
+     *     3c) If APN given, but empty (""), run 3GPP connection logic and try
      *         to use default subscription APN.
      */
 
     /* Check whether we have an APN */
     apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    profile_id = mm_bearer_properties_get_profile_id (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
 
-    /* Is this a 3GPP only modem and no APN was given? If so, error */
-    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            connect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_INVALID_ARGS,
-            "3GPP connection logic requires APN setting");
-        g_object_unref (modem);
+    /* Is this a 3GPP only modem and no APN or profile id was given? If so, error */
+    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) &&
+        !apn && (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                 "3GPP connection logic requires APN or profile id setting");
+        g_object_unref (task);
         return;
     }
 
-    /* Is this a 3GPP2 only modem and APN was given? If so, error */
-    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (modem)) && apn) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            connect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_INVALID_ARGS,
-            "3GPP2 doesn't support APN setting");
-        g_object_unref (modem);
+    /* Is this a 3GPP2 only modem and APN or profile id was given? If so, error */
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (modem)) &&
+        (apn || (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN))) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                 "3GPP2 doesn't support APN or profile id setting");
+        g_object_unref (task);
         return;
     }
-
-    /* In this context, we only keep the stuff we'll need later */
-    task = g_task_new (self, cancellable, callback, user_data);
 
     /* If the modem has 3GPP capabilities and an APN, launch 3GPP-based connection */
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem)) && apn) {
-        mm_obj_dbg (self, "launching 3GPP connection attempt with APN '%s'", apn);
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem)) &&
+        (apn || (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN))) {
+        mm_obj_dbg (self, "launching 3GPP connection attempt");
         MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp (
             MM_BROADBAND_BEARER (self),
             MM_BROADBAND_MODEM (modem),
@@ -1312,12 +1022,12 @@ connect (MMBaseBearer *self,
             cancellable,
             (GAsyncReadyCallback) connect_3gpp_ready,
             task);
-        g_object_unref (modem);
         return;
     }
 
     /* Otherwise, launch CDMA-specific connection. */
-    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem)) && !apn) {
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (modem)) &&
+        !apn && (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN)) {
         mm_obj_dbg (self, "launching 3GPP2 connection attempt");
         MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma (
             MM_BROADBAND_BEARER (self),
@@ -1327,7 +1037,6 @@ connect (MMBaseBearer *self,
             cancellable,
             (GAsyncReadyCallback) connect_cdma_ready,
             task);
-        g_object_unref (modem);
         return;
     }
 
@@ -1797,8 +1506,7 @@ disconnect_3gpp_ready (MMBroadbandBearer *self,
         g_task_return_error (task, error);
     else {
         /* Clear CID if we got any set */
-        if (self->priv->cid)
-            self->priv->cid = 0;
+        self->priv->profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
 
         /* Cleanup all connection related data */
         reset_bearer_connection (self);
@@ -1851,7 +1559,7 @@ disconnect (MMBaseBearer *self,
                 primary,
                 mm_base_modem_peek_port_secondary (modem),
                 MM_BROADBAND_BEARER (self)->priv->port,
-                MM_BROADBAND_BEARER (self)->priv->cid,
+                (guint)MM_BROADBAND_BEARER (self)->priv->profile_id,
                 (GAsyncReadyCallback) disconnect_3gpp_ready,
                 task);
         break;
@@ -1926,7 +1634,7 @@ cgact_periodic_query_ready (MMBaseModem  *modem,
         /* We look for he just assume the first active PDP context found is the one we're
          * looking for. */
         pdp_active = (MM3gppPdpContextActive *)(l->data);
-        if (pdp_active->cid == self->priv->cid) {
+        if (pdp_active->cid == (guint)self->priv->profile_id) {
             status = (pdp_active->active ? MM_BEARER_CONNECTION_STATUS_CONNECTED : MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
             break;
         }
@@ -1966,7 +1674,7 @@ load_connection_status (MMBaseBearer        *self,
     }
 
     /* If CID not defined, error out */
-    if (!MM_BROADBAND_BEARER (self)->priv->cid) {
+    if (MM_BROADBAND_BEARER (self)->priv->profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Couldn't load connection status: cid not defined");
         g_object_unref (task);
@@ -2323,8 +2031,6 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     klass->connect_3gpp_finish = detailed_connect_finish;
     klass->dial_3gpp = dial_3gpp;
     klass->dial_3gpp_finish = dial_3gpp_finish;
-    klass->cid_selection_3gpp = cid_selection_3gpp;
-    klass->cid_selection_3gpp_finish = cid_selection_3gpp_finish;
 
     klass->connect_cdma = connect_cdma;
     klass->connect_cdma_finish = detailed_connect_finish;

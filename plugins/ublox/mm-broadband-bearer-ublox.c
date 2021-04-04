@@ -775,19 +775,24 @@ ugcntrd_ready (MMBaseModem  *modem,
     GError                 *error = NULL;
     guint64                 tx_bytes = 0;
     guint64                 rx_bytes = 0;
-    guint                   cid;
+    gint                    cid;
 
     self = MM_BROADBAND_BEARER_UBLOX (g_task_get_source_object (task));
 
-    cid = mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (self));
+    cid = mm_base_bearer_get_profile_id (MM_BASE_BEARER (self));
 
     response = mm_base_modem_at_command_finish (modem, res, &error);
-    if (response)
-        mm_ublox_parse_ugcntrd_response_for_cid (response,
-                                                 cid,
-                                                 &tx_bytes, &rx_bytes,
-                                                 NULL, NULL,
-                                                 &error);
+    if (response) {
+        if (cid == MM_3GPP_PROFILE_ID_UNKNOWN)
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Unknown profile id");
+        else
+            mm_ublox_parse_ugcntrd_response_for_cid (response,
+                                                     cid,
+                                                     &tx_bytes, &rx_bytes,
+                                                     NULL, NULL,
+                                                     &error);
+    }
 
     if (error) {
         g_prefix_error (&error, "Couldn't load PDP context %u statistics: ", cid);

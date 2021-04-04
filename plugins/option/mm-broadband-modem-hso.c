@@ -198,7 +198,7 @@ static void
 bearer_list_report_status_foreach (MMBaseBearer *bearer,
                                    BearerListReportStatusForeachContext *ctx)
 {
-    if (mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != ctx->cid)
+    if (mm_base_bearer_get_profile_id (bearer) != (gint)ctx->cid)
         return;
 
     mm_base_bearer_report_connection_status (MM_BASE_BEARER (bearer), ctx->status);
@@ -209,7 +209,7 @@ hso_connection_status_changed (MMPortSerialAt *port,
                                GMatchInfo *match_info,
                                MMBroadbandModemHso *self)
 {
-    MMBearerList *list = NULL;
+    g_autoptr(MMBearerList) list = NULL;
     BearerListReportStatusForeachContext ctx;
     guint cid;
     guint status;
@@ -245,14 +245,10 @@ hso_connection_status_changed (MMPortSerialAt *port,
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
-    if (!list)
-        return;
 
     /* Will report status only in the bearer with the specific CID */
-    mm_bearer_list_foreach (list,
-                            (MMBearerListForeachFunc)bearer_list_report_status_foreach,
-                            &ctx);
-    g_object_unref (list);
+    if (list)
+        mm_bearer_list_foreach (list, (MMBearerListForeachFunc)bearer_list_report_status_foreach, &ctx);
 }
 
 static gboolean
