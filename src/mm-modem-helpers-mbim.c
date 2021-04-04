@@ -408,6 +408,70 @@ mm_bearer_allowed_auth_to_mbim_auth_protocol (MMBearerAllowedAuth   bearer_auth,
 
 /*****************************************************************************/
 
+MMBearerApnType
+mm_bearer_apn_type_from_mbim_context_type (MbimContextType context_type)
+{
+    switch (context_type) {
+        case MBIM_CONTEXT_TYPE_INTERNET:
+            return MM_BEARER_APN_TYPE_DEFAULT;
+        case MBIM_CONTEXT_TYPE_VPN:
+            return MM_BEARER_APN_TYPE_PRIVATE;
+        case MBIM_CONTEXT_TYPE_VOICE:
+            return MM_BEARER_APN_TYPE_VOICE;
+        case MBIM_CONTEXT_TYPE_PURCHASE:
+            return MM_BEARER_APN_TYPE_MANAGEMENT;
+        case MBIM_CONTEXT_TYPE_IMS:
+            return MM_BEARER_APN_TYPE_IMS;
+        case MBIM_CONTEXT_TYPE_MMS:
+            return MM_BEARER_APN_TYPE_MMS;
+        case MBIM_CONTEXT_TYPE_INVALID:
+        case MBIM_CONTEXT_TYPE_NONE:
+        case MBIM_CONTEXT_TYPE_LOCAL:
+        case MBIM_CONTEXT_TYPE_VIDEO_SHARE:
+            /* some types unused right now */
+        default:
+            return MM_BEARER_APN_TYPE_NONE;
+    }
+}
+
+MbimContextType
+mm_bearer_apn_type_to_mbim_context_type (MMBearerApnType   apn_type,
+                                         gpointer          log_object,
+                                         GError          **error)
+{
+    g_autofree gchar *str = NULL;
+
+    /* NOTE: the input is a BITMASK, so we try to find a "best match" */
+
+    if (apn_type == MM_BEARER_APN_TYPE_NONE) {
+        mm_obj_dbg (log_object, "using default (internet) APN type");
+        return MBIM_CONTEXT_TYPE_INTERNET;
+    }
+
+    if (apn_type & MM_BEARER_APN_TYPE_DEFAULT)
+        return MBIM_CONTEXT_TYPE_INTERNET;
+    if (apn_type & MM_BEARER_APN_TYPE_IMS)
+        return MBIM_CONTEXT_TYPE_IMS;
+    if (apn_type & MM_BEARER_APN_TYPE_MMS)
+        return MBIM_CONTEXT_TYPE_MMS;
+    if (apn_type &MM_BEARER_APN_TYPE_MANAGEMENT)
+        return MBIM_CONTEXT_TYPE_PURCHASE;
+    if (apn_type & MM_BEARER_APN_TYPE_VOICE)
+        return MBIM_CONTEXT_TYPE_VOICE;
+    if (apn_type & MM_BEARER_APN_TYPE_PRIVATE)
+        return MBIM_CONTEXT_TYPE_VPN;
+
+    str = mm_bearer_apn_type_build_string_from_mask (apn_type);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_UNSUPPORTED,
+                 "Unsupported APN types (%s)",
+                 str);
+    return MBIM_CONTEXT_TYPE_NONE;
+}
+
+/*****************************************************************************/
+
 MMBearerIpFamily
 mm_bearer_ip_family_from_mbim_context_ip_type (MbimContextIpType ip_type)
 {

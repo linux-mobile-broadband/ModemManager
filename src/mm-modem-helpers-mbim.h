@@ -47,6 +47,10 @@ MbimAuthProtocol    mm_bearer_allowed_auth_to_mbim_auth_protocol   (MMBearerAllo
 MMBearerIpFamily    mm_bearer_ip_family_from_mbim_context_ip_type  (MbimContextIpType     ip_type);
 MbimContextIpType   mm_bearer_ip_family_to_mbim_context_ip_type    (MMBearerIpFamily      ip_family,
                                                                     GError              **error);
+MMBearerApnType     mm_bearer_apn_type_from_mbim_context_type      (MbimContextType       context_type);
+MbimContextType     mm_bearer_apn_type_to_mbim_context_type        (MMBearerApnType       apn_type,
+                                                                    gpointer              log_object,
+                                                                    GError              **error);
 
 /*****************************************************************************/
 /* MBIM/SMS to MM translations */

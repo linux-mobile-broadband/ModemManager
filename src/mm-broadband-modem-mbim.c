@@ -35,6 +35,7 @@
 #include "mm-bearer-list.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-messaging.h"
@@ -46,14 +47,15 @@
 # include "mm-shared-qmi.h"
 #endif
 
-static void iface_modem_init           (MMIfaceModem          *iface);
-static void iface_modem_3gpp_init      (MMIfaceModem3gpp      *iface);
-static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd  *iface);
-static void iface_modem_location_init  (MMIfaceModemLocation  *iface);
-static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
-static void iface_modem_signal_init    (MMIfaceModemSignal    *iface);
+static void iface_modem_init                      (MMIfaceModem                   *iface);
+static void iface_modem_3gpp_init                 (MMIfaceModem3gpp               *iface);
+static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
+static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd           *iface);
+static void iface_modem_location_init             (MMIfaceModemLocation           *iface);
+static void iface_modem_messaging_init            (MMIfaceModemMessaging          *iface);
+static void iface_modem_signal_init               (MMIfaceModemSignal             *iface);
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-static void shared_qmi_init            (MMSharedQmi           *iface);
+static void shared_qmi_init                       (MMSharedQmi                    *iface);
 #endif
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
@@ -64,6 +66,7 @@ static MMIfaceModemSignal *iface_modem_signal_parent;
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
@@ -84,6 +87,7 @@ typedef enum {
     PROCESS_NOTIFICATION_FLAG_PCO                  = 1 << 6,
     PROCESS_NOTIFICATION_FLAG_USSD                 = 1 << 7,
     PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS    = 1 << 8,
+    PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS = 1 << 9,
 } ProcessNotificationFlag;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
@@ -106,6 +110,7 @@ struct _MMBroadbandModemMbimPrivate {
     gchar *caps_hardware_info;
 
     /* Supported features */
+    gboolean is_profile_management_supported;
     gboolean is_pco_supported;
     gboolean is_lte_attach_status_supported;
     gboolean is_ussd_supported;
@@ -2339,6 +2344,16 @@ query_device_services_ready (MbimDevice   *device,
 
             service = mbim_uuid_to_service (&device_services[i]->device_service_id);
 
+            if (service == MBIM_SERVICE_BASIC_CONNECT) {
+                for (j = 0; j < device_services[i]->cids_count; j++) {
+                    if (device_services[i]->cids[j] == MBIM_CID_BASIC_CONNECT_PROVISIONED_CONTEXTS) {
+                        mm_obj_dbg (self, "Profile management is supported");
+                        self->priv->is_profile_management_supported = TRUE;
+                    }
+                }
+                continue;
+            }
+
             if (service == MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS) {
                 for (j = 0; j < device_services[i]->cids_count; j++) {
                     if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO) {
@@ -3421,6 +3436,15 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     update_access_technologies (self);
 }
 
+static void
+basic_connect_notification_provisioned_contexts (MMBroadbandModemMbim *self,
+                                                 MbimMessage          *notification)
+{
+    /* We don't even attempt to parse the indication, we just need to notify that
+     * something changed to the upper layers */
+    mm_iface_modem_3gpp_profile_manager_updated (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
+}
+
 static void add_sms_part (MMBroadbandModemMbim *self,
                           const MbimSmsPduReadRecord *pdu);
 
@@ -3476,6 +3500,9 @@ basic_connect_notification (MMBroadbandModemMbim *self,
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE)
             basic_connect_notification_packet_service (self, notification);
         break;
+    case MBIM_CID_BASIC_CONNECT_PROVISIONED_CONTEXTS:
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS)
+            basic_connect_notification_provisioned_contexts (self, notification);
     default:
         /* Ignore */
         break;
@@ -3740,7 +3767,9 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
     if (!device)
         return;
 
-    mm_obj_dbg (self, "supported notifications: signal (%s), registration (%s), sms (%s), connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), lte attach status (%s)",
+    mm_obj_dbg (self, "supported notifications: signal (%s), registration (%s), sms (%s), "
+                "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
+                "lte attach status (%s), provisioned contexts (%s)",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -3749,7 +3778,8 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PCO ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
-                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS ? "yes" : "no");
+                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS ? "yes" : "no",
+                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no");
 
     if (setup) {
         /* Don't re-enable it if already there */
@@ -3914,7 +3944,9 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
     if (!peek_device (self, &device, callback, user_data))
         return;
 
-    mm_obj_dbg (self, "enabled notifications: signal (%s), registration (%s), sms (%s), connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), lte attach status (%s)",
+    mm_obj_dbg (self, "enabled notifications: signal (%s), registration (%s), sms (%s), "
+                "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
+                "lte attach status (%s), provisioned contexts (%s)",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -3923,7 +3955,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
-                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS ? "yes" : "no");
+                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS ? "yes" : "no",
+                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no");
 
     entries = g_new0 (MbimEventEntry *, 5);
 
@@ -3932,11 +3965,12 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
         self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ||
         self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_CONNECT ||
         self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO ||
-        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE) {
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE ||
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS) {
         entries[n_entries] = g_new (MbimEventEntry, 1);
         memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_BASIC_CONNECT, sizeof (MbimUuid));
         entries[n_entries]->cids_count = 0;
-        entries[n_entries]->cids = g_new0 (guint32, 5);
+        entries[n_entries]->cids = g_new0 (guint32, 6);
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_SIGNAL_STATE;
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
@@ -3947,6 +3981,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_SUBSCRIBER_READY_STATUS;
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_PACKET_SERVICE;
+        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS)
+            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_BASIC_CONNECT_PROVISIONED_CONTEXTS;
         n_entries++;
     }
 
@@ -4842,6 +4878,445 @@ modem_signal_load_values (MMIfaceModemSignal  *self,
                                             NULL,
                                             (GAsyncReadyCallback)parent_signal_load_values_ready,
                                             task);
+}
+
+/*****************************************************************************/
+/* Check support (3GPP profile management interface) */
+
+static gboolean
+modem_3gpp_profile_manager_check_support_finish (MMIfaceModem3gppProfileManager  *self,
+                                                 GAsyncResult                    *res,
+                                                 GError                         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_3gpp_profile_manager_check_support (MMIfaceModem3gppProfileManager  *_self,
+                                          GAsyncReadyCallback              callback,
+                                          gpointer                         user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)) && self->priv->is_profile_management_supported)
+        g_task_return_boolean (task, TRUE);
+    else
+        g_task_return_boolean (task, FALSE);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited event handlers (3gppProfileManager interface) */
+
+static gboolean
+common_setup_cleanup_unsolicited_events_3gpp_profile_manager_finish (MMIfaceModem3gppProfileManager  *self,
+                                                                     GAsyncResult                    *res,
+                                                                     GError                         **error)
+{
+    return common_setup_cleanup_unsolicited_events_finish (MM_BROADBAND_MODEM_MBIM (self), res, error);
+}
+
+static void
+cleanup_unsolicited_events_3gpp_profile_manager (MMIfaceModem3gppProfileManager *_self,
+                                                 GAsyncReadyCallback             callback,
+                                                 gpointer                        user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS;
+    common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
+}
+
+static void
+setup_unsolicited_events_3gpp_profile_manager (MMIfaceModem3gppProfileManager *_self,
+                                               GAsyncReadyCallback             callback,
+                                               gpointer                        user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS;
+    common_setup_cleanup_unsolicited_events (self, TRUE, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited event handlers (3gppProfileManager interface) */
+
+static gboolean
+common_enable_disable_unsolicited_events_3gpp_profile_manager_finish (MMIfaceModem3gppProfileManager  *self,
+                                                                      GAsyncResult                    *res,
+                                                                      GError                         **error)
+{
+    return common_enable_disable_unsolicited_events_finish (MM_BROADBAND_MODEM_MBIM (self), res, error);
+}
+
+static void
+disable_unsolicited_events_3gpp_profile_manager (MMIfaceModem3gppProfileManager *_self,
+                                                 GAsyncReadyCallback             callback,
+                                                 gpointer                        user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS;
+    common_enable_disable_unsolicited_events (self, callback, user_data);
+}
+
+static void
+enable_unsolicited_events_3gpp_profile_manager (MMIfaceModem3gppProfileManager *_self,
+                                                GAsyncReadyCallback             callback,
+                                                gpointer                        user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS;
+    common_enable_disable_unsolicited_events (self, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Check format (3gppProfileManager interface) */
+
+static gboolean
+modem_3gpp_profile_manager_check_format_finish (MMIfaceModem3gppProfileManager  *self,
+                                                GAsyncResult                    *res,
+                                                gboolean                        *new_id,
+                                                gint                            *min_profile_id,
+                                                gint                            *max_profile_id,
+                                                GEqualFunc                      *apn_cmp,
+                                                MM3gppProfileCmpFlags           *profile_cmp_flags,
+                                                GError                         **error)
+{
+    if (!g_task_propagate_boolean (G_TASK (res), error)) {
+        g_assert_not_reached ();
+        return FALSE;
+    }
+
+    if (new_id)
+        *new_id = TRUE;
+    if (min_profile_id)
+        *min_profile_id = 1;
+    if (max_profile_id)
+        *max_profile_id = G_MAXINT - 1;
+    /* use default string comparison method */
+    if (apn_cmp)
+        *apn_cmp = NULL;
+    /* we don't support IP type in the profiles */
+    if (profile_cmp_flags)
+        *profile_cmp_flags = MM_3GPP_PROFILE_CMP_FLAGS_NO_IP_TYPE;
+    return TRUE;
+}
+
+static void
+modem_3gpp_profile_manager_check_format (MMIfaceModem3gppProfileManager *self,
+                                         MMBearerIpFamily                ip_type,
+                                         GAsyncReadyCallback             callback,
+                                         gpointer                        user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* List profiles (3GPP profile management interface) */
+
+typedef struct {
+    GList *profiles;
+} ListProfilesContext;
+
+static void
+list_profiles_context_free (ListProfilesContext *ctx)
+{
+    mm_3gpp_profile_list_free (ctx->profiles);
+    g_slice_free (ListProfilesContext, ctx);
+}
+
+static gboolean
+modem_3gpp_profile_manager_list_profiles_finish (MMIfaceModem3gppProfileManager  *self,
+                                                 GAsyncResult                    *res,
+                                                 GList                          **out_profiles,
+                                                 GError                         **error)
+{
+    ListProfilesContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return FALSE;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+    if (out_profiles)
+        *out_profiles = g_steal_pointer (&ctx->profiles);
+    return TRUE;
+}
+
+static MM3gppProfile *
+provisioned_context_element_to_3gpp_profile (MbimProvisionedContextElement *element)
+{
+    MM3gppProfile   *profile;
+    MMBearerApnType  apn_type;
+
+    apn_type = mm_bearer_apn_type_from_mbim_context_type (mbim_uuid_to_context_type (&element->context_type));
+    if (apn_type == MM_BEARER_APN_TYPE_NONE)
+        return NULL;
+
+    profile = mm_3gpp_profile_new ();
+    mm_3gpp_profile_set_profile_id   (profile, element->context_id);
+    mm_3gpp_profile_set_apn          (profile, element->access_string);
+    mm_3gpp_profile_set_apn_type     (profile, apn_type);
+    mm_3gpp_profile_set_user         (profile, element->user_name);
+    mm_3gpp_profile_set_password     (profile, element->password);
+    mm_3gpp_profile_set_allowed_auth (profile, (mm_bearer_allowed_auth_from_mbim_auth_protocol (element->auth_protocol)));
+    /* compression unused, and ip-type not provided */
+    return profile;
+}
+
+static void
+profile_manager_provisioned_contexts_query_ready (MbimDevice   *device,
+                                                  GAsyncResult *res,
+                                                  GTask        *task)
+{
+    ListProfilesContext    *ctx;
+    GError                 *error = NULL;
+    guint32                 provisioned_contexts_count = 0;
+    g_autoptr(MbimMessage)  response = NULL;
+    g_autoptr(MbimProvisionedContextElementArray) provisioned_contexts = NULL;
+
+    ctx = g_slice_new0 (ListProfilesContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) list_profiles_context_free);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response,
+                                          MBIM_MESSAGE_TYPE_COMMAND_DONE,
+                                          &error) &&
+        mbim_message_provisioned_contexts_response_parse (response,
+                                                          &provisioned_contexts_count,
+                                                          &provisioned_contexts,
+                                                          &error)) {
+        guint i;
+
+        for (i = 0; i < provisioned_contexts_count; i++) {
+            MM3gppProfile *profile;
+
+            profile = provisioned_context_element_to_3gpp_profile (provisioned_contexts[i]);
+            if (profile)
+                ctx->profiles = g_list_append (ctx->profiles, profile);
+        }
+        g_task_return_boolean (task, TRUE);
+    } else
+        g_task_return_error (task, error);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_profile_manager_list_profiles (MMIfaceModem3gppProfileManager  *self,
+                                          GAsyncReadyCallback              callback,
+                                          gpointer                         user_data)
+{
+    MbimDevice             *device;
+    GTask                  *task;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_obj_dbg (self, "querying provisioned contexts...");
+    message = mbim_message_provisioned_contexts_query_new (NULL);
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)profile_manager_provisioned_contexts_query_ready,
+                         task);
+}
+
+/*****************************************************************************/
+/* Store profile (3GPP profile management interface) */
+
+static gint
+modem_3gpp_profile_manager_store_profile_finish (MMIfaceModem3gppProfileManager  *self,
+                                                 GAsyncResult                    *res,
+                                                 GError                         **error)
+{
+    if (!g_task_propagate_boolean (G_TASK (res), error))
+        return MM_3GPP_PROFILE_ID_UNKNOWN;
+
+    return GPOINTER_TO_INT (g_task_get_task_data (G_TASK (res)));
+}
+
+static void
+profile_manager_provisioned_contexts_set_ready (MbimDevice   *device,
+                                                GAsyncResult *res,
+                                                GTask        *task)
+{
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error))
+        g_task_return_boolean (task, TRUE);
+    else
+        g_task_return_error (task, error);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
+                                          MM3gppProfile                  *profile,
+                                          GAsyncReadyCallback             callback,
+                                          gpointer                        user_data)
+{
+    MbimDevice             *device;
+    GTask                  *task;
+    GError                 *error = NULL;
+    gint                    profile_id;
+    MMBearerApnType         apn_type;
+    MMBearerAllowedAuth     allowed_auth;
+    MbimAuthProtocol        auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
+    MbimContextType         context_type;
+    const MbimUuid         *context_type_uuid;
+    const gchar            *apn;
+    const gchar            *user;
+    const gchar            *password;
+    g_autofree gchar       *apn_type_str = NULL;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    profile_id = mm_3gpp_profile_get_profile_id (profile);
+    g_assert (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
+    g_task_set_task_data (task, GINT_TO_POINTER (profile_id), NULL);
+
+    apn = mm_3gpp_profile_get_apn (profile);
+
+    apn_type = mm_3gpp_profile_get_apn_type (profile);
+    context_type = mm_bearer_apn_type_to_mbim_context_type (apn_type, self, &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    context_type_uuid = mbim_uuid_from_context_type (context_type);
+    apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
+
+    user = mm_3gpp_profile_get_user (profile);
+    password = mm_3gpp_profile_get_password (profile);
+
+    allowed_auth = mm_3gpp_profile_get_allowed_auth (profile);
+    if ((allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN) || user || password) {
+        auth_protocol = mm_bearer_allowed_auth_to_mbim_auth_protocol (allowed_auth, self, &error);
+        if (error) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+    }
+
+    mm_obj_dbg (self, "storing profile '%d': apn '%s', apn type '%s'",
+                profile_id, apn, apn_type_str);
+
+    message = mbim_message_provisioned_contexts_set_new (profile_id,
+                                                         context_type_uuid,
+                                                         apn ? apn : "",
+                                                         user ? user : "",
+                                                         password ? password : "",
+                                                         MBIM_COMPRESSION_NONE,
+                                                         auth_protocol,
+                                                         "", /* provider id */
+                                                         &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)profile_manager_provisioned_contexts_set_ready,
+                         task);
+}
+
+/*****************************************************************************/
+/* Delete profile (3GPP profile management interface) */
+
+static gboolean
+modem_3gpp_profile_manager_delete_profile_finish (MMIfaceModem3gppProfileManager  *self,
+                                                  GAsyncResult                    *res,
+                                                  GError                         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+profile_manager_provisioned_contexts_reset_ready (MbimDevice   *device,
+                                                  GAsyncResult *res,
+                                                  GTask        *task)
+{
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error))
+        g_task_return_boolean (task, TRUE);
+    else
+        g_task_return_error (task, error);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_profile_manager_delete_profile (MMIfaceModem3gppProfileManager *self,
+                                           MM3gppProfile                  *profile,
+                                           GAsyncReadyCallback             callback,
+                                           gpointer                        user_data)
+{
+    MbimDevice             *device;
+    GTask                  *task;
+    GError                 *error = NULL;
+    gint                    profile_id;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    profile_id = mm_3gpp_profile_get_profile_id (profile);
+    g_assert (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
+
+    mm_obj_dbg (self, "deleting profile '%d'", profile_id);
+
+    message = mbim_message_provisioned_contexts_set_new (profile_id,
+                                                         mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_NONE),
+                                                         "", /* access string */
+                                                         "", /* user */
+                                                         "", /* pass */
+                                                         MBIM_COMPRESSION_NONE,
+                                                         MBIM_AUTH_PROTOCOL_NONE,
+                                                         "", /* provider id */
+                                                         &error);
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)profile_manager_provisioned_contexts_reset_ready,
+                         task);
 }
 
 /*****************************************************************************/
@@ -5885,6 +6360,40 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
     iface->scan_networks = modem_3gpp_scan_networks;
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
+}
+
+static void
+iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
+{
+    /* Initialization steps */
+    iface->check_support = modem_3gpp_profile_manager_check_support;
+    iface->check_support_finish = modem_3gpp_profile_manager_check_support_finish;
+
+    /* Enabling steps */
+    iface->setup_unsolicited_events = setup_unsolicited_events_3gpp_profile_manager;
+    iface->setup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_3gpp_profile_manager_finish;
+    iface->enable_unsolicited_events = enable_unsolicited_events_3gpp_profile_manager;
+    iface->enable_unsolicited_events_finish = common_enable_disable_unsolicited_events_3gpp_profile_manager_finish;
+
+    /* Disabling steps */
+    iface->cleanup_unsolicited_events = cleanup_unsolicited_events_3gpp_profile_manager;
+    iface->cleanup_unsolicited_events_finish = common_setup_cleanup_unsolicited_events_3gpp_profile_manager_finish;
+    iface->disable_unsolicited_events = disable_unsolicited_events_3gpp_profile_manager;
+    iface->disable_unsolicited_events_finish = common_enable_disable_unsolicited_events_3gpp_profile_manager_finish;
+
+    /* Additional actions */
+    iface->list_profiles = modem_3gpp_profile_manager_list_profiles;
+    iface->list_profiles_finish = modem_3gpp_profile_manager_list_profiles_finish;
+    iface->check_format = modem_3gpp_profile_manager_check_format;
+    iface->check_format_finish = modem_3gpp_profile_manager_check_format_finish;
+    iface->check_activated_profile = NULL;
+    iface->check_activated_profile_finish = NULL;
+    iface->deactivate_profile = NULL;
+    iface->deactivate_profile_finish = NULL;
+    iface->store_profile = modem_3gpp_profile_manager_store_profile;
+    iface->store_profile_finish = modem_3gpp_profile_manager_store_profile_finish;
+    iface->delete_profile = modem_3gpp_profile_manager_delete_profile;
+    iface->delete_profile_finish = modem_3gpp_profile_manager_delete_profile_finish;
 }
 
 static void
