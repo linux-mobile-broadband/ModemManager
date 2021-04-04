@@ -104,6 +104,10 @@
         <xi:include href="xml/mm-modem-3gpp-ussd.xml"/>
       </section>
       <section>
+        <title>Profile management support</title>
+        <xi:include href="xml/mm-3gpp-profile.xml"/>
+      </section>
+      <section>
         <title>Location support</title>
         <xi:include href="xml/mm-modem-location.xml"/>
         <xi:include href="xml/mm-location-3gpp.xml"/>

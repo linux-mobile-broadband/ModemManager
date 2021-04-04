@@ -91,6 +91,8 @@ libmm_glib_la_SOURCES = \
 	mm-call-audio-format.c \
 	mm-sim-preferred-network.h \
 	mm-sim-preferred-network.c \
+	mm-3gpp-profile.h \
+	mm-3gpp-profile.c \
 	$(NULL)
 
 libmm_glib_la_CPPFLAGS = \
@@ -163,6 +165,7 @@ include_HEADERS = \
 	mm-pco.h \
 	mm-call-audio-format.h \
 	mm-sim-preferred-network.h \
+	mm-3gpp-profile.h \
 	$(NULL)
 
 CLEANFILES =

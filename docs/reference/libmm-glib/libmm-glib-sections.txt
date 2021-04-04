@@ -1533,6 +1533,45 @@ mm_call_audio_format_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-3gpp-profile</FILE>
+<TITLE>3GPP profile</TITLE>
+MM_3GPP_PROFILE_ID_UNKNOWN
+MM3gppProfile
+mm_3gpp_profile_new
+<SUBSECTION GettersSetters>
+mm_3gpp_profile_get_apn
+mm_3gpp_profile_set_apn
+mm_3gpp_profile_get_apn_type
+mm_3gpp_profile_set_apn_type
+mm_3gpp_profile_get_allowed_auth
+mm_3gpp_profile_set_allowed_auth
+mm_3gpp_profile_get_user
+mm_3gpp_profile_set_user
+mm_3gpp_profile_get_password
+mm_3gpp_profile_set_password
+mm_3gpp_profile_get_ip_type
+mm_3gpp_profile_set_ip_type
+mm_3gpp_profile_get_profile_id
+mm_3gpp_profile_set_profile_id
+<SUBSECTION Private>
+mm_3gpp_profile_new_from_dictionary
+mm_3gpp_profile_new_from_string
+mm_3gpp_profile_consume_string
+mm_3gpp_profile_consume_variant
+mm_3gpp_profile_get_dictionary
+<SUBSECTION Standard>
+MM3gppProfileClass
+MM3gppProfilePrivate
+MM_3GPP_PROFILE
+MM_3GPP_PROFILE_CLASS
+MM_3GPP_PROFILE_GET_CLASS
+MM_IS_3GPP_PROFILE
+MM_IS_3GPP_PROFILE_CLASS
+MM_TYPE_3GPP_PROFILE
+mm_3gpp_profile_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-enums-types</FILE>
 <TITLE>Flags and Enumerations</TITLE>
 mm_bearer_type_get_string
