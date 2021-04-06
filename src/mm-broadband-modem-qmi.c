@@ -819,9 +819,7 @@ typedef enum {
 
 typedef struct {
     LoadUnlockRequiredStep step;
-    QmiClient *dms;
-    QmiClient *uim;
-    gboolean last_attempt;
+    gboolean               last_attempt;
 } LoadUnlockRequiredContext;
 
 static MMModemLock
