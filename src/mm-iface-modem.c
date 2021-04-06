@@ -346,8 +346,6 @@ mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *sel
 /*****************************************************************************/
 /* Helper method to load unlock required, considering retries */
 
-#define MAX_RETRIES 6
-
 typedef struct {
     guint retries;
     guint pin_check_timeout_id;
@@ -381,6 +379,28 @@ load_unlock_required_again (GTask *task)
     /* Retry the step */
     internal_load_unlock_required_context_step (task);
     return G_SOURCE_REMOVE;
+}
+
+#define MAX_RETRIES_NO_SIM 6
+#define MAX_RETRIES_SIM_EXISTS 30
+static guint
+get_max_retries (MMIfaceModem *self)
+{
+    g_autoptr(MMBaseSim) sim = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM,
+                  &sim,
+                  NULL);
+    /* If a SIM is known to exist, for e.g. if it was created during load_sim_slots,
+      persist a few more times before giving up on the SIM to be ready. There
+      are modems on which the SIM takes more than 15s to be ready, luckily,
+      they happen to be QMI modems where the SIM's iccid in load_sim_slots
+      lets us know that there is a sim. */
+    if (sim)
+        return MAX_RETRIES_SIM_EXISTS;
+
+    return MAX_RETRIES_NO_SIM;
 }
 
 static void
@@ -418,7 +438,7 @@ load_unlock_required_ready (MMIfaceModem *self,
         }
 
         /* For the remaining ones, retry if possible */
-        if (ctx->retries < MAX_RETRIES) {
+        if (ctx->retries < get_max_retries (self)) {
             ctx->retries++;
             mm_obj_dbg (self, "retrying (%u) unlock required check", ctx->retries);
 
@@ -436,7 +456,7 @@ load_unlock_required_ready (MMIfaceModem *self,
                                  MM_MOBILE_EQUIPMENT_ERROR,
                                  MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
                                  "Couldn't get SIM lock status after %u retries",
-                                 MAX_RETRIES);
+                                 get_max_retries (self));
         g_object_unref (task);
         return;
     }
@@ -458,8 +478,8 @@ internal_load_unlock_required_context_step (GTask *task)
     g_assert (ctx->pin_check_timeout_id == 0);
     MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required (
         self,
-        (ctx->retries == MAX_RETRIES), /* last_attempt? */
-        (GAsyncReadyCallback)load_unlock_required_ready,
+        (ctx->retries >= get_max_retries (self)), /* last_attempt? */
+        (GAsyncReadyCallback) load_unlock_required_ready,
         task);
 }
 
