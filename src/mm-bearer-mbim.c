@@ -27,6 +27,7 @@
 #include <libmm-glib.h>
 
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-modem-helpers-mbim.h"
 #include "mm-port-enums-types.h"
 #include "mm-bearer-mbim.h"
@@ -196,8 +197,8 @@ reload_stats (MMBaseBearer        *self,
 
 typedef enum {
     CONNECT_STEP_FIRST,
+    CONNECT_STEP_LOAD_PROFILE_SETTINGS,
     CONNECT_STEP_PACKET_SERVICE,
-    CONNECT_STEP_PROVISIONED_CONTEXTS,
     CONNECT_STEP_SETUP_LINK,
     CONNECT_STEP_SETUP_LINK_MASTER_UP,
     CONNECT_STEP_CHECK_DISCONNECTED,
@@ -209,12 +210,19 @@ typedef enum {
 
 typedef struct {
     MMPortMbim            *mbim;
-    MMBearerProperties    *properties;
+    MMBroadbandModemMbim  *modem;
     ConnectStep            step;
     MMPort                *data;
+    MMBearerConnectResult *connect_result;
+    /* settings to use */
+    gint                   profile_id;
+    gchar                 *apn;
+    MbimContextType        context_type;
+    gchar                 *user;
+    gchar                 *password;
+    MbimAuthProtocol       auth;
     MbimContextIpType      requested_ip_type;
     MbimContextIpType      activated_ip_type;
-    MMBearerConnectResult *connect_result;
     /* multiplex support */
     guint                  session_id;
     gchar                 *link_prefix_hint;
@@ -232,11 +240,15 @@ connect_context_free (ConnectContext *ctx)
     g_clear_object (&ctx->link);
     g_free (ctx->link_prefix_hint);
 
+    g_free (ctx->apn);
+    g_free (ctx->user);
+    g_free (ctx->password);
+
     g_clear_pointer (&ctx->connect_result, (GDestroyNotify)mm_bearer_connect_result_unref);
 
     g_clear_object (&ctx->data);
-    g_object_unref (ctx->properties);
     g_object_unref (ctx->mbim);
+    g_object_unref (ctx->modem);
     g_slice_free (ConnectContext, ctx);
 }
 
@@ -564,6 +576,9 @@ ip_configuration_query_ready (MbimDevice   *device,
                                                             ipv4_config,
                                                             ipv6_config);
         mm_bearer_connect_result_set_multiplexed (ctx->connect_result, !!ctx->link);
+
+        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
+            mm_bearer_connect_result_set_profile_id (ctx->connect_result, ctx->profile_id);
     }
 
     if (error) {
@@ -796,53 +811,6 @@ setup_link_ready (MMPortMbim    *mbim,
 }
 
 static void
-provisioned_contexts_query_ready (MbimDevice *device,
-                                  GAsyncResult *res,
-                                  GTask *task)
-{
-    MMBearerMbim           *self;
-    ConnectContext         *ctx;
-    g_autoptr(GError)       error = NULL;
-    g_autoptr(MbimMessage)  response = NULL;
-    guint32                 provisioned_contexts_count;
-    g_autoptr(MbimProvisionedContextElementArray) provisioned_contexts = NULL;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_provisioned_contexts_response_parse (
-            response,
-            &provisioned_contexts_count,
-            &provisioned_contexts,
-            &error)) {
-        guint32 i;
-
-        mm_obj_dbg (self, "provisioned contexts found (%u):", provisioned_contexts_count);
-        for (i = 0; i < provisioned_contexts_count; i++) {
-            MbimProvisionedContextElement *el = provisioned_contexts[i];
-            g_autofree gchar              *uuid_str = NULL;
-
-            uuid_str = mbim_uuid_get_printable (&el->context_type);
-            mm_obj_dbg (self, "[%u] context type: %s", el->context_id, mbim_context_type_get_string (mbim_uuid_to_context_type (&el->context_type)));
-            mm_obj_dbg (self, "             uuid: %s", uuid_str);
-            mm_obj_dbg (self, "    access string: %s", el->access_string ? el->access_string : "");
-            mm_obj_dbg (self, "         username: %s", el->user_name ? el->user_name : "");
-            mm_obj_dbg (self, "         password: %s", el->password ? el->password : "");
-            mm_obj_dbg (self, "      compression: %s", mbim_compression_get_string (el->compression));
-            mm_obj_dbg (self, "             auth: %s", mbim_auth_protocol_get_string (el->auth_protocol));
-        }
-    } else
-        mm_obj_dbg (self, "error listing provisioned contexts: %s", error->message);
-
-    /* Keep on */
-    ctx->step++;
-    connect_context_step (task);
-}
-
-static void
 packet_service_set_ready (MbimDevice *device,
                           GAsyncResult *res,
                           GTask *task)
@@ -913,6 +881,95 @@ packet_service_set_ready (MbimDevice *device,
     connect_context_step (task);
 }
 
+static gboolean
+load_settings_from_profile (MMBearerMbim    *self,
+                            ConnectContext  *ctx,
+                            MM3gppProfile   *profile,
+                            GError         **error)
+{
+    MMBearerAllowedAuth  bearer_auth;
+    MMBearerApnType      apn_type;
+    GError              *inner_error = NULL;
+
+    /* APN settings */
+    ctx->apn = g_strdup (mm_3gpp_profile_get_apn (profile));
+    apn_type = mm_3gpp_profile_get_apn_type (profile);
+    if (apn_type == MM_BEARER_APN_TYPE_NONE) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "APN type in profile is not initialized");
+        return FALSE;
+    }
+    ctx->context_type = mm_bearer_apn_type_to_mbim_context_type (apn_type, self, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    /* Auth settings */
+    ctx->user = g_strdup (mm_3gpp_profile_get_user (profile));
+    ctx->password = g_strdup (mm_3gpp_profile_get_password (profile));
+    if (!ctx->user && !ctx->password) {
+        ctx->auth = MBIM_AUTH_PROTOCOL_NONE;
+    } else {
+        bearer_auth = mm_3gpp_profile_get_allowed_auth (profile);
+        ctx->auth = mm_bearer_allowed_auth_to_mbim_auth_protocol (bearer_auth, self, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+    }
+
+    /* This IP type reading is applicable only when the profile comes
+     * from the input bearer properties, as there is no IP type stored
+     * in the device profiles. Therefore, only read it if it hasn't been
+     * read yet */
+    if (ctx->requested_ip_type == MBIM_CONTEXT_IP_TYPE_DEFAULT) {
+        MMBearerIpFamily ip_type;
+
+        ip_type = mm_3gpp_profile_get_ip_type (profile);
+        mm_3gpp_normalize_ip_family (&ip_type);
+        ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_type, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static void
+get_profile_ready (MMIfaceModem3gppProfileManager *modem,
+                   GAsyncResult                   *res,
+                   GTask                          *task)
+{
+    MMBearerMbim             *self;
+    ConnectContext           *ctx;
+    GError                   *error = NULL;
+    g_autoptr(MM3gppProfile)  profile = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    profile = mm_iface_modem_3gpp_profile_manager_get_profile_finish (modem, res, &error);
+    if (!profile) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!load_settings_from_profile (self, ctx, profile, &error)) {
+        g_prefix_error (&error, "Couldn't load settings from profile: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
 static void
 connect_context_step (GTask *task)
 {
@@ -934,6 +991,19 @@ connect_context_step (GTask *task)
         ctx->step++;
         /* Fall through */
 
+    case CONNECT_STEP_LOAD_PROFILE_SETTINGS:
+        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+            mm_obj_dbg (self, "loading connection settings from profile '%d'...", ctx->profile_id);
+            mm_iface_modem_3gpp_profile_manager_get_profile (
+                MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (ctx->modem),
+                ctx->profile_id,
+                (GAsyncReadyCallback)get_profile_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
     case CONNECT_STEP_PACKET_SERVICE:
         mm_obj_dbg (self, "activating packet service...");
         message = mbim_message_packet_service_set_new (MBIM_PACKET_SERVICE_ACTION_ATTACH, NULL);
@@ -942,17 +1012,6 @@ connect_context_step (GTask *task)
                              30,
                              NULL,
                              (GAsyncReadyCallback)packet_service_set_ready,
-                             task);
-        return;
-
-    case CONNECT_STEP_PROVISIONED_CONTEXTS:
-        mm_obj_dbg (self, "listing provisioned contexts...");
-        message = mbim_message_provisioned_contexts_query_new (NULL);
-        mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
-                             message,
-                             10,
-                             NULL,
-                             (GAsyncReadyCallback)provisioned_contexts_query_ready,
                              task);
         return;
 
@@ -1025,55 +1084,19 @@ connect_context_step (GTask *task)
                              task);
         return;
 
-    case CONNECT_STEP_CONNECT: {
-        const gchar      *apn;
-        const gchar      *user;
-        const gchar      *password;
-        MbimAuthProtocol  auth;
-        MMBearerIpFamily  ip_family;
-        GError           *error = NULL;
-
-        /* Setup parameters to use */
-
-        apn = mm_bearer_properties_get_apn (ctx->properties);
-        user = mm_bearer_properties_get_user (ctx->properties);
-        password = mm_bearer_properties_get_password (ctx->properties);
-
-        if (!user && !password) {
-            auth = MBIM_AUTH_PROTOCOL_NONE;
-        } else {
-            MMBearerAllowedAuth bearer_auth;
-
-            bearer_auth = mm_bearer_properties_get_allowed_auth (ctx->properties);
-            auth = mm_bearer_allowed_auth_to_mbim_auth_protocol (bearer_auth, self, &error);
-            if (error) {
-                g_task_return_error (task, error);
-                g_object_unref (task);
-                return;
-            }
-        }
-
-        ip_family = mm_bearer_properties_get_ip_type (ctx->properties);
-        mm_3gpp_normalize_ip_family (&ip_family);
-        ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_family, &error);
-        if (error) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
-            return;
-        }
-
-        mm_obj_dbg (self, "launching %s connection with APN '%s' in session %u...",
-                    mbim_context_ip_type_get_string (ctx->requested_ip_type), apn, ctx->session_id);
+    case CONNECT_STEP_CONNECT:
+        mm_obj_dbg (self, "launching %s connection in session %u...",
+                    mbim_context_ip_type_get_string (ctx->requested_ip_type), ctx->session_id);
         message = mbim_message_connect_set_new (
                       ctx->session_id,
                       MBIM_ACTIVATION_COMMAND_ACTIVATE,
-                      apn ? apn : "",
-                      user ? user : "",
-                      password ? password : "",
+                      ctx->apn ? ctx->apn : "",
+                      ctx->user ? ctx->user : "",
+                      ctx->password ? ctx->password : "",
                       MBIM_COMPRESSION_NONE,
-                      auth,
+                      ctx->auth,
                       ctx->requested_ip_type,
-                      mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                      mbim_uuid_from_context_type (ctx->context_type),
                       NULL);
         mbim_device_command (mm_port_mbim_peek_device (ctx->mbim),
                              message,
@@ -1082,7 +1105,6 @@ connect_context_step (GTask *task)
                              (GAsyncReadyCallback)connect_set_ready,
                              task);
         return;
-    }
 
     case CONNECT_STEP_IP_CONFIGURATION:
         mm_obj_dbg (self, "querying IP configuration...");
@@ -1143,74 +1165,113 @@ connect_context_step (GTask *task)
     g_assert_not_reached ();
 }
 
+static gboolean
+load_settings_from_bearer (MMBearerMbim        *self,
+                           ConnectContext      *ctx,
+                           MMBearerProperties  *properties,
+                           GError             **error)
+{
+    MMBearerMultiplexSupport  multiplex;
+    gboolean                  multiplex_supported = TRUE;
+    const gchar              *data_port_driver;
+
+    data_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (ctx->data));
+    if (!g_strcmp0 (data_port_driver, "mhi_net"))
+        multiplex_supported = FALSE;
+
+    /* If no multiplex setting given by the user, assume requested */
+    multiplex = mm_bearer_properties_get_multiplex (properties);
+    if (multiplex_supported &&
+        (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN   ||
+         multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
+         multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED)) {
+        /* the link prefix hint given must be modem-specific */
+        ctx->link_prefix_hint = g_strdup_printf ("mbimmux%u.", mm_base_modem_get_dbus_id (MM_BASE_MODEM (ctx->modem)));
+    }
+
+    if (!multiplex_supported && multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Multiplexing required but not supported by %s", data_port_driver);
+        return FALSE;
+    }
+
+    /* If profile id is given, we'll load all settings from the stored profile,
+     * so ignore any other setting received in the bearer properties */
+    ctx->profile_id = mm_bearer_properties_get_profile_id (properties);
+    if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+        MMBearerIpFamily  ip_type;
+        GError           *inner_error = NULL;
+
+        /* If we're loading settings from a profile, still read the ip-type
+         * from the user input, as that is not stored in the profile */
+        ip_type = mm_bearer_properties_get_ip_type (properties);
+        mm_3gpp_normalize_ip_family (&ip_type);
+        ctx->requested_ip_type = mm_bearer_ip_family_to_mbim_context_ip_type (ip_type, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+    /* If not loading from a stored profile, initialize the
+     * APN type to 'internet' by default, which is what we've done
+     * until now. */
+    if (mm_bearer_properties_get_apn_type (properties) == MM_BEARER_APN_TYPE_NONE)
+        mm_bearer_properties_set_apn_type (properties, MM_BEARER_APN_TYPE_DEFAULT);
+
+    /* Use the implicit profile settings in the bearer properties */
+    if (!load_settings_from_profile (self, ctx, mm_bearer_properties_peek_3gpp_profile (properties), error))
+        return FALSE;
+
+    /* Is this a 3GPP only modem and no APN or profile id was given? If so, error */
+    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (ctx->modem)) && !ctx->apn) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "3GPP connection logic requires APN or profile id setting");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 static void
 _connect (MMBaseBearer        *self,
           GCancellable        *cancellable,
           GAsyncReadyCallback  callback,
           gpointer             user_data)
 {
-    ConnectContext           *ctx;
-    MMPort                   *data;
-    MMPortMbim               *mbim;
-    const gchar              *apn;
-    GTask                    *task;
-    MMBearerMultiplexSupport  multiplex;
-    g_autoptr(MMBaseModem)    modem  = NULL;
-    const gchar              *data_port_driver;
-    gboolean                  multiplex_supported = TRUE;
+    ConnectContext                *ctx;
+    MMPort                        *data;
+    MMPortMbim                    *mbim;
+    GTask                         *task;
+    GError                        *error = NULL;
+    g_autoptr(MMBaseModem)         modem  = NULL;
+    g_autoptr(MMBearerProperties)  properties = NULL;
 
     if (!peek_ports (self, &mbim, &data, callback, user_data))
         return;
 
+    task = g_task_new (self, cancellable, callback, user_data);
+
     g_object_get (self,
-                  MM_BASE_BEARER_MODEM, &modem,
+                  MM_BASE_BEARER_MODEM,  &modem,
+                  MM_BASE_BEARER_CONFIG, &properties,
                   NULL);
     g_assert (modem);
 
-    /* Check whether we have an APN */
-    apn = mm_bearer_properties_get_apn (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
-
-    /* Is this a 3GPP only modem and no APN was given? If so, error */
-    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (modem)) && !apn) {
-        g_task_report_new_error (
-            self,
-            callback,
-            user_data,
-            _connect,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_INVALID_ARGS,
-            "3GPP connection logic requires APN setting");
-        return;
-    }
-
     ctx = g_slice_new0 (ConnectContext);
+    ctx->modem = g_object_ref (modem);
     ctx->mbim = g_object_ref (mbim);
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_STEP_FIRST;
     ctx->requested_ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
     ctx->activated_ip_type = MBIM_CONTEXT_IP_TYPE_DEFAULT;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)connect_context_free);
 
-    g_object_get (self,
-                  MM_BASE_BEARER_CONFIG, &ctx->properties,
-                  NULL);
-
-    data_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (data));
-    if (!g_strcmp0 (data_port_driver, "mhi_net"))
-        multiplex_supported = FALSE;
-
-    multiplex = mm_bearer_properties_get_multiplex (ctx->properties);
-
-    /* If no multiplex setting given by the user, assume requested */
-    if (multiplex_supported &&
-        (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN ||
-         multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
-         multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED)) {
-        /* the link prefix hint given must be modem-specific */
-        ctx->link_prefix_hint = g_strdup_printf ("mbimmux%u.", mm_base_modem_get_dbus_id (MM_BASE_MODEM (modem)));
-    }
-
-    if (!multiplex_supported && multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
-        mm_obj_err (self, "Multiplexing required but not supported by %s", data_port_driver);
+    if (!load_settings_from_bearer (MM_BEARER_MBIM (self), ctx, properties, &error)) {
+        g_prefix_error (&error, "Invalid bearer properties: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
         return;
     }
 
@@ -1218,9 +1279,6 @@ _connect (MMBaseBearer        *self,
                 ctx->link_prefix_hint ? "multiplexed " : "",
                 mm_port_subsys_get_string (mm_port_get_subsys (data)),
                 mm_port_get_device (data));
-
-    task = g_task_new (self, cancellable, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)connect_context_free);
 
     /* Run! */
     connect_context_step (task);
