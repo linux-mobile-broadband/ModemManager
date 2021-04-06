@@ -120,6 +120,9 @@ MMBearerIpFamily     mm_bearer_ip_family_from_qmi_ip_support_type   (QmiWdsIpSup
 MMBearerIpFamily     mm_bearer_ip_family_from_qmi_pdp_type          (QmiWdsPdpType pdp_type);
 gboolean             mm_bearer_ip_family_to_qmi_pdp_type            (MMBearerIpFamily  ip_family,
                                                                      QmiWdsPdpType    *out_pdp_type);
+QmiWdsApnTypeMask    mm_bearer_apn_type_to_qmi_apn_type             (MMBearerApnType apn_type,
+                                                                     gpointer        log_object);
+MMBearerApnType      mm_bearer_apn_type_from_qmi_apn_type           (QmiWdsApnTypeMask apn_type);
 
 /*****************************************************************************/
 /* QMI/WDA to MM translations */

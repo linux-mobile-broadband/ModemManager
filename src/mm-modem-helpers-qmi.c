@@ -1550,6 +1550,52 @@ mm_bearer_ip_family_to_qmi_pdp_type (MMBearerIpFamily  ip_family,
     }
 }
 
+QmiWdsApnTypeMask
+mm_bearer_apn_type_to_qmi_apn_type (MMBearerApnType apn_type,
+                                    gpointer        log_object)
+{
+    guint64 value = 0;
+
+    if (apn_type == MM_BEARER_APN_TYPE_NONE) {
+        mm_obj_dbg (log_object, "using default (internet) APN type");
+        return QMI_WDS_APN_TYPE_MASK_DEFAULT;
+    }
+
+    if (apn_type & MM_BEARER_APN_TYPE_DEFAULT)
+        value |= QMI_WDS_APN_TYPE_MASK_DEFAULT;
+    if (apn_type & MM_BEARER_APN_TYPE_IMS)
+        value |= QMI_WDS_APN_TYPE_MASK_IMS;
+    if (apn_type & MM_BEARER_APN_TYPE_MMS)
+        value |= QMI_WDS_APN_TYPE_MASK_MMS;
+    if (apn_type & MM_BEARER_APN_TYPE_MANAGEMENT)
+        value |= QMI_WDS_APN_TYPE_MASK_FOTA;
+    if (apn_type & MM_BEARER_APN_TYPE_INITIAL)
+        value |= QMI_WDS_APN_TYPE_MASK_IA;
+    if (apn_type & MM_BEARER_APN_TYPE_EMERGENCY)
+        value |= QMI_WDS_APN_TYPE_MASK_EMERGENCY;
+    return value;
+}
+
+MMBearerApnType
+mm_bearer_apn_type_from_qmi_apn_type (QmiWdsApnTypeMask apn_type)
+{
+    MMBearerApnType value = MM_BEARER_APN_TYPE_NONE;
+
+    if (apn_type & QMI_WDS_APN_TYPE_MASK_DEFAULT)
+        value |= MM_BEARER_APN_TYPE_DEFAULT;
+    if (apn_type & QMI_WDS_APN_TYPE_MASK_IMS)
+        value |= MM_BEARER_APN_TYPE_IMS;
+    if (apn_type & QMI_WDS_APN_TYPE_MASK_MMS)
+        value |= MM_BEARER_APN_TYPE_MMS;
+    if (apn_type & QMI_WDS_APN_TYPE_MASK_FOTA)
+        value |= MM_BEARER_APN_TYPE_MANAGEMENT;
+    if (apn_type & QMI_WDS_APN_TYPE_MASK_IA)
+        value |= MM_BEARER_APN_TYPE_INITIAL;
+    if (apn_type & QMI_WDS_APN_TYPE_MASK_EMERGENCY)
+        value |= MM_BEARER_APN_TYPE_EMERGENCY;
+    return value;
+}
+
 /*****************************************************************************/
 /* QMI/WDA to MM translations */
 
