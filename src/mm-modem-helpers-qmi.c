@@ -1485,6 +1485,10 @@ mm_bearer_allowed_auth_from_qmi_authentication (QmiWdsAuthentication auth)
 {
     MMBearerAllowedAuth out = 0;
 
+    /* Exact match for NONE */
+    if (auth == QMI_WDS_AUTHENTICATION_NONE)
+        return MM_BEARER_ALLOWED_AUTH_NONE;
+
     if (auth & QMI_WDS_AUTHENTICATION_PAP)
         out |= MM_BEARER_ALLOWED_AUTH_PAP;
     if (auth & QMI_WDS_AUTHENTICATION_CHAP)
