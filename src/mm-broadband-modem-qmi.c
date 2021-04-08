@@ -6039,8 +6039,16 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
     ctx->user = g_strdup (mm_3gpp_profile_get_user (profile));
     ctx->password = g_strdup (mm_3gpp_profile_get_password (profile));
     allowed_auth = mm_3gpp_profile_get_allowed_auth (profile);
-    if ((allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN) || ctx->user || ctx->password)
-        ctx->qmi_auth = mm_bearer_allowed_auth_to_qmi_authentication (allowed_auth);
+    if ((allowed_auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN) || ctx->user || ctx->password) {
+        GError *error = NULL;
+
+        ctx->qmi_auth = mm_bearer_allowed_auth_to_qmi_authentication (allowed_auth, self, &error);
+        if (error) {
+            g_task_return_error (task, error);
+            g_object_unref (task);
+            return;
+        }
+    }
 
     ip_type = mm_3gpp_profile_get_ip_type (profile);
     if (!mm_bearer_ip_family_to_qmi_pdp_type (ip_type, &ctx->qmi_pdp_type)) {
@@ -8880,7 +8888,7 @@ set_initial_eps_bearer_modify_profile (GTask *task)
     allowed_auth = mm_bearer_properties_get_allowed_auth (ctx->settings);
     if (allowed_auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN)
         allowed_auth = MM_BEARER_ALLOWED_AUTH_NONE;
-    auth = mm_bearer_allowed_auth_to_qmi_authentication (allowed_auth);
+    auth = mm_bearer_allowed_auth_to_qmi_authentication (allowed_auth, self, NULL);
     qmi_message_wds_modify_profile_input_set_authentication (input, auth, NULL);
 
     str = mm_bearer_properties_get_user (ctx->settings);

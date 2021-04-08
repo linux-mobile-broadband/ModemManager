@@ -1467,16 +1467,33 @@ mm_sms_state_from_qmi_message_tag (QmiWmsMessageTagType tag)
 /*****************************************************************************/
 
 QmiWdsAuthentication
-mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth auth)
+mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth   auth,
+                                              gpointer              log_object,
+                                              GError              **error)
 {
-    QmiWdsAuthentication out;
+    QmiWdsAuthentication  out;
+    g_autofree gchar     *str = NULL;
 
+    if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
+        mm_obj_dbg (log_object, "using default (CHAP) authentication method");
+        return QMI_WDS_AUTHENTICATION_CHAP;
+    }
+
+    if (auth == MM_BEARER_ALLOWED_AUTH_NONE)
+        return QMI_WDS_AUTHENTICATION_NONE;
+
+    /* otherwise find a bitmask that matches the input bitmask */
     out = QMI_WDS_AUTHENTICATION_NONE;
     if (auth & MM_BEARER_ALLOWED_AUTH_PAP)
         out |= QMI_WDS_AUTHENTICATION_PAP;
     if (auth & MM_BEARER_ALLOWED_AUTH_CHAP)
         out |= QMI_WDS_AUTHENTICATION_CHAP;
 
+    /* and if the bitmask cannot be built, error out */
+    str = mm_bearer_allowed_auth_build_string_from_mask (auth);
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                 "Unsupported authentication methods (%s)",
+                 str);
     return out;
 }
 

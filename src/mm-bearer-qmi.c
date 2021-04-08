@@ -2098,27 +2098,16 @@ _connect (MMBaseBearer *_self,
         auth = mm_bearer_properties_get_allowed_auth (properties);
         g_object_unref (properties);
 
-        if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
-            /* We'll default to CHAP later if needed */
+        if (!ctx->user && !ctx->password)
             ctx->auth = QMI_WDS_AUTHENTICATION_NONE;
-        } else if (auth & (MM_BEARER_ALLOWED_AUTH_PAP |
-                           MM_BEARER_ALLOWED_AUTH_CHAP |
-                           MM_BEARER_ALLOWED_AUTH_NONE)) {
-            /* Only PAP and/or CHAP or NONE are supported */
-            ctx->auth = mm_bearer_allowed_auth_to_qmi_authentication (auth);
-        } else {
-            gchar *str;
-
-            str = mm_bearer_allowed_auth_build_string_from_mask (auth);
-            g_task_return_new_error (
-                task,
-                MM_CORE_ERROR,
-                MM_CORE_ERROR_UNSUPPORTED,
-                "Cannot use any of the specified authentication methods (%s)",
-                str);
-            g_object_unref (task);
-            g_free (str);
-            goto out;
+        else {
+            auth = mm_bearer_properties_get_allowed_auth (properties);
+            ctx->auth = mm_bearer_allowed_auth_to_qmi_authentication (auth, self, &error);
+            if (error) {
+                g_task_return_error (task, error);
+                g_object_unref (task);
+                goto out;
+            }
         }
 
         multiplex = mm_bearer_properties_get_multiplex (properties);
