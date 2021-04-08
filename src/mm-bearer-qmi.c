@@ -415,6 +415,7 @@ static void cleanup_event_report_unsolicited_events (MMBearerQmi *self,
 
 typedef enum {
     CONNECT_STEP_FIRST,
+    CONNECT_STEP_LOAD_PROFILE_SETTINGS,
     CONNECT_STEP_OPEN_QMI_PORT,
     CONNECT_STEP_SETUP_DATA_FORMAT,
     CONNECT_STEP_SETUP_LINK,
@@ -445,6 +446,7 @@ typedef struct {
     MMPortQmi   *qmi;
     QmiSioPort   sio_port;
 
+    gint                  profile_id;
     MMBearerIpMethod      ip_method;
     gboolean              explicit_qmi_open;
     gchar                *user;
@@ -980,32 +982,30 @@ static QmiMessageWdsStartNetworkInput *
 build_start_network_input (ConnectContext *ctx)
 {
     QmiMessageWdsStartNetworkInput *input;
-    gboolean has_user, has_password;
 
     g_assert (ctx->running_ipv4 || ctx->running_ipv6);
     g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
 
     input = qmi_message_wds_start_network_input_new ();
 
-    if (ctx->apn && ctx->apn[0])
-        qmi_message_wds_start_network_input_set_apn (input, ctx->apn, NULL);
+    /* When requesting to connect through a profile, add the profile-id setting */
+    if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+        g_assert (ctx->profile_id <= (gint)G_MAXUINT8);
+        qmi_message_wds_start_network_input_set_profile_index_3gpp (input, (guint8)ctx->profile_id, NULL);
+    } else {
+        /* If user gives empty string as APN, we also skip setting it in the
+         * request. */
+        if (ctx->apn && ctx->apn[0])
+            qmi_message_wds_start_network_input_set_apn (input, ctx->apn, NULL);
 
-    has_user     = (ctx->user     && ctx->user[0]);
-    has_password = (ctx->password && ctx->password[0]);
-
-    /* Need to add auth info? */
-    if (has_user || has_password || ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
-        /* We define a valid auth preference if we have either user or password, or an explicit
-         * request for one to be set. If no explicit one was given, default to CHAP. */
-        qmi_message_wds_start_network_input_set_authentication_preference (
-            input,
-            (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) ? ctx->auth : QMI_WDS_AUTHENTICATION_CHAP,
-            NULL);
-
-        if (has_user)
-            qmi_message_wds_start_network_input_set_username (input, ctx->user, NULL);
-        if (has_password)
-            qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
+        /* Auth info */
+        qmi_message_wds_start_network_input_set_authentication_preference (input, ctx->auth, NULL);
+        if (ctx->auth != QMI_WDS_AUTHENTICATION_NONE) {
+            if (ctx->user)
+                qmi_message_wds_start_network_input_set_username (input, ctx->user, NULL);
+            if (ctx->user)
+                qmi_message_wds_start_network_input_set_password (input, ctx->password, NULL);
+        }
     }
 
     /* Only add the IP family preference TLV if explicitly requested a given
@@ -1486,6 +1486,66 @@ qmi_port_open_ready (MMPortQmi *qmi,
     connect_context_step (task);
 }
 
+static gboolean
+load_ip_type_settings_from_profile (ConnectContext *ctx,
+                                    MM3gppProfile  *profile,
+                                    GError        **error)
+{
+    MMBearerIpFamily ip_family;
+
+    ip_family = mm_3gpp_profile_get_ip_type (profile);
+    if (mm_3gpp_normalize_ip_family (&ip_family))
+        ctx->no_ip_family_preference = TRUE;
+    if (ip_family & MM_BEARER_IP_FAMILY_IPV4)
+        ctx->ipv4 = TRUE;
+    if (ip_family & MM_BEARER_IP_FAMILY_IPV6)
+        ctx->ipv6 = TRUE;
+    if (ip_family & MM_BEARER_IP_FAMILY_IPV4V6) {
+        ctx->ipv4 = TRUE;
+        ctx->ipv6 = TRUE;
+    }
+    if (!ctx->ipv4 && !ctx->ipv6) {
+        g_autofree gchar *str = NULL;
+
+        str = mm_bearer_ip_family_build_string_from_mask (ip_family);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported IP type requested: '%s'", str);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+get_profile_ready (MMIfaceModem3gppProfileManager *modem,
+                   GAsyncResult                   *res,
+                   GTask                          *task)
+{
+    ConnectContext           *ctx;
+    GError                   *error = NULL;
+    g_autoptr(MM3gppProfile)  profile = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    profile = mm_iface_modem_3gpp_profile_manager_get_profile_finish (modem, res, &error);
+    if (!profile) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!load_ip_type_settings_from_profile (ctx, profile, &error)) {
+        g_prefix_error (&error, "Couldn't load ip type settings from profile: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Keep on */
+    ctx->step++;
+    connect_context_step (task);
+}
+
 static void
 connect_context_step (GTask *task)
 {
@@ -1518,11 +1578,24 @@ connect_context_step (GTask *task)
 
     switch (ctx->step) {
     case CONNECT_STEP_FIRST:
-        g_assert (ctx->ipv4 || ctx->ipv6);
+        ctx->step++;
+        /* fall through */
+
+    case CONNECT_STEP_LOAD_PROFILE_SETTINGS:
+        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+            mm_obj_dbg (self, "loading connection settings from profile '%d'...", ctx->profile_id);
+            mm_iface_modem_3gpp_profile_manager_get_profile (
+                MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (ctx->modem),
+                ctx->profile_id,
+                (GAsyncReadyCallback)get_profile_ready,
+                task);
+            return;
+        }
         ctx->step++;
         /* fall through */
 
     case CONNECT_STEP_OPEN_QMI_PORT:
+        g_assert (ctx->ipv4 || ctx->ipv6);
         /* If we're explicitly opening the port (e.g. using a different cdc-wdm
          * port because the primary one is already connected by a different
          * bearer), then make sure we also close it if anything goes wrong and
@@ -1945,6 +2018,9 @@ connect_context_step (GTask *task)
                                                        ctx->ipv6_config);
         mm_bearer_connect_result_set_multiplexed (connect_result, !!ctx->link);
 
+        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
+            mm_bearer_connect_result_set_profile_id (connect_result, ctx->profile_id);
+
         complete_connect (task, connect_result, NULL);
         return;
     }
@@ -1969,8 +2045,8 @@ load_settings_from_bearer (MMBearerQmi         *self,
                            GError             **error)
 {
     MMBearerAllowedAuth  bearer_auth;
-    MMBearerIpFamily     ip_family;
     GError              *inner_error = NULL;
+    const gchar         *str;
 
     /* If no multiplex setting given by the user, assume requested */
     ctx->multiplex = mm_bearer_properties_get_multiplex (properties);
@@ -1981,6 +2057,22 @@ load_settings_from_bearer (MMBearerQmi         *self,
     if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
         ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
         ctx->link_prefix_hint = g_strdup_printf ("qmapmux%u.", mm_base_modem_get_dbus_id (MM_BASE_MODEM (modem)));
+    }
+
+    /* If profile id is given, we'll launch the connection specifying the profile id in use
+     * exclusively, so we ignore any additional user provided setting */
+    ctx->profile_id = mm_bearer_properties_get_profile_id (properties);
+    if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+        /* Is this a 3GPP2 only modem and profile id was given? If so, error, as we don't support
+         * 3GPP2 profiles in ModemManager */
+        if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (modem))) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "3GPP2 doesn't support profile id setting");
+            return FALSE;
+        }
+        /* All done now, we'll need to load IP type settings later on once
+         * we load the real profile to use */
+        return TRUE;
     }
 
     /* APN settings */
@@ -1999,29 +2091,17 @@ load_settings_from_bearer (MMBearerQmi         *self,
     }
 
     /* IP type settings */
-    ip_family = mm_bearer_properties_get_ip_type (properties);
-    if (mm_3gpp_normalize_ip_family (&ip_family))
-        ctx->no_ip_family_preference = TRUE;
-    if (ip_family & MM_BEARER_IP_FAMILY_IPV4)
-        ctx->ipv4 = TRUE;
-    if (ip_family & MM_BEARER_IP_FAMILY_IPV6)
-        ctx->ipv6 = TRUE;
-    if (ip_family & MM_BEARER_IP_FAMILY_IPV4V6) {
-        ctx->ipv4 = TRUE;
-        ctx->ipv6 = TRUE;
-    }
-    if (!ctx->ipv4 && !ctx->ipv6) {
-        g_autofree gchar *str = NULL;
-
-        str = mm_bearer_ip_family_build_string_from_mask (ip_family);
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                     "Unsupported IP type requested: '%s'", str);
+    if (!load_ip_type_settings_from_profile (ctx, mm_bearer_properties_peek_3gpp_profile (properties), error))
         return FALSE;
-    }
 
-    /* Auth settings */
-    ctx->user = g_strdup (mm_bearer_properties_get_user (properties));
-    ctx->password = g_strdup (mm_bearer_properties_get_password (properties));
+    /* Auth settings; in we treat user/password empty strings as no strings */
+    str = mm_bearer_properties_get_user (properties);
+    if (str && str[0])
+        ctx->user = g_strdup (str);
+    str = mm_bearer_properties_get_password (properties);
+    if (str && str[0])
+        ctx->password = g_strdup (str);
+
     if (!ctx->user && !ctx->password)
         ctx->auth = QMI_WDS_AUTHENTICATION_NONE;
     else {
