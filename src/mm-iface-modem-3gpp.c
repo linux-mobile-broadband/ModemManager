@@ -30,14 +30,20 @@
 
 #define SUBSYSTEM_3GPP "3gpp"
 
-/* When comparing EPS bearer settings take into account that PASSWORD may not always
- * be readable, and apply very loose matching for all fields. Also, some implementations
- * may allow configuring roaming allowance in the initial EPS bearer, but that is also
- * not common. */
+/* When comparing EPS bearer settings take into account that:
+ *  -  'password' may not always be readable.
+ *  -  'apn-type' may not always be supported.
+ *  -  'profile-id' will not be known in the requested settings
+ *  -  we ignore settings not applicable to profiles, like 'allow-roaming' or
+ *     'rm-protocol'.
+ *  -  we apply very loose matching for all fields.
+ */
 #define MM_BEARER_PROPERTIES_CMP_FLAGS_EPS              \
     (MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE |             \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID |     \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD |       \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING |  \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE |       \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL)
 
 /*****************************************************************************/
