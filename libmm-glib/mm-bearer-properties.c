@@ -764,8 +764,10 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
         if (a->priv->allow_roaming_set != b->priv->allow_roaming_set)
             return FALSE;
     }
-    if (a->priv->rm_protocol != b->priv->rm_protocol)
-        return FALSE;
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL)) {
+        if (a->priv->rm_protocol != b->priv->rm_protocol)
+            return FALSE;
+    }
     return TRUE;
 }
 
