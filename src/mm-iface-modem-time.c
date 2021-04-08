@@ -194,7 +194,7 @@ static void
 load_network_timezone_ready (MMIfaceModemTime *self,
                              GAsyncResult *res)
 {
-    GError *error = NULL;
+    g_autoptr(GError)  error = NULL;
     MMNetworkTimezone *tz;
 
     /* Finish the async operation */
@@ -203,7 +203,6 @@ load_network_timezone_ready (MMIfaceModemTime *self,
         NetworkTimezoneContext *ctx;
 
         mm_obj_dbg (self, "couldn't load network timezone: %s", error->message);
-        g_error_free (error);
 
         /* Note: may be NULL if the polling has been removed while processing the async operation */
         ctx = (NetworkTimezoneContext *) g_object_get_qdata (G_OBJECT (self), network_timezone_context_quark);
