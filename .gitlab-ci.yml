@@ -1,14 +1,38 @@
-image: gcc
+include:
+  - project: freedesktop/ci-templates
+    ref: 290b79e0e78eab67a83766f4e9691be554fc4afd
+    file:
+    - templates/debian.yml
 
 stages:
+  - container prep
   - build
 
-before_script:
-    - apt update || true
-    - apt -y install autoconf automake libtool libgettextpo-dev libgirepository1.0-dev libglib2.0-dev libgudev-1.0-dev python3-dbus python3-gi autopoint xsltproc dbus autoconf-archive gettext
+.common_variables:
+  variables:
+    FDO_UPSTREAM_REPO: mobile-broadband/ModemManager
+    FDO_DISTRIBUTION_VERSION: 'buster'
+    FDO_DISTRIBUTION_TAG: '2020-04-08.4'
+    FDO_DISTRIBUTION_PACKAGES: ca-certificates git gcc autoconf automake libtool libgettextpo-dev libgirepository1.0-dev libglib2.0-dev libgudev-1.0-dev python3-dbus python3-gi autopoint xsltproc dbus autoconf-archive gettext
+                               gtk-doc-tools libglib2.0-doc gobject-introspection libsystemd-dev libpolkit-gobject-1-dev valac
+
+build container:
+  extends:
+  - .fdo.container-build@debian
+  - .common_variables
+  stage: container prep
+  only:
+    - master
+    - branches
+    - merge_requests
+    - tags
+    - pushes
 
 build-no-qmi:
   stage: build
+  extends:
+  - .fdo.distribution-image@debian
+  - .common_variables
   only:
     - master
     - merge_requests
@@ -30,6 +54,9 @@ build-no-qmi:
 
 build-no-mbim:
   stage: build
+  extends:
+  - .fdo.distribution-image@debian
+  - .common_variables
   only:
     - master
     - merge_requests
@@ -51,6 +78,9 @@ build-no-mbim:
 
 build-no-qmi-no-mbim:
   stage: build
+  extends:
+  - .fdo.distribution-image@debian
+  - .common_variables
   only:
     - master
     - merge_requests
@@ -65,6 +95,9 @@ build-no-qmi-no-mbim:
 
 build-qmi-newest-commands:
   stage: build
+  extends:
+  - .fdo.distribution-image@debian
+  - .common_variables
   only:
     - master
     - merge_requests
@@ -86,6 +119,9 @@ build-qmi-newest-commands:
 
 build-single-plugins:
   stage: build
+  extends:
+  - .fdo.distribution-image@debian
+  - .common_variables
   only:
     - schedules
   script:
@@ -117,6 +153,9 @@ build-single-plugins:
 
 build-default:
   stage: build
+  extends:
+  - .fdo.distribution-image@debian
+  - .common_variables
   only:
     - master
     - branches
@@ -125,7 +164,6 @@ build-default:
     - schedules
     - pushes
   script:
-    - apt -y install gtk-doc-tools libglib2.0-doc gobject-introspection libsystemd-dev libpolkit-gobject-1-dev valac
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh
