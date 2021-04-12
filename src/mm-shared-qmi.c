@@ -3203,52 +3203,13 @@ mm_shared_qmi_load_carrier_config (MMIfaceModem        *self,
 typedef struct {
     QmiClientUim *client_uim;
     GPtrArray    *sim_slots;
-    GList        *sorted_sims;
-    MMBaseSim    *current_sim;
-    guint         current_slot_number;
     guint         active_slot_number;
     guint         active_logical_id;
-    GArray       *initial_slot_status;
-    GArray       *final_slot_status;
-    gulong        final_slot_status_timeout_id;
-    gulong        load_sim_slots_indication_id;
 } LoadSimSlotsContext;
-
-static void
-clear_load_sim_slot_callbacks (GTask *task)
-{
-    MMIfaceModem        *self;
-    LoadSimSlotsContext *ctx;
-    Private             *priv;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-    priv = get_private (MM_SHARED_QMI (self));
-
-    if (ctx->client_uim && ctx->load_sim_slots_indication_id) {
-        g_signal_handler_disconnect(ctx->client_uim, ctx->load_sim_slots_indication_id);
-        ctx->load_sim_slots_indication_id = 0;
-    }
-    if (ctx->final_slot_status_timeout_id) {
-        g_source_remove (ctx->final_slot_status_timeout_id);
-        ctx->final_slot_status_timeout_id = 0;
-    }
-    /* Restore hot swap detection because we aren't loading slots anymore */
-    if (priv->uim_slot_status_indication_id)
-        g_signal_handler_unblock (ctx->client_uim, priv->uim_slot_status_indication_id);
-}
 
 static void
 load_sim_slots_context_free (LoadSimSlotsContext *ctx)
 {
-    if (ctx->initial_slot_status)
-        g_array_unref (ctx->initial_slot_status);
-    if (ctx->final_slot_status)
-        g_array_unref (ctx->final_slot_status);
-    g_assert (ctx->load_sim_slots_indication_id == 0);
-    g_assert (ctx->final_slot_status_timeout_id == 0);
-    g_clear_object (&ctx->current_sim);
-    g_list_free_full (ctx->sorted_sims, (GDestroyNotify)g_object_unref);
     g_clear_pointer (&ctx->sim_slots, g_ptr_array_unref);
     g_clear_object (&ctx->client_uim);
     g_slice_free (LoadSimSlotsContext, ctx);
@@ -3282,278 +3243,6 @@ mm_shared_qmi_load_sim_slots_finish (MMIfaceModem  *self,
     return TRUE;
 }
 
-/* Compares arrays of QmiPhysicalSlotStatusSlot */
-static gboolean
-compare_slot_status (GArray *slot_status1,
-                     GArray *slot_status2)
-{
-    guint i;
-    guint j;
-
-    if (!slot_status1 && !slot_status2)
-        return TRUE;
-    if (!slot_status1 || !slot_status2 || slot_status1->len != slot_status2->len)
-        return FALSE;
-    for (i = 0; i < slot_status1->len; i++) {
-        /* Compare slot at index i from slot_status1 and slot_status2 */
-        QmiPhysicalSlotStatusSlot *slot_a;
-        QmiPhysicalSlotStatusSlot *slot_b;
-
-        slot_a = &g_array_index (slot_status1, QmiPhysicalSlotStatusSlot, i);
-        slot_b = &g_array_index (slot_status2, QmiPhysicalSlotStatusSlot, i);
-        if (slot_a->physical_card_status != slot_b->physical_card_status)
-            return FALSE;
-        if (slot_a->physical_slot_status != slot_b->physical_slot_status)
-            return FALSE;
-        if (slot_a->iccid->len != slot_b->iccid->len)
-            return FALSE;
-
-        for (j = 0; j < slot_a->iccid->len; j++) {
-            if (g_array_index (slot_a->iccid, guint8, j) != g_array_index (slot_b->iccid, guint8, j))
-                return FALSE;
-        }
-    }
-    return TRUE;
-}
-
-static gboolean
-hotswap_while_loading_slots (GTask *task)
-{
-    MMIfaceModem *self;
-
-    self = g_task_get_source_object (task);
-
-    mm_obj_dbg (self,
-                "Slot status before loading sim slots is different from slot status after loading sim slots, "
-                "assuming hotswap");
-    clear_load_sim_slot_callbacks (task);
-    g_task_return_new_error (task,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_ABORTED,
-                             "Timed out waiting for final slot status to match initial slot status");
-    g_object_unref (task);
-
-    mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
-    return G_SOURCE_REMOVE;
-}
-
-#define FINAL_SLOT_STATUS_TIMEOUT 3
-
-static void
-check_final_slot_status (GTask *task)
-{
-    LoadSimSlotsContext *ctx;
-    MMIfaceModem        *self;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    /* We may never receive a slot status indication, which means that
-     * no slot switch was performed while loading sim slots */
-    if (!ctx->final_slot_status || compare_slot_status (ctx->initial_slot_status, ctx->final_slot_status)) {
-        mm_obj_dbg (self, "Final slot status matches initial slot status");
-        clear_load_sim_slot_callbacks (task);
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
-        return;
-    }
-
-    if (!ctx->final_slot_status_timeout_id) {
-        /* Setup a timeout before which final and initial slot status should match */
-        mm_obj_dbg (self,
-                    "Final slot status does not match initial slot status. "
-                    "Waiting for final slot status indication...");
-        ctx->final_slot_status_timeout_id = g_timeout_add_seconds (FINAL_SLOT_STATUS_TIMEOUT,
-                                                                   (GSourceFunc) hotswap_while_loading_slots,
-                                                                   task);
-    }
-}
-
-static void
-active_slot_switch_ready (QmiClientUim *client,
-                          GAsyncResult *res,
-                          GTask        *task)
-{
-    g_autoptr(QmiMessageUimSwitchSlotOutput) output = NULL;
-    g_autoptr(GError)                        error = NULL;
-    MMIfaceModem                            *self;
-    LoadSimSlotsContext                     *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    output = qmi_client_uim_switch_slot_finish (client, res, &error);
-    if ((!output || !qmi_message_uim_switch_slot_output_get_result (output, &error)) &&
-        !g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
-        mm_obj_err (self, "couldn't switch to original slot %u", ctx->active_slot_number);
-        clear_load_sim_slot_callbacks (task);
-        g_task_return_error (task, g_steal_pointer (&error));
-        g_object_unref (task);
-        return;
-    }
-
-    check_final_slot_status (task);
-}
-
-static void
-reload_active_slot (GTask *task)
-{
-    g_autoptr(QmiMessageUimSwitchSlotInput)  input = NULL;
-    LoadSimSlotsContext                     *ctx;
-    MMIfaceModem                            *self;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    /* If we're already in the original active SIM slot, nothing else to do */
-    if (ctx->current_slot_number == ctx->active_slot_number) {
-        mm_obj_dbg (self,
-                    "Already on the original active SIM at slot %u. "
-                    "No more slot switches necessary", ctx->active_slot_number);
-        check_final_slot_status (task);
-        return;
-    }
-
-    mm_obj_dbg (self, "switching to original active SIM at slot %u", ctx->active_slot_number);
-
-    /* Switch to the original active slot */
-    input = qmi_message_uim_switch_slot_input_new ();
-    qmi_message_uim_switch_slot_input_set_logical_slot (input, (guint8) ctx->active_logical_id, NULL);
-    qmi_message_uim_switch_slot_input_set_physical_slot (input, ctx->active_slot_number, NULL);
-    qmi_client_uim_switch_slot (ctx->client_uim,
-                                input,
-                                10,
-                                NULL,
-                                (GAsyncReadyCallback) active_slot_switch_ready,
-                                task);
-}
-
-static void load_next_sim_info (GTask *task);
-
-static void
-next_sim_initialize_ready (MMBaseSim    *sim,
-                           GAsyncResult *res,
-                           GTask        *task)
-{
-    g_autoptr(GError)    error = NULL;
-    MMIfaceModem        *self;
-    LoadSimSlotsContext *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    if (!mm_base_sim_initialize_finish (sim, res, &error))
-        mm_obj_dbg (self, "couldn't initialize SIM at slot %u: won't load additional info",
-                    ctx->current_slot_number);
-    else
-        mm_obj_dbg (self, "initialized SIM at slot %u",
-                    ctx->current_slot_number);
-
-    /* Iterate to next SIM */
-    load_next_sim_info (task);
-}
-
-static void
-next_sim_switch_ready (QmiClientUim *client,
-                       GAsyncResult *res,
-                       GTask        *task)
-{
-    g_autoptr(QmiMessageUimSwitchSlotOutput) output = NULL;
-    g_autoptr(GError)                        error = NULL;
-    MMIfaceModem                            *self;
-    LoadSimSlotsContext                     *ctx;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    output = qmi_client_uim_switch_slot_finish (client, res, &error);
-    if (!output || !qmi_message_uim_switch_slot_output_get_result (output, &error)) {
-        /* ignore NoEffect errors on slot switch, because that indicates we're
-         * already in the desired slot */
-        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
-            mm_obj_dbg (self, "couldn't switch to SIM at slot %u: won't load additional info",
-                        ctx->current_slot_number);
-            load_next_sim_info (task);
-            return;
-        }
-    }
-
-    mm_obj_dbg (self, "switched to SIM at slot %u: initializing...",
-                ctx->current_slot_number);
-
-    mm_base_sim_initialize (ctx->current_sim,
-                            NULL,
-                            (GAsyncReadyCallback) next_sim_initialize_ready,
-                            task);
-}
-
-static void
-load_next_sim_info (GTask *task)
-{
-    g_autoptr(QmiMessageUimSwitchSlotInput)  input = NULL;
-    LoadSimSlotsContext                     *ctx;
-    MMIfaceModem                            *self;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    /* All done? */
-    if (!ctx->sorted_sims) {
-        mm_obj_dbg (self, "no more SIMs to load info from");
-        reload_active_slot (task);
-        return;
-    }
-
-    /* Steal SIM from list */
-    g_clear_object (&ctx->current_sim);
-    ctx->current_sim = MM_BASE_SIM (ctx->sorted_sims->data);
-    ctx->sorted_sims = g_list_delete_link (ctx->sorted_sims, ctx->sorted_sims);
-    ctx->current_slot_number = mm_base_sim_get_slot_number (ctx->current_sim);
-
-    mm_obj_dbg (self, "switching to SIM at slot %u: %s",
-                ctx->current_slot_number, mm_base_sim_get_path (ctx->current_sim));
-
-    /* Switch to the next slot */
-    input = qmi_message_uim_switch_slot_input_new ();
-    qmi_message_uim_switch_slot_input_set_logical_slot (input, (guint8) ctx->active_logical_id, NULL);
-    qmi_message_uim_switch_slot_input_set_physical_slot (input, ctx->current_slot_number, NULL);
-    qmi_client_uim_switch_slot (ctx->client_uim,
-                                input,
-                                10,
-                                NULL,
-                                (GAsyncReadyCallback) next_sim_switch_ready,
-                                task);
-}
-
-static void
-load_sim_slots_indication_cb (QmiClientUim                     *client,
-                              QmiIndicationUimSlotStatusOutput *output,
-                              GTask                            *task)
-{
-    g_autoptr(GError)    error = NULL;
-    LoadSimSlotsContext *ctx;
-    MMIfaceModem        *self;
-    GArray              *physical_slots = NULL;
-
-    self = g_task_get_source_object (task);
-    ctx  = g_task_get_task_data (task);
-
-    mm_obj_dbg (self, "received slot status indication while loading slots");
-    if (!qmi_indication_uim_slot_status_output_get_physical_slot_status (output,
-                                                                         &physical_slots,
-                                                                         &error)) {
-        mm_obj_warn (self, "could not process slot status indication: %s", error->message);
-        return;
-    }
-
-    g_clear_object (&ctx->final_slot_status);
-    ctx->final_slot_status = g_array_ref (physical_slots);
-
-    /* We are awaiting the final slot status before we finish the load_sim_slots task */
-    if (ctx->final_slot_status_timeout_id)
-        check_final_slot_status (task);
-}
-
 static void
 uim_get_slot_status_ready (QmiClientUim *client,
                            GAsyncResult *res,
@@ -3562,7 +3251,6 @@ uim_get_slot_status_ready (QmiClientUim *client,
     g_autoptr(QmiMessageUimGetSlotStatusOutput) output = NULL;
     LoadSimSlotsContext *ctx;
     MMIfaceModem              *self;
-    Private                   *priv;
     GError                    *error = NULL;
     GArray                    *physical_slots = NULL;
     GArray                    *ext_information = NULL;
@@ -3571,7 +3259,6 @@ uim_get_slot_status_ready (QmiClientUim *client,
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
-    priv = get_private (MM_SHARED_QMI (self));
 
     output = qmi_client_uim_get_slot_status_finish (client, res, &error);
     if (!output ||
@@ -3581,11 +3268,6 @@ uim_get_slot_status_ready (QmiClientUim *client,
         g_object_unref (task);
         return;
     }
-
-    /* Store the slot status before loading all sim slots.
-     * We know we are done loading sim slots when the final slot status
-     * indication is the same as initial slot status  */
-    ctx->initial_slot_status = g_array_ref (physical_slots);
 
     /* It's fine if we don't have EID information, but it should be well-formed if present. If it's malformed,
      * there is probably a modem firmware bug. */
@@ -3618,7 +3300,6 @@ uim_get_slot_status_ready (QmiClientUim *client,
             sim_active = TRUE;
             ctx->active_logical_id = slot_status->logical_slot;
             ctx->active_slot_number = i + 1;
-            ctx->current_slot_number = ctx->active_slot_number;
         }
 
         if (!slot_status->iccid->len) {
@@ -3666,28 +3347,11 @@ uim_get_slot_status_ready (QmiClientUim *client,
                                           NULL,  /* operator name unknown */
                                           NULL); /* emergency numbers unknown */
         g_ptr_array_add (ctx->sim_slots, sim);
-
-        if (sim_active)
-            ctx->sorted_sims = g_list_append (ctx->sorted_sims, g_object_ref (sim));
-        else
-            ctx->sorted_sims = g_list_prepend (ctx->sorted_sims, g_object_ref (sim));
     }
     g_assert_cmpuint (ctx->sim_slots->len, ==, physical_slots->len);
 
-    /* Block hotswap on slot_status_indications since
-     * we will be switching slots while loading them. */
-    if (priv->uim_slot_status_indication_id)
-        g_signal_handler_block (client, priv->uim_slot_status_indication_id);
-
-    /* Monitor slot status indications while we are loading slots. Once we are done loading slots,
-     * check that no hotswap occurred. */
-    ctx->load_sim_slots_indication_id = g_signal_connect (priv->uim_client,
-                                                          "slot-status",
-                                                          G_CALLBACK (load_sim_slots_indication_cb),
-                                                          task);
-    /* Now, iterate over all the SIMs, we'll attempt to load info from them by
-     * quickly switching over to them, leaving the active SIM to the end */
-    load_next_sim_info (task);
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 void
