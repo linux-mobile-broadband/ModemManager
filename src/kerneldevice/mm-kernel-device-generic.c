@@ -501,8 +501,10 @@ preload_contents (MMKernelDeviceGeneric *self)
         return;
 
     preload_sysfs_path (self);
-    bus_subsys = find_device_bus_subsystem (self);
+    if (!self->priv->sysfs_path)
+        return;
 
+    bus_subsys = find_device_bus_subsystem (self);
     if (g_strcmp0 (bus_subsys, "usb") == 0)
         preload_contents_usb (self);
     else if (g_strcmp0 (bus_subsys, "pcmcia") == 0)
