@@ -1450,9 +1450,9 @@ setup_data_format_completed (GTask *task)
 static void
 check_data_format_combination (GTask *task)
 {
-    MMPortQmi              *self;
+    MMPortQmi                      *self;
     InternalSetupDataFormatContext *ctx;
-    gboolean                first_iteration;
+    gboolean                        first_iteration;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -1499,7 +1499,7 @@ check_data_format_combination (GTask *task)
     }
 
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "No more data format combinations supported");
+                             "No more data format combinations supported");
     g_object_unref (task);
 }
 
