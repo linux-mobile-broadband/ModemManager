@@ -274,7 +274,7 @@ load_operator_identifier (MMBaseSim *self,
     message = mbim_message_home_provider_query_new (NULL);
     mbim_device_command (device,
                          message,
-                         10,
+                         30,
                          NULL,
                          (GAsyncReadyCallback)load_operator_identifier_ready,
                          task);
@@ -335,7 +335,7 @@ load_operator_name (MMBaseSim *self,
     message = mbim_message_home_provider_query_new (NULL);
     mbim_device_command (device,
                          message,
-                         10,
+                         30,
                          NULL,
                          (GAsyncReadyCallback)load_operator_name_ready,
                          task);
