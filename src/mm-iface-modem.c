@@ -346,18 +346,30 @@ mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *sel
 /*****************************************************************************/
 /* Helper method to load unlock required, considering retries */
 
+/* If a SIM is known to exist, for e.g. if it was created during load_sim_slots,
+ * persist a few more times before giving up on the SIM to be ready. There
+ * are modems on which the SIM takes more than 15s to be ready, luckily,
+ * they happen to be QMI modems where the SIM's iccid in load_sim_slots
+ * lets us know that there is a sim */
+#define MAX_UNLOCK_REQUIRED_RETRIES_NO_SIM     6
+#define MAX_UNLOCK_REQUIRED_RETRIES_SIM_EXISTS 30
+
+/* Time between retries */
+#define UNLOAD_REQUIRED_RETRY_TIMEOUT_SECS 2
+
 typedef struct {
     guint retries;
-    guint pin_check_timeout_id;
+    guint max_retries;
+    guint timeout_id;
 } InternalLoadUnlockRequiredContext;
 
 static MMModemLock
-internal_load_unlock_required_finish (MMIfaceModem *self,
-                                      GAsyncResult *res,
-                                      GError **error)
+internal_load_unlock_required_finish (MMIfaceModem  *self,
+                                      GAsyncResult  *res,
+                                      GError       **error)
 {
     GError *inner_error = NULL;
-    gssize value;
+    gssize  value;
 
     value = g_task_propagate_int (G_TASK (res), &inner_error);
     if (inner_error) {
@@ -375,42 +387,20 @@ load_unlock_required_again (GTask *task)
     InternalLoadUnlockRequiredContext *ctx;
 
     ctx = g_task_get_task_data (task);
-    ctx->pin_check_timeout_id = 0;
+    ctx->timeout_id = 0;
     /* Retry the step */
     internal_load_unlock_required_context_step (task);
     return G_SOURCE_REMOVE;
 }
 
-#define MAX_RETRIES_NO_SIM 6
-#define MAX_RETRIES_SIM_EXISTS 30
-static guint
-get_max_retries (MMIfaceModem *self)
-{
-    g_autoptr(MMBaseSim) sim = NULL;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_SIM,
-                  &sim,
-                  NULL);
-    /* If a SIM is known to exist, for e.g. if it was created during load_sim_slots,
-      persist a few more times before giving up on the SIM to be ready. There
-      are modems on which the SIM takes more than 15s to be ready, luckily,
-      they happen to be QMI modems where the SIM's iccid in load_sim_slots
-      lets us know that there is a sim. */
-    if (sim)
-        return MAX_RETRIES_SIM_EXISTS;
-
-    return MAX_RETRIES_NO_SIM;
-}
-
 static void
 load_unlock_required_ready (MMIfaceModem *self,
                             GAsyncResult *res,
-                            GTask *task)
+                            GTask        *task)
 {
     InternalLoadUnlockRequiredContext *ctx;
-    GError *error = NULL;
-    MMModemLock lock;
+    g_autoptr(GError)                  error = NULL;
+    MMModemLock                        lock;
 
     ctx = g_task_get_task_data (task);
 
@@ -432,31 +422,29 @@ load_unlock_required_ready (MMIfaceModem *self,
             g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
-            g_task_return_error (task, error);
+            g_task_return_error (task, g_steal_pointer (&error));
             g_object_unref (task);
             return;
         }
 
         /* For the remaining ones, retry if possible */
-        if (ctx->retries < get_max_retries (self)) {
+        if (ctx->retries < ctx->max_retries) {
             ctx->retries++;
             mm_obj_dbg (self, "retrying (%u) unlock required check", ctx->retries);
 
-            g_assert (ctx->pin_check_timeout_id == 0);
-            ctx->pin_check_timeout_id = g_timeout_add_seconds (2,
-                                                               (GSourceFunc)load_unlock_required_again,
-                                                               task);
-            g_error_free (error);
+            g_assert (ctx->timeout_id == 0);
+            ctx->timeout_id = g_timeout_add_seconds (UNLOAD_REQUIRED_RETRY_TIMEOUT_SECS,
+                                                     (GSourceFunc)load_unlock_required_again,
+                                                     task);
             return;
         }
 
         /* If reached max retries and still reporting error... default to SIM error */
-        g_error_free (error);
         g_task_return_new_error (task,
                                  MM_MOBILE_EQUIPMENT_ERROR,
                                  MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE,
                                  "Couldn't get SIM lock status after %u retries",
-                                 get_max_retries (self));
+                                 ctx->retries);
         g_object_unref (task);
         return;
     }
@@ -469,29 +457,42 @@ load_unlock_required_ready (MMIfaceModem *self,
 static void
 internal_load_unlock_required_context_step (GTask *task)
 {
-    MMIfaceModem *self;
+    MMIfaceModem                      *self;
     InternalLoadUnlockRequiredContext *ctx;
 
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    g_assert (ctx->pin_check_timeout_id == 0);
+    g_assert (ctx->timeout_id == 0);
     MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required (
         self,
-        (ctx->retries >= get_max_retries (self)), /* last_attempt? */
+        (ctx->retries >= ctx->max_retries), /* last_attempt? */
         (GAsyncReadyCallback) load_unlock_required_ready,
         task);
 }
 
+static guint
+load_unlock_required_max_retries (MMIfaceModem *self)
+{
+    g_autoptr(MMBaseSim) sim = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM, &sim,
+                  NULL);
+
+    return (sim ? MAX_UNLOCK_REQUIRED_RETRIES_SIM_EXISTS : MAX_UNLOCK_REQUIRED_RETRIES_NO_SIM);
+}
+
 static void
-internal_load_unlock_required (MMIfaceModem *self,
-                               GAsyncReadyCallback callback,
-                               gpointer user_data)
+internal_load_unlock_required (MMIfaceModem        *self,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
 {
     InternalLoadUnlockRequiredContext *ctx;
-    GTask *task;
+    GTask                             *task;
 
     ctx = g_new0 (InternalLoadUnlockRequiredContext, 1);
+    ctx->max_retries = load_unlock_required_max_retries (self);
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, g_free);
