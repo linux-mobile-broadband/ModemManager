@@ -355,7 +355,7 @@ mm_sms_part_3gpp_new_from_pdu (guint         index,
         return NULL;
     }
 
-    return mm_sms_part_3gpp_new_from_binary_pdu (index, pdu, pdu_len, log_object, error);
+    return mm_sms_part_3gpp_new_from_binary_pdu (index, pdu, pdu_len, log_object, FALSE, error);
 }
 
 MMSmsPart *
@@ -363,6 +363,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
                                       const guint8  *pdu,
                                       gsize          pdu_len,
                                       gpointer       log_object,
+                                      gboolean       transfer_route,
                                       GError       **error)
 {
     MMSmsPart *sms_part;
@@ -404,25 +405,28 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
 
     offset = 0;
 
-    /* ---------------------------------------------------------------------- */
-    /* SMSC, in address format, precedes the TPDU
-     * First byte represents the number of BYTES for the address value */
-    PDU_SIZE_CHECK (1, "cannot read SMSC address length");
-    smsc_addr_size_bytes = pdu[offset++];
-    if (smsc_addr_size_bytes > 0) {
-        PDU_SIZE_CHECK (offset + smsc_addr_size_bytes, "cannot read SMSC address");
-        /* SMSC may not be given in DELIVER PDUs */
-        address = sms_decode_address (&pdu[1], 2 * (smsc_addr_size_bytes - 1), error);
-        if (!address) {
-            g_prefix_error (error, "Couldn't read SMSC address: ");
-            mm_sms_part_free (sms_part);
-            return NULL;
-        }
-        mm_sms_part_take_smsc (sms_part, g_steal_pointer (&address));
-        mm_obj_dbg (log_object, "  SMSC address parsed: '%s'", mm_sms_part_get_smsc (sms_part));
-        offset += smsc_addr_size_bytes;
+    if (!transfer_route) {
+        /* ---------------------------------------------------------------------- */
+        /* SMSC, in address format, precedes the TPDU
+         * First byte represents the number of BYTES for the address value */
+        PDU_SIZE_CHECK (1, "cannot read SMSC address length");
+        smsc_addr_size_bytes = pdu[offset++];
+        if (smsc_addr_size_bytes > 0) {
+             PDU_SIZE_CHECK (offset + smsc_addr_size_bytes, "cannot read SMSC address");
+             /* SMSC may not be given in DELIVER PDUs */
+             address = sms_decode_address (&pdu[1], 2 * (smsc_addr_size_bytes - 1), error);
+             if (!address) {
+                     g_prefix_error (error, "Couldn't read SMSC address: ");
+                     mm_sms_part_free (sms_part);
+                     return NULL;
+             }
+             mm_sms_part_take_smsc (sms_part, g_steal_pointer (&address));
+             mm_obj_dbg (log_object, "  SMSC address parsed: '%s'", mm_sms_part_get_smsc (sms_part));
+             offset += smsc_addr_size_bytes;
+        } else
+              mm_obj_dbg (log_object, "  no SMSC address given");
     } else
-        mm_obj_dbg (log_object, "  no SMSC address given");
+        mm_obj_dbg (log_object, "  This is a transfer-route message");
 
 
     /* ---------------------------------------------------------------------- */

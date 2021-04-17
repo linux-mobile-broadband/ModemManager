@@ -30,6 +30,7 @@ MMSmsPart *mm_sms_part_3gpp_new_from_binary_pdu (guint          index,
                                                  const guint8  *pdu,
                                                  gsize          pdu_len,
                                                  gpointer       log_object,
+                                                 gboolean	transfer_route,
                                                  GError       **error);
 guint8    *mm_sms_part_3gpp_get_submit_pdu      (MMSmsPart     *part,
                                                  guint         *out_pdulen,

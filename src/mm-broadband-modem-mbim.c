@@ -5364,6 +5364,7 @@ add_sms_part (MMBroadbandModemMbim *self,
                                                  pdu->pdu_data,
                                                  pdu->pdu_data_size,
                                                  self,
+                                                 FALSE,
                                                  &error);
     if (part) {
         mm_obj_dbg (self, "correctly parsed PDU (%d)", pdu->message_index);

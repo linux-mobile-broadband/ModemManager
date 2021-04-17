@@ -5637,6 +5637,7 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
                        guint32 index,
                        QmiWmsMessageTagType tag,
                        QmiWmsMessageFormat format,
+                       gboolean transfer_route,
                        GArray *data)
 {
     MMSmsPart *part = NULL;
@@ -5657,6 +5658,7 @@ add_new_read_sms_part (MMIfaceModemMessaging *self,
                                                      (guint8 *)data->data,
                                                      data->len,
                                                      self,
+                                                     transfer_route,
                                                      &error);
         break;
     case QMI_WMS_MESSAGE_FORMAT_MWI:
@@ -5723,6 +5725,7 @@ wms_raw_read_ready (QmiClientWms *client,
                                message->memory_index,
                                tag,
                                format,
+                               FALSE,
                                data);
     }
 
@@ -6073,6 +6076,7 @@ wms_indication_raw_read_ready (QmiClientWms *client,
                                ctx->memory_index,
                                tag,
                                format,
+                               FALSE,
                                data);
     }
 
@@ -6160,6 +6164,7 @@ messaging_event_report_indication_cb (QmiClientNas *client,
                                memory_index,
                                tag,
                                msg_format,
+                               TRUE,
                                raw_data);
 	return;
     }
