@@ -6242,14 +6242,86 @@ wms_indication_raw_read_ready (QmiClientWms *client,
 }
 
 static void
+wms_send_ack_ready (QmiClientWms *client,
+                    GAsyncResult *res,
+                    MMBroadbandModemQmi *self)
+{
+    g_autoptr(QmiMessageWmsSendAckOutput) output = NULL;
+    g_autoptr(GError) error= NULL;
+
+    output = qmi_client_wms_send_ack_finish (client, res, &error);
+    if (!output) {
+        mm_obj_dbg (self, "QMI operation failed: '%s'", error->message);
+    }
+    g_object_unref (self);
+}
+
+static void
 messaging_event_report_indication_cb (QmiClientNas *client,
                                       QmiIndicationWmsEventReportOutput *output,
                                       MMBroadbandModemQmi *self)
 {
     QmiWmsStorageType storage;
     guint32 memory_index;
+    QmiWmsAckIndicator ack_ind;
+    guint32 transaction_id;
+    QmiWmsMessageFormat msg_format;
+    QmiWmsMessageTagType tag;
+    GArray *raw_data = NULL;
 
-    /* Currently ignoring transfer-route MT messages */
+    /* Handle transfer-route MT messages */
+    if (qmi_indication_wms_event_report_output_get_transfer_route_mt_message (
+            output,
+            &ack_ind,
+            &transaction_id,
+            &msg_format,
+            &raw_data,
+            NULL)) {
+        mm_obj_dbg (self, "Got transfer-route MT message");
+        /* If this is the first of a multi-part message, send an ACK to get the
+         * second part */
+        if (ack_ind == QMI_WMS_ACK_INDICATOR_SEND) {
+            g_autoptr(QmiMessageWmsSendAckInput) ack_input = NULL;
+            QmiWmsMessageProtocol message_protocol;
+            /* Need to ack message */
+            mm_obj_dbg (self, "Need to ACK indicator");
+            switch (msg_format) {
+            case QMI_WMS_MESSAGE_FORMAT_CDMA:
+                message_protocol = QMI_WMS_MESSAGE_PROTOCOL_CDMA;
+                break;
+            case QMI_WMS_MESSAGE_FORMAT_MWI:
+            case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_POINT_TO_POINT:
+            case QMI_WMS_MESSAGE_FORMAT_GSM_WCDMA_BROADCAST:
+            default:
+                message_protocol = QMI_WMS_MESSAGE_PROTOCOL_WCDMA;
+                break;
+            }
+            ack_input = qmi_message_wms_send_ack_input_new();
+            qmi_message_wms_send_ack_input_set_information (ack_input,
+                                                            transaction_id,
+                                                            message_protocol,
+                                                            TRUE,
+                                                            NULL);
+            qmi_client_wms_send_ack (QMI_CLIENT_WMS (client),
+                                     ack_input,
+                                     MM_BASE_SMS_DEFAULT_SEND_TIMEOUT,
+                                     NULL,
+                                     (GAsyncReadyCallback)wms_send_ack_ready,
+                                     g_object_ref (self));
+        }
+
+        /* Defaults for transfer-route messages, which are not stored anywhere */
+        storage = QMI_WMS_STORAGE_TYPE_NONE;
+        memory_index = 0;
+        tag = QMI_WMS_MESSAGE_TAG_TYPE_MT_NOT_READ;
+        add_new_read_sms_part (MM_IFACE_MODEM_MESSAGING (self),
+                               storage,
+                               memory_index,
+                               tag,
+                               msg_format,
+                               raw_data);
+	return;
+    }
 
     if (qmi_indication_wms_event_report_output_get_mt_message (
             output,
