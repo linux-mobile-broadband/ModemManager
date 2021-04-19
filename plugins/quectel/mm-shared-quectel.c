@@ -422,10 +422,13 @@ mm_shared_quectel_location_load_capabilities (MMIfaceModemLocation *_self,
  *  1) "+QGPSCFG=\"nmeasrc\",1" will be necessary for getting location data
  *     without the nmea port.
  *  2) may be necessary to set "+QGPSCFG=\"gpsnmeatype\".
+ *  3) QGPSXTRA=1 is necessary to support XTRA assistance data for
+ *     faster GNSS location locks.
  */
 static const MMBaseModemAtCommand gps_startup[] = {
     { "+QGPSCFG=\"outport\",\"usbnmea\"", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
     { "+QGPS=1",                          3, FALSE, mm_base_modem_response_processor_no_result_continue },
+    { "+QGPSXTRA=1",                      3, FALSE, mm_base_modem_response_processor_no_result_continue },
     { NULL }
 };
 
