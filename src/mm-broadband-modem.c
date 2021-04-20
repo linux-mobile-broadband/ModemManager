@@ -11941,6 +11941,7 @@ typedef enum {
     INITIALIZE_STEP_SETUP_SIMPLE_STATUS,
     INITIALIZE_STEP_IFACE_MODEM,
     INITIALIZE_STEP_IFACE_3GPP,
+    INITIALIZE_STEP_JUMP_TO_LIMITED,
     INITIALIZE_STEP_IFACE_3GPP_PROFILE_MANAGER,
     INITIALIZE_STEP_IFACE_3GPP_USSD,
     INITIALIZE_STEP_IFACE_CDMA,
@@ -12068,17 +12069,6 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
     mm_iface_modem_bind_simple_status (MM_IFACE_MODEM (self),
                                        self->priv->modem_simple_status);
 
-    /* If we find ourselves in a LOCKED state, we shouldn't keep on
-     * the initialization sequence. Instead, we will re-initialize once
-     * we are unlocked. */
-    if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
-        /* Jump to the fallback step when locked, we will allow some additional
-         * interfaces even in locked state. */
-        ctx->step = INITIALIZE_STEP_FALLBACK_LIMITED;
-        initialize_step (task);
-        return;
-    }
-
     /* Go on to next step */
     ctx->step++;
     initialize_step (task);
@@ -12201,6 +12191,17 @@ initialize_step (GTask *task)
             return;
         }
 
+        ctx->step++;
+       /* fall through */
+
+    case INITIALIZE_STEP_JUMP_TO_LIMITED:
+        if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
+            /* Jump to the fallback step when locked, we will allow some additional
+             * interfaces even in locked state. */
+            ctx->step = INITIALIZE_STEP_FALLBACK_LIMITED;
+            initialize_step (task);
+            return;
+        }
         ctx->step++;
        /* fall through */
 
