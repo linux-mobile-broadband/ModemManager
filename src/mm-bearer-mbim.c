@@ -1156,6 +1156,8 @@ _connect (MMBaseBearer        *self,
     GTask                    *task;
     MMBearerMultiplexSupport  multiplex;
     g_autoptr(MMBaseModem)    modem  = NULL;
+    const gchar              *data_port_driver;
+    gboolean                  multiplex_supported = TRUE;
 
     if (!peek_ports (self, &mbim, &data, callback, user_data))
         return;
@@ -1192,14 +1194,24 @@ _connect (MMBaseBearer        *self,
                   MM_BASE_BEARER_CONFIG, &ctx->properties,
                   NULL);
 
+    data_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (data));
+    if (!g_strcmp0 (data_port_driver, "mhi_net"))
+        multiplex_supported = FALSE;
+
     multiplex = mm_bearer_properties_get_multiplex (ctx->properties);
 
     /* If no multiplex setting given by the user, assume requested */
-    if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN   ||
-        multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
-        multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+    if (multiplex_supported &&
+        (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN ||
+         multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
+         multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED)) {
         /* the link prefix hint given must be modem-specific */
         ctx->link_prefix_hint = g_strdup_printf ("mbimmux%u.", mm_base_modem_get_dbus_id (MM_BASE_MODEM (modem)));
+    }
+
+    if (!multiplex_supported && multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+        mm_obj_err (self, "Multiplexing required but not supported by %s", data_port_driver);
+        return;
     }
 
     mm_obj_dbg (self, "launching %sconnection with data port (%s/%s)",
