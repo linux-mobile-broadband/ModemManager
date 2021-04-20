@@ -2175,6 +2175,7 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
     if (app->state != QMI_UIM_CARD_APPLICATION_STATE_READY &&
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_OR_UPIN_PIN_REQUIRED &&
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PUK1_OR_UPIN_PUK_REQUIRED &&
+        app->state != QMI_UIM_CARD_APPLICATION_STATE_CHECK_PERSONALIZATION_STATE &&
         app->state != QMI_UIM_CARD_APPLICATION_STATE_PIN1_BLOCKED) {
         mm_obj_dbg (log_object, "neither SIM nor USIM are ready");
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
@@ -2238,6 +2239,59 @@ mm_qmi_uim_get_card_status_output_parse (gpointer                           log_
                      MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
                      "Unknown SIM PIN/PUK status");
         return FALSE;
+    }
+
+    /* Personalization */
+    if (lock == MM_MODEM_LOCK_NONE &&
+        app->state == QMI_UIM_CARD_APPLICATION_STATE_CHECK_PERSONALIZATION_STATE) {
+        if (app->personalization_state == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_STATE_IN_PROGRESS ||
+            app->personalization_state == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_STATE_UNKNOWN) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_RETRY,
+                         "Personalization check in progress");
+            return FALSE;
+        }
+        if (app->personalization_state == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_STATE_CODE_REQUIRED ||
+            app->personalization_state == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_STATE_PUK_CODE_REQUIRED) {
+            gboolean pin;
+
+            pin = app->personalization_state == QMI_UIM_CARD_APPLICATION_PERSONALIZATION_STATE_CODE_REQUIRED;
+
+            switch (app->personalization_feature) {
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK:
+                lock = (pin ? MM_MODEM_LOCK_PH_NET_PIN : MM_MODEM_LOCK_PH_NET_PUK);
+                break;
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_NETWORK_SUBSET:
+                lock = (pin ? MM_MODEM_LOCK_PH_NETSUB_PIN : MM_MODEM_LOCK_PH_NETSUB_PUK);
+                break;
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_SERVICE_PROVIDER:
+                lock = (pin ? MM_MODEM_LOCK_PH_SP_PIN : MM_MODEM_LOCK_PH_SP_PUK);
+                break;
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_CORPORATE:
+                lock = (pin ? MM_MODEM_LOCK_PH_CORP_PIN : MM_MODEM_LOCK_PH_CORP_PUK);
+                break;
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_GW_UIM:
+                if (pin) {
+                    lock = MM_MODEM_LOCK_PH_SIM_PIN;
+                    break;
+                }
+                /* fall through */
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_NETWORK_TYPE_1:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_NETWORK_TYPE_2:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_HRPD:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_SERVICE_PROVIDER:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_CORPORATE:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_RUIM:
+            case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN:
+            default:
+                g_set_error (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG,
+                             "Unsupported personalization feature");
+                return FALSE;
+            }
+        }
     }
 
     /* PIN2 */

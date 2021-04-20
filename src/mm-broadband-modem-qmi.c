@@ -2256,12 +2256,78 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Facility locks disabling (3GPP interface) */
 
+# define DISABLE_FACILITY_LOCK_CHECK_TIMEOUT_MS 100
+# define DISABLE_FACILITY_LOCK_CHECK_ATTEMPTS    10
+
+typedef struct _DisableFacilityLockContext DisableFacilityLockContext;
+struct _DisableFacilityLockContext {
+    MMModem3gppFacility facility;
+    guint remaining_attempts;
+    guint8 slot;
+};
+
+static gboolean disable_facility_lock_check (GTask *task);
+
 static gboolean
 modem_3gpp_disable_facility_lock_finish (MMIfaceModem3gpp *self,
                                          GAsyncResult *res,
                                          GError **error)
 {
     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+disable_facility_lock_check_ready (MMIfaceModem3gpp *self,
+                                   GAsyncResult *res,
+                                   GTask *task)
+{
+    DisableFacilityLockContext *ctx;
+    MMModem3gppFacility facilities;
+    GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    facilities = modem_3gpp_load_enabled_facility_locks_finish (self, res, &error);
+    if (error) {
+        g_prefix_error (&error, "Failed to check the facility locks: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Check if the facility lock is still enabled */
+    if (facilities & ctx->facility) {
+        /* Wait again and retry */
+        g_timeout_add (DISABLE_FACILITY_LOCK_CHECK_TIMEOUT_MS,
+                       (GSourceFunc)disable_facility_lock_check,
+                       task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static gboolean
+disable_facility_lock_check (GTask *task)
+{
+    DisableFacilityLockContext *ctx;
+    MMIfaceModem3gpp *self;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+    if (ctx->remaining_attempts) {
+        ctx->remaining_attempts--;
+        modem_3gpp_load_enabled_facility_locks (self,
+                                                (GAsyncReadyCallback)disable_facility_lock_check_ready,
+                                                task);
+    } else {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Failed to disable the facility lock.");
+        g_object_unref (task);
+    }
+
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -2277,13 +2343,16 @@ disable_facility_lock_ready (QmiClientUim *client,
         !qmi_message_uim_depersonalization_output_get_result (output, &error)) {
         g_prefix_error (&error, "QMI message Depersonalization failed: ");
         g_task_return_error (task, error);
+        g_object_unref (task);
     } else {
-        g_task_return_boolean (task, TRUE);
+        /* Wait defined time for lock change to propagate to Card Status */
+        g_timeout_add (DISABLE_FACILITY_LOCK_CHECK_TIMEOUT_MS,
+                       (GSourceFunc)disable_facility_lock_check,
+                       task);
     }
 
     if (output)
         qmi_message_uim_depersonalization_output_unref (output);
-    g_object_unref (task);
 }
 
 static void
@@ -2296,6 +2365,7 @@ modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
 {
     QmiUimCardApplicationPersonalizationFeature feature;
     QmiMessageUimDepersonalizationInput *input;
+    DisableFacilityLockContext *ctx;
     QmiClient *client = NULL;
     GTask *task;
 
@@ -2326,6 +2396,12 @@ modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
                                                       key,
                                                       NULL);
     qmi_message_uim_depersonalization_input_set_slot (input, slot, NULL);
+
+    ctx = g_new0 (DisableFacilityLockContext, 1);
+    ctx->facility = facility;
+    ctx->slot = slot;
+    ctx->remaining_attempts = DISABLE_FACILITY_LOCK_CHECK_ATTEMPTS;
+    g_task_set_task_data (task, ctx, g_free);
 
     qmi_client_uim_depersonalization (QMI_CLIENT_UIM (client),
                                       input,
