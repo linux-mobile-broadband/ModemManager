@@ -593,11 +593,10 @@ update_lock_info_ready (MMIfaceModem *modem,
     MMModemLock  lock;
 
     lock = mm_iface_modem_update_lock_info_finish (modem, res, &error);
-    /* Even if we may be SIM-PIN2/PUK2 locked, we don't consider this an error
-     * in the PIN/PUK sending */
-    if (lock != MM_MODEM_LOCK_NONE &&
-        lock != MM_MODEM_LOCK_SIM_PIN2 &&
-        lock != MM_MODEM_LOCK_SIM_PUK2) {
+    /* Consider it only an error if SIM-PIN/PUK is locked or lock is unknown */
+    if (lock == MM_MODEM_LOCK_UNKNOWN ||
+        lock == MM_MODEM_LOCK_SIM_PIN ||
+        lock == MM_MODEM_LOCK_SIM_PUK) {
         const GError *saved_error;
 
         /* Device is locked. Now:
