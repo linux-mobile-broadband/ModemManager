@@ -541,7 +541,7 @@ port_open_step (GTask *task)
         qmi_device_open (ctx->device,
                          (QMI_DEVICE_OPEN_FLAGS_VERSION_INFO |
                           QMI_DEVICE_OPEN_FLAGS_PROXY),
-                         25,
+                         45,
                          g_task_get_cancellable (task),
                          (GAsyncReadyCallback) qmi_device_open_first_ready,
                          task);
