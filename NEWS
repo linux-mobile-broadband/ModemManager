@@ -1,4 +1,54 @@
 
+ModemManager 1.16.4
+-------------------------------------------
+
+ * Fix build when using libgudev < 232, which is when autoptr support was
+   introduced in the GUdev* types. We'll keep the 1.16.x branch depending on
+   libgudev 147, and only bump the requirement in git master.
+
+ * This version comes with an overall rework of the charset encoding handling
+   inside the ModemManager daemon, which was already available in git master
+   for some time and has been proved to be very useful.
+   ** The charset conversion is now strict, except for a few cases where we
+      would try to do our best (e.g. operator name normalization).
+   ** The charset methods are cleaned up, with clear distinction between the
+      ones that allow NUL-finished C strings and the ones that may have valid
+      embedded NUL bytes.
+   ** The //TRANSLIT extension is completely avoided, as not all implementations
+      out there have it (e.g. unavailable in musl libc), and we now use
+      g_convert_with_fallback() instead where appropriate.
+
+ * Modem interface:
+   ** Fixed crash triggered when attempting to update lock info on an already
+      removed DBus skeleton.
+
+ * Time interface:
+   ** Fixed invalid memory read when loading network timezone fails.
+
+ * Base bearer:
+   ** Ignored forced disconnections after some time unregistered when PPP is
+      being used, so that we don't end up hijacking the TTY while pppd is using
+      it.
+
+ * Kernel device:
+   ** Fix segfault when processing event for non-existing port.
+
+ * QMI:
+   ** Fixed allowed modes setup when using the "Acquisition Order Preference"
+      TLV in the "NAS System Selection Preference" messages. 3GPP+3GPP2
+      multimode devices like the MC73xx series were affected.
+
+ * libmm-glib:
+   ** Fixed comparison of 'allowed auth' and 'rm protocol' settings in bearer
+      properties.
+
+ * Plugins:
+   ** cinterion: allow '*' in Prov/Cfg response.
+   ** cinterion: fixed several FALSE returns without GError set.
+   ** quectel: ignore +QGPSURC URCs.
+
+ * Several other minor improvements and fixes.
+
 ModemManager 1.16.2
 -------------------------------------------
 
