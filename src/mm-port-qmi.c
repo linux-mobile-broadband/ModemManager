@@ -35,7 +35,7 @@ G_DEFINE_TYPE (MMPortQmi, mm_port_qmi, MM_TYPE_PORT)
 
 enum {
     PROP_0,
-#if WITH_QMI
+#if WITH_QRTR
     PROP_NODE,
 #endif
     PROP_LAST
