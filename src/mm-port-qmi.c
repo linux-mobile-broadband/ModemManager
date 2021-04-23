@@ -44,9 +44,9 @@ enum {
 static GParamSpec *properties[PROP_LAST];
 
 typedef struct {
-    QmiService     service;
-    QmiClient     *client;
-    MMPortQmiFlag  flag;
+    QmiService  service;
+    QmiClient  *client;
+    guint       flag;
 } ServiceInfo;
 
 struct _MMPortQmiPrivate {
@@ -78,10 +78,10 @@ struct _MMPortQmiPrivate {
 /*****************************************************************************/
 
 static QmiClient *
-lookup_client (MMPortQmi     *self,
-               QmiService     service,
-               MMPortQmiFlag  flag,
-               gboolean       steal)
+lookup_client (MMPortQmi  *self,
+               QmiService  service,
+               guint       flag,
+               gboolean    steal)
 {
     GList *l;
 
@@ -104,17 +104,17 @@ lookup_client (MMPortQmi     *self,
 }
 
 QmiClient *
-mm_port_qmi_peek_client (MMPortQmi *self,
-                         QmiService service,
-                         MMPortQmiFlag flag)
+mm_port_qmi_peek_client (MMPortQmi  *self,
+                         QmiService  service,
+                         guint       flag)
 {
     return lookup_client (self, service, flag, FALSE);
 }
 
 QmiClient *
-mm_port_qmi_get_client (MMPortQmi *self,
-                        QmiService service,
-                        MMPortQmiFlag flag)
+mm_port_qmi_get_client (MMPortQmi  *self,
+                        QmiService  service,
+                        guint       flag)
 {
     QmiClient *client;
 
@@ -257,12 +257,12 @@ allocate_client_ready (QmiDevice *qmi_device,
 }
 
 void
-mm_port_qmi_allocate_client (MMPortQmi *self,
-                             QmiService service,
-                             MMPortQmiFlag flag,
-                             GCancellable *cancellable,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data)
+mm_port_qmi_allocate_client (MMPortQmi           *self,
+                             QmiService           service,
+                             guint                flag,
+                             GCancellable        *cancellable,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
 {
     AllocateClientContext *ctx;
     GTask *task;
