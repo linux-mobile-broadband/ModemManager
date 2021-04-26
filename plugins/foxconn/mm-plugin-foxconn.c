@@ -34,7 +34,7 @@
 #endif
 
 #if defined WITH_MBIM
-#include "mm-broadband-modem-foxconn-t77w968.h"
+#include "mm-broadband-modem-mbim-foxconn.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginFoxconn, mm_plugin_foxconn, MM_TYPE_PLUGIN)
@@ -69,11 +69,11 @@ create_modem (MMPlugin     *self,
         /* Specific implementation for the T77W968 */
         if (product == 0xe0b4 || product == 0xe0b5) {
             mm_obj_dbg (self, "MBIM-powered T77W968 modem found...");
-            return MM_BASE_MODEM (mm_broadband_modem_foxconn_t77w968_new (uid,
-									  drivers,
-									  mm_plugin_get_name (self),
-									  vendor,
-									  product));
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_foxconn_new (uid,
+                                                                       drivers,
+                                                                       mm_plugin_get_name (self),
+                                                                       vendor,
+                                                                       product));
         }
 
         mm_obj_dbg (self, "MBIM-powered Foxconn-branded modem found...");

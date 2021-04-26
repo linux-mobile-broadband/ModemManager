@@ -429,8 +429,8 @@ if WITH_MBIM
 pkglib_LTLIBRARIES += libmm-shared-foxconn.la
 libmm_shared_foxconn_la_SOURCES = \
 	foxconn/mm-shared.c \
-	foxconn/mm-broadband-modem-foxconn-t77w968.c \
-	foxconn/mm-broadband-modem-foxconn-t77w968.h \
+	foxconn/mm-broadband-modem-mbim-foxconn.c \
+	foxconn/mm-broadband-modem-mbim-foxconn.h \
 	$(NULL)
 libmm_shared_foxconn_la_CPPFLAGS = \
 	$(SHARED_COMMON_COMPILER_FLAGS) \
@@ -716,11 +716,11 @@ libmm_plugin_foxconn_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += foxconn/77-mm-foxconn-port-types.rules
 
-dist_pkgdata_DATA += foxconn/mm-foxconn-t77w968-carrier-mapping.conf
+dist_pkgdata_DATA += foxconn/mm-foxconn-carrier-mapping.conf
 
 AM_CFLAGS += \
 	-DTESTUDEVRULESDIR_FOXCONN=\"${srcdir}/foxconn\" \
-	-DTESTKEYFILE_FOXCONN_T77W968=\"${srcdir}/foxconn/mm-foxconn-t77w968-carrier-mapping.conf\" \
+	-DTESTKEYFILE_FOXCONN=\"${srcdir}/foxconn/mm-foxconn-carrier-mapping.conf\" \
 	$(NULL)
 
 endif
