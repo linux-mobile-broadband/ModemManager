@@ -137,10 +137,17 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
     }
 
     input = qmi_message_dms_foxconn_get_firmware_version_input_new ();
-    qmi_message_dms_foxconn_get_firmware_version_input_set_version_type (
-        input,
-        QMI_DMS_FOXCONN_FIRMWARE_VERSION_TYPE_FIRMWARE_MCFG,
-        NULL);
+    /* 0x105b is the T99W175 module, T99W175 needs to compare the apps version. */
+    if (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) == 0x105b)
+        qmi_message_dms_foxconn_get_firmware_version_input_set_version_type (
+            input,
+            QMI_DMS_FOXCONN_FIRMWARE_VERSION_TYPE_FIRMWARE_MCFG_APPS,
+            NULL);
+    else
+        qmi_message_dms_foxconn_get_firmware_version_input_set_version_type (
+            input,
+            QMI_DMS_FOXCONN_FIRMWARE_VERSION_TYPE_FIRMWARE_MCFG,
+            NULL);
     qmi_client_dms_foxconn_get_firmware_version (
         QMI_CLIENT_DMS (client),
         input,

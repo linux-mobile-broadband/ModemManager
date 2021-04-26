@@ -66,22 +66,12 @@ create_modem (MMPlugin     *self,
 
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
-        /* Specific implementation for the T77W968 */
-        if (product == 0xe0b4 || product == 0xe0b5) {
-            mm_obj_dbg (self, "MBIM-powered T77W968 modem found...");
-            return MM_BASE_MODEM (mm_broadband_modem_mbim_foxconn_new (uid,
-                                                                       drivers,
-                                                                       mm_plugin_get_name (self),
-                                                                       vendor,
-                                                                       product));
-        }
-
         mm_obj_dbg (self, "MBIM-powered Foxconn-branded modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
-                                                           drivers,
-                                                           mm_plugin_get_name (self),
-                                                           vendor,
-                                                           product));
+        return MM_BASE_MODEM (mm_broadband_modem_mbim_foxconn_new (uid,
+                                                                   drivers,
+                                                                   mm_plugin_get_name (self),
+                                                                   vendor,
+                                                                   product));
     }
 #endif
 
@@ -98,14 +88,17 @@ create_modem (MMPlugin     *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
-    static const guint16 vendors[] = { 0x0489, 0 };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
+    static const guint16 vendor_ids[] = {
+        0x0489, /* usb vid */
+        0x105b, /* pci vid */
+        0 };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_FOXCONN,
                       MM_PLUGIN_NAME,               MM_MODULE_NAME,
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendors,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_QCDM,       TRUE,
                       MM_PLUGIN_ALLOWED_QMI,        TRUE,
