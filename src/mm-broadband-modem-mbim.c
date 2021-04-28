@@ -3724,9 +3724,8 @@ device_notification_cb (MbimDevice *device,
     case MBIM_SERVICE_QMI:
     case MBIM_SERVICE_ATDS:
     case MBIM_SERVICE_INTEL_FIRMWARE_UPDATE:
-#if MBIM_CHECK_VERSION (1,25,1)
     case MBIM_SERVICE_MS_SAR:
-#endif
+    case MBIM_SERVICE_QDU:
     default:
         /* Ignore */
         break;
