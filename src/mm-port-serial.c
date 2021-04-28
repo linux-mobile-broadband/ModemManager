@@ -1231,7 +1231,8 @@ mm_port_serial_open (MMPortSerial *self, GError **error)
     }
 
     g_warn_if_fail (MM_PORT_SERIAL_GET_CLASS (self)->config_fd);
-    if (self->priv->fd >= 0 && !MM_PORT_SERIAL_GET_CLASS (self)->config_fd (self, self->priv->fd, error)) {
+    if (self->priv->fd >= 0 && mm_port_get_subsys (MM_PORT (self)) != MM_PORT_SUBSYS_WWAN &&
+            !MM_PORT_SERIAL_GET_CLASS (self)->config_fd (self, self->priv->fd, error)) {
         mm_obj_dbg (self, "failed to configure serial device");
         goto error;
     }
