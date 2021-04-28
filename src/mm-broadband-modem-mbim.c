@@ -3615,6 +3615,9 @@ device_notification_cb (MbimDevice *device,
 #if MBIM_CHECK_VERSION (1,25,1)
     case MBIM_SERVICE_MS_SAR:
 #endif
+#if MBIM_CHECK_VERSION (1,25,3)
+    case MBIM_SERVICE_QDU:
+#endif
     default:
         /* Ignore */
         break;
