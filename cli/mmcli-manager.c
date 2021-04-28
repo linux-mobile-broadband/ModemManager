@@ -449,7 +449,7 @@ get_manager_ready (GObject      *source,
 
 #if defined WITH_UDEV
     if (report_kernel_event_auto_scan) {
-        const gchar *subsys[] = { "tty", "usbmisc", "net", "rpmsg", NULL };
+        const gchar *subsys[] = { "tty", "usbmisc", "net", "rpmsg", "wwan", NULL };
         guint i;
 
         ctx->udev = g_udev_client_new (subsys);
