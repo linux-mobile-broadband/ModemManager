@@ -2,7 +2,7 @@ include:
   - project: freedesktop/ci-templates
     ref: 290b79e0e78eab67a83766f4e9691be554fc4afd
     file:
-    - templates/debian.yml
+    - templates/ubuntu.yml
 
 stages:
   - container prep
@@ -11,14 +11,18 @@ stages:
 .common_variables:
   variables:
     FDO_UPSTREAM_REPO: mobile-broadband/ModemManager
-    FDO_DISTRIBUTION_VERSION: 'buster'
-    FDO_DISTRIBUTION_TAG: '2020-04-08.4'
-    FDO_DISTRIBUTION_PACKAGES: ca-certificates git gcc autoconf automake libtool libgettextpo-dev libgirepository1.0-dev libglib2.0-dev libgudev-1.0-dev python3-dbus python3-gi autopoint xsltproc dbus autoconf-archive gettext
-                               gtk-doc-tools libglib2.0-doc gobject-introspection libsystemd-dev libpolkit-gobject-1-dev valac
+    FDO_DISTRIBUTION_VERSION: '20.04'
+    FDO_DISTRIBUTION_TAG: '2021-04-28.2'
+    FDO_DISTRIBUTION_PACKAGES: ca-certificates git gcc autoconf automake libtool
+                               libgettextpo-dev libgirepository1.0-dev libglib2.0-dev
+                               libgudev-1.0-dev python3-dbus python3-gi autopoint
+                               xsltproc dbus autoconf-archive gettext gtk-doc-tools
+                               libglib2.0-doc gobject-introspection libsystemd-dev
+                               libpolkit-gobject-1-dev valac
 
 build container:
   extends:
-  - .fdo.container-build@debian
+  - .fdo.container-build@ubuntu
   - .common_variables
   stage: container prep
   only:
@@ -31,7 +35,7 @@ build container:
 build-no-qmi:
   stage: build
   extends:
-  - .fdo.distribution-image@debian
+  - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
     - master
@@ -55,7 +59,7 @@ build-no-qmi:
 build-qmi-qrtr-no-mbim:
   stage: build
   extends:
-  - .fdo.distribution-image@debian
+  - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
     - master
@@ -86,7 +90,7 @@ build-qmi-qrtr-no-mbim:
 build-qmi-no-qrtr-no-mbim:
   stage: build
   extends:
-  - .fdo.distribution-image@debian
+  - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
     - master
@@ -110,7 +114,7 @@ build-qmi-no-qrtr-no-mbim:
 build-no-qmi-no-mbim:
   stage: build
   extends:
-  - .fdo.distribution-image@debian
+  - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
     - master
@@ -127,7 +131,7 @@ build-no-qmi-no-mbim:
 build-qmi-newest-commands:
   stage: build
   extends:
-  - .fdo.distribution-image@debian
+  - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
     - master
@@ -151,7 +155,7 @@ build-qmi-newest-commands:
 build-single-plugins:
   stage: build
   extends:
-  - .fdo.distribution-image@debian
+  - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
     - schedules
@@ -192,7 +196,7 @@ build-single-plugins:
 build-default:
   stage: build
   extends:
-  - .fdo.distribution-image@debian
+  - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
     - master
