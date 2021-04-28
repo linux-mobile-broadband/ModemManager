@@ -31,7 +31,10 @@ test_stub_CPPFLAGS = \
 	-DTEST_SERVICES=\""$(abs_top_builddir)/tools/tests/services"\" \
 	$(NULL)
 
+# only run the test if introspection was enabled
+if HAVE_INTROSPECTION
 TEST_PROGS += $(noinst_PROGRAMS)
+endif
 
 test-wrapper.sh: test-wrapper.sh.in
 	@sed \
