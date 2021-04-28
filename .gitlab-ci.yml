@@ -46,12 +46,12 @@ build-no-qmi:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
     - make
     - make install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/tmp/build-no-qmi --disable-gtk-doc --without-qmi
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi
     - make
     - make check
     - make install
@@ -70,19 +70,19 @@ build-qmi-qrtr-no-mbim:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
     - make
     - make install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-mbim-qmux --enable-qrtr --enable-collection=basic
+    - ./configure --prefix=/usr  --disable-gtk-doc --disable-introspection --disable-mbim-qmux --enable-qrtr --enable-collection=basic
     - make
     - make install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/tmp/build-qmi-qrtr-no-mbim --disable-gtk-doc --without-mbim
+    - ./configure --prefix=/usr  --disable-gtk-doc --disable-introspection --without-mbim
     - make
     - make check
     - make install
@@ -101,12 +101,12 @@ build-qmi-no-qrtr-no-mbim:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-mbim-qmux --disable-qrtr --enable-collection=basic
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --disable-mbim-qmux --disable-qrtr --enable-collection=basic
     - make
     - make install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/tmp/build-qmi-no-qrtr-no-mbim --disable-gtk-doc --without-mbim
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-mbim
     - make
     - make check
     - make install
@@ -123,7 +123,7 @@ build-no-qmi-no-mbim:
     - schedules
   script:
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/tmp/build-no-qmi-no-mbim --disable-gtk-doc --without-qmi --without-mbim
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi --without-mbim
     - make
     - make check
     - make install
@@ -142,12 +142,12 @@ build-qmi-newest-commands:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-mbim-qmux --enable-collection=basic
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --disable-mbim-qmux --enable-collection=basic
     - make
     - make install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/tmp/build-qmi-newest-commands --disable-gtk-doc --without-mbim CFLAGS="-DWITH_NEWEST_QMI_COMMANDS"
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-mbim CFLAGS="-DWITH_NEWEST_QMI_COMMANDS"
     - make
     - make check
     - make install
@@ -163,21 +163,21 @@ build-single-plugins:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
     - make
     - make install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
     - make
     - make install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --enable-mbim-qmux --enable-qrtr --enable-collection=basic
+    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --enable-mbim-qmux --enable-qrtr --enable-collection=basic
     - make
     - make install
     - popd
@@ -188,7 +188,7 @@ build-single-plugins:
                     novatel novatel-lte option option-hso pantech
                     qcom-soc quectel samsung sierra-legacy sierra simtech
                     telit thuraya tplink ublox via wavecom x22x zte; do
-        ./configure --prefix=/usr --disable-gtk-doc --disable-all-plugins --enable-plugin-$plugin;
+        ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --disable-all-plugins --enable-plugin-$plugin;
         make;
         make clean;
       done
@@ -209,26 +209,26 @@ build-default:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr
+    - ./configure --prefix=/usr --disable-gtk-doc --enable-introspection
     - make
     - make install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr
+    - ./configure --prefix=/usr --disable-gtk-doc --enable-introspection
     - make
     - make install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --enable-mbim-qmux --enable-qrtr --enable-collection=basic
+    - ./configure --prefix=/usr --disable-gtk-doc --enable-introspection --enable-mbim-qmux --enable-qrtr --enable-collection=basic
     - make
     - make install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --enable-gtk-doc --with-polkit=strict --with-suspend-resume=systemd --with-systemdsystemunitdir=/lib/systemd/system
+    - ./configure --prefix=/usr --enable-gtk-doc --enable-introspection --with-polkit=strict --with-suspend-resume=systemd --with-systemdsystemunitdir=/lib/systemd/system
     - make
     - make check
     - make install
