@@ -3467,6 +3467,8 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
     if (has_lte_info)
         mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
+    else
+        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 }
 
