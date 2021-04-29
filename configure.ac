@@ -123,10 +123,8 @@ dnl-----------------------------------------------------------------------------
 dnl Build dependencies
 dnl
 
-# NOTE! If using glib < 2.55.1, make sure you have backported the following patch to avoid
-# the daemon leaking a lot: https://gitlab.gnome.org/GNOME/glib/commit/37d9b0c6995f97ea0f744650aaf5179081f878ba
-GLIB_MIN_VERSION=2.48.0
-GLIB_BUILD_SYMBOLS="-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_48 -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_48 -DGLIB_DISABLE_DEPRECATION_WARNINGS"
+GLIB_MIN_VERSION=2.56.0
+GLIB_BUILD_SYMBOLS="-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_56 -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_56 -DGLIB_DISABLE_DEPRECATION_WARNINGS"
 
 PKG_CHECK_MODULES(MM,
                   glib-2.0 >= $GLIB_MIN_VERSION
