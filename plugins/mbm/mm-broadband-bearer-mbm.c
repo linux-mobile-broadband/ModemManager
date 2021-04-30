@@ -558,7 +558,7 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
     GTask *task;
 
     ctx = g_new0 (GetIpConfig3gppContext, 1);
-    ctx->modem = g_object_ref (modem);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
     ctx->family = ip_family;
 

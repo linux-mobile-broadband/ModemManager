@@ -536,7 +536,7 @@ GObject *
 mm_device_get_plugin (MMDevice *self)
 {
     return (self->priv->plugin ?
-            g_object_ref (self->priv->plugin) :
+            G_OBJECT (g_object_ref (self->priv->plugin)) :
             NULL);
 }
 
@@ -573,7 +573,7 @@ mm_device_get_port_probe (MMDevice       *self,
     MMPortProbe *probe;
 
     probe = device_find_probe_with_device (self, kernel_port, FALSE);
-    return (probe ? g_object_ref (probe) : NULL);
+    return (probe ? G_OBJECT (g_object_ref (probe)) : NULL);
 }
 
 GList *

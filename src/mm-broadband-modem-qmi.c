@@ -1856,7 +1856,7 @@ common_power_up_down_off (MMIfaceModem *self,
 
     /* Setup context */
     ctx = g_slice_new0 (SetOperatingModeContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_DMS (g_object_ref (client));
     ctx->input = qmi_message_dms_set_operating_mode_input_new ();
     qmi_message_dms_set_operating_mode_input_set_mode (ctx->input, mode, NULL);
     ctx->step = SET_OPERATING_MODE_STEP_FIRST;
@@ -3570,7 +3570,7 @@ unsolicited_registration_events_task_new (MMBroadbandModemQmi *self,
     GTask *task;
 
     ctx = g_new0 (UnsolicitedRegistrationEventsContext, 1);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
     ctx->enable = enable;
 
     task = g_task_new (self, NULL, callback, user_data);
@@ -4539,7 +4539,7 @@ modem_cdma_activate (MMIfaceModemCdma *_self,
     /* Setup context */
     ctx = g_slice_new0 (CdmaActivationContext);
     ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_DMS (g_object_ref (client));
     ctx->step = CDMA_ACTIVATION_STEP_FIRST;
 
     /* Build base input bundle for the Automatic activation */
@@ -4585,7 +4585,7 @@ modem_cdma_activate_manual (MMIfaceModemCdma *_self,
     /* Setup context */
     ctx = g_slice_new0 (CdmaActivationContext);
     ctx->self = g_object_ref (self);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_DMS (g_object_ref (client));
 
     g_task_set_task_data (task, ctx, (GDestroyNotify)cdma_activation_context_free);
 
@@ -5175,8 +5175,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
 
     ctx = g_new0 (EnableUnsolicitedEventsContext, 1);
     ctx->enable = enable;
-    ctx->client_nas = client_nas ? g_object_ref (client_nas) : NULL;
-    ctx->client_wds = client_wds ? g_object_ref (client_wds) : NULL;
+    ctx->client_nas = client_nas ? QMI_CLIENT_NAS (g_object_ref (client_nas)) : NULL;
+    ctx->client_wds = client_wds ? QMI_CLIENT_WDS (g_object_ref (client_wds)) : NULL;
 
     g_task_set_task_data (task, ctx, (GDestroyNotify)enable_unsolicited_events_context_free);
 
@@ -6027,7 +6027,7 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
 
     task = g_task_new (self, NULL, callback, user_data);
     ctx = g_slice_new0 (StoreProfileContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_WDS (g_object_ref (client));
     g_task_set_task_data (task, ctx, (GDestroyNotify)store_profile_context_free);
 
     /* Note: may be UNKNOWN */
@@ -6801,7 +6801,7 @@ load_initial_sms_parts (MMIfaceModemMessaging *_self,
         return;
 
     ctx = g_slice_new0 (LoadInitialSmsPartsContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_WMS (g_object_ref (client));
     ctx->storage = storage;
     ctx->step = LOAD_INITIAL_SMS_PARTS_STEP_FIRST;
 
@@ -6815,7 +6815,7 @@ load_initial_sms_parts (MMIfaceModemMessaging *_self,
 /* Common setup/cleanup unsolicited event handlers (Messaging interface) */
 
 typedef struct {
-    MMIfaceModemMessaging *self;
+    MMBroadbandModemQmi *self;
     QmiClientWms *client;
     QmiWmsStorageType storage;
     guint32 memory_index;
@@ -6953,7 +6953,7 @@ messaging_event_report_indication_cb (QmiClientNas *client,
                                msg_format,
                                TRUE,
                                raw_data);
-	return;
+        return;
     }
 
     if (qmi_indication_wms_event_report_output_get_mt_message (
@@ -6966,7 +6966,7 @@ messaging_event_report_indication_cb (QmiClientNas *client,
 
         ctx = g_slice_new (IndicationRawReadContext);
         ctx->self = g_object_ref (self);
-        ctx->client = g_object_ref (client);
+        ctx->client = QMI_CLIENT_WMS (g_object_ref (client));
         ctx->storage = storage;
         ctx->memory_index = memory_index;
 
@@ -9559,7 +9559,7 @@ firmware_list_preload (MMBroadbandModemQmi *self,
         return;
 
     ctx = g_slice_new0 (FirmwareListPreloadContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_DMS (g_object_ref (client));
 
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)firmware_list_preload_context_free);
@@ -10392,7 +10392,7 @@ signal_load_values (MMIfaceModemSignal  *self,
         return;
 
     ctx = g_slice_new0 (SignalLoadValuesContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
     ctx->step = SIGNAL_LOAD_VALUES_STEP_SIGNAL_FIRST;
 
     task = g_task_new (self, cancellable, callback, user_data);

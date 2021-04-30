@@ -469,7 +469,7 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     task = g_task_new (self, cancellable, callback, user_data);
 
     ctx = g_slice_new0 (RegisterInNetworkContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
     ctx->cancellable = cancellable ? g_object_ref (cancellable) : NULL;
     g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
 
@@ -757,7 +757,7 @@ mm_shared_qmi_set_current_capabilities (MMIfaceModem        *self,
     g_assert (priv->feature_nas_ssp != FEATURE_UNKNOWN);
 
     ctx = g_slice_new0 (SetCurrentCapabilitiesContext);
-    ctx->client       = g_object_ref (client);
+    ctx->client       = QMI_CLIENT_NAS (g_object_ref (client));
     ctx->capabilities = capabilities;
     ctx->step = SET_CURRENT_CAPABILITIES_STEP_FIRST;
 
@@ -1057,8 +1057,8 @@ mm_shared_qmi_load_current_capabilities (MMIfaceModem        *self,
     g_assert (priv->feature_nas_ssp == FEATURE_UNKNOWN);
 
     ctx = g_slice_new0 (LoadCurrentCapabilitiesContext);
-    ctx->nas_client = g_object_ref (nas_client);
-    ctx->dms_client = g_object_ref (dms_client);
+    ctx->nas_client = QMI_CLIENT_NAS (g_object_ref (nas_client));
+    ctx->dms_client = QMI_CLIENT_DMS (g_object_ref (dms_client));
     ctx->step = LOAD_CURRENT_CAPABILITIES_STEP_FIRST;
 
     task = g_task_new (self, NULL, callback, user_data);
@@ -1341,7 +1341,7 @@ mm_shared_qmi_set_current_modes (MMIfaceModem        *self,
         return;
 
     ctx = g_slice_new0 (SetCurrentModesContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
 
     if (allowed == MM_MODEM_MODE_ANY && ctx->preferred == MM_MODEM_MODE_NONE) {
         ctx->allowed = MM_MODEM_MODE_NONE;
@@ -1598,7 +1598,7 @@ mm_shared_qmi_load_current_modes (MMIfaceModem        *self,
         return;
 
     ctx = g_new0 (LoadCurrentModesContext, 1);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
     task = g_task_new (self, NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_current_modes_context_free);
 
@@ -2710,7 +2710,7 @@ mm_shared_qmi_setup_carrier_config (MMIfaceModem        *self,
         g_object_unref (task);
         return;
     }
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_PDC (g_object_ref (client));
 
     setup_carrier_config_step (task);
 }
@@ -3192,7 +3192,7 @@ mm_shared_qmi_load_carrier_config (MMIfaceModem        *self,
         g_object_unref (task);
         return;
     }
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_PDC (g_object_ref (client));
 
     load_carrier_config_step (task);
 }
@@ -3371,7 +3371,7 @@ mm_shared_qmi_load_sim_slots (MMIfaceModem        *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     ctx = g_slice_new0 (LoadSimSlotsContext);
-    ctx->client_uim = g_object_ref (client);
+    ctx->client_uim = QMI_CLIENT_UIM (g_object_ref (client));
     g_task_set_task_data (task, ctx, (GDestroyNotify) load_sim_slots_context_free);
 
     qmi_client_uim_get_slot_status (ctx->client_uim,
@@ -4919,7 +4919,7 @@ setup_required_nmea_traces (MMSharedQmi         *self,
         SetupRequiredNmeaTracesContext *ctx;
 
         ctx = g_slice_new0 (SetupRequiredNmeaTracesContext);
-        ctx->client = g_object_ref (client);
+        ctx->client = QMI_CLIENT_LOC (g_object_ref (client));
         g_task_set_task_data (task, ctx, (GDestroyNotify)setup_required_nmea_traces_context_free);
 
         qmi_client_loc_get_nmea_types (ctx->client,
@@ -4980,7 +4980,7 @@ pds_ser_location_ready (QmiClientPds *client,
 
     g_assert (!priv->pds_client);
     g_assert (priv->pds_location_event_report_indication_id == 0);
-    priv->pds_client = g_object_ref (client);
+    priv->pds_client = QMI_CLIENT (g_object_ref (client));
     priv->pds_location_event_report_indication_id =
         g_signal_connect (priv->pds_client,
                           "event-report",
@@ -5110,7 +5110,7 @@ loc_register_events_ready (QmiClientLoc *client,
 
     g_assert (!priv->loc_client);
     g_assert (!priv->loc_location_nmea_indication_id);
-    priv->loc_client = g_object_ref (client);
+    priv->loc_client = QMI_CLIENT (g_object_ref (client));
     priv->loc_location_nmea_indication_id =
         g_signal_connect (client,
                           "nmea",
@@ -6223,7 +6223,7 @@ mm_shared_qmi_location_load_supported_assistance_data (MMIfaceModemLocation  *se
     }
 
     ctx = g_slice_new0 (LoadSupportedAssistanceDataContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_LOC (g_object_ref (client));
     g_task_set_task_data (task, ctx, (GDestroyNotify)load_supported_assistance_data_context_free);
 
     qmi_client_loc_get_predicted_orbits_data_source (ctx->client,
@@ -6587,7 +6587,7 @@ mm_shared_qmi_location_inject_assistance_data (MMIfaceModemLocation *self,
 
     task = g_task_new (self, NULL, callback, user_data);
     ctx = g_slice_new0 (InjectAssistanceDataContext);
-    ctx->client = g_object_ref (client);
+    ctx->client = QMI_CLIENT_LOC (g_object_ref (client));
     ctx->data = g_memdup (data, data_size);
     ctx->data_size = data_size;
     ctx->part_size = ((priv->loc_assistance_data_max_part_size > 0) ? priv->loc_assistance_data_max_part_size : MAX_BYTES_PER_REQUEST);

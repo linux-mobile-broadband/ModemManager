@@ -401,7 +401,7 @@ dial_3gpp (MMBroadbandBearer   *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify) dial_3gpp_context_free);
 
     /* Setup context */
-    ctx->self    = g_object_ref (self);
+    ctx->self    = MM_BROADBAND_BEARER_CINTERION (g_object_ref (self));
     ctx->modem   = g_object_ref (modem);
     ctx->primary = g_object_ref (primary);
     ctx->cid     = cid;
@@ -602,8 +602,8 @@ disconnect_3gpp (MMBroadbandBearer  *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify) disconnect_3gpp_context_free);
 
     /* Setup context */
-    ctx->self    = g_object_ref (self);
-    ctx->modem   = g_object_ref (modem);
+    ctx->self    = MM_BROADBAND_BEARER_CINTERION (g_object_ref (self));
+    ctx->modem   = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
     ctx->data    = g_object_ref (data);
     ctx->cid     = cid;

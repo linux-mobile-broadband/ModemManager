@@ -9815,19 +9815,19 @@ run_cdma_registration_checks_ready (MMBroadbandModem *self,
 }
 
 static void
-modem_cdma_register_in_network (MMIfaceModemCdma *self,
+modem_cdma_register_in_network (MMIfaceModemCdma *_self,
                                 guint max_registration_time,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
-    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (_self);
     RegisterInCdmaNetworkContext *ctx;
     GTask *task;
 
     /* (Try to) cancel previous registration request */
-    if (broadband->priv->modem_cdma_pending_registration_cancellable) {
-        g_cancellable_cancel (broadband->priv->modem_cdma_pending_registration_cancellable);
-        g_clear_object (&broadband->priv->modem_cdma_pending_registration_cancellable);
+    if (self->priv->modem_cdma_pending_registration_cancellable) {
+        g_cancellable_cancel (self->priv->modem_cdma_pending_registration_cancellable);
+        g_clear_object (&self->priv->modem_cdma_pending_registration_cancellable);
     }
 
     ctx = g_new0 (RegisterInCdmaNetworkContext, 1);
@@ -9837,7 +9837,7 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
 
     /* Keep an accessible reference to the cancellable, so that we can cancel
      * previous request when needed */
-    broadband->priv->modem_cdma_pending_registration_cancellable =
+    self->priv->modem_cdma_pending_registration_cancellable =
         g_object_ref (ctx->cancellable);
 
     /* Get fresh registration state */
@@ -9847,7 +9847,7 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_cdma_network_context_free);
 
     mm_iface_modem_cdma_run_registration_checks (
-        self,
+        _self,
         (GAsyncReadyCallback)run_cdma_registration_checks_ready,
         task);
 }
@@ -11902,7 +11902,7 @@ enable (MMBaseModem *self,
         EnablingContext *ctx;
 
         ctx = g_new0 (EnablingContext, 1);
-        ctx->self = g_object_ref (self);
+        ctx->self = MM_BROADBAND_MODEM (g_object_ref (self));
         ctx->step = ENABLING_STEP_FIRST;
 
         g_task_set_task_data (task, ctx, (GDestroyNotify)enabling_context_free);
@@ -12468,7 +12468,7 @@ initialize (MMBaseModem *self,
         InitializeContext *ctx;
 
         ctx = g_new0 (InitializeContext, 1);
-        ctx->self = g_object_ref (self);
+        ctx->self = MM_BROADBAND_MODEM (g_object_ref (self));
         ctx->step = INITIALIZE_STEP_FIRST;
 
         g_task_set_task_data (task, ctx, (GDestroyNotify)initialize_context_free);

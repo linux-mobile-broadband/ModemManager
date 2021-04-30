@@ -1260,7 +1260,7 @@ _connect (MMBaseBearer        *self,
     g_assert (modem);
 
     ctx = g_slice_new0 (ConnectContext);
-    ctx->modem = g_object_ref (modem);
+    ctx->modem = MM_BROADBAND_MODEM_MBIM (g_object_ref (modem));
     ctx->mbim = g_object_ref (mbim);
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_STEP_FIRST;

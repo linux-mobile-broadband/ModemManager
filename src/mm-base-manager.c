@@ -750,7 +750,7 @@ handle_set_logging (MmGdbusOrgFreedesktopModemManager1 *manager,
     SetLoggingContext *ctx;
 
     ctx = g_new0 (SetLoggingContext, 1);
-    ctx->self = g_object_ref (manager);
+    ctx->self = MM_BASE_MANAGER (g_object_ref (manager));
     ctx->invocation = g_object_ref (invocation);
     ctx->level = g_strdup (level);
 
@@ -813,7 +813,7 @@ handle_scan_devices (MmGdbusOrgFreedesktopModemManager1 *manager,
     ScanDevicesContext *ctx;
 
     ctx = g_new (ScanDevicesContext, 1);
-    ctx->self = g_object_ref (manager);
+    ctx->self = MM_BASE_MANAGER (g_object_ref (manager));
     ctx->invocation = g_object_ref (invocation);
 
     mm_auth_provider_authorize (ctx->self->priv->authp,
@@ -890,7 +890,7 @@ handle_report_kernel_event (MmGdbusOrgFreedesktopModemManager1 *manager,
     ReportKernelEventContext *ctx;
 
     ctx = g_slice_new0 (ReportKernelEventContext);
-    ctx->self = g_object_ref (manager);
+    ctx->self = MM_BASE_MANAGER (g_object_ref (manager));
     ctx->invocation = g_object_ref (invocation);
     ctx->dictionary = g_variant_ref (dictionary);
 
@@ -1215,7 +1215,7 @@ handle_inhibit_device (MmGdbusOrgFreedesktopModemManager1 *manager,
     InhibitDeviceContext *ctx;
 
     ctx = g_slice_new0 (InhibitDeviceContext);
-    ctx->self = g_object_ref (manager);
+    ctx->self = MM_BASE_MANAGER (g_object_ref (manager));
     ctx->invocation = g_object_ref (invocation);
     ctx->uid = g_strdup (uid);
     ctx->inhibit = inhibit;

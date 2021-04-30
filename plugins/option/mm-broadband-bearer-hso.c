@@ -191,7 +191,7 @@ get_ip_config_3gpp (MMBroadbandBearer *self,
     gchar *command;
 
     ctx = g_slice_new0 (GetIpConfig3gppContext);
-    ctx->modem = g_object_ref (modem);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
     ctx->cid = cid;
 

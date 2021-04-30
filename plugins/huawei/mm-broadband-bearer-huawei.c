@@ -509,7 +509,7 @@ connect_3gpp (MMBroadbandBearer *_self,
 
     /* Setup connection context */
     ctx = g_slice_new0 (Connect3gppContext);
-    ctx->modem = g_object_ref (modem);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->data = g_object_ref (data);
     ctx->step = CONNECT_3GPP_CONTEXT_STEP_FIRST;
 
