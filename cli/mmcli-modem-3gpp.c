@@ -304,6 +304,28 @@ disable_facility_lock_process_reply (gboolean      result,
     g_print ("successfully disabled facility lock\n");
 }
 
+static gboolean
+disable_facility_lock_parse_input (const gchar          *str,
+                                   MMModem3gppFacility  *out_facility,
+                                   gchar               **out_control_key)
+{
+    g_auto(GStrv)       properties = NULL;
+    MMModem3gppFacility facility;
+
+    properties = g_strsplit (str, ",", -1);
+    if (!properties || !properties[0] || !properties[1])
+        return FALSE;
+
+    /* Facilities is a bitmask, if 0 is returned we failed parsing */
+    facility = mm_common_get_3gpp_facility_from_string (properties[0], NULL);
+    if (!facility)
+        return FALSE;
+
+    *out_facility = facility;
+    *out_control_key = g_strdup (properties[1]);
+    return TRUE;
+}
+
 static void
 disable_facility_lock_ready (MMModem3gpp  *modem_3gpp,
                              GAsyncResult *result,
@@ -333,27 +355,23 @@ get_modem_ready (GObject      *source,
 
     /* Request to disable facility lock */
     if (disable_facility_lock_str) {
-        gchar               **properties;
-        gchar                *control_key;
-        MMModem3gppFacility   facility;
+        g_autofree gchar    *control_key = NULL;
+        MMModem3gppFacility  facility;
 
-        properties = g_strsplit (disable_facility_lock_str, ",", -1);
-        if (!properties[0] || !(control_key = properties[1]) ||
-            !(facility = mm_common_get_3gpp_facility_from_string (properties[0], NULL))) {
+        if (!disable_facility_lock_parse_input (disable_facility_lock_str,
+                                                &facility,
+                                                &control_key)) {
             g_printerr ("Error parsing properties string.\n");
-            g_free (properties[0]);
-            g_free (properties[1]);
             exit (EXIT_FAILURE);
         }
 
-        g_debug ("Disable facility lock...");
+        g_debug ("Asynchronously disabling facility lock...");
         mm_modem_3gpp_disable_facility_lock (ctx->modem_3gpp,
                                              facility,
                                              control_key,
                                              ctx->cancellable,
                                              (GAsyncReadyCallback)disable_facility_lock_ready,
                                              NULL);
-        g_strfreev (properties);
         return;
     }
 
@@ -460,27 +478,23 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
 
     /* Request to remove carrier lock */
     if (disable_facility_lock_str) {
-        gchar               **properties;
-        gchar                *control_key;
-        MMModem3gppFacility   facility;
-        gboolean              result;
+        g_autofree gchar    *control_key = NULL;
+        MMModem3gppFacility  facility;
+        gboolean             result;
 
-        properties = g_strsplit (disable_facility_lock_str, ",", -1);
-        if (!properties[0] || !(control_key = properties[1]) ||
-            !(facility = mm_common_get_3gpp_facility_from_string (properties[0], NULL))) {
+        if (!disable_facility_lock_parse_input (disable_facility_lock_str,
+                                                &facility,
+                                                &control_key)) {
             g_printerr ("Error parsing properties string.\n");
-            g_free (properties[0]);
-            g_free (properties[1]);
             exit (EXIT_FAILURE);
         }
 
-        g_debug ("Disable facility lock...");
+        g_debug ("Synchronously disabling facility lock...");
         result = mm_modem_3gpp_disable_facility_lock_sync (ctx->modem_3gpp,
                                                            facility,
                                                            control_key,
                                                            NULL,
                                                            &error);
-        g_strfreev (properties);
         disable_facility_lock_process_reply (result, error);
         return;
     }
