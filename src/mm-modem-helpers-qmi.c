@@ -2256,8 +2256,12 @@ mm_qmi_uim_get_configuration_output_parse (gpointer                             
         case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_CORPORATE:
         case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_1X_RUIM:
         case QMI_UIM_CARD_APPLICATION_PERSONALIZATION_FEATURE_UNKNOWN:
+            mm_obj_dbg (log_object, "ignoring lock in UIM feature: %s",
+                        qmi_uim_card_application_personalization_feature_get_string (element->feature));
+            break;
         default:
-            mm_obj_warn (log_object, "Invalid UIM feature : %u", (guint)element->feature);
+            mm_obj_dbg (log_object, "ignoring lock in unhandled UIM feature: 0x%x",
+                        (guint)element->feature);
         }
     }
     return TRUE;
