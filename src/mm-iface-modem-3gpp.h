@@ -345,15 +345,4 @@ gboolean mm_iface_modem_3gpp_reregister_in_network_finish (MMIfaceModem3gpp     
 void mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
                                              MMSimpleStatus *status);
 
-/* Remove modem personalization */
-void     mm_iface_modem_3gpp_disable_facility_lock        (MMIfaceModem3gpp     *self,
-                                                           MMModem3gppFacility   facility,
-                                                           guint8                slot,
-                                                           const gchar          *key,
-                                                           GAsyncReadyCallback   callback,
-                                                           gpointer              user_data);
-gboolean mm_iface_modem_3gpp_disable_facility_lock_finish (MMIfaceModem3gpp     *self,
-                                                           GAsyncResult         *res,
-                                                           GError              **error);
-
 #endif /* MM_IFACE_MODEM_3GPP_H */
