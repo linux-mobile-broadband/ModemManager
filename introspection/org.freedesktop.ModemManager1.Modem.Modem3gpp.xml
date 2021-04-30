@@ -207,6 +207,7 @@
             </para>
           </listitem>
         </varlistentry>
+        </variablelist>
     -->
     <method name="DisableFacilityLock">
         <arg name="properties" type="(us)" direction="in" />
