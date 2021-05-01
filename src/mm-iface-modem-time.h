@@ -125,6 +125,18 @@ gboolean mm_iface_modem_time_disable_finish (MMIfaceModemTime *self,
 /* Shutdown Time interface */
 void mm_iface_modem_time_shutdown (MMIfaceModemTime *self);
 
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+/* Sync Time interface (async) */
+void     mm_iface_modem_time_sync        (MMIfaceModemTime *self,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data);
+gboolean mm_iface_modem_time_sync_finish (MMIfaceModemTime *self,
+                                          GAsyncResult *res,
+                                          GError **error);
+
+#endif
+
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_time_bind_simple_status (MMIfaceModemTime *self,
                                              MMSimpleStatus *status);

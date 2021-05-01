@@ -728,6 +728,90 @@ mm_iface_modem_time_enable (MMIfaceModemTime *self,
 
 /*****************************************************************************/
 
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+typedef struct _SyncingContext SyncingContext;
+static void interface_syncing_step (GTask *task);
+
+typedef enum {
+    SYNCING_STEP_FIRST,
+    SYNCING_STEP_REFRESH_NETWORK_TIMEZONE,
+    SYNCING_STEP_LAST
+} SyncingStep;
+
+struct _SyncingContext {
+    SyncingStep step;
+};
+
+gboolean
+mm_iface_modem_time_sync_finish (MMIfaceModemTime  *self,
+                                 GAsyncResult      *res,
+                                 GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+interface_syncing_step (GTask *task)
+{
+    MMIfaceModemTime *self;
+    SyncingContext   *ctx;
+
+    /* Don't run new steps if we're cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case SYNCING_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_REFRESH_NETWORK_TIMEZONE:
+        /* We start it and schedule it to run asynchronously */
+        start_network_timezone (self);
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_LAST:
+        /* We are done without errors! */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        break;
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_iface_modem_time_sync (MMIfaceModemTime    *self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+    SyncingContext *ctx;
+    GTask          *task;
+
+    /* Create SyncingContext */
+    ctx = g_new0 (SyncingContext, 1);
+    ctx->step = SYNCING_STEP_FIRST;
+
+    /* Create sync steps task and execute it */
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+    interface_syncing_step (task);
+}
+
+#endif
+
+/*****************************************************************************/
+
 typedef struct _InitializationContext InitializationContext;
 static void interface_initialization_step (GTask *task);
 
