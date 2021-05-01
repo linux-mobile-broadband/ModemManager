@@ -11937,6 +11937,82 @@ enable (MMBaseModem *self,
 
     g_object_unref (task);
 }
+/*****************************************************************************/
+
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+typedef enum {
+    SYNCING_STEP_FIRST,
+    SYNCING_STEP_LAST,
+} SyncingStep;
+
+typedef struct {
+    SyncingStep step;
+} SyncingContext;
+
+static gboolean
+synchronize_finish (MMBaseModem   *self,
+                    GAsyncResult  *res,
+                    GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+syncing_step (GTask *task)
+{
+    MMBroadbandModem *self;
+    SyncingContext   *ctx;
+
+    /* Don't run new steps if we're cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case SYNCING_STEP_FIRST:
+        ctx->step++;
+        /* fall through */
+
+    case SYNCING_STEP_LAST:
+        mm_obj_info (self, "resume synchronization state (%d/%d): all done",
+                     ctx->step, SYNCING_STEP_LAST);
+        /* We are done without errors! */
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        break;
+    }
+
+    g_assert_not_reached ();
+}
+
+/* 'sync' as function name conflicts with a declared function in unistd.h */
+static void
+synchronize (MMBaseModem         *self,
+             GAsyncReadyCallback  callback,
+             gpointer             user_data)
+{
+    SyncingContext *ctx;
+    GTask          *task;
+
+    /* Create SyncingContext */
+    ctx = g_new0 (SyncingContext, 1);
+    ctx->step = SYNCING_STEP_FIRST;
+
+    /* Create sync steps task and execute it */
+    task = g_task_new (MM_BROADBAND_MODEM (self), NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+    syncing_step (task);
+}
+
+#endif
 
 /*****************************************************************************/
 
@@ -13342,6 +13418,11 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     base_modem_class->enable_finish = enable_finish;
     base_modem_class->disable = disable;
     base_modem_class->disable_finish = disable_finish;
+
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+    base_modem_class->sync = synchronize;
+    base_modem_class->sync_finish = synchronize_finish;
+#endif
 
     klass->setup_ports = setup_ports;
     klass->initialization_started = initialization_started;

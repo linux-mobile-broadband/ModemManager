@@ -72,6 +72,13 @@ resuming_cb (MMSleepMonitor *sleep_monitor)
     mm_base_manager_start (manager, FALSE);
 }
 
+static void
+resuming_quick_cb (MMSleepMonitor *sleep_monitor)
+{
+    mm_dbg ("syncing modem state (quick resuming)");
+    mm_base_manager_sync (manager);
+}
+
 #endif
 
 static void
@@ -191,7 +198,12 @@ main (int argc, char *argv[])
 
         if (mm_context_get_test_no_suspend_resume())
             mm_dbg ("Suspend/resume support disabled at runtime");
-        else {
+        else if (mm_context_get_test_quick_suspend_resume()) {
+            mm_dbg ("Quick suspend/resume hooks enabled");
+            sleep_monitor = mm_sleep_monitor_get ();
+            g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_RESUMING, G_CALLBACK (resuming_quick_cb), NULL);
+        } else {
+            mm_dbg ("Full suspend/resume hooks enabled");
             sleep_monitor = mm_sleep_monitor_get ();
             g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_SLEEPING, G_CALLBACK (sleeping_cb), NULL);
             g_signal_connect (sleep_monitor, MM_SLEEP_MONITOR_RESUMING, G_CALLBACK (resuming_cb), NULL);

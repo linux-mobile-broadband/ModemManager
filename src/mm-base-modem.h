@@ -108,6 +108,16 @@ struct _MMBaseModemClass {
                                 GAsyncResult *res,
                                 GError **error);
 
+    /* Modem synchronization.
+     * When resuming in quick suspend/resume mode,
+     * this method triggers a synchronization of all modem interfaces */
+    void (* sync) (MMBaseModem *self,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data);
+    gboolean (* sync_finish) (MMBaseModem *self,
+                              GAsyncResult *res,
+                              GError **error);
+
     /* signals */
     void (* link_port_grabbed)  (MMBaseModem *self,
                                  MMPort      *link_port);
@@ -228,6 +238,13 @@ void     mm_base_modem_disable        (MMBaseModem *self,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data);
 gboolean mm_base_modem_disable_finish (MMBaseModem *self,
+                                       GAsyncResult *res,
+                                       GError **error);
+
+void     mm_base_modem_sync           (MMBaseModem *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+gboolean mm_base_modem_sync_finish    (MMBaseModem *self,
                                        GAsyncResult *res,
                                        GError **error);
 

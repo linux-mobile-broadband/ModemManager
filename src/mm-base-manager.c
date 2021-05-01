@@ -52,6 +52,7 @@
 #include "mm-plugin.h"
 #include "mm-filter.h"
 #include "mm-log-object.h"
+#include "mm-base-modem.h"
 
 static void initable_iface_init   (GInitableIface       *iface);
 static void log_object_iface_init (MMLogObjectInterface *iface);
@@ -722,6 +723,53 @@ mm_base_manager_num_modems (MMBaseManager *self)
 
     return n;
 }
+
+/*****************************************************************************/
+/* Quick resume synchronization */
+
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+gboolean mm_base_modem_sync_finish (MMBaseModem   *self,
+                                    GAsyncResult  *res,
+                                    GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+mm_base_modem_sync_ready (MMBaseModem  *self,
+                          GAsyncResult *res,
+                          gpointer      user_data)
+{
+    g_autoptr(GError) error;
+
+    mm_base_modem_sync_finish (self, res, &error);
+    if (error) {
+        mm_obj_warn (self, "synchronization failed");
+        return;
+    }
+    mm_obj_info (self, "synchronization finished");
+}
+
+void
+mm_base_manager_sync (MMBaseManager *self)
+{
+    GHashTableIter iter;
+    gpointer       key, value;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_BASE_MANAGER (self));
+
+    /* Refresh each device */
+    g_hash_table_iter_init (&iter, self->priv->devices);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        MMBaseModem *modem = mm_device_peek_modem (MM_DEVICE (value));
+        /* We just want to start the synchronization, we don't need the result */
+        mm_base_modem_sync (modem, (GAsyncReadyCallback)mm_base_modem_sync_ready, NULL);
+    }
+}
+
+#endif
 
 /*****************************************************************************/
 /* Set logging */

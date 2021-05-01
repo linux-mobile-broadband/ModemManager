@@ -620,6 +620,31 @@ mm_base_modem_wait_link_port (MMBaseModem         *self,
 
 /******************************************************************************/
 
+static void
+mm_base_modem_sync_ready (MMBaseModem  *self,
+            GAsyncResult *res)
+{
+    g_autoptr (GError) error = NULL;
+
+    MM_BASE_MODEM_GET_CLASS (self)->sync_finish (self, res, &error);
+    if (error) {
+        mm_obj_warn (self, "synchronization failed");
+    }
+}
+
+void
+mm_base_modem_sync (MMBaseModem         *self,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->sync != NULL);
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->sync_finish != NULL);
+
+    MM_BASE_MODEM_GET_CLASS (self)->sync (self,
+                                          (GAsyncReadyCallback) mm_base_modem_sync_ready,
+                                          NULL);
+}
+
 gboolean
 mm_base_modem_disable_finish (MMBaseModem   *self,
                               GAsyncResult  *res,
