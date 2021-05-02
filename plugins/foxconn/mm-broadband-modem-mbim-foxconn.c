@@ -189,6 +189,26 @@ location_load_capabilities_finish (MMIfaceModemLocation  *self,
 }
 
 static void
+custom_location_load_capabilities (GTask                 *task,
+                                   MMModemLocationSource  sources)
+{
+    MMBroadbandModemMbimFoxconn *self;
+
+    self = g_task_get_source_object (task);
+
+    /* If we have a GPS port and an AT port, enable unmanaged GPS support */
+    if (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)) &&
+        mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
+        self->priv->unmanaged_gps_support = FEATURE_SUPPORTED;
+        sources |= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
+    }
+
+    /* So we're done, complete */
+    g_task_return_int (task, sources);
+    g_object_unref (task);
+}
+
+static void
 parent_load_capabilities_ready (MMIfaceModemLocation *self,
                                 GAsyncResult         *res,
                                 GTask                *task)
@@ -203,16 +223,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
         return;
     }
 
-    /* If we have a GPS port and an AT port, enable unmanaged GPS support */
-    if (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)) &&
-        mm_base_modem_peek_port_gps (MM_BASE_MODEM (self))) {
-        MM_BROADBAND_MODEM_MBIM_FOXCONN (self)->priv->unmanaged_gps_support = FEATURE_SUPPORTED;
-        sources |= MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED;
-    }
-
-    /* So we're done, complete */
-    g_task_return_int (task, sources);
-    g_object_unref (task);
+    custom_location_load_capabilities (task, sources);
 }
 
 static void
@@ -224,10 +235,18 @@ location_load_capabilities (MMIfaceModemLocation *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /* Chain up parent's setup */
-    iface_modem_location_parent->load_capabilities (self,
-                                                    (GAsyncReadyCallback)parent_load_capabilities_ready,
-                                                    task);
+    /* Chain up parent's setup, if any. If MM is built without QMI support,
+     * the MBIM modem won't have any location capabilities. */
+    if (iface_modem_location_parent &&
+        iface_modem_location_parent->load_capabilities &&
+        iface_modem_location_parent->load_capabilities_finish) {
+        iface_modem_location_parent->load_capabilities (self,
+                                                        (GAsyncReadyCallback)parent_load_capabilities_ready,
+                                                        task);
+        return;
+    }
+
+    custom_location_load_capabilities (task, MM_MODEM_LOCATION_SOURCE_NONE);
 }
 
 /*****************************************************************************/
@@ -264,10 +283,19 @@ parent_disable_location_gathering (GTask *task)
     self = MM_IFACE_MODEM_LOCATION (g_task_get_source_object (task));
     source = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
-    iface_modem_location_parent->disable_location_gathering (self,
-							     source,
-							     (GAsyncReadyCallback)parent_disable_location_gathering_ready,
-							     task);
+    if (iface_modem_location_parent &&
+        iface_modem_location_parent->disable_location_gathering &&
+        iface_modem_location_parent->disable_location_gathering_finish) {
+        iface_modem_location_parent->disable_location_gathering (
+            self,
+            source,
+            (GAsyncReadyCallback)parent_disable_location_gathering_ready,
+            task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
 }
 
 static void
@@ -339,22 +367,15 @@ unmanaged_gps_enabled_ready (MMBaseModem  *self,
 }
 
 static void
-parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
-                                        GAsyncResult         *res,
-                                        GTask                *task)
+custom_enable_location_gathering (GTask *task)
 {
-    MMBroadbandModemMbimFoxconn *self = MM_BROADBAND_MODEM_MBIM_FOXCONN (_self);
-    GError                      *error = NULL;
+    MMBroadbandModemMbimFoxconn *self;
     MMModemLocationSource        source;
 
-    if (!iface_modem_location_parent->enable_location_gathering_finish (_self, res, &error)) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
+    self = g_task_get_source_object (task);
+    source = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
     /* We only support Unmanaged GPS at this level */
-    source = GPOINTER_TO_UINT (g_task_get_task_data (task));
     if ((self->priv->unmanaged_gps_support != FEATURE_SUPPORTED) ||
         (source != MM_MODEM_LOCATION_SOURCE_GPS_UNMANAGED)) {
         g_task_return_boolean (task, TRUE);
@@ -362,12 +383,28 @@ parent_enable_location_gathering_ready (MMIfaceModemLocation *_self,
         return;
     }
 
-    mm_base_modem_at_command (MM_BASE_MODEM (_self),
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "^NV=30007,01,\"01\"",
                               3,
                               FALSE,
                               (GAsyncReadyCallback)unmanaged_gps_enabled_ready,
                               task);
+}
+
+static void
+parent_enable_location_gathering_ready (MMIfaceModemLocation *self,
+                                        GAsyncResult         *res,
+                                        GTask                *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_location_parent->enable_location_gathering_finish (self, res, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    custom_enable_location_gathering (task);
 }
 
 static void
@@ -382,10 +419,18 @@ enable_location_gathering (MMIfaceModemLocation  *self,
     g_task_set_task_data (task, GUINT_TO_POINTER (source), NULL);
 
     /* Chain up parent's gathering enable */
-    iface_modem_location_parent->enable_location_gathering (self,
-                                                            source,
-                                                            (GAsyncReadyCallback)parent_enable_location_gathering_ready,
-                                                            task);
+    if (iface_modem_location_parent &&
+        iface_modem_location_parent->enable_location_gathering &&
+        iface_modem_location_parent->enable_location_gathering_finish) {
+        iface_modem_location_parent->enable_location_gathering (
+            self,
+            source,
+            (GAsyncReadyCallback)parent_enable_location_gathering_ready,
+            task);
+        return;
+    }
+
+    custom_enable_location_gathering (task);
 }
 
 /*****************************************************************************/
