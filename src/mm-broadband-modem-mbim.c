@@ -86,7 +86,7 @@ typedef enum {
     PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE       = 1 << 5,
     PROCESS_NOTIFICATION_FLAG_PCO                  = 1 << 6,
     PROCESS_NOTIFICATION_FLAG_USSD                 = 1 << 7,
-    PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS    = 1 << 8,
+    PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO      = 1 << 8,
     PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS = 1 << 9,
 } ProcessNotificationFlag;
 
@@ -112,7 +112,7 @@ struct _MMBroadbandModemMbimPrivate {
     /* Supported features */
     gboolean is_profile_management_supported;
     gboolean is_pco_supported;
-    gboolean is_lte_attach_status_supported;
+    gboolean is_lte_attach_info_supported;
     gboolean is_ussd_supported;
     gboolean is_atds_location_supported;
     gboolean is_atds_signal_supported;
@@ -2359,9 +2359,9 @@ query_device_services_ready (MbimDevice   *device,
                     if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO) {
                         mm_obj_dbg (self, "PCO is supported");
                         self->priv->is_pco_supported = TRUE;
-                    } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_STATUS) {
-                        mm_obj_dbg (self, "LTE attach status is supported");
-                        self->priv->is_lte_attach_status_supported = TRUE;
+                    } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_INFO) {
+                        mm_obj_dbg (self, "LTE attach info is supported");
+                        self->priv->is_lte_attach_info_supported = TRUE;
                     }
                 }
                 continue;
@@ -2869,33 +2869,39 @@ modem_3gpp_load_initial_eps_bearer_finish (MMIfaceModem3gpp  *self,
 }
 
 static MMBearerProperties *
-common_process_lte_attach_status (MMBroadbandModemMbim  *self,
-                                  MbimLteAttachStatus   *status,
-                                  GError               **error)
+common_process_lte_attach_info (MMBroadbandModemMbim  *self,
+                                guint32                lte_attach_state,
+                                guint32                ip_type,
+                                const gchar           *access_string,
+                                const gchar           *user_name,
+                                const gchar           *password,
+                                guint32                compression,
+                                guint32                auth_protocol,
+                                GError               **error)
 {
     MMBearerProperties  *properties;
     MMBearerIpFamily     ip_family;
     MMBearerAllowedAuth  auth;
 
     /* Remove LTE attach bearer info */
-    if (status->lte_attach_state == MBIM_LTE_ATTACH_STATE_DETACHED) {
+    if (lte_attach_state == MBIM_LTE_ATTACH_STATE_DETACHED) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Not attached to LTE");
         return NULL;
     }
 
     properties = mm_bearer_properties_new ();
-    if (status->access_string)
-        mm_bearer_properties_set_apn (properties, status->access_string);
-    if (status->user_name)
-        mm_bearer_properties_set_user (properties, status->user_name);
-    if (status->password)
-        mm_bearer_properties_set_password (properties, status->password);
+    if (access_string)
+        mm_bearer_properties_set_apn (properties, access_string);
+    if (user_name)
+        mm_bearer_properties_set_user (properties, user_name);
+    if (password)
+        mm_bearer_properties_set_password (properties, password);
 
-    ip_family = mm_bearer_ip_family_from_mbim_context_ip_type (status->ip_type);
+    ip_family = mm_bearer_ip_family_from_mbim_context_ip_type (ip_type);
     if (ip_family != MM_BEARER_IP_FAMILY_NONE)
         mm_bearer_properties_set_ip_type (properties, ip_family);
 
-    auth = mm_bearer_allowed_auth_from_mbim_auth_protocol (status->auth_protocol);
+    auth = mm_bearer_allowed_auth_from_mbim_auth_protocol (auth_protocol);
     if (auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN)
         mm_bearer_properties_set_allowed_auth (properties, auth);
 
@@ -2905,43 +2911,57 @@ common_process_lte_attach_status (MMBroadbandModemMbim  *self,
 }
 
 static void
-lte_attach_status_query_ready (MbimDevice   *device,
-                               GAsyncResult *res,
-                               GTask        *task)
+lte_attach_info_query_ready (MbimDevice   *device,
+                             GAsyncResult *res,
+                             GTask        *task)
 {
-    MMBroadbandModemMbim *self;
-    MbimMessage          *response;
-    GError               *error = NULL;
-    MbimLteAttachStatus  *status = NULL;
-    MMBearerProperties   *properties;
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
+    MMBearerProperties     *properties;
+    guint32                 lte_attach_state;
+    guint32                 ip_type;
+    g_autofree gchar       *access_string = NULL;
+    g_autofree gchar       *user_name = NULL;
+    g_autofree gchar       *password = NULL;
+    guint32                 compression;
+    guint32                 auth_protocol;
 
     self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response ||
         !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
-        !mbim_message_ms_basic_connect_extensions_lte_attach_status_response_parse (
+        !mbim_message_ms_basic_connect_extensions_lte_attach_info_response_parse (
             response,
-            &status,
+            &lte_attach_state,
+            &ip_type,
+            &access_string,
+            &user_name,
+            &password,
+            &compression,
+            &auth_protocol,
             &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
-        goto out;
+        return;
     }
 
-    properties = common_process_lte_attach_status (self, status, &error);
-    mbim_lte_attach_status_free (status);
-
+    properties = common_process_lte_attach_info (self,
+                                                 lte_attach_state,
+                                                 ip_type,
+                                                 access_string,
+                                                 user_name,
+                                                 password,
+                                                 compression,
+                                                 auth_protocol,
+                                                 &error);
     g_assert (properties || error);
     if (properties)
         g_task_return_pointer (task, properties, g_object_unref);
     else
         g_task_return_error (task, error);
     g_object_unref (task);
-
- out:
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
@@ -2959,19 +2979,19 @@ modem_3gpp_load_initial_eps_bearer (MMIfaceModem3gpp    *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (!self->priv->is_lte_attach_status_supported) {
+    if (!self->priv->is_lte_attach_info_supported) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "LTE attach status is unsupported");
         g_object_unref (task);
         return;
     }
 
-    message = mbim_message_ms_basic_connect_extensions_lte_attach_status_query_new (NULL);
+    message = mbim_message_ms_basic_connect_extensions_lte_attach_info_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
                          NULL,
-                         (GAsyncReadyCallback)lte_attach_status_query_ready,
+                         (GAsyncReadyCallback)lte_attach_info_query_ready,
                          task);
     mbim_message_unref (message);
 }
@@ -3087,9 +3107,9 @@ modem_3gpp_load_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (!self->priv->is_lte_attach_status_supported) {
+    if (!self->priv->is_lte_attach_info_supported) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                 "LTE attach configuration is unsupported");
+                                 "LTE attach status info is unsupported");
         g_object_unref (task);
         return;
     }
@@ -3260,7 +3280,7 @@ modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    if (!self->priv->is_lte_attach_status_supported) {
+    if (!self->priv->is_lte_attach_info_supported) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "LTE attach configuration is unsupported");
         g_object_unref (task);
@@ -3746,27 +3766,43 @@ ms_basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
 }
 
 static void
-ms_basic_connect_extensions_notification_lte_attach_status (MMBroadbandModemMbim *self,
-                                                            MbimMessage *notification)
+ms_basic_connect_extensions_notification_lte_attach_info (MMBroadbandModemMbim *self,
+                                                          MbimMessage *notification)
 {
-    GError              *error = NULL;
-    MbimLteAttachStatus *status;
-    MMBearerProperties  *properties;
+    g_autoptr(GError)              error = NULL;
+    g_autoptr(MMBearerProperties)  properties = NULL;
+    guint32                        lte_attach_state;
+    guint32                        ip_type;
+    g_autofree gchar              *access_string = NULL;
+    g_autofree gchar              *user_name = NULL;
+    g_autofree gchar              *password = NULL;
+    guint32                        compression;
+    guint32                        auth_protocol;
 
-    if (!mbim_message_ms_basic_connect_extensions_lte_attach_status_notification_parse (
+    if (!mbim_message_ms_basic_connect_extensions_lte_attach_info_notification_parse (
             notification,
-            &status,
+            &lte_attach_state,
+            &ip_type,
+            &access_string,
+            &user_name,
+            &password,
+            &compression,
+            &auth_protocol,
             &error)) {
         mm_obj_warn (self, "couldn't parse LTE attach status notification: %s", error->message);
-        g_error_free (error);
         return;
     }
 
-    properties = common_process_lte_attach_status (self, status, NULL);
+    properties = common_process_lte_attach_info (self,
+                                                 lte_attach_state,
+                                                 ip_type,
+                                                 access_string,
+                                                 user_name,
+                                                 password,
+                                                 compression,
+                                                 auth_protocol,
+                                                 NULL);
     mm_iface_modem_3gpp_update_initial_eps_bearer (MM_IFACE_MODEM_3GPP (self), properties);
-    g_clear_object (&properties);
-
-    mbim_lte_attach_status_free (status);
 }
 
 static void
@@ -3778,9 +3814,9 @@ ms_basic_connect_extensions_notification (MMBroadbandModemMbim *self,
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PCO)
             ms_basic_connect_extensions_notification_pco (self, notification);
         break;
-    case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_STATUS:
-        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS)
-            ms_basic_connect_extensions_notification_lte_attach_status (self, notification);
+    case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_INFO:
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO)
+            ms_basic_connect_extensions_notification_lte_attach_info (self, notification);
         break;
     default:
         /* Ignore */
@@ -3862,7 +3898,7 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
 
     mm_obj_dbg (self, "supported notifications: signal (%s), registration (%s), sms (%s), "
                 "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
-                "lte attach status (%s), provisioned contexts (%s)",
+                "lte attach info (%s), provisioned contexts (%s)",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -3871,7 +3907,7 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PCO ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
-                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS ? "yes" : "no",
+                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no");
 
     if (setup) {
@@ -3943,8 +3979,8 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
-    if (self->priv->is_lte_attach_status_supported)
-        self->priv->setup_flags &= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS;
+    if (self->priv->is_lte_attach_info_supported)
+        self->priv->setup_flags &= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
     common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
 }
 
@@ -3961,8 +3997,8 @@ setup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
-    if (self->priv->is_lte_attach_status_supported)
-        self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS;
+    if (self->priv->is_lte_attach_info_supported)
+        self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
     common_setup_cleanup_unsolicited_events (self, TRUE, callback, user_data);
 }
 
@@ -4039,7 +4075,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
 
     mm_obj_dbg (self, "enabled notifications: signal (%s), registration (%s), sms (%s), "
                 "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
-                "lte attach status (%s), provisioned contexts (%s)",
+                "lte attach info (%s), provisioned contexts (%s)",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -4048,7 +4084,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
-                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS ? "yes" : "no",
+                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no");
 
     entries = g_new0 (MbimEventEntry *, 5);
@@ -4081,15 +4117,15 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
 
     /* Basic connect extensions service */
     if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO ||
-        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS) {
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO) {
         entries[n_entries] = g_new (MbimEventEntry, 1);
         memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_MS_BASIC_CONNECT_EXTENSIONS, sizeof (MbimUuid));
         entries[n_entries]->cids_count = 0;
         entries[n_entries]->cids = g_new0 (guint32, 2);
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO;
-        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS)
-            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_STATUS;
+        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO)
+            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_INFO;
         n_entries++;
     }
 
@@ -4323,8 +4359,8 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
-    if (self->priv->is_lte_attach_status_supported)
-        self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS;
+    if (self->priv->is_lte_attach_info_supported)
+        self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
     common_enable_disable_unsolicited_events (self, callback, user_data);
 }
 
@@ -4341,8 +4377,8 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
-    if (self->priv->is_lte_attach_status_supported)
-        self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_STATUS;
+    if (self->priv->is_lte_attach_info_supported)
+        self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
     common_enable_disable_unsolicited_events (self, callback, user_data);
 }
 
