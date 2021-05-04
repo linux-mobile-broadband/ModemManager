@@ -404,7 +404,6 @@ ip_configuration_query_ready (MbimDevice   *device,
 
                     str = g_inet_address_to_string (addr);
                     mm_obj_dbg (self, "    DNS [%u]: '%s'", i, str);
-                    g_free (str);
                 }
                 g_object_unref (addr);
             }
