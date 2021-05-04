@@ -3308,8 +3308,10 @@ uim_get_slot_status_ready (QmiClientUim *client,
             continue;
         }
 
-        raw_iccid = mm_bcd_to_string ((const guint8 *)slot_status->iccid->data, slot_status->iccid->len,
-                                      TRUE /* low_nybble_first */);
+        /* This is supposed to be BCD, but some carriers have non-spec-compliant ICCIDs that use
+         * A-F characters as part of the operator-specific part of the ICCID. Parse it as hex and
+         * let mm_3gpp_parse_iccid take care of handling the A-F characters properly. */
+        raw_iccid = mm_utils_bin2hexstr ((const guint8 *)slot_status->iccid->data, slot_status->iccid->len);
         if (!raw_iccid) {
             mm_obj_warn (self, "not creating SIM object: failed to convert ICCID from BCD");
             g_ptr_array_add (ctx->sim_slots, NULL);
