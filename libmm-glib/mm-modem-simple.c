@@ -99,7 +99,7 @@ mm_modem_simple_dup_path (MMModemSimple *self)
  * Finishes an operation started with mm_modem_simple_connect().
  *
  * Returns: (transfer full): A #MMBearer, or %FALSE if @error is set. The
- * returned value must be freed with g_object_ref().
+ * returned value must be freed with g_object_unref().
  *
  * Since: 1.0
  */
@@ -224,7 +224,7 @@ mm_modem_simple_connect (MMModemSimple *self,
  * mm_modem_simple_connect() for the asynchronous version of this method.
  *
  * Returns: (transfer full): A #MMBearer, or %FALSE if @error is set. The
- * returned value must be freed with g_object_ref().
+ * returned value must be freed with g_object_unref().
  *
  * Since: 1.0
  */
@@ -372,7 +372,7 @@ mm_modem_simple_disconnect_sync (MMModemSimple *self,
  * Finishes an operation started with mm_modem_simple_get_status().
  *
  * Returns: (transfer full): A #MMSimpleStatus, or %FALSE if @error is set. The
- * returned value must be freed with g_object_ref().
+ * returned value must be freed with g_object_unref().
  *
  * Since: 1.0
  */
@@ -440,7 +440,7 @@ mm_modem_simple_get_status (MMModemSimple *self,
  * mm_modem_simple_get_status() for the asynchronous version of this method.
  *
  * Returns: (transfer full): A #MMSimpleStatus, or %FALSE if @error is set. The
- * returned value must be freed with g_object_ref().
+ * returned value must be freed with g_object_unref().
  *
  * Since: 1.0
  */
