@@ -676,12 +676,43 @@ modem_load_manufacturer (MMIfaceModem *self,
 /* Model loading (Modem interface) */
 
 static gchar *
+modem_load_model_default (MMIfaceModem *self)
+{
+    return g_strdup_printf ("MBIM [%04X:%04X]",
+                            (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
+                            (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
+}
+
+static gchar *
 modem_load_model_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
     return g_task_propagate_pointer (G_TASK (res), error);
 }
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+qmi_load_model_ready (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GTask *task)
+{
+    gchar  *model = NULL;
+    GError *error = NULL;
+
+    model = mm_shared_qmi_load_model_finish (self, res, &error);
+    if (!model) {
+        mm_obj_dbg (self, "couldn't load model using QMI over MBIM: %s", error->message);
+        model = modem_load_model_default (self);
+        g_clear_error (&error);
+    }
+
+     g_task_return_pointer (task, model, g_free);
+     g_object_unref (task);
+}
+
+#endif
 
 static void
 modem_load_model (MMIfaceModem *self,
@@ -692,18 +723,24 @@ modem_load_model (MMIfaceModem *self,
     GTask *task;
     MMPortMbim *port;
 
+    task = g_task_new (self, NULL, callback, user_data);
+
     port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
     if (port) {
         model = g_strdup (mm_kernel_device_get_physdev_product (
             mm_port_peek_kernel_device (MM_PORT (port))));
     }
 
-    if (!model)
-        model = g_strdup_printf ("MBIM [%04X:%04X]",
-                                 (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) & 0xFFFF),
-                                 (mm_base_modem_get_product_id (MM_BASE_MODEM (self)) & 0xFFFF));
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    if (!model) {
+        mm_shared_qmi_load_model (self, (GAsyncReadyCallback)qmi_load_model_ready, task);
+        return;
+    }
+#endif
 
-    task = g_task_new (self, NULL, callback, user_data);
+    if (!model)
+        model = modem_load_model_default (self);
+
     g_task_return_pointer (task, model, g_free);
     g_object_unref (task);
 }

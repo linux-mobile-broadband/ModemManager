@@ -1154,6 +1154,66 @@ mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Load model (Modem interface) */
+
+gchar *
+mm_shared_qmi_load_model_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+dms_get_model_ready (QmiClientDms *client,
+                     GAsyncResult *res,
+                     GTask *task)
+{
+    QmiMessageDmsGetModelOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_get_model_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_dms_get_model_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get Model: ");
+        g_task_return_error (task, error);
+    } else {
+        const gchar *str;
+
+        qmi_message_dms_get_model_output_get_model (output, &str, NULL);
+        g_task_return_pointer (task, g_strdup (str), g_free);
+    }
+
+    if (output)
+        qmi_message_dms_get_model_output_unref (output);
+
+    g_object_unref (task);
+}
+
+void
+mm_shared_qmi_load_model (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    QmiClient *client = NULL;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_DMS, &client,
+                                      callback, user_data))
+        return;
+
+    mm_obj_dbg (self, "loading model...");
+    qmi_client_dms_get_model (QMI_CLIENT_DMS (client),
+                              NULL,
+                              5,
+                              NULL,
+                              (GAsyncReadyCallback)dms_get_model_ready,
+                              g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
 /* Allowed modes setting (Modem interface) */
 
 typedef struct {
