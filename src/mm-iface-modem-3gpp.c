@@ -2506,10 +2506,12 @@ static void interface_initialization_step (GTask *task);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
-    INITIALIZATION_STEP_IMEI,
     INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS,
+    INITIALIZATION_STEP_TEST_LOCKED,
+    INITIALIZATION_STEP_IMEI,
     INITIALIZATION_STEP_EPS_UE_MODE_OPERATION,
     INITIALIZATION_STEP_EPS_INITIAL_BEARER_SETTINGS,
+    INITIALIZATION_STEP_CONNECT_SIGNALS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -2664,6 +2666,7 @@ interface_initialization_step (GTask *task)
 {
     MMIfaceModem3gpp *self;
     InitializationContext *ctx;
+    MMModemState modem_state;
 
     /* Don't run new steps if we're cancelled */
     if (g_task_return_error_if_cancelled (task)) {
@@ -2679,6 +2682,32 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall through */
 
+    case INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks (
+                self,
+                (GAsyncReadyCallback)load_enabled_facility_locks_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case INITIALIZATION_STEP_TEST_LOCKED:
+        modem_state = MM_MODEM_STATE_UNKNOWN;
+        g_object_get (self,
+                      MM_IFACE_MODEM_STATE, &modem_state,
+                      NULL);
+        if (modem_state == MM_MODEM_STATE_LOCKED) {
+            /* Skip some steps and export the interface if modem is locked */
+            ctx->step = INITIALIZATION_STEP_LAST;
+            interface_initialization_step (task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
     case INITIALIZATION_STEP_IMEI:
         /* IMEI value is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have it loaded,
@@ -2689,18 +2718,6 @@ interface_initialization_step (GTask *task)
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_imei (
                 self,
                 (GAsyncReadyCallback)load_imei_ready,
-                task);
-            return;
-        }
-        ctx->step++;
-        /* fall through */
-
-    case INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks &&
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks_finish) {
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks (
-                self,
-                (GAsyncReadyCallback)load_enabled_facility_locks_ready,
                 task);
             return;
         }
@@ -2731,7 +2748,7 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case INITIALIZATION_STEP_LAST:
+    case INITIALIZATION_STEP_CONNECT_SIGNALS:
         /* We are done without errors! */
 
         /* Handle method invocations */
@@ -2751,6 +2768,12 @@ interface_initialization_step (GTask *task)
                           "handle-set-initial-eps-bearer-settings",
                           G_CALLBACK (handle_set_initial_eps_bearer_settings),
                           self);
+
+        ctx->step++;
+        /* fall through */
+
+    case INITIALIZATION_STEP_LAST:
+        /* Always connect the signal to unlock modem */
         g_signal_connect (ctx->skeleton,
                           "handle-disable-facility-lock",
                           G_CALLBACK (handle_disable_facility_lock),
