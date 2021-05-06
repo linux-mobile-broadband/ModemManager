@@ -417,7 +417,7 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     }
 
     /* Validate input MCC/MNC */
-    if (ctx->operator_id && !mm_3gpp_parse_operator_id (ctx->operator_id, NULL, NULL, &error)) {
+    if (ctx->operator_id && !mm_3gpp_parse_operator_id (ctx->operator_id, NULL, NULL, NULL, &error)) {
         g_assert (error != NULL);
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1432,7 +1432,7 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "couldn't load operator code: %s", error->message);
-    } else if (!mm_3gpp_parse_operator_id (str, &mcc, &mnc, &error)) {
+    } else if (!mm_3gpp_parse_operator_id (str, &mcc, &mnc, NULL, &error)) {
         mm_obj_dbg (self, "unexpected operator code string '%s': %s", str, error->message);
         g_clear_pointer (&str, g_free);
     }

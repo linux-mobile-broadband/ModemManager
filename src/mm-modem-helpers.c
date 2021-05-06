@@ -4322,6 +4322,7 @@ gboolean
 mm_3gpp_parse_operator_id (const gchar *operator_id,
                            guint16 *mcc,
                            guint16 *mnc,
+                           gboolean *three_digit_mnc,
                            GError **error)
 {
     guint len;
@@ -4372,6 +4373,9 @@ mm_3gpp_parse_operator_id (const gchar *operator_id,
             memcpy (&aux[0], &operator_id[3], 3);
         *mnc = atoi (aux);
     }
+
+    if (three_digit_mnc)
+        *three_digit_mnc = len == 6;
 
     return TRUE;
 }

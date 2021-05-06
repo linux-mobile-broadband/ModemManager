@@ -2738,7 +2738,7 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp    *_self,
     }
 
     /* Parse input MCC/MNC */
-    if (!mm_3gpp_parse_operator_id (self->priv->current_operator_id, &mcc, &mnc, &error)) {
+    if (!mm_3gpp_parse_operator_id (self->priv->current_operator_id, &mcc, &mnc, NULL, &error)) {
         g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;

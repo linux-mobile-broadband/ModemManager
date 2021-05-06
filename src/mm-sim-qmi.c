@@ -1011,7 +1011,7 @@ set_preferred_networks (MMBaseSim *self,
 
         operator_code = mm_sim_preferred_network_get_operator_code (preferred_network_list->data);
         act = mm_sim_preferred_network_get_access_technology (preferred_network_list->data);
-        if (mm_3gpp_parse_operator_id (operator_code, &preferred_nets_element.mcc, &preferred_nets_element.mnc, NULL)) {
+        if (mm_3gpp_parse_operator_id (operator_code, &preferred_nets_element.mcc, &preferred_nets_element.mnc, NULL, NULL)) {
             pcs_digit_element.mcc = preferred_nets_element.mcc;
             pcs_digit_element.mnc = preferred_nets_element.mnc;
             pcs_digit_element.includes_pcs_digit = strlen(operator_code) > 5;

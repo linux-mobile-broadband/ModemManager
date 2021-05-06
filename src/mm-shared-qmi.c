@@ -474,7 +474,7 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
 
     /* Parse input MCC/MNC */
-    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error)) {
+    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, NULL, &error)) {
         g_assert (error != NULL);
         g_task_return_error (task, error);
         g_object_unref (task);

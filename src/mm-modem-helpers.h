@@ -431,6 +431,7 @@ void mm_3gpp_normalize_operator (gchar          **operator,
 gboolean mm_3gpp_parse_operator_id (const gchar *operator_id,
                                     guint16 *mcc,
                                     guint16 *mnc,
+                                    gboolean *three_digit_mnc,
                                     GError **error);
 
 const gchar      *mm_3gpp_get_pdp_type_from_ip_family (MMBearerIpFamily  family);

@@ -3254,21 +3254,23 @@ static void
 common_parse_operator_id (const gchar *operator_id,
                           gboolean expected_success,
                           guint16 expected_mcc,
-                          guint16 expected_mnc)
+                          guint16 expected_mnc,
+                          gboolean expected_three_digit_mnc)
 {
     guint16 mcc;
     guint16 mnc;
+    gboolean three_digit_mnc;
     gboolean result;
     GError *error = NULL;
 
     if (expected_mcc) {
         g_debug ("Parsing Operator ID '%s' "
-                 "(%" G_GUINT16_FORMAT ", %" G_GUINT16_FORMAT  ")...",
-                 operator_id, expected_mcc, expected_mnc);
-        result = mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &error);
+                 "(%" G_GUINT16_FORMAT ", %" G_GUINT16_FORMAT  ", %s)...",
+                 operator_id, expected_mcc, expected_mnc, expected_three_digit_mnc ? "TRUE" : "FALSE");
+        result = mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &three_digit_mnc, &error);
     } else {
         g_debug ("Validating Operator ID '%s'...", operator_id);
-        result = mm_3gpp_parse_operator_id (operator_id, NULL, NULL, &error);
+        result = mm_3gpp_parse_operator_id (operator_id, NULL, NULL, NULL, &error);
     }
 
     if (error)
@@ -3283,6 +3285,7 @@ common_parse_operator_id (const gchar *operator_id,
         if (expected_mcc) {
             g_assert_cmpuint (expected_mcc, ==, mcc);
             g_assert_cmpuint (expected_mnc, ==, mnc);
+            g_assert_cmpint (expected_three_digit_mnc, ==, three_digit_mnc);
         }
     } else {
         g_assert (error != NULL);
@@ -3295,26 +3298,26 @@ static void
 test_parse_operator_id (void *f, gpointer d)
 {
     /* Valid MCC+MNC(2) */
-    common_parse_operator_id ("41201",  TRUE, 412, 1);
-    common_parse_operator_id ("41201",  TRUE, 0, 0);
+    common_parse_operator_id ("41201",  TRUE, 412, 1, FALSE);
+    common_parse_operator_id ("41201",  TRUE, 0, 0, FALSE);
     /* Valid MCC+MNC(3) */
-    common_parse_operator_id ("342600", TRUE, 342, 600);
-    common_parse_operator_id ("342600", TRUE, 0, 0);
+    common_parse_operator_id ("342600", TRUE, 342, 600, TRUE);
+    common_parse_operator_id ("342600", TRUE, 0, 0, FALSE);
     /* Valid MCC+MNC(2, == 0) */
-    common_parse_operator_id ("72400", TRUE, 724, 0);
-    common_parse_operator_id ("72400", TRUE, 0, 0);
+    common_parse_operator_id ("72400", TRUE, 724, 0, FALSE);
+    common_parse_operator_id ("72400", TRUE, 0, 0, FALSE);
     /* Valid MCC+MNC(3, == 0) */
-    common_parse_operator_id ("724000", TRUE, 724, 0);
-    common_parse_operator_id ("724000", TRUE, 0, 0);
+    common_parse_operator_id ("724000", TRUE, 724, 0, TRUE);
+    common_parse_operator_id ("724000", TRUE, 0, 0, FALSE);
 
     /* Invalid MCC=0 */
-    common_parse_operator_id ("000600", FALSE, 0, 0);
+    common_parse_operator_id ("000600", FALSE, 0, 0, FALSE);
     /* Invalid, non-digits */
-    common_parse_operator_id ("000Z00", FALSE, 0, 0);
+    common_parse_operator_id ("000Z00", FALSE, 0, 0, FALSE);
     /* Invalid, short */
-    common_parse_operator_id ("123", FALSE, 0, 0);
+    common_parse_operator_id ("123", FALSE, 0, 0, FALSE);
     /* Invalid, long */
-    common_parse_operator_id ("1234567", FALSE, 0, 0);
+    common_parse_operator_id ("1234567", FALSE, 0, 0, FALSE);
 }
 
 /*****************************************************************************/
