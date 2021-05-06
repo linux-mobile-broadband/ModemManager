@@ -345,10 +345,12 @@ notify_3gpp_location_update (MMIfaceModemLocation *self,
                              MmGdbusModemLocation *skeleton,
                              MMLocation3gpp *location_3gpp)
 {
+    const gchar *operator_code;
+
+    operator_code = mm_location_3gpp_get_operator_code (location_3gpp);
     mm_obj_dbg (self, "3GPP location updated "
-                "(MCC: '%u', MNC: '%u', location area code: '%lX', tracking area code: '%lX', cell ID: '%lX')",
-                mm_location_3gpp_get_mobile_country_code (location_3gpp),
-                mm_location_3gpp_get_mobile_network_code (location_3gpp),
+                "(MCCMNC: '%s', location area code: '%lX', tracking area code: '%lX', cell ID: '%lX')",
+                operator_code ? operator_code : "<none>",
                 mm_location_3gpp_get_location_area_code (location_3gpp),
                 mm_location_3gpp_get_tracking_area_code (location_3gpp),
                 mm_location_3gpp_get_cell_id (location_3gpp));
@@ -365,9 +367,8 @@ notify_3gpp_location_update (MMIfaceModemLocation *self,
 }
 
 void
-mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
-                                             guint mobile_country_code,
-                                             guint mobile_network_code)
+mm_iface_modem_location_3gpp_update_operator_code (MMIfaceModemLocation *self,
+                                                   const gchar *operator_code)
 {
     MmGdbusModemLocation *skeleton;
     LocationContext *ctx;
@@ -383,10 +384,8 @@ mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
         guint changed = 0;
 
         g_assert (ctx->location_3gpp != NULL);
-        changed += mm_location_3gpp_set_mobile_country_code (ctx->location_3gpp,
-                                                             mobile_country_code);
-        changed += mm_location_3gpp_set_mobile_network_code (ctx->location_3gpp,
-                                                             mobile_network_code);
+        changed += mm_location_3gpp_set_operator_code (ctx->location_3gpp,
+                                                       operator_code);
         if (changed)
             notify_3gpp_location_update (self, skeleton, ctx->location_3gpp);
     }

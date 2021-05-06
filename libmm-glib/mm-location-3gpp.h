@@ -56,11 +56,16 @@ struct _MMLocation3gppClass {
 GType mm_location_3gpp_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMLocation3gpp, g_object_unref)
 
-guint  mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self);
-guint  mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);
-gulong mm_location_3gpp_get_location_area_code  (MMLocation3gpp *self);
-gulong mm_location_3gpp_get_cell_id             (MMLocation3gpp *self);
-gulong mm_location_3gpp_get_tracking_area_code  (MMLocation3gpp *self);
+guint        mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self);
+gulong       mm_location_3gpp_get_location_area_code  (MMLocation3gpp *self);
+gulong       mm_location_3gpp_get_cell_id             (MMLocation3gpp *self);
+gulong       mm_location_3gpp_get_tracking_area_code  (MMLocation3gpp *self);
+const gchar *mm_location_3gpp_get_operator_code       (MMLocation3gpp *self);
+
+#ifndef MM_DISABLE_DEPRECATED
+G_DEPRECATED
+guint mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);
+#endif
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -75,17 +80,15 @@ MMLocation3gpp *mm_location_3gpp_new (void);
 MMLocation3gpp *mm_location_3gpp_new_from_string_variant (GVariant *string,
                                                           GError **error);
 
-gboolean mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
-                                                   guint mobile_country_code);
-gboolean mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
-                                                   guint mobile_network_code);
-gboolean mm_location_3gpp_set_location_area_code  (MMLocation3gpp *self,
-                                                   gulong location_area_code);
-gboolean mm_location_3gpp_set_cell_id             (MMLocation3gpp *self,
-                                                   gulong cell_id);
-gboolean mm_location_3gpp_set_tracking_area_code  (MMLocation3gpp *self,
-                                                   gulong tracking_area_code);
-gboolean mm_location_3gpp_reset                   (MMLocation3gpp *self);
+gboolean mm_location_3gpp_set_operator_code      (MMLocation3gpp *self,
+                                                  const gchar *operator_code);
+gboolean mm_location_3gpp_set_location_area_code (MMLocation3gpp *self,
+                                                  gulong location_area_code);
+gboolean mm_location_3gpp_set_cell_id            (MMLocation3gpp *self,
+                                                  gulong cell_id);
+gboolean mm_location_3gpp_set_tracking_area_code (MMLocation3gpp *self,
+                                                  gulong tracking_area_code);
+gboolean mm_location_3gpp_reset                  (MMLocation3gpp *self);
 
 #endif
 

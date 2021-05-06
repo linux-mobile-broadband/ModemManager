@@ -37,17 +37,82 @@
 G_DEFINE_TYPE (MMLocation3gpp, mm_location_3gpp, G_TYPE_OBJECT);
 
 struct _MMLocation3gppPrivate {
-    guint mobile_country_code;
-    guint mobile_network_code;
+    gchar *operator_code;
     gulong location_area_code;
     gulong cell_id;
     gulong tracking_area_code;
-
-    /* We use 0 as default MNC when unknown, and that is a bit problematic if
-     * the network operator has actually a 0 MNC (e.g. China Mobile, 46000).
-     * We need to explicitly track whether MNC is set or not. */
-    gboolean mobile_network_code_set;
 };
+
+/*****************************************************************************/
+
+static gboolean
+validate_string_length (const gchar *display,
+                        const gchar *str,
+                        guint min_length,
+                        guint max_length,
+                        GError **error)
+{
+    /* Avoid empty strings */
+    if (!str || !str[0]) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid %s: none given",
+                     display);
+        return FALSE;
+    }
+
+    /* Check min length of the field */
+    if (strlen (str) < min_length) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid %s: shorter than the maximum expected (%u): '%s'",
+                     display,
+                     min_length,
+                     str);
+        return FALSE;
+    }
+
+    /* Check max length of the field */
+    if (strlen (str) > max_length) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid %s: longer than the maximum expected (%u): '%s'",
+                     display,
+                     max_length,
+                     str);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+validate_numeric_string_content (const gchar *display,
+                                 const gchar *str,
+                                 gboolean hex,
+                                 GError **error)
+{
+    guint i;
+
+    for (i = 0; str[i]; i++) {
+        if ((hex && !g_ascii_isxdigit (str[i])) ||
+            (!hex && !g_ascii_isdigit (str[i]))) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_INVALID_ARGS,
+                         "Invalid %s: unexpected char (%c): '%s'",
+                         display,
+                         str[i],
+                         str);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
 
 /*****************************************************************************/
 
@@ -64,29 +129,20 @@ struct _MMLocation3gppPrivate {
 guint
 mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self)
 {
+    gchar mcc[4];
+
     g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
 
-    return self->priv->mobile_country_code;
-}
-
-/**
- * mm_location_3gpp_set_mobile_country_code: (skip)
- */
-gboolean
-mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
-                                          guint mobile_country_code)
-{
-    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
-
-    /* If no change in the location info, don't do anything */
-    if (self->priv->mobile_country_code == mobile_country_code)
-        return FALSE;
-
-    self->priv->mobile_country_code = mobile_country_code;
-    return TRUE;
+    if (!self->priv->operator_code)
+        return 0;
+    memcpy (mcc, self->priv->operator_code, 3);
+    mcc[4] = '\0';
+    return strtol (mcc, NULL, 10);
 }
 
 /*****************************************************************************/
+
+#ifndef MM_DISABLE_DEPRECATED
 
 /**
  * mm_location_3gpp_get_mobile_network_code:
@@ -101,32 +157,21 @@ mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
  * Returns: the MNC, or 0 if unknown.
  *
  * Since: 1.0
+ * Deprecated: 1.18.0. This function can not separate between two-digit MNCs
+ * and three-digit MNCs with a leading zero. Use mm_location_3gpp_get_operator_code()
+ * instead.
  */
 guint
 mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
 {
     g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
 
-    return self->priv->mobile_network_code;
+    if (!self->priv->operator_code)
+        return 0;
+    return strtol (self->priv->operator_code + 3, NULL, 10);
 }
 
-/**
- * mm_location_3gpp_set_mobile_network_code: (skip)
- */
-gboolean
-mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
-                                          guint mobile_network_code)
-{
-    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
-
-    /* If no change in the location info, don't do anything */
-    if (self->priv->mobile_network_code_set && (self->priv->mobile_network_code == mobile_network_code))
-        return FALSE;
-
-    self->priv->mobile_network_code_set = TRUE;
-    self->priv->mobile_network_code = mobile_network_code;
-    return TRUE;
-}
+#endif /* MM_DISABLE_DEPRECATED */
 
 /*****************************************************************************/
 
@@ -242,6 +287,55 @@ mm_location_3gpp_set_tracking_area_code (MMLocation3gpp *self,
 /*****************************************************************************/
 
 /**
+ * mm_location_3gpp_get_operator_code:
+ * @self: A #MMLocation3gpp.
+ *
+ * Gets the 3GPP network Mobile Country Code and Mobile Network Code.
+ *
+ * Returned in the format <literal>"MCCMNC"</literal>, where
+ * <literal>MCC</literal> is the three-digit ITU E.212 Mobile Country Code
+ * and <literal>MNC</literal> is the two- or three-digit GSM Mobile Network
+ * Code. e.g. e<literal>"31026"</literal> or <literal>"310260"</literal>.
+ *
+ * Returns: (transfer none): The operator code, or %NULL if none available.
+ *
+ * Since: 1.18
+ */
+const gchar *
+mm_location_3gpp_get_operator_code (MMLocation3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), NULL);
+
+    return self->priv->operator_code;
+}
+
+/**
+ * mm_location_3gpp_set_operator_code: (skip)
+ */
+gboolean
+mm_location_3gpp_set_operator_code (MMLocation3gpp *self,
+                                    const gchar *operator_code)
+{
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
+
+    /* If no change in operator code, don't do anything */
+    if (!g_strcmp0 (operator_code, self->priv->operator_code))
+        return FALSE;
+
+    /* Check the validity here, all other functions expect it's valid. */
+    if (operator_code &&
+        (!validate_string_length ("MCCMNC", operator_code, 5, 6, NULL) ||
+         !validate_numeric_string_content ("MCCMNC", operator_code, FALSE, NULL)))
+         return FALSE;
+
+    g_free (self->priv->operator_code);
+    self->priv->operator_code = g_strdup (operator_code);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_location_3gpp_reset: (skip)
  */
 gboolean
@@ -249,17 +343,14 @@ mm_location_3gpp_reset (MMLocation3gpp *self)
 {
     g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
 
-    if (self->priv->mobile_country_code == 0 &&
-        !self->priv->mobile_network_code_set &&
-        self->priv->mobile_network_code == 0 &&
+    if (self->priv->operator_code == NULL &&
         self->priv->location_area_code == 0 &&
         self->priv->tracking_area_code == 0 &&
         self->priv->cell_id == 0)
         return FALSE;
 
-    self->priv->mobile_country_code = 0;
-    self->priv->mobile_network_code_set = FALSE;
-    self->priv->mobile_network_code = 0;
+    g_free (self->priv->operator_code);
+    self->priv->operator_code = NULL;
     self->priv->location_area_code = 0;
     self->priv->tracking_area_code = 0;
     self->priv->cell_id = 0;
@@ -278,15 +369,14 @@ mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
 
     g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), NULL);
 
-    if (self->priv->mobile_country_code &&
-        self->priv->mobile_network_code_set &&  /* MNC 0 is actually valid! */
+    if (self->priv->operator_code &&
         (self->priv->location_area_code || self->priv->tracking_area_code) &&
         self->priv->cell_id) {
         gchar *str;
 
-        str = g_strdup_printf ("%u,%u,%lX,%lX,%lX",
-                               self->priv->mobile_country_code,
-                               self->priv->mobile_network_code,
+        str = g_strdup_printf ("%.3s,%s,%lX,%lX,%lX",
+                               self->priv->operator_code,
+                               self->priv->operator_code + 3,
                                self->priv->location_area_code,
                                self->priv->cell_id,
                                self->priv->tracking_area_code);
@@ -299,62 +389,6 @@ mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
 }
 
 /*****************************************************************************/
-
-static gboolean
-validate_string_length (const gchar *display,
-                        const gchar *str,
-                        guint max_length,
-                        GError **error)
-{
-    /* Avoid empty strings */
-    if (!str || !str[0]) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Invalid %s: none given",
-                     display);
-        return FALSE;
-    }
-
-    /* Check max length of the field */
-    if (strlen (str) > max_length) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Invalid %s: longer than the maximum expected (%u): '%s'",
-                     display,
-                     max_length,
-                     str);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-static gboolean
-validate_numeric_string_content (const gchar *display,
-                                 const gchar *str,
-                                 gboolean hex,
-                                 GError **error)
-{
-    guint i;
-
-    for (i = 0; str[i]; i++) {
-        if ((hex && !g_ascii_isxdigit (str[i])) ||
-            (!hex && !g_ascii_isdigit (str[i]))) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_INVALID_ARGS,
-                         "Invalid %s: unexpected char (%c): '%s'",
-                         display,
-                         str[i],
-                         str);
-            return FALSE;
-        }
-    }
-
-    return TRUE;
-}
 
 /**
  * mm_location_3gpp_new_from_string_variant: (skip)
@@ -386,20 +420,24 @@ mm_location_3gpp_new_from_string_variant (GVariant *string,
     }
 
     /* Validate fields */
-    if (validate_string_length ("MCC", split[0], 3, error) &&
+    if (validate_string_length ("MCC", split[0], 0, 3, error) &&
         validate_numeric_string_content ("MCC", split[0], FALSE, error) &&
-        validate_string_length ("MNC", split[1], 3, error) &&
+        validate_string_length ("MNC", split[1], 0, 3, error) &&
         validate_numeric_string_content ("MNC", split[1], FALSE, error) &&
-        validate_string_length ("Location area code", split[2], 4, error) &&
+        validate_string_length ("Location area code", split[2], 0, 4, error) &&
         validate_numeric_string_content ("Location area code", split[2], TRUE, error) &&
-        validate_string_length ("Cell ID", split[3], 8, error) &&
+        validate_string_length ("Cell ID", split[3], 0, 8, error) &&
         validate_numeric_string_content ("Cell ID", split[3], TRUE, error) &&
-        validate_string_length ("Tracking area code", split[4], 8, error) &&
+        validate_string_length ("Tracking area code", split[4], 0, 8, error) &&
         validate_numeric_string_content ("Tracking area code", split[4], TRUE, error)) {
+        gchar *operator_code;
         /* Create new location object */
         self = mm_location_3gpp_new ();
-        self->priv->mobile_country_code = strtol (split[0], NULL, 10);
-        self->priv->mobile_network_code = strtol (split[1], NULL, 10);
+        /* Join MCC and MNC and ensure they are zero-padded to required widths */
+        self->priv->operator_code = g_strdup_printf ("%03lu%0*lu",
+                                                     strtoul (split[0], NULL, 10),
+                                                     strlen (split[1]) == 3 ? 3 : 2,
+                                                     strtoul (split[1], NULL, 10));
         self->priv->location_area_code = strtol (split[2], NULL, 16);
         self->priv->cell_id = strtol (split[3], NULL, 16);
         self->priv->tracking_area_code = strtol (split[4], NULL, 16);
@@ -430,9 +468,21 @@ mm_location_3gpp_init (MMLocation3gpp *self)
 }
 
 static void
+finalize (GObject *object)
+{
+    MMLocation3gpp *self = MM_LOCATION_3GPP (object);
+
+    g_free (self->priv->operator_code);
+
+    G_OBJECT_CLASS (mm_location_3gpp_parent_class)->finalize (object);
+}
+
+static void
 mm_location_3gpp_class_init (MMLocation3gppClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMLocation3gppPrivate));
+
+    object_class->finalize = finalize;
 }

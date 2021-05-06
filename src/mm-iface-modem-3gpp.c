@@ -1424,15 +1424,13 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     ReloadCurrentRegistrationInfoContext *ctx;
     GError *error = NULL;
     gchar *str;
-    guint16 mcc = 0;
-    guint16 mnc = 0;
 
     ctx = g_task_get_task_data (task);
 
     str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish (self, res, &error);
     if (error) {
         mm_obj_warn (self, "couldn't load operator code: %s", error->message);
-    } else if (!mm_3gpp_parse_operator_id (str, &mcc, &mnc, NULL, &error)) {
+    } else if (!mm_3gpp_parse_operator_id (str, NULL, NULL, NULL, &error)) {
         mm_obj_dbg (self, "unexpected operator code string '%s': %s", str, error->message);
         g_clear_pointer (&str, g_free);
     }
@@ -1442,8 +1440,8 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
         mm_gdbus_modem3gpp_set_operator_code (ctx->skeleton, str);
 
     /* If we also implement the location interface, update the 3GPP location */
-    if (mcc && MM_IS_IFACE_MODEM_LOCATION (self))
-        mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), mcc, mnc);
+    if (str && MM_IS_IFACE_MODEM_LOCATION (self))
+        mm_iface_modem_location_3gpp_update_operator_code (MM_IFACE_MODEM_LOCATION (self), str);
 
     g_free (str);
 
@@ -1513,7 +1511,7 @@ mm_iface_modem_3gpp_reload_current_registration_info (MMIfaceModem3gpp *self,
     if (ctx->operator_code_loaded) {
         mm_gdbus_modem3gpp_set_operator_code (ctx->skeleton, NULL);
         if (MM_IS_IFACE_MODEM_LOCATION (self))
-            mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), 0, 0);
+            mm_iface_modem_location_3gpp_update_operator_code (MM_IFACE_MODEM_LOCATION (self), NULL);
     }
 
     ctx->operator_name_loaded = !(MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name &&
@@ -1538,7 +1536,7 @@ mm_iface_modem_3gpp_clear_current_operator (MMIfaceModem3gpp *self)
     mm_gdbus_modem3gpp_set_operator_code (skeleton, NULL);
     mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
     if (MM_IS_IFACE_MODEM_LOCATION (self))
-        mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), 0, 0);
+        mm_iface_modem_location_3gpp_update_operator_code (MM_IFACE_MODEM_LOCATION (self), NULL);
 }
 
 /*****************************************************************************/

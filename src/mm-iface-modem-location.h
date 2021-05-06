@@ -139,9 +139,8 @@ void mm_iface_modem_location_shutdown (MMIfaceModemLocation *self);
 
 /* Update 3GPP (LAC/CI) location */
 void mm_iface_modem_location_3gpp_clear          (MMIfaceModemLocation *self);
-void mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
-                                                  guint mobile_country_code,
-                                                  guint mobile_network_code);
+void mm_iface_modem_location_3gpp_update_operator_code (MMIfaceModemLocation *self,
+                                                        const gchar *operator_code);
 void mm_iface_modem_location_3gpp_update_lac_tac_ci  (MMIfaceModemLocation *self,
                                                       gulong location_area_code,
                                                       gulong tracking_area_code,
