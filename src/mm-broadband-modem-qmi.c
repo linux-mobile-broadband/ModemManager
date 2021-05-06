@@ -2718,6 +2718,7 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp    *_self,
     QmiClient           *client;
     guint16              mcc = 0;
     guint16              mnc = 0;
+    gboolean             mnc_pcs_digit = FALSE;
     g_autoptr(GError)    error = NULL;
     g_autoptr(QmiMessageNasGetPlmnNameInput) input = NULL;
 
@@ -2738,7 +2739,7 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp    *_self,
     }
 
     /* Parse input MCC/MNC */
-    if (!mm_3gpp_parse_operator_id (self->priv->current_operator_id, &mcc, &mnc, NULL, &error)) {
+    if (!mm_3gpp_parse_operator_id (self->priv->current_operator_id, &mcc, &mnc, &mnc_pcs_digit, &error)) {
         g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
@@ -2757,6 +2758,8 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp    *_self,
 
     input = qmi_message_nas_get_plmn_name_input_new ();
     qmi_message_nas_get_plmn_name_input_set_plmn (input, mcc, mnc, NULL);
+    if (mnc_pcs_digit && mnc < 100)
+        qmi_message_nas_get_plmn_name_input_set_mnc_pcs_digit_include_status (input, mnc_pcs_digit, NULL);
 
     qmi_client_nas_get_plmn_name (QMI_CLIENT_NAS (client),
                                   input,
