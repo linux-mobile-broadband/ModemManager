@@ -530,8 +530,11 @@ get_location_process_reply (MMLocation3gpp *location_3gpp,
     }
 
     if (location_3gpp) {
-        mcc = g_strdup_printf ("%u", mm_location_3gpp_get_mobile_country_code (location_3gpp));
-        mnc = g_strdup_printf ("%u", mm_location_3gpp_get_mobile_network_code (location_3gpp));
+        const gchar *operator_code;
+
+        operator_code = mm_location_3gpp_get_operator_code (location_3gpp);
+        mcc = g_strndup (operator_code ? operator_code : "0", 3);
+        mnc = g_strdup (operator_code ? operator_code + 3 : "0");
         lac = g_strdup_printf ("%04lX", mm_location_3gpp_get_location_area_code (location_3gpp));
         tac = g_strdup_printf ("%04lX", mm_location_3gpp_get_tracking_area_code (location_3gpp));
         cid = g_strdup_printf ("%08lX", mm_location_3gpp_get_cell_id (location_3gpp));
