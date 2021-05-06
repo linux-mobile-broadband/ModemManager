@@ -352,7 +352,8 @@ register_in_network_inr (GTask        *task,
                          QmiClient    *client,
                          GCancellable *cancellable,
                          guint16       mcc,
-                         guint16       mnc)
+                         guint16       mnc,
+                         gboolean      mnc_pcs_digit)
 {
     QmiMessageNasInitiateNetworkRegisterInput *input;
 
@@ -370,6 +371,12 @@ register_in_network_inr (GTask        *task,
             mnc,
             QMI_NAS_RADIO_INTERFACE_UNKNOWN, /* don't change radio interface */
             NULL);
+        if (mnc_pcs_digit && mnc < 100)
+            qmi_message_nas_initiate_network_register_input_set_mnc_pcs_digit_include_status (
+                input,
+                mnc_pcs_digit,
+                NULL
+            );
     } else {
         /* Otherwise, automatic registration */
         qmi_message_nas_initiate_network_register_input_set_action (
@@ -421,7 +428,8 @@ register_in_network_sssp (GTask        *task,
                           QmiClient    *client,
                           GCancellable *cancellable,
                           guint16       mcc,
-                          guint16       mnc)
+                          guint16       mnc,
+                          gboolean      mnc_pcs_digit)
 {
     QmiMessageNasSetSystemSelectionPreferenceInput *input;
 
@@ -433,6 +441,13 @@ register_in_network_sssp (GTask        *task,
         mcc,
         mnc,
         NULL);
+
+    if (mnc_pcs_digit && mnc < 100)
+        qmi_message_nas_set_system_selection_preference_input_set_mnc_pcs_digit_include_status (
+            input,
+            mnc_pcs_digit,
+            NULL
+        );
 
     qmi_client_nas_set_system_selection_preference (
         QMI_CLIENT_NAS (client),
@@ -456,6 +471,7 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     RegisterInNetworkContext *ctx;
     guint16                   mcc = 0;
     guint16                   mnc;
+    gboolean                  mnc_pcs_digit = FALSE;
     QmiClient                *client = NULL;
     GError                   *error = NULL;
     Private                  *priv = NULL;
@@ -474,7 +490,7 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)register_in_network_context_free);
 
     /* Parse input MCC/MNC */
-    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, NULL, &error)) {
+    if (operator_id && !mm_3gpp_parse_operator_id (operator_id, &mcc, &mnc, &mnc_pcs_digit, &error)) {
         g_assert (error != NULL);
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -483,9 +499,9 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
 
     priv = get_private (MM_SHARED_QMI (self));
     if (priv->feature_nas_ssp == FEATURE_SUPPORTED)
-        register_in_network_sssp (task, client, cancellable, mcc, mnc);
+        register_in_network_sssp (task, client, cancellable, mcc, mnc, mnc_pcs_digit);
     else
-        register_in_network_inr (task, client, cancellable, mcc, mnc);
+        register_in_network_inr (task, client, cancellable, mcc, mnc, mnc_pcs_digit);
 }
 
 /*****************************************************************************/
