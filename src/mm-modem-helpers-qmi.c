@@ -1471,8 +1471,7 @@ mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth   auth,
                                               gpointer              log_object,
                                               GError              **error)
 {
-    QmiWdsAuthentication  out;
-    g_autofree gchar     *str = NULL;
+    QmiWdsAuthentication out;
 
     if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN) {
         mm_obj_dbg (log_object, "using default (CHAP) authentication method");
@@ -1490,10 +1489,14 @@ mm_bearer_allowed_auth_to_qmi_authentication (MMBearerAllowedAuth   auth,
         out |= QMI_WDS_AUTHENTICATION_CHAP;
 
     /* and if the bitmask cannot be built, error out */
-    str = mm_bearer_allowed_auth_build_string_from_mask (auth);
-    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                 "Unsupported authentication methods (%s)",
-                 str);
+    if (out == QMI_WDS_AUTHENTICATION_NONE) {
+        g_autofree gchar *str = NULL;
+
+        str = mm_bearer_allowed_auth_build_string_from_mask (auth);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported authentication methods (%s)",
+                     str);
+    }
     return out;
 }
 
