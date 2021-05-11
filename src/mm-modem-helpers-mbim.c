@@ -243,141 +243,189 @@ mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error)
     switch (nw_error) {
     case MBIM_NW_ERROR_IMSI_UNKNOWN_IN_HLR:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR,
+                            MM_MOBILE_EQUIPMENT_ERROR_IMSI_UNKNOWN_IN_HSS,
                             "IMSI unknown in HLR");
     case MBIM_NW_ERROR_ILLEGAL_MS:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS,
-                            "Illegal MS");
+                            MM_MOBILE_EQUIPMENT_ERROR_ILLEGAL_UE,
+                            "Illegal UE/MS");
     case MBIM_NW_ERROR_IMSI_UNKNOWN_IN_VLR:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR,
+                            MM_MOBILE_EQUIPMENT_ERROR_IMSI_UNKNOWN_IN_VLR,
                             "IMSI unknown in VLR");
     case MBIM_NW_ERROR_ILLEGAL_ME:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME,
+                            MM_MOBILE_EQUIPMENT_ERROR_ILLEGAL_ME,
                             "Illegal ME");
     case MBIM_NW_ERROR_GPRS_NOT_ALLOWED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED,
-                            "GPRS not allowed");
+                            MM_MOBILE_EQUIPMENT_ERROR_PS_SERVICES_NOT_ALLOWED,
+                            "PS services not allowed");
     case MBIM_NW_ERROR_GPRS_AND_NON_GPRS_NOT_ALLOWED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED,
-                            "GPRS and non-GPRS not allowed");
+                            MM_MOBILE_EQUIPMENT_ERROR_PS_AND_NON_PS_SERVICES_NOT_ALLOWED,
+                            "PS and non-PS services not allowed");
     case MBIM_NW_ERROR_PLMN_NOT_ALLOWED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED,
+                            MM_MOBILE_EQUIPMENT_ERROR_PLMN_NOT_ALLOWED,
                             "PLMN not allowed");
     case MBIM_NW_ERROR_LOCATION_AREA_NOT_ALLOWED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED,
-                            "Location area not allowed");
+                            MM_MOBILE_EQUIPMENT_ERROR_AREA_NOT_ALLOWED,
+                            "Location/tracking area not allowed");
     case MBIM_NW_ERROR_ROAMING_NOT_ALLOWED_IN_LOCATION_AREA:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED,
-                            "Roaming not allowed in location area");
+                            MM_MOBILE_EQUIPMENT_ERROR_ROAMING_NOT_ALLOWED_IN_AREA,
+                            "Roaming not allowed in location/tracking area");
     case MBIM_NW_ERROR_GPRS_NOT_ALLOWED_IN_PLMN:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED,
-                            "GPRS not allowed in PLMN");
+                            MM_MOBILE_EQUIPMENT_ERROR_PS_SERVICES_NOT_ALLOWED_IN_PLMN,
+                            "PS services not allowed in PLMN");
     case MBIM_NW_ERROR_NO_CELLS_IN_LOCATION_AREA:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA,
-                            "No cells in location area");
+                            MM_MOBILE_EQUIPMENT_ERROR_NO_CELLS_IN_AREA,
+                            "No cells in location/tracking area");
     case MBIM_NW_ERROR_NETWORK_FAILURE:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE,
+                            MM_MOBILE_EQUIPMENT_ERROR_NETWORK_FAILURE_ATTACH,
                             "Network failure");
     case MBIM_NW_ERROR_CONGESTION:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION,
+                            MM_MOBILE_EQUIPMENT_ERROR_CONGESTION,
                             "Congestion");
     case MBIM_NW_ERROR_GSM_AUTHENTICATION_UNACCEPTABLE:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED,
+                            MM_MOBILE_EQUIPMENT_ERROR_USER_AUTHENTICATION_FAILED,
                             "GSM authentication unacceptable");
     case MBIM_NW_ERROR_NOT_AUTHORIZED_FOR_CSG:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED,
+                            MM_MOBILE_EQUIPMENT_ERROR_NOT_AUTHORIZED_FOR_CSG,
                             "Not authorized for this CSG");
     case MBIM_NW_ERROR_INSUFFICIENT_RESOURCES:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_INSUFFICIENT_RESOURCES,
+                            MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES,
                             "Insufficient resources");
     case MBIM_NW_ERROR_MISSING_OR_UNKNOWN_APN:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN,
+                            MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN,
                             "Missing or unknown APN");
     case MBIM_NW_ERROR_UNKNOWN_PDP_ADDRESS_OR_TYPE:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_ADDRESS_OR_TYPE,
+                            MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN_PDP_ADDRESS_OR_TYPE,
                             "Unknown PDP address or type");
     case MBIM_NW_ERROR_USER_AUTHENTICATION_FAILED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED,
+                            MM_MOBILE_EQUIPMENT_ERROR_USER_AUTHENTICATION_FAILED,
                             "User authentication failed");
     case MBIM_NW_ERROR_ACTIVATION_REJECTED_BY_GGSN_OR_GW:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_BY_GGSN_OR_GW,
+                            MM_MOBILE_EQUIPMENT_ERROR_ACTIVATION_REJECTED_BY_GGSN_OR_GW,
                             "Activation rejected by GGSN or GW");
     case MBIM_NW_ERROR_ACTIVATION_REJECTED_UNSPECIFIED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_UNSPECIFIED,
+                            MM_MOBILE_EQUIPMENT_ERROR_ACTIVATION_REJECTED_UNSPECIFIED,
                             "Activation rejected; unspecified");
     case MBIM_NW_ERROR_SERVICE_OPTION_NOT_SUPPORTED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED,
+                            MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_SUPPORTED,
                             "Service option not supported");
     case MBIM_NW_ERROR_REQUESTED_SERVICE_OPTION_NOT_SUBSCRIBED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED,
+                            MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_SUBSCRIBED,
                             "Requested service option not subscribed");
     case MBIM_NW_ERROR_SERVICE_OPTION_TEMPORARILY_OUT_OF_ORDER:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER,
+                            MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_OUT_OF_ORDER,
                             "Service option temporarily out of order");
     case MBIM_NW_ERROR_MAXIMUM_NUMBER_OF_PDP_CONTEXTS_REACHED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_MAXIMUM_NUMBER_OF_PDP_CONTEXTS_REACHED,
+                            MM_MOBILE_EQUIPMENT_ERROR_MAXIMUM_NUMBER_OF_BEARERS_REACHED,
                             "Maximum number of PDP contexts reached");
     case MBIM_NW_ERROR_REQUESTED_APN_NOT_SUPPORTED_IN_CURRENT_RAT_AND_PLMN:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUESTED_APN_NOT_SUPPORTED,
+                            MM_MOBILE_EQUIPMENT_ERROR_REQUESTED_APN_NOT_SUPPORTED,
                             "Requested APN not supported");
 
     case MBIM_NW_ERROR_SEMANTICALLY_INCORRECT_MESSAGE:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE,
+                            MM_MOBILE_EQUIPMENT_ERROR_SEMANTICALLY_INCORRECT_MESSAGE,
                             "Semantically incorrect message");
 
     case MBIM_NW_ERROR_PROTOCOL_ERROR_UNSPECIFIED:
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNSPECIFIED_PROTOCOL_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_UNSPECIFIED_PROTOCOL_ERROR,
                             "Unspecified protocol error");
 
     case MBIM_NW_ERROR_IMEI_NOT_ACCEPTED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_IMEI_NOT_ACCEPTED,
+                            "IMEI not accepted");
     case MBIM_NW_ERROR_MS_IDENTITY_NOT_DERIVED_BY_NETWORK:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_UE_IDENTITY_NOT_DERIVED_FROM_NETWORK,
+                            "UE identity not derived from network");
     case MBIM_NW_ERROR_IMPLICITLY_DETACHED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_IMPLICITLY_DETACHED,
+                            "Implicitly detached");
     case MBIM_NW_ERROR_MSC_TEMPORARILY_NOT_REACHABLE:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_MSC_TEMPORARILY_NOT_REACHABLE,
+                            "MSC temporarily not reachable");
+    case MBIM_NW_ERROR_NO_PDP_CONTEXT_ACTIVATED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_NO_BEARER_ACTIVATED,
+                            "No bearer activated");
+    case MBIM_NW_ERROR_PDP_TYPE_IPV4_ONLY_ALLOWED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_IPV4_ONLY_ALLOWED,
+                            "IPv4 only allowed");
+    case MBIM_NW_ERROR_PDP_TYPE_IPV6_ONLY_ALLOWED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_IPV6_ONLY_ALLOWED,
+                            "IPv6 only allowed");
+    case MBIM_NW_ERROR_INVALID_MANDATORY_INFORMATION:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_INVALID_MANDATORY_INFORMATION,
+                            "Invalid mandatory information");
+    case MBIM_NW_ERROR_MESSAGE_TYPE_NON_EXISTENT_OR_NOT_IMPLEMENTED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_TYPE_NOT_IMPLEMENTED,
+                            "Message type nonexistent or not implemented");
+    case MBIM_NW_ERROR_MESSAGE_TYPE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_TYPE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE,
+                            "Message type not compatible with protocol state");
+    case MBIM_NW_ERROR_INFORMATION_ELEMENT_NON_EXISTENT_OR_NOT_IMPLEMENTED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_IE_NOT_IMPLEMENTED,
+                            "Information element nonexistent or not implemented");
+    case MBIM_NW_ERROR_CONDITIONAL_IE_ERROR:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_CONDITIONAL_IE_ERROR,
+                            "Conditional IE error");
+    case MBIM_NW_ERROR_MESSAGE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE,
+                            "Message not compatible with protocol state");
+    case MBIM_NW_ERROR_APN_RESTRICTION_VALUE_INCOMPATIBLE_WITH_ACTIVE_PDP_CONTEXT:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_APN_RESTRICTION_INCOMPATIBLE,
+                            "APN restriction incompatible with active bearer");
+    case MBIM_NW_ERROR_MULTIPLE_ACCESSES_TO_A_PDN_CONNECTION_NOT_ALLOWED:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_MULTIPLE_ACCESS_TO_PDN_CONNECTION_NOT_ALLOWED,
+                            "Multiple accesses to PDN connection not allowed");
+    case MBIM_NW_ERROR_UNKNOWN:
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                            MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
+                            "Unknown error");
     case MBIM_NW_ERROR_MAC_FAILURE:
     case MBIM_NW_ERROR_SYNCH_FAILURE:
-    case MBIM_NW_ERROR_NO_PDP_CONTEXT_ACTIVATED:
-    case MBIM_NW_ERROR_PDP_TYPE_IPV4_ONLY_ALLOWED:
-    case MBIM_NW_ERROR_PDP_TYPE_IPV6_ONLY_ALLOWED:
-    case MBIM_NW_ERROR_INVALID_MANDATORY_INFORMATION:
-    case MBIM_NW_ERROR_MESSAGE_TYPE_NON_EXISTENT_OR_NOT_IMPLEMENTED:
-    case MBIM_NW_ERROR_MESSAGE_TYPE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE:
-    case MBIM_NW_ERROR_INFORMATION_ELEMENT_NON_EXISTENT_OR_NOT_IMPLEMENTED:
-    case MBIM_NW_ERROR_CONDITIONAL_IE_ERROR:
-    case MBIM_NW_ERROR_MESSAGE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE:
-    case MBIM_NW_ERROR_APN_RESTRICTION_VALUE_INCOMPATIBLE_WITH_ACTIVE_PDP_CONTEXT:
-    case MBIM_NW_ERROR_MULTIPLE_ACCESSES_TO_A_PDN_CONNECTION_NOT_ALLOWED:
-    case MBIM_NW_ERROR_UNKNOWN:
     default:
         msg = mbim_nw_error_get_string (nw_error);
         return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN,
+                            MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
                             "Unsupported error (%u): %s",
                             nw_error, msg ? msg : "unknown");
     }

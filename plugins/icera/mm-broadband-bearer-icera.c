@@ -502,7 +502,7 @@ ier_query_ready (MMBaseModem  *modem,
              * 33 - Requested service option not subscribed
              */
             if (nw_activation_err == 27 || nw_activation_err == 33)
-                activation_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED, self);
+                activation_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_SUBSCRIBED, self);
         }
     }
 

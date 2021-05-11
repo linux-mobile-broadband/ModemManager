@@ -63,8 +63,8 @@ test_error_helpers_mobile_equipment_error_for_code (void)
     g_clear_error (&error);
 
     /* last */
-    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION, NULL);
-    g_assert_error (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION);
+    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_WIRELINE_ACCESS_AREA_NOT_ALLOWED, NULL);
+    g_assert_error (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_WIRELINE_ACCESS_AREA_NOT_ALLOWED);
     g_clear_error (&error);
 
     /* other > 255 */

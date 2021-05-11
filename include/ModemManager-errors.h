@@ -117,141 +117,300 @@ typedef enum { /*< underscore_name=mm_core_error >*/
  * @MM_MOBILE_EQUIPMENT_ERROR_HIDDEN_KEY_REQUIRED: Hidden key required. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_EAP_METHOD_NOT_SUPPORTED: EAP method not supported. Since: 1.8.
  * @MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PARAMETERS: Incorrect parameters. Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_COMMAND_DISABLED: Command implemented but currently disabled. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_COMMAND_ABORTED: Command aborted by user. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NOT_ATTACHED_RESTRICTED: Not attached to network due to MT functionality restrictions. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED_EMERGENCY_ONLY: Modem not allowed, MT restricted to emergency calls only. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED_RESTRICTED: Operation not allowed because of MT functionality restrictions. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_FIXED_DIAL_NUMBER_ONLY: Fixed dial number only allowed; called number is not a fixed dial number. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_TEMPORARILY_OUT_OF_SERVICE: Temporarily out of service due to other MT usage. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_LANGUAGE_OR_ALPHABET_NOT_SUPPORTED: Language or alphabet not supported. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UNEXPECTED_DATA_VALUE: Unexpected data value. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SYSTEM_FAILURE: System failure. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_DATA_MISSING: Data missing. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_CALL_BARRED: Call barred. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_WAITING_INDICATION_SUBSCRIPTION_FAILURE: Message waiting indication subscription failure. Since 1.18.
  * @MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN: Unknown.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR: IMSI unknown in HLR.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR: IMSI unknown in VLR.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS: Illegal MS.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME: Illegal ME.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED: GPRS service not allowed.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_AND_NON_GPRS_SERVICES_NOT_ALLOWED: GPRS and non-GPRS services not allowed. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED: PLMN not allowed.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED: Location area not allowed.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED: Roaming not allowed in this location area.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA: No cells in this location area.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE: Network failure.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION: Congestion.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_NOT_AUTHORIZED_FOR_CSG: GPRS not authorized for CSG. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_INSUFFICIENT_RESOURCES: Insufficient resources. Since 1.4.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN: Missing or unknown APN. Since 1.4.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_ADDRESS_OR_TYPE: Unknown PDP address or type. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED: User authentication failed. Since 1.4.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_BY_GGSN_OR_GW: Activation rejected by GGSN or gateway. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_UNSPECIFIED: Activation rejected (reason unspecified). Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED: Service option not supported.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED: Requested service option not subscribed.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER: Service option temporarily out of order.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_FEATURE_NOT_SUPPORTED: Feature not supported. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERROR_IN_TFT_OPERATION: Semantic error in TFT operation. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_TFT_OPERATION: Syntactical error in TFT operation. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_CONTEXT: Unknown PDP context. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERRORS_IN_PACKET_FILTER: Semantic errors in packet filter. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_PACKET_FILTER: Syntactical error in packet filter. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_CONTEXT_WITHOUT_TFT_ALREADY_ACTIVATED: PDP context witout TFT already activated. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN: Unspecified GPRS error.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE: PDP authentication failure.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS: Invalid mobile class.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED_LEGACY: Last PDN disconnection not allowed (legacy value defined before 3GPP Rel-11). Since: 1.14.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED: Last PDN disconnection not allowed. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE: Semantically incorrect message. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MANDATORY_IE_ERROR: Mandatory IE error. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_IE_NOT_IMPLEMENTED: IE not implemented. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONDITIONAL_IE_ERROR: Conditional IE error. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNSPECIFIED_PROTOCOL_ERROR: Unspecified protocol error. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_OPERATOR_DETERMINED_BARRING: Operator determined barring. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_MAXIMUM_NUMBER_OF_PDP_CONTEXTS_REACHED: Maximum number of PDP contexts reached. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUESTED_APN_NOT_SUPPORTED: Requested APN not supported. Since: 1.8.
- * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION: Request rejected (BCM violation). Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IMSI_UNKNOWN_IN_HSS: IMSI unknown in HLR (CS, GPRS, UMTS); IMSI unknown in HSS (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ILLEGAL_UE: Illegal MS (CS, GPRS, UMTS); Illegal UE (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IMSI_UNKNOWN_IN_VLR: IMSI unknown in VLR. Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IMEI_NOT_ACCEPTED: IMEI not accepted (CS, GPRS, UMTS, EPS); PEI not accepted (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ILLEGAL_ME: Illegal ME (CS, GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PS_SERVICES_NOT_ALLOWED: GPRS services not allowed (CS, GPRS, UMTS); EPS services not allowed (EPS); 5GS services not allowed (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PS_AND_NON_PS_SERVICES_NOT_ALLOWED: GPRS and non-GPRS services not allowed (CS, GPRS, UMTS); EPS and non-EPS services not allowed (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UE_IDENTITY_NOT_DERIVED_FROM_NETWORK: MS identity cannot be derived from network (CS, GPRS, UMTS; UE identity cannot be derived from network (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IMPLICITLY_DETACHED: Implicitly detached (CS, GPRS, UMTS, EPS); implicitly degistered (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PLMN_NOT_ALLOWED: PLMN not allowed (CS, GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_AREA_NOT_ALLOWED: Location area not allowed (CS, GPRS, UMTS); Tracking area not allowed (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ROAMING_NOT_ALLOWED_IN_AREA: Roaming not allowed in this location area (CS, GPRS, UMTS); Roaming not allowed in this tracking area (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PS_SERVICES_NOT_ALLOWED_IN_PLMN: GPRS services not allowed in this PLMN (CS, GPRS, UMTS); EPS services not allowed in this PLMN (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NO_CELLS_IN_AREA: No suitable cells in this location area (CS, GPRS, UMTS); no suitable cells in this tracking area (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MSC_TEMPORARILY_NOT_REACHABLE: MSC temporarily not reachable (CS, GPRS, UMTS, EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NETWORK_FAILURE_ATTACH: Network failure during attach (CS, GPRS, UMTS, EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_CS_DOMAIN_UNAVAILABLE: CS domain not available (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ESM_FAILURE: ESM failure (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_CONGESTION: Congestion (CS, GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MBMS_BEARER_CAPABILITIES_INSUFFICIENT_FOR_SERVICE: MBMS bearer capabilities insufficient for service (GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NOT_AUTHORIZED_FOR_CSG: Not authorized for this CSG (CS, GPRS, UMTS, EPS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES: Insufficient resources (GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN: Missing or unknown APN (GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN_PDP_ADDRESS_OR_TYPE: Unknown PDP address or PDP type (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_USER_AUTHENTICATION_FAILED: User authentication or authorization failed (GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ACTIVATION_REJECTED_BY_GGSN_OR_GW: Activation rejected by GGSN, Serving GW or PDN GW (GPRS, UMTS); activation rejected by Serving GW or PDN GW (EPS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ACTIVATION_REJECTED_UNSPECIFIED: Activation rejected, unspecified (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_SUPPORTED: Service option not supported (CS, GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_SUBSCRIBED: Requested service option not subscribed (CS, GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_OUT_OF_ORDER: Service option temporarily out of order (CS, GPRS, UMTS, EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NSAPI_OR_PTI_ALREADY_IN_USE: NSAPI out of order (GPRS, UMTS); PTI out of order (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_REGULAR_DEACTIVATION: Regular deactivation (GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_QOS_NOT_ACCEPTED: EPS Qos not accepted (EPS); 5GS QoS not accepted (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_CALL_CANNOT_BE_IDENTIFIED: Call cannot be identified (CS, GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_CS_SERVICE_TEMPORARILY_UNAVAILABLE: CS service temporarily unavailable (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_FEATURE_NOT_SUPPORTED: Feature not supported (GPRS, UMTS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SEMANTIC_ERROR_IN_TFT_OPERATION: Semantic error in TFT operation (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SYNTACTICAL_ERROR_IN_TFT_OPERATION: Syntactical error in TFT operation (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN_PDP_CONTEXT: Unknown PDP context (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SEMANTIC_ERRORS_IN_PACKET_FILTER: Semantic errors in packet filter (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SYNTACTICAL_ERROR_IN_PACKET_FILTER: Syntactical error in packet filter (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PDP_CONTEXT_WITHOUT_TFT_ALREADY_ACTIVATED: PDP context without TFT already activated (GPRS, UMTS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MULTICAST_GROUP_MEMBERSHIP_TIMEOUT: Multicast group membership timeout (GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN: Unspecified GPRS error (CS, GPRS, UMTS).
+ * @MM_MOBILE_EQUIPMENT_ERROR_PDP_AUTH_FAILURE: PDP authentication failure (GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INVALID_MOBILE_CLASS: Invalid mobile class (CS, GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_LAST_PDN_DISCONNECTION_NOT_ALLOWED_LEGACY: Last PDN disconnection not allowed, legacy value defined before 3GPP Rel-11 (EPS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_LAST_PDN_DISCONNECTION_NOT_ALLOWED: Last PDN disconnection not allowed (EPS). Since: 1.8.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SEMANTICALLY_INCORRECT_MESSAGE: Semantically incorrect message (CS, GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INVALID_MANDATORY_INFORMATION: Invalid mandatory information (CS, GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_TYPE_NOT_IMPLEMENTED: Message type non-existent or not implemented (CS, GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_CONDITIONAL_IE_ERROR: Conditional IE error (CS, GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UNSPECIFIED_PROTOCOL_ERROR: Unspecified protocol error (CS, GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_OPERATOR_DETERMINED_BARRING: Operator determined barring (GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MAXIMUM_NUMBER_OF_BEARERS_REACHED: Maximum number of PDP contexts reached (GPRS, UMTS); maximum number of EPS bearers reached (EPS); maximum number of PDU sessions reached (5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_REQUESTED_APN_NOT_SUPPORTED: Requested APN not supported in current RAT and PLMN combination (GPRS, UMTS, EPS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_REQUEST_REJECTED_BCM_VIOLATION: Request rejected, bearer control mode violation (GPRS, UMTS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UNSUPPORTED_QCI_OR_5QI_VALUE: Unsupported QCI value (EPS); unsupported 5QI value (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_USER_DATA_VIA_CONTROL_PLANE_CONGESTED: User data transmission via control plane is congested (GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SMS_PROVIDED_VIA_GPRS_IN_ROUTING_AREA: SMS provided via GPRS in routing area (CS, GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INVALID_PTI_VALUE: Invalid PTI value (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NO_BEARER_ACTIVATED: No PDP context activated (CS, GPRS, UMTS); no bearer context activated (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE: Message not compatible with protocol state (CS, GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_RECOVERY_ON_TIMER_EXPIRY: Recovery on timer expiry (CS, GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INVALID_TRANSACTION_ID_VALUE: Invalid transaction identifier value (GPRS, UMTS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_AUTHORIZED_IN_PLMN: Requested service option is not authorized in this PLMN (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NETWORK_FAILURE_ACTIVATION: Network failure during context activation (GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_REACTIVATION_REQUESTED: Reactivation requested (GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IPV4_ONLY_ALLOWED: PDP type IPv4 only allowed (GPRS, UMTS); PDN type IPv4 only allowed (EPS); PDU session type IPv4 only allowed (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IPV6_ONLY_ALLOWED: PDP type IPv6 only allowed (GPRS, UMTS); PDN type IPv6 only allowed (EPS); PDU session type IPv6 only allowed (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SINGLE_ADDRESS_BEARERS_ONLY_ALLOWED: Single address bearers only allowed (GPRS, UMTS, EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_COLLISION_WITH_NETWORK_INITIATED_REQUEST: Collision with network initiated request (GPRS, UMTS, EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IPV4V6_ONLY_ALLOWED: PDP type IPv4v6 only allowed (GPRS, UMTS); PDN type IPv4v6 only allowed (EPS); PDU session type IPv4v6 only allowed (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NON_IP_ONLY_ALLOWED: PDP type non-IP only allowed (GPRS, UMTS); PDN type non-IP only allowed (EPS); PDU session type unstructured only allowed (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_BEARER_HANDLING_UNSUPPORTED: Bearer handling not supported (GPRS, UMTS, EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_APN_RESTRICTION_INCOMPATIBLE: APN restriction value incompatible with active PDP context (GPRS, UMTS); APN restriction value incompatible with active EPS bearer context (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MULTIPLE_ACCESS_TO_PDN_CONNECTION_NOT_ALLOWED: Multiple accesses to PDN connection not allowed (GPRS, UMTS, EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ESM_INFORMATION_NOT_RECEIVED: ESM information not received (EPS).Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PDN_CONNECTION_NONEXISTENT: PDN connection does not exist (EPS); PDU session does not exist (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MULTIPLE_PDN_CONNECTION_SAME_APN_NOT_ALLOWED: Multiple PDN connections for a given APN not allowed (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SEVERE_NETWORK_FAILURE: Severe network failure (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES_FOR_SLICE_AND_DNN: Insufficient resources for specific slice and DNN (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UNSUPPORTED_SSC_MODE: Not supported SSC mode (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES_FOR_SLICE: Insufficient resources for specific slice (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_TYPE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE: Message type not compatible with protocol state (CS, GPRS, UMTS, EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_IE_NOT_IMPLEMENTED: Information element non-existent or not implemented (CS, GPRS, UMTS, EPS, 5GS). Since: 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_N1_MODE_NOT_ALLOWED: N1 mode not allowed. (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_RESTRICTED_SERVICE_AREA: Restricted service area (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_LADN_UNAVAILABLE: LADN not available (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_DNN_IN_SLICE: Missing or unknown DNN in a slice (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NGKSI_ALREADY_IN_USE: ngKSI already in use (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PAYLOAD_NOT_FORWARDED: Payload was not forwarded (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NON_3GPP_ACCESS_TO_5GCN_NOT_ALLOWED: Non-3GPP access to 5GCN not allowed (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SERVING_NETWORK_NOT_AUTHORIZED: Serving network not authorized (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_DNN_NOT_SUPPORTED_IN_SLICE: DNN not supported or not subscribed in the slice (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_USER_PLANE_RESOURCES_FOR_PDU_SESSION: Insufficient user plane resources for PDU session (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_OUT_OF_LADN_SERVICE_AREA: Out of LADN service area (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PTI_MISMATCH: PTI mismatch (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_MAX_DATA_RATE_FOR_USER_PLANE_INTEGRITY_TOO_LOW: Maximum data rate per UE for user-plane integrity protection is too low (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SEMANTIC_ERROR_IN_QOS_OPERATION: Semantic error in QoS operation (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_SYNTACTICAL_ERROR_IN_QOS_OPERATION: Semantic error in QoS operation (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_INVALID_MAPPED_EPS_BEARER_IDENTITY: Invalid mapped EPS bearer identity (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_REDIRECTION_TO_5GCN_REQUIRED: Redirection to 5GCN required (EPS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_REDIRECTION_TO_EPC_REQUIRED: Redirection to EPC required (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_TEMPORARILY_UNAUTHORIZED_FOR_SNPN: Temporarily not authorized for this SNPN (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_PERMANENTLY_UNAUTHORIZED_FOR_SNPN: Permanently not authorized for this SNPN (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_ETHERNET_ONLY_ALLOWED: PDN type Ethernet only allowed (EPS, 5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_UNAUTHORIZED_FOR_CAG: Not authorized for this CAG or authorized for CAG cells only (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK_SLICES_AVAILABLE: No network slices available (5GS). Since 1.18.
+ * @MM_MOBILE_EQUIPMENT_ERROR_WIRELINE_ACCESS_AREA_NOT_ALLOWED: Wireline access area not allowed (5GS). Since 1.18.
  *
- * Enumeration of Mobile Equipment errors, as defined in 3GPP TS 07.07 version 7.8.0.
+ * Enumeration of Mobile Equipment errors, as defined in 3GPP TS 27.007 v17.1.0,
+ * section 9.2 (Mobile termination error result code +CME ERROR).
  *
  * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_mobile_equipment_error >*/
-    /* General errors */
-    MM_MOBILE_EQUIPMENT_ERROR_PHONE_FAILURE            = 0,   /*< nick=PhoneFailure >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NO_CONNECTION            = 1,   /*< nick=NoConnection >*/
-    MM_MOBILE_EQUIPMENT_ERROR_LINK_RESERVED            = 2,   /*< nick=LinkReserved >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED              = 3,   /*< nick=NotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED            = 4,   /*< nick=NotSupported >*/
-    MM_MOBILE_EQUIPMENT_ERROR_PH_SIM_PIN               = 5,   /*< nick=PhSimPin >*/
-    MM_MOBILE_EQUIPMENT_ERROR_PH_FSIM_PIN              = 6,   /*< nick=PhFsimPin >*/
-    MM_MOBILE_EQUIPMENT_ERROR_PH_FSIM_PUK              = 7,   /*< nick=PhFsimPuk >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED         = 10,  /*< nick=SimNotInserted >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN                  = 11,  /*< nick=SimPin >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK                  = 12,  /*< nick=SimPuk >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE              = 13,  /*< nick=SimFailure >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_BUSY                 = 14,  /*< nick=SimBusy >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG                = 15,  /*< nick=SimWrong >*/
-    MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD       = 16,  /*< nick=IncorrectPassword >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN2                 = 17,  /*< nick=SimPin2 >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK2                 = 18,  /*< nick=SimPuk2 >*/
-    MM_MOBILE_EQUIPMENT_ERROR_MEMORY_FULL              = 20,  /*< nick=MemoryFull >*/
-    MM_MOBILE_EQUIPMENT_ERROR_INVALID_INDEX            = 21,  /*< nick=InvalidIndex >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NOT_FOUND                = 22,  /*< nick=NotFound >*/
-    MM_MOBILE_EQUIPMENT_ERROR_MEMORY_FAILURE           = 23,  /*< nick=MemoryFailure >*/
-    MM_MOBILE_EQUIPMENT_ERROR_TEXT_TOO_LONG            = 24,  /*< nick=TextTooLong >*/
-    MM_MOBILE_EQUIPMENT_ERROR_INVALID_CHARS            = 25,  /*< nick=InvalidChars >*/
-    MM_MOBILE_EQUIPMENT_ERROR_DIAL_STRING_TOO_LONG     = 26,  /*< nick=DialStringTooLong >*/
-    MM_MOBILE_EQUIPMENT_ERROR_DIAL_STRING_INVALID      = 27,  /*< nick=DialStringInvalid >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK               = 30,  /*< nick=NoNetwork >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT          = 31,  /*< nick=NetworkTimeout >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_NOT_ALLOWED      = 32,  /*< nick=NetworkNotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_PIN              = 40,  /*< nick=NetworkPin >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_PUK              = 41,  /*< nick=NetworkPuk >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PIN       = 42,  /*< nick=NetworkSubsetPin >*/
-    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PUK       = 43,  /*< nick=NetworkSubsetPuk >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PIN              = 44,  /*< nick=ServicePin >*/
-    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PUK              = 45,  /*< nick=ServicePuk >*/
-    MM_MOBILE_EQUIPMENT_ERROR_CORP_PIN                 = 46,  /*< nick=CorpPin >*/
-    MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK                 = 47,  /*< nick=CorpPuk >*/
-    MM_MOBILE_EQUIPMENT_ERROR_HIDDEN_KEY_REQUIRED      = 48,  /*< nick=HiddenKeyRequired >*/
-    MM_MOBILE_EQUIPMENT_ERROR_EAP_METHOD_NOT_SUPPORTED = 49, /*< nick=EapMethodNotSupported >*/
-    MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PARAMETERS     = 50,  /*< nick=IncorrectParameters >*/
-    MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN                  = 100, /*< nick=Unknown >*/
-    /* GPRS related errors */
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_HLR                       = 102, /*< nick=GprsImsiUnknownInHlr >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_MS                                = 103, /*< nick=GprsIllegalMs >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IMSI_UNKNOWN_IN_VLR                       = 104, /*< nick=GprsImsiUnknownInVlr >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ILLEGAL_ME                                = 106, /*< nick=GprsIllegalMe >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_NOT_ALLOWED                       = 107, /*< nick=GprsServiceNotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_AND_NON_GPRS_SERVICES_NOT_ALLOWED         = 108, /*< nick=GprsAndNonGprsServicesNotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PLMN_NOT_ALLOWED                          = 111, /*< nick=GprsPlmnNotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_LOCATION_NOT_ALLOWED                      = 112, /*< nick=GprsLocationNotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ROAMING_NOT_ALLOWED                       = 113, /*< nick=GprsRomaingNotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NO_CELLS_IN_LOCATION_AREA                 = 115, /*< nick=GprsNoCellsInLocationArea >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NETWORK_FAILURE                           = 117, /*< nick=GprsNetworkFailure >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONGESTION                                = 122, /*< nick=GprsCongestion >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_NOT_AUTHORIZED_FOR_CSG                    = 125, /*< nick=NotAuthorizedForCsg >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_INSUFFICIENT_RESOURCES                    = 126, /*< nick=GprsInsufficientResources >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_MISSING_OR_UNKNOWN_APN                    = 127, /*< nick=GprsMissingOrUnknownApn >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_ADDRESS_OR_TYPE               = 128, /*< nick=GprsUnknownPdpAddressOrType >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_USER_AUTHENTICATION_FAILED                = 129, /*< nick=GprsUserAuthenticationFailed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_BY_GGSN_OR_GW         = 130, /*< nick=GprsActivationRejectedByGgsnOrGw >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_ACTIVATION_REJECTED_UNSPECIFIED           = 131, /*< nick=GprsActivationRejectedUnspecified >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUPPORTED              = 132, /*< nick=GprsServiceOptionNotSupported >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_NOT_SUBSCRIBED             = 133, /*< nick=GprsServiceOptionNotSubscribed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SERVICE_OPTION_OUT_OF_ORDER               = 134, /*< nick=GprsServiceOptionOutOfOrder >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_FEATURE_NOT_SUPPORTED                     = 140, /*< nick=GprsFeatureNotSupported >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERROR_IN_TFT_OPERATION           = 141, /*< nick=GprsSemanticErrorInTftOperation >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_TFT_OPERATION        = 142, /*< nick=GprsSyntacticalErrorInTftOperation >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN_PDP_CONTEXT                       = 143, /*< nick=GprsUnknownPdpContext >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTIC_ERRORS_IN_PACKET_FILTER          = 144, /*< nick=GprsSemanticErrorsInPacketFilter >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SYNTACTICAL_ERROR_IN_PACKET_FILTER        = 145, /*< nick=GprsSyntacticalErrorsInPacketFilter >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_CONTEXT_WITHOUT_TFT_ALREADY_ACTIVATED = 146, /*< nick=GprsPdpContextWithoutTftAlreadyActivated >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN                                   = 148, /*< nick=GprsUnknown >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_PDP_AUTH_FAILURE                          = 149, /*< nick=GprsPdpAuthFailure >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_INVALID_MOBILE_CLASS                      = 150, /*< nick=GprsInvalidMobileClass >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED_LEGACY = 151, /*< nick=GprsLastPdnDisconnectionNotAllowedLegacy >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_LAST_PDN_DISCONNECTION_NOT_ALLOWED        = 171, /*< nick=GprsLastPdnDisconnectionNotAllowed >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_SEMANTICALLY_INCORRECT_MESSAGE            = 172, /*< nick=GprsSemanticallyIncorrectMessage >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_MANDATORY_IE_ERROR                        = 173, /*< nick=GprsMandatoryIeError >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_IE_NOT_IMPLEMENTED                        = 174, /*< nick=GprsIeNotImplemented >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_CONDITIONAL_IE_ERROR                      = 175, /*< nick=GprsConditionalIeError >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNSPECIFIED_PROTOCOL_ERROR                = 176, /*< nick=GprsUnspecifiedProtocolError >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_OPERATOR_DETERMINED_BARRING               = 177, /*< nick=GprsOperatorDeterminedBarring >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_MAXIMUM_NUMBER_OF_PDP_CONTEXTS_REACHED    = 178, /*< nick=GprsMaximumNumberOfPdpContextsReached >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUESTED_APN_NOT_SUPPORTED               = 179, /*< nick=GprsRequestedApnNotSupported >*/
-    MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION            = 180, /*< nick=GprsRequestRejectedBcmViolation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PHONE_FAILURE                                     = 0,   /*< nick=PhoneFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NO_CONNECTION                                     = 1,   /*< nick=NoConnection >*/
+    MM_MOBILE_EQUIPMENT_ERROR_LINK_RESERVED                                     = 2,   /*< nick=LinkReserved >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED                                       = 3,   /*< nick=NotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED                                     = 4,   /*< nick=NotSupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PH_SIM_PIN                                        = 5,   /*< nick=PhSimPin >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PH_FSIM_PIN                                       = 6,   /*< nick=PhFsimPin >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PH_FSIM_PUK                                       = 7,   /*< nick=PhFsimPuk >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED                                  = 10,  /*< nick=SimNotInserted >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN                                           = 11,  /*< nick=SimPin >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK                                           = 12,  /*< nick=SimPuk >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE                                       = 13,  /*< nick=SimFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_BUSY                                          = 14,  /*< nick=SimBusy >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG                                         = 15,  /*< nick=SimWrong >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PASSWORD                                = 16,  /*< nick=IncorrectPassword >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN2                                          = 17,  /*< nick=SimPin2 >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK2                                          = 18,  /*< nick=SimPuk2 >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MEMORY_FULL                                       = 20,  /*< nick=MemoryFull >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INVALID_INDEX                                     = 21,  /*< nick=InvalidIndex >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NOT_FOUND                                         = 22,  /*< nick=NotFound >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MEMORY_FAILURE                                    = 23,  /*< nick=MemoryFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_TEXT_TOO_LONG                                     = 24,  /*< nick=TextTooLong >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INVALID_CHARS                                     = 25,  /*< nick=InvalidChars >*/
+    MM_MOBILE_EQUIPMENT_ERROR_DIAL_STRING_TOO_LONG                              = 26,  /*< nick=DialStringTooLong >*/
+    MM_MOBILE_EQUIPMENT_ERROR_DIAL_STRING_INVALID                               = 27,  /*< nick=DialStringInvalid >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK                                        = 30,  /*< nick=NoNetwork >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT                                   = 31,  /*< nick=NetworkTimeout >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_NOT_ALLOWED                               = 32,  /*< nick=NetworkNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_PIN                                       = 40,  /*< nick=NetworkPin >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_PUK                                       = 41,  /*< nick=NetworkPuk >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PIN                                = 42,  /*< nick=NetworkSubsetPin >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PUK                                = 43,  /*< nick=NetworkSubsetPuk >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PIN                                       = 44,  /*< nick=ServicePin >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PUK                                       = 45,  /*< nick=ServicePuk >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CORP_PIN                                          = 46,  /*< nick=CorpPin >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK                                          = 47,  /*< nick=CorpPuk >*/
+    MM_MOBILE_EQUIPMENT_ERROR_HIDDEN_KEY_REQUIRED                               = 48,  /*< nick=HiddenKeyRequired >*/
+    MM_MOBILE_EQUIPMENT_ERROR_EAP_METHOD_NOT_SUPPORTED                          = 49,  /*< nick=EapMethodNotSupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INCORRECT_PARAMETERS                              = 50,  /*< nick=IncorrectParameters >*/
+    MM_MOBILE_EQUIPMENT_ERROR_COMMAND_DISABLED                                  = 51, /*< nick=CommandDisabled >*/
+    MM_MOBILE_EQUIPMENT_ERROR_COMMAND_ABORTED                                   = 52, /*< nick=CommandAborted >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NOT_ATTACHED_RESTRICTED                           = 53, /*< nick=NotAttachedRestricted >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED_EMERGENCY_ONLY                        = 54, /*< nick=NotAllowedEmergencyOnly >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED_RESTRICTED                            = 55, /*< nick=NotAllowedRestricted >*/
+    MM_MOBILE_EQUIPMENT_ERROR_FIXED_DIAL_NUMBER_ONLY                            = 56, /*< nick=FixedDialNumberOnly >*/
+    MM_MOBILE_EQUIPMENT_ERROR_TEMPORARILY_OUT_OF_SERVICE                        = 57, /*< nick=TemporarilyOutOfService >*/
+    MM_MOBILE_EQUIPMENT_ERROR_LANGUAGE_OR_ALPHABET_NOT_SUPPORTED                = 58, /*< nick=LanguageOrAlphabetNotSupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNEXPECTED_DATA_VALUE                             = 59, /*< nick=UnexpectedDataValue >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SYSTEM_FAILURE                                    = 60, /*< nick=SystemFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_DATA_MISSING                                      = 61, /*< nick=DataMissing >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CALL_BARRED                                       = 62, /*< nick=CallBarred >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_WAITING_INDICATION_SUBSCRIPTION_FAILURE   = 63, /*< nick=MessageWaitingIndicationSubscriptionFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN                                           = 100, /*< nick=Unknown >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IMSI_UNKNOWN_IN_HSS                               = 102, /*< nick=ImsiUnknownInHss >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ILLEGAL_UE                                        = 103, /*< nick=IllegalUe >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IMSI_UNKNOWN_IN_VLR                               = 104, /*< nick=ImsiUnknownInVlr >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IMEI_NOT_ACCEPTED                                 = 105, /*< nick=ImeiNotAccepted >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ILLEGAL_ME                                        = 106, /*< nick=IllegalMe >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PS_SERVICES_NOT_ALLOWED                           = 107, /*< nick=PsServicesNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PS_AND_NON_PS_SERVICES_NOT_ALLOWED                = 108, /*< nick=PsAndNonPsServicesNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UE_IDENTITY_NOT_DERIVED_FROM_NETWORK              = 109, /*< nick=UeIdentityNotDerivedFromNetwork >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IMPLICITLY_DETACHED                               = 110, /*< nick=ImplicitlyDetached >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PLMN_NOT_ALLOWED                                  = 111, /*< nick=PlmnNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_AREA_NOT_ALLOWED                                  = 112, /*< nick=AreaNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ROAMING_NOT_ALLOWED_IN_AREA                       = 113, /*< nick=RoamingNotAllowedInArea >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PS_SERVICES_NOT_ALLOWED_IN_PLMN                   = 114, /*< nick=PsServicesNotAllowedInPlmn >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NO_CELLS_IN_AREA                                  = 115, /*< nick=NoCellsInArea >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MSC_TEMPORARILY_NOT_REACHABLE                     = 116, /*< nick=MscTemporarilyNotReachable >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_FAILURE_ATTACH                            = 117, /*< nick=NetworkFailureAttach >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CS_DOMAIN_UNAVAILABLE                             = 118, /*< nick=CsDomainUnavailable >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ESM_FAILURE                                       = 119, /*< nick=EsmFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CONGESTION                                        = 122, /*< nick=Congestion >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MBMS_BEARER_CAPABILITIES_INSUFFICIENT_FOR_SERVICE = 124, /*< nick=MbmsBearerCapabilitiesInsufficientForService >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NOT_AUTHORIZED_FOR_CSG                            = 125, /*< nick=NotAuthorizedForCsg >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES                            = 126, /*< nick=InsufficientResources >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_APN                            = 127, /*< nick=MissingOrUnknownApn >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN_PDP_ADDRESS_OR_TYPE                       = 128, /*< nick=UnknownPdpAddressOrType >*/
+    MM_MOBILE_EQUIPMENT_ERROR_USER_AUTHENTICATION_FAILED                        = 129, /*< nick=UserAuthenticationFailed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ACTIVATION_REJECTED_BY_GGSN_OR_GW                 = 130, /*< nick=ActivationRejectedByGgsnOrGw >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ACTIVATION_REJECTED_UNSPECIFIED                   = 131, /*< nick=ActivationRejectedUnspecified >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_SUPPORTED                      = 132, /*< nick=ServiceOptionNotSupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_SUBSCRIBED                     = 133, /*< nick=ServiceOptionNotSubscribed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_OUT_OF_ORDER                       = 134, /*< nick=ServiceOptionOutOfOrder >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NSAPI_OR_PTI_ALREADY_IN_USE                       = 135, /*< nick=NsapiOrPtiAlreadyInUse >*/
+    MM_MOBILE_EQUIPMENT_ERROR_REGULAR_DEACTIVATION                              = 136, /*< nick=RegularDeactivation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_QOS_NOT_ACCEPTED                                  = 137, /*< nick=QosNotAccepted >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CALL_CANNOT_BE_IDENTIFIED                         = 138, /*< nick=CallCannotBeIdentified >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CS_SERVICE_TEMPORARILY_UNAVAILABLE                = 139, /*< nick=CsServiceTemporarilyUnavailable >*/
+    MM_MOBILE_EQUIPMENT_ERROR_FEATURE_NOT_SUPPORTED                             = 140, /*< nick=FeatureNotSupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SEMANTIC_ERROR_IN_TFT_OPERATION                   = 141, /*< nick=SemanticErrorInTftOperation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SYNTACTICAL_ERROR_IN_TFT_OPERATION                = 142, /*< nick=SyntacticalErrorInTftOperation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN_PDP_CONTEXT                               = 143, /*< nick=UnknownPdpContext >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SEMANTIC_ERRORS_IN_PACKET_FILTER                  = 144, /*< nick=SemanticErrorsInPacketFilter >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SYNTACTICAL_ERROR_IN_PACKET_FILTER                = 145, /*< nick=SyntacticalErrorsInPacketFilter >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PDP_CONTEXT_WITHOUT_TFT_ALREADY_ACTIVATED         = 146, /*< nick=PdpContextWithoutTftAlreadyActivated >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MULTICAST_GROUP_MEMBERSHIP_TIMEOUT                = 147, /*< nick=MulticastGroupMembershipTimeout >*/
+    MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN                                      = 148, /*< nick=GprsUnknown >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PDP_AUTH_FAILURE                                  = 149, /*< nick=PdpAuthFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INVALID_MOBILE_CLASS                              = 150, /*< nick=InvalidMobileClass >*/
+    MM_MOBILE_EQUIPMENT_ERROR_LAST_PDN_DISCONNECTION_NOT_ALLOWED_LEGACY         = 151, /*< nick=LastPdnDisconnectionNotAllowedLegacy >*/
+    MM_MOBILE_EQUIPMENT_ERROR_LAST_PDN_DISCONNECTION_NOT_ALLOWED                = 171, /*< nick=LastPdnDisconnectionNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SEMANTICALLY_INCORRECT_MESSAGE                    = 172, /*< nick=SemanticallyIncorrectMessage >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INVALID_MANDATORY_INFORMATION                     = 173, /*< nick=InvalidMandatoryInformation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_TYPE_NOT_IMPLEMENTED                      = 174, /*< nick=MessageTypeNotImplemented >*/
+    MM_MOBILE_EQUIPMENT_ERROR_CONDITIONAL_IE_ERROR                              = 175, /*< nick=ConditionalIeError >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNSPECIFIED_PROTOCOL_ERROR                        = 176, /*< nick=UnspecifiedProtocolError >*/
+    MM_MOBILE_EQUIPMENT_ERROR_OPERATOR_DETERMINED_BARRING                       = 177, /*< nick=OperatorDeterminedBarring >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MAXIMUM_NUMBER_OF_BEARERS_REACHED                 = 178, /*< nick=MaximumNumberOfBearersReached >*/
+    MM_MOBILE_EQUIPMENT_ERROR_REQUESTED_APN_NOT_SUPPORTED                       = 179, /*< nick=RequestedApnNotSupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_REQUEST_REJECTED_BCM_VIOLATION                    = 180, /*< nick=RequestRejectedBcmViolation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNSUPPORTED_QCI_OR_5QI_VALUE                      = 181, /*< nick=UnsupportedQciOr5qiValue >*/
+    MM_MOBILE_EQUIPMENT_ERROR_USER_DATA_VIA_CONTROL_PLANE_CONGESTED             = 182, /*< nick=UserDataViaControlPlaneCongested >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SMS_PROVIDED_VIA_GPRS_IN_ROUTING_AREA             = 183, /*< nick=SmsProvidedViaGprsInRoutingArea >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INVALID_PTI_VALUE                                 = 184, /*< nick=InvalidPtiValue >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NO_BEARER_ACTIVATED                               = 185, /*< nick=NoBearerActivated >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE        = 186, /*< nick=MessageNotCompatibleWithProtocolState >*/
+    MM_MOBILE_EQUIPMENT_ERROR_RECOVERY_ON_TIMER_EXPIRY                          = 187, /*< nick=RecoveryOnTimerExpiry >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INVALID_TRANSACTION_ID_VALUE                      = 188, /*< nick=InvalidTransactionIdValue >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SERVICE_OPTION_NOT_AUTHORIZED_IN_PLMN             = 189, /*< nick=ServiceOptionNotAuthorizedInPlmn >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NETWORK_FAILURE_ACTIVATION                        = 190, /*< nick=NetworkFailureActivation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_REACTIVATION_REQUESTED                            = 191, /*< nick=ReactivationRequested >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IPV4_ONLY_ALLOWED                                 = 192, /*< nick=Ipv4OnlyAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IPV6_ONLY_ALLOWED                                 = 193, /*< nick=Ipv6OnlyAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SINGLE_ADDRESS_BEARERS_ONLY_ALLOWED               = 194, /*< nick=SingleAddressBearersOnlyAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_COLLISION_WITH_NETWORK_INITIATED_REQUEST          = 195, /*< nick=CollisionWithNetworkInitiatedRequest >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IPV4V6_ONLY_ALLOWED                               = 196, /*< nick=Ipv4v6OnlyAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NON_IP_ONLY_ALLOWED                               = 197, /*< nick=NonIpOnlyAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_BEARER_HANDLING_UNSUPPORTED                       = 198, /*< nick=BearerHandlingUnsupported >*/
+    MM_MOBILE_EQUIPMENT_ERROR_APN_RESTRICTION_INCOMPATIBLE                      = 199, /*< nick=ApnRestrictionIncompatible >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MULTIPLE_ACCESS_TO_PDN_CONNECTION_NOT_ALLOWED     = 200, /*< nick=MultipleAccessToPdnConnectionNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ESM_INFORMATION_NOT_RECEIVED                      = 201, /*< nick=EsmInformationNotReceived >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PDN_CONNECTION_NONEXISTENT                        = 202, /*< nick=PdnConnectionNonexistent >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MULTIPLE_PDN_CONNECTION_SAME_APN_NOT_ALLOWED      = 203, /*< nick=MultiplePdnConnectionSameApnNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SEVERE_NETWORK_FAILURE                            = 204, /*< nick=SevereNetworkFailure >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES_FOR_SLICE_AND_DNN          = 205, /*< nick=InsufficientResourcesForSliceAndDnn >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNSUPPORTED_SSC_MODE                              = 206, /*< nick=UnsupportedSscMode >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_RESOURCES_FOR_SLICE                  = 207, /*< nick=InsufficientResourcesForSlice >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MESSAGE_TYPE_NOT_COMPATIBLE_WITH_PROTOCOL_STATE   = 208, /*< nick=MessageTypeNotCompatibleWithProtocolState >*/
+    MM_MOBILE_EQUIPMENT_ERROR_IE_NOT_IMPLEMENTED                                = 209, /*< nick=IeNotImplemented >*/
+    MM_MOBILE_EQUIPMENT_ERROR_N1_MODE_NOT_ALLOWED                               = 210, /*< nick=N1ModeNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_RESTRICTED_SERVICE_AREA                           = 211, /*< nick=RestrictedServiceArea >*/
+    MM_MOBILE_EQUIPMENT_ERROR_LADN_UNAVAILABLE                                  = 212, /*< nick=LadnUnavailable >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MISSING_OR_UNKNOWN_DNN_IN_SLICE                   = 213, /*< nick=MissingOrUnknownDnnInSlice >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NGKSI_ALREADY_IN_USE                              = 214, /*< nick=NkgsiAlreadyInUse >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PAYLOAD_NOT_FORWARDED                             = 215, /*< nick=PayloadNotForwarded >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NON_3GPP_ACCESS_TO_5GCN_NOT_ALLOWED               = 216, /*< nick=Non3gppAccessTo5gcnNotAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SERVING_NETWORK_NOT_AUTHORIZED                    = 217, /*< nick=ServingNetworkNotAuthorized >*/
+    MM_MOBILE_EQUIPMENT_ERROR_DNN_NOT_SUPPORTED_IN_SLICE                        = 218, /*< nick=DnnNotSupportedInSlice >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INSUFFICIENT_USER_PLANE_RESOURCES_FOR_PDU_SESSION = 219, /*< nick=InsufficientUserPlaneResourcesForPduSession >*/
+    MM_MOBILE_EQUIPMENT_ERROR_OUT_OF_LADN_SERVICE_AREA                          = 220, /*< nick=OutOfLadnServiceArea >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PTI_MISMATCH                                      = 221, /*< nick=PtiMismatch >*/
+    MM_MOBILE_EQUIPMENT_ERROR_MAX_DATA_RATE_FOR_USER_PLANE_INTEGRITY_TOO_LOW    = 222, /*< nick=MaxDataRateForUserPlaneIntegrityTooLow >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SEMANTIC_ERROR_IN_QOS_OPERATION                   = 223, /*< nick=SemanticErrorInQosOperation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_SYNTACTICAL_ERROR_IN_QOS_OPERATION                = 224, /*< nick=SyntacticalErrorInQosOperation >*/
+    MM_MOBILE_EQUIPMENT_ERROR_INVALID_MAPPED_EPS_BEARER_IDENTITY                = 225, /*< nick=InvalidMappedEpsBearerIdentity >*/
+    MM_MOBILE_EQUIPMENT_ERROR_REDIRECTION_TO_5GCN_REQUIRED                      = 226, /*< nick=RedirectionTo5gcnRequired >*/
+    MM_MOBILE_EQUIPMENT_ERROR_REDIRECTION_TO_EPC_REQUIRED                       = 227, /*< nick=RedirectionToEpcRequired >*/
+    MM_MOBILE_EQUIPMENT_ERROR_TEMPORARILY_UNAUTHORIZED_FOR_SNPN                 = 228, /*< nick=TemporarilyUnauthorizedForSnpn >*/
+    MM_MOBILE_EQUIPMENT_ERROR_PERMANENTLY_UNAUTHORIZED_FOR_SNPN                 = 229, /*< nick=PermanentlyUnauthorizedForSnpn >*/
+    MM_MOBILE_EQUIPMENT_ERROR_ETHERNET_ONLY_ALLOWED                             = 230, /*< nick=EthernetOnlyAllowed >*/
+    MM_MOBILE_EQUIPMENT_ERROR_UNAUTHORIZED_FOR_CAG                              = 231, /*< nick=UnauthorizedForCag >*/
+    MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK_SLICES_AVAILABLE                       = 232, /*< nick=NoNetworkSlicesAvailable >*/
+    MM_MOBILE_EQUIPMENT_ERROR_WIRELINE_ACCESS_AREA_NOT_ALLOWED                  = 233, /*< nick=WirelineAccessAreaNotAllowed >*/
 } MMMobileEquipmentError;
 
 /**
