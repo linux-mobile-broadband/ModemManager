@@ -1126,7 +1126,7 @@ handle_set_primary_sim_slot_auth_ready (MMBaseModem                    *self,
 
     /* Validate SIM slot number */
     sim_slot_paths = mm_gdbus_modem_get_sim_slots (ctx->skeleton);
-    if (ctx->requested_sim_slot > g_strv_length ((gchar **)sim_slot_paths)) {
+    if (!sim_slot_paths || (ctx->requested_sim_slot > g_strv_length ((gchar **)sim_slot_paths))) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_INVALID_ARGS,
