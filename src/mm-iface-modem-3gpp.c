@@ -1129,6 +1129,7 @@ set_initial_eps_bearer_settings_auth_ready (MMBaseModem                         
         old_config = mm_bearer_properties_new_from_dictionary (old_dictionary, NULL);
 
     if (old_config && mm_bearer_properties_cmp (ctx->config, old_config, MM_BEARER_PROPERTIES_CMP_FLAGS_EPS)) {
+        mm_obj_dbg (self, "Skipping initial eps bearer configuration. Same configuration provided");
         mm_gdbus_modem3gpp_complete_set_initial_eps_bearer_settings (ctx->skeleton, ctx->invocation);
         handle_set_initial_eps_bearer_settings_context_free (ctx);
     } else {
