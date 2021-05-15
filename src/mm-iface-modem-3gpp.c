@@ -458,11 +458,11 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp    *self,
         /* If the modem is already registered and the last time it was asked
          * automatic registration, we're done */
         if (!force_registration &&
-            (current_operator_code || REG_STATE_IS_REGISTERED (reg_state)) &&
+            REG_STATE_IS_REGISTERED (reg_state) &&
             !priv->manual_registration) {
             mm_obj_dbg (self, "already registered automatically in network '%s',"
                         " automatic registration not launched...",
-                        current_operator_code);
+                        current_operator_code ? current_operator_code : "unknown");
             g_task_return_boolean (task, TRUE);
             g_object_unref (task);
             return;
