@@ -33,15 +33,17 @@
 
 G_DEFINE_TYPE (MMPortQmi, mm_port_qmi, MM_TYPE_PORT)
 
+#if defined WITH_QRTR
+
 enum {
     PROP_0,
-#if defined WITH_QRTR
     PROP_NODE,
-#endif
     PROP_LAST
 };
 
 static GParamSpec *properties[PROP_LAST];
+
+#endif
 
 typedef struct {
     QmiService  service;
@@ -2511,23 +2513,21 @@ mm_port_qmi_init (MMPortQmi *self)
                                                             NULL);
 }
 
+#if defined WITH_QRTR
+
 static void
 set_property (GObject      *object,
               guint         prop_id,
               const GValue *value,
               GParamSpec   *pspec)
 {
-    switch (prop_id) {
-#if defined WITH_QRTR
-    case PROP_NODE:
-    {
-        MMPortQmi *self = MM_PORT_QMI (object);
+    MMPortQmi *self = MM_PORT_QMI (object);
 
+    switch (prop_id) {
+    case PROP_NODE:
         /* construct only, no new reference! */
         self->priv->node = g_value_get_object (value);
         break;
-    }
-#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -2540,21 +2540,19 @@ get_property (GObject    *object,
               GValue     *value,
               GParamSpec *pspec)
 {
-    switch (prop_id) {
-#if defined WITH_QRTR
-    case PROP_NODE:
-    {
-        MMPortQmi *self = MM_PORT_QMI (object);
+    MMPortQmi *self = MM_PORT_QMI (object);
 
+    switch (prop_id) {
+    case PROP_NODE:
         g_value_set_object (value, self->priv->node);
         break;
-    }
-#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
     }
 }
+
+#endif /* defined WITH_QRTR */
 
 static void
 dispose (GObject *object)
@@ -2603,11 +2601,12 @@ mm_port_qmi_class_init (MMPortQmiClass *klass)
     g_type_class_add_private (object_class, sizeof (MMPortQmiPrivate));
 
     /* Virtual methods */
-    object_class->get_property = get_property;
-    object_class->set_property = set_property;
     object_class->dispose = dispose;
 
 #if defined WITH_QRTR
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
     properties[PROP_NODE] =
         g_param_spec_object ("node",
                              "Qrtr Node",
@@ -2615,6 +2614,6 @@ mm_port_qmi_class_init (MMPortQmiClass *klass)
                              QRTR_TYPE_NODE,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
 
-#endif
     g_object_class_install_properties (object_class, PROP_LAST, properties);
+#endif
 }
