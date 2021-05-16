@@ -4473,8 +4473,11 @@ register_state_set_ready (MbimDevice *device,
                           GAsyncResult *res,
                           GTask *task)
 {
-    MbimMessage *response;
-    GError *error = NULL;
+    MMBroadbandModemMbim *self;
+    MbimMessage          *response;
+    GError               *error = NULL;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     /* According to Mobile Broadband Interface Model specification 1.0,
@@ -4510,7 +4513,7 @@ register_state_set_ready (MbimDevice *device,
                 NULL, /* roaming_text */
                 NULL, /* registration_flag */
                 &error))
-            error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error);
+            error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
     }
 
     if (response)
