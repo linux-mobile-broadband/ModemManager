@@ -126,6 +126,9 @@ QmiWdsApnTypeMask    mm_bearer_apn_type_to_qmi_apn_type             (MMBearerApn
                                                                      gpointer        log_object);
 MMBearerApnType      mm_bearer_apn_type_from_qmi_apn_type           (QmiWdsApnTypeMask apn_type);
 
+GError *qmi_mobile_equipment_error_from_verbose_call_end_reason_3gpp (QmiWdsVerboseCallEndReason3gpp vcer_3gpp,
+                                                                      gpointer                       log_object);
+
 /*****************************************************************************/
 /* QMI/WDA to MM translations */
 

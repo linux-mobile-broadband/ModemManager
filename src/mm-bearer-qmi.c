@@ -894,6 +894,55 @@ get_current_settings (GTask *task, QmiClientWds *client)
     qmi_message_wds_get_current_settings_input_unref (input);
 }
 
+static GError *
+mobile_equipment_error_from_start_network_output (MMBearerQmi                     *self,
+                                                  QmiMessageWdsStartNetworkOutput *output)
+{
+    QmiWdsCallEndReason            cer;
+    QmiWdsVerboseCallEndReasonType verbose_cer_type;
+    gint16                         verbose_cer_reason;
+
+    if (qmi_message_wds_start_network_output_get_verbose_call_end_reason (
+            output,
+            &verbose_cer_type,
+            &verbose_cer_reason,
+            NULL)) {
+        const gchar *verbose_cer_type_str;
+        const gchar *verbose_cer_reason_str;
+
+        verbose_cer_type_str = qmi_wds_verbose_call_end_reason_type_get_string (verbose_cer_type);
+        verbose_cer_reason_str = qmi_wds_verbose_call_end_reason_get_string (verbose_cer_type, verbose_cer_reason);
+        mm_obj_info (self, "verbose call end reason (%u,%d): [%s] %s",
+                     verbose_cer_type,
+                     verbose_cer_reason,
+                     verbose_cer_type_str,
+                     verbose_cer_reason_str);
+
+        /* If we have a 3GPP verbose call end reason, we try to build an error
+         * with the exact error code and message */
+        if (verbose_cer_type == QMI_WDS_VERBOSE_CALL_END_REASON_TYPE_3GPP)
+            return qmi_mobile_equipment_error_from_verbose_call_end_reason_3gpp ((QmiWdsVerboseCallEndReason3gpp)verbose_cer_reason, self);
+
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
+                            "Call failed: %s error: %s", verbose_cer_type_str, verbose_cer_reason_str);
+    }
+
+    if (qmi_message_wds_start_network_output_get_call_end_reason (
+            output,
+            &cer,
+            NULL)) {
+        const gchar *cer_str;
+
+        cer_str = qmi_wds_call_end_reason_get_string (cer);
+        mm_obj_info (self, "call end reason (%u): %s", cer, cer_str);
+
+        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
+                            "Call failed: %s", cer_str);
+    }
+
+    return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN, "Call failed");
+}
+
 static void
 start_network_ready (QmiClientWds *client,
                      GAsyncResult *res,
@@ -911,49 +960,24 @@ start_network_ready (QmiClientWds *client,
     g_assert (!(ctx->running_ipv4 && ctx->running_ipv6));
 
     output = qmi_client_wds_start_network_finish (client, res, &error);
-    if (output &&
-        !qmi_message_wds_start_network_output_get_result (output, &error)) {
+    if (output && !qmi_message_wds_start_network_output_get_result (output, &error)) {
         /* No-effect errors should be ignored. The modem will keep the
          * connection active as long as there is a WDS client which requested
          * to start the network. If ModemManager crashed while a connection was
          * active, we would be leaving an unreleased WDS client around and the
          * modem would just keep connected. */
-        if (g_error_matches (error,
-                             QMI_PROTOCOL_ERROR,
-                             QMI_PROTOCOL_ERROR_NO_EFFECT)) {
-            g_error_free (error);
-            error = NULL;
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_clear_error (&error);
             if (ctx->running_ipv4)
                 ctx->packet_data_handle_ipv4 = GLOBAL_PACKET_DATA_HANDLE;
             else
                 ctx->packet_data_handle_ipv6 = GLOBAL_PACKET_DATA_HANDLE;
-
             /* Fall down to a successful connection */
         } else {
             mm_obj_info (self, "couldn't start network: %s", error->message);
-            if (g_error_matches (error,
-                                 QMI_PROTOCOL_ERROR,
-                                 QMI_PROTOCOL_ERROR_CALL_FAILED)) {
-                QmiWdsCallEndReason cer;
-                QmiWdsVerboseCallEndReasonType verbose_cer_type;
-                gint16 verbose_cer_reason;
-
-                if (qmi_message_wds_start_network_output_get_call_end_reason (
-                        output,
-                        &cer,
-                        NULL))
-                    mm_obj_info (self, "call end reason (%u): %s", cer, qmi_wds_call_end_reason_get_string (cer));
-
-                if (qmi_message_wds_start_network_output_get_verbose_call_end_reason (
-                        output,
-                        &verbose_cer_type,
-                        &verbose_cer_reason,
-                        NULL))
-                    mm_obj_info (self, "verbose call end reason (%u,%d): [%s] %s",
-                                 verbose_cer_type,
-                                 verbose_cer_reason,
-                                 qmi_wds_verbose_call_end_reason_type_get_string (verbose_cer_type),
-                                 qmi_wds_verbose_call_end_reason_get_string (verbose_cer_type, verbose_cer_reason));
+            if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_CALL_FAILED)) {
+                g_clear_error (&error);
+                error = mobile_equipment_error_from_start_network_output (self, output);
             }
         }
     }
