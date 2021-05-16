@@ -52,6 +52,85 @@ TEST_ERROR_HELPER (MESSAGE_ERROR,          message_error,          MessageError)
 
 /*****************************************************************************/
 
+static void
+test_error_helpers_mobile_equipment_error_for_code (void)
+{
+    GError *error = NULL;
+
+    /* first */
+    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_PHONE_FAILURE, NULL);
+    g_assert_error (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_PHONE_FAILURE);
+    g_clear_error (&error);
+
+    /* last */
+    error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION, NULL);
+    g_assert_error (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_GPRS_REQUEST_REJECTED_BCM_VIOLATION);
+    g_clear_error (&error);
+
+    /* other > 255 */
+    error = mm_mobile_equipment_error_for_code (256, NULL);
+    g_assert_error (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
+    g_clear_error (&error);
+}
+
+static void
+test_error_helpers_message_error_for_code (void)
+{
+    GError *error = NULL;
+
+    /* first */
+    error = mm_message_error_for_code (MM_MESSAGE_ERROR_ME_FAILURE, NULL);
+    g_assert_error (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_ME_FAILURE);
+    g_clear_error (&error);
+
+    /* last */
+    error = mm_message_error_for_code (MM_MESSAGE_ERROR_UNKNOWN, NULL);
+    g_assert_error (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_UNKNOWN);
+    g_clear_error (&error);
+
+    /* other < 300 */
+    error = mm_message_error_for_code (299, NULL);
+    g_assert_error (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_UNKNOWN);
+    g_clear_error (&error);
+
+    /* other > 500 */
+    error = mm_message_error_for_code (501, NULL);
+    g_assert_error (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_UNKNOWN);
+    g_clear_error (&error);
+}
+
+/*****************************************************************************/
+
+static void
+test_error_helpers_mobile_equipment_error_for_string (void)
+{
+    GError *error = NULL;
+
+    error = mm_mobile_equipment_error_for_string ("operationnotallowed", NULL);
+    g_assert_error (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_ALLOWED);
+    g_clear_error (&error);
+
+    error = mm_mobile_equipment_error_for_string ("arratsaldeon", NULL);
+    g_assert_error (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
+    g_clear_error (&error);
+}
+
+static void
+test_error_helpers_message_error_for_string (void)
+{
+    GError *error = NULL;
+
+    error = mm_message_error_for_string ("operationnotallowed", NULL);
+    g_assert_error (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_NOT_ALLOWED);
+    g_clear_error (&error);
+
+    error = mm_message_error_for_string ("arratsaldeon", NULL);
+    g_assert_error (error, MM_MESSAGE_ERROR, MM_MESSAGE_ERROR_UNKNOWN);
+    g_clear_error (&error);
+}
+
+/*****************************************************************************/
+
 int main (int argc, char **argv)
 {
     setlocale (LC_ALL, "");
@@ -61,6 +140,12 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/error-helpers/connection-error",       test_error_helpers_connection_error);
     g_test_add_func ("/MM/error-helpers/mobile-equipment-error", test_error_helpers_mobile_equipment_error);
     g_test_add_func ("/MM/error-helpers/message-error",          test_error_helpers_message_error);
+
+    g_test_add_func ("/MM/error-helpers/mobile-equipment-error/for-code",   test_error_helpers_mobile_equipment_error_for_code);
+    g_test_add_func ("/MM/error-helpers/message-error/for-code",            test_error_helpers_message_error_for_code);
+
+    g_test_add_func ("/MM/error-helpers/mobile-equipment-error/for-string", test_error_helpers_mobile_equipment_error_for_string);
+    g_test_add_func ("/MM/error-helpers/message-error/for-string",          test_error_helpers_message_error_for_string);
 
     return g_test_run ();
 }
