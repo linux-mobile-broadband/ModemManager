@@ -136,7 +136,7 @@ mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self)
     if (!self->priv->operator_code)
         return 0;
     memcpy (mcc, self->priv->operator_code, 3);
-    mcc[4] = '\0';
+    mcc[3] = '\0';
     return strtol (mcc, NULL, 10);
 }
 
