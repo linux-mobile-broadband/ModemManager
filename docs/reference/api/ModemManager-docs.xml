@@ -142,6 +142,10 @@
     <title>Index of new symbols in 1.12</title>
     <xi:include href="xml/api-index-1.12.xml"></xi:include>
   </chapter>
+  <chapter id="api-index-1-14" role="1.14">
+    <title>Index of new symbols in 1.14</title>
+    <xi:include href="xml/api-index-1.14.xml"></xi:include>
+  </chapter>
   <chapter id="api-index-1-16" role="1.16">
     <title>Index of new symbols in 1.16</title>
     <xi:include href="xml/api-index-1.16.xml"></xi:include>
