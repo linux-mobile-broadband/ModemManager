@@ -31,12 +31,59 @@
  * ModemManager interface.
  **/
 
-#define MM_CORE_ERROR_DBUS_PREFIX             MM_DBUS_ERROR_PREFIX ".Core"
+/**
+ * MM_CORE_ERROR_DBUS_PREFIX:
+ *
+ * DBus prefix for #MMCoreError errors.
+ *
+ * Since: 1.0
+ */
+#define MM_CORE_ERROR_DBUS_PREFIX MM_DBUS_ERROR_PREFIX ".Core"
+
+/**
+ * MM_MOBILE_EQUIPMENT_ERROR_DBUS_PREFIX:
+ *
+ * DBus prefix for #MMMobileEquipmentError errors.
+ *
+ * Since: 1.0
+ */
 #define MM_MOBILE_EQUIPMENT_ERROR_DBUS_PREFIX MM_DBUS_ERROR_PREFIX ".MobileEquipment"
-#define MM_CONNECTION_ERROR_DBUS_PREFIX       MM_DBUS_ERROR_PREFIX ".Connection"
-#define MM_SERIAL_ERROR_DBUS_PREFIX           MM_DBUS_ERROR_PREFIX ".Serial"
-#define MM_MESSAGE_ERROR_DBUS_PREFIX          MM_DBUS_ERROR_PREFIX ".Message"
-#define MM_CDMA_ACTIVATION_ERROR_DBUS_PREFIX  MM_DBUS_ERROR_PREFIX ".CdmaActivation"
+
+/**
+ * MM_CONNECTION_ERROR_DBUS_PREFIX:
+ *
+ * DBus prefix for #MMConnectionError errors.
+ *
+ * Since: 1.0
+ */
+#define MM_CONNECTION_ERROR_DBUS_PREFIX MM_DBUS_ERROR_PREFIX ".Connection"
+
+/**
+ * MM_SERIAL_ERROR_DBUS_PREFIX:
+ *
+ * DBus prefix for #MMSerialError errors.
+ *
+ * Since: 1.0
+ */
+#define MM_SERIAL_ERROR_DBUS_PREFIX MM_DBUS_ERROR_PREFIX ".Serial"
+
+/**
+ * MM_MESSAGE_ERROR_DBUS_PREFIX:
+ *
+ * DBus prefix for #MMMessageError errors.
+ *
+ * Since: 1.0
+ */
+#define MM_MESSAGE_ERROR_DBUS_PREFIX MM_DBUS_ERROR_PREFIX ".Message"
+
+/**
+ * MM_CDMA_ACTIVATION_ERROR_DBUS_PREFIX:
+ *
+ * DBus prefix for #MMCdmaActivationError errors.
+ *
+ * Since: 1.0
+ */
+#define MM_CDMA_ACTIVATION_ERROR_DBUS_PREFIX MM_DBUS_ERROR_PREFIX ".CdmaActivation"
 
 /**
  * MMCoreError:
