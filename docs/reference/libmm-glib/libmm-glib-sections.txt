@@ -1091,6 +1091,8 @@ mm_bearer_peek_properties
 mm_bearer_get_properties
 mm_bearer_peek_stats
 mm_bearer_get_stats
+mm_bearer_get_connection_error
+mm_bearer_peek_connection_error
 <SUBSECTION Methods>
 mm_bearer_connect
 mm_bearer_connect_finish
@@ -1835,6 +1837,8 @@ mm_gdbus_bearer_get_ip_timeout
 mm_gdbus_bearer_get_properties
 mm_gdbus_bearer_dup_properties
 mm_gdbus_bearer_get_connected
+mm_gdbus_bearer_get_connection_error
+mm_gdbus_bearer_dup_connection_error
 mm_gdbus_bearer_get_suspended
 mm_gdbus_bearer_get_multiplexed
 mm_gdbus_bearer_get_bearer_type
@@ -1851,6 +1855,7 @@ mm_gdbus_bearer_call_disconnect_sync
 <SUBSECTION Private>
 mm_gdbus_bearer_interface_info
 mm_gdbus_bearer_set_connected
+mm_gdbus_bearer_set_connection_error
 mm_gdbus_bearer_set_interface
 mm_gdbus_bearer_set_ip4_config
 mm_gdbus_bearer_set_ip6_config

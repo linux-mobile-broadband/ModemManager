@@ -120,6 +120,9 @@ MMBearerIpConfig   *mm_bearer_peek_ipv6_config (MMBearer *self);
 MMBearerStats      *mm_bearer_get_stats        (MMBearer *self);
 MMBearerStats      *mm_bearer_peek_stats       (MMBearer *self);
 
+GError             *mm_bearer_get_connection_error  (MMBearer *self);
+GError             *mm_bearer_peek_connection_error (MMBearer *self);
+
 G_END_DECLS
 
 #endif /* _MM_BEARER_H_ */

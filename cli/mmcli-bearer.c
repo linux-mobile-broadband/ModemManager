@@ -133,30 +133,34 @@ mmcli_bearer_shutdown (void)
 static void
 print_bearer_info (MMBearer *bearer)
 {
-    MMBearerIpConfig   *ipv4_config;
-    MMBearerIpConfig   *ipv6_config;
-    MMBearerProperties *properties;
-    MMBearerStats      *stats;
-    gint                profile_id;
-    gchar              *profile_id_str;
+    g_autoptr(MMBearerIpConfig)    ipv4_config = NULL;
+    g_autoptr(MMBearerIpConfig)    ipv6_config = NULL;
+    g_autoptr(MMBearerProperties)  properties = NULL;
+    g_autoptr(MMBearerStats)       stats = NULL;
+    g_autoptr(GError)              connection_error = NULL;
+    gint                           profile_id;
+    gchar                         *profile_id_str;
 
-    ipv4_config = mm_bearer_get_ipv4_config (bearer);
-    ipv6_config = mm_bearer_get_ipv6_config (bearer);
-    properties  = mm_bearer_get_properties (bearer);
-    stats       = mm_bearer_get_stats (bearer);
-    profile_id  = mm_bearer_get_profile_id (bearer);
+    ipv4_config      = mm_bearer_get_ipv4_config (bearer);
+    ipv6_config      = mm_bearer_get_ipv6_config (bearer);
+    properties       = mm_bearer_get_properties (bearer);
+    stats            = mm_bearer_get_stats (bearer);
+    profile_id       = mm_bearer_get_profile_id (bearer);
+    connection_error = mm_bearer_get_connection_error (bearer);
 
     profile_id_str = (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) ? g_strdup_printf ("%d", profile_id) : NULL;
 
     mmcli_output_string      (MMC_F_BEARER_GENERAL_DBUS_PATH, mm_bearer_get_path (bearer));
     mmcli_output_string      (MMC_F_BEARER_GENERAL_TYPE,      mm_bearer_type_get_string (mm_bearer_get_bearer_type (bearer)));
 
-    mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTED,   mm_bearer_get_connected (bearer) ? "yes" : "no");
-    mmcli_output_string      (MMC_F_BEARER_STATUS_SUSPENDED,   mm_bearer_get_suspended (bearer) ? "yes" : "no");
-    mmcli_output_string      (MMC_F_BEARER_STATUS_MULTIPLEXED, mm_bearer_get_multiplexed (bearer) ? "yes" : "no");
-    mmcli_output_string      (MMC_F_BEARER_STATUS_INTERFACE,   mm_bearer_get_interface (bearer));
-    mmcli_output_string_take (MMC_F_BEARER_STATUS_IP_TIMEOUT,  g_strdup_printf ("%u", mm_bearer_get_ip_timeout (bearer)));
-    mmcli_output_string_take (MMC_F_BEARER_STATUS_PROFILE_ID,  profile_id_str);
+    mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTED,                mm_bearer_get_connected (bearer) ? "yes" : "no");
+    mmcli_output_string_take (MMC_F_BEARER_STATUS_CONNECTION_ERROR_NAME,    connection_error ? g_dbus_error_encode_gerror (connection_error) : NULL);
+    mmcli_output_string      (MMC_F_BEARER_STATUS_CONNECTION_ERROR_MESSAGE, connection_error ? connection_error->message : NULL);
+    mmcli_output_string      (MMC_F_BEARER_STATUS_SUSPENDED,                mm_bearer_get_suspended (bearer) ? "yes" : "no");
+    mmcli_output_string      (MMC_F_BEARER_STATUS_MULTIPLEXED,              mm_bearer_get_multiplexed (bearer) ? "yes" : "no");
+    mmcli_output_string      (MMC_F_BEARER_STATUS_INTERFACE,                mm_bearer_get_interface (bearer));
+    mmcli_output_string_take (MMC_F_BEARER_STATUS_IP_TIMEOUT,               g_strdup_printf ("%u", mm_bearer_get_ip_timeout (bearer)));
+    mmcli_output_string_take (MMC_F_BEARER_STATUS_PROFILE_ID,               profile_id_str);
 
     /* Properties */
     {
@@ -315,11 +319,6 @@ print_bearer_info (MMBearer *bearer)
     }
 
     mmcli_output_dump ();
-
-    g_clear_object (&stats);
-    g_clear_object (&properties);
-    g_clear_object (&ipv4_config);
-    g_clear_object (&ipv6_config);
 }
 
 static void

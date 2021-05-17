@@ -1911,3 +1911,53 @@ mm_common_register_errors (void)
 
     return TRUE;
 }
+
+GError *
+mm_common_error_from_tuple (GVariant  *tuple,
+                            GError   **error)
+{
+    g_autoptr(GError)  dbus_error = NULL;
+    g_autofree gchar  *error_name = NULL;
+    g_autofree gchar  *error_message = NULL;
+
+    mm_common_register_errors ();
+
+    if (!g_variant_is_of_type (tuple, G_VARIANT_TYPE ("(ss)"))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot create error from tuple: "
+                     "invalid variant type received");
+        return NULL;
+    }
+
+    g_variant_get (tuple, "(ss)", &error_name, &error_message);
+    if (!error_name || !error_name[0])
+        return NULL;
+
+    /* We convert the error name into a proper GError (domain+code), but we
+     * don't attempt to give the error message to new_for_dbus_error() as that
+     * would generate a string we don't want (e.g. instead of just "Unknown
+     * Error" we would get "GDBus.Error:org.freedesktop.ModemManager1.Error.MobileEquipment.Unknown: Unknown error"
+     */
+    dbus_error = g_dbus_error_new_for_dbus_error (error_name, "");
+
+    /* And now we build a new GError with same domain+code but with the received
+     * error message */
+    return g_error_new (dbus_error->domain, dbus_error->code, "%s", error_message);
+}
+
+GVariant *
+mm_common_error_to_tuple (const GError *error)
+{
+    g_autofree gchar *error_name = NULL;
+    GVariant         *tuple[2];
+
+    mm_common_register_errors ();
+
+    error_name = g_dbus_error_encode_gerror (error);
+    tuple[0] = g_variant_new_string (error_name);
+    tuple[1] = g_variant_new_string (error->message);
+
+    return g_variant_ref_sink (g_variant_new_tuple (tuple, 2));
+}

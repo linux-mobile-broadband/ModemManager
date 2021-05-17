@@ -22,6 +22,7 @@
  */
 
 #include "mm-helpers.h"
+#include "mm-common-helpers.h"
 #include "mm-bearer.h"
 
 /**
@@ -58,6 +59,11 @@ struct _MMBearerPrivate {
     GMutex stats_mutex;
     guint stats_id;
     MMBearerStats *stats;
+
+    /* Connection error */
+    GMutex connection_error_mutex;
+    guint connection_error_id;
+    GError *connection_error;
 };
 
 /*****************************************************************************/
@@ -757,6 +763,116 @@ mm_bearer_peek_stats (MMBearer *self)
 
 /*****************************************************************************/
 
+static void
+connection_error_updated (MMBearer   *self,
+                          GParamSpec *pspec)
+{
+    g_mutex_lock (&self->priv->connection_error_mutex);
+    {
+        GVariant *tuple;
+
+        g_clear_error (&self->priv->connection_error);
+
+        tuple = mm_gdbus_bearer_get_connection_error (MM_GDBUS_BEARER (self));
+        if (tuple) {
+            g_autoptr(GError) error = NULL;
+
+            self->priv->connection_error = mm_common_error_from_tuple (tuple, &error);
+            if (error)
+                g_warning ("Invalid bearer connection error update received: %s", error->message);
+        }
+    }
+    g_mutex_unlock (&self->priv->connection_error_mutex);
+}
+
+static void
+ensure_internal_connection_error (MMBearer  *self,
+                                  GError   **dup)
+{
+    g_mutex_lock (&self->priv->connection_error_mutex);
+    {
+        /* If this is the first time ever asking for the object, setup the
+         * update listener and the initial object, if any. */
+        if (!self->priv->connection_error_id) {
+            g_autoptr(GVariant) tuple = NULL;
+
+            tuple = mm_gdbus_bearer_dup_connection_error (MM_GDBUS_BEARER (self));
+            if (tuple) {
+                g_autoptr(GError) error = NULL;
+
+                self->priv->connection_error = mm_common_error_from_tuple (tuple, &error);
+                if (error)
+                    g_warning ("Invalid bearer connection error: %s", error->message);
+            }
+
+            /* No need to clear this signal connection when freeing self */
+            self->priv->connection_error_id =
+                g_signal_connect (self,
+                                  "notify::connection-error",
+                                  G_CALLBACK (connection_error_updated),
+                                  NULL);
+        }
+
+        if (dup && self->priv->connection_error)
+            *dup = g_error_copy (self->priv->connection_error);
+    }
+    g_mutex_unlock (&self->priv->connection_error_mutex);
+}
+
+/**
+ * mm_bearer_get_connection_error:
+ * @self: A #MMBearer.
+ *
+ * Gets a #GError specifying the connection error details, if any.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_bearer_get_connection_error() again to get a new #GError with the
+ * new values.</warning>
+ *
+ * Returns: (transfer full): A #GError that must be freed with
+ * g_error_free() or %NULL if none.
+ *
+ * Since: 1.18
+ */
+GError *
+mm_bearer_get_connection_error (MMBearer *self)
+{
+    GError *error = NULL;
+
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
+
+    ensure_internal_connection_error (self, &error);
+    return error;
+}
+
+/**
+ * mm_bearer_peek_connection_error:
+ * @self: A #MMBearer.
+ *
+ * Gets a #GError specifying the connection error details, if any.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_bearer_get_connection_error() if on another
+ * thread.</warning>
+ *
+ * Returns: (transfer none): A #GError, or %NULL if none. Do not
+ * free the returned value, it belongs to @self.
+ *
+ * Since: 1.18
+ */
+GError *
+mm_bearer_peek_connection_error (MMBearer *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
+
+    ensure_internal_connection_error (self, NULL);
+    return self->priv->connection_error;
+}
+
+/*****************************************************************************/
+
 /**
  * mm_bearer_connect_finish:
  * @self: A #MMBearer.
@@ -932,6 +1048,7 @@ mm_bearer_init (MMBearer *self)
     g_mutex_init (&self->priv->ipv6_config_mutex);
     g_mutex_init (&self->priv->properties_mutex);
     g_mutex_init (&self->priv->stats_mutex);
+    g_mutex_init (&self->priv->connection_error_mutex);
 }
 
 static void
@@ -943,6 +1060,7 @@ finalize (GObject *object)
     g_mutex_clear (&self->priv->ipv6_config_mutex);
     g_mutex_clear (&self->priv->properties_mutex);
     g_mutex_clear (&self->priv->stats_mutex);
+    g_mutex_clear (&self->priv->connection_error_mutex);
 
     G_OBJECT_CLASS (mm_bearer_parent_class)->finalize (object);
 }
@@ -956,6 +1074,7 @@ dispose (GObject *object)
     g_clear_object (&self->priv->ipv6_config);
     g_clear_object (&self->priv->properties);
     g_clear_object (&self->priv->stats);
+    g_clear_error (&self->priv->connection_error);
 
     G_OBJECT_CLASS (mm_bearer_parent_class)->dispose (object);
 }

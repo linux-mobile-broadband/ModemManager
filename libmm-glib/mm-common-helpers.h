@@ -202,6 +202,9 @@ gboolean  mm_utils_ishexstr   (const gchar *hex);
 gboolean  mm_utils_check_for_single_value (guint32 value);
 
 /* DBus error handling */
-gboolean mm_common_register_errors (void);
+gboolean  mm_common_register_errors  (void);
+GError   *mm_common_error_from_tuple (GVariant      *tuple,
+                                      GError       **error);
+GVariant *mm_common_error_to_tuple   (const GError  *error);
 
 #endif /* MM_COMMON_HELPERS_H */

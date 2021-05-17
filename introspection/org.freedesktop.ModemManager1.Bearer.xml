@@ -102,6 +102,20 @@
     <property name="Connected" type="b" access="read" />
 
     <!--
+        ConnectionError:
+
+        Provides additional information specifying the reason why the modem is
+	not connected (either due to a failed connection attempt, or due to a
+	a network initiated disconnection).
+
+        The value is composed of two strings: the registered DBus error name,
+	and an optional error message.
+
+        Since: 1.18
+    -->
+    <property name="ConnectionError" type="(ss)" access="read" />
+
+    <!--
         Suspended:
 
         In some devices, packet data service will be suspended while the device
