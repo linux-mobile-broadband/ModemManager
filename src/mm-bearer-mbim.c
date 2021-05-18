@@ -628,20 +628,14 @@ connect_set_ready (MbimDevice   *device,
                         mbim_activation_state_get_string (activation_state),
                         mbim_context_ip_type_get_string (ctx->requested_ip_type),
                         mbim_context_ip_type_get_string (ctx->activated_ip_type),
-                        nw_error ? mbim_nw_error_get_string (nw_error) : "none");
+                        mbim_nw_error_get_string (nw_error));
             /* If the response reports an ACTIVATED state, we're good even if
              * there is a nw_error set (e.g. asking for IPv4v6 may return a
              * 'pdp-type-ipv4-only-allowed' nw_error). */
             if (activation_state != MBIM_ACTIVATION_STATE_ACTIVATED &&
                 activation_state != MBIM_ACTIVATION_STATE_ACTIVATING) {
-                if (nw_error) {
-                    g_clear_error (&error);
-                    error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
-                } else if (!error) {
-                    error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                                         MM_MOBILE_EQUIPMENT_ERROR_GPRS_UNKNOWN,
-                                         "Unknown error: context activation failed");
-                }
+                g_clear_error (&error);
+                error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
             }
         } else {
             /* Prefer the error from the result to the parsing error */
