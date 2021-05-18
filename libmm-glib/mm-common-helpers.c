@@ -1889,3 +1889,25 @@ mm_utils_check_for_single_value (guint32 value)
 
     return TRUE;
 }
+
+/*****************************************************************************/
+/* DBus error handling */
+
+gboolean
+mm_common_register_errors (void)
+{
+    static volatile guint32 aux = 0;
+
+    if (G_LIKELY (aux))
+        return FALSE;
+
+    /* Register all known own errors */
+    aux |= MM_CORE_ERROR;
+    aux |= MM_MOBILE_EQUIPMENT_ERROR;
+    aux |= MM_CONNECTION_ERROR;
+    aux |= MM_SERIAL_ERROR;
+    aux |= MM_MESSAGE_ERROR;
+    aux |= MM_CDMA_ACTIVATION_ERROR;
+
+    return TRUE;
+}

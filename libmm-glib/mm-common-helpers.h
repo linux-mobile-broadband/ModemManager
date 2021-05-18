@@ -201,4 +201,7 @@ gboolean  mm_utils_ishexstr   (const gchar *hex);
 
 gboolean  mm_utils_check_for_single_value (guint32 value);
 
+/* DBus error handling */
+gboolean mm_common_register_errors (void);
+
 #endif /* MM_COMMON_HELPERS_H */

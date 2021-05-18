@@ -24,6 +24,7 @@
 #include <ModemManager.h>
 
 #include "mm-helpers.h"
+#include "mm-common-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-gdbus-manager.h"
 #include "mm-manager.h"
@@ -961,26 +962,9 @@ mm_manager_uninhibit_device_sync (MMManager     *manager,
 /*****************************************************************************/
 
 static void
-register_dbus_errors (void)
-{
-  static volatile guint32 aux = 0;
-
-  if (aux)
-      return;
-
-  /* Register all known own errors */
-  aux |= MM_CORE_ERROR;
-  aux |= MM_MOBILE_EQUIPMENT_ERROR;
-  aux |= MM_CONNECTION_ERROR;
-  aux |= MM_SERIAL_ERROR;
-  aux |= MM_MESSAGE_ERROR;
-  aux |= MM_CDMA_ACTIVATION_ERROR;
-}
-
-static void
 mm_manager_init (MMManager *manager)
 {
-    register_dbus_errors ();
+    mm_common_register_errors ();
 
     /* Setup private data */
     manager->priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
