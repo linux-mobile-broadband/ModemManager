@@ -249,8 +249,47 @@ bearer_update_connection_error (MMBaseBearer *self,
 {
     g_autoptr(GVariant) tuple = NULL;
 
-    if (connection_error)
-        tuple = mm_common_error_to_tuple (connection_error);
+    if (connection_error) {
+        /*
+         * Limit the type of errors we can expose in the interface;
+         * e.g. we don't want QMI or MBIM specific errors reported.
+         *
+         * G_IO_ERROR_CANCELLED is an exception, because we map it to
+         * MM_CORE_ERROR_CANCELLED implicitly when building the DBus error name.
+         */
+        if ((connection_error->domain != MM_CORE_ERROR) &&
+            (connection_error->domain != MM_MOBILE_EQUIPMENT_ERROR) &&
+            (connection_error->domain != MM_CONNECTION_ERROR) &&
+            (connection_error->domain != MM_SERIAL_ERROR) &&
+            (connection_error->domain != MM_CDMA_ACTIVATION_ERROR) &&
+            (!g_error_matches (connection_error, G_IO_ERROR, G_IO_ERROR_CANCELLED))) {
+            g_autoptr(GError) default_connection_error = NULL;
+
+#if defined WITH_QMI
+            if (connection_error->domain == QMI_CORE_ERROR)
+                mm_obj_dbg (self, "cannot set QMI core error as connection error: %s", connection_error->message);
+            else if (connection_error->domain == QMI_PROTOCOL_ERROR)
+                mm_obj_dbg (self, "cannot set QMI protocol error as connection error: %s", connection_error->message);
+            else
+#endif
+#if defined WITH_MBIM
+            if (connection_error->domain == MBIM_CORE_ERROR)
+                mm_obj_dbg (self, "cannot set MBIM core error as connection error: %s", connection_error->message);
+            else if (connection_error->domain == MBIM_PROTOCOL_ERROR)
+                mm_obj_dbg (self, "cannot set MBIM protocol error as connection error: %s", connection_error->message);
+            else if (connection_error->domain == MBIM_STATUS_ERROR)
+                mm_obj_dbg (self, "cannot set MBIM status error as connection error: %s", connection_error->message);
+            else
+#endif
+                mm_obj_dbg (self, "cannot set unhandled domain error as connection error: %s", connection_error->message);
+
+            default_connection_error = g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                                                    MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
+                                                    "%s", connection_error->message);
+            tuple = mm_common_error_to_tuple (default_connection_error);
+        } else
+            tuple = mm_common_error_to_tuple (connection_error);
+    }
     mm_gdbus_bearer_set_connection_error (MM_GDBUS_BEARER (self), tuple);
 }
 
