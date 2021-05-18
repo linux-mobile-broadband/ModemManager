@@ -3299,6 +3299,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
 typedef struct {
     MMBroadbandModemMbim *self;
     guint32               session_id;
+    GError               *connection_error;
 } ReportDisconnectedStatusContext;
 
 static void
@@ -3310,18 +3311,19 @@ bearer_list_report_disconnected_status (MMBaseBearer *bearer,
     if (MM_IS_BEARER_MBIM (bearer) &&
         mm_bearer_mbim_get_session_id (MM_BEARER_MBIM (bearer)) == ctx->session_id) {
         mm_obj_dbg (ctx->self, "bearer '%s' was disconnected.", mm_base_bearer_get_path (bearer));
-        mm_base_bearer_report_connection_status (bearer, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+        mm_base_bearer_report_connection_status_detailed (bearer, MM_BEARER_CONNECTION_STATUS_DISCONNECTED, ctx->connection_error);
     }
 }
 
 static void
 basic_connect_notification_connect (MMBroadbandModemMbim *self,
-                                    MbimMessage *notification)
+                                    MbimMessage          *notification)
 {
-    guint32 session_id;
-    MbimActivationState activation_state;
-    const MbimUuid *context_type;
-    MMBearerList *bearer_list;
+    guint32                  session_id;
+    MbimActivationState      activation_state;
+    const MbimUuid          *context_type;
+    guint32                  nw_error;
+    g_autoptr(MMBearerList)  bearer_list = NULL;
 
     if (!mbim_message_connect_notification_parse (
             notification,
@@ -3330,7 +3332,7 @@ basic_connect_notification_connect (MMBroadbandModemMbim *self,
             NULL, /* voice_call_state */
             NULL, /* ip_type */
             &context_type,
-            NULL, /* nw_error */
+            &nw_error,
             NULL)) {
         return;
     }
@@ -3344,17 +3346,20 @@ basic_connect_notification_connect (MMBroadbandModemMbim *self,
 
     if (mbim_uuid_to_context_type (context_type) == MBIM_CONTEXT_TYPE_INTERNET &&
         activation_state == MBIM_ACTIVATION_STATE_DEACTIVATED) {
-      ReportDisconnectedStatusContext ctx;
+        ReportDisconnectedStatusContext ctx;
+        g_autoptr(GError)               connection_error = NULL;
 
-      mm_obj_dbg (self, "session ID '%u' was deactivated.", session_id);
-      ctx.self = self;
-      ctx.session_id = session_id;
-      mm_bearer_list_foreach (bearer_list,
-                              (MMBearerListForeachFunc)bearer_list_report_disconnected_status,
-                              &ctx);
+        connection_error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
+
+        mm_obj_dbg (self, "session ID '%u' was deactivated: %s", session_id, connection_error->message);
+
+        ctx.self = self;
+        ctx.session_id = session_id;
+        ctx.connection_error = connection_error;
+        mm_bearer_list_foreach (bearer_list,
+                                (MMBearerListForeachFunc)bearer_list_report_disconnected_status,
+                                &ctx);
     }
-
-    g_object_unref (bearer_list);
 }
 
 static void
