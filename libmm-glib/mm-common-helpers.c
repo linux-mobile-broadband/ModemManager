@@ -1400,6 +1400,7 @@ mm_get_int_from_str (const gchar *str,
                      gint *out)
 {
     glong num;
+    guint i;
     guint eol = 0;
 
     if (!str)
@@ -1412,10 +1413,10 @@ mm_get_int_from_str (const gchar *str,
     if (!str[0])
         return FALSE;
 
-    for (num = 0; str[num]; num++) {
-        if (str[num] != '+' && str[num] != '-' && !g_ascii_isdigit (str[num])) {
+    for (i = 0; str[i]; i++) {
+        if (str[i] != '+' && str[i] != '-' && !g_ascii_isdigit (str[i])) {
             /* ignore \r\n at the end of the string */
-            if ((str[num] == '\r') || (str[num] == '\n')) {
+            if ((str[i] == '\r') || (str[i] == '\n')) {
                 eol++;
                 continue;
             }
@@ -1426,7 +1427,7 @@ mm_get_int_from_str (const gchar *str,
             return FALSE;
     }
     /* if all characters were eol, the string is not parseable */
-    if (eol == num)
+    if (eol == i)
         return FALSE;
 
     errno = 0;
@@ -1794,7 +1795,7 @@ mm_utils_hexstr2bin (const gchar  *hex,
 {
     const gchar *ipos = hex;
     g_autofree guint8 *buf = NULL;
-    gsize i;
+    gssize i;
     gint a;
     guint8 *opos;
 
