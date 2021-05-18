@@ -699,7 +699,8 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 static void
 report_connection_status (MMBaseBearer             *_self,
-                          MMBearerConnectionStatus  status)
+                          MMBearerConnectionStatus  status,
+                          const GError             *connection_error)
 {
     MMBroadbandBearerHso *self = MM_BROADBAND_BEARER_HSO (_self);
 
@@ -719,9 +720,7 @@ report_connection_status (MMBaseBearer             *_self,
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
         /* If no connection attempt on-going, make sure we mark ourselves as
          * disconnected */
-        MM_BASE_BEARER_CLASS (mm_broadband_bearer_hso_parent_class)->report_connection_status (
-            _self,
-            status);
+        MM_BASE_BEARER_CLASS (mm_broadband_bearer_hso_parent_class)->report_connection_status (_self, status,connection_error);
     }
 }
 

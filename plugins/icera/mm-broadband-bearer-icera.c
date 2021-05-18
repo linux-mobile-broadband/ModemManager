@@ -700,7 +700,8 @@ dial_3gpp (MMBroadbandBearer   *_self,
 
 static void
 report_connection_status (MMBaseBearer             *_self,
-                          MMBearerConnectionStatus  status)
+                          MMBearerConnectionStatus  status,
+                          const GError             *connection_error)
 {
     MMBroadbandBearerIcera *self = MM_BROADBAND_BEARER_ICERA (_self);
 
@@ -729,7 +730,8 @@ report_connection_status (MMBaseBearer             *_self,
          * disconnected. Make sure we only pass 'DISCONNECTED' to the parent */
         MM_BASE_BEARER_CLASS (mm_broadband_bearer_icera_parent_class)->report_connection_status (
             _self,
-            MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+            MM_BEARER_CONNECTION_STATUS_DISCONNECTED,
+            connection_error);
     }
 }
 

@@ -146,8 +146,9 @@ struct _MMBaseBearerClass {
                                       GError **error);
 
     /* Report connection status of this bearer */
-    void (* report_connection_status) (MMBaseBearer *bearer,
-                                       MMBearerConnectionStatus status);
+    void (* report_connection_status) (MMBaseBearer             *bearer,
+                                       MMBearerConnectionStatus  status,
+                                       const GError             *connection_error);
 };
 
 GType mm_base_bearer_get_type (void);
@@ -177,7 +178,11 @@ gboolean mm_base_bearer_disconnect_finish (MMBaseBearer *self,
 
 void mm_base_bearer_disconnect_force (MMBaseBearer *self);
 
-void mm_base_bearer_report_connection_status (MMBaseBearer *self,
-                                              MMBearerConnectionStatus status);
+void mm_base_bearer_report_connection_status_detailed (MMBaseBearer             *self,
+                                                       MMBearerConnectionStatus  status,
+                                                       const GError             *connection_error);
+
+/* When unknown, just pass NULL */
+#define mm_base_bearer_report_connection_status(self, status) mm_base_bearer_report_connection_status_detailed (self, status, NULL)
 
 #endif /* MM_BASE_BEARER_H */

@@ -37,6 +37,7 @@
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 #include "mm-bearer-stats.h"
 
 /* We require up to 20s to get a proper IP when using PPP */
@@ -1368,8 +1369,9 @@ mm_base_bearer_disconnect_force (MMBaseBearer *self)
 /*****************************************************************************/
 
 static void
-report_connection_status (MMBaseBearer *self,
-                          MMBearerConnectionStatus status)
+report_connection_status (MMBaseBearer             *self,
+                          MMBearerConnectionStatus status,
+                          const GError             *connection_error)
 {
     /* The only status expected at this point is DISCONNECTED or CONNECTED,
      * although here we just process the DISCONNECTED one.
@@ -1378,8 +1380,10 @@ report_connection_status (MMBaseBearer *self,
 
     /* In the generic bearer implementation we just need to reset the
      * interface status */
-    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) {
+        bearer_update_connection_error (self, connection_error);
         bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
+    }
 }
 
 /*
@@ -1409,15 +1413,28 @@ report_connection_status (MMBaseBearer *self,
  * pppd should detect it) and disconnect the bearer through DBus.
  */
 void
-mm_base_bearer_report_connection_status (MMBaseBearer             *self,
-                                         MMBearerConnectionStatus  status)
+mm_base_bearer_report_connection_status_detailed (MMBaseBearer             *self,
+                                                  MMBearerConnectionStatus  status,
+                                                  const GError             *connection_error)
 {
-    if ((status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED) && self->priv->ignore_disconnection_reports) {
-        mm_obj_dbg (self, "ignoring disconnection report");
-        return;
+    /* Reporting disconnection? */
+    if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED || status == MM_BEARER_CONNECTION_STATUS_CONNECTION_FAILED) {
+        if (self->priv->ignore_disconnection_reports) {
+            mm_obj_dbg (self, "ignoring disconnection report");
+            return;
+        }
+
+        /* Setup a generic default error if none explicitly given when reporting
+         * bearer disconnections. */
+        if (!connection_error) {
+            g_autoptr(GError) default_connection_error = NULL;
+
+            default_connection_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN, self);
+            return MM_BASE_BEARER_GET_CLASS (self)->report_connection_status (self, status, default_connection_error);
+        }
     }
 
-    return MM_BASE_BEARER_GET_CLASS (self)->report_connection_status (self, status);
+    return MM_BASE_BEARER_GET_CLASS (self)->report_connection_status (self, status, connection_error);
 }
 
 /*****************************************************************************/

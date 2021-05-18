@@ -777,8 +777,9 @@ disconnect_3gpp (MMBroadbandBearer *_self,
 /*****************************************************************************/
 
 static void
-report_connection_status (MMBaseBearer *bearer,
-                          MMBearerConnectionStatus status)
+report_connection_status (MMBaseBearer             *bearer,
+                          MMBearerConnectionStatus  status,
+                          const GError             *connection_error)
 {
     MMBroadbandBearerHuawei *self = MM_BROADBAND_BEARER_HUAWEI (bearer);
 
@@ -801,7 +802,8 @@ report_connection_status (MMBaseBearer *bearer,
     /* Report disconnected right away */
     MM_BASE_BEARER_CLASS (mm_broadband_bearer_huawei_parent_class)->report_connection_status (
         bearer,
-        MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+        MM_BEARER_CONNECTION_STATUS_DISCONNECTED,
+        NULL);
 }
 
 /*****************************************************************************/

@@ -1520,15 +1520,16 @@ mm_bearer_mbim_get_session_id (MMBearerMbim *self)
 /*****************************************************************************/
 
 static void
-report_connection_status (MMBaseBearer *self,
-                          MMBearerConnectionStatus status)
+report_connection_status (MMBaseBearer             *self,
+                          MMBearerConnectionStatus  status,
+                          const GError             *connection_error)
 {
     if (status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)
         /* Cleanup all connection related data */
         reset_bearer_connection (MM_BEARER_MBIM (self));
 
     /* Chain up parent's report_connection_status() */
-    MM_BASE_BEARER_CLASS (mm_bearer_mbim_parent_class)->report_connection_status (self, status);
+    MM_BASE_BEARER_CLASS (mm_bearer_mbim_parent_class)->report_connection_status (self, status, connection_error);
 }
 
 /*****************************************************************************/

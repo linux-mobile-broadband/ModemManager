@@ -2523,7 +2523,8 @@ disconnect (MMBaseBearer *_self,
 
 static void
 report_connection_status (MMBaseBearer             *_self,
-                          MMBearerConnectionStatus  status)
+                          MMBearerConnectionStatus  status,
+                          const GError             *connection_error)
 {
     MMBearerQmi *self = MM_BEARER_QMI (_self);
 
@@ -2535,7 +2536,7 @@ report_connection_status (MMBaseBearer             *_self,
     }
 
     /* Chain up parent's report_connection_status() */
-    MM_BASE_BEARER_CLASS (mm_bearer_qmi_parent_class)->report_connection_status (_self, status);
+    MM_BASE_BEARER_CLASS (mm_bearer_qmi_parent_class)->report_connection_status (_self, status, connection_error);
 }
 
 /*****************************************************************************/
