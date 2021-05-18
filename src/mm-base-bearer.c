@@ -456,7 +456,7 @@ bearer_update_status (MMBaseBearer *self,
                                 mm_bearer_stats_get_duration (self->priv->stats));
         if (!self->priv->reload_stats_unsupported)
             g_string_append_printf (report,
-                                    ", tx: %" G_GUINT64_FORMAT " bytes, rx :%" G_GUINT64_FORMAT " bytes",
+                                    ", tx: %" G_GUINT64_FORMAT " bytes, rx: %" G_GUINT64_FORMAT " bytes",
                                     mm_bearer_stats_get_tx_bytes (self->priv->stats),
                                     mm_bearer_stats_get_rx_bytes (self->priv->stats));
         mm_obj_info (self, "%s", report->str);
