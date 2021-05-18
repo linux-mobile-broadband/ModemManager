@@ -2867,8 +2867,6 @@ mm_modem_command (MMModem *self,
 
     g_return_if_fail (MM_IS_MODEM (self));
 
-    if (g_dbus_proxy_get_default_timeout (G_DBUS_PROXY (self)) < timeout)
-        g_warning ("Requested command timeout is shorter than the default DBus timeout");
     mm_gdbus_modem_call_command (MM_GDBUS_MODEM (self), cmd, timeout, cancellable, callback, user_data);
 }
 
@@ -2901,9 +2899,6 @@ mm_modem_command_sync (MMModem *self,
     gchar *result;
 
     g_return_val_if_fail (MM_IS_MODEM (self), NULL);
-
-    if (g_dbus_proxy_get_default_timeout (G_DBUS_PROXY (self)) < timeout)
-        g_warning ("Requested command timeout is shorter than the default DBus timeout");
 
     if (!mm_gdbus_modem_call_command_sync (MM_GDBUS_MODEM (self), cmd, timeout, &result, cancellable, error))
         return NULL;
