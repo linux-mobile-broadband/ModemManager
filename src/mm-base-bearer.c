@@ -243,6 +243,19 @@ connection_monitor_start (MMBaseBearer *self)
 /*****************************************************************************/
 
 static void
+bearer_update_connection_error (MMBaseBearer *self,
+                                const GError *connection_error)
+{
+    g_autoptr(GVariant) tuple = NULL;
+
+    if (connection_error)
+        tuple = mm_common_error_to_tuple (connection_error);
+    mm_gdbus_bearer_set_connection_error (MM_GDBUS_BEARER (self), tuple);
+}
+
+/*****************************************************************************/
+
+static void
 bearer_update_interface_stats (MMBaseBearer *self)
 {
     mm_gdbus_bearer_set_stats (
@@ -815,8 +828,11 @@ connect_ready (MMBaseBearer *self,
         if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
             /* Will launch disconnection */
             launch_disconnect = TRUE;
-        } else
+        } else {
+            /* Update reported connection error before the status update */
+            bearer_update_connection_error (self, error);
             bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
+        }
     }
     /* Handle cancellations detected after successful connection */
     else if (g_cancellable_is_cancelled (self->priv->connect_cancellable)) {
@@ -841,6 +857,8 @@ connect_ready (MMBaseBearer *self,
     }
 
     if (launch_disconnect) {
+        /* Update reported connection error before the status update */
+        bearer_update_connection_error (self, error);
         bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
         MM_BASE_BEARER_GET_CLASS (self)->disconnect (
             self,
