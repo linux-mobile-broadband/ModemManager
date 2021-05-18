@@ -968,6 +968,9 @@ mm_base_bearer_connect (MMBaseBearer *self,
                                   mm_bearer_stats_get_attempts (self->priv->stats) + 1);
     bearer_reset_ongoing_interface_stats (self);
 
+    /* Clear previous connection error, if any */
+    bearer_update_connection_error (self, NULL);
+
     /* Connecting! */
     mm_obj_dbg (self, "connecting...");
     self->priv->connect_cancellable = g_cancellable_new ();
