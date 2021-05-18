@@ -806,25 +806,6 @@ cmp_allowed_auth (MMBearerAllowedAuth        a,
     return FALSE;
 }
 
-static gboolean
-cmp_allow_roaming (gboolean                   a,
-                   gboolean                   a_set,
-                   gboolean                   b,
-                   gboolean                   b_set,
-                   MMBearerPropertiesCmpFlags flags)
-{
-    /* Strict match */
-    if (a == b && a_set == b_set)
-        return TRUE;
-    /* Additional loose match UNSET ==  */
-    if (flags & MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE) {
-        if ((a == MM_BEARER_ALLOWED_AUTH_UNKNOWN && b == MM_BEARER_ALLOWED_AUTH_NONE) ||
-            (b == MM_BEARER_ALLOWED_AUTH_UNKNOWN && a == MM_BEARER_ALLOWED_AUTH_NONE))
-            return TRUE;
-    }
-    return FALSE;
-}
-
 /**
  * mm_bearer_properties_cmp: (skip)
  */
