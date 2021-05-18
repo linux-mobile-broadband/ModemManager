@@ -37,18 +37,18 @@ uint16_array_copy (guint16 *array)
 GType
 mm_uint16_array_get_type (void)
 {
-    static volatile gsize g_define_type_id__volatile = 0;
+    static gsize g_define_type_id_initialized = 0;
 
-    if (g_once_init_enter (&g_define_type_id__volatile)) {
+    if (g_once_init_enter (&g_define_type_id_initialized)) {
         GType g_define_type_id =
             g_boxed_type_register_static (g_intern_static_string ("MMUint16Array"),
                                           (GBoxedCopyFunc) uint16_array_copy,
                                           (GBoxedFreeFunc) g_free);
 
-        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+        g_once_init_leave (&g_define_type_id_initialized, g_define_type_id);
     }
 
-    return g_define_type_id__volatile;
+    return g_define_type_id_initialized;
 }
 
 static mm_uint16_pair *
@@ -72,18 +72,18 @@ uint16_pair_array_copy (mm_uint16_pair *array)
 GType
 mm_uint16_pair_array_get_type (void)
 {
-    static volatile gsize g_define_type_id__volatile = 0;
+    static gsize g_define_type_id_initialized = 0;
 
-    if (g_once_init_enter (&g_define_type_id__volatile)) {
+    if (g_once_init_enter (&g_define_type_id_initialized)) {
         GType g_define_type_id =
             g_boxed_type_register_static (g_intern_static_string ("MMUint16PairArray"),
                                           (GBoxedCopyFunc) uint16_pair_array_copy,
                                           (GBoxedFreeFunc) g_free);
 
-        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+        g_once_init_leave (&g_define_type_id_initialized, g_define_type_id);
     }
 
-    return g_define_type_id__volatile;
+    return g_define_type_id_initialized;
 }
 
 static void
@@ -122,18 +122,18 @@ str_pair_array_copy (mm_str_pair *array)
 GType
 mm_str_pair_array_get_type (void)
 {
-    static volatile gsize g_define_type_id__volatile = 0;
+    static gsize g_define_type_id_initialized = 0;
 
-    if (g_once_init_enter (&g_define_type_id__volatile)) {
+    if (g_once_init_enter (&g_define_type_id_initialized)) {
         GType g_define_type_id =
             g_boxed_type_register_static (g_intern_static_string ("MMStrPairArray"),
                                           (GBoxedCopyFunc) str_pair_array_copy,
                                           (GBoxedFreeFunc) str_pair_array_free);
 
-        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+        g_once_init_leave (&g_define_type_id_initialized, g_define_type_id);
     }
 
-    return g_define_type_id__volatile;
+    return g_define_type_id_initialized;
 }
 
 static gpointer *
@@ -157,18 +157,18 @@ pointer_array_copy (gpointer *array)
 GType
 mm_pointer_array_get_type (void)
 {
-    static volatile gsize g_define_type_id__volatile = 0;
+    static gsize g_define_type_id_initialized = 0;
 
-    if (g_once_init_enter (&g_define_type_id__volatile)) {
+    if (g_once_init_enter (&g_define_type_id_initialized)) {
         GType g_define_type_id =
             g_boxed_type_register_static (g_intern_static_string ("MMPointerArray"),
                                           (GBoxedCopyFunc) pointer_array_copy,
                                           (GBoxedFreeFunc) g_free);
 
-        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+        g_once_init_leave (&g_define_type_id_initialized, g_define_type_id);
     }
 
-    return g_define_type_id__volatile;
+    return g_define_type_id_initialized;
 }
 
 static GPtrArray *
@@ -186,18 +186,18 @@ object_array_free (GPtrArray *object_array)
 GType
 mm_object_array_get_type (void)
 {
-    static volatile gsize g_define_type_id__volatile = 0;
+    static gsize g_define_type_id_initialized = 0;
 
-    if (g_once_init_enter (&g_define_type_id__volatile)) {
+    if (g_once_init_enter (&g_define_type_id_initialized)) {
         GType g_define_type_id =
             g_boxed_type_register_static (g_intern_static_string ("MMObjectArray"),
                                           (GBoxedCopyFunc) object_array_copy,
                                           (GBoxedFreeFunc) object_array_free);
 
-        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+        g_once_init_leave (&g_define_type_id_initialized, g_define_type_id);
     }
 
-    return g_define_type_id__volatile;
+    return g_define_type_id_initialized;
 }
 
 static void
@@ -223,16 +223,16 @@ async_method_copy (MMAsyncMethod *original)
 GType
 mm_async_method_get_type (void)
 {
-    static volatile gsize g_define_type_id__volatile = 0;
+    static gsize g_define_type_id_initialized = 0;
 
-    if (g_once_init_enter (&g_define_type_id__volatile)) {
+    if (g_once_init_enter (&g_define_type_id_initialized)) {
         GType g_define_type_id =
             g_boxed_type_register_static (g_intern_static_string ("MMAsyncMethod"),
                                           (GBoxedCopyFunc) async_method_copy,
                                           (GBoxedFreeFunc) async_method_free);
 
-        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+        g_once_init_leave (&g_define_type_id_initialized, g_define_type_id);
     }
 
-    return g_define_type_id__volatile;
+    return g_define_type_id_initialized;
 }

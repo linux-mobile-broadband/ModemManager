@@ -76,7 +76,7 @@ static const LogDesc level_descs[] = {
 };
 
 static GString *msgbuf = NULL;
-static volatile gsize msgbuf_once = 0;
+static gsize msgbuf_once = 0;
 
 static int
 mm_to_syslog_priority (MMLogLevel level)
