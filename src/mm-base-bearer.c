@@ -250,6 +250,11 @@ bearer_update_connection_error (MMBaseBearer *self,
     g_autoptr(GVariant) tuple = NULL;
 
     if (connection_error) {
+        /* Never overwrite a connection error if it's already set */
+        tuple = mm_gdbus_bearer_dup_connection_error (MM_GDBUS_BEARER (self));
+        if (tuple)
+            return;
+
         /*
          * Limit the type of errors we can expose in the interface;
          * e.g. we don't want QMI or MBIM specific errors reported.
