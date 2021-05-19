@@ -269,6 +269,14 @@ struct _MMIfaceModem {
                                                GAsyncResult *res,
                                                GError **error);
 
+    /* Asynchronous FCC unlock operation */
+    void     (* fcc_unlock)        (MMIfaceModem         *self,
+                                    GAsyncReadyCallback   callback,
+                                    gpointer              user_data);
+    gboolean (* fcc_unlock_finish) (MMIfaceModem         *self,
+                                    GAsyncResult         *res,
+                                    GError              **error);
+
     /* Asynchronous modem power-up operation */
     void (*modem_power_up) (MMIfaceModem *self,
                             GAsyncReadyCallback callback,
