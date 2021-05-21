@@ -1497,36 +1497,6 @@ modem_load_power_state (MMIfaceModem *self,
 /*****************************************************************************/
 /* Power up (Modem interface) */
 
-typedef enum {
-    POWER_UP_CONTEXT_STEP_FIRST,
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    POWER_UP_CONTEXT_STEP_FCC_AUTH,
-    POWER_UP_CONTEXT_STEP_RETRY,
-#endif
-    POWER_UP_CONTEXT_STEP_LAST,
-} PowerUpContextStep;
-
-typedef struct {
-    MbimDevice         *device;
-    PowerUpContextStep  step;
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    QmiClient          *qmi_client_dms;
-    GError             *saved_error;
-#endif
-} PowerUpContext;
-
-static void
-power_up_context_free (PowerUpContext *ctx)
-{
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    g_clear_object (&ctx->qmi_client_dms);
-    if (ctx->saved_error)
-        g_error_free (ctx->saved_error);
-#endif
-    g_object_unref (ctx->device);
-    g_slice_free (PowerUpContext, ctx);
-}
-
 static gboolean
 power_up_finish (MMIfaceModem  *self,
                  GAsyncResult  *res,
@@ -1535,72 +1505,18 @@ power_up_finish (MMIfaceModem  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static void power_up_context_step (GTask *task);
-
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-
 static void
-set_fcc_authentication_ready (QmiClientDms *qmi_client_dms,
-                              GAsyncResult *res,
-                              GTask        *task)
+radio_state_set_up_ready (MbimDevice   *device,
+                          GAsyncResult *res,
+                          GTask        *task)
 {
-    MMBroadbandModemMbim                    *self;
-    PowerUpContext                          *ctx;
-    QmiMessageDmsSetFccAuthenticationOutput *output;
-    GError                                  *error = NULL;
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    g_autoptr(GError)       error = NULL;
+    MbimRadioSwitchState    hardware_radio_state;
+    MbimRadioSwitchState    software_radio_state;
 
     self = g_task_get_source_object (task);
-    ctx = g_task_get_task_data (task);
-
-    output = qmi_client_dms_set_fcc_authentication_finish (qmi_client_dms, res, &error);
-    if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error)) {
-        mm_obj_dbg (self, "couldn't set FCC auth: %s", error->message);
-        g_error_free (error);
-        g_assert (ctx->saved_error);
-        g_task_return_error (task, ctx->saved_error);
-        ctx->saved_error = NULL;
-        g_object_unref (task);
-        goto out;
-    }
-
-    ctx->step++;
-    power_up_context_step (task);
-
-out:
-    if (output)
-        qmi_message_dms_set_fcc_authentication_output_unref (output);
-}
-
-static void
-set_radio_state_fcc_auth (GTask *task)
-{
-    PowerUpContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-    g_assert (ctx->qmi_client_dms);
-
-    qmi_client_dms_set_fcc_authentication (QMI_CLIENT_DMS (ctx->qmi_client_dms),
-                                           NULL,
-                                           10,
-                                           NULL, /* cancellable */
-                                           (GAsyncReadyCallback)set_fcc_authentication_ready,
-                                           task);
-}
-
-#endif
-
-static void
-radio_state_set_up_ready (MbimDevice *device,
-                          GAsyncResult *res,
-                          GTask *task)
-{
-    PowerUpContext *ctx;
-    MbimMessage *response;
-    GError *error = NULL;
-    MbimRadioSwitchState hardware_radio_state;
-    MbimRadioSwitchState software_radio_state;
-
-    ctx = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -1611,96 +1527,27 @@ radio_state_set_up_ready (MbimDevice *device,
             &software_radio_state,
             &error)) {
         if (hardware_radio_state == MBIM_RADIO_SWITCH_STATE_OFF)
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Cannot power-up: hardware radio switch is OFF");
         else if (software_radio_state == MBIM_RADIO_SWITCH_STATE_OFF)
-            error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Cannot power-up: sotware radio switch is OFF");
     }
 
-    if (response)
-        mbim_message_unref (response);
-
     /* Nice! we're done, quick exit */
     if (!error) {
-        ctx->step = POWER_UP_CONTEXT_STEP_LAST;
-        power_up_context_step (task);
-        return;
-    }
-
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    /* Only the first attempt isn't fatal, if we have a QMI DMS client */
-    if ((ctx->step == POWER_UP_CONTEXT_STEP_FIRST) && ctx->qmi_client_dms) {
-        MMBroadbandModemMbim *self;
-
-        /* Warn and keep, will retry */
-        self = g_task_get_source_object (task);
-        mm_obj_warn (self, "%s", error->message);
-        g_assert (!ctx->saved_error);
-        ctx->saved_error = error;
-        ctx->step++;
-        power_up_context_step (task);
-        return;
-    }
-#endif
-
-    /* Fatal */
-    g_task_return_error (task, error);
-    g_object_unref (task);
-}
-
-static void
-set_radio_state_up (GTask *task)
-{
-    PowerUpContext *ctx;
-    MbimMessage *message;
-
-    ctx = g_task_get_task_data (task);
-    message = mbim_message_radio_state_set_new (MBIM_RADIO_SWITCH_STATE_ON, NULL);
-    mbim_device_command (ctx->device,
-                         message,
-                         20,
-                         NULL,
-                         (GAsyncReadyCallback)radio_state_set_up_ready,
-                         task);
-    mbim_message_unref (message);
-}
-
-static void
-power_up_context_step (GTask *task)
-{
-    PowerUpContext *ctx;
-
-    ctx = g_task_get_task_data (task);
-
-    switch (ctx->step) {
-    case POWER_UP_CONTEXT_STEP_FIRST:
-        set_radio_state_up (task);
-        return;
-
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-
-    case POWER_UP_CONTEXT_STEP_FCC_AUTH:
-        set_radio_state_fcc_auth (task);
-        return;
-
-    case POWER_UP_CONTEXT_STEP_RETRY:
-        set_radio_state_up (task);
-        return;
-
-#endif
-
-    case POWER_UP_CONTEXT_STEP_LAST:
-        /* Good! */
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
-
-    default:
-        g_assert_not_reached ();
     }
+
+    /* The SDX55 returns "Operation not allowed", but not really sure about other
+     * older devices. The original logic in the MBIM implemetation triggered a retry
+     * for any kind of error, so let's do the same for now. */
+    mm_obj_warn (self, "%s", error->message);
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
+                             "FCC unlock may be needed");
+    g_object_unref (task);
 }
 
 static void
@@ -1708,30 +1555,22 @@ modem_power_up (MMIfaceModem        *self,
                 GAsyncReadyCallback  callback,
                 gpointer             user_data)
 {
-    PowerUpContext *ctx;
-    MbimDevice     *device;
-    GTask          *task;
+    MbimDevice             *device;
+    GTask                  *task;
+    g_autoptr(MbimMessage)  message = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
-    ctx = g_slice_new0 (PowerUpContext);
-    ctx->device = g_object_ref (device);
-    ctx->step = POWER_UP_CONTEXT_STEP_FIRST;
-
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    ctx->qmi_client_dms = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
-                                                     QMI_SERVICE_DMS,
-                                                     MM_PORT_QMI_FLAG_DEFAULT,
-                                                     NULL);
-    if (ctx->qmi_client_dms)
-        g_object_ref (ctx->qmi_client_dms);
-#endif
-
     task = g_task_new (self, NULL, callback, user_data);
-    g_task_set_task_data (task, ctx, (GDestroyNotify)power_up_context_free);
 
-    power_up_context_step (task);
+    message = mbim_message_radio_state_set_new (MBIM_RADIO_SWITCH_STATE_ON, NULL);
+    mbim_device_command (device,
+                         message,
+                         20,
+                         NULL,
+                         (GAsyncReadyCallback)radio_state_set_up_ready,
+                         task);
 }
 
 /*****************************************************************************/
@@ -5667,6 +5506,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = mm_shared_qmi_load_current_bands_finish;
     iface->set_current_bands = mm_shared_qmi_set_current_bands;
     iface->set_current_bands_finish = mm_shared_qmi_set_current_bands_finish;
+    iface->fcc_unlock = mm_shared_qmi_fcc_unlock;
+    iface->fcc_unlock_finish = mm_shared_qmi_fcc_unlock_finish;
 #endif
 
     /* Additional actions */
