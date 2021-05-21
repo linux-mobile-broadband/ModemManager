@@ -13,7 +13,7 @@ CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN
 ProtectSystem=true
 ProtectHome=true
 PrivateTmp=true
-RestrictAddressFamilies=AF_NETLINK AF_UNIX
+RestrictAddressFamilies=AF_NETLINK AF_UNIX AF_QIPCRTR
 NoNewPrivileges=true
 User=root
 
