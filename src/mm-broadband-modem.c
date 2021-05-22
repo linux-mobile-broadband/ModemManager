@@ -12361,10 +12361,9 @@ initialize_step (GTask *task)
                 /* Fatal SIM, firmware, or modem failure :-( */
                 gboolean is_sim_hot_swap_supported = FALSE;
                 gboolean is_sim_hot_swap_configured = FALSE;
+                MMModemStateFailedReason reason;
 
-                MMModemStateFailedReason reason =
-                    mm_gdbus_modem_get_state_failed_reason (
-                        (MmGdbusModem*)ctx->self->priv->modem_dbus_skeleton);
+                reason = mm_gdbus_modem_get_state_failed_reason (MM_GDBUS_MODEM (ctx->self->priv->modem_dbus_skeleton));
 
                 g_object_get (ctx->self,
                               MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
