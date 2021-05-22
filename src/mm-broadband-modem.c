@@ -1146,9 +1146,9 @@ modem_load_device_identifier_finish (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    GError *inner_error = NULL;
-    gpointer ctx = NULL;
-    gchar *device_identifier;
+    GError   *inner_error = NULL;
+    gpointer  ctx = NULL;
+    gchar    *device_identifier;
 
     mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, &ctx, &inner_error);
     if (inner_error) {
@@ -1157,10 +1157,16 @@ modem_load_device_identifier_finish (MMIfaceModem *self,
     }
 
     g_assert (ctx != NULL);
-    device_identifier = (mm_broadband_modem_create_device_identifier (
-                             MM_BROADBAND_MODEM (self),
-                             ((DeviceIdentifierContext *)ctx)->ati,
-                             ((DeviceIdentifierContext *)ctx)->ati1));
+    device_identifier = mm_broadband_modem_create_device_identifier (
+                            MM_BROADBAND_MODEM (self),
+                            ((DeviceIdentifierContext *)ctx)->ati,
+                            ((DeviceIdentifierContext *)ctx)->ati1,
+                            &inner_error);
+    if (!device_identifier) {
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
+
     mm_obj_dbg (self, "loaded device identifier: %s", device_identifier);
     return device_identifier;
 }
@@ -12521,10 +12527,18 @@ mm_broadband_modem_get_current_charset (MMBroadbandModem *self)
 /*****************************************************************************/
 
 gchar *
-mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
-                                             const gchar *ati,
-                                             const gchar *ati1)
+mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
+                                             const gchar       *ati,
+                                             const gchar       *ati1,
+                                             GError           **error)
 {
+    /* do nothing if device has gone already */
+    if (!self->priv->modem_dbus_skeleton) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Modem interface skeleton unavailable");
+        return NULL;
+    }
+
     return (mm_create_device_identifier (
                 mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
                 mm_base_modem_get_product_id (MM_BASE_MODEM (self)),

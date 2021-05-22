@@ -104,9 +104,10 @@ MMModemCharset mm_broadband_modem_get_current_charset (MMBroadbandModem *self);
 
 /* Create a unique device identifier string using the ATI and ATI1 replies and some
  * additional internal info */
-gchar *mm_broadband_modem_create_device_identifier (MMBroadbandModem *self,
-                                                    const gchar *ati,
-                                                    const gchar *ati1);
+gchar *mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
+                                                    const gchar       *ati,
+                                                    const gchar       *ati1,
+                                                    GError           **error);
 
 /* Locking/unlocking SMS storages */
 void     mm_broadband_modem_lock_sms_storages        (MMBroadbandModem *self,
