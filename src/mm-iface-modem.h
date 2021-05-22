@@ -609,4 +609,8 @@ gboolean mm_iface_modem_check_for_sim_swap_finish (MMIfaceModem *self,
                                                    GAsyncResult *res,
                                                    GError **error);
 
+void mm_iface_modem_modify_sim (MMIfaceModem *self,
+                                guint slot_index,
+                                MMBaseSim *new_sim);
+
 #endif /* MM_IFACE_MODEM_H */

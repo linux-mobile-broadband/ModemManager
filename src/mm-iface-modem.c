@@ -134,6 +134,78 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
     g_object_unref (task);
 }
 
+static void
+sim_slot_free (MMBaseSim *sim)
+{
+    if (sim)
+        g_object_unref (sim);
+}
+
+void
+mm_iface_modem_modify_sim (MMIfaceModem  *self,
+                           guint          slot_index,
+                           MMBaseSim     *new_sim)
+{
+    MmGdbusModem *skeleton;
+    g_autoptr (GPtrArray) sim_slots_old = NULL;
+    g_autoptr (GPtrArray) sim_slots_new = NULL;
+    guint i;
+    GPtrArray *sim_slot_paths_array;
+    g_auto (GStrv) sim_slot_paths = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIM_SLOTS,
+                  &sim_slots_old,
+                  NULL);
+    if (!sim_slots_old) {
+        mm_obj_warn (self, "Failed to process SIM hot swap: couldn't load current list of SIM slots");
+        return;
+    }
+
+    sim_slot_paths_array = g_ptr_array_new ();
+    sim_slots_new        = g_ptr_array_new_with_free_func ((GDestroyNotify) sim_slot_free);
+    for (i = 0; i < sim_slots_old->len; i++) {
+        MMBaseSim   *sim;
+        const gchar *sim_path;
+
+        sim = MM_BASE_SIM (g_ptr_array_index (sim_slots_old, i));
+        if (i == slot_index) {
+            mm_obj_dbg (self, "Updating sim at slot %d", i + 1);
+            g_ptr_array_add (sim_slots_new, new_sim ? g_object_ref (new_sim) : NULL);
+            sim = new_sim;
+        } else {
+            g_ptr_array_add (sim_slots_new, g_object_ref (sim));
+        }
+
+        if (!sim) {
+            g_ptr_array_add (sim_slot_paths_array, g_strdup ("/"));
+            continue;
+        }
+
+        sim_path = mm_base_sim_get_path (sim);
+        g_ptr_array_add (sim_slot_paths_array, g_strdup (sim_path));
+    }
+
+    g_object_set (self,
+                  MM_IFACE_MODEM_SIM_SLOTS,
+                  sim_slots_new,
+                  NULL);
+
+    g_ptr_array_add (sim_slot_paths_array, NULL);
+    sim_slot_paths = (GStrv) g_ptr_array_free (sim_slot_paths_array, FALSE);
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON,
+                  &skeleton,
+                  NULL);
+    if (!skeleton) {
+        mm_obj_warn (self, "Failed to get dbus skeleton in mm_iface_modem_modify_sim, will not update sim_slots");
+        return;
+    }
+    mm_gdbus_modem_set_sim_slots (skeleton, (const gchar *const *) sim_slot_paths);
+    g_object_unref (skeleton);
+}
+
 /*****************************************************************************/
 
 void

@@ -98,6 +98,7 @@ typedef struct {
     /* Slot status monitoring */
     QmiClient *uim_client;
     gulong     uim_slot_status_indication_id;
+    GArray    *slots_status;
     gulong     uim_refresh_indication_id;
     guint      uim_refresh_start_timeout_id;
 } Private;
@@ -121,6 +122,8 @@ private_free (Private *priv)
         g_object_unref (priv->loc_client);
     if (priv->uim_slot_status_indication_id)
         g_signal_handler_disconnect (priv->uim_client, priv->uim_slot_status_indication_id);
+    if (priv->slots_status)
+        g_array_unref (priv->slots_status);
     if (priv->uim_refresh_indication_id)
         g_signal_handler_disconnect (priv->uim_client, priv->uim_refresh_indication_id);
     if (priv->uim_client)
@@ -3326,15 +3329,17 @@ uim_get_slot_status_ready (QmiClientUim *client,
 {
     g_autoptr(QmiMessageUimGetSlotStatusOutput) output = NULL;
     LoadSimSlotsContext *ctx;
-    MMIfaceModem              *self;
-    GError                    *error = NULL;
-    GArray                    *physical_slots = NULL;
-    GArray                    *ext_information = NULL;
-    GArray                    *slot_eids = NULL;
-    guint                      i;
+    MMIfaceModem        *self;
+    Private             *priv;
+    GError              *error = NULL;
+    GArray              *physical_slots = NULL;
+    GArray              *ext_information = NULL;
+    GArray              *slot_eids = NULL;
+    guint                i;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
+    priv = get_private (MM_SHARED_QMI (self));
 
     output = qmi_client_uim_get_slot_status_finish (client, res, &error);
     if (!output ||
@@ -3344,6 +3349,12 @@ uim_get_slot_status_ready (QmiClientUim *client,
         g_object_unref (task);
         return;
     }
+
+    /* Store the slot status before loading all sim slots.
+     * We will use this to check if a hotswap requires a reprobe. */
+    if (priv->slots_status)
+        g_array_unref (priv->slots_status);
+    priv->slots_status = g_array_ref (physical_slots);
 
     /* It's fine if we don't have EID information, but it should be well-formed if present. If it's malformed,
      * there is probably a modem firmware bug. */
@@ -3710,18 +3721,120 @@ uim_refresh_indication_cb (QmiClientUim                  *client,
     }
 }
 
+/* Modifies the sim at slot == index+1, based on the content of slot_status.
+ * Primarily used when a hotswap occurs on the inactive slot */
+static void
+update_sim_from_slot_status (MMSharedQmi               *self,
+                             QmiPhysicalSlotStatusSlot *slot_status,
+                             guint                      slot_index)
+{
+    g_autoptr(MMBaseSim)  sim = NULL;
+    g_autofree gchar     *raw_iccid = NULL;
+    g_autofree gchar     *iccid = NULL;
+    g_autoptr(GError)     inner_error = NULL;
+
+    mm_obj_dbg (self, "Updating sim at slot %d", slot_index + 1);
+    /* If sim is not present, ask mm_iface_modem to clear the sim object */
+    if (slot_status->physical_card_status != QMI_UIM_PHYSICAL_CARD_STATE_PRESENT) {
+        mm_iface_modem_modify_sim (MM_IFACE_MODEM (self), slot_index, NULL);
+        return;
+    }
+
+    raw_iccid = mm_utils_bin2hexstr ((const guint8 *)slot_status->iccid->data, slot_status->iccid->len);
+    if (!raw_iccid) {
+        mm_obj_warn (self, "not creating SIM object: failed to convert ICCID from BCD");
+        return;
+    }
+    iccid = mm_3gpp_parse_iccid (raw_iccid, &inner_error);
+    if (!iccid) {
+        mm_obj_warn (self, "not creating SIM object: couldn't parse SIM iccid: %s", inner_error->message);
+        return;
+    }
+    sim = mm_sim_qmi_new_initialized (MM_BASE_MODEM (self),
+                                      TRUE,                              /* consider DMS UIM deprecated if we're creating SIM slots */
+                                      slot_index + 1,                    /* slot number is the array index starting at 1 */
+                                      slot_status->physical_slot_status, /* is_active */
+                                      iccid,
+                                      NULL,  /* imsi unknown */
+                                      NULL,  /* eid unknown */
+                                      NULL,  /* operator id unknown */
+                                      NULL,  /* operator name unknown */
+                                      NULL); /* emergency numbers unknown */
+
+    mm_iface_modem_modify_sim (MM_IFACE_MODEM (self), slot_index, sim);
+}
+
+/* Checks for equality of two slots. */
+static gboolean
+slot_status_equal (QmiPhysicalSlotStatusSlot *slot_a,
+                   QmiPhysicalSlotStatusSlot *slot_b)
+{
+    guint j;
+
+    if (slot_a->physical_slot_status != slot_b->physical_slot_status)
+        return FALSE;
+    if (slot_a->physical_card_status != slot_b->physical_card_status)
+        return FALSE;
+    if (slot_a->iccid->len != slot_b->iccid->len)
+        return FALSE;
+    for (j = 0; j < slot_a->iccid->len; j++) {
+        if (g_array_index (slot_a->iccid, guint8, j) != g_array_index (slot_b->iccid, guint8, j))
+            return FALSE;
+    }
+    return TRUE;
+}
+
+/* Checks for equality of QmiPhysicalSlotStatusSlot arrays.
+ * The number of elements in each array is expected to be the number of sim slots in the modem.*/
+static gboolean
+slot_array_status_equal (GArray   *slots_status1,
+                         GArray   *slots_status2,
+                         gboolean  check_active_slots_only)
+{
+    guint i;
+
+    if (!slots_status1 && !slots_status2)
+        return TRUE;
+    if (!slots_status1 || !slots_status2 || slots_status1->len != slots_status2->len)
+        return FALSE;
+    for (i = 0; i < slots_status1->len; i++) {
+        /* Compare slot at index i from slots_status1 and slots_status2 */
+        QmiPhysicalSlotStatusSlot *slot_a;
+        QmiPhysicalSlotStatusSlot *slot_b;
+
+        slot_a = &g_array_index (slots_status1, QmiPhysicalSlotStatusSlot, i);
+        slot_b = &g_array_index (slots_status2, QmiPhysicalSlotStatusSlot, i);
+
+        /* Check that slot_a and slot_b have the same slot status (i.e. active or inactive) */
+        if (slot_a->physical_slot_status != slot_b->physical_slot_status)
+            return FALSE;
+        /* Once slot_a and slot_b are confirmed to have the same physical slot status,
+         * we will ignore inactive slots if check_active_slots_only is set. */
+        if (check_active_slots_only && slot_a->physical_slot_status != QMI_UIM_SLOT_STATE_ACTIVE) {
+            g_assert (slot_a->physical_slot_status == slot_b->physical_slot_status);
+            continue;
+        }
+        if (!slot_status_equal (slot_a, slot_b))
+            return FALSE;
+    }
+    return TRUE;
+}
+
 static void
 uim_slot_status_indication_cb (QmiClientUim                     *client,
                                QmiIndicationUimSlotStatusOutput *output,
                                MMSharedQmi                      *self)
 {
-    GArray            *physical_slots = NULL;
+    GArray            *new_slots_status = NULL;
+    Private           *priv;
+    guint              i;
     g_autoptr(GError)  error = NULL;
 
+    priv = get_private (self);
     mm_obj_dbg (self, "received slot status indication");
 
     if (!qmi_indication_uim_slot_status_output_get_physical_slot_status (output,
-                                                                         &physical_slots,
+                                                                         &new_slots_status,
                                                                          &error)) {
         mm_obj_warn (self, "could not process slot status indication: %s", error->message);
         return;
@@ -3731,9 +3844,34 @@ uim_slot_status_indication_cb (QmiClientUim                     *client,
      * 1) The physical slot to logical slot mapping has changed as a
      * result of switching the slot. or,
      * 2) A card has been removed from, or inserted to, the physical slot. or,
-     * 3) A physical slot is powered up or down. or,
-     * In all these cases, we must reprobe the modem to keep SIM objects updated */
-    mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
+     * 3) A physical slot is powered up or down. */
+
+    /* Reprobe if the active slot changed or the information in an
+     * active slot's status changed */
+    if (!slot_array_status_equal (priv->slots_status, new_slots_status, TRUE)) {
+        mm_obj_dbg (self, "An active slot had a status change, will reprobe the modem");
+        mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
+        return;
+    }
+
+    /* An inactive slot changed, we won't be reprobing the modem.
+     * Instead, we will ask mm_iface_modem to update the sim object.
+     * Iterate over each slot to identify the slots that changed state.*/
+    for (i = 0; i < priv->slots_status->len; i++) {
+        QmiPhysicalSlotStatusSlot *old_slot;
+        QmiPhysicalSlotStatusSlot *new_slot;
+
+        old_slot = &g_array_index (priv->slots_status, QmiPhysicalSlotStatusSlot, i);
+        new_slot = &g_array_index (new_slots_status, QmiPhysicalSlotStatusSlot, i);
+
+        if (!slot_status_equal (old_slot, new_slot)) {
+            mm_obj_dbg (self, "Slot %d (inactive) had a status change. Will update sims, but not reprobe", i + 1);
+            update_sim_from_slot_status (self, new_slot, i);
+        }
+    }
+
+    g_clear_pointer (&priv->slots_status, g_array_unref);
+    priv->slots_status = g_array_ref (new_slots_status);
 }
 
 static void
