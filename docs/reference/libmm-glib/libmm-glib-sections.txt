@@ -1215,12 +1215,14 @@ mm_bearer_properties_set_number
 <SUBSECTION Private>
 mm_bearer_properties_new_from_dictionary
 mm_bearer_properties_new_from_string
+mm_bearer_properties_new_from_profile
 MMBearerPropertiesCmpFlags
 mm_bearer_properties_cmp
 mm_bearer_properties_consume_string
 mm_bearer_properties_consume_variant
 mm_bearer_properties_dup
 mm_bearer_properties_get_dictionary
+mm_bearer_properties_peek_3gpp_profile
 <SUBSECTION Standard>
 MMBearerPropertiesClass
 MMBearerPropertiesPrivate
@@ -1568,6 +1570,8 @@ mm_3gpp_profile_new_from_string
 mm_3gpp_profile_consume_string
 mm_3gpp_profile_consume_variant
 mm_3gpp_profile_get_dictionary
+MM3gppProfileCmpFlags
+mm_3gpp_profile_cmp
 <SUBSECTION Standard>
 MM3gppProfileClass
 MM3gppProfilePrivate
