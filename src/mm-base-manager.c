@@ -737,9 +737,9 @@ gboolean mm_base_modem_sync_finish (MMBaseModem   *self,
 }
 
 static void
-mm_base_modem_sync_ready (MMBaseModem  *self,
-                          GAsyncResult *res,
-                          gpointer      user_data)
+base_modem_sync_ready (MMBaseModem  *self,
+                       GAsyncResult *res,
+                       gpointer      user_data)
 {
     g_autoptr(GError) error = NULL;
 
@@ -769,7 +769,7 @@ mm_base_manager_sync (MMBaseManager *self)
 
         /* We just want to start the synchronization, we don't need the result */
         if (modem)
-            mm_base_modem_sync (modem, (GAsyncReadyCallback)mm_base_modem_sync_ready, NULL);
+            mm_base_modem_sync (modem, (GAsyncReadyCallback)base_modem_sync_ready, NULL);
     }
 }
 
