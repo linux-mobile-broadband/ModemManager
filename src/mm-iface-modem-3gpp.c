@@ -2534,7 +2534,6 @@ sync_eps_bearer_ready (MMIfaceModem3gpp *self,
     g_autoptr(MMBearerProperties)  properties  = NULL;
     g_autoptr(GError)              error = NULL;
 
-    mm_obj_dbg (self, "EPS bearer sync ready");
     ctx = g_task_get_task_data (task);
 
     properties = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_finish (self, res, &error);
