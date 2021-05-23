@@ -157,9 +157,9 @@ struct _MMBaseBearerClass {
     void (* reload_connection_status) (MMBaseBearer *bearer,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data);
-    gboolean (* reload_connection_status_finish) (MMBaseBearer *bearer,
-                                                  GAsyncResult *res,
-                                                  GError **error);
+    MMBearerConnectionStatus (* reload_connection_status_finish) (MMBaseBearer *bearer,
+                                                                  GAsyncResult *res,
+                                                                  GError **error);
 
 #endif
 

@@ -1498,7 +1498,8 @@ typedef enum {
 } SyncingStep;
 
 struct _SyncingContext {
-    SyncingStep step;
+    SyncingStep    step;
+    MMBearerStatus status;
 };
 
 gboolean
@@ -1514,14 +1515,29 @@ reload_connection_status_ready (MMBaseBearer *self,
                                 GAsyncResult *res,
                                 GTask        *task)
 {
-    SyncingContext    *ctx;
-    g_autoptr(GError)  error = NULL;
+    SyncingContext           *ctx;
+    MMBearerConnectionStatus  reloaded_status;
+    g_autoptr(GError)         error = NULL;
 
     ctx = g_task_get_task_data (task);
 
-    MM_BASE_BEARER_GET_CLASS (self)->reload_connection_status_finish (self, res, &error);
-    if (error)
+    /* The only update we're really interested in is the connected->disconnected
+     * one, because any other would be extremely strange and it's probably not
+     * worth trying to support those; e.g. a disconnected->connected change here
+     * would be impossible to be handled correctly. We'll also ignore intermediate
+     * states (connecting/disconnecting), as we can rely on the reports of the final
+     * state at some point soon.
+     *
+     * So, just handle DISCONNECTED at this point.
+     */
+    reloaded_status = MM_BASE_BEARER_GET_CLASS (self)->reload_connection_status_finish (self, res, &error);
+    if (reloaded_status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
         mm_obj_warn (self, "reloading connection status failed: %s", error->message);
+    else if ((ctx->status == MM_BEARER_STATUS_CONNECTED) &&
+             (reloaded_status == MM_BEARER_CONNECTION_STATUS_DISCONNECTED)) {
+        mm_obj_dbg (self, "disconnection detected during status synchronization");
+        mm_base_bearer_report_connection_status (self, reloaded_status);
+    }
 
     /* Go on to the next step */
     ctx->step++;
@@ -1588,9 +1604,10 @@ mm_base_bearer_sync (MMBaseBearer        *self,
     SyncingContext *ctx;
     GTask          *task;
 
-    /* Create SyncingContext */
+    /* Create SyncingContext and store the original bearer status */
     ctx = g_new0 (SyncingContext, 1);
     ctx->step = SYNCING_STEP_FIRST;
+    ctx->status = self->priv->status;
 
     /* Create sync steps task and execute it */
     task = g_task_new (self, NULL, callback, user_data);
