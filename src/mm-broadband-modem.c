@@ -12020,6 +12020,7 @@ iface_modem_sync_ready (MMIfaceModem *self,
         mm_obj_warn (self, "SIM is locked... Synchronization skipped");
         ctx->step = SYNCING_STEP_LAST;
         syncing_step (task);
+        return;
     }
 
     /* Not locked, go on to next step */
