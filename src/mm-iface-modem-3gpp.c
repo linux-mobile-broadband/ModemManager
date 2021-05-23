@@ -320,7 +320,7 @@ run_registration_checks_ready (MMIfaceModem3gpp *self,
          * from home to roaming or viceversa, both registered states, so there
          * wouldn't be an explicit refresh triggered from the modem interface as
          * the modem never got un-registered during the sequence. */
-        mm_iface_modem_refresh_signal (MM_IFACE_MODEM (ctx->self), FALSE);
+        mm_iface_modem_refresh_signal (MM_IFACE_MODEM (ctx->self));
         mm_obj_dbg (self, "currently registered in a 3GPP network");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);

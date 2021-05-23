@@ -557,7 +557,7 @@ void mm_iface_modem_update_signal_quality (MMIfaceModem *self,
                                            guint signal_quality);
 
 /* Allow requesting to refresh signal via polling */
-void mm_iface_modem_refresh_signal (MMIfaceModem *self, gboolean enforce);
+void mm_iface_modem_refresh_signal (MMIfaceModem *self);
 
 /* Allow setting allowed modes */
 void     mm_iface_modem_set_current_modes        (MMIfaceModem *self,
