@@ -1528,6 +1528,117 @@ report_connection_status (MMBaseBearer             *self,
 
 /*****************************************************************************/
 
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+static MMBearerConnectionStatus
+reload_connection_status_finish (MMBaseBearer  *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
+{
+    gint val;
+
+    val = g_task_propagate_int (G_TASK (res), error);
+    if (val < 0)
+        return MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+
+    return (MMBearerConnectionStatus) val;
+}
+
+static void
+reload_connection_status_ready (MbimDevice   *device,
+                                GAsyncResult *res,
+                                GTask        *task)
+{
+    MMBearerMbim             *self;
+    guint32                   session_id;
+    MbimActivationState       activation_state;
+    MMBearerConnectionStatus  bearer_connection_status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+    g_autoptr(MbimMessage)    response = NULL;
+    g_autoptr(GError)         error = NULL;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_connect_response_parse (
+            response,
+            &session_id,
+            &activation_state,
+            NULL, /* voice_call_state */
+            NULL, /* ip_type */
+            NULL, /* context_type */
+            NULL, /* nw_error */
+            &error)) {
+        g_prefix_error (&error, "Cannot load session ID '%u' status: ",
+                        mm_bearer_mbim_get_session_id (MM_BEARER_MBIM (self)));
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "session ID '%u': %s", session_id, mbim_activation_state_get_string (activation_state));
+
+    switch (activation_state) {
+    case MBIM_ACTIVATION_STATE_ACTIVATED:
+    case MBIM_ACTIVATION_STATE_ACTIVATING:
+        /* for the purposes of the sync operation, it's fine to map ACTIVATING
+         * to CONNECTED, as we're really going to ignore that state in the actual
+         * processing of the logic. */
+        bearer_connection_status = MM_BEARER_CONNECTION_STATUS_CONNECTED;
+        break;
+    case MBIM_ACTIVATION_STATE_DEACTIVATING:
+        bearer_connection_status = MM_BEARER_CONNECTION_STATUS_DISCONNECTING;
+        break;
+    case MBIM_ACTIVATION_STATE_DEACTIVATED:
+        bearer_connection_status = MM_BEARER_CONNECTION_STATUS_DISCONNECTED;
+        break;
+    case MBIM_ACTIVATION_STATE_UNKNOWN:
+    default:
+        break;
+    }
+
+    if (bearer_connection_status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Cannot load session ID '%u' status",
+                                 mm_bearer_mbim_get_session_id (MM_BEARER_MBIM (self)));
+    else
+        g_task_return_int (task, bearer_connection_status);
+    g_object_unref (task);
+}
+
+static void
+reload_connection_status (MMBaseBearer        *self,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
+{
+    MMPortMbim             *mbim;
+    GTask                  *task = NULL;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    if (!peek_ports (self, &mbim, NULL, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    message = mbim_message_connect_query_new (mm_bearer_mbim_get_session_id (MM_BEARER_MBIM (self)),
+                                              MBIM_ACTIVATION_STATE_UNKNOWN,
+                                              MBIM_VOICE_CALL_STATE_NONE,
+                                              MBIM_CONTEXT_IP_TYPE_DEFAULT,
+                                              mbim_uuid_from_context_type (MBIM_CONTEXT_TYPE_INTERNET),
+                                              0,
+                                              NULL);
+    mbim_device_command (mm_port_mbim_peek_device (mbim),
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)reload_connection_status_ready,
+                         task);
+}
+
+#endif /* WITH_SYSTEMD_SUSPEND_RESUME */
+
+/*****************************************************************************/
+
 MMBaseBearer *
 mm_bearer_mbim_new (MMBroadbandModemMbim *modem,
                     MMBearerProperties   *config)
@@ -1585,4 +1696,8 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     base_bearer_class->reload_stats_finish = reload_stats_finish;
     base_bearer_class->load_connection_status = NULL;
     base_bearer_class->load_connection_status_finish = NULL;
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+    base_bearer_class->reload_connection_status = reload_connection_status;
+    base_bearer_class->reload_connection_status_finish = reload_connection_status_finish;
+#endif
 }
