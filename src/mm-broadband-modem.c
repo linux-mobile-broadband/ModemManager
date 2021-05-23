@@ -11981,7 +11981,7 @@ iface_modem_time_sync_ready (MMIfaceModemTime *self,
 }
 
 static void
-iface_modem_3gpp_sync_ready (MMBroadbandModem *self,
+iface_modem_3gpp_sync_ready (MMIfaceModem3gpp *self,
                              GAsyncResult     *res,
                              GTask            *task)
 {
@@ -11990,7 +11990,7 @@ iface_modem_3gpp_sync_ready (MMBroadbandModem *self,
 
     ctx = g_task_get_task_data (task);
 
-    if (!mm_iface_modem_3gpp_sync_finish (MM_IFACE_MODEM_3GPP (self), res, &error))
+    if (!mm_iface_modem_3gpp_sync_finish (self, res, &error))
         mm_obj_warn (self, "3GPP interface synchronization failed: %s", error->message);
 
     /* Go on to next step */
