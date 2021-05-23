@@ -12004,22 +12004,26 @@ iface_modem_sync_ready (MMIfaceModem *self,
                         GAsyncResult *res,
                         GTask        *task)
 {
-    SyncingContext     *ctx;
-    MMModemLock         lock;
-    g_autoptr (GError)  error = NULL;
+    SyncingContext    *ctx;
+    MMModemLock        lock;
+    g_autoptr(GError)  error = NULL;
 
     ctx = g_task_get_task_data (task);
+
+    if (!mm_iface_modem_sync_finish (self, res, &error))
+        mm_obj_warn (self, "modem interface synchronization failed: %s", error->message);
+
+    /* The synchronization logic only runs on modems that were enabled before
+     * the suspend/resume cycle, and therefore we should not get SIM-PIN locked
+     * at this point, unless the SIM was swapped. */
     lock = mm_iface_modem_get_unlock_required (self);
-
-    if (!mm_iface_modem_sync_finish (self, res, &error)) {
-        mm_obj_warn (self, "synchronizing Modem interface failed: %s", error->message);
-    }
-
-    /* SIM is locked, skip synchronization */
     if (lock == MM_MODEM_LOCK_UNKNOWN || lock == MM_MODEM_LOCK_SIM_PIN || lock == MM_MODEM_LOCK_SIM_PUK) {
-        mm_obj_warn (self, "SIM is locked... Synchronization skipped");
-        ctx->step = SYNCING_STEP_LAST;
-        syncing_step (task);
+        /* Abort the sync() operation right away, and report a new SIM event that will
+         * disable the modem and trigger a full reprobe */
+        mm_obj_warn (self, "SIM is locked... synchronization aborted");
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                                 "Locked SIM found during modem interface synchronization");
+        g_object_unref (task);
         return;
     }
 
