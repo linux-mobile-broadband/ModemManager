@@ -229,7 +229,7 @@ reload_stats (MMBaseBearer *self,
 }
 
 /*****************************************************************************/
-/* Connection status polling */
+/* Connection status check */
 
 typedef enum {
     CONNECTION_STATUS_CONTEXT_STEP_FIRST,
@@ -243,9 +243,9 @@ typedef struct {
 } ConnectionStatusContext;
 
 static MMBearerConnectionStatus
-load_connection_status_finish (MMBaseBearer  *self,
-                               GAsyncResult  *res,
-                               GError       **error)
+reload_connection_status_finish (MMBaseBearer  *self,
+                                 GAsyncResult  *res,
+                                 GError       **error)
 {
     gint val;
 
@@ -315,21 +315,6 @@ connection_status_context_step (GTask *task)
 
     switch (ctx->step) {
         case CONNECTION_STATUS_CONTEXT_STEP_FIRST:
-            /* Connection status polling is an optional feature that must be
-             * enabled explicitly via udev tags. If not set, out as unsupported.
-             * Note that when connected via a muxed link, the udev tag should be
-             * checked on the master interface (lower device) */
-            if ((self->priv->data &&
-                 !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (self->priv->data),
-                                                                   "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) ||
-                (self->priv->link &&
-                 !mm_kernel_device_get_global_property_as_boolean (mm_kernel_device_peek_lower_device (mm_port_peek_kernel_device (self->priv->link)),
-                                                                   "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE"))) {
-                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                         "Connection status polling not required");
-                g_object_unref (task);
-                return;
-            }
             /* If no clients ready on start, assume disconnected */
             if (!self->priv->client_ipv4 && !self->priv->client_ipv6) {
                 g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
@@ -377,7 +362,7 @@ connection_status_context_step (GTask *task)
 }
 
 static void
-load_connection_status (MMBaseBearer        *self,
+reload_connection_status (MMBaseBearer        *self,
                         GAsyncReadyCallback  callback,
                         gpointer             user_data)
 {
@@ -391,6 +376,68 @@ load_connection_status (MMBaseBearer        *self,
     g_task_set_task_data (task, ctx, g_free);
 
     connection_status_context_step (task);
+}
+
+/*****************************************************************************/
+/* Connection status polling */
+
+static MMBearerConnectionStatus
+load_connection_status_finish (MMBaseBearer  *self,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    gint val;
+
+    val = g_task_propagate_int (G_TASK (res), error);
+    if (val < 0)
+        return MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+
+    return (MMBearerConnectionStatus) val;
+}
+
+static void
+reload_connection_status_ready (MMBaseBearer *self,
+                                GAsyncResult *res,
+                                GTask        *task)
+{
+    MMBearerConnectionStatus  status;
+    GError                   *error = NULL;
+
+    status = reload_connection_status_finish (self, res, &error);
+    if (status == MM_BEARER_CONNECTION_STATUS_UNKNOWN)
+        g_task_return_error (task, error);
+    else
+        g_task_return_int (task, MM_BEARER_CONNECTION_STATUS_CONNECTED);
+    g_object_unref (task);
+}
+
+static void
+load_connection_status (MMBaseBearer        *_self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    MMBearerQmi *self = MM_BEARER_QMI (_self);
+    GTask       *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Connection status polling is an optional feature that must be
+     * enabled explicitly via udev tags. If not set, out as unsupported.
+     * Note that when connected via a muxed link, the udev tag should be
+     * checked on the master interface (lower device) */
+    if ((self->priv->data &&
+         !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (self->priv->data),
+                                                           "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) ||
+        (self->priv->link &&
+         !mm_kernel_device_get_global_property_as_boolean (mm_kernel_device_peek_lower_device (mm_port_peek_kernel_device (self->priv->link)),
+                                                           "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE"))) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Connection status polling not required");
+        g_object_unref (task);
+        return;
+    }
+
+    reload_connection_status (_self, (GAsyncReadyCallback)reload_connection_status_ready, task);
 }
 
 /*****************************************************************************/
@@ -2623,4 +2670,8 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     base_bearer_class->reload_stats_finish = reload_stats_finish;
     base_bearer_class->load_connection_status = load_connection_status;
     base_bearer_class->load_connection_status_finish = load_connection_status_finish;
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+    base_bearer_class->reload_connection_status = reload_connection_status;
+    base_bearer_class->reload_connection_status_finish = reload_connection_status_finish;
+#endif
 }
