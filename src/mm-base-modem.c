@@ -651,8 +651,13 @@ mm_base_modem_sync (MMBaseModem         *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->sync != NULL);
-    g_assert (MM_BASE_MODEM_GET_CLASS (self)->sync_finish != NULL);
+    if (!MM_BASE_MODEM_GET_CLASS (self)->sync ||
+        !MM_BASE_MODEM_GET_CLASS (self)->sync_finish) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Suspend/resume quick synchronization unsupported");
+        g_object_unref (task);
+        return;
+    }
 
     MM_BASE_MODEM_GET_CLASS (self)->sync (self,
                                           (GAsyncReadyCallback) sync_ready,
