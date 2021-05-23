@@ -568,6 +568,10 @@ mm_broadband_bearer_novatel_lte_class_init (MMBroadbandBearerNovatelLteClass *kl
 
     base_bearer_class->load_connection_status = load_connection_status;
     base_bearer_class->load_connection_status_finish = load_connection_status_finish;
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+    base_bearer_class->reload_connection_status = load_connection_status;
+    base_bearer_class->reload_connection_status_finish = load_connection_status_finish;
+#endif
 
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
