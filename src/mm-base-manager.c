@@ -729,13 +729,6 @@ mm_base_manager_num_modems (MMBaseManager *self)
 
 #if defined WITH_SYSTEMD_SUSPEND_RESUME
 
-gboolean mm_base_modem_sync_finish (MMBaseModem   *self,
-                                    GAsyncResult  *res,
-                                    GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
 static void
 base_modem_sync_ready (MMBaseModem  *self,
                        GAsyncResult *res,
