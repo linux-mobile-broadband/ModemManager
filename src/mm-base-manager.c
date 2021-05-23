@@ -763,9 +763,13 @@ mm_base_manager_sync (MMBaseManager *self)
     /* Refresh each device */
     g_hash_table_iter_init (&iter, self->priv->devices);
     while (g_hash_table_iter_next (&iter, &key, &value)) {
-        MMBaseModem *modem = mm_device_peek_modem (MM_DEVICE (value));
+        MMBaseModem *modem;
+
+        modem = mm_device_peek_modem (MM_DEVICE (value));
+
         /* We just want to start the synchronization, we don't need the result */
-        mm_base_modem_sync (modem, (GAsyncReadyCallback)mm_base_modem_sync_ready, NULL);
+        if (modem)
+            mm_base_modem_sync (modem, (GAsyncReadyCallback)mm_base_modem_sync_ready, NULL);
     }
 }
 
