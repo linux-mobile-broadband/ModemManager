@@ -4272,19 +4272,49 @@ sync_detect_sim_swap_ready (MMIfaceModem *self,
 }
 
 static void
-reload_bearers (MMIfaceModem *self)
+sync_all_bearers_ready (MMBearerList *bearer_list,
+                        GAsyncResult *res,
+                        GTask        *task)
 {
-    g_autoptr(MMBearerList) list = NULL;
+    MMIfaceModem       *self;
+    SyncingContext     *ctx;
+    g_autoptr (GError)  error = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    if (!mm_bearer_list_sync_all_bearers_finish (bearer_list, res, &error))
+        mm_obj_warn (self, "synchronizing all bearer status failed: %s", error->message);
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_syncing_step (task);
+}
+
+static void
+reload_bearers (GTask *task)
+{
+    MMIfaceModem            *self;
+    SyncingContext          *ctx;
+    g_autoptr(MMBearerList)  bearer_list = NULL;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
 
     g_object_get (self,
-                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
                   NULL);
 
-    if (list) {
-        mm_bearer_list_foreach (list,
-                               (MMBearerListForeachFunc)mm_base_bearer_sync,
-                                NULL);
+    if (!bearer_list) {
+        /* Go on to next step */
+        ctx->step++;
+        interface_syncing_step (task);
+        return;
     }
+
+    mm_bearer_list_sync_all_bearers (bearer_list,
+                                     (GAsyncReadyCallback)sync_all_bearers_ready,
+                                     task);
 }
 
 static void
@@ -4337,9 +4367,8 @@ interface_syncing_step (GTask *task)
         /*
          * Refresh bearers.
          */
-        reload_bearers (self);
-        ctx->step++;
-        /* fall through */
+        reload_bearers (task);
+        return;
 
     case SYNCING_STEP_LAST:
         /* We are done without errors! */

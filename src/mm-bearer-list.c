@@ -261,6 +261,92 @@ mm_bearer_list_disconnect_all_bearers (MMBearerList *self,
 
 /*****************************************************************************/
 
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+typedef struct {
+    GList        *pending;
+    MMBaseBearer *current;
+} SyncAllContext;
+
+static void
+sync_all_context_free (SyncAllContext *ctx)
+{
+    if (ctx->current)
+        g_object_unref (ctx->current);
+    g_list_free_full (ctx->pending, g_object_unref);
+    g_free (ctx);
+}
+
+gboolean
+mm_bearer_list_sync_all_bearers_finish (MMBearerList  *self,
+                                        GAsyncResult  *res,
+                                        GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void sync_next_bearer (GTask *task);
+
+static void
+sync_ready (MMBaseBearer *bearer,
+            GAsyncResult *res,
+            GTask        *task)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_base_bearer_sync_finish (bearer, res, &error))
+        mm_obj_warn (bearer, "failed synchronizing state: %s", error->message);
+
+    sync_next_bearer (task);
+}
+
+static void
+sync_next_bearer (GTask *task)
+{
+    SyncAllContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    if (ctx->current)
+        g_clear_object (&ctx->current);
+
+    /* No more bearers? all done! */
+    if (!ctx->pending) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->current = MM_BASE_BEARER (ctx->pending->data);
+    ctx->pending = g_list_delete_link (ctx->pending, ctx->pending);
+
+    mm_base_bearer_sync (ctx->current, (GAsyncReadyCallback)sync_ready, task);
+}
+
+void
+mm_bearer_list_sync_all_bearers (MMBearerList        *self,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
+{
+    SyncAllContext *ctx;
+    GTask          *task;
+
+    ctx = g_new0 (SyncAllContext, 1);
+
+    /* Get a copy of the list */
+    ctx->pending = g_list_copy_deep (self->priv->bearers,
+                                     (GCopyFunc)g_object_ref,
+                                     NULL);
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)sync_all_context_free);
+
+    sync_next_bearer (task);
+}
+
+#endif
+
+/*****************************************************************************/
+
 MMBearerList *
 mm_bearer_list_new (guint max_active_bearers,
                     guint max_active_multiplexed_bearers)

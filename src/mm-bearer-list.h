@@ -84,4 +84,15 @@ gboolean mm_bearer_list_disconnect_all_bearers_finish (MMBearerList *self,
                                                        GAsyncResult *res,
                                                        GError **error);
 
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+
+void     mm_bearer_list_sync_all_bearers        (MMBearerList *self,
+                                                 GAsyncReadyCallback callback,
+                                                 gpointer user_data);
+gboolean mm_bearer_list_sync_all_bearers_finish (MMBearerList *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
+
+#endif
+
 #endif /* MM_BEARER_LIST_H */
