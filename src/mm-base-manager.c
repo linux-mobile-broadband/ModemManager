@@ -741,11 +741,11 @@ mm_base_modem_sync_ready (MMBaseModem  *self,
                           GAsyncResult *res,
                           gpointer      user_data)
 {
-    g_autoptr(GError) error;
+    g_autoptr(GError) error = NULL;
 
     mm_base_modem_sync_finish (self, res, &error);
     if (error) {
-        mm_obj_warn (self, "synchronization failed");
+        mm_obj_warn (self, "synchronization failed: %s", error->message);
         return;
     }
     mm_obj_info (self, "synchronization finished");
