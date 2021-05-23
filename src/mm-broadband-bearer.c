@@ -2028,6 +2028,10 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     base_bearer_class->report_connection_status = report_connection_status;
     base_bearer_class->load_connection_status = load_connection_status;
     base_bearer_class->load_connection_status_finish = load_connection_status_finish;
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+    base_bearer_class->reload_connection_status = load_connection_status;
+    base_bearer_class->reload_connection_status_finish = load_connection_status_finish;
+#endif
 
     klass->connect_3gpp = connect_3gpp;
     klass->connect_3gpp_finish = detailed_connect_finish;
