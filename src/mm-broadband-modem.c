@@ -12049,7 +12049,13 @@ syncing_step (GTask *task)
          * We want to make sure that the SIM is unlocked and not swapped before
          * synchronizing other interfaces.
          */
-        mm_obj_info (self, "resume synchronization state (%d/%d): Modem interface sync",
+        if (!self->priv->modem_dbus_skeleton) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                                     "Synchronization aborted: no modem exposed in DBus");
+            g_object_unref (task);
+            return;
+        }
+        mm_obj_info (self, "resume synchronization state (%d/%d): modem interface sync",
                      ctx->step, SYNCING_STEP_LAST);
         mm_iface_modem_sync (MM_IFACE_MODEM (self),
                              (GAsyncReadyCallback)iface_modem_sync_ready,
