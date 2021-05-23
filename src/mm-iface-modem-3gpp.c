@@ -2530,20 +2530,18 @@ sync_eps_bearer_ready (MMIfaceModem3gpp *self,
                        GAsyncResult     *res,
                        GTask            *task)
 {
-    MMBearerProperties  *properties;
-    SyncingContext      *ctx;
-    g_autoptr (GError)   error = NULL;
+    SyncingContext                *ctx;
+    g_autoptr(MMBearerProperties)  properties  = NULL;
+    g_autoptr(GError)              error = NULL;
 
     mm_obj_dbg (self, "EPS bearer sync ready");
     ctx = g_task_get_task_data (task);
 
     properties = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_finish (self, res, &error);
-    if (!properties) {
-        mm_obj_dbg (self, "couldn't refresh EPS bearer properties: %s", error->message);
-    } else {
+    if (!properties)
+        mm_obj_dbg (self, "couldn't refresh initial EPS bearer status: %s", error->message);
+    else
         mm_iface_modem_3gpp_update_initial_eps_bearer (self, properties);
-        g_object_unref (properties);
-    }
 
     /* Go on to next step */
     ctx->step++;
