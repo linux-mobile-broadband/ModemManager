@@ -11997,10 +11997,14 @@ syncing_step (GTask *task)
         /*
          * Synchronize asynchronously the Time interface.
          */
-        mm_obj_info (self, "resume synchronization state (%d/%d): time interface sync",
-                     ctx->step, SYNCING_STEP_LAST);
-        mm_iface_modem_time_sync (MM_IFACE_MODEM_TIME (self), (GAsyncReadyCallback)iface_modem_time_sync_ready, task);
-        return;
+        if (self->priv->modem_time_dbus_skeleton) {
+            mm_obj_info (self, "resume synchronization state (%d/%d): time interface sync",
+                         ctx->step, SYNCING_STEP_LAST);
+            mm_iface_modem_time_sync (MM_IFACE_MODEM_TIME (self), (GAsyncReadyCallback)iface_modem_time_sync_ready, task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
 
     case SYNCING_STEP_LAST:
         mm_obj_info (self, "resume synchronization state (%d/%d): all done",
