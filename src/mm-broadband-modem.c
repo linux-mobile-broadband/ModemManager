@@ -11996,13 +11996,24 @@ synchronize (MMBaseModem         *self,
     SyncingContext *ctx;
     GTask          *task;
 
+    task = g_task_new (MM_BROADBAND_MODEM (self), NULL, callback, user_data);
+
+    /* Synchronization after resume is not needed on modems that have never
+     * been enabled.
+     */
+    if (MM_BROADBAND_MODEM (self)->priv->modem_state < MM_MODEM_STATE_ENABLED) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                 "Synchronization after resume not needed in modem state '%s'",
+                                 mm_modem_state_get_string (MM_BROADBAND_MODEM (self)->priv->modem_state));
+        g_object_unref (task);
+        return;
+    }
+
     /* Create SyncingContext */
     ctx = g_new0 (SyncingContext, 1);
     ctx->step = SYNCING_STEP_FIRST;
-
-    /* Create sync steps task and execute it */
-    task = g_task_new (MM_BROADBAND_MODEM (self), NULL, callback, user_data);
     g_task_set_task_data (task, ctx, (GDestroyNotify)g_free);
+
     syncing_step (task);
 }
 
