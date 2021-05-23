@@ -12019,10 +12019,14 @@ syncing_step (GTask *task)
          * therefore we cannot continue with the other steps until
          * this one is finished.
          */
-        mm_obj_info (self, "resume synchronization state (%d/%d): 3GPP interface sync",
-                     ctx->step, SYNCING_STEP_LAST);
-        mm_iface_modem_3gpp_sync (MM_IFACE_MODEM_3GPP (self), (GAsyncReadyCallback)iface_modem_3gpp_sync_ready, task);
-        return;
+        if (self->priv->modem_3gpp_dbus_skeleton) {
+            mm_obj_info (self, "resume synchronization state (%d/%d): 3GPP interface sync",
+                         ctx->step, SYNCING_STEP_LAST);
+            mm_iface_modem_3gpp_sync (MM_IFACE_MODEM_3GPP (self), (GAsyncReadyCallback)iface_modem_3gpp_sync_ready, task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
 
     case SYNCING_STEP_IFACE_TIME:
         /*
