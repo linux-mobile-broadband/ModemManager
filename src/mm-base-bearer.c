@@ -1509,14 +1509,6 @@ mm_base_bearer_sync_finish (MMBaseBearer  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-static gboolean
-reload_connection_status_finish (MMBaseBearer  *self,
-                                 GAsyncResult  *res,
-                                 GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
 static void
 reload_connection_status_ready (MMBaseBearer *self,
                                 GAsyncResult *res,
@@ -1527,7 +1519,7 @@ reload_connection_status_ready (MMBaseBearer *self,
 
     ctx = g_task_get_task_data (task);
 
-    reload_connection_status_finish (self, res, &error);
+    MM_BASE_BEARER_GET_CLASS (self)->reload_connection_status_finish (self, res, &error);
     if (error)
         mm_obj_warn (self, "reloading connection status failed: %s", error->message);
 
