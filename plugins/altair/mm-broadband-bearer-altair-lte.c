@@ -358,6 +358,10 @@ mm_broadband_bearer_altair_lte_class_init (MMBroadbandBearerAltairLteClass *klas
 
     base_bearer_class->load_connection_status = NULL;
     base_bearer_class->load_connection_status_finish = NULL;
+#if defined WITH_SYSTEMD_SUSPEND_RESUME
+    base_bearer_class->reload_connection_status = NULL;
+    base_bearer_class->reload_connection_status_finish = NULL;
+#endif
 
     broadband_bearer_class->connect_3gpp = connect_3gpp;
     broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
