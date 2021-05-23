@@ -2587,11 +2587,8 @@ sync_registration_ready (MMIfaceModem3gpp *self,
 
     ctx = g_task_get_task_data (task);
 
-    mm_iface_modem_3gpp_run_registration_checks_finish (self, res, &error);
-    if (error) {
-        mm_obj_dbg (self, "Synchronizing 3GPP registration failed: %s", error->message);
-        g_error_free (error);
-    }
+    if (!mm_iface_modem_3gpp_run_registration_checks_finish (self, res, &error))
+        mm_obj_dbg (self, "couldn't synchronize 3GPP registration: %s", error->message);
 
     /* Go on to next step */
     ctx->step++;
