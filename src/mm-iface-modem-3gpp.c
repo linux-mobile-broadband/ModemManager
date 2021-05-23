@@ -2600,12 +2600,6 @@ interface_syncing_step (GTask *task)
     MMIfaceModem3gpp *self;
     SyncingContext   *ctx;
 
-    /* Don't run new steps if we're cancelled */
-    if (g_task_return_error_if_cancelled (task)) {
-        g_object_unref (task);
-        return;
-    }
-
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
