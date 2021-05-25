@@ -433,6 +433,17 @@ handle_uevent (MMBaseManager *self,
                const gchar   *action,
                GUdevDevice   *device)
 {
+    const gchar *subsystem;
+    const gchar *name;
+
+    subsystem = g_udev_device_get_subsystem (device);
+    name      = g_udev_device_get_name      (device);
+
+    /* Valid udev devices must have subsystem and name set; if they don't have
+     * both things, we silently ignore them. */
+    if (!subsystem || !name)
+        return;
+
     if (g_str_equal (action, "add") || g_str_equal (action, "move") || g_str_equal (action, "change")) {
         g_autoptr(MMKernelDevice) kernel_device = NULL;
 
@@ -442,7 +453,7 @@ handle_uevent (MMBaseManager *self,
     }
 
     if (g_str_equal (action, "remove")) {
-        device_removed (self, g_udev_device_get_subsystem (device), g_udev_device_get_name (device));
+        device_removed (self, subsystem, name);
         return;
     }
 }
@@ -456,11 +467,20 @@ typedef struct {
 static gboolean
 start_device_added_idle (StartDeviceAdded *ctx)
 {
-    MMKernelDevice *kernel_device;
+    const gchar *subsystem;
+    const gchar *name;
 
-    kernel_device = mm_kernel_device_udev_new (ctx->device);
-    device_added (ctx->self, kernel_device, FALSE, ctx->manual_scan);
-    g_object_unref (kernel_device);
+    subsystem = g_udev_device_get_subsystem (ctx->device);
+    name      = g_udev_device_get_name      (ctx->device);
+
+    /* Valid udev devices must have subsystem and name set; if they don't have
+     * both things, we silently ignore them. */
+    if (subsystem && name) {
+        g_autoptr(MMKernelDevice) kernel_device = NULL;
+
+        kernel_device = mm_kernel_device_udev_new (ctx->device);
+        device_added (ctx->self, kernel_device, FALSE, ctx->manual_scan);
+    }
 
     g_object_unref (ctx->self);
     g_object_unref (ctx->device);
