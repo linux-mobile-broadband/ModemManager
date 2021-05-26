@@ -230,6 +230,8 @@ main (gint argc, gchar **argv)
     g_option_context_add_group (context,
                                 mmcli_modem_firmware_get_option_group ());
     g_option_context_add_group (context,
+                                mmcli_modem_sar_get_option_group ());
+    g_option_context_add_group (context,
                                 mmcli_modem_signal_get_option_group ());
     g_option_context_add_group (context,
                                 mmcli_modem_oma_get_option_group ());
@@ -402,6 +404,13 @@ main (gint argc, gchar **argv)
         else
             mmcli_modem_firmware_run_synchronous (connection);
     }
+    /* Modem SAR options? */
+    else if (mmcli_modem_sar_options_enabled ()) {
+        if (async_flag)
+            mmcli_modem_sar_run_asynchronous (connection, cancellable);
+        else
+            mmcli_modem_sar_run_synchronous (connection);
+    }
     /* Modem Signal options? */
     else if (mmcli_modem_signal_options_enabled ()) {
         if (async_flag)
@@ -458,6 +467,8 @@ main (gint argc, gchar **argv)
         mmcli_modem_time_shutdown ();
     } else if (mmcli_modem_firmware_options_enabled ()) {
         mmcli_modem_firmware_shutdown ();
+    } else if (mmcli_modem_sar_options_enabled ()) {
+        mmcli_modem_sar_shutdown ();
     } else if (mmcli_modem_signal_options_enabled ()) {
         mmcli_modem_signal_shutdown ();
     } else if (mmcli_modem_oma_options_enabled ()) {

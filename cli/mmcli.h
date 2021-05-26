@@ -125,6 +125,15 @@ void          mmcli_modem_firmware_run_asynchronous   (GDBusConnection *connecti
 void          mmcli_modem_firmware_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_firmware_shutdown           (void);
 
+/* SAR group */
+GOptionGroup *mmcli_modem_sar_get_option_group   (void);
+gboolean      mmcli_modem_sar_options_enabled    (void);
+void          mmcli_modem_sar_run_asynchronous   (GDBusConnection *connection,
+                                                  GCancellable    *cancellable);
+void          mmcli_modem_sar_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_sar_shutdown           (void);
+
+
 /* Signal group */
 GOptionGroup *mmcli_modem_signal_get_option_group   (void);
 gboolean      mmcli_modem_signal_options_enabled    (void);
