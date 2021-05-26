@@ -41,6 +41,7 @@
 #include "mm-iface-modem-voice.h"
 #include "mm-iface-modem-time.h"
 #include "mm-iface-modem-firmware.h"
+#include "mm-iface-modem-sar.h"
 #include "mm-iface-modem-signal.h"
 #include "mm-iface-modem-oma.h"
 #include "mm-broadband-bearer.h"
@@ -72,6 +73,7 @@ static void iface_modem_time_init (MMIfaceModemTime *iface);
 static void iface_modem_signal_init (MMIfaceModemSignal *iface);
 static void iface_modem_oma_init (MMIfaceModemOma *iface);
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
+static void iface_modem_sar_init (MMIfaceModemSar *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -86,6 +88,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_OMA, iface_modem_oma_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SAR, iface_modem_sar_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init))
 
 enum {
@@ -103,6 +106,7 @@ enum {
     PROP_MODEM_SIGNAL_DBUS_SKELETON,
     PROP_MODEM_OMA_DBUS_SKELETON,
     PROP_MODEM_FIRMWARE_DBUS_SKELETON,
+    PROP_MODEM_SAR_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_SIM_SLOTS,
     PROP_MODEM_BEARER_LIST,
@@ -265,6 +269,11 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Firmware interface --->*/
     /* Properties */
     GObject  *modem_firmware_dbus_skeleton;
+
+    /*<--- Modem Sar interface --->*/
+    /* Properties */
+    GObject  *modem_sar_dbus_skeleton;
+
     gboolean  modem_firmware_ignore_carrier;
 };
 
@@ -12208,6 +12217,7 @@ typedef enum {
     INITIALIZE_STEP_IFACE_TIME,
     INITIALIZE_STEP_IFACE_SIGNAL,
     INITIALIZE_STEP_IFACE_OMA,
+    INITIALIZE_STEP_IFACE_SAR,
     INITIALIZE_STEP_FALLBACK_LIMITED,
     INITIALIZE_STEP_IFACE_VOICE,
     INITIALIZE_STEP_IFACE_FIRMWARE,
@@ -12386,6 +12396,7 @@ INTERFACE_INIT_READY_FN (iface_modem_time,                 MM_IFACE_MODEM_TIME, 
 INTERFACE_INIT_READY_FN (iface_modem_signal,               MM_IFACE_MODEM_SIGNAL,               FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_oma,                  MM_IFACE_MODEM_OMA,                  FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_firmware,             MM_IFACE_MODEM_FIRMWARE,             FALSE)
+INTERFACE_INIT_READY_FN (iface_modem_sar,                  MM_IFACE_MODEM_SAR,                  FALSE)
 
 static void
 initialize_step (GTask *task)
@@ -12534,6 +12545,14 @@ initialize_step (GTask *task)
         mm_iface_modem_oma_initialize (MM_IFACE_MODEM_OMA (ctx->self),
                                        g_task_get_cancellable (task),
                                        (GAsyncReadyCallback)iface_modem_oma_initialize_ready,
+                                       task);
+        return;
+
+    case INITIALIZE_STEP_IFACE_SAR:
+        /* Initialize the SAR interface */
+        mm_iface_modem_sar_initialize (MM_IFACE_MODEM_SAR (ctx->self),
+                                       g_task_get_cancellable (task),
+                                       (GAsyncReadyCallback)iface_modem_sar_initialize_ready,
                                        task);
         return;
 
@@ -12913,6 +12932,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_firmware_dbus_skeleton);
         self->priv->modem_firmware_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_SAR_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_sar_dbus_skeleton);
+        self->priv->modem_sar_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_SIM:
         g_clear_object (&self->priv->modem_sim);
         self->priv->modem_sim = g_value_dup_object (value);
@@ -13066,6 +13089,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_FIRMWARE_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_firmware_dbus_skeleton);
+        break;
+    case PROP_MODEM_SAR_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_sar_dbus_skeleton);
         break;
     case PROP_MODEM_SIM:
         g_value_set_object (value, self->priv->modem_sim);
@@ -13285,6 +13311,11 @@ dispose (GObject *object)
     if (self->priv->modem_firmware_dbus_skeleton) {
         mm_iface_modem_firmware_shutdown (MM_IFACE_MODEM_FIRMWARE (object));
         g_clear_object (&self->priv->modem_firmware_dbus_skeleton);
+    }
+
+    if (self->priv->modem_sar_dbus_skeleton) {
+        mm_iface_modem_sar_shutdown (MM_IFACE_MODEM_SAR (object));
+        g_clear_object (&self->priv->modem_sar_dbus_skeleton);
     }
 
     g_clear_object (&self->priv->modem_3gpp_initial_eps_bearer);
@@ -13592,6 +13623,12 @@ iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 }
 
 static void
+iface_modem_sar_init (MMIfaceModemSar *iface)
+{
+
+}
+
+static void
 mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -13674,6 +13711,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_OMA_DBUS_SKELETON,
                                       MM_IFACE_MODEM_OMA_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_SAR_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_SAR_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_FIRMWARE_DBUS_SKELETON,
