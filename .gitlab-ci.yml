@@ -200,11 +200,9 @@ build-default:
   - .common_variables
   only:
     - master
-    - branches
     - merge_requests
     - tags
     - schedules
-    - pushes
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
