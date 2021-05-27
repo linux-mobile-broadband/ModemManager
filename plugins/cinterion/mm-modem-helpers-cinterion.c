@@ -978,7 +978,7 @@ mm_cinterion_parse_smong_response (const gchar              *response,
     guint                  value = 0;
     GError                *inner_error = NULL;
     g_autoptr(GMatchInfo)  match_info = NULL;
-    g_autoptr(GRegex)      regex;
+    g_autoptr(GRegex)      regex = NULL;
 
     /* The AT^SMONG command returns a cell info table, where the second
      * column identifies the "GPRS status", which is exactly what we want.
