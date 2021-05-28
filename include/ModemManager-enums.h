@@ -1516,6 +1516,7 @@ typedef enum { /*< underscore_name=mm_call_direction >*/
  * @MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT: Device supports fastboot-based update.
  * @MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC: Device supports QMI PDC based update.
  * @MM_MODEM_FIRMWARE_UPDATE_METHOD_MBIM_QDU: Device supports MBIM QDU based update. Since 1.18.
+ * @MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE: Device supports Firehose based update. Since 1.18.
  *
  * Type of firmware update method supported by the module.
  *
@@ -1526,6 +1527,7 @@ typedef enum { /*< underscore_name=mm_modem_firmware_update_method >*/
     MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT = 1 << 0,
     MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC  = 1 << 1,
     MM_MODEM_FIRMWARE_UPDATE_METHOD_MBIM_QDU = 1 << 2,
+    MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE = 1 << 3,
 } MMModemFirmwareUpdateMethod;
 
 /**
