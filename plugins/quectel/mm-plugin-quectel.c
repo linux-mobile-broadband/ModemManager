@@ -29,6 +29,7 @@
 
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
+#include "mm-broadband-modem-mbim-quectel.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginQuectel, mm_plugin_quectel, MM_TYPE_PLUGIN)
@@ -60,12 +61,21 @@ create_modem (MMPlugin     *self,
 
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
-        mm_obj_dbg (self, "MBIM-powered Quectel modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
-                                                           drivers,
-                                                           mm_plugin_get_name (self),
-                                                           vendor,
-                                                           product));
+        if (vendor == 0x1eac) {
+            mm_obj_dbg (self, "MBIM-powered PCI Quectel modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_quectel_new (uid,
+                                                                       drivers,
+                                                                       mm_plugin_get_name (self),
+                                                                       vendor,
+                                                                       product));
+        } else {
+            mm_obj_dbg (self, "MBIM-powered Quectel modem found...");
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
+                                                               drivers,
+                                                               mm_plugin_get_name (self),
+                                                               vendor,
+                                                               product));
+        }
     }
 #endif
 
@@ -81,9 +91,12 @@ create_modem (MMPlugin     *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
     static const gchar *vendor_strings[] = { "quectel", NULL };
-    static const guint16 vendor_ids[] = { 0x2c7c, 0 };
+    static const guint16 vendor_ids[] = {
+        0x2c7c, /* usb vid */
+        0x1eac, /* pci vid */
+        0 };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_QUECTEL,
