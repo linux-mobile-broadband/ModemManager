@@ -593,7 +593,7 @@ mbim_device_new_ready (GObject      *unused,
     /* Now open the MBIM device */
     mbim_device_open_full (self->priv->mbim_device,
                            MBIM_DEVICE_OPEN_FLAGS_PROXY,
-                           30,
+                           45,
                            g_task_get_cancellable (task),
                            (GAsyncReadyCallback)mbim_device_open_ready,
                            task);
