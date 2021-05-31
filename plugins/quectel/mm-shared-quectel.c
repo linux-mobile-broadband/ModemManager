@@ -50,12 +50,14 @@ typedef struct {
     MMModemLocationSource  enabled_sources;
     FeatureSupport         qgps_supported;
     GRegex                *qgpsurc_regex;
+    GRegex                *qlwurc_regex;
 } Private;
 
 static void
 private_free (Private *priv)
 {
     g_regex_unref (priv->qgpsurc_regex);
+    g_regex_unref (priv->qlwurc_regex);
     g_slice_free (Private, priv);
 }
 
@@ -75,6 +77,7 @@ get_private (MMSharedQuectel *self)
         priv->enabled_sources   = MM_MODEM_LOCATION_SOURCE_NONE;
         priv->qgps_supported    = FEATURE_SUPPORT_UNKNOWN;
         priv->qgpsurc_regex     = g_regex_new ("\\r\\n\\+QGPSURC:.*", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        priv->qlwurc_regex      = g_regex_new ("\\r\\n\\+QLWURC:.*", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
         g_assert (MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class);
         priv->broadband_modem_class_parent = MM_SHARED_QUECTEL_GET_INTERFACE (self)->peek_parent_broadband_modem_class (self);
@@ -119,6 +122,12 @@ mm_shared_quectel_setup_ports (MMBroadbandModem *self)
         mm_port_serial_at_add_unsolicited_msg_handler (
             ports[i],
             priv->qgpsurc_regex,
+            NULL, NULL, NULL);
+
+        /* Ignore +QLWURC */
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            ports[i],
+            priv->qlwurc_regex,
             NULL, NULL, NULL);
     }
 }
