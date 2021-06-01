@@ -3741,36 +3741,14 @@ device_notification_cb (MbimDevice *device,
                 mbim_cid_get_printable (service,
                                         mbim_message_indicate_status_get_cid (notification)));
 
-    switch (service) {
-    case MBIM_SERVICE_BASIC_CONNECT:
+    if (service == MBIM_SERVICE_BASIC_CONNECT)
         basic_connect_notification (self, notification);
-        break;
-    case MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS:
+    else if (service == MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS)
         ms_basic_connect_extensions_notification (self, notification);
-        break;
-    case MBIM_SERVICE_SMS:
+    else if (service == MBIM_SERVICE_SMS)
         sms_notification (self, notification);
-        break;
-    case MBIM_SERVICE_USSD:
+    else if (service == MBIM_SERVICE_USSD)
         ussd_notification (self, notification);
-        break;
-    case MBIM_SERVICE_INVALID:
-    case MBIM_SERVICE_PHONEBOOK:
-    case MBIM_SERVICE_STK:
-    case MBIM_SERVICE_AUTH:
-    case MBIM_SERVICE_DSS:
-    case MBIM_SERVICE_MS_FIRMWARE_ID:
-    case MBIM_SERVICE_MS_HOST_SHUTDOWN:
-    case MBIM_SERVICE_PROXY_CONTROL:
-    case MBIM_SERVICE_QMI:
-    case MBIM_SERVICE_ATDS:
-    case MBIM_SERVICE_INTEL_FIRMWARE_UPDATE:
-    case MBIM_SERVICE_MS_SAR:
-    case MBIM_SERVICE_QDU:
-    default:
-        /* Ignore */
-        break;
-    }
 }
 
 static void
