@@ -3688,7 +3688,7 @@ static void
 uim_refresh_complete (QmiClientUim      *client,
                       QmiUimSessionType  session_type)
 {
-    g_autoptr(QmiMessageUimRefreshCompleteInput)  refresh_complete_input;
+    g_autoptr(QmiMessageUimRefreshCompleteInput)  refresh_complete_input = NULL;
     GArray                                       *dummy_aid;
 
     dummy_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
