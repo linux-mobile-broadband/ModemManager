@@ -1,4 +1,30 @@
 
+ModemManager 1.16.6
+-------------------------------------------
+
+ * Build:
+   ** Require libqmi >= 1.28.6 (for the optional QMI support).
+   ** Fix error with GCC 11 and -Wincompatible-pointer-types.
+   ** Fix warning with GCC 11 and -Wmaybe-uninitialized.
+
+ * QMI:
+   ** Increased device open timeout to 45s.
+   ** Added support to handle transfer-route messages.
+
+ * Base manager:
+   ** Added support for Qualcomm based PCI devices in the new WWAN subsystem in
+      kernel 5.13.
+   ** Fix segfault on rare conditions when ports reported don't have a proper
+      subsystem or name.
+   ** Fix segfault when trying to create device id after device is already gone.
+
+ * plugins:
+   ** foxconn: added support for the T99W175 module.
+   ** foxconn: fix segfault when attempting to use parent location support.
+   ** quectel: ignore QLWURC URCs.
+
+ * Several other minor improvements and fixes.
+
 ModemManager 1.16.4
 -------------------------------------------
 
