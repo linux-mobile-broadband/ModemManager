@@ -145,24 +145,15 @@ foxconn_get_firmware_version_ready (QmiClientDms *client,
     GError                                       *error = NULL;
     MMFirmwareUpdateSettings                     *update_settings = NULL;
     const gchar                                  *str;
-    MMIfaceModemFirmware                         *self;
 
     output = qmi_client_dms_foxconn_get_firmware_version_finish (client, res, &error);
     if (!output || !qmi_message_dms_foxconn_get_firmware_version_output_get_result (output, &error))
         goto out;
 
-    /* Create update settings now:
-     * 0x105b is the T99W175 module, T99W175 supports QDU,
-     * else support FASTBOOT and QMI PDC.
-     */
-    self = g_task_get_source_object (task);
-    if (mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)) == 0x105b)
-        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_MBIM_QDU);
-    else {
-        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT |
-                                                           MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC);
-        mm_firmware_update_settings_set_fastboot_at (update_settings, "AT^FASTBOOT");
-    }
+    /* Create update settings now */
+    update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT |
+                                                       MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC);
+    mm_firmware_update_settings_set_fastboot_at (update_settings, "AT^FASTBOOT");
 
     qmi_message_dms_foxconn_get_firmware_version_output_get_version (output, &str, NULL);
     mm_firmware_update_settings_set_version (update_settings, str);
