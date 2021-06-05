@@ -67,7 +67,7 @@ create_modem (MMPlugin     *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "rpmsg", "net", "qrtr", NULL };
+    static const gchar *subsystems[] = { "wwan", "rpmsg", "net", "qrtr", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_QCOM_SOC,
