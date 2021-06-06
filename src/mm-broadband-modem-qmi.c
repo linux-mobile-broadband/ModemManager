@@ -1679,7 +1679,7 @@ dms_set_operating_mode_ready (QmiClientDms *client,
             ((g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INTERNAL) ||
               g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_TRANSITION)))) {
             g_clear_error (&error);
-            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_RETRY, "FCC unlock may be needed");
+            error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_RETRY, "Invalid transition");
         }
     }
 

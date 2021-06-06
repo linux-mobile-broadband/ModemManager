@@ -1545,8 +1545,7 @@ radio_state_set_up_ready (MbimDevice   *device,
      * older devices. The original logic in the MBIM implemetation triggered a retry
      * for any kind of error, so let's do the same for now. */
     mm_obj_warn (self, "%s", error->message);
-    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_RETRY,
-                             "FCC unlock may be needed");
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_RETRY, "Invalid transition");
     g_object_unref (task);
 }
 
