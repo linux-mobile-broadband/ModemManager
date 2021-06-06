@@ -17,8 +17,12 @@ SUBSYSTEM=="tty", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEM=="net", ENV{ID_MM_CANDIDATE}="1"
 KERNEL=="cdc-wdm[0-9]*", SUBSYSTEM=="usbmisc", ENV{ID_MM_CANDIDATE}="1"
 
-# For now WWAN subsystem has only been validated with PCI-based devices
+# WWAN subsystem port handling
+#  - All USB devices ignored for now, only PCI devices expected
+#  - Only "wwan_port" device types processed (single ports); we fully ignore
+#    the "wwan_dev" device type (full device, not just one port)
 SUBSYSTEMS=="usb", GOTO="mm_candidate_end"
+SUBSYSTEM=="wwan", ENV{DEVTYPE}=="wwan_dev", GOTO="mm_candidate_end"
 SUBSYSTEM=="wwan", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEM=="wwan", KERNEL=="*MBIM", ENV{ID_MM_PORT_TYPE_MBIM}="1"
 SUBSYSTEM=="wwan", KERNEL=="*QMI", ENV{ID_MM_PORT_TYPE_QMI}="1"
