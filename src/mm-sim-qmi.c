@@ -336,6 +336,7 @@ uim_get_iccid_ready (QmiClientUim *client,
 {
     GError *error = NULL;
     GArray *read_result;
+    g_autofree gchar *raw_iccid = NULL;
     gchar *iccid;
 
     read_result = uim_read_finish (client, res, &error);
@@ -345,10 +346,14 @@ uim_get_iccid_ready (QmiClientUim *client,
         return;
     }
 
-    iccid = mm_bcd_to_string ((const guint8 *) read_result->data, read_result->len,
-                              TRUE /* low_nybble_first */);
-    g_assert (iccid);
-    g_task_return_pointer (task, iccid, g_free);
+    raw_iccid = mm_utils_bin2hexstr ((const guint8 *) read_result->data, read_result->len);
+    g_assert (raw_iccid);
+    iccid = mm_3gpp_parse_iccid (raw_iccid, &error);
+    if (!iccid) {
+        g_task_return_error (task, error);
+    } else {
+        g_task_return_pointer (task, iccid, g_free);
+    }
     g_object_unref (task);
 
     g_array_unref (read_result);
