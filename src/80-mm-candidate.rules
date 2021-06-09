@@ -24,6 +24,12 @@ KERNEL=="cdc-wdm[0-9]*", SUBSYSTEM=="usbmisc", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEMS=="usb", GOTO="mm_candidate_end"
 SUBSYSTEM=="wwan", ENV{DEVTYPE}=="wwan_dev", GOTO="mm_candidate_end"
 SUBSYSTEM=="wwan", ENV{ID_MM_CANDIDATE}="1"
+SUBSYSTEM=="wwan", ATTR{type}=="AT", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+SUBSYSTEM=="wwan", ATTR{type}=="MBIM", ENV{ID_MM_PORT_TYPE_MBIM}="1"
+SUBSYSTEM=="wwan", ATTR{type}=="QMI", ENV{ID_MM_PORT_TYPE_QMI}="1"
+SUBSYSTEM=="wwan", ATTR{type}=="QCDM", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+
+# Linux 5.13 does not have "type" attribute yet, match kernel name instead
 SUBSYSTEM=="wwan", KERNEL=="*MBIM", ENV{ID_MM_PORT_TYPE_MBIM}="1"
 SUBSYSTEM=="wwan", KERNEL=="*QMI", ENV{ID_MM_PORT_TYPE_QMI}="1"
 SUBSYSTEM=="wwan", KERNEL=="*AT", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
