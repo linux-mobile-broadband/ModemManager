@@ -85,10 +85,9 @@
  * ignore all ports exposed by the device.
  *
  * This tag was originally applicable to TTY ports and only when running
- * in DEFAULT or PARANOID filter policy types. Since 1.12, this tag
- * applies to all filter types (including STRICT), and to all port types
- * (not only TTYs), and is associated to the
- * MM_FILTER_RULE_EXPLICIT_BLACKLIST rule.
+ * in certain filter policy types. Since 1.12, this tag applies to all
+ * filter types and to all port types (not only TTYs), and is associated
+ * to the MM_FILTER_RULE_EXPLICIT_BLACKLIST rule.
  *
  * Since: 1.10
  */
@@ -105,41 +104,6 @@
  * Since: 1.10
  */
 #define ID_MM_PORT_IGNORE "ID_MM_PORT_IGNORE"
-
- /**
- * ID_MM_TTY_BLACKLIST:
- *
- * This is a device-specific tag that allows explicitly blacklisting
- * devices that expose TTY devices so that they are never probed.
- *
- * This tag is used when the daemon runs with DEFAULT or PARANOID
- * filter policy type, and is associated to the MM_FILTER_RULE_TTY_BLACKLIST
- * rule.
- *
- * This tag is ignored when the STRICT filter policy is used.
- *
- * Since: 1.12
- */
-#define ID_MM_TTY_BLACKLIST "ID_MM_TTY_BLACKLIST"
-
-/**
- * ID_MM_TTY_MANUAL_SCAN_ONLY:
- *
- * This is a device-specific tag that allows explicitly greylisting
- * devices that expose TTY devices so that they are never probed
- * automatically. Instead, an explicit manual scan request may be sent
- * to the daemon so that the TTY ports exposed by the device are
- * probed.
- *
- * This tag is used when the daemon runs with DEFAULT or PARANOID
- * filter policy type, and is associated to the MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY
- * rule.
- *
- * This tag is ignored when the STRICT filter policy is used.
- *
- * Since: 1.12
- */
-#define ID_MM_TTY_MANUAL_SCAN_ONLY "ID_MM_TTY_MANUAL_SCAN_ONLY"
 
 /**
  * ID_MM_PORT_TYPE_AT_PRIMARY:
@@ -274,5 +238,45 @@
  * Since: 1.10
  */
 #define ID_MM_TTY_FLOW_CONTROL "ID_MM_TTY_FLOW_CONTROL"
+
+/*
+ * The following symbols are deprecated. We don't add them to -compat
+ * because this -tags file is not really part of the installed API.
+ */
+
+#ifndef MM_DISABLE_DEPRECATED
+
+ /**
+  * ID_MM_TTY_BLACKLIST:
+  *
+  * This was a device-specific tag that allowed explicitly blacklisting
+  * devices that exposed TTY devices so that they were never probed.
+  *
+  * This tag was applicable only when running in certain filter policy types,
+  * and is no longer used since 1.18.
+  *
+  * Since: 1.12
+  * Deprecated: 1.18.0
+  */
+#define ID_MM_TTY_BLACKLIST "ID_MM_TTY_BLACKLIST"
+
+/**
+ * ID_MM_TTY_MANUAL_SCAN_ONLY:
+ *
+ * This was a device-specific tag that allowed explicitly greylisting
+ * devices that exposed TTY devices so that they were never probed
+ * automatically. Instead, an explicit manual scan request could
+ * be sent to the daemon so that the TTY ports exposed by the device
+ * were probed.
+ *
+ * This tag was applicable only when running in certain filter policy types,
+ * and is no longer used since 1.18.
+ *
+ * Since: 1.12
+ * Deprecated: 1.18.0
+ */
+#define ID_MM_TTY_MANUAL_SCAN_ONLY "ID_MM_TTY_MANUAL_SCAN_ONLY"
+
+#endif
 
 #endif /* MM_TAGS_H */
