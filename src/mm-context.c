@@ -48,11 +48,6 @@ filter_policy_option_arg (const gchar  *option_name,
                           gpointer      data,
                           GError      **error)
 {
-    if (!g_ascii_strcasecmp (value, "legacy")) {
-        filter_policy = MM_FILTER_POLICY_LEGACY;
-        return TRUE;
-    }
-
     if (!g_ascii_strcasecmp (value, "whitelist-only")) {
         filter_policy = MM_FILTER_POLICY_WHITELIST_ONLY;
         return TRUE;
@@ -60,11 +55,6 @@ filter_policy_option_arg (const gchar  *option_name,
 
     if (!g_ascii_strcasecmp (value, "strict")) {
         filter_policy = MM_FILTER_POLICY_STRICT;
-        return TRUE;
-    }
-
-    if (!g_ascii_strcasecmp (value, "paranoid")) {
-        filter_policy = MM_FILTER_POLICY_PARANOID;
         return TRUE;
     }
 
@@ -77,7 +67,7 @@ filter_policy_option_arg (const gchar  *option_name,
 static const GOptionEntry entries[] = {
     {
         "filter-policy", 0, 0, G_OPTION_ARG_CALLBACK, filter_policy_option_arg,
-        "Filter policy: one of LEGACY, WHITELIST-ONLY, STRICT, PARANOID",
+        "Filter policy: one of WHITELIST-ONLY, STRICT",
         "[POLICY]"
     },
     {

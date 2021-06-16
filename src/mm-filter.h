@@ -87,22 +87,6 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN | \
      MM_FILTER_RULE_WWAN)
 
-/* This is the legacy ModemManager policy that tries to automatically probe
- * device ports unless they're blacklisted in some way or another. */
-#define MM_FILTER_POLICY_LEGACY            \
-    (MM_FILTER_RULE_EXPLICIT_WHITELIST   | \
-     MM_FILTER_RULE_EXPLICIT_BLACKLIST   | \
-     MM_FILTER_RULE_VIRTUAL              | \
-     MM_FILTER_RULE_NET                  | \
-     MM_FILTER_RULE_USBMISC              | \
-     MM_FILTER_RULE_RPMSG                | \
-     MM_FILTER_RULE_TTY                  | \
-     MM_FILTER_RULE_TTY_BLACKLIST        | \
-     MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY | \
-     MM_FILTER_RULE_TTY_PLATFORM_DRIVER  | \
-     MM_FILTER_RULE_TTY_DEFAULT_ALLOWED  | \
-     MM_FILTER_RULE_WWAN)
-
 /* This is a stricter policy which will only automatically probe device ports
  * if they are allowed by any of the automatic whitelist rules. */
 #define MM_FILTER_POLICY_STRICT             \
@@ -115,27 +99,6 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
      MM_FILTER_RULE_USBMISC               | \
      MM_FILTER_RULE_RPMSG                 | \
      MM_FILTER_RULE_TTY                   | \
-     MM_FILTER_RULE_TTY_PLATFORM_DRIVER   | \
-     MM_FILTER_RULE_TTY_DRIVER            | \
-     MM_FILTER_RULE_TTY_ACM_INTERFACE     | \
-     MM_FILTER_RULE_TTY_WITH_NET          | \
-     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN | \
-     MM_FILTER_RULE_WWAN)
-
-/* This is equivalent to the strict policy, but also applying the device
- * blacklists explicitly */
-#define MM_FILTER_POLICY_PARANOID           \
-    (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
-     MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
-     MM_FILTER_RULE_PLUGIN_WHITELIST      | \
-     MM_FILTER_RULE_QRTR                  | \
-     MM_FILTER_RULE_VIRTUAL               | \
-     MM_FILTER_RULE_NET                   | \
-     MM_FILTER_RULE_USBMISC               | \
-     MM_FILTER_RULE_RPMSG                 | \
-     MM_FILTER_RULE_TTY                   | \
-     MM_FILTER_RULE_TTY_BLACKLIST         | \
-     MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  | \
      MM_FILTER_RULE_TTY_PLATFORM_DRIVER   | \
      MM_FILTER_RULE_TTY_DRIVER            | \
      MM_FILTER_RULE_TTY_ACM_INTERFACE     | \
