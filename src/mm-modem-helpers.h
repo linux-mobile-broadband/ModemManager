@@ -146,6 +146,7 @@ GRegex    *mm_3gpp_cds_regex_get (void);
 
 /* AT+WS46=? response parser: returns array of MMModemMode values */
 GArray *mm_3gpp_parse_ws46_test_response (const gchar  *response,
+                                          gpointer      log_object,
                                           GError      **error);
 
 /* AT+COPS=? (network scan) response parser */

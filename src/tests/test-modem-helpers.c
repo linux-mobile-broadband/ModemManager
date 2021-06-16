@@ -126,7 +126,7 @@ test_ws46_response (const gchar       *str,
     GArray *modes;
     GError *error = NULL;
 
-    modes = mm_3gpp_parse_ws46_test_response (str, &error);
+    modes = mm_3gpp_parse_ws46_test_response (str, NULL, &error);
     g_assert_no_error (error);
     g_assert (modes != NULL);
     g_assert_cmpuint (modes->len, ==, n_expected);

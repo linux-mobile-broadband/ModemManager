@@ -71,7 +71,7 @@ load_supported_modes_ready (MMIfaceModem *self,
         return;
     }
 
-    modes = mm_3gpp_parse_ws46_test_response (response, &error);
+    modes = mm_3gpp_parse_ws46_test_response (response, self, &error);
     if (!modes) {
         g_prefix_error (&error, "parsing WS46=? response failed: ");
         g_task_return_error (task, error);

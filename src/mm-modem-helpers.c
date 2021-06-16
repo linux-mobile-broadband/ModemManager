@@ -995,6 +995,7 @@ static const Ws46Mode ws46_modes[] = {
 
 GArray *
 mm_3gpp_parse_ws46_test_response (const gchar  *response,
+                                  gpointer      log_object,
                                   GError      **error)
 {
     GArray     *modes = NULL;
@@ -1060,7 +1061,7 @@ mm_3gpp_parse_ws46_test_response (const gchar  *response,
         }
 
         if (j == G_N_ELEMENTS (ws46_modes))
-            g_warning ("Unknown +WS46 mode reported: %u", val);
+            mm_obj_warn (log_object, "Unknown +WS46 mode reported: %u", val);
     }
 
     if (supported_mode_25) {

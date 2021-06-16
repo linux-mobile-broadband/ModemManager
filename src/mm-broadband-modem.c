@@ -520,7 +520,7 @@ current_capabilities_ws46_test_ready (MMBaseModem *self,
     if (!response)
         goto out;
 
-    modes = mm_3gpp_parse_ws46_test_response (response, NULL);
+    modes = mm_3gpp_parse_ws46_test_response (response, self, NULL);
     if (!modes)
         goto out;
 
@@ -1745,7 +1745,7 @@ supported_modes_ws46_test_ready (MMBroadbandModem *self,
         goto out;
     }
 
-    modes = mm_3gpp_parse_ws46_test_response (response, &error);
+    modes = mm_3gpp_parse_ws46_test_response (response, self, &error);
     if (!modes) {
         mm_obj_dbg (self, "parsing WS46=? response failed: '%s'", error->message);
         g_error_free (error);
