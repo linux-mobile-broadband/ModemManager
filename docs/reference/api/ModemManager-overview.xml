@@ -197,6 +197,17 @@ $ sudo udevadm trigger
             </para>
           </listitem>
           <listitem>
+            <para><emphasis>MM_FILTER_RULE_WWAN</emphasis></para>
+            <para>
+              This filter will automatically flag as allowed all wwan control ports exposed
+              in the wwan subsystem. Unless there is a will to explicitly forbid the wwan control
+              ports, this filter should always be enabled.
+            </para>
+            <para>
+              This filter rule is available since 1.18.0.
+            </para>
+          </listitem>
+          <listitem>
             <para><emphasis>MM_FILTER_RULE_TTY</emphasis></para>
             <para>
               If the MM_FILTER_RULE_TTY filter is disabled, no TTY port will be allowed. If this
@@ -237,17 +248,6 @@ $ sudo udevadm trigger
             <para>
               This rule is the implicit one defining what happens when a TTY port isn't explicitly
               accepted by any of the TTY-specific filters; i.e. the TTY port will be forbidden.
-            </para>
-          </listitem>
-          <listitem>
-            <para><emphasis>MM_FILTER_RULE_WWAN</emphasis></para>
-            <para>
-              This filter will automatically flag as allowed all wwan control ports exposed
-              in the wwan subsystem. Unless there is a will to explicitly forbid the wwan control
-              ports, this filter should always be enabled.
-            </para>
-            <para>
-              This filter rule is available since 1.18.0.
             </para>
           </listitem>
         </itemizedlist>
