@@ -166,7 +166,7 @@ main (int argc, char *argv[])
                        mm_context_get_log_timestamps (),
                        mm_context_get_log_relative_timestamps (),
                        &error)) {
-        g_warning ("failed to set up logging: %s", error->message);
+        g_printerr ("error: failed to set up logging: %s\n", error->message);
         g_error_free (error);
         exit (1);
     }

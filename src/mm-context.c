@@ -367,7 +367,7 @@ mm_context_init (gint argc,
     g_option_context_set_help_enabled (ctx, FALSE);
 
     if (!g_option_context_parse (ctx, &argc, &argv, &error)) {
-        g_warning ("error: %s", error->message);
+        g_printerr ("error: %s\n", error->message);
         g_error_free (error);
         exit (1);
     }
@@ -396,7 +396,7 @@ mm_context_init (gint argc,
     /* Initial kernel events processing may only be used if autoscan is disabled */
 #if defined WITH_UDEV || defined WITH_QRTR
     if (!no_auto_scan && initial_kernel_events) {
-        g_warning ("error: --initial-kernel-events must be used only if --no-auto-scan is also used");
+        g_printerr ("error: --initial-kernel-events must be used only if --no-auto-scan is also used\n");
         exit (1);
     }
 # if defined WITH_UDEV
