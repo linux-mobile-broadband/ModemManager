@@ -228,23 +228,6 @@ mm_filter_port (MMFilter        *self,
         const gchar *physdev_subsystem;
         const gchar *driver;
 
-        /* Blacklist rules first */
-
-        /* Ignore blacklisted tty devices. */
-        if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_BLACKLIST) &&
-            (mm_kernel_device_get_global_property_as_boolean (port, ID_MM_TTY_BLACKLIST))) {
-            mm_obj_dbg (self, "(%s/%s): port filtered: tty is blacklisted", subsystem, name);
-            return FALSE;
-        }
-
-        /* Is the device in the manual-only greylist? If so, return if this is an
-         * automatic scan. */
-        if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY) &&
-            (!manual_scan && mm_kernel_device_get_global_property_as_boolean (port, ID_MM_TTY_MANUAL_SCAN_ONLY))) {
-            mm_obj_dbg (self, "(%s/%s): port filtered: tty probed only in manual scan", subsystem, name);
-            return FALSE;
-        }
-
         /* Mixed blacklist/whitelist rules */
 
         /* If the physdev is a 'platform' or 'pnp' device that's not whitelisted, ignore it */
@@ -256,12 +239,6 @@ mm_filter_port (MMFilter        *self,
              !g_strcmp0 (physdev_subsystem, "sdio"))) {
             mm_obj_dbg (self, "(%s/%s): port filtered: tty platform driver", subsystem, name);
             return FALSE;
-        }
-
-        /* Default allowed? */
-        if (self->priv->enabled_rules & MM_FILTER_RULE_TTY_DEFAULT_ALLOWED) {
-            mm_obj_dbg (self, "(%s/%s) port allowed", subsystem, name);
-            return TRUE;
         }
 
         /* Whitelist rules last */
@@ -437,11 +414,8 @@ log_object_build_id (MMLogObject *_self)
 
 /*****************************************************************************/
 
-/* If TTY rule enabled, either DEFAULT_ALLOWED or DEFAULT_FORBIDDEN must be set. */
-#define VALIDATE_RULE_TTY(rules) (!(rules & MM_FILTER_RULE_TTY) || \
-                                  ((rules & (MM_FILTER_RULE_TTY_DEFAULT_ALLOWED | MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)) && \
-                                   ((rules & (MM_FILTER_RULE_TTY_DEFAULT_ALLOWED | MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)) != \
-                                    (MM_FILTER_RULE_TTY_DEFAULT_ALLOWED | MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN))))
+/* If TTY rule enabled, DEFAULT_FORBIDDEN must be set. */
+#define VALIDATE_RULE_TTY(rules) (!(rules & MM_FILTER_RULE_TTY) || (rules & (MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)))
 
 MMFilter *
 mm_filter_new (MMFilterRule   enabled_rules,
@@ -477,15 +451,11 @@ mm_filter_new (MMFilterRule   enabled_rules,
     mm_obj_dbg (self, "  wwan devices allowed:       %s", RULE_ENABLED_STR (MM_FILTER_RULE_WWAN));
     if (self->priv->enabled_rules & MM_FILTER_RULE_TTY) {
         mm_obj_dbg (self, "  tty devices:");
-        mm_obj_dbg (self, "      blacklist applied:        %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_BLACKLIST));
-        mm_obj_dbg (self, "      manual scan only applied: %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY));
         mm_obj_dbg (self, "      platform driver check:    %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_PLATFORM_DRIVER));
         mm_obj_dbg (self, "      driver check:             %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_DRIVER));
         mm_obj_dbg (self, "      cdc-acm interface check:  %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_ACM_INTERFACE));
         mm_obj_dbg (self, "      with net check:           %s", RULE_ENABLED_STR (MM_FILTER_RULE_TTY_WITH_NET));
-        if (self->priv->enabled_rules & MM_FILTER_RULE_TTY_DEFAULT_ALLOWED)
-            mm_obj_dbg (self, "      default:                  allowed");
-        else if (self->priv->enabled_rules & MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)
+        if (self->priv->enabled_rules & MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN)
             mm_obj_dbg (self, "      default:                  forbidden");
         else
             g_assert_not_reached ();

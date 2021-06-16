@@ -56,36 +56,13 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
     MM_FILTER_RULE_USBMISC               = 1 << 6,
     MM_FILTER_RULE_RPMSG                 = 1 << 7,
     MM_FILTER_RULE_TTY                   = 1 << 8,
-    MM_FILTER_RULE_TTY_BLACKLIST         = 1 << 9,
-    MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  = 1 << 10,
-    MM_FILTER_RULE_TTY_PLATFORM_DRIVER   = 1 << 11,
-    MM_FILTER_RULE_TTY_DEFAULT_ALLOWED   = 1 << 12,
-    MM_FILTER_RULE_TTY_DRIVER            = 1 << 13,
-    MM_FILTER_RULE_TTY_ACM_INTERFACE     = 1 << 14,
-    MM_FILTER_RULE_TTY_WITH_NET          = 1 << 15,
-    MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN = 1 << 16,
-    MM_FILTER_RULE_WWAN                  = 1 << 17,
+    MM_FILTER_RULE_TTY_PLATFORM_DRIVER   = 1 << 9,
+    MM_FILTER_RULE_TTY_DRIVER            = 1 << 10,
+    MM_FILTER_RULE_TTY_ACM_INTERFACE     = 1 << 11,
+    MM_FILTER_RULE_TTY_WITH_NET          = 1 << 12,
+    MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN = 1 << 13,
+    MM_FILTER_RULE_WWAN                  = 1 << 14,
 } MMFilterRule;
-
-#define MM_FILTER_RULE_ALL                  \
-    (MM_FILTER_RULE_EXPLICIT_WHITELIST    | \
-     MM_FILTER_RULE_EXPLICIT_BLACKLIST    | \
-     MM_FILTER_RULE_PLUGIN_WHITELIST      | \
-     MM_FILTER_RULE_QRTR                  | \
-     MM_FILTER_RULE_VIRTUAL               | \
-     MM_FILTER_RULE_NET                   | \
-     MM_FILTER_RULE_USBMISC               | \
-     MM_FILTER_RULE_RPMSG                 | \
-     MM_FILTER_RULE_TTY                   | \
-     MM_FILTER_RULE_TTY_BLACKLIST         | \
-     MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY  | \
-     MM_FILTER_RULE_TTY_PLATFORM_DRIVER   | \
-     MM_FILTER_RULE_TTY_DEFAULT_ALLOWED   | \
-     MM_FILTER_RULE_TTY_DRIVER            | \
-     MM_FILTER_RULE_TTY_ACM_INTERFACE     | \
-     MM_FILTER_RULE_TTY_WITH_NET          | \
-     MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN | \
-     MM_FILTER_RULE_WWAN)
 
 /* This is a stricter policy which will only automatically probe device ports
  * if they are allowed by any of the automatic whitelist rules. */
@@ -109,6 +86,9 @@ typedef enum { /*< underscore_name=mm_filter_rule >*/
 /* This policy only allows using device ports explicitly whitelisted via
  * udev rules. i.e. ModemManager won't do any kind of automatic probing. */
 #define MM_FILTER_POLICY_WHITELIST_ONLY MM_FILTER_RULE_EXPLICIT_WHITELIST
+
+/* The strict policy has all supported rules */
+#define MM_FILTER_RULE_ALL MM_FILTER_POLICY_STRICT
 
 MMFilter *mm_filter_new (MMFilterRule   enabled_rules,
                          GError       **error);
