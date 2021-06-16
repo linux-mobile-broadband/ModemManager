@@ -28,14 +28,8 @@ Specify which ports are probed and how:
 \fB'WHITELIST-ONLY'\fR
 Only devices or ports explicitly whitelisted with the 'ID_MM_DEVICE_PROCESS' udev tag are probed.
 .TP
-\fB'DEFAULT'\fR
-All ports are allowed to be probed except for the ones explicitly greylisted as RS232 adapters or completely blacklisted.
-.TP
 \fB'STRICT'\fR
-Only the TTY ports that are heurstically determined to be very likely to be modem ports are probed. Nay end up ignoring some devices.
-.TP
-\fB'PARANOID'\fR
-This is equivalent to running the STRICT mode but also applying the blacklist and RS232 greylist filters explicitly.
+Only the TTY ports that are heuristically determined to be very likely to be modem ports are probed. Nay end up ignoring some devices.
 .RE
 .TP
 .B \-\-no\-auto\-scan

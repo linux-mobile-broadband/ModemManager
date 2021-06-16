@@ -246,32 +246,6 @@ $ sudo udevadm trigger
             <programlisting># /usr/sbin/ModemManager --filter-policy=WHITELIST-ONLY</programlisting>
           </listitem>
           <listitem>
-            <para><emphasis>Default</emphasis></para>
-            <para>
-              This is a policy where the following rules are enabled:
-              <itemizedlist>
-                <listitem>MM_FILTER_RULE_EXPLICIT_WHITELIST</listitem>
-                <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
-                <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
-                <listitem>MM_FILTER_RULE_NET</listitem>
-                <listitem>MM_FILTER_RULE_USBMISC</listitem>
-                <listitem>MM_FILTER_RULE_TTY</listitem>
-                <listitem>MM_FILTER_RULE_TTY_BLACKLIST</listitem>
-                <listitem>MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY</listitem>
-                <listitem>MM_FILTER_RULE_TTY_PLATFORM_DRIVER</listitem>
-                <listitem>MM_FILTER_RULE_TTY_DEFAULT_ALLOWED</listitem>
-              </itemizedlist>
-            </para>
-            <para>
-              This policy is the default one when a different one not explicitly
-              selected, and is equivalent to the way ModemManager has worked in previous
-              releases. This policy is the least restrictive one, and will end up
-              allowing port probing of all TTYs not explicitly blacklisted in one way
-              or another.
-            </para>
-            <programlisting># /usr/sbin/ModemManager --filter-policy=DEFAULT</programlisting>
-          </listitem>
-          <listitem>
             <para><emphasis>Strict</emphasis></para>
             <para>
               This is a policy where the following rules are enabled:
@@ -290,44 +264,12 @@ $ sudo udevadm trigger
               </itemizedlist>
             </para>
             <para>
-              This policy is stricter than the default one, as by default all TTYs are
-              forbidden except for the ones explicitly allowed by one of the TTY-specific
-              rules. Distributions or users should use this policy if they don't want
-              ModemManager to mess around with TTY ports that may not be exposed by
-              actual modems.
+              This policy is the default one when a different one is not explicitly
+              selected. In this policy, all TTYs are forbidden except for the ones
+              explicitly allowed by one of the TTY-specific rules.
             </para>
             <programlisting># /usr/sbin/ModemManager --filter-policy=STRICT</programlisting>
           </listitem>
-          <listitem>
-            <para><emphasis>Paranoid</emphasis></para>
-            <para>
-              This policy is a mix of the Default and Strict ones:
-              <itemizedlist>
-                <listitem>MM_FILTER_RULE_EXPLICIT_WHITELIST</listitem>
-                <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
-                <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
-                <listitem>MM_FILTER_RULE_NET</listitem>
-                <listitem>MM_FILTER_RULE_USBMISC</listitem>
-                <listitem>MM_FILTER_RULE_TTY</listitem>
-                <listitem>MM_FILTER_RULE_TTY_BLACKLIST</listitem>
-                <listitem>MM_FILTER_RULE_TTY_MANUAL_SCAN_ONLY</listitem>
-                <listitem>MM_FILTER_RULE_TTY_PLATFORM_DRIVER</listitem>
-                <listitem>MM_FILTER_RULE_TTY_DRIVER</listitem>
-                <listitem>MM_FILTER_RULE_TTY_ACM_INTERFACE</listitem>
-                <listitem>MM_FILTER_RULE_TTY_WITH_NET</listitem>
-                <listitem>MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN</listitem>
-              </itemizedlist>
-            </para>
-            <para>
-              This policy is equivalent to the Strict policy, but where the ModemManager
-              provided blacklist and manual scan only greylist are also used. It is not
-              recommended to use this option in normal setups as the blacklists may be
-              obsoleted in future ModemManager versions (in favor of using the Strict
-              policy as default).
-            </para>
-            <programlisting># /usr/sbin/ModemManager --filter-policy=PARANOID</programlisting>
-          </listitem>
-
           <listitem>
             <para><emphasis>Custom</emphasis></para>
             <para>
@@ -335,12 +277,12 @@ $ sudo udevadm trigger
               by explicitly enabling or disabling rules via environment variables.
             </para>
             <para>
-              E.g. this would launch ModemManager with the Default filter policy but with all
+              E.g. this would launch ModemManager with the Strict filter policy but with all
               net and cdc-wdm ports forbidden completely:
               <programlisting>
 # MM_FILTER_RULE_NET=0 \
   MM_FILTER_RULE_USBMISC=0 \
-  /usr/sbin/ModemManager --filter-policy=DEFAULT</programlisting>
+  /usr/sbin/ModemManager --filter-policy=STRICT</programlisting>
             </para>
             <para>
               E.g. this would launch ModemManager with the Whitelist-only filter policy but also
