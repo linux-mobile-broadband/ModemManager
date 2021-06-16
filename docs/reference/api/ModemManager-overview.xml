@@ -143,6 +143,24 @@ $ sudo udevadm trigger
             </programlisting>
           </listitem>
           <listitem>
+            <para><emphasis>MM_FILTER_RULE_PLUGIN_WHITELIST</emphasis></para>
+            <para>
+              This filter will automatically whitelist devices that are explicitly referenced
+              by plugins, either with plugin-specific whitelist tags, with exact
+              <emphasis>vid:pid</emphasis> matches, or just with <emphasis>vid</emphasis> matches.
+            </para>
+          </listitem>
+          <listitem>
+            <para><emphasis>MM_FILTER_RULE_QRTR</emphasis></para>
+            <para>
+              This filter will automatically flag as allowed all QRTR nodes that have been
+              notified as being modem management capable.
+            </para>
+            <para>
+              This filter rule is available since 1.18.0.
+            </para>
+          </listitem>
+          <listitem>
             <para><emphasis>MM_FILTER_RULE_VIRTUAL</emphasis></para>
             <para>
               This filter will automatically flag as forbidden all ports exposed by virtual
@@ -165,6 +183,17 @@ $ sudo udevadm trigger
               usbmisc subsystem. Unless there is a will to explicitly forbid the cdc-wdm ports exposed
               by qmi_wwan, cdc_mbim or huawei-cdc-ncm kernel drivers, this filter should always
               be enabled.
+            </para>
+          </listitem>
+          <listitem>
+            <para><emphasis>MM_FILTER_RULE_RPMSG</emphasis></para>
+            <para>
+              This filter will automatically flag as allowed all rpmsg ports exposed in the
+              rpmsg subsystem. Unless there is a will to explicitly forbid the rpmsg ports,
+              this filter should always be enabled.
+            </para>
+            <para>
+              This filter rule is available since 1.16.0.
             </para>
           </listitem>
           <listitem>
@@ -228,6 +257,17 @@ $ sudo udevadm trigger
               interface port will be allowed automatically.
             </para>
           </listitem>
+          <listitem>
+            <para><emphasis>MM_FILTER_RULE_WWAN</emphasis></para>
+            <para>
+              This filter will automatically flag as allowed all wwan control ports exposed
+              in the wwan subsystem. Unless there is a will to explicitly forbid the wwan control
+              ports, this filter should always be enabled.
+            </para>
+            <para>
+              This filter rule is available since 1.18.0.
+            </para>
+          </listitem>
         </itemizedlist>
       </para>
     </section>
@@ -252,15 +292,19 @@ $ sudo udevadm trigger
               <itemizedlist>
                 <listitem>MM_FILTER_RULE_EXPLICIT_WHITELIST</listitem>
                 <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
+                <listitem>MM_FILTER_RULE_PLUGIN_WHITELIST</listitem>
+                <listitem>MM_FILTER_RULE_QRTR</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
                 <listitem>MM_FILTER_RULE_USBMISC</listitem>
+                <listitem>MM_FILTER_RULE_RPMSG</listitem>
                 <listitem>MM_FILTER_RULE_TTY</listitem>
                 <listitem>MM_FILTER_RULE_TTY_PLATFORM_DRIVER</listitem>
                 <listitem>MM_FILTER_RULE_TTY_DRIVER</listitem>
                 <listitem>MM_FILTER_RULE_TTY_ACM_INTERFACE</listitem>
                 <listitem>MM_FILTER_RULE_TTY_WITH_NET</listitem>
                 <listitem>MM_FILTER_RULE_TTY_DEFAULT_FORBIDDEN</listitem>
+                <listitem>MM_FILTER_RULE_WWAN</listitem>
               </itemizedlist>
             </para>
             <para>
