@@ -1305,9 +1305,9 @@ setup_master_mtu (GTask *task)
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data     (task);
 
-    /* qmi_wwan add_mux/del_mux based logic requires master mtu set to the maximum data
+    /* qmi_wwan multiplexing logic requires master mtu set to the maximum data
      * aggregation size */
-    if (ctx->kernel_data_modes_requested & MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN) {
+    if (ctx->kernel_data_modes_requested & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)) {
         /* Load current max datagram size supported */
         if (MM_PORT_QMI_DAP_IS_SUPPORTED_QMAP (ctx->wda_dl_dap_requested))
             mtu = ctx->wda_dl_dap_max_size_current;
