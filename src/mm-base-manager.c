@@ -575,7 +575,7 @@ process_initial_kernel_events (MMBaseManager *self)
         return;
 
     if (!g_file_get_contents (self->priv->initial_kernel_events, &contents, NULL, &error)) {
-        g_warning ("Couldn't load initial kernel events: %s", error->message);
+        mm_obj_warn (self, "couldn't load initial kernel events: %s", error->message);
         g_error_free (error);
         return;
     }
@@ -596,13 +596,13 @@ process_initial_kernel_events (MMBaseManager *self)
 
             properties = mm_kernel_event_properties_new_from_string (line, &error);
             if (!properties) {
-                g_warning ("Couldn't parse line '%s' as initial kernel event %s", line, error->message);
+                mm_obj_warn (self, "couldn't parse line '%s' as initial kernel event %s", line, error->message);
                 g_clear_error (&error);
             } else if (!handle_kernel_event (self, properties, &error)) {
-                g_warning ("Couldn't process line '%s' as initial kernel event %s", line, error->message);
+                mm_obj_warn (self, "couldn't process line '%s' as initial kernel event %s", line, error->message);
                 g_clear_error (&error);
             } else
-                g_debug ("Processed initial kernel event:' %s'", line);
+                mm_obj_dbg (self, "processed initial kernel event:' %s'", line);
             g_clear_object (&properties);
         }
 
