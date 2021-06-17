@@ -10207,6 +10207,7 @@ profile_manager_cgdcont_query_ready (MMBaseModem  *self,
     ctx = g_slice_new0 (ListProfilesContext);
     g_task_set_task_data (task, ctx, (GDestroyNotify) list_profiles_context_free);
     ctx->profiles = mm_3gpp_profile_list_new_from_pdp_context_list (pdp_context_list);
+    mm_3gpp_pdp_context_list_free (pdp_context_list);
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
