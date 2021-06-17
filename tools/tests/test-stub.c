@@ -206,7 +206,7 @@ set_modem_state (TestData *tdata,
     GError *error = NULL;
     GVariant *ret = NULL;
     GVariant *old_state_variant = NULL;
-    guint old_state = 0;
+    gint old_state = 0;
 
     g_assert_nonnull (tdata->mm_modem_prop_proxy);
 
@@ -222,7 +222,7 @@ set_modem_state (TestData *tdata,
                                   &error);
     g_assert_no_error (error);
     g_variant_get (ret, "(v)", &old_state_variant);
-    old_state = (guint)g_variant_get_int32 (old_state_variant);
+    old_state = g_variant_get_int32 (old_state_variant);
     g_variant_unref (ret);
     g_variant_unref (old_state_variant);
 
@@ -256,7 +256,7 @@ set_modem_state (TestData *tdata,
     /* Emit state change signal */
     g_dbus_proxy_call (tdata->mm_proxy,
                        "EmitStateChanged",
-                       g_variant_new ("(uuu)", old_state, state, reason),
+                       g_variant_new ("(iiu)", old_state, state, reason),
                        G_DBUS_CALL_FLAGS_NO_AUTO_START,
                        1000,
                        NULL,

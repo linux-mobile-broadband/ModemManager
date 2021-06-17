@@ -339,7 +339,7 @@ class Modem(ExportedObj):
     def PropertiesChanged(self, changed):
         pass
 
-    @dbus.service.signal(IFACE_MODEM, signature='uuu')
+    @dbus.service.signal(IFACE_MODEM, signature='iiu')
     def StateChanged(self, old_state, new_state, reason):
         pass
 
@@ -406,7 +406,7 @@ class ObjectManager(dbus.service.Object):
         self.modem = Modem(self.bus, add_sim, iccid)
         return dbus.ObjectPath(self.modem.path)
 
-    @dbus.service.method(IFACE_TEST, in_signature='uuu', out_signature='')
+    @dbus.service.method(IFACE_TEST, in_signature='iiu', out_signature='')
     def EmitStateChanged(self, old_state, new_state, reason):
         if self.modem is not None:
             self.modem.StateChanged(old_state, new_state, reason)
