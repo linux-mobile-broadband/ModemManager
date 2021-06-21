@@ -84,23 +84,35 @@ class ModemWatcher:
         else:
             self.set_unavailable()
 
+    def on_modem_state_updated(self, modem, old, new, reason):
+        """
+        Modem state updated
+        """
+        print('[ModemWatcher] %s: modem state updated: %s -> %s (%s) ' %
+              (modem.get_object_path(),
+               ModemManager.ModemState.get_string (old),
+               ModemManager.ModemState.get_string (new),
+               ModemManager.ModemStateChangeReason.get_string (reason)))
+
     def on_object_added(self, manager, obj):
         """
         Object added.
         """
         modem = obj.get_modem()
-        print('[ModemWatcher] %s (%s) modem managed by ModemManager [%s]: %s' %
-              (modem.get_manufacturer(),
-               modem.get_model(),
+        print('[ModemWatcher] %s: modem managed by ModemManager [%s]: %s (%s)' %
+              (obj.get_object_path(),
                modem.get_equipment_identifier(),
-               obj.get_object_path()))
+               modem.get_manufacturer(),
+               modem.get_model()))
         if modem.get_state() == ModemManager.ModemState.FAILED:
-            print('[ModemWatcher] ignoring failed modem: %s' %
+            print('[ModemWatcher] %s: ignoring failed modem' %
                   obj.get_object_path())
+        else:
+            modem.connect('state-changed', self.on_modem_state_updated)
 
     def on_object_removed(self, manager, obj):
         """
         Object removed.
         """
-        print('[ModemWatcher] modem unmanaged by ModemManager: %s' %
+        print('[ModemWatcher] %s: modem unmanaged by ModemManager' %
               obj.get_object_path())
