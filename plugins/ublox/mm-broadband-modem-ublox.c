@@ -1079,6 +1079,167 @@ common_voice_enable_disable_unsolicited_events (MMBroadbandModemUblox *self,
 }
 
 /*****************************************************************************/
+/* Hotplug configure (Modem interface) */
+
+typedef enum {
+    CIEV_SIM_STATUS_UNKNOWN = -1,
+    CIEV_SIM_STATUS_REMOVED,
+    CIEV_SIM_STATUS_INSERTED,
+} MMUbloxSimInsertStatus;
+
+static gboolean
+modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+ublox_ciev_unsolicited_handler (MMPortSerialAt *port,
+                                GMatchInfo *match_info,
+                                MMBroadbandModemUblox *self)
+{
+    gint sim_insert_status = CIEV_SIM_STATUS_UNKNOWN;
+
+    if (!mm_get_int_from_match_info (match_info, 1, &sim_insert_status)) {
+        mm_obj_dbg (self, "CIEV: unable to parse sim insert indication");
+        return;
+    }
+
+    mm_obj_info (self, "CIEV: sim hot swap detected '%d'", sim_insert_status);
+    if (sim_insert_status == CIEV_SIM_STATUS_INSERTED ||
+        sim_insert_status == CIEV_SIM_STATUS_REMOVED) {
+        mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+    } else {
+        mm_obj_warn (self, "(%s) CIEV: unable to determine sim insert status: %d",
+                     mm_port_get_device (MM_PORT (port)),
+                     sim_insert_status);
+    }
+}
+
+static void
+ublox_setup_ciev_handler (MMIfaceModem *self,
+                          guint simind_idx)
+{
+    GRegex *pattern;
+    gchar *ciev_regex;
+    MMPortSerialAt *primary_port;
+    MMPortSerialAt *secondary_port;
+
+    primary_port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    mm_obj_dbg (self, "setting up simind 'CIEV: %d' events handler", simind_idx);
+    ciev_regex = g_strdup_printf ("\\r\\n\\+CIEV: %d,([0-1]{1})\\r\\n", simind_idx);
+    pattern = g_regex_new (ciev_regex,
+                           G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                           0, NULL);
+    g_assert (pattern);
+    mm_port_serial_at_add_unsolicited_msg_handler (
+        primary_port,
+        pattern,
+        (MMPortSerialAtUnsolicitedMsgFn) ublox_ciev_unsolicited_handler,
+        self,
+        NULL);
+
+    secondary_port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (secondary_port)
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            secondary_port,
+            pattern,
+            (MMPortSerialAtUnsolicitedMsgFn) ublox_ciev_unsolicited_handler,
+            self,
+            NULL);
+
+    g_regex_unref (pattern);
+    g_free (ciev_regex);
+}
+
+static void
+process_cind_verbosity_response (MMBaseModem *self,
+                                 GAsyncResult *res,
+                                 GTask *task)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (self, res, &error);
+
+    if (error) {
+        mm_obj_warn (self, "CIND: verbose mode is not configured: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+    mm_obj_info (self, "CIND unsolicited response codes processing verbosity configured successfully");
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+typedef struct {
+    gchar *desc;
+    guint idx;
+    gint min;
+    gint max;
+} CindResponse;
+
+static void
+cind_simind_format_check_ready (MMBroadbandModem *self,
+                                GAsyncResult     *res,
+                                GTask            *task)
+{
+    GHashTable *indicators = NULL;
+    GError *error = NULL;
+    const gchar *result;
+    CindResponse *r;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error ||
+        !(indicators = mm_3gpp_parse_cind_test_response (result, &error))) {
+        mm_obj_dbg (self, "+CIND check failed: %s", error->message);
+        g_prefix_error (&error, "CIND check failed: ");
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    r = g_hash_table_lookup (indicators, "simind");
+    if (r) {
+        mm_obj_dbg (self, "simind CIEV indications are supported, indication order number: %d", r->idx);
+        ublox_setup_ciev_handler (MM_IFACE_MODEM (self), r->idx);
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CMER=1,0,0,1,0",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback) process_cind_verbosity_response,
+                                  task);
+    } else {
+        mm_obj_dbg (self, "simind CIEV indications are not supported");
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "simind CIEV indications are not supported");
+        g_object_unref (task);
+    }
+    g_hash_table_destroy (indicators);
+}
+
+static void
+modem_setup_sim_hot_swap (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CIND=?",
+                              3,
+                              TRUE,
+                              (GAsyncReadyCallback) cind_simind_format_check_ready,
+                              task);
+}
+
+/*****************************************************************************/
 /* Enabling unsolicited events (Voice interface) */
 
 static gboolean
@@ -1811,6 +1972,8 @@ mm_broadband_modem_ublox_new (const gchar  *device,
                          MM_BASE_MODEM_PLUGIN,     plugin,
                          MM_BASE_MODEM_VENDOR_ID,  vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
                          /* Generic bearer (TTY) and u-blox bearer (NET) supported */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
@@ -1867,6 +2030,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = load_current_bands_finish;
     iface->set_current_bands        = set_current_bands;
     iface->set_current_bands_finish = common_set_current_modes_bands_finish;
+    iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
+    iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
 }
 
 static void
