@@ -215,6 +215,7 @@ print_messaging_status (void)
     mm_modem_messaging_get_supported_storages (ctx->modem_messaging, &supported, &supported_len);
     if (supported)
         supported_str = mm_common_build_sms_storages_string (supported, supported_len);
+    g_free (supported);
 
     mmcli_output_string_take (MMC_F_MESSAGING_SUPPORTED_STORAGES, supported_str);
     mmcli_output_string      (MMC_F_MESSAGING_DEFAULT_STORAGES,   mm_sms_storage_get_string (
