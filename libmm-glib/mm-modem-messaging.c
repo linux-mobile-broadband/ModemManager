@@ -115,10 +115,13 @@ supported_storages_updated (MMModemMessaging *self,
     g_mutex_unlock (&self->priv->supported_storages_mutex);
 }
 
-static void
-ensure_internal_supported_storages (MMModemMessaging *self,
-                                    GArray **dup)
+static gboolean
+ensure_internal_supported_storages (MMModemMessaging  *self,
+                                    MMSmsStorage     **dup_storages,
+                                    guint             *dup_storages_n)
 {
+    gboolean ret;
+
     g_mutex_lock (&self->priv->supported_storages_mutex);
     {
         /* If this is the first time ever asking for the array, setup the
@@ -140,10 +143,24 @@ ensure_internal_supported_storages (MMModemMessaging *self,
                                   NULL);
         }
 
-        if (dup && self->priv->supported_storages)
-            *dup = g_array_ref (self->priv->supported_storages);
+        if (!self->priv->supported_storages)
+            ret = FALSE;
+        else {
+            ret = TRUE;
+
+            if (dup_storages && dup_storages_n) {
+                *dup_storages_n = self->priv->supported_storages->len;
+                if (self->priv->supported_storages->len > 0) {
+                    *dup_storages = g_malloc (sizeof (MMSmsStorage) * self->priv->supported_storages->len);
+                    memcpy (*dup_storages, self->priv->supported_storages->data, sizeof (MMSmsStorage) * self->priv->supported_storages->len);
+                } else
+                    *dup_storages = NULL;
+            }
+        }
     }
     g_mutex_unlock (&self->priv->supported_storages_mutex);
+
+    return ret;
 }
 
 /**
@@ -165,19 +182,11 @@ mm_modem_messaging_get_supported_storages (MMModemMessaging *self,
                                            MMSmsStorage **storages,
                                            guint *n_storages)
 {
-    GArray *array = NULL;
-
     g_return_val_if_fail (MM_IS_MODEM_MESSAGING (self), FALSE);
     g_return_val_if_fail (storages != NULL, FALSE);
     g_return_val_if_fail (n_storages != NULL, FALSE);
 
-    ensure_internal_supported_storages (self, &array);
-    if (!array)
-        return FALSE;
-
-    *n_storages = array->len;
-    *storages = (MMSmsStorage *)g_array_free (array, FALSE);
-    return TRUE;
+    return ensure_internal_supported_storages (self, storages, n_storages);
 }
 
 /**
@@ -194,16 +203,15 @@ mm_modem_messaging_get_supported_storages (MMModemMessaging *self,
  * Since: 1.0
  */
 gboolean
-mm_modem_messaging_peek_supported_storages (MMModemMessaging *self,
+mm_modem_messaging_peek_supported_storages (MMModemMessaging    *self,
                                             const MMSmsStorage **storages,
-                                            guint *n_storages)
+                                            guint               *n_storages)
 {
     g_return_val_if_fail (MM_IS_MODEM_MESSAGING (self), FALSE);
     g_return_val_if_fail (storages != NULL, FALSE);
     g_return_val_if_fail (n_storages != NULL, FALSE);
 
-    ensure_internal_supported_storages (self, NULL);
-    if (!self->priv->supported_storages)
+    if (!ensure_internal_supported_storages (self, NULL, NULL))
         return FALSE;
 
     *n_storages = self->priv->supported_storages->len;
