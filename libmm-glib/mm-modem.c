@@ -334,6 +334,8 @@ mm_modem_get_supported_capabilities (MMModem *self,
                                      guint *n_capabilities)
 {
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (capabilities != NULL, FALSE);
+    g_return_val_if_fail (n_capabilities != NULL, FALSE);
 
     return ensure_internal_supported_capabilities (self, capabilities, n_capabilities);
 }
