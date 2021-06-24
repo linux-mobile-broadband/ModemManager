@@ -349,7 +349,7 @@ notify_3gpp_location_update (MMIfaceModemLocation *self,
 
     operator_code = mm_location_3gpp_get_operator_code (location_3gpp);
     mm_obj_dbg (self, "3GPP location updated "
-                "(MCCMNC: '%s', location area code: '%lX', tracking area code: '%lX', cell ID: '%lX')",
+                "(MCCMNC: '%s', location area code: '%04lX', tracking area code: '%06lX', cell ID: '%08lX')",
                 operator_code ? operator_code : "<none>",
                 mm_location_3gpp_get_location_area_code (location_3gpp),
                 mm_location_3gpp_get_tracking_area_code (location_3gpp),
@@ -422,13 +422,13 @@ mm_iface_modem_location_3gpp_update_lac_tac_ci (MMIfaceModemLocation *self,
     /* Update LAC if given, and clear TAC unless a TAC is also given */
     if (location_area_code) {
         if (old_location_area_code != location_area_code) {
-            mm_obj_dbg (self, "3GPP location area code updated: '%lX->%lX'", old_location_area_code, location_area_code);
+            mm_obj_dbg (self, "3GPP location area code updated: '%04lX->%04lX'", old_location_area_code, location_area_code);
             mm_location_3gpp_set_location_area_code (ctx->location_3gpp, location_area_code);
             changed++;
         }
         if (!tracking_area_code) {
             if (old_tracking_area_code != 0) {
-                mm_obj_dbg (self, "3GPP tracking area code cleared: '%lX->%lX'", old_tracking_area_code, tracking_area_code);
+                mm_obj_dbg (self, "3GPP tracking area code cleared: '%06lX->%06lX'", old_tracking_area_code, tracking_area_code);
                 mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, 0);
                 changed++;
             }
@@ -437,13 +437,13 @@ mm_iface_modem_location_3gpp_update_lac_tac_ci (MMIfaceModemLocation *self,
     /* Update TAC if given, and clear LAC unless a LAC is also given */
     if (tracking_area_code) {
         if (old_tracking_area_code != tracking_area_code) {
-            mm_obj_dbg (self, "3GPP tracking area code updated: '%lX->%lX'", old_tracking_area_code, tracking_area_code);
+            mm_obj_dbg (self, "3GPP tracking area code updated: '%06lX->%06lX'", old_tracking_area_code, tracking_area_code);
             mm_location_3gpp_set_tracking_area_code (ctx->location_3gpp, tracking_area_code);
             changed++;
         }
         if (!location_area_code) {
             if (old_location_area_code != 0) {
-                mm_obj_dbg (self, "3GPP location area code cleared: '%lX->%lX'", old_location_area_code, location_area_code);
+                mm_obj_dbg (self, "3GPP location area code cleared: '%04lX->%04lX'", old_location_area_code, location_area_code);
                 mm_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
                 changed++;
             }
@@ -452,7 +452,7 @@ mm_iface_modem_location_3gpp_update_lac_tac_ci (MMIfaceModemLocation *self,
 
     /* Cell ID only updated if given. It is assumed that if LAC or TAC are given, CID is also given */
     if (cell_id && (old_cell_id != cell_id)) {
-        mm_obj_dbg (self, "3GPP cell id updated: '%lX->%lX'", old_cell_id, cell_id);
+        mm_obj_dbg (self, "3GPP cell id updated: '%08lX->%08lX'", old_cell_id, cell_id);
         mm_location_3gpp_set_cell_id (ctx->location_3gpp, cell_id);
         changed++;
     }
