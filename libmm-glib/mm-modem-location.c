@@ -566,25 +566,24 @@ mm_modem_location_set_gps_refresh_rate_sync (MMModemLocation *self,
 /*****************************************************************************/
 
 static gboolean
-build_locations (GVariant *dictionary,
-                 MMLocation3gpp **location_3gpp,
+build_locations (GVariant           *dictionary,
+                 MMLocation3gpp    **location_3gpp,
                  MMLocationGpsNmea **location_gps_nmea,
-                 MMLocationGpsRaw **location_gps_raw,
-                 MMLocationCdmaBs **location_cdma_bs,
-                 GError **error)
+                 MMLocationGpsRaw  **location_gps_raw,
+                 MMLocationCdmaBs  **location_cdma_bs,
+                 GError            **error)
 {
-    GError *inner_error = NULL;
-    GVariant *value;
-    guint source;
-    GVariantIter iter;
+    GError       *inner_error = NULL;
+    GVariant     *value;
+    guint         source;
+    GVariantIter  iter;
 
     if (!dictionary)
         /* No location provided. Not actually an error. */
         return TRUE;
 
     g_variant_iter_init (&iter, dictionary);
-    while (!inner_error &&
-           g_variant_iter_next (&iter, "{uv}", &source, &value)) {
+    while (!inner_error && g_variant_iter_next (&iter, "{uv}", &source, &value)) {
         switch (source) {
         case MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI:
             if (location_3gpp)
@@ -606,16 +605,12 @@ build_locations (GVariant *dictionary,
             g_warn_if_reached ();
             break;
         }
-
         g_variant_unref (value);
     }
 
-    g_variant_unref (dictionary);
-
     if (inner_error) {
         g_propagate_error (error, inner_error);
-        g_prefix_error (error,
-                        "Couldn't build locations result: ");
+        g_prefix_error (error, "Couldn't build locations result: ");
         return FALSE;
     }
 
@@ -656,7 +651,7 @@ mm_modem_location_get_full_finish (MMModemLocation *self,
                                    MMLocationCdmaBs **location_cdma_bs,
                                    GError **error)
 {
-    GVariant *dictionary = NULL;
+    g_autoptr(GVariant) dictionary = NULL;
 
     g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
 
@@ -736,7 +731,7 @@ mm_modem_location_get_full_sync (MMModemLocation *self,
                                  GCancellable *cancellable,
                                  GError **error)
 {
-    GVariant *dictionary = NULL;
+    g_autoptr(GVariant) dictionary = NULL;
 
     g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), FALSE);
 
