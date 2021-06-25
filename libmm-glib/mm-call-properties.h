@@ -61,24 +61,6 @@ void              mm_call_properties_set_number (MMCallProperties *self,
                                                  const gchar *text);
 const gchar      *mm_call_properties_get_number (MMCallProperties *self);
 
-#ifndef MM_DISABLE_DEPRECATED
-G_DEPRECATED
-void mm_call_properties_set_direction    (MMCallProperties *self,
-                                          MMCallDirection   direction);
-G_DEPRECATED
-void mm_call_properties_set_state_reason (MMCallProperties  *self,
-                                          MMCallStateReason  state_reason);
-G_DEPRECATED
-void mm_call_properties_set_state        (MMCallProperties *self,
-                                          MMCallState       state);
-G_DEPRECATED
-MMCallDirection   mm_call_properties_get_direction    (MMCallProperties *self);
-G_DEPRECATED
-MMCallStateReason mm_call_properties_get_state_reason (MMCallProperties *self);
-G_DEPRECATED
-MMCallState       mm_call_properties_get_state        (MMCallProperties *self);
-#endif
-
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 

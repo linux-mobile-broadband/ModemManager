@@ -29,6 +29,7 @@
 #error "Only <libmm-glib.h> can be included directly."
 #endif
 
+#include "mm-call-properties.h"
 #include "mm-modem-oma.h"
 
 /**
@@ -39,6 +40,106 @@
  * shouldn't be used in newly written code. They are provided to avoid
  * innecessary API/ABI breaks, for compatibility purposes only.
  */
+
+/*****************************************************************************/
+
+/**
+ * mm_call_properties_set_direction:
+ * @self: A #MMCallProperties.
+ * @direction: the call direction
+ *
+ * Sets the call direction.
+ *
+ * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the direction of the call, as
+ * it is implicit (outgoing always). Anyway, this parameter has always been
+ * ignored during the new call creation processing.
+ */
+G_DEPRECATED
+void mm_call_properties_set_direction (MMCallProperties *self,
+                                       MMCallDirection   direction);
+
+/**
+ * mm_call_properties_set_state_reason:
+ * @self: A #MMCallProperties.
+ * @state_reason: the call state reason.
+ *
+ * Sets the call state reason.
+ *
+ * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state reason of the call
+ * before the call is created. This parameter has always been ignored during the
+ * new call creation processing.
+ */
+G_DEPRECATED
+void mm_call_properties_set_state_reason (MMCallProperties  *self,
+                                          MMCallStateReason  state_reason);
+
+/**
+ * mm_call_properties_set_state:
+ * @self: A #MMCallProperties.
+ * @state: the call state
+ *
+ * Sets the call state
+ *
+ * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state of the call before
+ * the call is created. This parameter has always been ignored during the new
+ * call creation processing.
+ */
+G_DEPRECATED
+void mm_call_properties_set_state (MMCallProperties *self,
+                                   MMCallState       state);
+
+/**
+ * mm_call_properties_get_direction:
+ * @self: A #MMCallProperties.
+ *
+ * Gets the call direction.
+ *
+ * Returns: the call direction.
+ *
+ * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the direction of the call, as
+ * it is implicit (outgoing always). This parameter has always been ignored
+ * during the new call creation processing.
+ */
+G_DEPRECATED
+MMCallDirection mm_call_properties_get_direction (MMCallProperties *self);
+
+/**
+ * mm_call_properties_get_state_reason:
+ * @self: A #MMCallProperties.
+ *
+ * Gets the call state reason.
+ *
+ * Returns: the call state reason.
+ *
+ * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state reason of the call
+ * before the call is created. This parameter has always been ignored during the
+ * new call creation processing.
+ */
+G_DEPRECATED
+MMCallStateReason mm_call_properties_get_state_reason (MMCallProperties *self);
+
+/**
+ * mm_call_properties_get_state:
+ * @self: A #MMCallProperties.
+ *
+ * Gets the call state.
+ *
+ * Returns: the call state.
+ *
+ * Since: 1.6
+ * Deprecated: 1.12: the user should not specify the state of the call before
+ * the call is created. This parameter has always been ignored during the new
+ * call creation processing.
+ */
+G_DEPRECATED
+MMCallState mm_call_properties_get_state (MMCallProperties *self);
+
+/*****************************************************************************/
 
 /**
  * mm_modem_get_pending_network_initiated_sessions:

@@ -26,6 +26,54 @@
 
 #ifndef MM_DISABLE_DEPRECATED
 
+/*****************************************************************************/
+
+void
+mm_call_properties_set_direction (MMCallProperties *self,
+                                  MMCallDirection   direction)
+{
+    /* NO-OP */
+}
+
+MMCallDirection
+mm_call_properties_get_direction (MMCallProperties *self)
+{
+    /* NO-OP */
+    return MM_CALL_DIRECTION_UNKNOWN;
+}
+
+
+void
+mm_call_properties_set_state (MMCallProperties *self,
+                              MMCallState       state)
+{
+    /* NO-OP */
+}
+
+
+MMCallState
+mm_call_properties_get_state (MMCallProperties *self)
+{
+    /* NO-OP */
+    return MM_CALL_STATE_UNKNOWN;
+}
+
+void
+mm_call_properties_set_state_reason (MMCallProperties *self,
+                                     MMCallStateReason state_reason)
+{
+    /* NO-OP */
+}
+
+MMCallStateReason
+mm_call_properties_get_state_reason (MMCallProperties *self)
+{
+    /* NO-OP */
+    return MM_CALL_STATE_REASON_UNKNOWN;
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_modem_get_pending_network_initiated_sessions (MMModemOma                           *self,
                                                  MMOmaPendingNetworkInitiatedSession **sessions,
