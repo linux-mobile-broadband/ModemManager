@@ -172,4 +172,14 @@ mm_modem_peek_pending_network_initiated_sessions (MMModemOma                    
     return mm_modem_oma_peek_pending_network_initiated_sessions (self, sessions, n_sessions);
 }
 
+/*****************************************************************************/
+
+guint
+mm_modem_get_max_bearers (MMModem *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM (self), 0);
+
+    return mm_gdbus_modem_get_max_bearers (MM_GDBUS_MODEM (self));
+}
+
 #endif /* MM_DISABLE_DEPRECATED */

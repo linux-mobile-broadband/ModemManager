@@ -38,6 +38,7 @@
 #include "mm-simple-status.h"
 #include "mm-modem-3gpp.h"
 #include "mm-modem-oma.h"
+#include "mm-modem.h"
 
 /**
  * SECTION:mm-compat
@@ -350,6 +351,34 @@ G_DEPRECATED_FOR (mm_modem_oma_peek_pending_network_initiated_sessions)
 gboolean mm_modem_peek_pending_network_initiated_sessions (MMModemOma                                 *self,
                                                            const MMOmaPendingNetworkInitiatedSession **sessions,
                                                            guint                                      *n_sessions);
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_get_max_bearers:
+ * @self: a #MMModem.
+ *
+ * Gets the maximum number of defined packet data bearers this #MMModem
+ * supports.
+ *
+ * This is not the number of active/connected bearers the modem supports,
+ * but simply the number of bearers that may be defined at any given time.
+ * For example, POTS and CDMA2000-only devices support only one bearer,
+ * while GSM/UMTS devices typically support three or more, and any
+ * LTE-capable device (whether LTE-only, GSM/UMTS-capable, and/or
+ * CDMA2000-capable) also typically support three or more.
+ *
+ * Returns: the maximum number of defined packet data bearers.
+ *
+ * Since: 1.0
+ * Deprecated: 1.18. There is no way to query the modem how many bearers
+ * it supports, so the value exposed in this property in all the different
+ * implementations is always equal to the one retrieved with
+ * mm_modem_get_max_active_bearers(), so there is no point in using this
+ * method.
+ */
+G_DEPRECATED
+guint mm_modem_get_max_bearers (MMModem *self);
 
 #endif /* MM_DISABLE_DEPRECATED */
 
