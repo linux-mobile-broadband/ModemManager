@@ -142,39 +142,6 @@ mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self)
 
 /*****************************************************************************/
 
-#ifndef MM_DISABLE_DEPRECATED
-
-/**
- * mm_location_3gpp_get_mobile_network_code:
- * @self: a #MMLocation3gpp.
- *
- * Gets the Mobile Network Code of the 3GPP network.
- *
- * Note that 0 may actually be a valid MNC. In general, the MNC should be
- * considered valid just if the reported MCC is valid, as MCC should never
- * be 0.
- *
- * Returns: the MNC, or 0 if unknown.
- *
- * Since: 1.0
- * Deprecated: 1.18.0. This function can not separate between two-digit MNCs
- * and three-digit MNCs with a leading zero. Use mm_location_3gpp_get_operator_code()
- * instead.
- */
-guint
-mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
-{
-    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
-
-    if (!self->priv->operator_code)
-        return 0;
-    return strtol (self->priv->operator_code + 3, NULL, 10);
-}
-
-#endif /* MM_DISABLE_DEPRECATED */
-
-/*****************************************************************************/
-
 /**
  * mm_location_3gpp_get_location_area_code:
  * @self: a #MMLocation3gpp.

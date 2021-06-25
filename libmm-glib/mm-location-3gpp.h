@@ -62,11 +62,6 @@ gulong       mm_location_3gpp_get_cell_id             (MMLocation3gpp *self);
 gulong       mm_location_3gpp_get_tracking_area_code  (MMLocation3gpp *self);
 const gchar *mm_location_3gpp_get_operator_code       (MMLocation3gpp *self);
 
-#ifndef MM_DISABLE_DEPRECATED
-G_DEPRECATED
-guint mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);
-#endif
-
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 

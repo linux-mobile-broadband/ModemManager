@@ -117,6 +117,21 @@ mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
 
 /*****************************************************************************/
 
+guint
+mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
+{
+    const gchar *operator_code;
+
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
+    operator_code = mm_location_3gpp_get_operator_code (self);
+    if (!operator_code)
+        return 0;
+    return strtol (operator_code + 3, NULL, 10);
+}
+
+/*****************************************************************************/
+
 void
 mm_pco_list_free (GList *pco_list)
 {

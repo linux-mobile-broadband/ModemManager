@@ -33,6 +33,7 @@
 #include "mm-bearer-properties.h"
 #include "mm-call-properties.h"
 #include "mm-location-gps-nmea.h"
+#include "mm-location-3gpp.h"
 #include "mm-pco.h"
 #include "mm-simple-status.h"
 #include "mm-modem-3gpp.h"
@@ -210,6 +211,27 @@ MMCallStateReason mm_call_properties_get_state_reason (MMCallProperties *self);
  */
 G_DEPRECATED
 MMCallState mm_call_properties_get_state (MMCallProperties *self);
+
+/*****************************************************************************/
+/**
+ * mm_location_3gpp_get_mobile_network_code:
+ * @self: a #MMLocation3gpp.
+ *
+ * Gets the Mobile Network Code of the 3GPP network.
+ *
+ * Note that 0 may actually be a valid MNC. In general, the MNC should be
+ * considered valid just if the reported MCC is valid, as MCC should never
+ * be 0.
+ *
+ * Returns: the MNC, or 0 if unknown.
+ *
+ * Since: 1.0
+ * Deprecated: 1.18.0. This function can not separate between two-digit MNCs
+ * and three-digit MNCs with a leading zero. Use mm_location_3gpp_get_operator_code()
+ * instead.
+ */
+G_DEPRECATED
+guint mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self);
 
 /*****************************************************************************/
 
