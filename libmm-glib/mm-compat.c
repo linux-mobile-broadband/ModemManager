@@ -29,6 +29,22 @@
 /*****************************************************************************/
 
 void
+mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
+                                         const gchar               *number)
+{
+    /* NO-OP */
+}
+
+const gchar *
+mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
+{
+    /* NO-OP */
+    return NULL;
+}
+
+/*****************************************************************************/
+
+void
 mm_bearer_properties_set_number (MMBearerProperties *self,
                                  const gchar        *number)
 {

@@ -884,8 +884,6 @@ mm_simple_connect_properties_get_rm_protocol
 mm_simple_connect_properties_set_rm_protocol
 mm_simple_connect_properties_get_multiplex
 mm_simple_connect_properties_set_multiplex
-mm_simple_connect_properties_get_number
-mm_simple_connect_properties_set_number
 <SUBSECTION Private>
 mm_simple_connect_properties_get_bearer_properties
 mm_simple_connect_properties_new_from_dictionary
@@ -1823,6 +1821,9 @@ mm_serial_error_get_type
 <SECTION>
 <FILE>mm-compat</FILE>
 <TITLE>Deprecated Interface</TITLE>
+<SUBSECTION SimpleConnectProperties>
+mm_simple_connect_properties_get_number
+mm_simple_connect_properties_set_number
 <SUBSECTION BearerProperties>
 mm_bearer_properties_get_number
 mm_bearer_properties_set_number

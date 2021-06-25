@@ -519,54 +519,6 @@ mm_simple_connect_properties_get_multiplex (MMSimpleConnectProperties *self)
 
 /*****************************************************************************/
 
-#ifndef MM_DISABLE_DEPRECATED
-
-/**
- * mm_simple_connect_properties_set_number:
- * @self: a #MMSimpleConnectProperties.
- * @number: the number.
- *
- * Sets the number to use when performing the connection.
- *
- * Since: 1.0
- * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
- * it doesn't make sense to expose it in the ModemManager interface.
- */
-void
-mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
-                                         const gchar *number)
-{
-    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
-
-    /* NO-OP */
-}
-
-/**
- * mm_simple_connect_properties_get_number:
- * @self: a #MMSimpleConnectProperties.
- *
- * Gets the number to use when performing the connection.
- *
- * Returns: (transfer none): the number, or #NULL if not set. Do not free the
- * returned value, it is owned by @self.
- *
- * Since: 1.0
- * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
- * it doesn't make sense to expose it in the ModemManager interface.
- */
-const gchar *
-mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
-{
-    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
-
-    /* NO-OP */
-    return NULL;
-}
-
-#endif /* MM_DISABLE_DEPRECATED */
-
-/*****************************************************************************/
-
 /**
  * mm_simple_connect_properties_get_bearer_properties: (skip)
  */

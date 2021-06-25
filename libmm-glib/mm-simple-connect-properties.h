@@ -98,14 +98,6 @@ gboolean                  mm_simple_connect_properties_get_allow_roaming (MMSimp
 MMModemCdmaRmProtocol     mm_simple_connect_properties_get_rm_protocol   (MMSimpleConnectProperties *self);
 MMBearerMultiplexSupport  mm_simple_connect_properties_get_multiplex     (MMSimpleConnectProperties *self);
 
-#ifndef MM_DISABLE_DEPRECATED
-G_DEPRECATED
-void         mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
-                                                      const gchar               *number);
-G_DEPRECATED
-const gchar *mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self);
-#endif
-
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 

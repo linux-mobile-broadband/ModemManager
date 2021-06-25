@@ -29,6 +29,7 @@
 #error "Only <libmm-glib.h> can be included directly."
 #endif
 
+#include "mm-simple-connect-properties.h"
 #include "mm-bearer-properties.h"
 #include "mm-call-properties.h"
 #include "mm-modem-oma.h"
@@ -41,6 +42,39 @@
  * shouldn't be used in newly written code. They are provided to avoid
  * innecessary API/ABI breaks, for compatibility purposes only.
  */
+
+/*****************************************************************************/
+
+/**
+ * mm_simple_connect_properties_set_number:
+ * @self: a #MMSimpleConnectProperties.
+ * @number: the number.
+ *
+ * Sets the number to use when performing the connection.
+ *
+ * Since: 1.0
+ * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
+ * it doesn't make sense to expose it in the ModemManager interface.
+ */
+G_DEPRECATED
+void mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
+                                              const gchar               *number);
+
+/**
+ * mm_simple_connect_properties_get_number:
+ * @self: a #MMSimpleConnectProperties.
+ *
+ * Gets the number to use when performing the connection.
+ *
+ * Returns: (transfer none): the number, or #NULL if not set. Do not free the
+ * returned value, it is owned by @self.
+ *
+ * Since: 1.0
+ * Deprecated: 1.10.0. The number setting is not used anywhere, and therefore
+ * it doesn't make sense to expose it in the ModemManager interface.
+ */
+G_DEPRECATED
+const gchar *mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self);
 
 /*****************************************************************************/
 
