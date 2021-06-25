@@ -177,7 +177,7 @@ print_oma_status (void)
     }
 
     /* If 1 or more pending sessions... */
-    if (mm_modem_peek_pending_network_initiated_sessions (ctx->modem_oma, &pending_sessions, &n_pending_sessions) &&
+    if (mm_modem_oma_peek_pending_network_initiated_sessions (ctx->modem_oma, &pending_sessions, &n_pending_sessions) &&
         n_pending_sessions > 0) {
         guint i;
 

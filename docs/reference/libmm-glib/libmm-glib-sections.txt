@@ -811,8 +811,8 @@ mm_modem_oma_cancel_session_sync
 mm_modem_oma_get_features
 mm_modem_oma_get_session_type
 mm_modem_oma_get_session_state
-mm_modem_peek_pending_network_initiated_sessions
-mm_modem_get_pending_network_initiated_sessions
+mm_modem_oma_peek_pending_network_initiated_sessions
+mm_modem_oma_get_pending_network_initiated_sessions
 <SUBSECTION Standard>
 MMModemOmaClass
 MMModemOmaPrivate
@@ -1826,6 +1826,13 @@ mm_core_error_get_type
 mm_message_error_get_type
 mm_mobile_equipment_error_get_type
 mm_serial_error_get_type
+</SECTION>
+
+<SECTION>
+<FILE>mm-compat</FILE>
+<TITLE>Deprecated Interface</TITLE>
+mm_modem_peek_pending_network_initiated_sessions
+mm_modem_get_pending_network_initiated_sessions
 </SECTION>
 
 <SECTION>

@@ -83,6 +83,7 @@
 #include <mm-pco.h>
 #include <mm-sim-preferred-network.h>
 #include <mm-3gpp-profile.h>
+#include <mm-compat.h>
 
 /* generated */
 #include <mm-errors-types.h>

@@ -571,7 +571,7 @@ ensure_internal_pending_network_initiated_sessions (MMModemOma *self,
 }
 
 /**
- * mm_modem_get_pending_network_initiated_sessions:
+ * mm_modem_oma_get_pending_network_initiated_sessions:
  * @self: A #MMModem.
  * @sessions: (out) (array length=n_sessions): Return location for the array of
  *  #MMOmaPendingNetworkInitiatedSession structs. The returned array should be
@@ -582,12 +582,12 @@ ensure_internal_pending_network_initiated_sessions (MMModemOma *self,
  *
  * Returns: %TRUE if @sessions and @n_sessions are set, %FALSE otherwise.
  *
- * Since: 1.2
+ * Since: 1.18
  */
 gboolean
-mm_modem_get_pending_network_initiated_sessions (MMModemOma *self,
-                                                 MMOmaPendingNetworkInitiatedSession **sessions,
-                                                 guint *n_sessions)
+mm_modem_oma_get_pending_network_initiated_sessions (MMModemOma                           *self,
+                                                     MMOmaPendingNetworkInitiatedSession **sessions,
+                                                     guint                                *n_sessions)
 {
     g_return_val_if_fail (MM_IS_MODEM_OMA (self), FALSE);
     g_return_val_if_fail (sessions != NULL, FALSE);
@@ -597,7 +597,7 @@ mm_modem_get_pending_network_initiated_sessions (MMModemOma *self,
 }
 
 /**
- * mm_modem_peek_pending_network_initiated_sessions:
+ * mm_modem_oma_peek_pending_network_initiated_sessions:
  * @self: A #MMModem.
  * @sessions: (out) (array length=n_sessions): Return location for the array of
  *  #MMOmaPendingNetworkInitiatedSession values. Do not free the returned array,
@@ -608,12 +608,12 @@ mm_modem_get_pending_network_initiated_sessions (MMModemOma *self,
  *
  * Returns: %TRUE if @sessions and @n_sessions are set, %FALSE otherwise.
  *
- * Since: 1.2
+ * Since: 1.18
  */
 gboolean
-mm_modem_peek_pending_network_initiated_sessions (MMModemOma *self,
-                                                  const MMOmaPendingNetworkInitiatedSession **sessions,
-                                                  guint *n_sessions)
+mm_modem_oma_peek_pending_network_initiated_sessions (MMModemOma                                 *self,
+                                                      const MMOmaPendingNetworkInitiatedSession **sessions,
+                                                      guint                                      *n_sessions)
 {
     g_return_val_if_fail (MM_IS_MODEM_OMA (self), FALSE);
     g_return_val_if_fail (sessions != NULL, FALSE);
