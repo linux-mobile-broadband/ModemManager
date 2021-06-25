@@ -32,6 +32,7 @@
 #include "mm-simple-connect-properties.h"
 #include "mm-bearer-properties.h"
 #include "mm-call-properties.h"
+#include "mm-location-gps-nmea.h"
 #include "mm-modem-oma.h"
 
 /**
@@ -206,6 +207,25 @@ MMCallStateReason mm_call_properties_get_state_reason (MMCallProperties *self);
  */
 G_DEPRECATED
 MMCallState mm_call_properties_get_state (MMCallProperties *self);
+
+/*****************************************************************************/
+
+/**
+ * mm_location_gps_nmea_build_full:
+ * @self: a #MMLocationGpsNmea.
+ *
+ * Gets a compilation of all cached traces, in a single string.
+ * Traces are separated by '\r\n'.
+ *
+ * Returns: (transfer full): a string containing all traces, or #NULL if none
+ * available. The returned value should be freed with g_free().
+ *
+ * Since: 1.0
+ * Deprecated: 1.14: user should use mm_location_gps_nmea_get_traces() instead,
+ * which provides a much more generic interface to the full list of traces.
+ */
+G_DEPRECATED_FOR(mm_location_gps_nmea_get_traces)
+gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
 
 /*****************************************************************************/
 

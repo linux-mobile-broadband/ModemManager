@@ -106,6 +106,17 @@ mm_call_properties_get_state_reason (MMCallProperties *self)
 
 /*****************************************************************************/
 
+gchar *
+mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
+{
+    g_auto(GStrv) traces = NULL;
+
+    traces = mm_location_gps_nmea_get_traces (self);
+    return (traces ? g_strjoinv ("\r\n", traces) : g_strdup (""));
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_modem_get_pending_network_initiated_sessions (MMModemOma                           *self,
                                                  MMOmaPendingNetworkInitiatedSession **sessions,

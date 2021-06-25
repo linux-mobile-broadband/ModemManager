@@ -544,7 +544,6 @@ MMLocationGpsNmea
 <SUBSECTION Getters>
 mm_location_gps_nmea_get_trace
 mm_location_gps_nmea_get_traces
-mm_location_gps_nmea_build_full
 <SUBSECTION Private>
 mm_location_gps_nmea_new
 mm_location_gps_nmea_new_from_string_variant
@@ -1834,6 +1833,8 @@ mm_call_properties_get_state
 mm_call_properties_set_state
 mm_call_properties_get_state_reason
 mm_call_properties_set_state_reason
+<SUBSECTION LocationGpsNmea>
+mm_location_gps_nmea_build_full
 <SUBSECTION ModemOma>
 mm_modem_peek_pending_network_initiated_sessions
 mm_modem_get_pending_network_initiated_sessions

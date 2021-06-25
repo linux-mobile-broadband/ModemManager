@@ -60,11 +60,6 @@ const gchar  *mm_location_gps_nmea_get_trace  (MMLocationGpsNmea *self,
                                                const gchar       *trace_type);
 gchar       **mm_location_gps_nmea_get_traces (MMLocationGpsNmea *self);
 
-#ifndef MM_DISABLE_DEPRECATED
-G_DEPRECATED_FOR(mm_location_gps_nmea_get_traces)
-gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
-#endif
-
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 

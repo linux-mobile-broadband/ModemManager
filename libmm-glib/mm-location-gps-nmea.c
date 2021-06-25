@@ -190,49 +190,6 @@ mm_location_gps_nmea_get_traces (MMLocationGpsNmea *self)
 
 /*****************************************************************************/
 
-#ifndef MM_DISABLE_DEPRECATED
-
-static void
-build_full_foreach (const gchar *trace_type,
-                    const gchar *trace,
-                    GString **built)
-{
-    if ((*built)->len == 0 || g_str_has_suffix ((*built)->str, "\r\n"))
-        g_string_append (*built, trace);
-    else
-        g_string_append_printf (*built, "\r\n%s", trace);
-}
-
-/**
- * mm_location_gps_nmea_build_full:
- * @self: a #MMLocationGpsNmea.
- *
- * Gets a compilation of all cached traces, in a single string.
- * Traces are separated by '\r\n'.
- *
- * Returns: (transfer full): a string containing all traces, or #NULL if none
- * available. The returned value should be freed with g_free().
- *
- * Since: 1.0
- * Deprecated: 1.14: user should use mm_location_gps_nmea_get_traces() instead,
- * which provides a much more generic interface to the full list of traces.
- */
-gchar *
-mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
-{
-    GString *built;
-
-    built = g_string_new ("");
-    g_hash_table_foreach (self->priv->traces,
-                          (GHFunc)build_full_foreach,
-                          &built);
-    return g_string_free (built, FALSE);
-}
-
-#endif
-
-/*****************************************************************************/
-
 /**
  * mm_location_gps_nmea_get_string_variant: (skip)
  */
