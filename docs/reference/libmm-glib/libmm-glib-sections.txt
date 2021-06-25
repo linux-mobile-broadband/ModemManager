@@ -1213,8 +1213,6 @@ mm_bearer_properties_get_rm_protocol
 mm_bearer_properties_set_rm_protocol
 mm_bearer_properties_get_multiplex
 mm_bearer_properties_set_multiplex
-mm_bearer_properties_get_number
-mm_bearer_properties_set_number
 <SUBSECTION Private>
 mm_bearer_properties_new_from_dictionary
 mm_bearer_properties_new_from_string
@@ -1825,6 +1823,9 @@ mm_serial_error_get_type
 <SECTION>
 <FILE>mm-compat</FILE>
 <TITLE>Deprecated Interface</TITLE>
+<SUBSECTION BearerProperties>
+mm_bearer_properties_get_number
+mm_bearer_properties_set_number
 <SUBSECTION CallProperties>
 mm_call_properties_get_direction
 mm_call_properties_set_direction
