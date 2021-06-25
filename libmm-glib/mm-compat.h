@@ -33,6 +33,7 @@
 #include "mm-bearer-properties.h"
 #include "mm-call-properties.h"
 #include "mm-location-gps-nmea.h"
+#include "mm-pco.h"
 #include "mm-modem-3gpp.h"
 #include "mm-modem-oma.h"
 
@@ -227,6 +228,22 @@ MMCallState mm_call_properties_get_state (MMCallProperties *self);
  */
 G_DEPRECATED_FOR(mm_location_gps_nmea_get_traces)
 gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
+
+/*****************************************************************************/
+
+/**
+ * mm_pco_list_free:
+ * @pco_list: (transfer full)(element-type ModemManager.Pco): a #GList of
+ *  #MMPco.
+ *
+ * Frees all of the memory used by a #GList of #MMPco.
+ *
+ * Since: 1.10
+ * Deprecated: 1.12.0: Use g_list_free_full() using g_object_unref() as
+ * #GDestroyNotify function instead.
+ */
+G_DEPRECATED
+void mm_pco_list_free (GList *pco_list);
 
 /*****************************************************************************/
 

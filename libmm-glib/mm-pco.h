@@ -61,13 +61,6 @@ gboolean      mm_pco_is_complete    (MMPco *self);
 const guint8 *mm_pco_get_data       (MMPco *self,
                                      gsize *data_size);
 
-#ifndef MM_DISABLE_DEPRECATED
-
-G_DEPRECATED
-void mm_pco_list_free (GList *pco_list);
-
-#endif
-
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
 

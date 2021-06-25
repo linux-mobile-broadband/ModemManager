@@ -117,6 +117,14 @@ mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
 
 /*****************************************************************************/
 
+void
+mm_pco_list_free (GList *pco_list)
+{
+    g_list_free_full (pco_list, g_object_unref);
+}
+
+/*****************************************************************************/
+
 MMModem3gppSubscriptionState
 mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
 {
