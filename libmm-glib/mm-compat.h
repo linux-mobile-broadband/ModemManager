@@ -34,6 +34,7 @@
 #include "mm-call-properties.h"
 #include "mm-location-gps-nmea.h"
 #include "mm-pco.h"
+#include "mm-simple-status.h"
 #include "mm-modem-3gpp.h"
 #include "mm-modem-oma.h"
 
@@ -244,6 +245,23 @@ gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
  */
 G_DEPRECATED
 void mm_pco_list_free (GList *pco_list);
+
+/*****************************************************************************/
+
+/**
+ * mm_simple_status_get_3gpp_subscription_state:
+ * @self: a #MMSimpleStatus.
+ *
+ * Gets the current subscription status of the account.
+ *
+ * Returns: a #MMModem3gppSubscriptionState.
+ *
+ * Since: 1.0
+ * Deprecated: 1.12.0. The value of this property can only be obtained with
+ * operator specific logic (e.g. processing specific PCO info), and therefore
+ * it doesn't make sense to expose it in the ModemManager interface.
+ */
+MMModem3gppSubscriptionState mm_simple_status_get_3gpp_subscription_state (MMSimpleStatus *self);
 
 /*****************************************************************************/
 

@@ -68,10 +68,6 @@ MMModem3gppRegistrationState  mm_simple_status_get_3gpp_registration_state (MMSi
 const gchar                  *mm_simple_status_get_3gpp_operator_code      (MMSimpleStatus *self);
 const gchar                  *mm_simple_status_get_3gpp_operator_name      (MMSimpleStatus *self);
 
-#ifndef MM_DISABLE_DEPRECATED
-MMModem3gppSubscriptionState  mm_simple_status_get_3gpp_subscription_state (MMSimpleStatus *self);
-#endif
-
 MMModemCdmaRegistrationState mm_simple_status_get_cdma_cdma1x_registration_state (MMSimpleStatus *self);
 MMModemCdmaRegistrationState mm_simple_status_get_cdma_evdo_registration_state   (MMSimpleStatus *self);
 guint                        mm_simple_status_get_cdma_sid                       (MMSimpleStatus *self);

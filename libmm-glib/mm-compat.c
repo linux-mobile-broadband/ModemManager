@@ -126,6 +126,14 @@ mm_pco_list_free (GList *pco_list)
 /*****************************************************************************/
 
 MMModem3gppSubscriptionState
+mm_simple_status_get_3gpp_subscription_state (MMSimpleStatus *self)
+{
+    return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+}
+
+/*****************************************************************************/
+
+MMModem3gppSubscriptionState
 mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
 {
     return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
