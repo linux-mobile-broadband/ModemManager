@@ -149,6 +149,9 @@ struct _MMBroadbandModemMbimPrivate {
 #endif
 
     gboolean intel_firmware_update_unsupported;
+
+    /* Multi-SIM support */
+    guint32 executor_index;
 };
 
 /*****************************************************************************/
@@ -6158,6 +6161,351 @@ get_property (GObject *object,
     }
 }
 
+/*****************************************************************************/
+/* Create SIMs in all SIM slots */
+
+typedef struct {
+    GPtrArray *sim_slots;
+    guint number_slots;
+    guint query_slot_index;
+    guint active_slot_index;
+} LoadSimSlotsContext;
+
+static void
+load_sim_slots_context_free (LoadSimSlotsContext *ctx)
+{
+    g_clear_pointer (&ctx->sim_slots, g_ptr_array_unref);
+    g_slice_free (LoadSimSlotsContext, ctx);
+}
+
+static gboolean
+load_sim_slots_finish (MMIfaceModem *self,
+                       GAsyncResult *res,
+                       GPtrArray   **sim_slots,
+                       guint        *primary_sim_slot,
+                       GError      **error)
+{
+    LoadSimSlotsContext *ctx;
+
+    if (!g_task_propagate_boolean (G_TASK(res), error))
+        return FALSE;
+
+    ctx = g_task_get_task_data (G_TASK (res));
+
+    if (sim_slots)
+        *sim_slots = g_steal_pointer (&ctx->sim_slots);
+    if (primary_sim_slot)
+        *primary_sim_slot = ctx->active_slot_index;
+    return TRUE;
+}
+
+static void
+query_slot_information_status (MbimDevice *device,
+                               guint       slot_index,
+                               GTask      *task);
+
+static void
+query_slot_information_status_ready (MbimDevice   *device,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    MMIfaceModem          *self;
+    g_autoptr(MbimMessage) response = NULL;
+    GError                *error = NULL;
+    guint32                slot_index;
+    MbimUiccSlotState      slot_state;
+    LoadSimSlotsContext   *ctx;
+    MMBaseSim             *sim;
+    gboolean               sim_active = FALSE;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_extensions_slot_info_status_response_parse (
+                response,
+                &slot_index,
+                &slot_state,
+                &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (slot_index == ctx->active_slot_index) {
+        sim_active = TRUE;
+    }
+
+    if (slot_state == MBIM_UICC_SLOT_STATE_ACTIVE ||
+        slot_state == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM ||
+        slot_state == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM_NO_PROFILES) {
+        sim = mm_sim_mbim_new_initialized (MM_BASE_MODEM (self),
+                                           slot_index,
+                                           sim_active,
+                                           NULL,
+                                           NULL,
+                                           NULL,
+                                           NULL,
+                                           NULL,
+                                           NULL);
+        g_ptr_array_add (ctx->sim_slots, sim);
+    } else
+        g_ptr_array_add (ctx->sim_slots, NULL);
+
+    ctx->query_slot_index++;
+    if (ctx->query_slot_index < ctx->number_slots) {
+        query_slot_information_status (device, ctx->query_slot_index, task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+query_slot_information_status (MbimDevice *device,
+                               guint       slot_index,
+                               GTask      *task)
+{
+    g_autoptr(MbimMessage) message = NULL;
+
+    message = mbim_message_ms_basic_connect_extensions_slot_info_status_query_new (slot_index, NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)query_slot_information_status_ready,
+                         task);
+}
+
+static void
+query_device_slot_mappings_ready (MbimDevice   *device,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    MMBroadbandModemMbim    *self;
+    g_autoptr(MbimMessage)   response = NULL;
+    GError                  *error = NULL;
+    g_autoptr(MbimMessage)   message = NULL;
+    guint32                  map_count = 0;
+    g_autoptr(MbimSlotArray) slot_mappings = NULL;
+    LoadSimSlotsContext     *ctx;
+
+    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_extensions_device_slot_mappings_response_parse (
+            response,
+            &map_count,
+            &slot_mappings,
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (self->priv->executor_index >= map_count) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                 "The executor index doesn't have an entry in the map count");
+        g_object_unref (task);
+        return;
+    }
+    ctx->active_slot_index = slot_mappings[self->priv->executor_index]->slot;
+
+    query_slot_information_status (device, ctx->query_slot_index, task);
+}
+
+static void
+query_device_slot_mappings (MbimDevice *device,
+                            GTask      *task)
+{
+    g_autoptr(MbimMessage) message = NULL;
+
+    message = mbim_message_ms_basic_connect_extensions_device_slot_mappings_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)query_device_slot_mappings_ready,
+                         task);
+}
+
+static void
+query_device_caps_ready (MbimDevice   *device,
+                         GAsyncResult *res,
+                         GTask        *task)
+{
+    MMBroadbandModemMbim   *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
+    g_autoptr(MbimMessage)  message = NULL;
+    guint32                 executor_index;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_extensions_device_caps_response_parse (
+            response,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            &executor_index,
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    self->priv->executor_index = executor_index;
+
+    query_device_slot_mappings (device, task);
+}
+
+static void
+query_sys_caps_ready (MbimDevice   *device,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    MMBroadbandModemMbim  *self;
+    g_autoptr(MbimMessage) response = NULL;
+    g_autoptr(MbimMessage) message = NULL;
+    GError                *error = NULL;
+    guint32                number_executors;
+    guint32                number_slots;
+    guint32                concurrency;
+    guint64                modem_id;
+    LoadSimSlotsContext   *ctx;
+
+    ctx = g_task_get_task_data (task);
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_extensions_sys_caps_response_parse (
+            response,
+            &number_executors,
+            &number_slots,
+            &concurrency,
+            &modem_id,
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (number_slots == 1) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                 "Only one SIM slot is supported");
+        g_object_unref (task);
+        return;
+    }
+    ctx->number_slots = number_slots;
+    ctx->sim_slots = g_ptr_array_new_full (number_slots, NULL);
+
+    if (number_executors == 0) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                                 "There is no executor");
+        g_object_unref (task);
+        return;
+    }
+    /* Given that there is one single executor supported,we assume the executor index to be always 0 */
+    if (number_executors == 1) {
+        self->priv->executor_index = 0;
+        query_device_slot_mappings (device, task);
+        return;
+    }
+    /* Given that more than one executors supported,we first query the current device caps to know which is the current executor index */
+    message = mbim_message_ms_basic_connect_extensions_device_caps_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)query_device_caps_ready,
+                         task);
+}
+
+static void
+load_sim_slots_mbim (GTask *task)
+{
+    MMBroadbandModemMbim *self;
+    MbimDevice           *device;
+    MbimMessage          *message;
+
+    self = g_task_get_source_object (task);
+
+    if (!peek_device (self, &device, NULL, NULL))
+        return;
+
+    message = mbim_message_ms_basic_connect_extensions_sys_caps_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)query_sys_caps_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+static void
+shared_qmi_load_sim_slots_ready (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GTask        *task)
+{
+    g_autoptr(GPtrArray)   sim_slots = NULL;
+    guint                  primary_sim_slot = 0;
+    LoadSimSlotsContext   *ctx;
+
+    if (!mm_shared_qmi_load_sim_slots_finish (self, res, &sim_slots, &primary_sim_slot, NULL)) {
+        load_sim_slots_mbim (task);
+        return;
+    }
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->sim_slots = g_steal_pointer (&sim_slots);
+    ctx->active_slot_index = primary_sim_slot;
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+#endif
+
+static void
+load_sim_slots (MMIfaceModem       *self,
+                GAsyncReadyCallback callback,
+                gpointer            user_data)
+{
+    GTask               *task;
+    LoadSimSlotsContext *ctx;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (LoadSimSlotsContext);
+    g_task_set_task_data (task, ctx, (GDestroyNotify)load_sim_slots_context_free);
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+    mm_shared_qmi_load_sim_slots (self, (GAsyncReadyCallback)shared_qmi_load_sim_slots_ready, task);
+#else
+    load_sim_slots_mbim (task);
+#endif
+}
+
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
                              const gchar **drivers,
@@ -6308,9 +6656,9 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create MBIM-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
+    iface->load_sim_slots = load_sim_slots;
+    iface->load_sim_slots_finish = load_sim_slots_finish;
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    iface->load_sim_slots = mm_shared_qmi_load_sim_slots;
-    iface->load_sim_slots_finish = mm_shared_qmi_load_sim_slots_finish;
     iface->set_primary_sim_slot = mm_shared_qmi_set_primary_sim_slot;
     iface->set_primary_sim_slot_finish = mm_shared_qmi_set_primary_sim_slot_finish;
 #endif

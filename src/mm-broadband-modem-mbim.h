@@ -62,5 +62,4 @@ MMPortMbim *mm_broadband_modem_mbim_get_port_mbim           (MMBroadbandModemMbi
 MMPortMbim *mm_broadband_modem_mbim_get_port_mbim_for_data  (MMBroadbandModemMbim  *self,
                                                              MMPort                *data,
                                                              GError               **error);
-
 #endif /* MM_BROADBAND_MODEM_MBIM_H */

@@ -48,5 +48,13 @@ void       mm_sim_mbim_new        (MMBaseModem *modem,
                                    gpointer user_data);
 MMBaseSim *mm_sim_mbim_new_finish (GAsyncResult  *res,
                                    GError       **error);
-
+MMBaseSim *mm_sim_mbim_new_initialized (MMBaseModem *modem,
+                                        guint        slot_number,
+                                        gboolean     active,
+                                        const gchar *sim_identifier,
+                                        const gchar *imsi,
+                                        const gchar *eid,
+                                        const gchar *operator_identifier,
+                                        const gchar *operator_name,
+                                        const GStrv  emergency_numbers);
 #endif /* MM_SIM_MBIM_H */

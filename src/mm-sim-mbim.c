@@ -704,6 +704,34 @@ mm_sim_mbim_new (MMBaseModem *modem,
                                 NULL);
 }
 
+MMBaseSim *
+mm_sim_mbim_new_initialized (MMBaseModem *modem,
+                             guint        slot_number,
+                             gboolean     active,
+                             const gchar *sim_identifier,
+                             const gchar *imsi,
+                             const gchar *eid,
+                             const gchar *operator_identifier,
+                             const gchar *operator_name,
+                             const GStrv  emergency_numbers)
+{
+    MMBaseSim *sim;
+
+    sim = MM_BASE_SIM (g_object_new (MM_TYPE_SIM_MBIM,
+                                     MM_BASE_SIM_MODEM,       modem,
+                                     MM_BASE_SIM_SLOT_NUMBER, slot_number,
+                                     "active",                active,
+                                     "sim-identifier",        sim_identifier,
+                                     "eid",                   eid,
+                                     "operator-identifier",   operator_identifier,
+                                     "operator-name",         operator_name,
+                                     "emergency-numbers",     emergency_numbers,
+                                     NULL));
+
+    mm_base_sim_export (sim);
+    return sim;
+}
+
 static void
 mm_sim_mbim_init (MMSimMbim *self)
 {
