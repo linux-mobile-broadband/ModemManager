@@ -33,6 +33,7 @@
 #include "mm-bearer-properties.h"
 #include "mm-call-properties.h"
 #include "mm-location-gps-nmea.h"
+#include "mm-modem-3gpp.h"
 #include "mm-modem-oma.h"
 
 /**
@@ -226,6 +227,30 @@ MMCallState mm_call_properties_get_state (MMCallProperties *self);
  */
 G_DEPRECATED_FOR(mm_location_gps_nmea_get_traces)
 gchar *mm_location_gps_nmea_build_full (MMLocationGpsNmea *self);
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_3gpp_get_subscription_state:
+ * @self: A #MMModem.
+ *
+ * Get the current subscription status of the account. This value is only
+ * available after the modem attempts to register with the network.
+ *
+ * The value of this property can only be obtained with operator specific logic
+ * (e.g. processing specific PCO info), and therefore it doesn't make sense to
+ * expose it in the ModemManager interface.
+ *
+ * Returns: A #MMModem3gppSubscriptionState value, specifying the current
+ * subscription state.
+ *
+ * Since: 1.0
+ * Deprecated: 1.10.0. The value of this property can only be obtained with
+ * operator specific logic (e.g. processing specific PCO info), and therefore
+ * it doesn't make sense to expose it in the ModemManager interface.
+ */
+G_DEPRECATED
+MMModem3gppSubscriptionState mm_modem_3gpp_get_subscription_state (MMModem3gpp *self);
 
 /*****************************************************************************/
 

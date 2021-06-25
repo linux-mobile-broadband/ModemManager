@@ -187,13 +187,6 @@ gboolean mm_modem_3gpp_disable_facility_lock_sync   (MMModem3gpp          *self,
                                                      GCancellable         *cancellable,
                                                      GError              **error);
 
-#ifndef MM_DISABLE_DEPRECATED
-
-G_DEPRECATED
-MMModem3gppSubscriptionState mm_modem_3gpp_get_subscription_state (MMModem3gpp *self);
-
-#endif
-
 G_END_DECLS
 
 #endif /* _MM_MODEM_3GPP_H_ */

@@ -117,6 +117,14 @@ mm_location_gps_nmea_build_full (MMLocationGpsNmea *self)
 
 /*****************************************************************************/
 
+MMModem3gppSubscriptionState
+mm_modem_3gpp_get_subscription_state (MMModem3gpp *self)
+{
+    return MM_MODEM_3GPP_SUBSCRIPTION_STATE_UNKNOWN;
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_modem_get_pending_network_initiated_sessions (MMModemOma                           *self,
                                                  MMOmaPendingNetworkInitiatedSession **sessions,
