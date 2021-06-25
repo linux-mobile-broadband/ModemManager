@@ -176,6 +176,8 @@ mm_location_gps_nmea_get_traces (MMLocationGpsNmea *self)
 {
     GPtrArray *built = NULL;
 
+    g_return_val_if_fail (MM_IS_LOCATION_GPS_NMEA (self), NULL);
+
     g_hash_table_foreach (self->priv->traces,
                           (GHFunc)build_all_foreach,
                           &built);
