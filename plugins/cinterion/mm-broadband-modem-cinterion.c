@@ -1686,7 +1686,7 @@ common_load_initial_eps_step (GTask *task)
         return;
 
     case COMMON_LOAD_INITIAL_EPS_STEP_LAST:
-        g_task_return_pointer (task, ctx->properties, g_object_unref);
+        g_task_return_pointer (task, g_steal_pointer (&ctx->properties), g_object_unref);
         g_object_unref (task);
         return;
 
