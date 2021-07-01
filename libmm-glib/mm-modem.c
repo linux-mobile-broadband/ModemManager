@@ -44,33 +44,30 @@
 G_DEFINE_TYPE (MMModem, mm_modem, MM_GDBUS_TYPE_MODEM_PROXY)
 
 struct _MMModemPrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     /* Ports */
-    GMutex ports_mutex;
     guint ports_id;
     GArray *ports;
 
     /* UnlockRetries */
-    GMutex unlock_retries_mutex;
     guint unlock_retries_id;
     MMUnlockRetries *unlock_retries;
 
     /* Supported Modes */
-    GMutex supported_modes_mutex;
     guint supported_modes_id;
     GArray *supported_modes;
 
     /* Supported Capabilities */
-    GMutex supported_capabilities_mutex;
     guint supported_capabilities_id;
     GArray *supported_capabilities;
 
     /* Supported Bands */
-    GMutex supported_bands_mutex;
     guint supported_bands_id;
     GArray *supported_bands;
 
     /* Current Bands */
-    GMutex current_bands_mutex;
     guint current_bands_id;
     GArray *current_bands;
 };
@@ -248,7 +245,7 @@ static void
 supported_capabilities_updated (MMModem *self,
                                 GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->supported_capabilities_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -260,7 +257,7 @@ supported_capabilities_updated (MMModem *self,
                                               mm_common_capability_combinations_variant_to_garray (dictionary) :
                                               NULL);
     }
-    g_mutex_unlock (&self->priv->supported_capabilities_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static gboolean
@@ -270,7 +267,7 @@ ensure_internal_supported_capabilities (MMModem *self,
 {
     gboolean ret;
 
-    g_mutex_lock (&self->priv->supported_capabilities_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
@@ -306,7 +303,7 @@ ensure_internal_supported_capabilities (MMModem *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->supported_capabilities_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 
     return ret;
 }
@@ -1026,7 +1023,7 @@ static void
 ports_updated (MMModem *self,
                GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->ports_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -1038,7 +1035,7 @@ ports_updated (MMModem *self,
                              mm_common_ports_variant_to_garray (dictionary) :
                              NULL);
     }
-    g_mutex_unlock (&self->priv->ports_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static gboolean
@@ -1049,7 +1046,7 @@ ensure_internal_ports (MMModem *self,
     gboolean ret;
     guint i;
 
-    g_mutex_lock (&self->priv->ports_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
@@ -1093,7 +1090,7 @@ ensure_internal_ports (MMModem *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->ports_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 
     return ret;
 }
@@ -1290,7 +1287,7 @@ static void
 unlock_retries_updated (MMModem *self,
                         GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->unlock_retries_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -1301,14 +1298,14 @@ unlock_retries_updated (MMModem *self,
         if (dictionary)
             self->priv->unlock_retries = mm_unlock_retries_new_from_dictionary (dictionary);
     }
-    g_mutex_unlock (&self->priv->unlock_retries_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_unlock_retries (MMModem *self,
                                 MMUnlockRetries **dup)
 {
-    g_mutex_lock (&self->priv->unlock_retries_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -1332,7 +1329,7 @@ ensure_internal_unlock_retries (MMModem *self,
         if (dup && self->priv->unlock_retries)
             *dup = g_object_ref (self->priv->unlock_retries);
     }
-    g_mutex_unlock (&self->priv->unlock_retries_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -1520,7 +1517,7 @@ static void
 supported_modes_updated (MMModem *self,
                          GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->supported_modes_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -1532,7 +1529,7 @@ supported_modes_updated (MMModem *self,
                                        mm_common_mode_combinations_variant_to_garray (dictionary) :
                                        NULL);
     }
-    g_mutex_unlock (&self->priv->supported_modes_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static gboolean
@@ -1542,7 +1539,7 @@ ensure_internal_supported_modes (MMModem *self,
 {
     gboolean ret;
 
-    g_mutex_lock (&self->priv->supported_modes_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
@@ -1578,7 +1575,7 @@ ensure_internal_supported_modes (MMModem *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->supported_modes_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 
     return ret;
 }
@@ -1686,7 +1683,7 @@ static void
 supported_bands_updated (MMModem *self,
                          GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->supported_bands_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -1698,7 +1695,7 @@ supported_bands_updated (MMModem *self,
                                        mm_common_bands_variant_to_garray (dictionary) :
                                        NULL);
     }
-    g_mutex_unlock (&self->priv->supported_bands_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static gboolean
@@ -1708,7 +1705,7 @@ ensure_internal_supported_bands (MMModem *self,
 {
     gboolean ret;
 
-    g_mutex_lock (&self->priv->supported_bands_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
@@ -1744,7 +1741,7 @@ ensure_internal_supported_bands (MMModem *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->supported_bands_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 
     return ret;
 }
@@ -1817,7 +1814,7 @@ static void
 current_bands_updated (MMModem *self,
                        GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->current_bands_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -1829,7 +1826,7 @@ current_bands_updated (MMModem *self,
                                      mm_common_bands_variant_to_garray (dictionary) :
                                      NULL);
     }
-    g_mutex_unlock (&self->priv->current_bands_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static gboolean
@@ -1839,7 +1836,7 @@ ensure_internal_current_bands (MMModem *self,
 {
     gboolean ret;
 
-    g_mutex_lock (&self->priv->current_bands_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
@@ -1875,7 +1872,7 @@ ensure_internal_current_bands (MMModem *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->current_bands_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 
     return ret;
 }
@@ -3782,16 +3779,8 @@ mm_modem_set_primary_sim_slot_sync (MMModem       *self,
 static void
 mm_modem_init (MMModem *self)
 {
-    /* Setup private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_MODEM,
-                                              MMModemPrivate);
-    g_mutex_init (&self->priv->unlock_retries_mutex);
-    g_mutex_init (&self->priv->supported_modes_mutex);
-    g_mutex_init (&self->priv->supported_capabilities_mutex);
-    g_mutex_init (&self->priv->supported_bands_mutex);
-    g_mutex_init (&self->priv->current_bands_mutex);
-    g_mutex_init (&self->priv->ports_mutex);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM, MMModemPrivate);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -3799,35 +3788,17 @@ finalize (GObject *object)
 {
     MMModem *self = MM_MODEM (object);
 
-    g_mutex_clear (&self->priv->unlock_retries_mutex);
-    g_mutex_clear (&self->priv->supported_modes_mutex);
-    g_mutex_clear (&self->priv->supported_capabilities_mutex);
-    g_mutex_clear (&self->priv->supported_bands_mutex);
-    g_mutex_clear (&self->priv->current_bands_mutex);
-    g_mutex_clear (&self->priv->ports_mutex);
+    g_mutex_clear (&self->priv->mutex);
 
-    if (self->priv->supported_modes)
-        g_array_unref (self->priv->supported_modes);
-    if (self->priv->supported_capabilities)
-        g_array_unref (self->priv->supported_capabilities);
-    if (self->priv->supported_bands)
-        g_array_unref (self->priv->supported_bands);
-    if (self->priv->current_bands)
-        g_array_unref (self->priv->current_bands);
-    if (self->priv->ports)
-       g_array_unref (self->priv->ports);
-
-    G_OBJECT_CLASS (mm_modem_parent_class)->finalize (object);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMModem *self = MM_MODEM (object);
+    g_clear_pointer (&self->priv->supported_modes, g_array_unref);
+    g_clear_pointer (&self->priv->supported_capabilities, g_array_unref);
+    g_clear_pointer (&self->priv->supported_bands, g_array_unref);
+    g_clear_pointer (&self->priv->current_bands, g_array_unref);
+    g_clear_pointer (&self->priv->ports, g_array_unref);
 
     g_clear_object (&self->priv->unlock_retries);
 
-    G_OBJECT_CLASS (mm_modem_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_modem_parent_class)->finalize (object);
 }
 
 static void
@@ -3838,6 +3809,5 @@ mm_modem_class_init (MMModemClass *modem_class)
     g_type_class_add_private (object_class, sizeof (MMModemPrivate));
 
     /* Virtual methods */
-    object_class->dispose = dispose;
     object_class->finalize = finalize;
 }

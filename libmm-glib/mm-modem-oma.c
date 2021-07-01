@@ -43,8 +43,10 @@
 G_DEFINE_TYPE (MMModemOma, mm_modem_oma, MM_GDBUS_TYPE_MODEM_OMA_PROXY)
 
 struct _MMModemOmaPrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     /* Supported Modes */
-    GMutex pending_network_initiated_sessions_mutex;
     guint pending_network_initiated_sessions_id;
     GArray *pending_network_initiated_sessions;
 };
@@ -507,7 +509,7 @@ static void
 pending_network_initiated_sessions_updated (MMModemOma *self,
                                             GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->pending_network_initiated_sessions_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -519,7 +521,7 @@ pending_network_initiated_sessions_updated (MMModemOma *self,
                                                           mm_common_oma_pending_network_initiated_sessions_variant_to_garray (dictionary) :
                                                           NULL);
     }
-    g_mutex_unlock (&self->priv->pending_network_initiated_sessions_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static gboolean
@@ -529,7 +531,7 @@ ensure_internal_pending_network_initiated_sessions (MMModemOma *self,
 {
     gboolean ret;
 
-    g_mutex_lock (&self->priv->pending_network_initiated_sessions_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
@@ -565,7 +567,7 @@ ensure_internal_pending_network_initiated_sessions (MMModemOma *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->pending_network_initiated_sessions_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 
     return ret;
 }
@@ -632,11 +634,8 @@ mm_modem_oma_peek_pending_network_initiated_sessions (MMModemOma                
 static void
 mm_modem_oma_init (MMModemOma *self)
 {
-    /* Setup private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_MODEM_OMA,
-                                              MMModemOmaPrivate);
-    g_mutex_init (&self->priv->pending_network_initiated_sessions_mutex);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_OMA, MMModemOmaPrivate);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -644,10 +643,9 @@ finalize (GObject *object)
 {
     MMModemOma *self = MM_MODEM_OMA (object);
 
-    g_mutex_clear (&self->priv->pending_network_initiated_sessions_mutex);
+    g_mutex_clear (&self->priv->mutex);
 
-    if (self->priv->pending_network_initiated_sessions)
-        g_array_unref (self->priv->pending_network_initiated_sessions);
+    g_clear_pointer (&self->priv->pending_network_initiated_sessions, g_array_unref);
 
     G_OBJECT_CLASS (mm_modem_oma_parent_class)->finalize (object);
 }
@@ -659,6 +657,5 @@ mm_modem_oma_class_init (MMModemOmaClass *modem_class)
 
     g_type_class_add_private (object_class, sizeof (MMModemOmaPrivate));
 
-    /* Virtual methods */
     object_class->finalize = finalize;
 }

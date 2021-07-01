@@ -37,8 +37,10 @@
 G_DEFINE_TYPE (MMCall, mm_call, MM_GDBUS_TYPE_CALL_PROXY)
 
 struct _MMCallPrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     /* Audio Format */
-    GMutex audio_format_mutex;
     guint audio_format_id;
     MMCallAudioFormat *audio_format;
 };
@@ -265,7 +267,7 @@ static void
 audio_format_updated (MMCall *self,
                       GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->audio_format_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -283,14 +285,14 @@ audio_format_updated (MMCall *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->audio_format_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_audio_format (MMCall *self,
                              MMCallAudioFormat **dup)
 {
-    g_mutex_lock (&self->priv->audio_format_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -320,7 +322,7 @@ ensure_internal_audio_format (MMCall *self,
         if (dup && self->priv->audio_format)
             *dup = g_object_ref (self->priv->audio_format);
     }
-    g_mutex_unlock (&self->priv->audio_format_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -1013,10 +1015,8 @@ mm_call_send_dtmf_sync (MMCall *self,
 static void
 mm_call_init (MMCall *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_CALL,
-                                              MMCallPrivate);
-    g_mutex_init (&self->priv->audio_format_mutex);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_CALL, MMCallPrivate);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -1024,19 +1024,11 @@ finalize (GObject *object)
 {
     MMCall *self = MM_CALL (object);
 
-    g_mutex_clear (&self->priv->audio_format_mutex);
-
-    G_OBJECT_CLASS (mm_call_parent_class)->finalize (object);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMCall *self = MM_CALL (object);
+    g_mutex_clear (&self->priv->mutex);
 
     g_clear_object (&self->priv->audio_format);
 
-    G_OBJECT_CLASS (mm_call_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_call_parent_class)->finalize (object);
 }
 
 static void
@@ -1046,7 +1038,5 @@ mm_call_class_init (MMCallClass *call_class)
 
     g_type_class_add_private (object_class, sizeof (MMCallPrivate));
 
-    /* Virtual methods */
-    object_class->dispose = dispose;
     object_class->finalize = finalize;
 }

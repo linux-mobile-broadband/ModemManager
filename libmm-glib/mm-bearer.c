@@ -40,28 +40,26 @@
 G_DEFINE_TYPE (MMBearer, mm_bearer, MM_GDBUS_TYPE_BEARER_PROXY)
 
 struct _MMBearerPrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     /* IPv4 config */
-    GMutex ipv4_config_mutex;
     guint ipv4_config_id;
     MMBearerIpConfig *ipv4_config;
 
     /* IPv6 config */
-    GMutex ipv6_config_mutex;
     guint ipv6_config_id;
     MMBearerIpConfig *ipv6_config;
 
     /* Properties */
-    GMutex properties_mutex;
     guint properties_id;
     MMBearerProperties *properties;
 
     /* Stats */
-    GMutex stats_mutex;
     guint stats_id;
     MMBearerStats *stats;
 
     /* Connection error */
-    GMutex connection_error_mutex;
     guint connection_error_id;
     GError *connection_error;
 };
@@ -296,7 +294,7 @@ static void
 ipv4_config_updated (MMBearer *self,
                      GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->ipv4_config_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -314,14 +312,14 @@ ipv4_config_updated (MMBearer *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->ipv4_config_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_ipv4_config (MMBearer *self,
                              MMBearerIpConfig **dup)
 {
-    g_mutex_lock (&self->priv->ipv4_config_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -351,7 +349,7 @@ ensure_internal_ipv4_config (MMBearer *self,
         if (dup && self->priv->ipv4_config)
             *dup = g_object_ref (self->priv->ipv4_config);
     }
-    g_mutex_unlock (&self->priv->ipv4_config_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -414,7 +412,7 @@ static void
 ipv6_config_updated (MMBearer *self,
                      GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->ipv6_config_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -432,14 +430,14 @@ ipv6_config_updated (MMBearer *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->ipv6_config_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_ipv6_config (MMBearer *self,
                              MMBearerIpConfig **dup)
 {
-    g_mutex_lock (&self->priv->ipv6_config_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -469,7 +467,7 @@ ensure_internal_ipv6_config (MMBearer *self,
         if (dup && self->priv->ipv6_config)
             *dup = g_object_ref (self->priv->ipv6_config);
     }
-    g_mutex_unlock (&self->priv->ipv6_config_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -532,7 +530,7 @@ static void
 properties_updated (MMBearer *self,
                     GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->properties_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -550,14 +548,14 @@ properties_updated (MMBearer *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->properties_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_properties (MMBearer *self,
                             MMBearerProperties **dup)
 {
-    g_mutex_lock (&self->priv->properties_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -587,7 +585,7 @@ ensure_internal_properties (MMBearer *self,
         if (dup && self->priv->properties)
             *dup = g_object_ref (self->priv->properties);
     }
-    g_mutex_unlock (&self->priv->properties_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -650,7 +648,7 @@ static void
 stats_updated (MMBearer *self,
                GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->stats_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -667,14 +665,14 @@ stats_updated (MMBearer *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->stats_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_stats (MMBearer *self,
                        MMBearerStats **dup)
 {
-    g_mutex_lock (&self->priv->stats_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -704,7 +702,7 @@ ensure_internal_stats (MMBearer *self,
         if (dup && self->priv->stats)
             *dup = g_object_ref (self->priv->stats);
     }
-    g_mutex_unlock (&self->priv->stats_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -767,7 +765,7 @@ static void
 connection_error_updated (MMBearer   *self,
                           GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->connection_error_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *tuple;
 
@@ -782,14 +780,14 @@ connection_error_updated (MMBearer   *self,
                 g_warning ("Invalid bearer connection error update received: %s", error->message);
         }
     }
-    g_mutex_unlock (&self->priv->connection_error_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_connection_error (MMBearer  *self,
                                   GError   **dup)
 {
-    g_mutex_lock (&self->priv->connection_error_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -816,7 +814,7 @@ ensure_internal_connection_error (MMBearer  *self,
         if (dup && self->priv->connection_error)
             *dup = g_error_copy (self->priv->connection_error);
     }
-    g_mutex_unlock (&self->priv->connection_error_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -1040,15 +1038,8 @@ mm_bearer_disconnect_sync (MMBearer *self,
 static void
 mm_bearer_init (MMBearer *self)
 {
-    /* Setup private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_BEARER,
-                                              MMBearerPrivate);
-    g_mutex_init (&self->priv->ipv4_config_mutex);
-    g_mutex_init (&self->priv->ipv6_config_mutex);
-    g_mutex_init (&self->priv->properties_mutex);
-    g_mutex_init (&self->priv->stats_mutex);
-    g_mutex_init (&self->priv->connection_error_mutex);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_BEARER, MMBearerPrivate);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -1056,19 +1047,7 @@ finalize (GObject *object)
 {
     MMBearer *self = MM_BEARER (object);
 
-    g_mutex_clear (&self->priv->ipv4_config_mutex);
-    g_mutex_clear (&self->priv->ipv6_config_mutex);
-    g_mutex_clear (&self->priv->properties_mutex);
-    g_mutex_clear (&self->priv->stats_mutex);
-    g_mutex_clear (&self->priv->connection_error_mutex);
-
-    G_OBJECT_CLASS (mm_bearer_parent_class)->finalize (object);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMBearer *self = MM_BEARER (object);
+    g_mutex_clear (&self->priv->mutex);
 
     g_clear_object (&self->priv->ipv4_config);
     g_clear_object (&self->priv->ipv6_config);
@@ -1076,7 +1055,7 @@ dispose (GObject *object)
     g_clear_object (&self->priv->stats);
     g_clear_error (&self->priv->connection_error);
 
-    G_OBJECT_CLASS (mm_bearer_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_bearer_parent_class)->finalize (object);
 }
 
 static void
@@ -1086,7 +1065,5 @@ mm_bearer_class_init (MMBearerClass *bearer_class)
 
     g_type_class_add_private (object_class, sizeof (MMBearerPrivate));
 
-    /* Virtual methods */
-    object_class->dispose = dispose;
     object_class->finalize = finalize;
 }

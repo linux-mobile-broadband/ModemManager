@@ -41,7 +41,9 @@
 G_DEFINE_TYPE (MMModemLocation, mm_modem_location, MM_GDBUS_TYPE_MODEM_LOCATION_PROXY)
 
 struct _MMModemLocationPrivate {
-    GMutex             signaled_location_mutex;
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     guint              signaled_location_id;
     MMLocation3gpp    *signaled_location_3gpp;
     MMLocationGpsNmea *signaled_location_gps_nmea;
@@ -1219,7 +1221,7 @@ static void
 signaled_location_updated (MMModemLocation *self,
                            GParamSpec      *pspec)
 {
-    g_mutex_lock (&self->priv->signaled_location_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -1241,7 +1243,7 @@ signaled_location_updated (MMModemLocation *self,
                 g_warning ("Invalid signaled location received: %s", error->message);
         }
     }
-    g_mutex_unlock (&self->priv->signaled_location_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
@@ -1251,7 +1253,7 @@ ensure_internal_signaled_location (MMModemLocation    *self,
                                    MMLocationGpsRaw  **dupl_location_gps_raw,
                                    MMLocationCdmaBs  **dupl_location_cdma_bs)
 {
-    g_mutex_lock (&self->priv->signaled_location_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -1288,7 +1290,7 @@ ensure_internal_signaled_location (MMModemLocation    *self,
         if (dupl_location_cdma_bs && self->priv->signaled_location_cdma_bs)
             *dupl_location_cdma_bs = g_object_ref (self->priv->signaled_location_cdma_bs);
     }
-    g_mutex_unlock (&self->priv->signaled_location_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -1565,7 +1567,7 @@ static void
 mm_modem_location_init (MMModemLocation *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_LOCATION, MMModemLocationPrivate);
-    g_mutex_init (&self->priv->signaled_location_mutex);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -1573,22 +1575,14 @@ finalize (GObject *object)
 {
     MMModemLocation *self = MM_MODEM_LOCATION (object);
 
-    g_mutex_clear (&self->priv->signaled_location_mutex);
-
-    G_OBJECT_CLASS (mm_modem_location_parent_class)->finalize (object);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMModemLocation *self = MM_MODEM_LOCATION (object);
+    g_mutex_clear (&self->priv->mutex);
 
     g_clear_object (&self->priv->signaled_location_3gpp);
     g_clear_object (&self->priv->signaled_location_gps_nmea);
     g_clear_object (&self->priv->signaled_location_gps_raw);
     g_clear_object (&self->priv->signaled_location_cdma_bs);
 
-    G_OBJECT_CLASS (mm_modem_location_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_modem_location_parent_class)->finalize (object);
 }
 
 static void
@@ -1598,7 +1592,5 @@ mm_modem_location_class_init (MMModemLocationClass *modem_class)
 
     g_type_class_add_private (object_class, sizeof (MMModemLocationPrivate));
 
-    /* Virtual methods */
-    object_class->dispose = dispose;
     object_class->finalize = finalize;
 }

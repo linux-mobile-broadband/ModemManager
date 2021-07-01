@@ -42,8 +42,7 @@
 G_DEFINE_TYPE (MMModemSignal, mm_modem_signal, MM_GDBUS_TYPE_MODEM_SIGNAL_PROXY)
 
 typedef struct {
-    GMutex mutex;
-    guint id;
+    guint     id;
     MMSignal *info;
 } UpdatedProperty;
 
@@ -58,6 +57,9 @@ typedef enum {
 } UpdatedPropertyType;
 
 struct _MMModemSignalPrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     UpdatedProperty values [UPDATED_PROPERTY_TYPE_LAST];
 };
 
@@ -282,7 +284,7 @@ values_updated (MMModemSignal *self,
                 GParamSpec *pspec,
                 UpdatedPropertyType type)
 {
-    g_mutex_lock (&self->priv->values[type].mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -298,7 +300,7 @@ values_updated (MMModemSignal *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->values[type].mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
@@ -306,7 +308,7 @@ ensure_internal (MMModemSignal *self,
                  MMSignal **dup,
                  UpdatedPropertyType type)
 {
-    g_mutex_lock (&self->priv->values[type].mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -336,7 +338,7 @@ ensure_internal (MMModemSignal *self,
         if (dup && self->priv->values[type].info)
             *dup = g_object_ref (self->priv->values[type].info);
     }
-    g_mutex_unlock (&self->priv->values[type].mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /*****************************************************************************/
@@ -660,13 +662,8 @@ mm_modem_signal_peek_nr5g (MMModemSignal *self)
 static void
 mm_modem_signal_init (MMModemSignal *self)
 {
-    guint i;
-
-    /* Setup private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_SIGNAL, MMModemSignalPrivate);
-
-    for (i = 0; i < UPDATED_PROPERTY_TYPE_LAST; i++)
-        g_mutex_init (&self->priv->values[i].mutex);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -675,22 +672,12 @@ finalize (GObject *object)
     MMModemSignal *self = MM_MODEM_SIGNAL (object);
     guint i;
 
-    for (i = 0; i < UPDATED_PROPERTY_TYPE_LAST; i++)
-        g_mutex_clear (&self->priv->values[i].mutex);
-
-    G_OBJECT_CLASS (mm_modem_signal_parent_class)->finalize (object);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMModemSignal *self = MM_MODEM_SIGNAL (object);
-    guint i;
+    g_mutex_clear (&self->priv->mutex);
 
     for (i = 0; i < UPDATED_PROPERTY_TYPE_LAST; i++)
         g_clear_object (&self->priv->values[i].info);
 
-    G_OBJECT_CLASS (mm_modem_signal_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_modem_signal_parent_class)->finalize (object);
 }
 
 static void
@@ -700,7 +687,5 @@ mm_modem_signal_class_init (MMModemSignalClass *modem_class)
 
     g_type_class_add_private (object_class, sizeof (MMModemSignalPrivate));
 
-    /* Virtual methods */
-    object_class->dispose = dispose;
     object_class->finalize = finalize;
 }

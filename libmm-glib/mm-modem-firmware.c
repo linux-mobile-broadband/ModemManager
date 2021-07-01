@@ -41,7 +41,9 @@
 G_DEFINE_TYPE (MMModemFirmware, mm_modem_firmware, MM_GDBUS_TYPE_MODEM_FIRMWARE_PROXY)
 
 struct _MMModemFirmwarePrivate {
-    GMutex                    update_settings_mutex;
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     guint                     update_settings_id;
     MMFirmwareUpdateSettings *update_settings;
 };
@@ -98,7 +100,7 @@ static void
 update_settings_updated (MMModemFirmware *self,
                          GParamSpec      *pspec)
 {
-    g_mutex_lock (&self->priv->update_settings_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *variant;
 
@@ -114,14 +116,14 @@ update_settings_updated (MMModemFirmware *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->update_settings_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_update_settings (MMModemFirmware           *self,
                                  MMFirmwareUpdateSettings **dupl)
 {
-    g_mutex_lock (&self->priv->update_settings_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -151,7 +153,7 @@ ensure_internal_update_settings (MMModemFirmware           *self,
         if (dupl && self->priv->update_settings)
             *dupl = g_object_ref (self->priv->update_settings);
     }
-    g_mutex_unlock (&self->priv->update_settings_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -533,7 +535,7 @@ static void
 mm_modem_firmware_init (MMModemFirmware *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_FIRMWARE, MMModemFirmwarePrivate);
-    g_mutex_init (&self->priv->update_settings_mutex);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -541,19 +543,11 @@ finalize (GObject *object)
 {
     MMModemFirmware *self = MM_MODEM_FIRMWARE (object);
 
-    g_mutex_clear (&self->priv->update_settings_mutex);
-
-    G_OBJECT_CLASS (mm_modem_firmware_parent_class)->finalize (object);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMModemFirmware *self = MM_MODEM_FIRMWARE (object);
+    g_mutex_clear (&self->priv->mutex);
 
     g_clear_object (&self->priv->update_settings);
 
-    G_OBJECT_CLASS (mm_modem_firmware_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_modem_firmware_parent_class)->finalize (object);
 }
 
 static void
@@ -563,7 +557,5 @@ mm_modem_firmware_class_init (MMModemFirmwareClass *modem_class)
 
     g_type_class_add_private (object_class, sizeof (MMModemFirmwarePrivate));
 
-    /* Virtual methods */
-    object_class->dispose = dispose;
     object_class->finalize = finalize;
 }

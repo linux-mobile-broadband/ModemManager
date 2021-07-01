@@ -41,8 +41,10 @@
 G_DEFINE_TYPE (MMModemTime, mm_modem_time, MM_GDBUS_TYPE_MODEM_TIME_PROXY)
 
 struct _MMModemTimePrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     /* Timezone */
-    GMutex timezone_mutex;
     guint timezone_id;
     MMNetworkTimezone *timezone;
 };
@@ -195,7 +197,7 @@ static void
 timezone_updated (MMModemTime *self,
                   GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->timezone_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -205,14 +207,14 @@ timezone_updated (MMModemTime *self,
                                 mm_network_timezone_new_from_dictionary (dictionary, NULL) :
                                 NULL);
     }
-    g_mutex_unlock (&self->priv->timezone_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_timezone (MMModemTime *self,
                           MMNetworkTimezone **dup)
 {
-    g_mutex_lock (&self->priv->timezone_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -236,7 +238,7 @@ ensure_internal_timezone (MMModemTime *self,
         if (dup && self->priv->timezone)
             *dup = g_object_ref (self->priv->timezone);
     }
-    g_mutex_unlock (&self->priv->timezone_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -295,21 +297,8 @@ mm_modem_time_peek_network_timezone (MMModemTime *self)
 static void
 mm_modem_time_init (MMModemTime *self)
 {
-    /* Setup private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_MODEM_TIME,
-                                              MMModemTimePrivate);
-    g_mutex_init (&self->priv->timezone_mutex);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMModemTime *self = MM_MODEM_TIME (object);
-
-    g_clear_object (&self->priv->timezone);
-
-    G_OBJECT_CLASS (mm_modem_time_parent_class)->dispose (object);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_TIME, MMModemTimePrivate);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -317,7 +306,9 @@ finalize (GObject *object)
 {
     MMModemTime *self = MM_MODEM_TIME (object);
 
-    g_mutex_clear (&self->priv->timezone_mutex);
+    g_mutex_clear (&self->priv->mutex);
+
+    g_clear_object (&self->priv->timezone);
 
     G_OBJECT_CLASS (mm_modem_time_parent_class)->finalize (object);
 }
@@ -329,7 +320,5 @@ mm_modem_time_class_init (MMModemTimeClass *modem_class)
 
     g_type_class_add_private (object_class, sizeof (MMModemTimePrivate));
 
-    /* Virtual methods */
     object_class->finalize = finalize;
-    object_class->dispose = dispose;
 }

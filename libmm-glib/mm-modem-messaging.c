@@ -42,8 +42,10 @@
 G_DEFINE_TYPE (MMModemMessaging, mm_modem_messaging, MM_GDBUS_TYPE_MODEM_MESSAGING_PROXY)
 
 struct _MMModemMessagingPrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     /* Supported Storage */
-    GMutex supported_storages_mutex;
     guint supported_storages_id;
     GArray *supported_storages;
 };
@@ -100,7 +102,7 @@ static void
 supported_storages_updated (MMModemMessaging *self,
                             GParamSpec *pspec)
 {
-    g_mutex_lock (&self->priv->supported_storages_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -112,7 +114,7 @@ supported_storages_updated (MMModemMessaging *self,
                                           mm_common_sms_storages_variant_to_garray (dictionary) :
                                           NULL);
     }
-    g_mutex_unlock (&self->priv->supported_storages_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static gboolean
@@ -122,7 +124,7 @@ ensure_internal_supported_storages (MMModemMessaging  *self,
 {
     gboolean ret;
 
-    g_mutex_lock (&self->priv->supported_storages_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the array, setup the
          * update listener and the initial array, if any. */
@@ -158,7 +160,7 @@ ensure_internal_supported_storages (MMModemMessaging  *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->supported_storages_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 
     return ret;
 }
@@ -734,11 +736,8 @@ mm_modem_messaging_delete_sync (MMModemMessaging *self,
 static void
 mm_modem_messaging_init (MMModemMessaging *self)
 {
-    /* Setup private data */
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
-                                              MM_TYPE_MODEM_MESSAGING,
-                                              MMModemMessagingPrivate);
-    g_mutex_init (&self->priv->supported_storages_mutex);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_MESSAGING, MMModemMessagingPrivate);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -746,10 +745,9 @@ finalize (GObject *object)
 {
     MMModemMessaging *self = MM_MODEM_MESSAGING (object);
 
-    g_mutex_clear (&self->priv->supported_storages_mutex);
+    g_mutex_clear (&self->priv->mutex);
 
-    if (self->priv->supported_storages)
-        g_array_unref (self->priv->supported_storages);
+    g_clear_pointer (&self->priv->supported_storages, g_array_unref);
 
     G_OBJECT_CLASS (mm_modem_messaging_parent_class)->finalize (object);
 }
@@ -761,6 +759,5 @@ mm_modem_messaging_class_init (MMModemMessagingClass *modem_class)
 
     g_type_class_add_private (object_class, sizeof (MMModemMessagingPrivate));
 
-    /* Virtual methods */
     object_class->finalize = finalize;
 }

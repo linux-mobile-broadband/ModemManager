@@ -45,8 +45,10 @@
 G_DEFINE_TYPE (MMModem3gpp, mm_modem_3gpp, MM_GDBUS_TYPE_MODEM3GPP_PROXY)
 
 struct _MMModem3gppPrivate {
+    /* Common mutex to sync access */
+    GMutex mutex;
+
     /* Properties */
-    GMutex              initial_eps_bearer_settings_mutex;
     guint               initial_eps_bearer_settings_id;
     MMBearerProperties *initial_eps_bearer_settings;
 };
@@ -632,7 +634,7 @@ static void
 initial_eps_bearer_settings_updated (MMModem3gpp *self,
                                      GParamSpec  *pspec)
 {
-    g_mutex_lock (&self->priv->initial_eps_bearer_settings_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         GVariant *dictionary;
 
@@ -649,14 +651,14 @@ initial_eps_bearer_settings_updated (MMModem3gpp *self,
             }
         }
     }
-    g_mutex_unlock (&self->priv->initial_eps_bearer_settings_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 static void
 ensure_internal_initial_eps_bearer_settings (MMModem3gpp         *self,
                                              MMBearerProperties **dup)
 {
-    g_mutex_lock (&self->priv->initial_eps_bearer_settings_mutex);
+    g_mutex_lock (&self->priv->mutex);
     {
         /* If this is the first time ever asking for the object, setup the
          * update listener and the initial object, if any. */
@@ -686,7 +688,7 @@ ensure_internal_initial_eps_bearer_settings (MMModem3gpp         *self,
         if (dup && self->priv->initial_eps_bearer_settings)
             *dup = g_object_ref (self->priv->initial_eps_bearer_settings);
     }
-    g_mutex_unlock (&self->priv->initial_eps_bearer_settings_mutex);
+    g_mutex_unlock (&self->priv->mutex);
 }
 
 /**
@@ -1283,7 +1285,7 @@ static void
 mm_modem_3gpp_init (MMModem3gpp *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_3GPP, MMModem3gppPrivate);
-    g_mutex_init (&self->priv->initial_eps_bearer_settings_mutex);
+    g_mutex_init (&self->priv->mutex);
 }
 
 static void
@@ -1291,19 +1293,11 @@ finalize (GObject *object)
 {
     MMModem3gpp *self = MM_MODEM_3GPP (object);
 
-    g_mutex_clear (&self->priv->initial_eps_bearer_settings_mutex);
-
-    G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->finalize (object);
-}
-
-static void
-dispose (GObject *object)
-{
-    MMModem3gpp *self = MM_MODEM_3GPP (object);
+    g_mutex_clear (&self->priv->mutex);
 
     g_clear_object (&self->priv->initial_eps_bearer_settings);
 
-    G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->dispose (object);
+    G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->finalize (object);
 }
 
 static void
@@ -1313,7 +1307,5 @@ mm_modem_3gpp_class_init (MMModem3gppClass *modem_class)
 
     g_type_class_add_private (object_class, sizeof (MMModem3gppPrivate));
 
-    /* Virtual methods */
-    object_class->dispose  = dispose;
     object_class->finalize = finalize;
 }
