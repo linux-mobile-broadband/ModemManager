@@ -44,11 +44,12 @@ struct _MMModemLocationPrivate {
     /* Common mutex to sync access */
     GMutex mutex;
 
-    guint              signaled_location_id;
-    MMLocation3gpp    *signaled_location_3gpp;
-    MMLocationGpsNmea *signaled_location_gps_nmea;
-    MMLocationGpsRaw  *signaled_location_gps_raw;
-    MMLocationCdmaBs  *signaled_location_cdma_bs;
+    MMLocation3gpp    *signaled_3gpp;
+    MMLocationGpsNmea *signaled_gps_nmea;
+    MMLocationGpsRaw  *signaled_gps_raw;
+    MMLocationCdmaBs  *signaled_cdma_bs;
+
+    PROPERTY_COMMON_DECLARE (signaled_location)
 };
 
 /*****************************************************************************/
@@ -1217,81 +1218,32 @@ mm_modem_location_get_gps_refresh_rate (MMModemLocation *self)
 
 /*****************************************************************************/
 
+/* custom refresh method instead of PROPERTY_OBJECT_DEFINE_REFRESH() */
 static void
-signaled_location_updated (MMModemLocation *self,
-                           GParamSpec      *pspec)
+signaled_location_refresh (MMModemLocation *self)
 {
-    g_mutex_lock (&self->priv->mutex);
-    {
-        GVariant *dictionary;
+    g_autoptr(GVariant) variant = NULL;
+    g_autoptr(GError)   inner_error = NULL;
 
-        g_clear_object (&self->priv->signaled_location_3gpp);
-        g_clear_object (&self->priv->signaled_location_gps_nmea);
-        g_clear_object (&self->priv->signaled_location_gps_raw);
-        g_clear_object (&self->priv->signaled_location_cdma_bs);
+    g_clear_object (&self->priv->signaled_3gpp);
+    g_clear_object (&self->priv->signaled_gps_nmea);
+    g_clear_object (&self->priv->signaled_gps_raw);
+    g_clear_object (&self->priv->signaled_cdma_bs);
 
-        dictionary = mm_gdbus_modem_location_get_location (MM_GDBUS_MODEM_LOCATION (self));
-        if (dictionary) {
-            g_autoptr(GError) error = NULL;
+    variant = mm_gdbus_modem_location_dup_location (MM_GDBUS_MODEM_LOCATION (self));
+    if (!variant)
+        return;
 
-            if (!build_locations (dictionary,
-                                  &self->priv->signaled_location_3gpp,
-                                  &self->priv->signaled_location_gps_nmea,
-                                  &self->priv->signaled_location_gps_raw,
-                                  &self->priv->signaled_location_cdma_bs,
-                                  &error))
-                g_warning ("Invalid signaled location received: %s", error->message);
-        }
-    }
-    g_mutex_unlock (&self->priv->mutex);
+    if (!build_locations (variant,
+                          &self->priv->signaled_3gpp,
+                          &self->priv->signaled_gps_nmea,
+                          &self->priv->signaled_gps_raw,
+                          &self->priv->signaled_cdma_bs,
+                          &inner_error))
+        g_warning ("Invalid signaled location received: %s", inner_error->message);
 }
 
-static void
-ensure_internal_signaled_location (MMModemLocation    *self,
-                                   MMLocation3gpp    **dupl_location_3gpp,
-                                   MMLocationGpsNmea **dupl_location_gps_nmea,
-                                   MMLocationGpsRaw  **dupl_location_gps_raw,
-                                   MMLocationCdmaBs  **dupl_location_cdma_bs)
-{
-    g_mutex_lock (&self->priv->mutex);
-    {
-        /* If this is the first time ever asking for the object, setup the
-         * update listener and the initial object, if any. */
-        if (!self->priv->signaled_location_id) {
-            g_autoptr(GVariant) dictionary = NULL;
-
-            dictionary = mm_gdbus_modem_location_dup_location (MM_GDBUS_MODEM_LOCATION (self));
-            if (dictionary) {
-                g_autoptr(GError) error = NULL;
-
-                if (!build_locations (dictionary,
-                                      &self->priv->signaled_location_3gpp,
-                                      &self->priv->signaled_location_gps_nmea,
-                                      &self->priv->signaled_location_gps_raw,
-                                      &self->priv->signaled_location_cdma_bs,
-                                      &error))
-                    g_warning ("Invalid initial signaled location: %s", error->message);
-            }
-
-            /* No need to clear this signal connection when freeing self */
-            self->priv->signaled_location_id =
-                g_signal_connect (self,
-                                  "notify::location",
-                                  G_CALLBACK (signaled_location_updated),
-                                  NULL);
-        }
-
-        if (dupl_location_3gpp && self->priv->signaled_location_3gpp)
-            *dupl_location_3gpp = g_object_ref (self->priv->signaled_location_3gpp);
-        if (dupl_location_gps_nmea && self->priv->signaled_location_gps_nmea)
-            *dupl_location_gps_nmea = g_object_ref (self->priv->signaled_location_gps_nmea);
-        if (dupl_location_gps_raw && self->priv->signaled_location_gps_raw)
-            *dupl_location_gps_raw = g_object_ref (self->priv->signaled_location_gps_raw);
-        if (dupl_location_cdma_bs && self->priv->signaled_location_cdma_bs)
-            *dupl_location_cdma_bs = g_object_ref (self->priv->signaled_location_cdma_bs);
-    }
-    g_mutex_unlock (&self->priv->mutex);
-}
+PROPERTY_DEFINE_UPDATED (signaled_location, ModemLocation)
 
 /**
  * mm_modem_location_peek_signaled_3gpp:
@@ -1315,14 +1267,8 @@ ensure_internal_signaled_location (MMModemLocation    *self,
  *
  * Since: 1.18
  */
-MMLocation3gpp *
-mm_modem_location_peek_signaled_3gpp (MMModemLocation *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
 
-    ensure_internal_signaled_location (self, NULL, NULL, NULL, NULL);
-    return self->priv->signaled_location_3gpp;
-}
+PROPERTY_OBJECT_DEFINE_PEEK (signaled_location, signaled_3gpp, ModemLocation, modem_location, MODEM_LOCATION, MMLocation3gpp)
 
 /**
  * mm_modem_location_get_signaled_3gpp:
@@ -1346,16 +1292,8 @@ mm_modem_location_peek_signaled_3gpp (MMModemLocation *self)
  *
  * Since: 1.18
  */
-MMLocation3gpp *
-mm_modem_location_get_signaled_3gpp (MMModemLocation *self)
-{
-    MMLocation3gpp *location_3gpp = NULL;
 
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
-
-    ensure_internal_signaled_location (self, &location_3gpp, NULL, NULL, NULL);
-    return location_3gpp;
-}
+PROPERTY_OBJECT_DEFINE_GET (signaled_location, signaled_3gpp, ModemLocation, modem_location, MODEM_LOCATION, MMLocation3gpp)
 
 /**
  * mm_modem_location_peek_signaled_gps_nmea:
@@ -1381,14 +1319,8 @@ mm_modem_location_get_signaled_3gpp (MMModemLocation *self)
  *
  * Since: 1.18
  */
-MMLocationGpsNmea *
-mm_modem_location_peek_signaled_gps_nmea (MMModemLocation *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
 
-    ensure_internal_signaled_location (self, NULL, NULL, NULL, NULL);
-    return self->priv->signaled_location_gps_nmea;
-}
+PROPERTY_OBJECT_DEFINE_PEEK (signaled_location, signaled_gps_nmea, ModemLocation, modem_location, MODEM_LOCATION, MMLocationGpsNmea)
 
 /**
  * mm_modem_location_get_signaled_gps_nmea:
@@ -1414,16 +1346,7 @@ mm_modem_location_peek_signaled_gps_nmea (MMModemLocation *self)
  *
  * Since: 1.18
  */
-MMLocationGpsNmea *
-mm_modem_location_get_signaled_gps_nmea (MMModemLocation *self)
-{
-    MMLocationGpsNmea *location_gps_nmea = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
-
-    ensure_internal_signaled_location (self, NULL, &location_gps_nmea, NULL, NULL);
-    return location_gps_nmea;
-}
+PROPERTY_OBJECT_DEFINE_GET (signaled_location, signaled_gps_nmea, ModemLocation, modem_location, MODEM_LOCATION, MMLocationGpsNmea)
 
 /**
  * mm_modem_location_peek_signaled_gps_raw:
@@ -1449,14 +1372,8 @@ mm_modem_location_get_signaled_gps_nmea (MMModemLocation *self)
  *
  * Since: 1.18
  */
-MMLocationGpsRaw *
-mm_modem_location_peek_signaled_gps_raw (MMModemLocation *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
 
-    ensure_internal_signaled_location (self, NULL, NULL, NULL, NULL);
-    return self->priv->signaled_location_gps_raw;
-}
+PROPERTY_OBJECT_DEFINE_PEEK (signaled_location, signaled_gps_raw, ModemLocation, modem_location, MODEM_LOCATION, MMLocationGpsRaw)
 
 /**
  * mm_modem_location_get_signaled_gps_raw:
@@ -1482,16 +1399,8 @@ mm_modem_location_peek_signaled_gps_raw (MMModemLocation *self)
  *
  * Since: 1.18
  */
-MMLocationGpsRaw *
-mm_modem_location_get_signaled_gps_raw (MMModemLocation *self)
-{
-    MMLocationGpsRaw *location_gps_raw = NULL;
 
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
-
-    ensure_internal_signaled_location (self, NULL, NULL, &location_gps_raw, NULL);
-    return location_gps_raw;
-}
+PROPERTY_OBJECT_DEFINE_GET (signaled_location, signaled_gps_raw, ModemLocation, modem_location, MODEM_LOCATION, MMLocationGpsRaw)
 
 /**
  * mm_modem_location_peek_signaled_cdma_bs:
@@ -1517,14 +1426,8 @@ mm_modem_location_get_signaled_gps_raw (MMModemLocation *self)
  *
  * Since: 1.18
  */
-MMLocationCdmaBs *
-mm_modem_location_peek_signaled_cdma_bs (MMModemLocation *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
 
-    ensure_internal_signaled_location (self, NULL, NULL, NULL, NULL);
-    return self->priv->signaled_location_cdma_bs;
-}
+PROPERTY_OBJECT_DEFINE_PEEK (signaled_location, signaled_cdma_bs, ModemLocation, modem_location, MODEM_LOCATION, MMLocationCdmaBs)
 
 /**
  * mm_modem_location_get_signaled_cdma_bs:
@@ -1550,16 +1453,7 @@ mm_modem_location_peek_signaled_cdma_bs (MMModemLocation *self)
  *
  * Since: 1.18
  */
-MMLocationCdmaBs *
-mm_modem_location_get_signaled_cdma_bs (MMModemLocation *self)
-{
-    MMLocationCdmaBs *location_cdma_bs = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_LOCATION (self), NULL);
-
-    ensure_internal_signaled_location (self, NULL, NULL, NULL, &location_cdma_bs);
-    return location_cdma_bs;
-}
+PROPERTY_OBJECT_DEFINE_GET (signaled_location, signaled_cdma_bs, ModemLocation, modem_location, MODEM_LOCATION, MMLocationCdmaBs)
 
 /*****************************************************************************/
 
@@ -1568,6 +1462,8 @@ mm_modem_location_init (MMModemLocation *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_LOCATION, MMModemLocationPrivate);
     g_mutex_init (&self->priv->mutex);
+
+    PROPERTY_INITIALIZE (signaled_location, "location")
 }
 
 static void
@@ -1577,10 +1473,10 @@ finalize (GObject *object)
 
     g_mutex_clear (&self->priv->mutex);
 
-    g_clear_object (&self->priv->signaled_location_3gpp);
-    g_clear_object (&self->priv->signaled_location_gps_nmea);
-    g_clear_object (&self->priv->signaled_location_gps_raw);
-    g_clear_object (&self->priv->signaled_location_cdma_bs);
+    PROPERTY_OBJECT_FINALIZE (signaled_3gpp)
+    PROPERTY_OBJECT_FINALIZE (signaled_gps_nmea)
+    PROPERTY_OBJECT_FINALIZE (signaled_gps_raw)
+    PROPERTY_OBJECT_FINALIZE (signaled_cdma_bs)
 
     G_OBJECT_CLASS (mm_modem_location_parent_class)->finalize (object);
 }
