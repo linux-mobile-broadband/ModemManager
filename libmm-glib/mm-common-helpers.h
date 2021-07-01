@@ -94,6 +94,9 @@ GArray   *mm_common_ports_variant_to_garray (GVariant              *variant);
 GVariant *mm_common_ports_array_to_variant  (const MMModemPortInfo *ports,
                                              guint                  n_ports);
 GVariant *mm_common_ports_garray_to_variant (GArray                *array);
+gboolean  mm_common_ports_garray_to_array   (GArray                 *array,
+                                             MMModemPortInfo       **ports,
+                                             guint                  *n_ports);
 
 /* MMSmsStorage array management */
 

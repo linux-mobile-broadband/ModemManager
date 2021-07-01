@@ -728,6 +728,33 @@ mm_common_ports_garray_to_variant (GArray *array)
     return mm_common_ports_array_to_variant (NULL, 0);
 }
 
+gboolean
+mm_common_ports_garray_to_array (GArray           *array,
+                                 MMModemPortInfo **ports,
+                                 guint            *n_ports)
+{
+    if (!array)
+        return FALSE;
+
+    *ports = NULL;
+    *n_ports = array->len;
+    if (array->len > 0) {
+        guint i;
+
+        *ports = g_malloc (sizeof (MMModemPortInfo) * array->len);
+
+        /* Deep-copy the array */
+        for (i = 0; i < array->len; i++) {
+            MMModemPortInfo *src;
+
+            src = &g_array_index (array, MMModemPortInfo, i);
+            (*ports)[i].name = g_strdup (src->name);
+            (*ports)[i].type = src->type;
+        }
+    }
+    return TRUE;
+}
+
 /******************************************************************************/
 /* MMSmsStorage array management */
 
