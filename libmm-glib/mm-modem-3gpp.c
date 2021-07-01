@@ -48,9 +48,7 @@ struct _MMModem3gppPrivate {
     /* Common mutex to sync access */
     GMutex mutex;
 
-    /* Properties */
-    guint               initial_eps_bearer_settings_id;
-    MMBearerProperties *initial_eps_bearer_settings;
+    PROPERTY_OBJECT_DECLARE (initial_eps_bearer_settings, MMBearerProperties)
 };
 
 /*****************************************************************************/
@@ -630,67 +628,6 @@ mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network)
 
 /*****************************************************************************/
 
-static void
-initial_eps_bearer_settings_updated (MMModem3gpp *self,
-                                     GParamSpec  *pspec)
-{
-    g_mutex_lock (&self->priv->mutex);
-    {
-        GVariant *dictionary;
-
-        g_clear_object (&self->priv->initial_eps_bearer_settings);
-
-        dictionary = mm_gdbus_modem3gpp_get_initial_eps_bearer_settings (MM_GDBUS_MODEM3GPP (self));
-        if (dictionary) {
-            GError *error = NULL;
-
-            self->priv->initial_eps_bearer_settings = mm_bearer_properties_new_from_dictionary (dictionary, &error);
-            if (error) {
-                g_warning ("Invalid bearer properties received: %s", error->message);
-                g_error_free (error);
-            }
-        }
-    }
-    g_mutex_unlock (&self->priv->mutex);
-}
-
-static void
-ensure_internal_initial_eps_bearer_settings (MMModem3gpp         *self,
-                                             MMBearerProperties **dup)
-{
-    g_mutex_lock (&self->priv->mutex);
-    {
-        /* If this is the first time ever asking for the object, setup the
-         * update listener and the initial object, if any. */
-        if (!self->priv->initial_eps_bearer_settings_id) {
-            GVariant *dictionary;
-
-            dictionary = mm_gdbus_modem3gpp_dup_initial_eps_bearer_settings (MM_GDBUS_MODEM3GPP (self));
-            if (dictionary) {
-                GError *error = NULL;
-
-                self->priv->initial_eps_bearer_settings = mm_bearer_properties_new_from_dictionary (dictionary, &error);
-                if (error) {
-                    g_warning ("Invalid initial bearer properties: %s", error->message);
-                    g_error_free (error);
-                }
-                g_variant_unref (dictionary);
-            }
-
-            /* No need to clear this signal connection when freeing self */
-            self->priv->initial_eps_bearer_settings_id =
-                g_signal_connect (self,
-                                  "notify::initial-eps-bearer-settings",
-                                  G_CALLBACK (initial_eps_bearer_settings_updated),
-                                  NULL);
-        }
-
-        if (dup && self->priv->initial_eps_bearer_settings)
-            *dup = g_object_ref (self->priv->initial_eps_bearer_settings);
-    }
-    g_mutex_unlock (&self->priv->mutex);
-}
-
 /**
  * mm_modem_3gpp_get_initial_eps_bearer_settings:
  * @self: A #MMModem3gpp.
@@ -708,16 +645,6 @@ ensure_internal_initial_eps_bearer_settings (MMModem3gpp         *self,
  *
  * Since: 1.10
  */
-MMBearerProperties *
-mm_modem_3gpp_get_initial_eps_bearer_settings (MMModem3gpp *self)
-{
-    MMBearerProperties *props = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
-
-    ensure_internal_initial_eps_bearer_settings (self, &props);
-    return props;
-}
 
 /**
  * mm_modem_3gpp_peek_initial_eps_bearer_settings:
@@ -736,14 +663,15 @@ mm_modem_3gpp_get_initial_eps_bearer_settings (MMModem3gpp *self)
  *
  * Since: 1.10
  */
-MMBearerProperties *
-mm_modem_3gpp_peek_initial_eps_bearer_settings (MMModem3gpp *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), NULL);
 
-    ensure_internal_initial_eps_bearer_settings (self, NULL);
-    return self->priv->initial_eps_bearer_settings;
-}
+/* helpers to match the property substring name with the one in our API */
+#define mm_gdbus_modem_3gpp_dup_initial_eps_bearer_settings mm_gdbus_modem3gpp_dup_initial_eps_bearer_settings
+#define MM_GDBUS_MODEM_3GPP MM_GDBUS_MODEM3GPP
+
+PROPERTY_OBJECT_DEFINE_FAILABLE (initial_eps_bearer_settings,
+                                 Modem3gpp, modem_3gpp, MODEM_3GPP,
+                                 MMBearerProperties,
+                                 mm_bearer_properties_new_from_dictionary)
 
 /*****************************************************************************/
 
@@ -1286,6 +1214,8 @@ mm_modem_3gpp_init (MMModem3gpp *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_3GPP, MMModem3gppPrivate);
     g_mutex_init (&self->priv->mutex);
+
+    PROPERTY_INITIALIZE (initial_eps_bearer_settings, "initial-eps-bearer-settings")
 }
 
 static void
@@ -1295,7 +1225,7 @@ finalize (GObject *object)
 
     g_mutex_clear (&self->priv->mutex);
 
-    g_clear_object (&self->priv->initial_eps_bearer_settings);
+    PROPERTY_OBJECT_FINALIZE (initial_eps_bearer_settings);
 
     G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->finalize (object);
 }
