@@ -25,69 +25,12 @@
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
 
-static gint
-_enum_from_string (GType type,
-                   const gchar *str,
-                   gint error_value,
-                   GError **error)
-{
-    GEnumClass *enum_class;
-    gint value;
-    guint i;
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (type));
-
-    for (i = 0; enum_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick)) {
-            value = enum_class->values[i].value;
-            g_type_class_unref (enum_class);
-            return value;
-        }
-    }
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid %s value",
-                 str,
-                 g_type_name (type));
-    g_type_class_unref (enum_class);
-    return error_value;
-}
-
-static guint
-_flags_from_string (GType type,
-                    const gchar *str,
-                    guint error_value,
-                    GError **error)
-{
-    GFlagsClass *flags_class;
-    guint value;
-    guint i;
-
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (type));
-
-    for (i = 0; flags_class->values[i].value_nick; i++) {
-        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick)) {
-            value = flags_class->values[i].value;
-            g_type_class_unref (flags_class);
-            return value;
-        }
-    }
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Couldn't match '%s' with a valid %s value",
-                 str,
-                 g_type_name (type));
-    g_type_class_unref (flags_class);
-    return error_value;
-}
+/******************************************************************************/
+/* Enums/flags to string builders */
 
 gchar *
 mm_common_build_capabilities_string (const MMModemCapability *capabilities,
-                                     guint n_capabilities)
+                                     guint                    n_capabilities)
 {
     gboolean first = TRUE;
     GString *str;
@@ -115,7 +58,7 @@ mm_common_build_capabilities_string (const MMModemCapability *capabilities,
 
 gchar *
 mm_common_build_bands_string (const MMModemBand *bands,
-                              guint n_bands)
+                              guint              n_bands)
 {
     gboolean first = TRUE;
     GString *str;
@@ -139,7 +82,7 @@ mm_common_build_bands_string (const MMModemBand *bands,
 
 gchar *
 mm_common_build_ports_string (const MMModemPortInfo *ports,
-                              guint n_ports)
+                              guint                  n_ports)
 {
     gboolean first = TRUE;
     GString *str;
@@ -164,7 +107,7 @@ mm_common_build_ports_string (const MMModemPortInfo *ports,
 
 gchar *
 mm_common_build_sms_storages_string (const MMSmsStorage *storages,
-                                     guint n_storages)
+                                     guint               n_storages)
 {
     gboolean first = TRUE;
     GString *str;
@@ -188,7 +131,7 @@ mm_common_build_sms_storages_string (const MMSmsStorage *storages,
 
 gchar *
 mm_common_build_mode_combinations_string (const MMModemModeCombination *modes,
-                                          guint n_modes)
+                                          guint                         n_modes)
 {
     gboolean first = TRUE;
     GString *str;
@@ -218,148 +161,74 @@ mm_common_build_mode_combinations_string (const MMModemModeCombination *modes,
     return g_string_free (str, FALSE);
 }
 
-GArray *
-mm_common_sms_storages_variant_to_garray (GVariant *variant)
+/******************************************************************************/
+/* String to enums/flags parsers */
+
+
+static gint
+_enum_from_string (GType         type,
+                   const gchar  *str,
+                   gint          error_value,
+                   GError      **error)
 {
-    GArray *array = NULL;
+    g_autoptr(GEnumClass) enum_class = NULL;
+    gint                  value;
+    guint                 i;
 
-    if (variant) {
-        GVariantIter iter;
-        guint n;
+    enum_class = G_ENUM_CLASS (g_type_class_ref (type));
 
-        g_variant_iter_init (&iter, variant);
-        n = g_variant_iter_n_children (&iter);
-
-        if (n > 0) {
-            guint32 storage;
-
-            array = g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), n);
-            while (g_variant_iter_loop (&iter, "u", &storage))
-                g_array_append_val (array, storage);
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick)) {
+            value = enum_class->values[i].value;
+            return value;
         }
     }
 
-    return array;
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid %s value",
+                 str,
+                 g_type_name (type));
+    return error_value;
 }
 
-MMSmsStorage *
-mm_common_sms_storages_variant_to_array (GVariant *variant,
-                                         guint *n_storages)
+static guint
+_flags_from_string (GType         type,
+                    const gchar  *str,
+                    guint         error_value,
+                    GError      **error)
 {
-    GArray *array;
+    g_autoptr(GFlagsClass) flags_class = NULL;
+    guint                  value;
+    guint                  i;
 
-    array = mm_common_sms_storages_variant_to_garray (variant);
-    if (n_storages)
-        *n_storages = array->len;
-    return (MMSmsStorage *) g_array_free (array, FALSE);
-}
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (type));
 
-GVariant *
-mm_common_sms_storages_array_to_variant (const MMSmsStorage *storages,
-                                         guint n_storages)
-{
-    GVariantBuilder builder;
-    guint i;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
-
-    for (i = 0; i < n_storages; i++)
-        g_variant_builder_add_value (&builder,
-                                     g_variant_new_uint32 ((guint32)storages[i]));
-    return g_variant_builder_end (&builder);
-}
-
-GVariant *
-mm_common_sms_storages_garray_to_variant (GArray *array)
-{
-    if (array)
-        return mm_common_sms_storages_array_to_variant ((const MMSmsStorage *)array->data,
-                                                        array->len);
-
-    return mm_common_sms_storages_array_to_variant (NULL, 0);
-}
-
-static void
-clear_modem_port_info (MMModemPortInfo *info)
-{
-    g_free (info->name);
-}
-
-GArray *
-mm_common_ports_variant_to_garray (GVariant *variant)
-{
-    GArray *array = NULL;
-
-    if (variant) {
-        guint i;
-        guint n;
-
-        n = g_variant_n_children (variant);
-
-        if (n > 0) {
-            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemPortInfo), n);
-            g_array_set_clear_func (array, (GDestroyNotify) clear_modem_port_info);
-            for (i = 0; i < n; i++) {
-                MMModemPortInfo info;
-
-                g_variant_get_child (variant, i, "(su)", &info.name, &info.type);
-                g_array_append_val (array, info);
-            }
+    for (i = 0; flags_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, flags_class->values[i].value_nick)) {
+            value = flags_class->values[i].value;
+            return value;
         }
     }
 
-    return array;
-}
-
-MMModemPortInfo *
-mm_common_ports_variant_to_array (GVariant *variant,
-                                  guint *n_ports)
-{
-    GArray *array;
-
-    array = mm_common_ports_variant_to_garray (variant);
-    if (n_ports)
-        *n_ports = array->len;
-    return (MMModemPortInfo *) g_array_free (array, FALSE);
-}
-
-GVariant *
-mm_common_ports_array_to_variant (const MMModemPortInfo *ports,
-                                  guint n_ports)
-{
-    GVariantBuilder builder;
-    guint i;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(su)"));
-
-    for (i = 0; i < n_ports; i++) {
-        GVariant *tuple[2];
-
-        tuple[0] = g_variant_new_string (ports[i].name);
-        tuple[1] = g_variant_new_uint32 ((guint32)ports[i].type);
-        g_variant_builder_add_value (&builder, g_variant_new_tuple (tuple, 2));
-    }
-    return g_variant_builder_end (&builder);
-}
-
-GVariant *
-mm_common_ports_garray_to_variant (GArray *array)
-{
-    if (array)
-        return mm_common_ports_array_to_variant ((const MMModemPortInfo *)array->data,
-                                                 array->len);
-
-    return mm_common_ports_array_to_variant (NULL, 0);
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid %s value",
+                 str,
+                 g_type_name (type));
+    return error_value;
 }
 
 MMModemCapability
-mm_common_get_capabilities_from_string (const gchar *str,
-                                        GError **error)
+mm_common_get_capabilities_from_string (const gchar  *str,
+                                        GError      **error)
 {
-    GError *inner_error = NULL;
-    MMModemCapability capabilities;
-    gchar **capability_strings;
-    GFlagsClass *flags_class;
+    GError                 *inner_error = NULL;
+    MMModemCapability       capabilities;
+    g_auto(GStrv)           capability_strings = NULL;
+    g_autoptr(GFlagsClass)  flags_class = NULL;
 
     capabilities = MM_MODEM_CAPABILITY_NONE;
 
@@ -396,20 +265,17 @@ mm_common_get_capabilities_from_string (const gchar *str,
         g_propagate_error (error, inner_error);
         capabilities = MM_MODEM_CAPABILITY_NONE;
     }
-
-    g_type_class_unref (flags_class);
-    g_strfreev (capability_strings);
     return capabilities;
 }
 
 MMModemMode
-mm_common_get_modes_from_string (const gchar *str,
-                                 GError **error)
+mm_common_get_modes_from_string (const gchar  *str,
+                                 GError      **error)
 {
-    GError *inner_error = NULL;
-    MMModemMode modes;
-    gchar **mode_strings;
-    GFlagsClass *flags_class;
+    GError                 *inner_error = NULL;
+    MMModemMode             modes;
+    g_auto(GStrv)           mode_strings = NULL;
+    g_autoptr(GFlagsClass)  flags_class = NULL;
 
     modes = MM_MODEM_MODE_NONE;
 
@@ -446,11 +312,476 @@ mm_common_get_modes_from_string (const gchar *str,
         g_propagate_error (error, inner_error);
         modes = MM_MODEM_MODE_NONE;
     }
-
-    g_type_class_unref (flags_class);
-    g_strfreev (mode_strings);
     return modes;
 }
+
+gboolean
+mm_common_get_bands_from_string (const gchar  *str,
+                                 MMModemBand **bands,
+                                 guint        *n_bands,
+                                 GError      **error)
+{
+    GError                *inner_error = NULL;
+    GArray                *array;
+    g_auto(GStrv)          band_strings = NULL;
+    g_autoptr(GEnumClass)  enum_class = NULL;
+
+    array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
+    band_strings = g_strsplit (str, "|", -1);
+
+    if (band_strings) {
+        guint i;
+
+        for (i = 0; band_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; enum_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (band_strings[i], enum_class->values[j].value_nick)) {
+                    g_array_append_val (array, enum_class->values[j].value);
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_INVALID_ARGS,
+                                           "Couldn't match '%s' with a valid MMModemBand value",
+                                           band_strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_array_free (array, TRUE);
+        *n_bands = 0;
+        *bands = NULL;
+        return FALSE;
+    }
+
+    if (!array->len) {
+        GEnumValue *value;
+
+        value = g_enum_get_value (enum_class, MM_MODEM_BAND_UNKNOWN);
+        g_array_append_val (array, value->value);
+    }
+
+    *n_bands = array->len;
+    *bands = (MMModemBand *)g_array_free (array, FALSE);
+    return TRUE;
+}
+
+gboolean
+mm_common_get_boolean_from_string (const gchar  *value,
+                                   GError      **error)
+{
+    if (!g_ascii_strcasecmp (value, "true") || g_str_equal (value, "1") || !g_ascii_strcasecmp (value, "yes"))
+        return TRUE;
+
+    if (!g_ascii_strcasecmp (value, "false") || g_str_equal (value, "0") || !g_ascii_strcasecmp (value, "no"))
+        return FALSE;
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Cannot get boolean from string '%s'", value);
+    return FALSE;
+}
+
+MMModemCdmaRmProtocol
+mm_common_get_rm_protocol_from_string (const gchar  *str,
+                                       GError      **error)
+{
+    return _enum_from_string (MM_TYPE_MODEM_CDMA_RM_PROTOCOL,
+                              str,
+                              MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN,
+                              error);
+}
+
+MMBearerIpFamily
+mm_common_get_ip_type_from_string (const gchar  *str,
+                                   GError      **error)
+{
+    return _flags_from_string (MM_TYPE_BEARER_IP_FAMILY,
+                               str,
+                               MM_BEARER_IP_FAMILY_NONE,
+                               error);
+}
+
+MMBearerAllowedAuth
+mm_common_get_allowed_auth_from_string (const gchar  *str,
+                                        GError      **error)
+{
+    GError                 *inner_error = NULL;
+    MMBearerAllowedAuth     allowed_auth;
+    g_auto(GStrv)           strings = NULL;
+    g_autoptr(GFlagsClass)  flags_class = NULL;
+
+    allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_BEARER_ALLOWED_AUTH));
+    strings = g_strsplit (str, "|", -1);
+
+    if (strings) {
+        guint i;
+
+        for (i = 0; strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (strings[i], flags_class->values[j].value_nick)) {
+                    allowed_auth |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMBearerAllowedAuth value",
+                    strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
+    }
+    return allowed_auth;
+}
+
+MMSmsStorage
+mm_common_get_sms_storage_from_string (const gchar  *str,
+                                       GError      **error)
+{
+    return _enum_from_string (MM_TYPE_SMS_STORAGE,
+                              str,
+                              MM_SMS_STORAGE_UNKNOWN,
+                              error);
+}
+
+MMSmsCdmaTeleserviceId
+mm_common_get_sms_cdma_teleservice_id_from_string (const gchar  *str,
+                                                   GError      **error)
+{
+    return _enum_from_string (MM_TYPE_SMS_CDMA_TELESERVICE_ID,
+                              str,
+                              MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN,
+                              error);
+}
+
+MMSmsCdmaServiceCategory
+mm_common_get_sms_cdma_service_category_from_string (const gchar  *str,
+                                                     GError      **error)
+{
+    return _enum_from_string (MM_TYPE_SMS_CDMA_SERVICE_CATEGORY,
+                              str,
+                              MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
+                              error);
+}
+
+MMCallDirection
+mm_common_get_call_direction_from_string (const gchar  *str,
+                                          GError      **error)
+{
+    return _enum_from_string (MM_TYPE_CALL_DIRECTION,
+                              str,
+                              MM_CALL_DIRECTION_UNKNOWN,
+                              error);
+}
+
+MMCallState
+mm_common_get_call_state_from_string (const gchar  *str,
+                                      GError      **error)
+{
+    return _enum_from_string (MM_TYPE_CALL_STATE,
+                              str,
+                              MM_CALL_STATE_UNKNOWN,
+                              error);
+}
+
+MMCallStateReason
+mm_common_get_call_state_reason_from_string (const gchar  *str,
+                                             GError      **error)
+{
+    return _enum_from_string (MM_TYPE_CALL_STATE_REASON,
+                              str,
+                              MM_CALL_STATE_REASON_UNKNOWN,
+                              error);
+}
+
+MMOmaFeature
+mm_common_get_oma_features_from_string (const gchar  *str,
+                                        GError      **error)
+{
+    GError                 *inner_error = NULL;
+    MMOmaFeature            features;
+    g_auto(GStrv)           feature_strings = NULL;
+    g_autoptr(GFlagsClass)  flags_class = NULL;
+
+    features = MM_OMA_FEATURE_NONE;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_OMA_FEATURE));
+    feature_strings = g_strsplit (str, "|", -1);
+
+    if (feature_strings) {
+        guint i;
+
+        for (i = 0; feature_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (feature_strings[i], flags_class->values[j].value_nick)) {
+                    features |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMOmaFeature value",
+                    feature_strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        features = MM_OMA_FEATURE_NONE;
+    }
+    return features;
+}
+
+MMOmaSessionType
+mm_common_get_oma_session_type_from_string (const gchar  *str,
+                                            GError      **error)
+{
+    return _enum_from_string (MM_TYPE_OMA_SESSION_TYPE,
+                              str,
+                              MM_OMA_SESSION_TYPE_UNKNOWN,
+                              error);
+}
+
+MMModem3gppEpsUeModeOperation
+mm_common_get_eps_ue_mode_operation_from_string (const gchar  *str,
+                                                 GError      **error)
+{
+    return _enum_from_string (MM_TYPE_MODEM_3GPP_EPS_UE_MODE_OPERATION,
+                              str,
+                              MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN,
+                              error);
+}
+
+MMModemAccessTechnology
+mm_common_get_access_technology_from_string (const gchar  *str,
+                                             GError      **error)
+{
+    GError                  *inner_error = NULL;
+    MMModemAccessTechnology  technologies;
+    g_auto(GStrv)            technology_strings = NULL;
+    g_autoptr(GFlagsClass)   flags_class = NULL;
+
+    technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
+    technology_strings = g_strsplit (str, "|", -1);
+
+    if (technology_strings) {
+        guint i;
+
+        for (i = 0; technology_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (!g_ascii_strcasecmp (technology_strings[i], flags_class->values[j].value_nick)) {
+                    technologies |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMModemAccessTechnology value",
+                    technology_strings[i]);
+                break;
+            }
+        }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    }
+    return technologies;
+}
+
+MMBearerMultiplexSupport
+mm_common_get_multiplex_support_from_string (const gchar  *str,
+                                             GError      **error)
+{
+    return _enum_from_string (MM_TYPE_BEARER_MULTIPLEX_SUPPORT,
+                              str,
+                              MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN,
+                              error);
+}
+
+MMBearerApnType
+mm_common_get_apn_type_from_string (const gchar  *str,
+                                    GError      **error)
+{
+    return _flags_from_string (MM_TYPE_BEARER_APN_TYPE,
+                               str,
+                               MM_BEARER_APN_TYPE_NONE,
+                               error);
+}
+
+MMModem3gppFacility
+mm_common_get_3gpp_facility_from_string (const gchar  *str,
+                                         GError      **error)
+{
+    return _flags_from_string (MM_TYPE_MODEM_3GPP_FACILITY,
+                               str,
+                               MM_MODEM_3GPP_FACILITY_NONE,
+                               error);
+}
+
+/******************************************************************************/
+/* MMModemPortInfo array management */
+
+static void
+clear_modem_port_info (MMModemPortInfo *info)
+{
+    g_free (info->name);
+}
+
+GArray *
+mm_common_ports_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        guint i;
+        guint n;
+
+        n = g_variant_n_children (variant);
+
+        if (n > 0) {
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemPortInfo), n);
+            g_array_set_clear_func (array, (GDestroyNotify) clear_modem_port_info);
+            for (i = 0; i < n; i++) {
+                MMModemPortInfo info;
+
+                g_variant_get_child (variant, i, "(su)", &info.name, &info.type);
+                g_array_append_val (array, info);
+            }
+        }
+    }
+
+    return array;
+}
+
+GVariant *
+mm_common_ports_array_to_variant (const MMModemPortInfo *ports,
+                                  guint                  n_ports)
+{
+    GVariantBuilder builder;
+    guint i;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(su)"));
+
+    for (i = 0; i < n_ports; i++) {
+        GVariant *tuple[2];
+
+        tuple[0] = g_variant_new_string (ports[i].name);
+        tuple[1] = g_variant_new_uint32 ((guint32)ports[i].type);
+        g_variant_builder_add_value (&builder, g_variant_new_tuple (tuple, 2));
+    }
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_ports_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_ports_array_to_variant ((const MMModemPortInfo *)array->data,
+                                                 array->len);
+
+    return mm_common_ports_array_to_variant (NULL, 0);
+}
+
+/******************************************************************************/
+/* MMSmsStorage array management */
+
+GArray *
+mm_common_sms_storages_variant_to_garray (GVariant *variant)
+{
+    GArray *array = NULL;
+
+    if (variant) {
+        GVariantIter iter;
+        guint n;
+
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
+
+        if (n > 0) {
+            guint32 storage;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMSmsStorage), n);
+            while (g_variant_iter_loop (&iter, "u", &storage))
+                g_array_append_val (array, storage);
+        }
+    }
+
+    return array;
+}
+
+GVariant *
+mm_common_sms_storages_array_to_variant (const MMSmsStorage *storages,
+                                         guint               n_storages)
+{
+    GVariantBuilder builder;
+    guint i;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+
+    for (i = 0; i < n_storages; i++)
+        g_variant_builder_add_value (&builder,
+                                     g_variant_new_uint32 ((guint32)storages[i]));
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_sms_storages_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_sms_storages_array_to_variant ((const MMSmsStorage *)array->data,
+                                                        array->len);
+
+    return mm_common_sms_storages_array_to_variant (NULL, 0);
+}
+
+/******************************************************************************/
+/* MMModemCapability array management */
 
 GArray *
 mm_common_capability_combinations_variant_to_garray (GVariant *variant)
@@ -484,21 +815,9 @@ mm_common_capability_combinations_variant_to_garray (GVariant *variant)
     return array;
 }
 
-MMModemCapability *
-mm_common_capability_combinations_variant_to_array (GVariant *variant,
-                                                    guint *n_capabilities)
-{
-    GArray *array;
-
-    array = mm_common_capability_combinations_variant_to_garray (variant);
-    if (n_capabilities)
-        *n_capabilities = array->len;
-    return (MMModemCapability *) g_array_free (array, FALSE);
-}
-
 GVariant *
 mm_common_capability_combinations_array_to_variant (const MMModemCapability *capabilities,
-                                                    guint n_capabilities)
+                                                    guint                    n_capabilities)
 {
     GVariantBuilder builder;
 
@@ -538,67 +857,89 @@ mm_common_build_capability_combinations_none (void)
     return g_variant_builder_end (&builder);
 }
 
-void
-mm_common_get_bands_from_string (const gchar *str,
-                                 MMModemBand **bands,
-                                 guint *n_bands,
-                                 GError **error)
+/******************************************************************************/
+/* MMModemModeCombination array management */
+
+GArray *
+mm_common_mode_combinations_variant_to_garray (GVariant *variant)
 {
-    GError *inner_error = NULL;
-    GArray *array;
-    gchar **band_strings;
-    GEnumClass *enum_class;
+    GArray *array = NULL;
 
-    array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+    if (variant) {
+        GVariantIter iter;
+        guint n;
 
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
-    band_strings = g_strsplit (str, "|", -1);
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
 
-    if (band_strings) {
+        if (n > 0) {
+            MMModemModeCombination mode;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), n);
+            while (g_variant_iter_loop (&iter, "(uu)", &mode.allowed, &mode.preferred))
+                g_array_append_val (array, mode);
+        }
+    }
+
+    /* If nothing set, fallback to default */
+    if (!array) {
+        MMModemModeCombination default_mode;
+
+        default_mode.allowed = MM_MODEM_MODE_ANY;
+        default_mode.preferred = MM_MODEM_MODE_NONE;
+        array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+        g_array_append_val (array, default_mode);
+    }
+
+    return array;
+}
+
+GVariant *
+mm_common_mode_combinations_array_to_variant (const MMModemModeCombination *modes,
+                                              guint                         n_modes)
+{
+    if (n_modes > 0) {
+        GVariantBuilder builder;
         guint i;
 
-        for (i = 0; band_strings[i]; i++) {
-            guint j;
-            gboolean found = FALSE;
+        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
 
-            for (j = 0; enum_class->values[j].value_nick; j++) {
-                if (!g_ascii_strcasecmp (band_strings[i], enum_class->values[j].value_nick)) {
-                    g_array_append_val (array, enum_class->values[j].value);
-                    found = TRUE;
-                    break;
-                }
-            }
-
-            if (!found) {
-                inner_error = g_error_new (MM_CORE_ERROR,
-                                           MM_CORE_ERROR_INVALID_ARGS,
-                                           "Couldn't match '%s' with a valid MMModemBand value",
-                                           band_strings[i]);
-                break;
-            }
-        }
+        for (i = 0; i < n_modes; i++)
+            g_variant_builder_add_value (&builder,
+                                         g_variant_new ("(uu)",
+                                                        ((guint32)modes[i].allowed),
+                                                        ((guint32)modes[i].preferred)));
+        return g_variant_builder_end (&builder);
     }
 
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        g_array_free (array, TRUE);
-        *n_bands = 0;
-        *bands = NULL;
-    } else {
-        if (!array->len) {
-            GEnumValue *value;
-
-            value = g_enum_get_value (enum_class, MM_MODEM_BAND_UNKNOWN);
-            g_array_append_val (array, value->value);
-        }
-
-        *n_bands = array->len;
-        *bands = (MMModemBand *)g_array_free (array, FALSE);
-    }
-
-    g_type_class_unref (enum_class);
-    g_strfreev (band_strings);
+    return mm_common_build_mode_combinations_default ();
 }
+
+GVariant *
+mm_common_mode_combinations_garray_to_variant (GArray *array)
+{
+    if (array)
+        return mm_common_mode_combinations_array_to_variant ((const MMModemModeCombination *)array->data,
+                                                             array->len);
+
+    return mm_common_mode_combinations_array_to_variant (NULL, 0);
+}
+
+GVariant *
+mm_common_build_mode_combinations_default (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new ("(uu)",
+                                                MM_MODEM_MODE_ANY,
+                                                MM_MODEM_MODE_NONE));
+    return g_variant_builder_end (&builder);
+}
+
+/******************************************************************************/
+/* MMModemBand array management */
 
 GArray *
 mm_common_bands_variant_to_garray (GVariant *variant)
@@ -632,21 +973,9 @@ mm_common_bands_variant_to_garray (GVariant *variant)
     return array;
 }
 
-MMModemBand *
-mm_common_bands_variant_to_array (GVariant *variant,
-                                  guint *n_bands)
-{
-    GArray *array;
-
-    array = mm_common_bands_variant_to_garray (variant);
-    if (n_bands)
-        *n_bands = array->len;
-    return (MMModemBand *) g_array_free (array, FALSE);
-}
-
 GVariant *
 mm_common_bands_array_to_variant (const MMModemBand *bands,
-                                  guint n_bands)
+                                  guint              n_bands)
 {
     if (n_bands > 0) {
         GVariantBuilder builder;
@@ -671,6 +1000,28 @@ mm_common_bands_garray_to_variant (GArray *array)
                                                  array->len);
 
     return mm_common_bands_array_to_variant (NULL, 0);
+}
+
+GVariant *
+mm_common_build_bands_unknown (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_BAND_UNKNOWN));
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_build_bands_any (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_BAND_ANY));
+    return g_variant_builder_end (&builder);
 }
 
 static guint
@@ -757,135 +1108,8 @@ mm_common_band_is_cdma (MMModemBand band)
     return (band >= MM_MODEM_BAND_CDMA_BC0 && band <= MM_MODEM_BAND_CDMA_BC19);
 }
 
-GArray *
-mm_common_mode_combinations_variant_to_garray (GVariant *variant)
-{
-    GArray *array = NULL;
-
-    if (variant) {
-        GVariantIter iter;
-        guint n;
-
-        g_variant_iter_init (&iter, variant);
-        n = g_variant_iter_n_children (&iter);
-
-        if (n > 0) {
-            MMModemModeCombination mode;
-
-            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), n);
-            while (g_variant_iter_loop (&iter, "(uu)", &mode.allowed, &mode.preferred))
-                g_array_append_val (array, mode);
-        }
-    }
-
-    /* If nothing set, fallback to default */
-    if (!array) {
-        MMModemModeCombination default_mode;
-
-        default_mode.allowed = MM_MODEM_MODE_ANY;
-        default_mode.preferred = MM_MODEM_MODE_NONE;
-        array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
-        g_array_append_val (array, default_mode);
-    }
-
-    return array;
-}
-
-MMModemModeCombination *
-mm_common_mode_combinations_variant_to_array (GVariant *variant,
-                                              guint *n_modes)
-{
-    GArray *array;
-
-    array = mm_common_mode_combinations_variant_to_garray (variant);
-    if (n_modes)
-        *n_modes = array->len;
-    return (MMModemModeCombination *) g_array_free (array, FALSE);
-}
-
-GVariant *
-mm_common_mode_combinations_array_to_variant (const MMModemModeCombination *modes,
-                                              guint n_modes)
-{
-    if (n_modes > 0) {
-        GVariantBuilder builder;
-        guint i;
-
-        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
-
-        for (i = 0; i < n_modes; i++)
-            g_variant_builder_add_value (&builder,
-                                         g_variant_new ("(uu)",
-                                                        ((guint32)modes[i].allowed),
-                                                        ((guint32)modes[i].preferred)));
-        return g_variant_builder_end (&builder);
-    }
-
-    return mm_common_build_mode_combinations_default ();
-}
-
-GVariant *
-mm_common_mode_combinations_garray_to_variant (GArray *array)
-{
-    if (array)
-        return mm_common_mode_combinations_array_to_variant ((const MMModemModeCombination *)array->data,
-                                                             array->len);
-
-    return mm_common_mode_combinations_array_to_variant (NULL, 0);
-}
-
-GVariant *
-mm_common_build_mode_combinations_default (void)
-{
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(uu)"));
-    g_variant_builder_add_value (&builder,
-                                 g_variant_new ("(uu)",
-                                                MM_MODEM_MODE_ANY,
-                                                MM_MODEM_MODE_NONE));
-    return g_variant_builder_end (&builder);
-}
-
-MMModem3gppEpsUeModeOperation
-mm_common_get_eps_ue_mode_operation_from_string (const gchar  *str,
-                                                 GError      **error)
-{
-    return _enum_from_string (MM_TYPE_MODEM_3GPP_EPS_UE_MODE_OPERATION,
-                              str,
-                              MM_MODEM_3GPP_EPS_UE_MODE_OPERATION_UNKNOWN,
-                              error);
-}
-
-MMBearerMultiplexSupport
-mm_common_get_multiplex_support_from_string (const gchar  *str,
-                                             GError      **error)
-{
-    return _enum_from_string (MM_TYPE_BEARER_MULTIPLEX_SUPPORT,
-                              str,
-                              MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN,
-                              error);
-}
-
-MMBearerApnType
-mm_common_get_apn_type_from_string (const gchar *str,
-                                    GError **error)
-{
-    return _flags_from_string (MM_TYPE_BEARER_APN_TYPE,
-                               str,
-                               MM_BEARER_APN_TYPE_NONE,
-                               error);
-}
-
-MMModem3gppFacility
-mm_common_get_3gpp_facility_from_string (const gchar  *str,
-                                         GError      **error)
-{
-    return _flags_from_string (MM_TYPE_MODEM_3GPP_FACILITY,
-                               str,
-                               MM_MODEM_3GPP_FACILITY_NONE,
-                               error);
-}
+/******************************************************************************/
+/* MMOmaPendingNetworkInitiatedSession array management */
 
 GArray *
 mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *variant)
@@ -915,21 +1139,9 @@ mm_common_oma_pending_network_initiated_sessions_variant_to_garray (GVariant *va
     return array;
 }
 
-MMOmaPendingNetworkInitiatedSession *
-mm_common_oma_pending_network_initiated_sessions_variant_to_array (GVariant *variant,
-                                                                   guint *n_sessions)
-{
-    GArray *array;
-
-    array = mm_common_oma_pending_network_initiated_sessions_variant_to_garray (variant);
-    if (n_sessions)
-        *n_sessions = array->len;
-    return (MMOmaPendingNetworkInitiatedSession *) g_array_free (array, FALSE);
-}
-
 GVariant *
 mm_common_oma_pending_network_initiated_sessions_array_to_variant (const MMOmaPendingNetworkInitiatedSession *sessions,
-                                                                   guint n_sessions)
+                                                                   guint                                      n_sessions)
 {
     if (n_sessions > 0) {
         GVariantBuilder builder;
@@ -967,234 +1179,8 @@ mm_common_build_oma_pending_network_initiated_sessions_default (void)
     return g_variant_builder_end (&builder);
 }
 
-gboolean
-mm_common_get_boolean_from_string (const gchar *value,
-                                   GError **error)
-{
-    if (!g_ascii_strcasecmp (value, "true") || g_str_equal (value, "1") || !g_ascii_strcasecmp (value, "yes"))
-        return TRUE;
-
-    if (!g_ascii_strcasecmp (value, "false") || g_str_equal (value, "0") || !g_ascii_strcasecmp (value, "no"))
-        return FALSE;
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_INVALID_ARGS,
-                 "Cannot get boolean from string '%s'", value);
-    return FALSE;
-}
-
-MMModemCdmaRmProtocol
-mm_common_get_rm_protocol_from_string (const gchar *str,
-                                       GError **error)
-{
-    return _enum_from_string (MM_TYPE_MODEM_CDMA_RM_PROTOCOL,
-                              str,
-                              MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN,
-                              error);
-}
-
-MMBearerIpFamily
-mm_common_get_ip_type_from_string (const gchar *str,
-                                   GError **error)
-{
-    return _flags_from_string (MM_TYPE_BEARER_IP_FAMILY,
-                               str,
-                               MM_BEARER_IP_FAMILY_NONE,
-                               error);
-}
-
-MMBearerAllowedAuth
-mm_common_get_allowed_auth_from_string (const gchar *str,
-                                        GError **error)
-{
-    GError *inner_error = NULL;
-    MMBearerAllowedAuth allowed_auth;
-    gchar **strings;
-    GFlagsClass *flags_class;
-
-    allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
-
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_BEARER_ALLOWED_AUTH));
-    strings = g_strsplit (str, "|", -1);
-
-    if (strings) {
-        guint i;
-
-        for (i = 0; strings[i]; i++) {
-            guint j;
-            gboolean found = FALSE;
-
-            for (j = 0; flags_class->values[j].value_nick; j++) {
-                if (!g_ascii_strcasecmp (strings[i], flags_class->values[j].value_nick)) {
-                    allowed_auth |= flags_class->values[j].value;
-                    found = TRUE;
-                    break;
-                }
-            }
-
-            if (!found) {
-                inner_error = g_error_new (
-                    MM_CORE_ERROR,
-                    MM_CORE_ERROR_INVALID_ARGS,
-                    "Couldn't match '%s' with a valid MMBearerAllowedAuth value",
-                    strings[i]);
-                break;
-            }
-        }
-    }
-
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
-    }
-
-    g_type_class_unref (flags_class);
-    g_strfreev (strings);
-    return allowed_auth;
-}
-
-MMSmsStorage
-mm_common_get_sms_storage_from_string (const gchar *str,
-                                       GError **error)
-{
-    return _enum_from_string (MM_TYPE_SMS_STORAGE,
-                              str,
-                              MM_SMS_STORAGE_UNKNOWN,
-                              error);
-}
-
-MMSmsCdmaTeleserviceId
-mm_common_get_sms_cdma_teleservice_id_from_string (const gchar *str,
-                                                   GError **error)
-{
-    return _enum_from_string (MM_TYPE_SMS_CDMA_TELESERVICE_ID,
-                              str,
-                              MM_SMS_CDMA_TELESERVICE_ID_UNKNOWN,
-                              error);
-}
-
-MMSmsCdmaServiceCategory
-mm_common_get_sms_cdma_service_category_from_string (const gchar *str,
-                                                     GError **error)
-{
-    return _enum_from_string (MM_TYPE_SMS_CDMA_SERVICE_CATEGORY,
-                              str,
-                              MM_SMS_CDMA_SERVICE_CATEGORY_UNKNOWN,
-                              error);
-}
-
-MMCallDirection
-mm_common_get_call_direction_from_string (const gchar *str,
-                                          GError **error)
-{
-    return _enum_from_string (MM_TYPE_CALL_DIRECTION,
-                              str,
-                              MM_CALL_DIRECTION_UNKNOWN,
-                              error);
-}
-
-MMCallState
-mm_common_get_call_state_from_string (const gchar *str,
-                                      GError **error)
-{
-    return _enum_from_string (MM_TYPE_CALL_STATE,
-                              str,
-                              MM_CALL_STATE_UNKNOWN,
-                              error);
-}
-
-MMCallStateReason
-mm_common_get_call_state_reason_from_string (const gchar *str,
-                                             GError **error)
-{
-    return _enum_from_string (MM_TYPE_CALL_STATE_REASON,
-                              str,
-                              MM_CALL_STATE_REASON_UNKNOWN,
-                              error);
-}
-
-MMOmaFeature
-mm_common_get_oma_features_from_string (const gchar *str,
-                                        GError **error)
-{
-    GError *inner_error = NULL;
-    MMOmaFeature features;
-    gchar **feature_strings;
-    GFlagsClass *flags_class;
-
-    features = MM_OMA_FEATURE_NONE;
-
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_OMA_FEATURE));
-    feature_strings = g_strsplit (str, "|", -1);
-
-    if (feature_strings) {
-        guint i;
-
-        for (i = 0; feature_strings[i]; i++) {
-            guint j;
-            gboolean found = FALSE;
-
-            for (j = 0; flags_class->values[j].value_nick; j++) {
-                if (!g_ascii_strcasecmp (feature_strings[i], flags_class->values[j].value_nick)) {
-                    features |= flags_class->values[j].value;
-                    found = TRUE;
-                    break;
-                }
-            }
-
-            if (!found) {
-                inner_error = g_error_new (
-                    MM_CORE_ERROR,
-                    MM_CORE_ERROR_INVALID_ARGS,
-                    "Couldn't match '%s' with a valid MMOmaFeature value",
-                    feature_strings[i]);
-                break;
-            }
-        }
-    }
-
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        features = MM_OMA_FEATURE_NONE;
-    }
-
-    g_type_class_unref (flags_class);
-    g_strfreev (feature_strings);
-    return features;
-}
-
-MMOmaSessionType
-mm_common_get_oma_session_type_from_string (const gchar *str,
-                                            GError **error)
-{
-    return _enum_from_string (MM_TYPE_OMA_SESSION_TYPE,
-                              str,
-                              MM_OMA_SESSION_TYPE_UNKNOWN,
-                              error);
-}
-
-GVariant *
-mm_common_build_bands_unknown (void)
-{
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
-    g_variant_builder_add_value (&builder,
-                                 g_variant_new_uint32 (MM_MODEM_BAND_UNKNOWN));
-    return g_variant_builder_end (&builder);
-}
-
-GVariant *
-mm_common_build_bands_any (void)
-{
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
-    g_variant_builder_add_value (&builder,
-                                 g_variant_new_uint32 (MM_MODEM_BAND_ANY));
-    return g_variant_builder_end (&builder);
-}
+/******************************************************************************/
+/* Common parsers */
 
 /* Expecting input as:
  *   key1=string,key2=true,key3=false...
@@ -1343,61 +1329,11 @@ mm_common_parse_key_value_string (const gchar *str,
     return TRUE;
 }
 
-MMModemAccessTechnology
-mm_common_get_access_technology_from_string (const gchar *str,
-                                             GError **error)
-{
-    GError *inner_error = NULL;
-    MMModemAccessTechnology technologies;
-    gchar **technology_strings;
-    GFlagsClass *flags_class;
-
-    technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
-    technology_strings = g_strsplit (str, "|", -1);
-
-    if (technology_strings) {
-        guint i;
-
-        for (i = 0; technology_strings[i]; i++) {
-            guint j;
-            gboolean found = FALSE;
-
-            for (j = 0; flags_class->values[j].value_nick; j++) {
-                if (!g_ascii_strcasecmp (technology_strings[i], flags_class->values[j].value_nick)) {
-                    technologies |= flags_class->values[j].value;
-                    found = TRUE;
-                    break;
-                }
-            }
-
-            if (!found) {
-                inner_error = g_error_new (
-                    MM_CORE_ERROR,
-                    MM_CORE_ERROR_INVALID_ARGS,
-                    "Couldn't match '%s' with a valid MMModemAccessTechnology value",
-                    technology_strings[i]);
-                break;
-            }
-        }
-    }
-
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    }
-
-    g_type_class_unref (flags_class);
-    g_strfreev (technology_strings);
-    return technologies;
-}
-
 /*****************************************************************************/
 
 gboolean
 mm_get_int_from_str (const gchar *str,
-                     gint *out)
+                     gint        *out)
 {
     glong num;
     guint i;
@@ -1441,8 +1377,8 @@ mm_get_int_from_str (const gchar *str,
 
 gboolean
 mm_get_int_from_match_info (GMatchInfo *match_info,
-                            guint32 match_index,
-                            gint *out)
+                            guint32     match_index,
+                            gint       *out)
 {
     g_autofree gchar *s = NULL;
 
@@ -1617,7 +1553,7 @@ mm_get_u64_from_hex_match_info (GMatchInfo *match_info,
 
 gboolean
 mm_get_double_from_str (const gchar *str,
-                        gdouble *out)
+                        gdouble     *out)
 {
     gdouble  num;
     guint    i;
@@ -1656,8 +1592,8 @@ mm_get_double_from_str (const gchar *str,
 
 gboolean
 mm_get_double_from_match_info (GMatchInfo *match_info,
-                               guint32 match_index,
-                               gdouble *out)
+                               guint32     match_index,
+                               gdouble    *out)
 {
     g_autofree gchar *s = NULL;
 
@@ -1667,7 +1603,7 @@ mm_get_double_from_match_info (GMatchInfo *match_info,
 
 gchar *
 mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
-                                        guint32 match_index)
+                                        guint32     match_index)
 {
     gchar *str;
     gsize len;
@@ -1691,70 +1627,6 @@ mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
     }
 
     return str;
-}
-
-gboolean
-mm_is_string_mccmnc (const gchar *str)
-{
-    gsize len;
-    guint i;
-
-    if (!str)
-        return FALSE;
-
-    len = strlen (str);
-    if (len < 5 || len > 6)
-        return FALSE;
-
-    for (i = 0; i < len; i++)
-        if (str[i] < '0' || str[i] > '9')
-            return FALSE;
-
-    return TRUE;
-}
-
-/*****************************************************************************/
-
-const gchar *
-mm_sms_delivery_state_get_string_extended (guint delivery_state)
-{
-    if (delivery_state > 0x02 && delivery_state < 0x20) {
-        if (delivery_state < 0x10)
-            return "completed-reason-reserved";
-        else
-            return "completed-sc-specific-reason";
-    }
-
-    if (delivery_state > 0x25 && delivery_state < 0x40) {
-        if (delivery_state < 0x30)
-            return "temporary-error-reason-reserved";
-        else
-            return "temporary-error-sc-specific-reason";
-    }
-
-    if (delivery_state > 0x49 && delivery_state < 0x60) {
-        if (delivery_state < 0x50)
-            return "error-reason-reserved";
-        else
-            return "error-sc-specific-reason";
-    }
-
-    if (delivery_state > 0x65 && delivery_state < 0x80) {
-        if (delivery_state < 0x70)
-            return "temporary-fatal-error-reason-reserved";
-        else
-            return "temporary-fatal-error-sc-specific-reason";
-    }
-
-    if (delivery_state >= 0x80 && delivery_state < 0x100)
-        return "unknown-reason-reserved";
-
-    if (delivery_state >= 0x100)
-        return "unknown";
-
-    /* Otherwise, use the MMSmsDeliveryState enum as we can match the known
-     * value */
-    return mm_sms_delivery_state_get_string ((MMSmsDeliveryState)delivery_state);
 }
 
 /*****************************************************************************/
@@ -1859,7 +1731,8 @@ mm_utils_ishexstr (const gchar *hex)
 }
 
 gchar *
-mm_utils_bin2hexstr (const guint8 *bin, gsize len)
+mm_utils_bin2hexstr (const guint8 *bin,
+                     gsize         len)
 {
     GString *ret;
     gsize i;
@@ -1888,6 +1761,72 @@ mm_utils_check_for_single_value (guint32 value)
     }
 
     return TRUE;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_is_string_mccmnc (const gchar *str)
+{
+    gsize len;
+    guint i;
+
+    if (!str)
+        return FALSE;
+
+    len = strlen (str);
+    if (len < 5 || len > 6)
+        return FALSE;
+
+    for (i = 0; i < len; i++)
+        if (str[i] < '0' || str[i] > '9')
+            return FALSE;
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+const gchar *
+mm_sms_delivery_state_get_string_extended (guint delivery_state)
+{
+    if (delivery_state > 0x02 && delivery_state < 0x20) {
+        if (delivery_state < 0x10)
+            return "completed-reason-reserved";
+        else
+            return "completed-sc-specific-reason";
+    }
+
+    if (delivery_state > 0x25 && delivery_state < 0x40) {
+        if (delivery_state < 0x30)
+            return "temporary-error-reason-reserved";
+        else
+            return "temporary-error-sc-specific-reason";
+    }
+
+    if (delivery_state > 0x49 && delivery_state < 0x60) {
+        if (delivery_state < 0x50)
+            return "error-reason-reserved";
+        else
+            return "error-sc-specific-reason";
+    }
+
+    if (delivery_state > 0x65 && delivery_state < 0x80) {
+        if (delivery_state < 0x70)
+            return "temporary-fatal-error-reason-reserved";
+        else
+            return "temporary-fatal-error-sc-specific-reason";
+    }
+
+    if (delivery_state >= 0x80 && delivery_state < 0x100)
+        return "unknown-reason-reserved";
+
+    if (delivery_state >= 0x100)
+        return "unknown";
+
+    /* Otherwise, use the MMSmsDeliveryState enum as we can match the known
+     * value */
+    return mm_sms_delivery_state_get_string ((MMSmsDeliveryState)delivery_state);
 }
 
 /*****************************************************************************/
