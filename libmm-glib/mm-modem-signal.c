@@ -41,26 +41,16 @@
 
 G_DEFINE_TYPE (MMModemSignal, mm_modem_signal, MM_GDBUS_TYPE_MODEM_SIGNAL_PROXY)
 
-typedef struct {
-    guint     id;
-    MMSignal *info;
-} UpdatedProperty;
-
-typedef enum {
-    UPDATED_PROPERTY_TYPE_CDMA = 0,
-    UPDATED_PROPERTY_TYPE_EVDO = 1,
-    UPDATED_PROPERTY_TYPE_GSM  = 2,
-    UPDATED_PROPERTY_TYPE_UMTS = 3,
-    UPDATED_PROPERTY_TYPE_LTE  = 4,
-    UPDATED_PROPERTY_TYPE_NR5G = 5,
-    UPDATED_PROPERTY_TYPE_LAST
-} UpdatedPropertyType;
-
 struct _MMModemSignalPrivate {
     /* Common mutex to sync access */
     GMutex mutex;
 
-    UpdatedProperty values [UPDATED_PROPERTY_TYPE_LAST];
+    PROPERTY_OBJECT_DECLARE (cdma, MMSignal)
+    PROPERTY_OBJECT_DECLARE (evdo, MMSignal)
+    PROPERTY_OBJECT_DECLARE (gsm,  MMSignal)
+    PROPERTY_OBJECT_DECLARE (umts, MMSignal)
+    PROPERTY_OBJECT_DECLARE (lte,  MMSignal)
+    PROPERTY_OBJECT_DECLARE (nr5g, MMSignal)
 };
 
 /*****************************************************************************/
@@ -216,133 +206,6 @@ mm_modem_signal_get_rate (MMModemSignal *self)
 
 /*****************************************************************************/
 
-static void values_updated (MMModemSignal *self, GParamSpec *pspec, UpdatedPropertyType type);
-
-static void
-cdma_updated (MMModemSignal *self,
-              GParamSpec *pspec)
-{
-    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_CDMA);
-}
-
-static void
-evdo_updated (MMModemSignal *self,
-              GParamSpec *pspec)
-{
-    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_EVDO);
-}
-
-static void
-gsm_updated (MMModemSignal *self,
-             GParamSpec *pspec)
-{
-    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_GSM);
-}
-
-static void
-umts_updated (MMModemSignal *self,
-              GParamSpec *pspec)
-{
-    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_UMTS);
-}
-
-static void
-lte_updated (MMModemSignal *self,
-             GParamSpec *pspec)
-{
-    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_LTE);
-}
-
-static void
-nr5g_updated (MMModemSignal *self,
-             GParamSpec *pspec)
-{
-    values_updated (self, pspec, UPDATED_PROPERTY_TYPE_NR5G);
-}
-
-typedef GVariant * (* Getter)          (MmGdbusModemSignal *self);
-typedef GVariant * (* Dupper)          (MmGdbusModemSignal *self);
-typedef void       (* UpdatedCallback) (MMModemSignal *self, GParamSpec *pspec);
-typedef struct {
-    const gchar *signal_name;
-    Getter get;
-    Dupper dup;
-    UpdatedCallback updated_callback;
-} SignalData;
-
-static const SignalData signal_data [UPDATED_PROPERTY_TYPE_LAST] = {
-    { "notify::cdma", mm_gdbus_modem_signal_get_cdma, mm_gdbus_modem_signal_dup_cdma, cdma_updated },
-    { "notify::evdo", mm_gdbus_modem_signal_get_evdo, mm_gdbus_modem_signal_dup_evdo, evdo_updated },
-    { "notify::gsm",  mm_gdbus_modem_signal_get_gsm,  mm_gdbus_modem_signal_dup_gsm,  gsm_updated  },
-    { "notify::umts", mm_gdbus_modem_signal_get_umts, mm_gdbus_modem_signal_dup_umts, umts_updated },
-    { "notify::lte",  mm_gdbus_modem_signal_get_lte,  mm_gdbus_modem_signal_dup_lte,  lte_updated  },
-    { "notify::nr5g", mm_gdbus_modem_signal_get_nr5g, mm_gdbus_modem_signal_dup_nr5g, nr5g_updated }
-};
-
-static void
-values_updated (MMModemSignal *self,
-                GParamSpec *pspec,
-                UpdatedPropertyType type)
-{
-    g_mutex_lock (&self->priv->mutex);
-    {
-        GVariant *dictionary;
-
-        g_clear_object (&self->priv->values[type].info);
-        dictionary = signal_data[type].get (MM_GDBUS_MODEM_SIGNAL (self));
-        if (dictionary) {
-            GError *error = NULL;
-
-            self->priv->values[type].info = mm_signal_new_from_dictionary (dictionary, &error);
-            if (error) {
-                g_warning ("Invalid signal info update received: %s", error->message);
-                g_error_free (error);
-            }
-        }
-    }
-    g_mutex_unlock (&self->priv->mutex);
-}
-
-static void
-ensure_internal (MMModemSignal *self,
-                 MMSignal **dup,
-                 UpdatedPropertyType type)
-{
-    g_mutex_lock (&self->priv->mutex);
-    {
-        /* If this is the first time ever asking for the object, setup the
-         * update listener and the initial object, if any. */
-        if (!self->priv->values[type].id) {
-            GVariant *dictionary;
-
-            dictionary = signal_data[type].dup (MM_GDBUS_MODEM_SIGNAL (self));
-            if (dictionary) {
-                GError *error = NULL;
-
-                self->priv->values[type].info = mm_signal_new_from_dictionary (dictionary, &error);
-                if (error) {
-                    g_warning ("Invalid signal info: %s", error->message);
-                    g_error_free (error);
-                }
-                g_variant_unref (dictionary);
-            }
-
-            /* No need to clear this signal connection when freeing self */
-            self->priv->values[type].id =
-                g_signal_connect (self,
-                                  signal_data[type].signal_name,
-                                  G_CALLBACK (signal_data[type].updated_callback),
-                                  NULL);
-        }
-
-        if (dup && self->priv->values[type].info)
-            *dup = g_object_ref (self->priv->values[type].info);
-    }
-    g_mutex_unlock (&self->priv->mutex);
-}
-
-/*****************************************************************************/
-
 /**
  * mm_modem_signal_get_cdma:
  * @self: A #MMModem.
@@ -359,16 +222,6 @@ ensure_internal (MMModemSignal *self,
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_get_cdma (MMModemSignal *self)
-{
-    MMSignal *info = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
-
-    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_CDMA);
-    return info;
-}
 
 /**
  * mm_modem_signal_peek_cdma:
@@ -385,14 +238,11 @@ mm_modem_signal_get_cdma (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_peek_cdma (MMModemSignal *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
 
-    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_CDMA);
-    return self->priv->values[UPDATED_PROPERTY_TYPE_CDMA].info;
-}
+PROPERTY_OBJECT_DEFINE_FAILABLE (cdma,
+                                 ModemSignal, modem_signal, MODEM_SIGNAL,
+                                 MMSignal,
+                                 mm_signal_new_from_dictionary)
 
 /*****************************************************************************/
 
@@ -412,16 +262,6 @@ mm_modem_signal_peek_cdma (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_get_evdo (MMModemSignal *self)
-{
-    MMSignal *info = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
-
-    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_EVDO);
-    return info;
-}
 
 /**
  * mm_modem_signal_peek_evdo:
@@ -438,14 +278,11 @@ mm_modem_signal_get_evdo (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_peek_evdo (MMModemSignal *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
 
-    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_EVDO);
-    return self->priv->values[UPDATED_PROPERTY_TYPE_EVDO].info;
-}
+PROPERTY_OBJECT_DEFINE_FAILABLE (evdo,
+                                 ModemSignal, modem_signal, MODEM_SIGNAL,
+                                 MMSignal,
+                                 mm_signal_new_from_dictionary)
 
 /*****************************************************************************/
 
@@ -465,16 +302,6 @@ mm_modem_signal_peek_evdo (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_get_gsm (MMModemSignal *self)
-{
-    MMSignal *info = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
-
-    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_GSM);
-    return info;
-}
 
 /**
  * mm_modem_signal_peek_gsm:
@@ -491,14 +318,11 @@ mm_modem_signal_get_gsm (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_peek_gsm (MMModemSignal *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
 
-    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_GSM);
-    return self->priv->values[UPDATED_PROPERTY_TYPE_GSM].info;
-}
+PROPERTY_OBJECT_DEFINE_FAILABLE (gsm,
+                                 ModemSignal, modem_signal, MODEM_SIGNAL,
+                                 MMSignal,
+                                 mm_signal_new_from_dictionary)
 
 /*****************************************************************************/
 
@@ -518,16 +342,6 @@ mm_modem_signal_peek_gsm (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_get_umts (MMModemSignal *self)
-{
-    MMSignal *info = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
-
-    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_UMTS);
-    return info;
-}
 
 /**
  * mm_modem_signal_peek_umts:
@@ -544,14 +358,11 @@ mm_modem_signal_get_umts (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_peek_umts (MMModemSignal *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
 
-    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_UMTS);
-    return self->priv->values[UPDATED_PROPERTY_TYPE_UMTS].info;
-}
+PROPERTY_OBJECT_DEFINE_FAILABLE (umts,
+                                 ModemSignal, modem_signal, MODEM_SIGNAL,
+                                 MMSignal,
+                                 mm_signal_new_from_dictionary)
 
 /*****************************************************************************/
 
@@ -571,16 +382,29 @@ mm_modem_signal_peek_umts (MMModemSignal *self)
  *
  * Since: 1.2
  */
-MMSignal *
-mm_modem_signal_get_lte (MMModemSignal *self)
-{
-    MMSignal *info = NULL;
 
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
+/**
+ * mm_modem_signal_peek_lte:
+ * @self: A #MMModem.
+ *
+ * Gets a #MMSignal object specifying the LTE signal information.
+ *
+ * <warning>The returned value is only valid until the property changes so it is
+ * only safe to use this function on the thread where @self was constructed. Use
+ * mm_modem_signal_get_lte() if on another thread.</warning>
+ *
+ * Returns: (transfer none): A #MMSignal. Do not free the returned value, it
+ * belongs to @self.
+ *
+ * Since: 1.2
+ */
 
-    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_LTE);
-    return info;
-}
+PROPERTY_OBJECT_DEFINE_FAILABLE (lte,
+                                 ModemSignal, modem_signal, MODEM_SIGNAL,
+                                 MMSignal,
+                                 mm_signal_new_from_dictionary)
+
+/*****************************************************************************/
 
 /**
  * mm_modem_signal_get_nr5g:
@@ -598,40 +422,6 @@ mm_modem_signal_get_lte (MMModemSignal *self)
  *
  * Since: 1.16
  */
-MMSignal *
-mm_modem_signal_get_nr5g (MMModemSignal *self)
-{
-    MMSignal *info = NULL;
-
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
-
-    ensure_internal (self, &info, UPDATED_PROPERTY_TYPE_NR5G);
-    return info;
-}
-
-/**
- * mm_modem_signal_peek_lte:
- * @self: A #MMModem.
- *
- * Gets a #MMSignal object specifying the LTE signal information.
- *
- * <warning>The returned value is only valid until the property changes so it is
- * only safe to use this function on the thread where @self was constructed. Use
- * mm_modem_signal_get_lte() if on another thread.</warning>
- *
- * Returns: (transfer none): A #MMSignal. Do not free the returned value, it
- * belongs to @self.
- *
- * Since: 1.2
- */
-MMSignal *
-mm_modem_signal_peek_lte (MMModemSignal *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
-
-    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_LTE);
-    return self->priv->values[UPDATED_PROPERTY_TYPE_LTE].info;
-}
 
 /**
  * mm_modem_signal_peek_nr5g:
@@ -648,14 +438,11 @@ mm_modem_signal_peek_lte (MMModemSignal *self)
  *
  * Since: 1.16
  */
-MMSignal *
-mm_modem_signal_peek_nr5g (MMModemSignal *self)
-{
-    g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), NULL);
 
-    ensure_internal (self, NULL, UPDATED_PROPERTY_TYPE_NR5G);
-    return self->priv->values[UPDATED_PROPERTY_TYPE_NR5G].info;
-}
+PROPERTY_OBJECT_DEFINE_FAILABLE (nr5g,
+                                 ModemSignal, modem_signal, MODEM_SIGNAL,
+                                 MMSignal,
+                                 mm_signal_new_from_dictionary)
 
 /*****************************************************************************/
 
@@ -664,18 +451,28 @@ mm_modem_signal_init (MMModemSignal *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, MM_TYPE_MODEM_SIGNAL, MMModemSignalPrivate);
     g_mutex_init (&self->priv->mutex);
+
+    PROPERTY_INITIALIZE (cdma, "cdma")
+    PROPERTY_INITIALIZE (evdo, "evdo")
+    PROPERTY_INITIALIZE (gsm,  "gsm")
+    PROPERTY_INITIALIZE (umts, "umts")
+    PROPERTY_INITIALIZE (lte,  "lte")
+    PROPERTY_INITIALIZE (nr5g, "nr5g")
 }
 
 static void
 finalize (GObject *object)
 {
     MMModemSignal *self = MM_MODEM_SIGNAL (object);
-    guint i;
 
     g_mutex_clear (&self->priv->mutex);
 
-    for (i = 0; i < UPDATED_PROPERTY_TYPE_LAST; i++)
-        g_clear_object (&self->priv->values[i].info);
+    PROPERTY_OBJECT_FINALIZE (cdma)
+    PROPERTY_OBJECT_FINALIZE (evdo)
+    PROPERTY_OBJECT_FINALIZE (gsm)
+    PROPERTY_OBJECT_FINALIZE (umts)
+    PROPERTY_OBJECT_FINALIZE (lte)
+    PROPERTY_OBJECT_FINALIZE (nr5g)
 
     G_OBJECT_CLASS (mm_modem_signal_parent_class)->finalize (object);
 }
