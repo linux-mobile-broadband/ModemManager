@@ -256,8 +256,8 @@
               </varlistentry>
               <varlistentry><term><literal>TAC</literal></term>
                 <listitem>
-                  This is the two-byte Location Area Code of the LTE base
-                  station with which the mobile is registered, in upper-case
+                  This is the two- or three-byte Tracking Area Code of the LTE/5GNR
+                  base station with which the mobile is registered, in upper-case
                   hexadecimal format without leading zeros, as specified in
                   3GPP TS 27.007. E.g. <literal>"6FFE"</literal>. Since 1.10.
                 </listitem>
