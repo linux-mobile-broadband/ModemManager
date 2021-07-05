@@ -34,6 +34,303 @@
 
 G_DEFINE_TYPE (MMCallQmi, mm_call_qmi, MM_TYPE_BASE_CALL)
 
+/*****************************************************************************/
+
+static gboolean
+ensure_qmi_client (MMCallQmi            *self,
+                   QmiService            service,
+                   QmiClient           **o_client,
+                   GAsyncReadyCallback   callback,
+                   gpointer              user_data)
+{
+    MMBaseModem *modem = NULL;
+    QmiClient   *client;
+    MMPortQmi   *port;
+
+    g_object_get (self,
+                  MM_BASE_CALL_MODEM, &modem,
+                  NULL);
+    g_assert (MM_IS_BASE_MODEM (modem));
+
+    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (modem));
+    g_object_unref (modem);
+
+    if (!port) {
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 ensure_qmi_client,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek QMI port");
+        return FALSE;
+    }
+
+    client = mm_port_qmi_peek_client (port,
+                                      service,
+                                      MM_PORT_QMI_FLAG_DEFAULT);
+    if (!client) {
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 ensure_qmi_client,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Couldn't peek client for service '%s'",
+                                 qmi_service_get_string (service));
+        return FALSE;
+    }
+
+    *o_client = client;
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Start the CALL */
+
+static gboolean
+call_start_finish (MMBaseCall    *self,
+                   GAsyncResult  *res,
+                   GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+voice_dial_call_ready (QmiClientVoice *client,
+                       GAsyncResult   *res,
+                       GTask          *task)
+{
+    QmiMessageVoiceDialCallOutput *output;
+    GError                        *error = NULL;
+    MMBaseCall                    *self;
+    
+    self = MM_BASE_CALL (g_task_get_source_object (task));
+
+    output = qmi_client_voice_dial_call_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_voice_dial_call_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't create call: ");
+        g_task_return_error (task, error);
+    } else {
+        guint8 call_id = 0;
+
+        qmi_message_voice_dial_call_output_get_call_id (output, &call_id, NULL);
+        if (call_id == 0) {
+            g_task_return_new_error (task,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_INVALID_ARGS,
+                                     "Invalid call index");
+        } else {
+            mm_base_call_set_index (self, call_id);
+            g_task_return_boolean (task, TRUE);
+        }
+    }
+    
+    if (output)
+        qmi_message_voice_dial_call_output_unref (output);
+
+    g_object_unref (task);
+}
+
+static void
+call_start (MMBaseCall          *self,
+            GCancellable        *cancellable,
+            GAsyncReadyCallback  callback,
+            gpointer             user_data)
+{
+    QmiClient                    *client = NULL;
+    GTask                        *task;
+    QmiMessageVoiceDialCallInput *input;
+
+    /* Ensure Voice client */
+    if (!ensure_qmi_client (MM_CALL_QMI (self),
+                            QMI_SERVICE_VOICE, &client,
+                            callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    input = qmi_message_voice_dial_call_input_new ();
+    qmi_message_voice_dial_call_input_set_calling_number (
+        input,
+        mm_gdbus_call_get_number (MM_GDBUS_CALL (self)),
+        NULL);
+
+    mm_obj_dbg (self, "starting call");
+    qmi_client_voice_dial_call (QMI_CLIENT_VOICE (client),
+                                input,
+                                90,
+                                NULL,
+                                (GAsyncReadyCallback) voice_dial_call_ready,
+                                task);
+    qmi_message_voice_dial_call_input_unref (input);
+}
+
+/*****************************************************************************/
+/* Accept the call */
+
+static gboolean
+call_accept_finish (MMBaseCall    *self,
+                    GAsyncResult  *res,
+                    GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+voice_answer_call_ready (QmiClientVoice *client,
+                         GAsyncResult   *res,
+                         GTask          *task)
+{
+    QmiMessageVoiceAnswerCallOutput *output;
+    GError *error = NULL;
+
+    output = qmi_client_voice_answer_call_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_voice_answer_call_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't accept call: ");
+        g_task_return_error (task, error);
+    } else {
+        g_task_return_boolean (task, TRUE);
+    }
+    
+    if (output)
+        qmi_message_voice_answer_call_output_unref (output);
+
+    g_object_unref (task);
+}
+
+static void
+call_accept (MMBaseCall          *self,
+             GAsyncReadyCallback  callback,
+             gpointer             user_data)
+{
+    QmiClient                       *client = NULL;
+    GTask                           *task;
+    guint8                           call_id;
+    QmiMessageVoiceAnswerCallInput  *input;
+
+    /* Ensure Voice client */
+    if (!ensure_qmi_client (MM_CALL_QMI (self),
+                            QMI_SERVICE_VOICE, &client,
+                            callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    call_id = mm_base_call_get_index (self);
+    if (call_id == 0) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_INVALID_ARGS,
+                                 "Invalid call index");
+        g_object_unref (task);
+        return;
+    }
+
+    input = qmi_message_voice_answer_call_input_new ();
+    qmi_message_voice_answer_call_input_set_call_id (
+        input,
+        call_id,
+        NULL);
+
+    mm_obj_dbg (self, "Accepting call with id: %u", call_id);
+    qmi_client_voice_answer_call (QMI_CLIENT_VOICE (client),
+                                  input,
+                                  5,
+                                  NULL,
+                                  (GAsyncReadyCallback) voice_answer_call_ready,
+                                  task);
+    qmi_message_voice_answer_call_input_unref (input);
+}
+
+/*****************************************************************************/
+/* Hangup the call */
+
+static gboolean
+call_hangup_finish (MMBaseCall    *self,
+                    GAsyncResult  *res,
+                    GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+voice_end_call_ready (QmiClientVoice *client,
+                      GAsyncResult   *res,
+                      GTask          *task)
+{
+    QmiMessageVoiceEndCallOutput *output;
+    GError                       *error = NULL;
+
+    output = qmi_client_voice_end_call_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_voice_end_call_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't hangup call: ");
+        g_task_return_error (task, error);
+    } else {
+        g_task_return_boolean (task, TRUE);
+    }
+    
+    if (output)
+        qmi_message_voice_end_call_output_unref (output);
+
+    g_object_unref (task);
+}
+
+static void
+call_hangup (MMBaseCall          *self,
+             GAsyncReadyCallback  callback,
+             gpointer             user_data)
+{
+    QmiClient                    *client = NULL;
+    GTask                        *task;
+    guint8                        call_id;
+    QmiMessageVoiceEndCallInput  *input;
+
+    /* Ensure Voice client */
+    if (!ensure_qmi_client (MM_CALL_QMI (self),
+                            QMI_SERVICE_VOICE, &client,
+                            callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    call_id = mm_base_call_get_index (self);
+    if (call_id == 0) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_INVALID_ARGS,
+                                 "Invalid call index");
+        g_object_unref (task);
+        return;
+    }
+
+    input = qmi_message_voice_end_call_input_new ();
+    qmi_message_voice_end_call_input_set_call_id (
+        input,
+        call_id,
+        NULL);
+
+    mm_obj_dbg (self, "Hanging up call with id: %u", call_id);
+    qmi_client_voice_end_call (QMI_CLIENT_VOICE (client),
+                               input,
+                               5,
+                               NULL,
+                               (GAsyncReadyCallback) voice_end_call_ready,
+                               task);
+    qmi_message_voice_end_call_input_unref (input);
+}
+
+/*****************************************************************************/
+
 MMBaseCall *
 mm_call_qmi_new (MMBaseModem     *modem,
                  MMCallDirection  direction,
@@ -57,4 +354,12 @@ mm_call_qmi_init (MMCallQmi *self)
 static void
 mm_call_qmi_class_init (MMCallQmiClass *klass)
 {
+    MMBaseCallClass *base_call_class = MM_BASE_CALL_CLASS (klass);
+
+    base_call_class->start = call_start;
+    base_call_class->start_finish = call_start_finish;
+    base_call_class->accept = call_accept;
+    base_call_class->accept_finish = call_accept_finish;
+    base_call_class->hangup = call_hangup;
+    base_call_class->hangup_finish = call_hangup_finish;
 }
