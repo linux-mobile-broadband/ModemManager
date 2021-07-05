@@ -34,6 +34,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-3gpp-ussd.h"
+#include "mm-iface-modem-voice.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-iface-modem-location.h"
@@ -46,11 +47,13 @@
 #include "mm-sms-qmi.h"
 #include "mm-sms-part-3gpp.h"
 #include "mm-sms-part-cdma.h"
+#include "mm-call-qmi.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface);
 static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
+static void iface_modem_voice_init (MMIfaceModemVoice *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
@@ -67,6 +70,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_PROFILE_MANAGER, iface_modem_3gpp_profile_manager_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
@@ -8722,6 +8726,54 @@ modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *_self,
 }
 
 /*****************************************************************************/
+/* Check support (Voice interface) */
+
+static gboolean
+modem_voice_check_support_finish (MMIfaceModemVoice  *self,
+                                  GAsyncResult       *res,
+                                  GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_voice_check_support (MMIfaceModemVoice   *self,
+                           GAsyncReadyCallback  callback,
+                           gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* If we have support for the Voice client, Voice is supported */
+    if (!mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                    QMI_SERVICE_VOICE,
+                                    MM_PORT_QMI_FLAG_DEFAULT,
+                                    NULL)) {
+        mm_obj_dbg (self, "Voice capabilities not supported");
+        g_task_return_boolean (task, FALSE);
+    } else {
+        mm_obj_dbg (self, "Voice capabilities supported");
+        g_task_return_boolean (task, TRUE);
+    }
+
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Create CALL (Voice interface) */
+
+static MMBaseCall *
+modem_voice_create_call (MMIfaceModemVoice *self,
+                         MMCallDirection    direction,
+                         const gchar       *number)
+{
+    return mm_call_qmi_new (MM_BASE_MODEM (self),
+                            direction,
+                            number);
+}
+
+/*****************************************************************************/
 /* Initial EPS bearer info loading */
 
 static MMBearerProperties *
@@ -11257,6 +11309,14 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
     iface->send_finish = modem_3gpp_ussd_send_finish;
     iface->cancel = modem_3gpp_ussd_cancel;
     iface->cancel_finish = modem_3gpp_ussd_cancel_finish;
+}
+
+static void
+iface_modem_voice_init (MMIfaceModemVoice *iface)
+{
+    iface->check_support = modem_voice_check_support;
+    iface->check_support_finish = modem_voice_check_support_finish;
+    iface->create_call = modem_voice_create_call;
 }
 
 static void
