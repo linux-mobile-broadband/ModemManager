@@ -399,6 +399,8 @@ ModemManager_SOURCES += \
 	mm-sms-qmi.c \
 	mm-sim-qmi.h \
 	mm-sim-qmi.c \
+	mm-call-qmi.h \
+	mm-call-qmi.c \
 	mm-bearer-qmi.h \
 	mm-bearer-qmi.c \
 	mm-broadband-modem-qmi.h \
