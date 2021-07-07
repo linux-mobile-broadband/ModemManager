@@ -361,6 +361,8 @@ static const MMModemMode ublox_combinations[] = {
     ( MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G ),
     ( MM_MODEM_MODE_2G |                    MM_MODEM_MODE_4G ),
     (                    MM_MODEM_MODE_3G | MM_MODEM_MODE_4G ),
+    (                                       MM_MODEM_MODE_4G ),
+    (                                       MM_MODEM_MODE_4G ),
 };
 
 GArray *
