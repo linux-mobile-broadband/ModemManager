@@ -3864,6 +3864,15 @@ set_power_state_step (GTask *task)
 
     case SET_POWER_STATE_STEP_UPDATE:
         mm_obj_dbg (self, "updating power state: '%s'...", mm_modem_power_state_get_string (ctx->requested_power_state));
+
+        /* Error if unsupported */
+        if (!ctx->requested_power_setup || !ctx->requested_power_setup_finish) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                     "Requested power transition is not supported by this modem");
+            g_object_unref (task);
+            return;
+        }
+
         ctx->requested_power_setup (self, (GAsyncReadyCallback)requested_power_setup_ready, task);
         return;
 
@@ -3962,14 +3971,6 @@ mm_iface_modem_set_power_state (MMIfaceModem        *self,
     case MM_MODEM_POWER_STATE_UNKNOWN:
     default:
         g_assert_not_reached ();
-    }
-
-    /* Error if unsupported */
-    if (!ctx->requested_power_setup || !ctx->requested_power_setup_finish) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                                 "Requested power transition is not supported by this modem");
-        g_object_unref (task);
-        return;
     }
 
     set_power_state_step (task);
