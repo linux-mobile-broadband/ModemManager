@@ -25,6 +25,11 @@
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
 
+#if (!GLIB_CHECK_VERSION (2, 58, 0))
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GEnumClass, g_type_class_unref)
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GFlagsClass, g_type_class_unref)
+#endif
+
 /******************************************************************************/
 /* Enums/flags to string builders */
 
