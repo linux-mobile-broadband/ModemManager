@@ -605,6 +605,12 @@ libmm_plugin_cinterion_la_SOURCES += \
 	cinterion/mm-broadband-modem-qmi-cinterion.h \
 	$(NULL)
 endif
+if WITH_MBIM
+libmm_plugin_cinterion_la_SOURCES += \
+	cinterion/mm-broadband-modem-mbim-cinterion.c \
+	cinterion/mm-broadband-modem-mbim-cinterion.h \
+	$(NULL)
+endif
 libmm_plugin_cinterion_la_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS) \
 	-DMM_MODULE_NAME=\"cinterion\" \
