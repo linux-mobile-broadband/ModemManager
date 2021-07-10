@@ -40,6 +40,9 @@ typedef struct _MMSharedCinterion MMSharedCinterion;
 struct _MMSharedCinterion {
     GTypeInterface g_iface;
 
+    /* Peek modem interface of the parent class of the object */
+    MMIfaceModem *  (* peek_parent_interface) (MMSharedCinterion *self);
+
     /* Peek location interface of the parent class of the object */
     MMIfaceModemLocation *  (* peek_parent_location_interface) (MMSharedCinterion *self);
 
@@ -51,6 +54,16 @@ struct _MMSharedCinterion {
 };
 
 GType mm_shared_cinterion_get_type (void);
+
+/*****************************************************************************/
+/* Modem interface */
+
+void     mm_shared_cinterion_modem_reset        (MMIfaceModem        *self,
+                                                 GAsyncReadyCallback  callback,
+                                                 gpointer             user_data);
+gboolean mm_shared_cinterion_modem_reset_finish (MMIfaceModem        *self,
+                                                 GAsyncResult        *res,
+                                                 GError             **error);
 
 /*****************************************************************************/
 /* Location interface */

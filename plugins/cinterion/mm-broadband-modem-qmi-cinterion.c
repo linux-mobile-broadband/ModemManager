@@ -25,21 +25,25 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-voice.h"
 #include "mm-broadband-modem-qmi-cinterion.h"
 #include "mm-shared-cinterion.h"
 
+static void iface_modem_init          (MMIfaceModem         *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
 static void iface_modem_voice_init    (MMIfaceModemVoice    *iface);
 static void iface_modem_time_init     (MMIfaceModemTime     *iface);
 static void shared_cinterion_init     (MMSharedCinterion    *iface);
 
+static MMIfaceModem         *iface_modem_parent;
 static MMIfaceModemLocation *iface_modem_location_parent;
 static MMIfaceModemVoice    *iface_modem_voice_parent;
 static MMIfaceModemTime     *iface_modem_time_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmiCinterion, mm_broadband_modem_qmi_cinterion, MM_TYPE_BROADBAND_MODEM_QMI, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_VOICE, iface_modem_voice_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init)
@@ -71,6 +75,21 @@ mm_broadband_modem_qmi_cinterion_new (const gchar *device,
 static void
 mm_broadband_modem_qmi_cinterion_init (MMBroadbandModemQmiCinterion *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface_modem_parent = g_type_interface_peek_parent (iface);
+
+    iface->reset        = mm_shared_cinterion_modem_reset;
+    iface->reset_finish = mm_shared_cinterion_modem_reset_finish;
+}
+
+static MMIfaceModem *
+peek_parent_interface (MMSharedCinterion *self)
+{
+    return iface_modem_parent;
 }
 
 static void
@@ -137,6 +156,7 @@ peek_parent_time_interface (MMSharedCinterion *self)
 static void
 shared_cinterion_init (MMSharedCinterion *iface)
 {
+    iface->peek_parent_interface          = peek_parent_interface;
     iface->peek_parent_location_interface = peek_parent_location_interface;
     iface->peek_parent_voice_interface    = peek_parent_voice_interface;
     iface->peek_parent_time_interface     = peek_parent_time_interface;

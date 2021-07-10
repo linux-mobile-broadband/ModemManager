@@ -44,6 +44,8 @@ typedef enum {
 } FeatureSupport;
 
 typedef struct {
+    /* modem */
+    MMIfaceModem          *iface_modem_parent;
     /* location */
     MMIfaceModemLocation  *iface_modem_location_parent;
     MMModemLocationSource  supported_sources;
@@ -87,7 +89,11 @@ get_private (MMSharedCinterion *self)
         priv->slcc_regex = mm_cinterion_get_slcc_regex ();
         priv->ctzu_regex = mm_cinterion_get_ctzu_regex ();
 
-        /* Setup parent class' MMIfaceModemLocation, MMIfaceModemVoice and MMIfaceModemTime */
+        /* Setup parent class' MMIfaceModem, MMIfaceModemLocation, MMIfaceModemVoice
+         * and MMIfaceModemTime */
+
+        g_assert (MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_interface);
+        priv->iface_modem_parent = MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_interface (self);
 
         g_assert (MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_location_interface);
         priv->iface_modem_location_parent = MM_SHARED_CINTERION_GET_INTERFACE (self)->peek_parent_location_interface (self);
@@ -102,6 +108,85 @@ get_private (MMSharedCinterion *self)
     }
 
     return priv;
+}
+
+/*****************************************************************************/
+/* Modem interface */
+
+gboolean
+mm_shared_cinterion_modem_reset_finish (MMIfaceModem  *self,
+                                        GAsyncResult  *res,
+                                        GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_reset_at_ready (MMBaseModem  *self,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_reset_at (GTask *task)
+{
+    MMSharedCinterion *self;
+
+    self = g_task_get_source_object (task);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=1,1",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) modem_reset_at_ready,
+                              task);
+}
+
+static void
+parent_modem_reset_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GTask        *task)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+    if (!priv->iface_modem_parent->reset_finish (self, res, NULL)) {
+        modem_reset_at (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+void
+mm_shared_cinterion_modem_reset (MMIfaceModem        *self,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
+{
+    GTask   *task;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_CINTERION (self));
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (priv->iface_modem_parent->reset &&
+        priv->iface_modem_parent->reset_finish) {
+        priv->iface_modem_parent->reset (self,
+                                         (GAsyncReadyCallback) parent_modem_reset_ready,
+                                         task);
+        return;
+    }
+
+    modem_reset_at (task);
 }
 
 /*****************************************************************************/

@@ -442,30 +442,6 @@ messaging_check_support (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
-/* Reset (Modem interface) */
-
-static gboolean
-modem_reset_finish (MMIfaceModem  *self,
-                    GAsyncResult  *res,
-                    GError       **error)
-{
-    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-}
-
-static void
-modem_reset (MMIfaceModem        *self,
-             GAsyncReadyCallback  callback,
-             gpointer             user_data)
-{
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CFUN=1,1",
-                              3,
-                              FALSE,
-                              callback,
-                              user_data);
-}
-
-/*****************************************************************************/
 /* Power down */
 
 static gboolean
@@ -2984,14 +2960,20 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_after_sim_unlock_finish = after_sim_unlock_finish;
     iface->load_unlock_retries = load_unlock_retries;
     iface->load_unlock_retries_finish = load_unlock_retries_finish;
-    iface->reset = modem_reset;
-    iface->reset_finish = modem_reset_finish;
+    iface->reset = mm_shared_cinterion_modem_reset;
+    iface->reset_finish = mm_shared_cinterion_modem_reset_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
     iface->modem_power_off = modem_power_off;
     iface->modem_power_off_finish = modem_power_off_finish;
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
+}
+
+static MMIfaceModem *
+peek_parent_interface (MMSharedCinterion *self)
+{
+    return iface_modem_parent;
 }
 
 static void
@@ -3091,6 +3073,7 @@ peek_parent_time_interface (MMSharedCinterion *self)
 static void
 shared_cinterion_init (MMSharedCinterion *iface)
 {
+    iface->peek_parent_interface          = peek_parent_interface;
     iface->peek_parent_location_interface = peek_parent_location_interface;
     iface->peek_parent_voice_interface    = peek_parent_voice_interface;
     iface->peek_parent_time_interface     = peek_parent_time_interface;
