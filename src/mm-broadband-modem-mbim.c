@@ -90,13 +90,14 @@ typedef enum {
     PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS = 1 << 9,
 } ProcessNotificationFlag;
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 enum {
     PROP_0,
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     PROP_QMI_UNSUPPORTED,
+#endif
+    PROP_INTEL_FIRMWARE_UPDATE_UNSUPPORTED,
     PROP_LAST
 };
-#endif
 
 struct _MMBroadbandModemMbimPrivate {
     /* Queried and cached capabilities */
@@ -146,6 +147,8 @@ struct _MMBroadbandModemMbimPrivate {
     /* Flag when QMI-based capability/mode switching is in use */
     gboolean qmi_capability_and_mode_switching;
 #endif
+
+    gboolean intel_firmware_update_unsupported;
 };
 
 /*****************************************************************************/
@@ -2271,6 +2274,10 @@ query_device_services_ready (MbimDevice   *device,
             }
 
             if (service == MBIM_SERVICE_INTEL_FIRMWARE_UPDATE) {
+                if (self->priv->intel_firmware_update_unsupported) {
+                    mm_obj_dbg (self, "Intel firmware update service is explicitly ignored");
+                    continue;
+                }
                 for (j = 0; j < device_services[i]->cids_count; j++) {
                     if (device_services[i]->cids[j] == MBIM_CID_INTEL_FIRMWARE_UPDATE_MODEM_REBOOT) {
                         mm_obj_dbg (self, "Intel reset is supported");
@@ -6104,7 +6111,7 @@ messaging_create_sms (MMIfaceModemMessaging *self)
 
 /*****************************************************************************/
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
 static void
 set_property (GObject *object,
               guint prop_id,
@@ -6114,8 +6121,13 @@ set_property (GObject *object,
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
 
     switch (prop_id) {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
    case PROP_QMI_UNSUPPORTED:
         self->priv->qmi_unsupported = g_value_get_boolean (value);
+        break;
+#endif
+   case PROP_INTEL_FIRMWARE_UPDATE_UNSUPPORTED:
+        self->priv->intel_firmware_update_unsupported = g_value_get_boolean (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -6132,15 +6144,19 @@ get_property (GObject *object,
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
 
     switch (prop_id) {
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     case PROP_QMI_UNSUPPORTED:
         g_value_set_boolean (value, self->priv->qmi_unsupported);
+        break;
+#endif
+    case PROP_INTEL_FIRMWARE_UPDATE_UNSUPPORTED:
+        g_value_set_boolean (value, self->priv->intel_firmware_update_unsupported);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
     }
 }
-#endif
 
 MMBroadbandModemMbim *
 mm_broadband_modem_mbim_new (const gchar *device,
@@ -6514,10 +6530,8 @@ mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
 
     klass->peek_port_mbim_for_data = peek_port_mbim_for_data;
 
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     object_class->set_property = set_property;
     object_class->get_property = get_property;
-#endif
     object_class->dispose = dispose;
     object_class->finalize = finalize;
 
@@ -6537,4 +6551,11 @@ mm_broadband_modem_mbim_class_init (MMBroadbandModemMbimClass *klass)
                               FALSE,
                               G_PARAM_READWRITE));
 #endif
+
+    g_object_class_install_property (object_class, PROP_INTEL_FIRMWARE_UPDATE_UNSUPPORTED,
+        g_param_spec_boolean (MM_BROADBAND_MODEM_MBIM_INTEL_FIRMWARE_UPDATE_UNSUPPORTED,
+                              "Intel Firmware Update service unsupported",
+                              "TRUE when the Intel Firmware Update service should not be considered.",
+                              FALSE,
+                              G_PARAM_READWRITE));
 }
