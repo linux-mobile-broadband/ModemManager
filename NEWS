@@ -1,4 +1,29 @@
 
+ModemManager 1.16.8
+-------------------------------------------
+
+ * MBIM:
+   ** Fixed wrong session id management when multiple bearers are created.
+
+ * Modem interface:
+   ** Fixed the enabling operation on multiple plugins that don't have explicit
+      power up/down operations.
+
+ * libmm-glib:
+   ** Modem interface: added missing input argument checks.
+   ** Messaging interface: fixed get_supported_storages() handling when it's
+      called several consecutive times.
+   ** 3GPP interface: fixed initial EPS bearer settings property updates.
+
+ * plugins:
+   ** cinterion: fixed double free when loading initial EPS context.
+
+ * udev:
+   ** Explicitly ignore "FIREHOSE" WWAN ports.
+   ** Add support to match WWAN type via sysfs attributes.
+
+ * Several other minor improvements and fixes.
+
 ModemManager 1.16.6
 -------------------------------------------
 
