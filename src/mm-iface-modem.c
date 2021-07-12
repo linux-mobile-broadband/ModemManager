@@ -265,7 +265,9 @@ wait_for_final_state_context_complete (GTask *task,
      * 'task' in order to prevent state_changed from being invoked, which
      * invokes wait_for_final_state_context_complete again. */
     if (ctx->state_changed_id) {
-        g_signal_handler_disconnect (self, ctx->state_changed_id);
+        /* may be automatically disconnected during dispose */
+        if (g_signal_handler_is_connected (self, ctx->state_changed_id))
+            g_signal_handler_disconnect (self, ctx->state_changed_id);
         ctx->state_changed_id = 0;
     }
 
