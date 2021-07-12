@@ -473,7 +473,7 @@ mm_shared_qmi_3gpp_register_in_network (MMIfaceModem3gpp    *self,
     GTask                    *task;
     RegisterInNetworkContext *ctx;
     guint16                   mcc = 0;
-    guint16                   mnc;
+    guint16                   mnc = 0;
     gboolean                  mnc_pcs_digit = FALSE;
     QmiClient                *client = NULL;
     GError                   *error = NULL;
