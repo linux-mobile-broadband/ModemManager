@@ -56,4 +56,6 @@ void          mm_broadband_bearer_hso_new        (MMBroadbandModemHso *modem,
 MMBaseBearer *mm_broadband_bearer_hso_new_finish (GAsyncResult *res,
                                                   GError **error);
 
+gint mm_broadband_bearer_hso_get_connecting_profile_id (MMBroadbandBearerHso *self);
+
 #endif /* MM_BROADBAND_BEARER_HSO_H */
