@@ -8758,6 +8758,10 @@ modem_voice_check_support (MMIfaceModemVoice   *self,
         mm_obj_dbg (self, "Voice capabilities not supported");
         g_task_return_boolean (task, FALSE);
     } else {
+        /* In case of QMI, we don't need polling as call list will be dynamically updated by All Call Status indication */
+        g_object_set (self,
+                      MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, TRUE,
+                      NULL);
         mm_obj_dbg (self, "Voice capabilities supported");
         g_task_return_boolean (task, TRUE);
     }
