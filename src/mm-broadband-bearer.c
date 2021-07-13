@@ -930,11 +930,12 @@ connect (MMBaseBearer *self,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
-    MMPortSerialAt         *primary;
-    const gchar            *apn;
-    gint                    profile_id;
-    GTask                  *task;
-    g_autoptr(MMBaseModem)  modem = NULL;
+    MMPortSerialAt           *primary;
+    const gchar              *apn;
+    gint                      profile_id;
+    MMBearerMultiplexSupport  multiplex;
+    GTask                    *task;
+    g_autoptr(MMBaseModem)    modem = NULL;
 
     task = g_task_new (self, cancellable, callback, user_data);
 
@@ -1006,6 +1007,15 @@ connect (MMBaseBearer *self,
         (apn || (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN))) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                                  "3GPP2 doesn't support APN or profile id setting");
+        g_object_unref (task);
+        return;
+    }
+
+    /* The generic broadband bearer doesn't support multiplexing */
+    multiplex = mm_bearer_properties_get_multiplex (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "Multiplexing required but not supported");
         g_object_unref (task);
         return;
     }
