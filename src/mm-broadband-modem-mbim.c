@@ -6620,7 +6620,7 @@ before_set_query_device_slot_mappings_ready (MbimDevice   *device,
     }
 
     message = mbim_message_ms_basic_connect_extensions_device_slot_mappings_set_new (map_count,
-                                                                                     (const MbimSlot **)&slot_mappings,
+                                                                                     (const MbimSlot **)slot_mappings,
                                                                                      NULL);
     mbim_device_command (device,
                          message,
