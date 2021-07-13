@@ -404,10 +404,19 @@ static void
 bearer_list_report_status_foreach (MMBaseBearer *bearer,
                                    BearerListReportStatusForeachContext *ctx)
 {
-    if (mm_base_bearer_get_profile_id (bearer) != (gint)ctx->cid)
-        return;
+    gint profile_id;
+    gint connecting_profile_id;
 
     if (!MM_IS_BROADBAND_BEARER_ICERA (bearer))
+        return;
+
+    /* The profile ID in the base bearer is set only once the modem is connected */
+    profile_id = mm_base_bearer_get_profile_id (bearer);
+
+    /* The profile ID in the icera bearer is available during the connecting phase */
+    connecting_profile_id = mm_broadband_bearer_icera_get_connecting_profile_id (MM_BROADBAND_BEARER_ICERA (bearer));
+
+    if ((profile_id != (gint)ctx->cid) && (connecting_profile_id != (gint)ctx->cid))
         return;
 
     mm_base_bearer_report_connection_status (bearer, ctx->status);

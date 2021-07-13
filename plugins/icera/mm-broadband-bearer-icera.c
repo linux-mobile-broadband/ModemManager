@@ -395,6 +395,15 @@ dial_3gpp_context_free (Dial3gppContext *ctx)
     g_slice_free (Dial3gppContext, ctx);
 }
 
+static guint
+dial_3gpp_get_connecting_cid (GTask *task)
+{
+    Dial3gppContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+    return ctx->cid;
+}
+
 static MMPort *
 dial_3gpp_finish (MMBroadbandBearer  *self,
                   GAsyncResult       *res,
@@ -694,6 +703,16 @@ dial_3gpp (MMBroadbandBearer   *_self,
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback) activate_ready,
                                    g_object_ref (self)); /* we pass the bearer object! */
+}
+
+/*****************************************************************************/
+
+gint
+mm_broadband_bearer_icera_get_connecting_profile_id (MMBroadbandBearerIcera *self)
+{
+    return (self->priv->connect_pending ?
+            (gint)dial_3gpp_get_connecting_cid (self->priv->connect_pending) :
+            MM_3GPP_PROFILE_ID_UNKNOWN);
 }
 
 /*****************************************************************************/

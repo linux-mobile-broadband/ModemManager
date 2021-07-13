@@ -61,4 +61,6 @@ void      mm_broadband_bearer_icera_new            (MMBroadbandModem *modem,
 MMBaseBearer *mm_broadband_bearer_icera_new_finish (GAsyncResult *res,
                                                     GError **error);
 
+gint mm_broadband_bearer_icera_get_connecting_profile_id (MMBroadbandBearerIcera *self);
+
 #endif /* MM_BROADBAND_BEARER_ICERA_H */
