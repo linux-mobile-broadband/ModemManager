@@ -6167,8 +6167,8 @@ get_property (GObject *object,
 typedef struct {
     GPtrArray *sim_slots;
     guint number_slots;
-    guint query_slot_index;
-    guint active_slot_index;
+    guint query_slot_index;  /* range [0,number_slots-1] */
+    guint active_slot_index; /* range [1,number_slots]   */
 } LoadSimSlotsContext;
 
 static void
@@ -6234,9 +6234,9 @@ query_slot_information_status_ready (MbimDevice   *device,
         return;
     }
 
-    if (slot_index == ctx->active_slot_index) {
+    /* the slot index in MM starts at 1 */
+    if ((slot_index + 1) == ctx->active_slot_index)
         sim_active = TRUE;
-    }
 
     if (slot_state == MBIM_UICC_SLOT_STATE_ACTIVE ||
         slot_state == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM ||
@@ -6314,7 +6314,9 @@ query_device_slot_mappings_ready (MbimDevice   *device,
         g_object_unref (task);
         return;
     }
-    ctx->active_slot_index = slot_mappings[self->priv->executor_index]->slot;
+
+    /* the slot index in MM starts at 1 */
+    ctx->active_slot_index = slot_mappings[self->priv->executor_index]->slot + 1;
 
     query_slot_information_status (device, ctx->query_slot_index, task);
 }
@@ -6531,7 +6533,9 @@ set_device_slot_mappings_ready (MbimDevice   *device,
     guint                    slot_number;
 
     self = g_task_get_source_object (task);
-    slot_number = GPOINTER_TO_UINT (g_task_get_task_data (task));
+
+    /* the slot index in MM starts at 1 */
+    slot_number = GPOINTER_TO_UINT (g_task_get_task_data (task)) - 1;
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
@@ -6580,7 +6584,8 @@ before_set_query_device_slot_mappings_ready (MbimDevice   *device,
 
     self = g_task_get_source_object (task);
 
-    slot_number = GPOINTER_TO_UINT (g_task_get_task_data (task));
+    /* the slot index in MM starts at 1 */
+    slot_number = GPOINTER_TO_UINT (g_task_get_task_data (task)) - 1;
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
