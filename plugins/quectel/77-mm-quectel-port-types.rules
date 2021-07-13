@@ -12,59 +12,59 @@ SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInte
 #  ttyUSB1 (if #1): GPS data port
 #  ttyUSB2 (if #2): AT primary port
 #  ttyUSB3 (if #3): AT secondary port
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0306", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # Quectel EG91
 #  ttyUSB0 (if #0): QCDM/DIAG port
 #  ttyUSB1 (if #1): GPS data port
 #  ttyUSB2 (if #2): AT primary port
 #  ttyUSB3 (if #3): AT secondary port
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0191", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # Quectel EG95
 #  ttyUSB0 (if #0): QCDM/DIAG port
 #  ttyUSB1 (if #1): GPS data port
 #  ttyUSB2 (if #2): AT primary port
 #  ttyUSB3 (if #3): AT secondary port
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0195", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # Quectel BG96
 #  ttyUSB0 (if #0): QCDM/DIAG port
 #  ttyUSB1 (if #1): GPS data port
 #  ttyUSB2 (if #2): AT primary port
 #  ttyUSB3 (if #3): AT secondary port
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0296", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # Quectel EC25/EG25
 #  ttyUSB0 (if #0): QCDM/DIAG port
 #  ttyUSB1 (if #1): GPS data port
 #  ttyUSB2 (if #2): AT primary port
 #  ttyUSB3 (if #3): AT secondary port
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0125", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # Quectel RM500
 #  ttyUSB0 (if #0): QCDM/DIAG port
 #  ttyUSB1 (if #1): GPS data port
 #  ttyUSB2 (if #2): AT primary port
 #  ttyUSB3 (if #3): AT secondary port
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_TYPE_QCDM}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_TYPE_GPS}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_QCDM}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 LABEL="mm_quectel_port_types_end"

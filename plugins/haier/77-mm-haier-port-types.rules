@@ -8,6 +8,6 @@ LABEL="mm_haier_port_types"
 SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
 
 # Haier CE81B
-ATTRS{idVendor}=="201e", ATTRS{idProduct}=="10f8", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="201e", ATTRS{idProduct}=="10f8", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
 LABEL="mm_haier_port_types_end"
