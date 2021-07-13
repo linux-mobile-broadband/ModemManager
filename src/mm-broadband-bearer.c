@@ -1011,8 +1011,12 @@ connect (MMBaseBearer *self,
         return;
     }
 
-    /* The generic broadband bearer doesn't support multiplexing */
+    /* If no multiplex setting given by the user, assume default */
     multiplex = mm_bearer_properties_get_multiplex (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN)
+        multiplex = MM_BASE_BEARER_MULTIPLEX_SUPPORT_DEFAULT;
+
+    /* The generic broadband bearer doesn't support multiplexing */
     if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                                  "Multiplexing required but not supported");

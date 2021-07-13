@@ -67,6 +67,11 @@ gint                   mm_bearer_connect_result_get_profile_id   (MMBearerConnec
 
 /*****************************************************************************/
 
+/* Default multiplex support setting to use when none explicitly given */
+#define MM_BASE_BEARER_MULTIPLEX_SUPPORT_DEFAULT MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED
+
+/*****************************************************************************/
+
 #define MM_TYPE_BASE_BEARER            (mm_base_bearer_get_type ())
 #define MM_BASE_BEARER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_BEARER, MMBaseBearer))
 #define MM_BASE_BEARER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_BASE_BEARER, MMBaseBearerClass))
