@@ -12,17 +12,17 @@ LABEL="mm_mbm_ericsson_vendorcheck"
 SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
 
 # Ericsson F3507g
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1900", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1900", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1900", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1902", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1902", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1902", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson F3607gw
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1904", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1904", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1904", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1905", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1905", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1905", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1906", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1906", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1906", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson F3307
@@ -39,9 +39,9 @@ ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1049", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190b", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson F5521gw
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190d", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190d", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190d", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1911", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1911", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1911", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson H5321gw
@@ -63,9 +63,9 @@ ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="191f", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1921", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson H5321gw
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1926", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1926", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1926", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1927", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1927", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1927", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson C3304w
@@ -97,25 +97,25 @@ SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInte
 
 # Dell 5560
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818e", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818e", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818e", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 
 # Dell 5550
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818d", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Dell 5530 HSDPA
-ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8147", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8147", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8147", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Dell F3607gw
-ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8183", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8183", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8183", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8184", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8184", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8184", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Dell F3307
-ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818b", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818b", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818b", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818c", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818c", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818c", ENV{ID_MM_ERICSSON_MBM}="1"
 
 GOTO="mm_mbm_end"
@@ -133,7 +133,7 @@ ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="261d", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="3a1d", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # HP hs2350 Mobile Broadband Module
-ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="3d1d", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="3d1d", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="3d1d", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # HP lc2000 Mobile Broadband Module
@@ -148,13 +148,13 @@ LABEL="mm_mbm_toshiba_vendorcheck"
 SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
 
 # Toshiba
-ATTRS{idVendor}=="0930", ATTRS{idProduct}=="130b", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0930", ATTRS{idProduct}=="130b", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0930", ATTRS{idProduct}=="130b", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Toshiba F3607gw
-ATTRS{idVendor}=="0930", ATTRS{idProduct}=="130c", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0930", ATTRS{idProduct}=="130c", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0930", ATTRS{idProduct}=="130c", ENV{ID_MM_ERICSSON_MBM}="1"
-ATTRS{idVendor}=="0930", ATTRS{idProduct}=="1311", ENV{.MM_USBIFNUM}=="09", ENV{ID_MM_PORT_TYPE_GPS}="1"
+ATTRS{idVendor}=="0930", ATTRS{idProduct}=="1311", ENV{.MM_USBIFNUM}=="09", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 ATTRS{idVendor}=="0930", ATTRS{idProduct}=="1311", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Toshiba F3307

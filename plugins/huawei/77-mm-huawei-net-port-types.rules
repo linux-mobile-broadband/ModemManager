@@ -9,17 +9,17 @@ LABEL="mm_huawei_port_types"
 ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="1573", ENV{ID_MM_HUAWEI_DISABLE_GETPORTMODE}="1"
 
 # Mark the modem and at port flags for ModemManager
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="01", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="01", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="02", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PPP}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="02", ATTRS{bInterfaceProtocol}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
 # GPS NMEA port on MU609
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="05", ENV{ID_MM_PORT_TYPE_GPS}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="05", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 # GPS NMEA port on MU909
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="14", ENV{ID_MM_PORT_TYPE_GPS}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="14", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 # GPS NMEA port on MU906e
-SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="06", ATTRS{bInterfaceProtocol}=="14", ENV{ID_MM_PORT_TYPE_GPS}="1"
+SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="ff", ATTRS{bInterfaceSubClass}=="06", ATTRS{bInterfaceProtocol}=="14", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_GPS}="1"
 
 # Only the standard ECM or NCM port can support dial-up with AT NDISDUP through AT port
 SUBSYSTEMS=="usb", ATTRS{bInterfaceClass}=="02", ATTRS{bInterfaceSubClass}=="06",ATTRS{bInterfaceProtocol}=="00", ENV{ID_MM_HUAWEI_NDISDUP_SUPPORTED}="1"
