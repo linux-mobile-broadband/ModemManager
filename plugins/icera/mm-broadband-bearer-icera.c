@@ -442,7 +442,7 @@ connect_reset (GTask *task)
                                    FALSE, /* raw */
                                    NULL, /* cancellable */
                                    (GAsyncReadyCallback)connect_reset_ready,
-                                   ctx);
+                                   task);
     g_free (command);
 }
 
