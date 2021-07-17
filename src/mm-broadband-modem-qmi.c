@@ -48,6 +48,7 @@
 #include "mm-sms-part-3gpp.h"
 #include "mm-sms-part-cdma.h"
 #include "mm-call-qmi.h"
+#include "mm-call-list.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
@@ -152,6 +153,8 @@ struct _MMBroadbandModemQmiPrivate {
     guint all_call_status_indication_id;
     gboolean all_call_status_unsolicited_events_enabled;
     gboolean all_call_status_unsolicited_events_setup;
+    guint supplementary_service_indication_id;
+    gboolean supplementary_service_unsolicited_events_setup;
 
     /* Firmware helpers */
     gboolean firmware_list_preloaded;
@@ -8868,6 +8871,49 @@ all_call_status_indication_cb (QmiClientVoice                        *client,
 }
 
 /*****************************************************************************/
+/* Supplementary service indication */
+
+static void
+supplementary_service_indication_cb (QmiClientVoice                               *client,
+                                     QmiIndicationVoiceSupplementaryServiceOutput *output,
+                                     MMBroadbandModemQmi                          *self)
+{
+    QmiVoiceSupplementaryServiceNotificationType notification_type;
+    guint8                 call_id = 0;
+    g_autoptr(MMCallList)  call_list = NULL;
+    MMBaseCall            *call = NULL;
+
+    if (!qmi_indication_voice_supplementary_service_output_get_info (output, &call_id, &notification_type, NULL)) {
+        mm_obj_dbg (self, "Ignoring supplementary service indication: no call id or notification type given");
+        return;
+    }
+
+    /* Retrieve list of known calls */
+    g_object_get (MM_BASE_MODEM (self),
+                  MM_IFACE_MODEM_VOICE_CALL_LIST, &call_list,
+                  NULL);
+    if (!call_list) {
+        mm_obj_dbg (self, "Ignoring supplementary service indication: no call list exists");
+        return;
+    }
+
+    call = mm_call_list_get_call_by_index (call_list, call_id);
+    if (!call) {
+        mm_obj_dbg (self, "Ignoring supplementary service indication: no matching call exists");
+        return;
+    }
+
+    if (notification_type == QMI_VOICE_SUPPLEMENTARY_SERVICE_NOTIFICATION_TYPE_CALL_IS_ON_HOLD)
+        mm_base_call_change_state (call, MM_CALL_STATE_HELD, MM_CALL_STATE_REASON_UNKNOWN);
+    else if (notification_type == QMI_VOICE_SUPPLEMENTARY_SERVICE_NOTIFICATION_TYPE_CALL_IS_RETRIEVED)
+        mm_base_call_change_state (call, MM_CALL_STATE_ACTIVE, MM_CALL_STATE_REASON_UNKNOWN);
+    else if (notification_type == QMI_VOICE_SUPPLEMENTARY_SERVICE_NOTIFICATION_TYPE_OUTGOING_CALL_IS_WAITING)
+        mm_base_call_change_state (call, MM_CALL_STATE_WAITING, MM_CALL_STATE_REASON_REFUSED_OR_BUSY);
+    else
+        mm_obj_dbg (self, "Ignoring supplementary service indication: unhandled notification type");
+}
+
+/*****************************************************************************/
 /* Setup/cleanup unsolicited events */
 
 static gboolean
@@ -8985,7 +9031,7 @@ common_voice_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     if (enable == self->priv->all_call_status_unsolicited_events_enabled) {
-        mm_obj_dbg (self, "All Call Status unsolicited events already %s; skipping",
+        mm_obj_dbg (self, "voice unsolicited events already %s; skipping",
                     enable ? "enabled" : "disabled");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -8995,6 +9041,7 @@ common_voice_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
 
     input = qmi_message_voice_indication_register_input_new ();
     qmi_message_voice_indication_register_input_set_call_notification_events (input, enable, NULL);
+    qmi_message_voice_indication_register_input_set_supplementary_service_notification_events (input, enable, NULL);
     qmi_client_voice_indication_register (QMI_CLIENT_VOICE (client),
                                           input,
                                           10,
@@ -9017,6 +9064,75 @@ modem_voice_disable_unsolicited_events (MMIfaceModemVoice   *self,
                                         gpointer             user_data)
 {
     common_voice_enable_disable_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Setup/cleanup in-call unsolicited events */
+
+static gboolean
+common_voice_setup_cleanup_in_call_unsolicited_events_finish (MMIfaceModemVoice  *self,
+                                                              GAsyncResult       *res,
+                                                              GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+common_voice_setup_in_call_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
+                                                       gboolean             setup,
+                                                       GAsyncReadyCallback  callback,
+                                                       gpointer             user_data)
+{
+    GTask     *task;
+    QmiClient *client = NULL;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_VOICE, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (setup == self->priv->supplementary_service_unsolicited_events_setup) {
+        mm_obj_dbg (self, "Supplementary service unsolicited events already %s; skipping",
+                    setup ? "setup" : "cleanup");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+    self->priv->supplementary_service_unsolicited_events_setup = setup;
+
+    if (setup) {
+        g_assert (self->priv->supplementary_service_indication_id == 0);
+        self->priv->supplementary_service_indication_id =
+            g_signal_connect (client,
+                              "supplementary-service",
+                              G_CALLBACK (supplementary_service_indication_cb),
+                              self);
+    } else {
+        g_assert (self->priv->supplementary_service_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->supplementary_service_indication_id);
+        self->priv->supplementary_service_indication_id = 0;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_voice_setup_in_call_unsolicited_events (MMIfaceModemVoice   *self,
+                                              GAsyncReadyCallback  callback,
+                                              gpointer             user_data)
+{
+    common_voice_setup_in_call_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), TRUE, callback, user_data);
+}
+
+static void
+modem_voice_cleanup_in_call_unsolicited_events (MMIfaceModemVoice   *self,
+                                                GAsyncReadyCallback  callback,
+                                                gpointer             user_data)
+{
+    common_voice_setup_in_call_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), FALSE, callback, user_data);
 }
 
 /*****************************************************************************/
@@ -11583,6 +11699,12 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->disable_unsolicited_events_finish = common_voice_enable_disable_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_voice_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = common_voice_setup_cleanup_unsolicited_events_finish;
+
+    iface->setup_in_call_unsolicited_events = modem_voice_setup_in_call_unsolicited_events;
+    iface->setup_in_call_unsolicited_events_finish = common_voice_setup_cleanup_in_call_unsolicited_events_finish;
+    iface->cleanup_in_call_unsolicited_events = modem_voice_cleanup_in_call_unsolicited_events;
+    iface->cleanup_in_call_unsolicited_events_finish = common_voice_setup_cleanup_in_call_unsolicited_events_finish;
+
     iface->create_call = modem_voice_create_call;
 }
 
