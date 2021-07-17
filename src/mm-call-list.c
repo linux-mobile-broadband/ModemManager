@@ -148,6 +148,26 @@ mm_call_list_get_call (MMCallList  *self,
     return (l ? MM_BASE_CALL (l->data) : NULL);
 }
 
+static guint
+cmp_call_by_index (MMBaseCall *call,
+                   guint8     *index)
+{
+    return mm_base_call_get_index (call) - *index;
+}
+
+MMBaseCall *
+mm_call_list_get_call_by_index (MMCallList *self,
+                                guint8      index)
+{
+    GList *l;
+
+    l = g_list_find_custom (self->priv->list,
+                            (gpointer)&index,
+                            (GCompareFunc)cmp_call_by_index);
+
+    return (l ? MM_BASE_CALL (l->data) : NULL);
+}
+
 gboolean
 mm_call_list_delete_call (MMCallList   *self,
                           const gchar  *call_path,

@@ -68,6 +68,9 @@ void mm_call_list_add_call  (MMCallList *self,
 MMBaseCall *mm_call_list_get_call (MMCallList   *self,
                                    const gchar  *call_path);
 
+MMBaseCall *mm_call_list_get_call_by_index (MMCallList *self,
+                                            guint8      index);
+
 gboolean mm_call_list_delete_call (MMCallList   *self,
                                    const gchar  *call_path,
                                    GError      **error);
