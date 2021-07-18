@@ -9149,6 +9149,240 @@ modem_voice_create_call (MMIfaceModemVoice *self,
 }
 
 /*****************************************************************************/
+/* Common manage calls (Voice interface) */
+
+static gboolean
+common_manage_calls_finish (MMIfaceModemVoice  *self,
+                            GAsyncResult       *res,
+                            GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+common_manage_calls_ready (QmiClientVoice *client,
+                           GAsyncResult   *res,
+                           GTask          *task)
+{
+    g_autoptr(QmiMessageVoiceManageCallsOutput) output = NULL;
+    GError     *error = NULL;
+
+    output = qmi_client_voice_manage_calls_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_voice_manage_calls_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't process manage calls action: ");
+        g_task_return_error (task, error);
+    } else
+        g_task_return_boolean (task, TRUE);
+
+    g_object_unref (task);
+}
+
+static void
+common_manage_calls (MMIfaceModemVoice               *self,
+                     GAsyncReadyCallback              callback,
+                     gpointer                         user_data,
+                     QmiMessageVoiceManageCallsInput *input)
+{
+    GTask     *task;
+    QmiClient *client;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_VOICE, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!input) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                 "Cannot perform call management operation: invalid input");
+        g_object_unref (task);
+        return;
+    }
+
+    qmi_client_voice_manage_calls (QMI_CLIENT_VOICE (client),
+                                   input,
+                                   10,
+                                   NULL,
+                                   (GAsyncReadyCallback) common_manage_calls_ready,
+                                   task);
+}
+
+/*****************************************************************************/
+/* Hold and accept (Voice interface) */
+
+static gboolean
+modem_voice_hold_and_accept_finish (MMIfaceModemVoice  *self,
+                                    GAsyncResult       *res,
+                                    GError            **error)
+{
+    return common_manage_calls_finish (self, res, error);
+}
+
+static void
+modem_voice_hold_and_accept (MMIfaceModemVoice   *self,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
+{
+    g_autoptr(QmiMessageVoiceManageCallsInput) input = NULL;
+
+    input = qmi_message_voice_manage_calls_input_new ();
+    qmi_message_voice_manage_calls_input_set_service_type (
+        input,
+        QMI_VOICE_SUPPLEMENTARY_SERVICE_TYPE_HOLD_ACTIVE_ACCEPT_WAITING_OR_HELD,
+        NULL);
+
+    common_manage_calls (self, callback, user_data, input);
+}
+
+/*****************************************************************************/
+/* Hangup and accept (Voice interface) */
+
+static gboolean
+modem_voice_hangup_and_accept_finish (MMIfaceModemVoice  *self,
+                                      GAsyncResult       *res,
+                                      GError            **error)
+{
+    return common_manage_calls_finish (self, res, error);
+}
+
+static void
+modem_voice_hangup_and_accept (MMIfaceModemVoice   *self,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
+{
+    g_autoptr(QmiMessageVoiceManageCallsInput) input = NULL;
+
+    input = qmi_message_voice_manage_calls_input_new ();
+    qmi_message_voice_manage_calls_input_set_service_type (
+        input,
+        QMI_VOICE_SUPPLEMENTARY_SERVICE_TYPE_RELEASE_ACTIVE_ACCEPT_HELD_OR_WAITING,
+        NULL);
+
+    common_manage_calls (self, callback, user_data, input);
+}
+
+/*****************************************************************************/
+/* Hangup all (Voice interface) */
+
+static gboolean
+modem_voice_hangup_all_finish (MMIfaceModemVoice  *self,
+                               GAsyncResult       *res,
+                               GError            **error)
+{
+    return common_manage_calls_finish (self, res, error);
+}
+
+static void
+modem_voice_hangup_all (MMIfaceModemVoice   *self,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    g_autoptr(QmiMessageVoiceManageCallsInput) input = NULL;
+
+    input = qmi_message_voice_manage_calls_input_new ();
+    qmi_message_voice_manage_calls_input_set_service_type (
+        input,
+        QMI_VOICE_SUPPLEMENTARY_SERVICE_TYPE_END_ALL_CALLS,
+        NULL);
+
+    common_manage_calls (self, callback, user_data, input);
+}
+
+/*****************************************************************************/
+/* Join multiparty (Voice interface) */
+
+static gboolean
+modem_voice_join_multiparty_finish (MMIfaceModemVoice  *self,
+                                    GAsyncResult       *res,
+                                    GError            **error)
+{
+    return common_manage_calls_finish (self, res, error);
+}
+
+static void
+modem_voice_join_multiparty (MMIfaceModemVoice   *self,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
+{
+    g_autoptr(QmiMessageVoiceManageCallsInput) input = NULL;
+
+    input = qmi_message_voice_manage_calls_input_new ();
+    qmi_message_voice_manage_calls_input_set_service_type (
+        input,
+        QMI_VOICE_SUPPLEMENTARY_SERVICE_TYPE_MAKE_CONFERENCE_CALL,
+        NULL);
+
+    common_manage_calls (self, callback, user_data, input);
+}
+
+/*****************************************************************************/
+/* Leave multiparty (Voice interface) */
+
+static gboolean
+modem_voice_leave_multiparty_finish (MMIfaceModemVoice  *self,
+                                     GAsyncResult       *res,
+                                     GError            **error)
+{
+    return common_manage_calls_finish (self, res, error);
+}
+
+static void
+modem_voice_leave_multiparty (MMIfaceModemVoice   *self,
+                              MMBaseCall          *call,
+                              GAsyncReadyCallback  callback,
+                              gpointer             user_data)
+{
+    g_autoptr(QmiMessageVoiceManageCallsInput) input = NULL;
+    guint      idx = 0;
+
+    idx = mm_base_call_get_index (call);
+    if (idx != 0) {
+        input = qmi_message_voice_manage_calls_input_new ();
+        qmi_message_voice_manage_calls_input_set_call_id (
+            input,
+            idx,
+            NULL );
+        qmi_message_voice_manage_calls_input_set_service_type (
+            input,
+            QMI_VOICE_SUPPLEMENTARY_SERVICE_TYPE_HOLD_ALL_EXCEPT_SPECIFIED_CALL,
+            NULL);
+    }
+
+    common_manage_calls (self, callback, user_data, input);
+}
+
+/*****************************************************************************/
+/* Transfer (Voice interface) */
+
+static gboolean
+modem_voice_transfer_finish (MMIfaceModemVoice  *self,
+                             GAsyncResult       *res,
+                             GError            **error)
+{
+    return common_manage_calls_finish (self, res, error);
+}
+
+static void
+modem_voice_transfer (MMIfaceModemVoice   *self,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+    g_autoptr(QmiMessageVoiceManageCallsInput) input = NULL;
+
+    input = qmi_message_voice_manage_calls_input_new ();
+    qmi_message_voice_manage_calls_input_set_service_type (
+        input,
+        QMI_VOICE_SUPPLEMENTARY_SERVICE_TYPE_EXPLICIT_CALL_TRANSFER,
+        NULL);
+
+    common_manage_calls (self, callback, user_data, input);
+}
+
+/*****************************************************************************/
 /* Call waiting setup (Voice interface) */
 
 static gboolean
@@ -11870,6 +12104,18 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->cleanup_in_call_unsolicited_events_finish = common_voice_setup_cleanup_in_call_unsolicited_events_finish;
 
     iface->create_call = modem_voice_create_call;
+    iface->hold_and_accept = modem_voice_hold_and_accept;
+    iface->hold_and_accept_finish = modem_voice_hold_and_accept_finish;
+    iface->hangup_and_accept = modem_voice_hangup_and_accept;
+    iface->hangup_and_accept_finish = modem_voice_hangup_and_accept_finish;
+    iface->hangup_all = modem_voice_hangup_all;
+    iface->hangup_all_finish = modem_voice_hangup_all_finish;
+    iface->join_multiparty = modem_voice_join_multiparty;
+    iface->join_multiparty_finish = modem_voice_join_multiparty_finish;
+    iface->leave_multiparty = modem_voice_leave_multiparty;
+    iface->leave_multiparty_finish = modem_voice_leave_multiparty_finish;
+    iface->transfer = modem_voice_transfer;
+    iface->transfer_finish = modem_voice_transfer_finish;
     iface->call_waiting_setup = modem_voice_call_waiting_setup;
     iface->call_waiting_setup_finish = modem_voice_call_waiting_setup_finish;
     iface->call_waiting_query = modem_voice_call_waiting_query;
