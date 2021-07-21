@@ -56,6 +56,7 @@ struct _MMPortQmiPrivate {
     QmiDevice *qmi_device;
     GList     *services;
     gchar     *net_driver;
+    gchar     *net_sysfs_path;
 #if defined WITH_QRTR
     QrtrNode  *node;
 #endif
@@ -2372,6 +2373,17 @@ mm_port_qmi_set_net_driver (MMPortQmi   *self,
 
 /*****************************************************************************/
 
+void
+mm_port_qmi_set_net_sysfs_path (MMPortQmi   *self,
+                                const gchar *net_sysfs_path)
+{
+    g_assert (MM_IS_PORT_QMI (self));
+    g_assert (!self->priv->net_sysfs_path);
+    self->priv->net_sysfs_path = g_strdup (net_sysfs_path);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     QmiDevice *qmi_device;
 } PortQmiCloseContext;
@@ -2589,6 +2601,7 @@ dispose (GObject *object)
     g_clear_object (&self->priv->qmi_device);
 
     g_clear_pointer (&self->priv->net_driver, g_free);
+    g_clear_pointer (&self->priv->net_sysfs_path, g_free);
 
     G_OBJECT_CLASS (mm_port_qmi_parent_class)->dispose (object);
 }

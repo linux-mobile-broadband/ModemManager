@@ -89,6 +89,9 @@ gboolean   mm_port_qmi_close_finish (MMPortQmi            *self,
 void       mm_port_qmi_set_net_driver (MMPortQmi   *self,
                                        const gchar *net_driver);
 
+void       mm_port_qmi_set_net_sysfs_path (MMPortQmi   *self,
+                                           const gchar *net_sysfs_path);
+
 typedef enum {
     MM_PORT_QMI_FLAG_DEFAULT  = 0,
     MM_PORT_QMI_FLAG_WDS_IPV4 = 1,
