@@ -1130,6 +1130,8 @@ typedef enum {
     INTERNAL_SETUP_DATA_FORMAT_STEP_SUPPORTED_KERNEL_DATA_MODES,
     INTERNAL_SETUP_DATA_FORMAT_STEP_RETRY,
     INTERNAL_SETUP_DATA_FORMAT_STEP_CURRENT_KERNEL_DATA_MODES,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_DPM_CLIENT,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_DPM_OPEN,
     INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_GET_WDA_DATA_FORMAT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE,
@@ -1156,6 +1158,7 @@ typedef struct {
 
     /* configured device data format */
     QmiClient                     *wda;
+    QmiClient                     *dpm;
     QmiWdaLinkLayerProtocol        wda_llp_current;
     QmiWdaLinkLayerProtocol        wda_llp_requested;
     QmiWdaDataAggregationProtocol  wda_ul_dap_current;
@@ -1175,7 +1178,15 @@ internal_setup_data_format_context_free (InternalSetupDataFormatContext *ctx)
                                    ctx->wda,
                                    QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
                                    3, NULL, NULL, NULL);
+
+    if (ctx->dpm && ctx->device)
+        qmi_device_release_client (ctx->device,
+                                   ctx->dpm,
+                                   QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
+                                   3, NULL, NULL, NULL);
+
     g_clear_object (&ctx->wda);
+    g_clear_object (&ctx->dpm);
     g_clear_object (&ctx->data);
     g_clear_object (&ctx->device);
     g_slice_free (InternalSetupDataFormatContext, ctx);
@@ -1599,6 +1610,112 @@ allocate_client_wda_ready (QmiDevice    *device,
 }
 
 static void
+dpm_open_port_ready (QmiClientDpm *client,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    g_autoptr(QmiMessageDpmOpenPortOutput)  output = NULL;
+    InternalSetupDataFormatContext         *ctx;
+    g_autoptr(GError)                       error = NULL;
+
+    ctx  = g_task_get_task_data (task);
+
+    output = qmi_client_dpm_open_port_finish (client, res, &error);
+    if (!output ||
+        !qmi_message_dpm_open_port_output_get_result (output, &error)) {
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
+dpm_open_port (GTask *task)
+{
+    MMPortQmi                                          *self;
+    InternalSetupDataFormatContext                     *ctx;
+    QmiMessageDpmOpenPortInputHardwareDataPortsElement  hw_port;
+    g_autoptr(GArray)                                   hw_data_ports = NULL;
+    g_autoptr(QmiMessageDpmOpenPortInput)               input = NULL;
+    g_autofree gchar *tx_sysfs_path = NULL;
+    g_autofree gchar *rx_sysfs_path = NULL;
+    g_autofree gchar *tx_sysfs_str = NULL;
+    g_autofree gchar *rx_sysfs_str = NULL;
+    guint tx_id = 0;
+    guint rx_id = 0;
+
+    self = g_task_get_source_object (task);
+    ctx  = g_task_get_task_data (task);
+
+    tx_sysfs_path = g_build_filename (self->priv->net_sysfs_path, "device", "modem", "tx_endpoint_id", NULL);
+    rx_sysfs_path = g_build_filename (self->priv->net_sysfs_path, "device", "modem", "rx_endpoint_id", NULL);
+    
+    if (g_file_get_contents (rx_sysfs_path, &rx_sysfs_str, NULL, NULL) &&
+        g_file_get_contents (tx_sysfs_path, &tx_sysfs_str, NULL, NULL)) {
+        if (rx_sysfs_str && tx_sysfs_str) {
+            mm_get_uint_from_str (rx_sysfs_str, &rx_id);
+            mm_get_uint_from_str (tx_sysfs_str, &tx_id);
+        }
+    }
+
+    if (tx_id == 0 || rx_id == 0) {
+        mm_obj_warn (self, "Unable to read TX and RX endpoint IDs from sysfs. skipping automatic DPM port opening.");
+
+        /* Go on to next step */
+        ctx->step++;
+        internal_setup_data_format_context_step (task);
+        return;
+    }
+
+    mm_obj_dbg (self, "Opening DPM port with TX ID: %u and RX ID: %u", tx_id, rx_id);
+
+    /* The modem TX endpoint connects with the IPA's RX port and the modem RX endpoint connects with the IPA's TX port. */
+    hw_port.rx_endpoint_number = tx_id;
+    hw_port.tx_endpoint_number = rx_id;
+    hw_port.endpoint_type = self->priv->endpoint_type;
+    hw_port.interface_number = self->priv->endpoint_interface_number;
+    hw_data_ports = g_array_new (FALSE, FALSE, sizeof (QmiMessageDpmOpenPortInputHardwareDataPortsElement));
+    g_array_append_val (hw_data_ports, hw_port);
+    
+    input = qmi_message_dpm_open_port_input_new ();
+    qmi_message_dpm_open_port_input_set_hardware_data_ports (input,
+                                                             hw_data_ports,
+                                                             NULL);
+    qmi_client_dpm_open_port (QMI_CLIENT_DPM (ctx->dpm),
+                              input,
+                              10,
+                              g_task_get_cancellable (task),
+                              (GAsyncReadyCallback) dpm_open_port_ready,
+                              task);
+}
+
+static void
+allocate_client_dpm_ready (QmiDevice    *device,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    InternalSetupDataFormatContext *ctx;
+    GError                         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->dpm = qmi_device_allocate_client_finish (device, res, &error);
+    if (!ctx->dpm) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
 internal_setup_data_format_context_step (GTask *task)
 {
     MMPortQmi                      *self;
@@ -1626,6 +1743,31 @@ internal_setup_data_format_context_step (GTask *task)
             /* Only reload kernel data modes if it was updated or on first loop */
             if (ctx->kernel_data_modes_current == MM_PORT_QMI_KERNEL_DATA_MODE_NONE)
                 ctx->kernel_data_modes_current = load_current_kernel_data_modes (self, ctx->device);
+            ctx->step++;
+            /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_DPM_CLIENT:
+            /* Only allocate new DPM client on first loop */
+            if ((g_strcmp0 (self->priv->net_driver, "ipa") == 0) && (ctx->data_format_combination_i < 0)) {
+                g_assert (!ctx->dpm);
+                qmi_device_allocate_client (ctx->device,
+                                            QMI_SERVICE_DPM,
+                                            QMI_CID_NONE,
+                                            10,
+                                            g_task_get_cancellable (task),
+                                            (GAsyncReadyCallback) allocate_client_dpm_ready,
+                                            task);
+                return;
+            }
+            ctx->step++;
+            /* Fall through */
+        
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_DPM_OPEN:
+            /* Only for IPA based setups, open dpm port */
+            if (g_strcmp0 (self->priv->net_driver, "ipa") == 0) {
+                dpm_open_port (task);
+                return;
+            }
             ctx->step++;
             /* Fall through */
 
