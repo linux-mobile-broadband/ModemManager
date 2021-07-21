@@ -1553,6 +1553,11 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                         (gpointer) mm_kernel_device_get_driver (
                             mm_port_peek_kernel_device (
                                 MM_PORT (self->priv->data->data))));
+        g_list_foreach (qmi,
+                        (GFunc)mm_port_qmi_set_net_sysfs_path,
+                        (gpointer) mm_kernel_device_get_sysfs_path (
+                            mm_port_peek_kernel_device (
+                                MM_PORT (self->priv->data->data))));
         g_list_foreach (qmi, (GFunc)g_object_ref, NULL);
         self->priv->qmi = g_steal_pointer (&qmi);
     }
