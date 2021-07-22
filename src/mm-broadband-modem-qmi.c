@@ -360,24 +360,35 @@ static MMBearerList *
 modem_create_bearer_list (MMIfaceModem *self)
 {
     MMPortQmi *port;
-    guint      n;
-    guint      n_multiplexed;
-
-    /* The maximum number of available/connected modems is guessed from
-     * the size of the data ports list. */
-    n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (self)));
-    mm_obj_dbg (self, "allowed up to %u active bearers", n);
-
-    /* The maximum number of multiplexed links is retrieved from the
-     * MMPortQmi */
+    guint      n = 0;
+    guint      n_multiplexed = 0;
 
     port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (self));
     if (!port) {
+        /* this should not happen, just fallback to defaults */
         mm_obj_warn (self, "no port to query maximum number of supported network links");
-        n_multiplexed = 0;
     } else {
-        n_multiplexed = mm_port_qmi_get_max_multiplexed_links (port);
-        mm_obj_dbg (self, "allowed up to %u active multiplexed bearers", n_multiplexed);
+        MMPortQmiKernelDataMode kernel_data_modes;
+
+        kernel_data_modes = mm_port_qmi_get_kernel_data_modes (port);
+
+        /* There are setups, like IPA, where there is ONLY multiplexing expected
+         * and supported. In those cases, there isn't any expected non-multiplexed
+         * bearer */
+
+        if (kernel_data_modes & (QMI_WDA_LINK_LAYER_PROTOCOL_RAW_IP | MM_PORT_QMI_KERNEL_DATA_MODE_802_3)) {
+            /* The maximum number of available/connected modems is guessed from
+             * the size of the data ports list. */
+            n = g_list_length (mm_base_modem_peek_data_ports (MM_BASE_MODEM (self)));
+            mm_obj_dbg (self, "allowed up to %u active bearers", n);
+        }
+
+        if (kernel_data_modes & (MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET | MM_PORT_QMI_KERNEL_DATA_MODE_MUX_QMIWWAN)) {
+            /* The maximum number of multiplexed links is retrieved from the
+             * MMPortQmi */
+            n_multiplexed = mm_port_qmi_get_max_multiplexed_links (port);
+            mm_obj_dbg (self, "allowed up to %u active multiplexed bearers", n_multiplexed);
+        }
     }
 
     /* by default, no multiplexing support */
