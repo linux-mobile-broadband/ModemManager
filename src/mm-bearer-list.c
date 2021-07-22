@@ -464,9 +464,9 @@ mm_bearer_list_class_init (MMBearerListClass *klass)
         g_param_spec_uint (MM_BEARER_LIST_MAX_ACTIVE_MULTIPLEXED_BEARERS,
                            "Max active multiplexed bearers",
                            "Maximum number of active multiplexed bearers the list can handle",
-                           1,
+                           0,
                            G_MAXUINT,
-                           1,
+                           0,
                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS, properties[PROP_MAX_ACTIVE_MULTIPLEXED_BEARERS]);
 }
