@@ -86,4 +86,10 @@ mm_sim_iridium_class_init (MMSimIridiumClass *klass)
     base_sim_class->load_operator_identifier_finish = NULL;
     base_sim_class->load_operator_name = NULL;
     base_sim_class->load_operator_name_finish = NULL;
+
+    /* Skip managing preferred networks, not applicable to Iridium modems */
+    base_sim_class->load_preferred_networks = NULL;
+    base_sim_class->load_preferred_networks_finish = NULL;
+    base_sim_class->set_preferred_networks = NULL;
+    base_sim_class->set_preferred_networks_finish = NULL;
 }
