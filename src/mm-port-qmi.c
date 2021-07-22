@@ -2371,7 +2371,7 @@ port_open_step (GTask *task)
         }
 
     case PORT_OPEN_STEP_OPEN_WITHOUT_DATA_FORMAT:
-        if (!self->priv->wda_unsupported) {
+        if (!self->priv->wda_unsupported || !ctx->set_data_format) {
             QmiDeviceOpenFlags  open_flags;
             g_autofree gchar   *open_flags_str = NULL;
 
