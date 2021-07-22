@@ -228,6 +228,10 @@ if WITH_SHARED_OPTION
 pkglib_LTLIBRARIES += libmm-shared-option.la
 libmm_shared_option_la_SOURCES = \
 	option/mm-shared.c \
+	option/mm-shared-option.h \
+	option/mm-shared-option.c \
+	option/mm-sim-option.c \
+	option/mm-sim-option.h \
 	option/mm-broadband-modem-option.c \
 	option/mm-broadband-modem-option.h \
 	$(NULL)
