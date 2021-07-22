@@ -1720,6 +1720,7 @@ qcdm_cmd_log_config_new (char *buf,
     size_t cmdsize = 0, cmdbufsize;
     uint32_t i;
     uint16_t log_code;
+    size_t ret;
 
     qcdm_return_val_if_fail (buf != NULL, 0);
     qcdm_return_val_if_fail ((equip_id & 0xFFF0) == 0, 0);
@@ -1753,7 +1754,10 @@ qcdm_cmd_log_config_new (char *buf,
         cmd->num_items = htole32 (highest);
     }
 
-    return dm_encapsulate_buffer ((char *) cmd, cmdsize, cmdbufsize, buf, len);
+    ret = dm_encapsulate_buffer ((char *) cmd, cmdsize, cmdbufsize, buf, len);
+    free (cmd);
+
+    return ret;
 }
 
 size_t
