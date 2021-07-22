@@ -2118,6 +2118,7 @@ typedef struct {
     PortOpenStep             step;
     gboolean                 set_data_format;
     MMPortQmiKernelDataMode  kernel_data_modes;
+    gboolean                 ctl_raw_ip_unsupported;
 } PortOpenContext;
 
 static void
@@ -2174,13 +2175,29 @@ qmi_device_open_second_ready (QmiDevice    *qmi_device,
                               GAsyncResult *res,
                               GTask        *task)
 {
-    MMPortQmi       *self;
-    PortOpenContext *ctx;
+    MMPortQmi         *self;
+    PortOpenContext   *ctx;
+    g_autoptr(GError)  error = NULL;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
-    if (qmi_device_open_finish (qmi_device, res, &ctx->error)) {
+    if (!qmi_device_open_finish (qmi_device, res, &error)) {
+        /* Not all devices support raw-ip, which is the first thing we try
+         * by default. Detect this case, and retry with 802.3 if so. */
+        if ((g_strcmp0 (self->priv->net_driver, "qmi_wwan") == 0) &&
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_DATA_FORMAT) &&
+            (ctx->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP)) {
+            /* switch to 802.3 right away, so that the logic can successfully go on after that */
+            qmi_device_set_expected_data_format (qmi_device, QMI_DEVICE_EXPECTED_DATA_FORMAT_802_3, NULL);
+            ctx->ctl_raw_ip_unsupported = TRUE;
+            port_open_step (task);
+            return;
+        }
+
+        /* Otherwise, fatal */
+        ctx->error = g_steal_pointer (&error);
+    } else {
         /* If the open with CTL data format is sucessful, update all settings
          * that we would have received with the internal setup data format
          * process */
@@ -2414,6 +2431,10 @@ port_open_step (GTask *task)
                       QMI_DEVICE_OPEN_FLAGS_NET_NO_QOS_HEADER);
 
         ctx->kernel_data_modes = load_current_kernel_data_modes (self, ctx->device);
+
+        /* Skip trying raw-ip if we already tried and it failed */
+        if (ctx->ctl_raw_ip_unsupported)
+            ctx->kernel_data_modes &= ~MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP;
 
         /* Need to reopen setting 802.3/raw-ip using CTL */
         if (ctx->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP)
