@@ -2442,9 +2442,12 @@ port_open_step (GTask *task)
         else if (ctx->kernel_data_modes & MM_PORT_QMI_KERNEL_DATA_MODE_802_3)
             open_flags |= QMI_DEVICE_OPEN_FLAGS_NET_802_3;
         else {
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "Unexpected kernel data mode: cannot setup using CTL");
-            g_object_unref (task);
+            /* Set error and jump to last step, so that we cleanly close the device
+             * in case we need to reopen it right away */
+            ctx->error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                      "Unexpected kernel data mode: cannot setup using CTL");
+            ctx->step = PORT_OPEN_STEP_LAST;
+            port_open_step (task);
             return;
         }
 
