@@ -1127,12 +1127,12 @@ static const DataFormatCombination data_format_combinations[] = {
 
 typedef enum {
     INTERNAL_SETUP_DATA_FORMAT_STEP_FIRST,
+    INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_SUPPORTED_KERNEL_DATA_MODES,
     INTERNAL_SETUP_DATA_FORMAT_STEP_RETRY,
     INTERNAL_SETUP_DATA_FORMAT_STEP_CURRENT_KERNEL_DATA_MODES,
     INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_DPM_CLIENT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_DPM_OPEN,
-    INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_GET_WDA_DATA_FORMAT,
     INTERNAL_SETUP_DATA_FORMAT_STEP_QUERY_DONE,
     INTERNAL_SETUP_DATA_FORMAT_STEP_CHECK_DATA_FORMAT_COMBINATION,
@@ -1588,28 +1588,6 @@ get_data_format_ready (QmiClientWda *client,
 }
 
 static void
-allocate_client_wda_ready (QmiDevice    *device,
-                           GAsyncResult *res,
-                           GTask        *task)
-{
-    InternalSetupDataFormatContext *ctx;
-    GError                         *error = NULL;
-
-    ctx = g_task_get_task_data (task);
-
-    ctx->wda = qmi_device_allocate_client_finish (device, res, &error);
-    if (!ctx->wda) {
-        g_task_return_error (task, error);
-        g_object_unref (task);
-        return;
-    }
-
-    /* Go on to next step */
-    ctx->step++;
-    internal_setup_data_format_context_step (task);
-}
-
-static void
 dpm_open_port_ready (QmiClientDpm *client,
                      GAsyncResult *res,
                      GTask        *task)
@@ -1653,7 +1631,7 @@ dpm_open_port (GTask *task)
 
     tx_sysfs_path = g_build_filename (self->priv->net_sysfs_path, "device", "modem", "tx_endpoint_id", NULL);
     rx_sysfs_path = g_build_filename (self->priv->net_sysfs_path, "device", "modem", "rx_endpoint_id", NULL);
-    
+
     if (g_file_get_contents (rx_sysfs_path, &rx_sysfs_str, NULL, NULL) &&
         g_file_get_contents (tx_sysfs_path, &tx_sysfs_str, NULL, NULL)) {
         if (rx_sysfs_str && tx_sysfs_str) {
@@ -1680,7 +1658,7 @@ dpm_open_port (GTask *task)
     hw_port.interface_number = self->priv->endpoint_interface_number;
     hw_data_ports = g_array_new (FALSE, FALSE, sizeof (QmiMessageDpmOpenPortInputHardwareDataPortsElement));
     g_array_append_val (hw_data_ports, hw_port);
-    
+
     input = qmi_message_dpm_open_port_input_new ();
     qmi_message_dpm_open_port_input_set_hardware_data_ports (input,
                                                              hw_data_ports,
@@ -1716,6 +1694,28 @@ allocate_client_dpm_ready (QmiDevice    *device,
 }
 
 static void
+allocate_client_wda_ready (QmiDevice    *device,
+                           GAsyncResult *res,
+                           GTask        *task)
+{
+    InternalSetupDataFormatContext *ctx;
+    GError                         *error = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    ctx->wda = qmi_device_allocate_client_finish (device, res, &error);
+    if (!ctx->wda) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    internal_setup_data_format_context_step (task);
+}
+
+static void
 internal_setup_data_format_context_step (GTask *task)
 {
     MMPortQmi                      *self;
@@ -1728,6 +1728,18 @@ internal_setup_data_format_context_step (GTask *task)
         case INTERNAL_SETUP_DATA_FORMAT_STEP_FIRST:
             ctx->step++;
             /* Fall through */
+
+        case INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT:
+            /* Allocate new WDA client, only on first loop iteration */
+            g_assert (!ctx->wda);
+            qmi_device_allocate_client (ctx->device,
+                                        QMI_SERVICE_WDA,
+                                        QMI_CID_NONE,
+                                        10,
+                                        g_task_get_cancellable (task),
+                                        (GAsyncReadyCallback) allocate_client_wda_ready,
+                                        task);
+            return;
 
         case INTERNAL_SETUP_DATA_FORMAT_STEP_SUPPORTED_KERNEL_DATA_MODES:
             /* Load kernel data format capabilities, only on first loop iteration */
@@ -1761,27 +1773,11 @@ internal_setup_data_format_context_step (GTask *task)
             }
             ctx->step++;
             /* Fall through */
-        
+
         case INTERNAL_SETUP_DATA_FORMAT_STEP_DPM_OPEN:
             /* Only for IPA based setups, open dpm port */
             if (g_strcmp0 (self->priv->net_driver, "ipa") == 0) {
                 dpm_open_port (task);
-                return;
-            }
-            ctx->step++;
-            /* Fall through */
-
-        case INTERNAL_SETUP_DATA_FORMAT_STEP_ALLOCATE_WDA_CLIENT:
-            /* Only allocate new WDA client on first loop */
-            if (ctx->data_format_combination_i < 0) {
-                g_assert (!ctx->wda);
-                qmi_device_allocate_client (ctx->device,
-                                            QMI_SERVICE_WDA,
-                                            QMI_CID_NONE,
-                                            10,
-                                            g_task_get_cancellable (task),
-                                            (GAsyncReadyCallback) allocate_client_wda_ready,
-                                            task);
                 return;
             }
             ctx->step++;
