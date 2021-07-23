@@ -85,7 +85,8 @@ simid_subscriber_ready_state_ready (MbimDevice *device,
 {
     MbimMessage *response;
     GError *error = NULL;
-    gchar *sim_iccid;
+    gchar *sim_iccid = NULL;
+    g_autofree gchar *raw_iccid = NULL;
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -94,14 +95,18 @@ simid_subscriber_ready_state_ready (MbimDevice *device,
             response,
             NULL, /* ready_state */
             NULL, /* subscriber_id */
-            &sim_iccid,
+            &raw_iccid,
             NULL, /* ready_info */
             NULL, /* telephone_numbers_count */
             NULL, /* telephone_numbers */
             &error))
-        g_task_return_pointer (task, sim_iccid, g_free);
-    else
+        sim_iccid = mm_3gpp_parse_iccid (raw_iccid, &error);
+
+    if (error)
         g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, sim_iccid, g_free);
+
     g_object_unref (task);
 
     if (response)
