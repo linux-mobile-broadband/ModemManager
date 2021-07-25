@@ -105,8 +105,9 @@
           <varlistentry><term><literal>"signal-quality"</literal></term>
             <listitem>
               Signal quality value, given only when registered,
-              as an unsigned integer value
-              (signature <literal>"u"</literal>).
+              as unsigned integer value and an additional boolean value 
+              indicating if the value was recently taken.
+              (signature <literal>"(ub)"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"current-bands"</literal></term>
