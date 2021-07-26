@@ -1176,6 +1176,9 @@ load_settings_from_bearer (MMBearerMbim        *self,
     if (!g_strcmp0 (data_port_driver, "mhi_net"))
         multiplex_supported = FALSE;
 
+    if (mm_kernel_device_get_wwandev_sysfs_path (mm_port_peek_kernel_device (ctx->data)))
+        multiplex_supported = FALSE;
+
     /* If no multiplex setting given by the user, assume default */
     multiplex = mm_bearer_properties_get_multiplex (properties);
     if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN)
