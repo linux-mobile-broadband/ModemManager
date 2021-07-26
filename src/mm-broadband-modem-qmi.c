@@ -8799,14 +8799,14 @@ all_call_status_indication_cb (QmiClientVoice                        *client,
                                               i);
         for (j = 0; j < qmi_remote_party_number_list->len; j++) {
             QmiIndicationVoiceAllCallStatusOutputRemotePartyNumberCall qmi_remote_party_number;
-            
+
             qmi_remote_party_number = g_array_index (qmi_remote_party_number_list,
                                                      QmiIndicationVoiceAllCallStatusOutputRemotePartyNumberCall,
                                                      j);
             if (qmi_call_information.id == qmi_remote_party_number.id) {
                 MMCallInfo *call_info;
 
-                call_info = g_slice_new0 (MMCallInfo); 
+                call_info = g_slice_new0 (MMCallInfo);
                 call_info->index = qmi_call_information.id;
                 call_info->number = g_strdup (qmi_remote_party_number.type);
 
