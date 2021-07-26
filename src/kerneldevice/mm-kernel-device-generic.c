@@ -58,6 +58,7 @@ struct _MMKernelDeviceGenericPrivate {
     gchar  **drivers;
     gchar  **subsystems;
     gchar   *sysfs_path;
+    gchar   *wwandev_sysfs_path;
     gchar   *interface_sysfs_path;
     guint8   interface_class;
     guint8   interface_subclass;
@@ -460,6 +461,30 @@ preload_contents_usb (MMKernelDeviceGeneric *self)
     self->priv->subsystems = (gchar **) g_ptr_array_free (subsystems, FALSE);
 }
 
+static void
+preload_contents_wwan (MMKernelDeviceGeneric *self)
+{
+    g_autofree gchar *iter = NULL;
+
+    /* Find the first parent device subsystem */
+    iter = g_path_get_dirname(self->priv->sysfs_path);
+    while (iter && (g_strcmp0 (iter, "/") != 0)) {
+        g_autofree gchar *current_subsystem = NULL;
+        gchar            *parent;
+
+        current_subsystem = read_sysfs_attribute_link_basename (iter, "subsystem");
+        if (current_subsystem) {
+            if (g_strcmp0 (current_subsystem, "wwan") == 0)
+                self->priv->wwandev_sysfs_path = g_strdup (iter);
+            break;
+        }
+
+        parent = g_path_get_dirname (iter);
+        g_clear_pointer (&iter, g_free);
+        iter = parent;
+    }
+}
+
 static gchar *
 find_device_bus_subsystem (MMKernelDeviceGeneric *self)
 {
@@ -517,6 +542,8 @@ preload_contents (MMKernelDeviceGeneric *self)
         preload_contents_platform (self, bus_subsys);
     else
         preload_contents_other (self);
+
+    preload_contents_wwan (self); /* wwan is bus agnostic class */
 
     if (!bus_subsys)
         return;
@@ -578,6 +605,12 @@ static const gchar *
 kernel_device_get_sysfs_path (MMKernelDevice *self)
 {
     return MM_KERNEL_DEVICE_GENERIC (self)->priv->sysfs_path;
+}
+
+static const gchar *
+kernel_device_get_wwandev_sysfs_path (MMKernelDevice *self)
+{
+    return MM_KERNEL_DEVICE_GENERIC (self)->priv->wwandev_sysfs_path;
 }
 
 static gint
@@ -1200,6 +1233,7 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     kernel_device_class->get_name                  = kernel_device_get_name;
     kernel_device_class->get_driver                = kernel_device_get_driver;
     kernel_device_class->get_sysfs_path            = kernel_device_get_sysfs_path;
+    kernel_device_class->get_wwandev_sysfs_path    = kernel_device_get_wwandev_sysfs_path;
     kernel_device_class->get_physdev_uid           = kernel_device_get_physdev_uid;
     kernel_device_class->get_physdev_vid           = kernel_device_get_physdev_vid;
     kernel_device_class->get_physdev_pid           = kernel_device_get_physdev_pid;

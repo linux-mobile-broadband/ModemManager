@@ -74,6 +74,14 @@ mm_kernel_device_get_sysfs_path (MMKernelDevice *self)
 }
 
 const gchar *
+mm_kernel_device_get_wwandev_sysfs_path (MMKernelDevice *self)
+{
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_wwandev_sysfs_path ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_wwandev_sysfs_path (self) :
+            NULL);
+}
+
+const gchar *
 mm_kernel_device_get_physdev_uid (MMKernelDevice *self)
 {
     /* when a lower device is available, physdev info taken from it */

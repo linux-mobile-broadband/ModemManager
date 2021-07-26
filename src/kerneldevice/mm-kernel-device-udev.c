@@ -348,6 +348,27 @@ kernel_device_get_sysfs_path (MMKernelDevice *_self)
 }
 
 static const gchar *
+kernel_device_get_wwandev_sysfs_path (MMKernelDevice *_self)
+{
+    g_autoptr(GUdevDevice) parent = NULL;
+    MMKernelDeviceUdev *self;
+    const gchar *subsys;
+
+    self = MM_KERNEL_DEVICE_UDEV (_self);
+    parent = g_udev_device_get_parent (self->priv->device);
+
+    if (!parent)
+        return NULL;
+
+    subsys = g_udev_device_get_subsystem (parent);
+
+    if (!subsys || g_strcmp0 (subsys, "wwan"))
+        return NULL;
+
+    return g_udev_device_get_sysfs_path (parent);
+}
+
+static const gchar *
 kernel_device_get_physdev_uid (MMKernelDevice *_self)
 {
     MMKernelDeviceUdev *self;
@@ -780,6 +801,7 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     kernel_device_class->get_name                  = kernel_device_get_name;
     kernel_device_class->get_driver                = kernel_device_get_driver;
     kernel_device_class->get_sysfs_path            = kernel_device_get_sysfs_path;
+    kernel_device_class->get_wwandev_sysfs_path    = kernel_device_get_wwandev_sysfs_path;
     kernel_device_class->get_physdev_uid           = kernel_device_get_physdev_uid;
     kernel_device_class->get_physdev_vid           = kernel_device_get_physdev_vid;
     kernel_device_class->get_physdev_pid           = kernel_device_get_physdev_pid;
