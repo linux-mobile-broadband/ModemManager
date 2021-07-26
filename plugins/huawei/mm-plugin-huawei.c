@@ -460,6 +460,8 @@ propagate_getportmode_hints (MMPlugin *self,
         mode_i++;
     }
 
+    g_list_free (tty_probes);
+
     return n_ports_with_hints;
 }
 
