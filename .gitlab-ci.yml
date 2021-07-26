@@ -12,12 +12,12 @@ stages:
   variables:
     FDO_UPSTREAM_REPO: mobile-broadband/ModemManager
     FDO_DISTRIBUTION_VERSION: '20.04'
-    FDO_DISTRIBUTION_TAG: '2021-04-28.2'
+    FDO_DISTRIBUTION_TAG: '2021-07-27.1'
     FDO_DISTRIBUTION_PACKAGES: ca-certificates git gcc autoconf automake libtool
                                libgettextpo-dev libgirepository1.0-dev libglib2.0-dev
                                libgudev-1.0-dev python3-dbus python3-gi autopoint
-                               xsltproc dbus autoconf-archive gettext gtk-doc-tools
-                               libglib2.0-doc gobject-introspection libsystemd-dev
+                               xsltproc dbus gettext gtk-doc-tools libglib2.0-doc
+                               gobject-introspection libsystemd-dev
                                libpolkit-gobject-1-dev valac
 
 build container:
