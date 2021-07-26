@@ -88,6 +88,7 @@ typedef enum {
     PROCESS_NOTIFICATION_FLAG_USSD                 = 1 << 7,
     PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO      = 1 << 8,
     PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS = 1 << 9,
+    PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS     = 1 << 10,
 } ProcessNotificationFlag;
 
 enum {
@@ -118,6 +119,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_atds_location_supported;
     gboolean is_atds_signal_supported;
     gboolean is_intel_reset_supported;
+    gboolean is_slot_info_status_supported;
 
     /* Process unsolicited notifications */
     guint notification_id;
@@ -152,6 +154,7 @@ struct _MMBroadbandModemMbimPrivate {
 
     /* Multi-SIM support */
     guint32 executor_index;
+    guint active_slot_index;
 };
 
 /*****************************************************************************/
@@ -2247,6 +2250,9 @@ query_device_services_ready (MbimDevice   *device,
                     } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_INFO) {
                         mm_obj_dbg (self, "LTE attach info is supported");
                         self->priv->is_lte_attach_info_supported = TRUE;
+                    } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_SLOT_INFO_STATUS) {
+                        mm_obj_dbg (self, "Slot info status is supported");
+                        self->priv->is_slot_info_status_supported = TRUE;
                     }
                 }
                 continue;
@@ -3699,6 +3705,57 @@ ms_basic_connect_extensions_notification_lte_attach_info (MMBroadbandModemMbim *
     mm_iface_modem_3gpp_update_initial_eps_bearer (MM_IFACE_MODEM_3GPP (self), properties);
 }
 
+/* Modifies the sim at slot == index+1, based on the content of slot_status.
+ * Primarily used when a hotswap occurs on the inactive slot */
+static void
+update_sim_from_slot_status (MMBroadbandModemMbim *self,
+                             MbimUiccSlotState     slot_status,
+                             guint                 slot_index)
+{
+    g_autoptr(MMBaseSim) sim = NULL;
+
+    mm_obj_dbg (self, "Updating sim at slot %d", slot_index + 1);
+
+    if (slot_status == MBIM_UICC_SLOT_STATE_ACTIVE ||
+        slot_status == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM ||
+        slot_status == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM_NO_PROFILES) {
+        sim = mm_sim_mbim_new_initialized (MM_BASE_MODEM (self),
+                                           slot_index,
+                                           FALSE,
+                                           NULL,
+                                           NULL,
+                                           NULL,
+                                           NULL,
+                                           NULL,
+                                           NULL);
+    }
+
+    mm_iface_modem_modify_sim (MM_IFACE_MODEM (self), slot_index, sim);
+}
+
+static void
+ms_basic_connect_extensions_notification_slot_info_status (MMBroadbandModemMbim *self,
+                                                           MbimMessage          *notification)
+{
+    g_autoptr(GError) error = NULL;
+    guint32           slot_index;
+    MbimUiccSlotState slot_state;
+
+    if (!mbim_message_ms_basic_connect_extensions_slot_info_status_notification_parse (
+            notification,
+            &slot_index,
+            &slot_state,
+            &error)) {
+        mm_obj_warn (self, "Couldn't parse slot info status notification: %s", error->message);
+        return;
+    }
+
+    if (self->priv->active_slot_index == slot_index + 1)
+        mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
+    else
+        update_sim_from_slot_status (self, slot_state, slot_index);
+}
+
 static void
 ms_basic_connect_extensions_notification (MMBroadbandModemMbim *self,
                                           MbimMessage *notification)
@@ -3711,6 +3768,10 @@ ms_basic_connect_extensions_notification (MMBroadbandModemMbim *self,
     case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_INFO:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO)
             ms_basic_connect_extensions_notification_lte_attach_info (self, notification);
+        break;
+    case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_SLOT_INFO_STATUS:
+        if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS)
+            ms_basic_connect_extensions_notification_slot_info_status (self, notification);
         break;
     default:
         /* Ignore */
@@ -3770,7 +3831,7 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
 
     mm_obj_dbg (self, "supported notifications: signal (%s), registration (%s), sms (%s), "
                 "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
-                "lte attach info (%s), provisioned contexts (%s)",
+                "lte attach info (%s), provisioned contexts (%s), slot_info_status (%s)",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -3780,7 +3841,8 @@ common_setup_cleanup_unsolicited_events_sync (MMBroadbandModemMbim *self,
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PCO ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
                 self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO ? "yes" : "no",
-                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no");
+                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no",
+                self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS ? "yes" : "no");
 
     if (setup) {
         /* Don't re-enable it if already there */
@@ -3853,6 +3915,8 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
         self->priv->setup_flags &= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
+    if (self->priv->is_slot_info_status_supported)
+        self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_setup_cleanup_unsolicited_events (self, FALSE, callback, user_data);
 }
 
@@ -3871,6 +3935,8 @@ setup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
         self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
         self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
+    if (self->priv->is_slot_info_status_supported)
+        self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_setup_cleanup_unsolicited_events (self, TRUE, callback, user_data);
 }
 
@@ -3947,7 +4013,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
 
     mm_obj_dbg (self, "enabled notifications: signal (%s), registration (%s), sms (%s), "
                 "connect (%s), subscriber (%s), packet (%s), pco (%s), ussd (%s), "
-                "lte attach info (%s), provisioned contexts (%s)",
+                "lte attach info (%s), provisioned contexts (%s), slot_info_status (%s)",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ ? "yes" : "no",
@@ -3957,7 +4023,8 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_USSD ? "yes" : "no",
                 self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO ? "yes" : "no",
-                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no");
+                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS ? "yes" : "no",
+                self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS ? "yes" : "no");
 
     entries = g_new0 (MbimEventEntry *, 5);
 
@@ -3989,15 +4056,18 @@ common_enable_disable_unsolicited_events (MMBroadbandModemMbim *self,
 
     /* Basic connect extensions service */
     if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO ||
-        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO) {
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO ||
+        self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS) {
         entries[n_entries] = g_new (MbimEventEntry, 1);
         memcpy (&(entries[n_entries]->device_service_id), MBIM_UUID_MS_BASIC_CONNECT_EXTENSIONS, sizeof (MbimUuid));
         entries[n_entries]->cids_count = 0;
-        entries[n_entries]->cids = g_new0 (guint32, 2);
+        entries[n_entries]->cids = g_new0 (guint32, 3);
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_PCO)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO;
         if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO)
             entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_INFO;
+        if (self->priv->enable_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS)
+            entries[n_entries]->cids[entries[n_entries]->cids_count++] = MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_SLOT_INFO_STATUS;
         n_entries++;
     }
 
@@ -4233,6 +4303,8 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
+    if (self->priv->is_slot_info_status_supported)
+        self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_enable_disable_unsolicited_events (self, callback, user_data);
 }
 
@@ -4251,6 +4323,8 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
         self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
     if (self->priv->is_lte_attach_info_supported)
         self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO;
+    if (self->priv->is_slot_info_status_supported)
+        self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS;
     common_enable_disable_unsolicited_events (self, callback, user_data);
 }
 
@@ -6317,6 +6391,7 @@ query_device_slot_mappings_ready (MbimDevice   *device,
 
     /* the slot index in MM starts at 1 */
     ctx->active_slot_index = slot_mappings[self->priv->executor_index]->slot + 1;
+    self->priv->active_slot_index = ctx->active_slot_index;
 
     query_slot_information_status (device, ctx->query_slot_index, task);
 }
@@ -6551,11 +6626,13 @@ set_device_slot_mappings_ready (MbimDevice   *device,
 
     for (i = 0; i < map_count; i++) {
         if (i == self->priv->executor_index) {
-            if (slot_number != slot_mappings[i]->slot)
+            if (slot_number != slot_mappings[i]->slot) {
                 g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
                                          "SIM slot switch to '%u' failed", slot_number);
-            else
+            } else {
+                self->priv->active_slot_index = slot_number + 1;
                 g_task_return_boolean (task, TRUE);
+            }
 
             g_object_unref (task);
             return;
