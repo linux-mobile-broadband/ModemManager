@@ -533,7 +533,7 @@ mbim_query_device_services (GTask *task)
     message = mbim_message_device_services_query_new (NULL);
     mbim_device_command (self->priv->mbim_device,
                          message,
-                         10,
+                         20,
                          NULL,
                          (GAsyncReadyCallback)mbim_query_device_services_ready,
                          task);
