@@ -12,13 +12,13 @@ stages:
   variables:
     FDO_UPSTREAM_REPO: mobile-broadband/ModemManager
     FDO_DISTRIBUTION_VERSION: '20.04'
-    FDO_DISTRIBUTION_TAG: '2021-07-27.1'
+    FDO_DISTRIBUTION_TAG: '2021-07-28.2'
     FDO_DISTRIBUTION_PACKAGES: ca-certificates git gcc autoconf automake libtool
                                libgettextpo-dev libgirepository1.0-dev libglib2.0-dev
                                libgudev-1.0-dev python3-dbus python3-gi autopoint
                                xsltproc dbus gettext gtk-doc-tools libglib2.0-doc
-                               gobject-introspection libsystemd-dev
-                               libpolkit-gobject-1-dev valac
+                               gobject-introspection python-is-python3 libsystemd-dev
+                               libpolkit-gobject-1-dev valac meson ninja-build
 
 build container:
   extends:
@@ -45,10 +45,9 @@ build-no-qmi:
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false
+    - ninja -C build
+    - ninja -C build install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-qmi
@@ -162,10 +161,9 @@ build-single-plugins:
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false
+    - ninja -C build
+    - ninja -C build install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
@@ -204,10 +202,9 @@ build-default:
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
     - pushd libmbim
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --enable-introspection
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=true -Dbash_completion=false
+    - ninja -C build
+    - ninja -C build install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
