@@ -2141,10 +2141,10 @@ load_settings_from_bearer (MMBearerQmi         *self,
     GError              *inner_error = NULL;
     const gchar         *str;
 
-    /* If no multiplex setting given by the user, assume default */
+    /* If no multiplex setting given by the user, assume requested */
     ctx->multiplex = mm_bearer_properties_get_multiplex (properties);
     if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN)
-        ctx->multiplex = MM_BASE_BEARER_MULTIPLEX_SUPPORT_DEFAULT;
+        ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
 
     /* The link prefix hint given must be modem-specific */
     if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||

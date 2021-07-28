@@ -1179,10 +1179,10 @@ load_settings_from_bearer (MMBearerMbim        *self,
     if (mm_kernel_device_get_wwandev_sysfs_path (mm_port_peek_kernel_device (ctx->data)))
         multiplex_supported = FALSE;
 
-    /* If no multiplex setting given by the user, assume default */
+    /* If no multiplex setting given by the user, assume requested */
     multiplex = mm_bearer_properties_get_multiplex (properties);
     if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN)
-        multiplex = MM_BASE_BEARER_MULTIPLEX_SUPPORT_DEFAULT;
+        multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
 
     if (multiplex_supported &&
         (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
