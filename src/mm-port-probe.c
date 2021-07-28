@@ -1086,6 +1086,9 @@ static const MMPortProbeAtCommand at_probing[] = {
     { "AT",  3, mm_port_probe_response_processor_is_at },
     { "AT",  3, mm_port_probe_response_processor_is_at },
     { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
     { NULL }
 };
 
