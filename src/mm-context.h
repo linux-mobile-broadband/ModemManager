@@ -54,7 +54,8 @@ gboolean     mm_context_get_test_no_suspend_resume (void);
 gboolean     mm_context_get_test_quick_suspend_resume (void);
 #endif
 #if defined WITH_QRTR
-gboolean     mm_context_get_test_no_qrtr    (void);
+gboolean     mm_context_get_test_no_qrtr (void);
 #endif
+gboolean     mm_context_get_test_multiplex_requested (void);
 
 #endif /* MM_CONTEXT_H */

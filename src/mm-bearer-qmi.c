@@ -34,6 +34,7 @@
 #include "mm-port-enums-types.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
+#include "mm-context.h"
 
 G_DEFINE_TYPE (MMBearerQmi, mm_bearer_qmi, MM_TYPE_BASE_BEARER)
 
@@ -2147,7 +2148,9 @@ load_settings_from_bearer (MMBearerQmi         *self,
     /* If no multiplex setting given by the user, assume none; unless in IPA */
     ctx->multiplex = mm_bearer_properties_get_multiplex (properties);
     if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN) {
-        if (!g_strcmp0 (data_port_driver, "ipa"))
+        if (mm_context_get_test_multiplex_requested ())
+            ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
+        else if (!g_strcmp0 (data_port_driver, "ipa"))
             ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED;
         else
             ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;

@@ -222,6 +222,7 @@ static gboolean  test_quick_suspend_resume;
 #if defined WITH_QRTR
 static gboolean  test_no_qrtr;
 #endif
+static gboolean  test_multiplex_requested;
 
 static const GOptionEntry test_entries[] = {
     {
@@ -265,6 +266,11 @@ static const GOptionEntry test_entries[] = {
         NULL
     },
 #endif
+    {
+        "test-multiplex-requested", 0, 0, G_OPTION_ARG_NONE, &test_multiplex_requested,
+        "Default to request multiplex support if no explicitly given",
+        NULL
+    },
     { NULL }
 };
 
@@ -328,6 +334,13 @@ mm_context_get_test_no_qrtr (void)
     return test_no_qrtr;
 }
 #endif
+
+gboolean
+mm_context_get_test_multiplex_requested (void)
+{
+    return test_multiplex_requested;
+}
+
 /*****************************************************************************/
 
 static void
