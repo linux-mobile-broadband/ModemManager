@@ -1011,10 +1011,11 @@ connect (MMBaseBearer *self,
         return;
     }
 
-    /* If no multiplex setting given by the user, assume requested */
+    /* If no multiplex setting given by the user, assume none (which is the only
+     * supported mode anyway)  */
     multiplex = mm_bearer_properties_get_multiplex (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
     if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN)
-        multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
+        multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;
 
     /* The generic broadband bearer doesn't support multiplexing */
     if (multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED) {
