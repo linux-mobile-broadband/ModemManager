@@ -2140,11 +2140,18 @@ load_settings_from_bearer (MMBearerQmi         *self,
     MMBearerAllowedAuth  bearer_auth;
     GError              *inner_error = NULL;
     const gchar         *str;
+    const gchar         *data_port_driver;
 
-    /* If no multiplex setting given by the user, assume requested */
+    data_port_driver = mm_kernel_device_get_driver (mm_port_peek_kernel_device (ctx->data));
+
+    /* If no multiplex setting given by the user, assume none; unless in IPA */
     ctx->multiplex = mm_bearer_properties_get_multiplex (properties);
-    if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN)
-        ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
+    if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_UNKNOWN) {
+        if (!g_strcmp0 (data_port_driver, "ipa"))
+            ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED;
+        else
+            ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;
+    }
 
     /* The link prefix hint given must be modem-specific */
     if (ctx->multiplex == MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED ||
