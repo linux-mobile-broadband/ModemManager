@@ -131,6 +131,7 @@ struct _MMBroadbandModemHuaweiPrivate {
     GRegex *cschannelinfo_regex;
     GRegex *ccallstate_regex;
     GRegex *eons_regex;
+    GRegex *lwurc_regex;
 
     FeatureSupport ndisdup_support;
     FeatureSupport rfswitch_support;
@@ -4374,6 +4375,10 @@ set_ignored_unsolicited_events_handlers (MMBroadbandModemHuawei *self)
             port,
             self->priv->eons_regex,
             NULL, NULL, NULL);
+        mm_port_serial_at_add_unsolicited_msg_handler (
+            port,
+            self->priv->lwurc_regex,
+            NULL, NULL, NULL);
     }
 
     g_list_free_full (ports, g_object_unref);
@@ -4514,6 +4519,8 @@ mm_broadband_modem_huawei_init (MMBroadbandModemHuawei *self)
                                                 G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->eons_regex = g_regex_new ("\\r\\n\\^EONS:.+\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->lwurc_regex = g_regex_new ("\\r\\n\\^LWURC:.+\\r\\n",
+                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 
     self->priv->ndisdup_support = FEATURE_SUPPORT_UNKNOWN;
     self->priv->rfswitch_support = FEATURE_SUPPORT_UNKNOWN;
@@ -4573,6 +4580,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->cschannelinfo_regex);
     g_regex_unref (self->priv->ccallstate_regex);
     g_regex_unref (self->priv->eons_regex);
+    g_regex_unref (self->priv->lwurc_regex);
 
     if (self->priv->syscfg_supported_modes)
         g_array_unref (self->priv->syscfg_supported_modes);
