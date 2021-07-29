@@ -2056,9 +2056,14 @@ load_current_bands (MMIfaceModem        *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    /* The timeout in this command is extremely large, because there are some
+     * modules like the EGS5 that build the response based on the current network
+     * registration, and that implies the module needs to be registered. If for
+     * any reason there is no serving network where to register, the response
+     * comes after a very long time, up to 100s. */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "AT^SCFG?",
-                              3,
+                              120,
                               FALSE,
                               (GAsyncReadyCallback)get_band_ready,
                               task);
