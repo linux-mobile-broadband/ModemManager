@@ -1,8 +1,8 @@
 
 EXTRA_DIST = \
 	header-generator.xsl \
-	mm-enums-template.h \
-	mm-enums-template.c \
-	mm-errors-template.h \
-	mm-errors-template.c \
-	mm-errors-quarks-template.c
+	mm-enums-types.h.template \
+	mm-enums-types.c.template \
+	mm-errors-types.h.template \
+	mm-errors-types.c.template \
+	mm-errors-quarks.c.template

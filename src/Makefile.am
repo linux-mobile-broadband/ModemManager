@@ -85,17 +85,17 @@ HELPER_ENUMS_GENERATED = \
 	mm-helper-enums-types.c \
 	$(NULL)
 
-mm-helper-enums-types.h: Makefile.am $(HELPER_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+mm-helper-enums-types.h: Makefile.am $(HELPER_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-types.h.template
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-sms-part.h\"\n#include \"mm-modem-helpers.h\"\n#ifndef __MM_HELPER_ENUMS_TYPES_H__\n#define __MM_HELPER_ENUMS_TYPES_H__\n" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.h \
+		--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
 		--ftail "#endif /* __MM_HELPER_ENUMS_TYPES_H__ */\n" \
 		$(HELPER_ENUMS_INPUTS) > $@
 
-mm-helper-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-helper-enums-types.h
+mm-helper-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-types.c.template mm-helper-enums-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-helper-enums-types.h\"" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.c \
+		--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
 		$(HELPER_ENUMS_INPUTS) > $@
 
 libhelpers_la_SOURCES = \
@@ -198,17 +198,17 @@ PORT_ENUMS_GENERATED = \
 	mm-port-enums-types.c \
 	$(NULL)
 
-mm-port-enums-types.h: Makefile.am $(PORT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+mm-port-enums-types.h: Makefile.am $(PORT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-types.h.template
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"config.h\"\n#include \"mm-port.h\"\n#include \"mm-port-serial-at.h\"\n#if defined WITH_QMI\n#include \"mm-port-qmi.h\"\n#endif\n#ifndef __MM_PORT_ENUMS_TYPES_H__\n#define __MM_PORT_ENUMS_TYPES_H__\n" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.h \
+		--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
 		--ftail "#endif /* __MM_PORT_ENUMS_TYPES_H__ */\n" \
 		$(PORT_ENUMS_INPUTS) > $@
 
-mm-port-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-port-enums-types.h
+mm-port-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-types.c.template mm-port-enums-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-port-enums-types.h\"" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.c \
+		--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
 		$(PORT_ENUMS_INPUTS) > $@
 
 libport_la_SOURCES = \
@@ -273,17 +273,17 @@ DAEMON_ENUMS_GENERATED = \
 	mm-daemon-enums-types.c \
 	$(NULL)
 
-mm-daemon-enums-types.h: Makefile.am $(DAEMON_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+mm-daemon-enums-types.h: Makefile.am $(DAEMON_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-types.h.template
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-filter.h\"\n#include \"mm-base-bearer.h\"\n#include \"mm-port-probe.h\"\n#ifndef __MM_DAEMON_ENUMS_TYPES_H__\n#define __MM_DAEMON_ENUMS_TYPES_H__\n" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.h \
+		--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
 		--ftail "#endif /* __MM_DAEMON_ENUMS_TYPES_H__ */\n" \
 		$(DAEMON_ENUMS_INPUTS) > $@
 
-mm-daemon-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-daemon-enums-types.h
+mm-daemon-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-types.c.template mm-daemon-enums-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-daemon-enums-types.h\"" \
-		--template $(top_srcdir)/build-aux/mm-enums-template.c \
+		--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
 		$(DAEMON_ENUMS_INPUTS) > $@
 
 # Request to build enum types before anything else

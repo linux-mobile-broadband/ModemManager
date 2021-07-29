@@ -342,21 +342,21 @@ TELIT_ENUMS_GENERATED = \
 BUILT_SOURCES += $(TELIT_ENUMS_GENERATED)
 CLEANFILES    += $(TELIT_ENUMS_GENERATED)
 
-telit/mm-telit-enums-types.h: Makefile.am $(TELIT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+telit/mm-telit-enums-types.h: Makefile.am $(TELIT_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-types.h.template
 	$(AM_V_GEN) \
 		$(MKDIR_P) telit; \
 		$(GLIB_MKENUMS) \
 			--fhead "#include \"mm-modem-helpers-telit.h\"\n#ifndef __MM_TELIT_ENUMS_TYPES_H__\n#define __MM_TELIT_ENUMS_TYPES_H__\n" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.h \
+			--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
 			--ftail "#endif /* __MM_TELIT_ENUMS_TYPES_H__ */\n" \
 			$(TELIT_ENUMS_INPUTS) > $@
 
-telit/mm-telit-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c telit/mm-telit-enums-types.h
+telit/mm-telit-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-types.c.template telit/mm-telit-enums-types.h
 	$(AM_V_GEN) \
 		$(MKDIR_P) telit; \
 		$(GLIB_MKENUMS) \
 			--fhead "#include \"mm-telit-enums-types.h\"" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.c \
+			--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
 			$(TELIT_ENUMS_INPUTS) > $@
 
 noinst_LTLIBRARIES += libhelpers-telit.la
@@ -799,21 +799,21 @@ HUAWEI_ENUMS_GENERATED = \
 BUILT_SOURCES += $(HUAWEI_ENUMS_GENERATED)
 CLEANFILES    += $(HUAWEI_ENUMS_GENERATED)
 
-huawei/mm-huawei-enums-types.h: Makefile.am $(HUAWEI_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+huawei/mm-huawei-enums-types.h: Makefile.am $(HUAWEI_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-types.h.template
 	$(AM_V_GEN) \
 		$(MKDIR_P) huawei; \
 		$(GLIB_MKENUMS) \
 			--fhead "#include \"mm-modem-helpers-huawei.h\"\n#ifndef __MM_HUAWEI_ENUMS_TYPES_H__\n#define __MM_HUAWEI_ENUMS_TYPES_H__\n" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.h \
+			--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
 			--ftail "#endif /* __MM_HUAWEI_ENUMS_TYPES_H__ */\n" \
 			$(HUAWEI_ENUMS_INPUTS) > $@
 
-huawei/mm-huawei-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c huawei/mm-huawei-enums-types.h
+huawei/mm-huawei-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-types.c.template huawei/mm-huawei-enums-types.h
 	$(AM_V_GEN) \
 		$(MKDIR_P) huawei; \
 		$(GLIB_MKENUMS) \
 			--fhead "#include \"mm-huawei-enums-types.h\"" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.c \
+			--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
 			$(HUAWEI_ENUMS_INPUTS) > $@
 
 noinst_LTLIBRARIES += libhelpers-huawei.la
@@ -1543,21 +1543,21 @@ UBLOX_ENUMS_GENERATED = \
 	ublox/mm-ublox-enums-types.c \
 	$(NULL)
 
-ublox/mm-ublox-enums-types.h: Makefile.am $(UBLOX_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-template.h
+ublox/mm-ublox-enums-types.h: Makefile.am $(UBLOX_ENUMS_INPUTS) $(top_srcdir)/build-aux/mm-enums-types.h.template
 	$(AM_V_GEN) \
 		$(MKDIR_P) ublox; \
 		$(GLIB_MKENUMS) \
 			--fhead "#include \"mm-modem-helpers-ublox.h\"\n#ifndef __MM_UBLOX_ENUMS_TYPES_H__\n#define __MM_UBLOX_ENUMS_TYPES_H__\n" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.h \
+			--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
 			--ftail "#endif /* __MM_UBLOX_ENUMS_TYPES_H__ */\n" \
 			$(UBLOX_ENUMS_INPUTS) > $@
 
-ublox/mm-ublox-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c ublox/mm-ublox-enums-types.h
+ublox/mm-ublox-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-types.c.template ublox/mm-ublox-enums-types.h
 	$(AM_V_GEN) \
 		$(MKDIR_P) ublox; \
 		$(GLIB_MKENUMS) \
 			--fhead "#include \"mm-ublox-enums-types.h\"" \
-			--template $(top_srcdir)/build-aux/mm-enums-template.c \
+			--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
 			$(UBLOX_ENUMS_INPUTS) > $@
 
 libhelpers_ublox_la_SOURCES = \
