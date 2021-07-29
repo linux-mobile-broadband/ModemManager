@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2021 Iñigo Martinez <inigomartinez@gmail.com>
+
+option('udev', type: 'feature', value: 'auto', description: 'enable udev support')
+option('udevdir', type: 'string', value: '', description: 'udev base directory')
+
+option('dbus_policy_dir', type: 'string', value: '', description: 'd-bus system policy directory')
+
+option('systemdsystemunitdir', type: 'string', value: '', description: 'systemd system units directory')
+option('systemd_suspend_resume', type: 'boolean', value: true, description: 'enable suspend/resume support')
+option('systemd_journal', type: 'boolean', value: true, description: 'enable systemd journal support')
+
+option('polkit', type: 'combo', choices: ['strict', 'permissive', 'no'], value: 'strict', description: 'User auth-polkit configuration option.')
+
+option('at_command_via_dbus', type: 'boolean', value: false, description: 'enable at commands vida d-bus')
+
+option('mbim', type: 'feature', value: 'auto', description: 'enable MBIM support')
+option('qmi', type: 'feature', value: 'auto', description: 'enable QMI support')
+option('qrtr', type: 'feature', value: 'auto', description: 'enable QRTR support')
+
+option('dist_version', type: 'string', value: '', description: 'define the custom version (like distribution package name and revision')
+
+option('plugin_disable_all', type: 'boolean', value: false, description: 'disable all plugin support')
+
+option('plugin_generic', type: 'boolean', value: true, description: 'enable generic plugin support')
+option('plugin_altair_lte', type: 'boolean', value: true, description: 'enable altair lte plugin support')
+option('plugin_anydata', type: 'boolean', value: true, description: 'enable anydata plugin support')
+option('plugin_broadmobi', type: 'boolean', value: true, description: 'enable broadmobi plugin support')
+option('plugin_cinterion', type: 'boolean', value: true, description: 'enable cinterion plugin support')
+
+# shared_sierra, shared_novatel, shared_xmm, shared_telit, shared_foxonn
+option('plugin_dell', type: 'boolean', value: true, description: 'enable dell plugin support')
+
+option('plugin_dlink', type: 'boolean', value: true, description: 'enable dlink plugin support')
+
+# shared_xmm
+option('plugin_fibocom', type: 'boolean', value: true, description: 'enable fibocom plugin support')
+
+# shared_foxconn
+option('plugin_foxconn', type: 'boolean', value: true, description: 'enable foxconn plugin support')
+option('plugin_gosuncn', type: 'boolean', value: true, description: 'enable gosuncn plugin support')
+option('plugin_haier', type: 'boolean', value: true, description: 'enable haier plugin support')
+option('plugin_huawei', type: 'boolean', value: true, description: 'enable huawei plugin support')
+option('plugin_iridium', type: 'boolean', value: true, description: 'enable iridium plugin support')
+option('plugin_linktop', type: 'boolean', value: true, description: 'enable linktop plugin support')
+option('plugin_longcheer', type: 'boolean', value: true, description: 'enable longcheer plugin support')
+option('plugin_mbm', type: 'boolean', value: true, description: 'enable mbm plugin support')
+option('plugin_motorola', type: 'boolean', value: true, description: 'enable motorola plugin support')
+option('plugin_mtk', type: 'boolean', value: true, description: 'enable mtk plugin support')
+option('plugin_nokia', type: 'boolean', value: true, description: 'enable nokia plugin support')
+
+# shared_icera
+option('plugin_nokia_icera', type: 'boolean', value: true, description: 'enable nokia icera plugin support')
+
+# shared_novatel
+option('plugin_novatel', type: 'boolean', value: true, description: 'enable novatel plugin support')
+option('plugin_novatel_lte', type: 'boolean', value: true, description: 'enable novatel lte plugin support')
+
+# shared_option
+option('plugin_option', type: 'boolean', value: true, description: 'enable option plugin support')
+
+# shared_option
+option('plugin_option_hso', type: 'boolean', value: true, description: 'enable option hso plugin support')
+option('plugin_pantech', type: 'boolean', value: true, description: 'enable pantech plugin support')
+
+option('plugin_qcom_soc', type: 'boolean', value: false, description: 'enable qcom soc plugin support')
+option('plugin_quectel', type: 'boolean', value: true, description: 'enable quectel plugin support')
+
+# shared_icera
+option('plugin_samsung', type: 'boolean', value: true, description: 'enable samsung plugin support')
+
+# shared_icera, shared_sierra
+option('plugin_sierra_legacy', type: 'boolean', value: true, description: 'enable sierra legacy plugin support')
+
+# shared_xmm
+option('plugin_sierra', type: 'boolean', value: true, description: 'enable sierra plugin support')
+option('plugin_simtech', type: 'boolean', value: true, description: 'enable simtech plugin support')
+
+# shared_telit
+option('plugin_telit', type: 'boolean', value: true, description: 'enable telit plugin support')
+option('plugin_thuraya', type: 'boolean', value: true, description: 'enable thuraya plugin support')
+option('plugin_tplink', type: 'boolean', value: true, description: 'enable tplink plugin support')
+option('plugin_ublox', type: 'boolean', value: true, description: 'enable ublox plugin support')
+option('plugin_via', type: 'boolean', value: true, description: 'enable via plugin support')
+option('plugin_wavecom', type: 'boolean', value: true, description: 'enable wavecom plugin support')
+option('plugin_x22x', type: 'boolean', value: true, description: 'enable x22x plugin support')
+
+# shared_icera
+option('plugin_zte', type: 'boolean', value: true, description: 'enable zte plugin support')
+
+option('qcdm_standalone', type: 'boolean', value: true, description: 'enable standalone qdcm')
+
+option('introspection', type: 'feature', value: 'auto', description: 'build introspection support')
+option('vapi', type: 'boolean', value: false, description: 'build vala bindings')
+
+option('man', type: 'boolean', value: true, description: 'build manual pages')
+option('gtk_doc', type: 'boolean', value: false, description: 'use gtk-doc to build documentation')
+
+option('bash_completion', type: 'boolean', value: true, description: 'install bash completion files')

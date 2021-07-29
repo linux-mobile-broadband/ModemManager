@@ -1,0 +1,8 @@
+{
+global:
+  mm_plugin_major_version*;
+  mm_plugin_minor_version*;
+  mm_plugin_create*;
+local:
+  *;
+};
