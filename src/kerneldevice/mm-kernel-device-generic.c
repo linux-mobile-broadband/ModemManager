@@ -128,7 +128,8 @@ read_sysfs_attribute_link_basename (const gchar *path,
 
 static gchar *
 lookup_sysfs_attribute_as_string (MMKernelDeviceGeneric *self,
-                                  const gchar           *attribute)
+                                  const gchar           *attribute,
+                                  gboolean              iterate)
 {
     g_autofree gchar *iter = NULL;
 
@@ -145,6 +146,8 @@ lookup_sysfs_attribute_as_string (MMKernelDeviceGeneric *self,
         /* return first one found */
         if ((value = read_sysfs_attribute_as_string (iter, attribute)) != NULL)
             return value;
+        else if (!iterate)
+            break;
 
         if (g_strcmp0 (iter, self->priv->physdev_sysfs_path) == 0)
             break;
@@ -834,7 +837,7 @@ check_condition (MMKernelDeviceGeneric *self,
     }
 
     /* Attributes checks */
-    if (g_str_has_prefix (match->parameter, "ATTRS")) {
+    if (g_str_has_prefix (match->parameter, "ATTR")) {
         gchar    *attribute;
         gchar    *contents = NULL;
         gboolean  result = FALSE;
@@ -873,7 +876,7 @@ check_condition (MMKernelDeviceGeneric *self,
         else {
             g_autofree gchar *found_value = NULL;
 
-            found_value = lookup_sysfs_attribute_as_string (self, attribute);
+            found_value = lookup_sysfs_attribute_as_string (self, attribute, g_str_has_prefix (match->parameter, "ATTRS"));
             result = ((found_value && g_str_equal (found_value, match->value)) == condition_equal);
         }
 
