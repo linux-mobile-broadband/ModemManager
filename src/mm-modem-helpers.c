@@ -5401,3 +5401,14 @@ mm_sim_parse_cpol_test_response (const gchar  *response,
 
     return TRUE;
 }
+
+#define EID_BYTE_LENGTH 16
+
+gchar *
+mm_decode_eid (const gchar *eid, gsize eid_len)
+{
+    if (eid_len != EID_BYTE_LENGTH)
+        return NULL;
+
+    return mm_bcd_to_string ((const guint8 *) eid, eid_len, FALSE /* low_nybble_first */);
+}

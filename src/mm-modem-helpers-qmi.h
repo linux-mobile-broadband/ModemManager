@@ -188,10 +188,6 @@ gboolean mm_qmi_uim_get_card_status_output_parse (gpointer                      
                                                   GError                           **error);
 
 /*****************************************************************************/
-/* UIM Get Slot Status parsing */
-gchar *mm_qmi_uim_decode_eid (const gchar *eid, gsize eid_len);
-
-/*****************************************************************************/
 /* UIM Get Configuration parsing */
 
 gboolean mm_qmi_uim_get_configuration_output_parse (gpointer                              log_object,

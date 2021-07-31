@@ -572,4 +572,9 @@ gboolean mm_sim_parse_cpol_test_response (const gchar  *response,
  * and in order to avoid -Wtype-limits warnings. */
 #define MM_CLAMP_HIGH(x, high) (((x) > (high)) ? (high) : (x))
 
+/*****************************************************************************/
+
+/* Helper function to decode eid read from esim */
+gchar *mm_decode_eid (const gchar *eid, gsize eid_len);
+
 #endif  /* MM_MODEM_HELPERS_H */

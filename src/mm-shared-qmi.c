@@ -3419,7 +3419,7 @@ uim_get_slot_status_ready (QmiClientUim *client,
 
                 slot_eid = g_array_index (slot_eids, GArray *, i);
                 if (slot_eid->len)
-                    eid = mm_qmi_uim_decode_eid (slot_eid->data, slot_eid->len);
+                    eid = mm_decode_eid (slot_eid->data, slot_eid->len);
                 if (!eid)
                     mm_obj_dbg (self, "SIM in slot %d is marked as eUICC, but has malformed EID", i + 1);
             }

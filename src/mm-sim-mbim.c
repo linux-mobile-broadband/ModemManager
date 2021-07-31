@@ -31,6 +31,26 @@
 #include "mm-modem-helpers-mbim.h"
 #include "mm-sim-mbim.h"
 
+typedef enum {
+    ESIM_CHECK_STEP_UICC_OPEN_CHANNEL,
+    ESIM_CHECK_STEP_UICC_GET_APDU,
+    ESIM_CHECK_STEP_UICC_CLOSE_CHANNEL,
+    ESIM_CHECK_STEP_UICC_STEP_LAST
+} EsimCheckStep;
+
+typedef struct {
+    EsimCheckStep step;
+    guint32       channel;
+    guint32       channel_grp;
+    gchar        *eid;
+}EsimCheckContext;
+
+void esim_check_step (MbimDevice *device, GTask *task);
+
+void esim_check_step_free (EsimCheckContext *ctx);
+
+/*****************************************************************************/
+
 G_DEFINE_TYPE (MMSimMbim, mm_sim_mbim, MM_TYPE_BASE_SIM)
 
 /*****************************************************************************/
@@ -200,6 +220,244 @@ load_imsi (MMBaseSim *self,
                          (GAsyncReadyCallback)imsi_subscriber_ready_state_ready,
                          task);
     mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+
+#define UICC_STATUS_OK 144
+#define EID_APDU_HEADER 5
+
+static void
+check_uicc_close_channel_ready (MbimDevice *device,
+                                GAsyncResult *res,
+                                GTask *task)
+{
+    g_autoptr(GError)      error = NULL;
+    g_autoptr(MbimMessage) response = NULL;
+    guint32                status;
+    EsimCheckContext *ctx;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response,
+                                           MBIM_MESSAGE_TYPE_COMMAND_DONE,
+                                           &error) ||
+        !mbim_message_ms_uicc_low_level_access_close_channel_response_parse (
+            response, &status, &error)) {
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+    if (status != UICC_STATUS_OK) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "UICC close channel failed");
+        g_object_unref (task);
+        return;
+    }
+    ctx = g_task_get_task_data (task);
+    /* If ESIM_CHECK_STEP_UICC_CLOSE_CHANNEL is successful,
+     * go on to next step.
+     */
+    ctx->step++;
+    esim_check_step (device, task);
+    return;
+}
+
+static void
+check_uicc_apdu_ready (MbimDevice *device,
+                       GAsyncResult *res,
+                       GTask *task)
+{
+    g_autoptr(GError)        error = NULL;
+    g_autoptr(MbimMessage)   response = NULL;
+    guint32                  status;
+    guint32                  response_size;
+    const guint8            *out_response = NULL;
+    EsimCheckContext        *ctx;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE,&error) ||
+        !mbim_message_ms_uicc_low_level_access_apdu_response_parse (
+            response,
+            &status,
+            &response_size,
+            &out_response,
+            &error)) {
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+    /* Store results */
+    ctx = g_task_get_task_data (task);
+    ctx->eid = mm_decode_eid ((const gchar *)(out_response + EID_APDU_HEADER),
+                              response_size - EID_APDU_HEADER);
+
+    /* If ESIM_CHECK_STEP_UICC_GET_APDU is successful, go on to next step */
+    ctx->step++;
+    esim_check_step (device, task);
+    return;
+}
+
+static void
+check_uicc_open_channel_ready (MbimDevice *device,
+                               GAsyncResult *res,
+                               GTask *task)
+{
+    g_autoptr(GError)      error = NULL;
+    g_autoptr(MbimMessage) response = NULL;
+    guint32                status;
+    guint32                channel;
+    EsimCheckContext      *ctx;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_uicc_low_level_access_open_channel_response_parse (
+            response,
+            &status,
+            &channel,
+            NULL,
+            NULL,
+            &error)) {
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
+        return;
+    }
+
+        if (status != UICC_STATUS_OK) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "UICC open channel failed");
+            g_object_unref (task);
+            return;
+        }
+
+    ctx = g_task_get_task_data (task);
+    ctx->channel = channel;
+    /* If ESIM_CHECK_STEP_UICC_OPEN_CHANNEL is successful, go on to next step */
+    ctx->step++;
+    esim_check_step (device, task);
+    return;
+}
+
+
+void
+esim_check_step_free (EsimCheckContext *ctx)
+{
+    g_free (ctx->eid);
+    g_free (ctx);
+}
+
+void
+esim_check_step (MbimDevice *device,
+                 GTask *task)
+{
+    EsimCheckContext      *ctx;
+    g_autoptr(MbimMessage) message = NULL;
+
+    /* Don't run new steps if we're cancelled */
+    if (g_task_return_error_if_cancelled (task)) {
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_task_get_task_data (task);
+    switch (ctx->step) {
+    case ESIM_CHECK_STEP_UICC_OPEN_CHANNEL: {
+        const guint8 app_id[16] = {0xa0, 0x00, 0x00, 0x05, 0x59, 0x10, 0x10, 0xff,
+                                   0xff, 0xff, 0xff, 0x89, 0x00, 0x00, 0x01, 0x00};
+
+    /* Channel group is used to bundle all logical channels opened and for future reference to close */
+        ctx->channel_grp = 1;
+        message = mbim_message_ms_uicc_low_level_access_open_channel_set_new (
+                      sizeof (app_id),
+                      app_id,
+                      4, /* SelectP2Arg: Return File Control Parameters(FCP) template.
+                          * Refer 11.1.13 of of the ETSI TS 102 221 technical specification.
+                          */
+                      ctx->channel_grp,
+                      NULL);
+        mbim_device_command (device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)check_uicc_open_channel_ready,
+                             task);
+        break;
+    }
+    case ESIM_CHECK_STEP_UICC_GET_APDU: {
+        const guint8 apdu_cmd[12] = {0x81, 0xe2, 0x91, 0x00, 0x06, 0xbf,
+                                     0x3e, 0x03, 0x5c, 0x01, 0x5a, 0x00};
+
+        message = mbim_message_ms_uicc_low_level_access_apdu_set_new (
+                      ctx->channel,
+                      MBIM_UICC_SECURE_MESSAGING_NONE,
+                      MBIM_UICC_CLASS_BYTE_TYPE_EXTENDED,
+                      sizeof (apdu_cmd),
+                      apdu_cmd,
+                      NULL);
+        mbim_device_command (device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)check_uicc_apdu_ready,
+                             task);
+        break;
+    }
+    case ESIM_CHECK_STEP_UICC_CLOSE_CHANNEL: {
+        message = mbim_message_ms_uicc_low_level_access_close_channel_set_new (
+                      ctx->channel,
+                      ctx->channel_grp,
+                      NULL);
+        mbim_device_command (device,
+                             message,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback)check_uicc_close_channel_ready,
+                             task);
+        break;
+    }
+    case ESIM_CHECK_STEP_UICC_STEP_LAST:
+        /* We are done without errors! */
+        g_task_return_pointer (task, g_strdup (ctx->eid), g_free);
+        g_object_unref (task);
+        break;
+    default:
+        break;
+    }
+}
+
+/*****************************************************************************/
+/* Load EID */
+
+static gchar *
+load_eid_finish (MMBaseSim *self,
+                 GAsyncResult *res,
+                 GError **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+load_eid (MMBaseSim *self,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
+{
+    MbimDevice *device;
+    GTask *task;
+    EsimCheckContext *esim_ctx;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    esim_ctx = g_new0 (EsimCheckContext, 1);
+    esim_ctx->step = ESIM_CHECK_STEP_UICC_OPEN_CHANNEL;
+    g_task_set_task_data (task, esim_ctx, (GDestroyNotify)esim_check_step_free);
+    esim_check_step (device, task);
 }
 
 /*****************************************************************************/
@@ -751,6 +1009,8 @@ mm_sim_mbim_class_init (MMSimMbimClass *klass)
     base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
     base_sim_class->load_imsi = load_imsi;
     base_sim_class->load_imsi_finish = load_imsi_finish;
+    base_sim_class->load_eid = load_eid;
+    base_sim_class->load_eid_finish = load_eid_finish;
     base_sim_class->load_operator_identifier = load_operator_identifier;
     base_sim_class->load_operator_identifier_finish = load_operator_identifier_finish;
     base_sim_class->load_operator_name = load_operator_name;
