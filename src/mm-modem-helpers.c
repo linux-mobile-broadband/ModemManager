@@ -5259,7 +5259,7 @@ mm_sim_parse_cpol_query_response (const gchar  *response,
     guint                  act = 0;
     guint                  match_count;
 
-    r = g_regex_new ("\\+CPOL:\\s*(\\d+),\\s*(\\d+),\\s*\"(\\d+)\""
+    r = g_regex_new ("\\+CPOL:\\s*(\\d+),\\s*(\\d+),\\s*\"?(\\d+)\"?"
                      "(?:,\\s*(\\d+))?"     /* GSM_AcTn */
                      "(?:,\\s*(\\d+))?"     /* GSM_Compact_AcTn */
                      "(?:,\\s*(\\d+))?"     /* UTRAN_AcTn */
