@@ -4495,6 +4495,82 @@ test_bcd_to_string (void *f, gpointer d)
 
 /*****************************************************************************/
 
+typedef struct {
+    const gchar *response;
+    gboolean     expected_error;
+    guint        expected_index;
+    const gchar *expected_operator_code;
+    gboolean     expected_gsm_act;
+    gboolean     expected_gsm_compact_act;
+    gboolean     expected_utran_act;
+    gboolean     expected_eutran_act;
+    gboolean     expected_ngran_act;
+    guint        expected_act_count;
+} TestCpol;
+
+static const TestCpol test_cpol[] = {
+    { "+CPOL: 1,2,\"24412\",0,0,0,0", FALSE, 1, "24412", FALSE, FALSE, FALSE, FALSE, FALSE, 4 },
+    { "+CPOL: 1,2,24412,0,0,0,0", FALSE, 1, "24412", FALSE, FALSE, FALSE, FALSE, FALSE, 4 },
+    { "+CPOL: 1", TRUE },
+    { "+CPOL: 1,2", TRUE },
+    { "+CPOL: 1,1,\"Test\"", TRUE },
+    { "+CPOL: 5,2,123456,0,0,0,0,1", FALSE, 5, "123456", FALSE, FALSE, FALSE, FALSE, TRUE, 5 },
+    { "+CPOL: 99,2,\"63423\",1,0,1,0,1", FALSE, 99, "63423", TRUE, FALSE, TRUE, FALSE, TRUE, 5 },
+    { "+CPOL: 101,2,\"63423\",1,1,1", FALSE, 101, "63423", TRUE, TRUE, TRUE, FALSE, FALSE, 3 },
+    { "+CPOL: 101,2,\"24491\"", FALSE, 101, "24491", FALSE, FALSE, FALSE, FALSE, FALSE, 0 },
+    { "+CPOL: X,2,\"24491\"", TRUE },
+    { "+CPOL:1, 2, 12345, 1, 1, 1, 1, 1", FALSE, 1, "12345", TRUE, TRUE, TRUE, TRUE, TRUE, 5 }
+};
+
+static void
+test_cpol_response (void)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (test_cpol); i++) {
+        guint    index;
+        gchar   *operator_code = NULL;
+        gboolean gsm_act;
+        gboolean gsm_compact_act;
+        gboolean utran_act;
+        gboolean eutran_act;
+        gboolean ngran_act;
+        guint    act_count;
+        gboolean result;
+        GError  *error = NULL;
+
+        result = mm_sim_parse_cpol_query_response (test_cpol[i].response,
+                                                   &index,
+                                                   &operator_code,
+                                                   &gsm_act,
+                                                   &gsm_compact_act,
+                                                   &utran_act,
+                                                   &eutran_act,
+                                                   &ngran_act,
+                                                   &act_count,
+                                                   &error);
+        if (test_cpol[i].expected_error) {
+            g_assert (!result);
+            g_assert (error);
+            g_error_free (error);
+        } else {
+            g_assert (result);
+            g_assert_no_error (error);
+            g_assert_cmpuint (index, ==, test_cpol[i].expected_index);
+            g_assert_cmpstr (operator_code, ==, test_cpol[i].expected_operator_code);
+            g_assert_cmpuint (gsm_act, ==, test_cpol[i].expected_gsm_act);
+            g_assert_cmpuint (gsm_compact_act, ==, test_cpol[i].expected_gsm_compact_act);
+            g_assert_cmpuint (utran_act, ==, test_cpol[i].expected_utran_act);
+            g_assert_cmpuint (eutran_act, ==, test_cpol[i].expected_eutran_act);
+            g_assert_cmpuint (ngran_act, ==, test_cpol[i].expected_ngran_act);
+            g_assert_cmpuint (act_count, ==, test_cpol[i].expected_act_count);
+        }
+        g_free (operator_code);
+    }
+}
+
+/*****************************************************************************/
+
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (GTestFixtureFunc) t, NULL)
 
 int main (int argc, char **argv)
@@ -4725,6 +4801,8 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_parse_uint_list, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_bcd_to_string, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cpol_response, NULL));
 
     result = g_test_run ();
 
