@@ -238,10 +238,12 @@ ptr_array_add_sysfs_attribute_link_basename (GPtrArray    *array,
 
     g_assert (array && sysfs_path && attribute);
     value = read_sysfs_attribute_link_basename (sysfs_path, attribute);
-    if (value && !g_ptr_array_find_with_equal_func (array, value, g_str_equal, NULL))
-        g_ptr_array_add (array, g_steal_pointer (&value));
+
     if (out_value)
         *out_value = g_strdup (value);
+    if (value && !g_ptr_array_find_with_equal_func (array, value, g_str_equal, NULL))
+        g_ptr_array_add (array, g_steal_pointer (&value));
+
 }
 
 static void
