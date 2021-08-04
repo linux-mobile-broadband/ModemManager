@@ -3716,9 +3716,13 @@ update_sim_from_slot_status (MMBroadbandModemMbim *self,
 
     mm_obj_dbg (self, "Updating sim at slot %d", slot_index + 1);
 
+    /* Not fully ready (NOT_READY) or unusable (ERROR) SIM cards should also be
+     * reported as being available in the non-active slot. */
     if (slot_status == MBIM_UICC_SLOT_STATE_ACTIVE ||
         slot_status == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM ||
-        slot_status == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM_NO_PROFILES) {
+        slot_status == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM_NO_PROFILES ||
+        slot_status == MBIM_UICC_SLOT_STATE_NOT_READY ||
+        slot_status == MBIM_UICC_SLOT_STATE_ERROR) {
         sim = mm_sim_mbim_new_initialized (MM_BASE_MODEM (self),
                                            slot_index,
                                            FALSE,
@@ -6312,9 +6316,13 @@ query_slot_information_status_ready (MbimDevice   *device,
     if ((slot_index + 1) == ctx->active_slot_index)
         sim_active = TRUE;
 
+    /* Not fully ready (NOT_READY) or unusable (ERROR) SIM cards should also be
+     * reported as being available. */
     if (slot_state == MBIM_UICC_SLOT_STATE_ACTIVE ||
         slot_state == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM ||
-        slot_state == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM_NO_PROFILES) {
+        slot_state == MBIM_UICC_SLOT_STATE_ACTIVE_ESIM_NO_PROFILES ||
+        slot_state == MBIM_UICC_SLOT_STATE_NOT_READY ||
+        slot_state == MBIM_UICC_SLOT_STATE_ERROR) {
         sim = mm_sim_mbim_new_initialized (MM_BASE_MODEM (self),
                                            slot_index,
                                            sim_active,
