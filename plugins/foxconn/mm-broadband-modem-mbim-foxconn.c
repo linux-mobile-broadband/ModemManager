@@ -511,7 +511,7 @@ mm_broadband_modem_mbim_foxconn_new (const gchar  *device,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED,             FALSE,
                          MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      TRUE,
                          MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS, TRUE,
-                         MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,              PKGDATADIR "/mm-foxconn-carrier-mapping.conf",
+                         MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,              PKGDATADIR "/mm-foxconn-t77w968-carrier-mapping.conf",
                          NULL);
 }
 

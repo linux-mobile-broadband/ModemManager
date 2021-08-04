@@ -56,9 +56,9 @@ test_dummy (void)
 
 #if defined ENABLE_PLUGIN_FOXCONN
 static void
-test_foxconn (void)
+test_foxconn_t77w968 (void)
 {
-    common_test (TESTKEYFILE_FOXCONN);
+    common_test (TESTKEYFILE_FOXCONN_T77W968);
 }
 #endif
 
@@ -72,7 +72,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/test-keyfiles/dummy", test_dummy);
 
 #if defined ENABLE_PLUGIN_FOXCONN
-    g_test_add_func ("/MM/test-keyfiles/foxconn", test_foxconn);
+    g_test_add_func ("/MM/test-keyfiles/foxconn/t77w968", test_foxconn_t77w968);
 #endif
 
     return g_test_run ();

@@ -726,11 +726,11 @@ libmm_plugin_foxconn_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 dist_udevrules_DATA += foxconn/77-mm-foxconn-port-types.rules
 
-dist_pkgdata_DATA += foxconn/mm-foxconn-carrier-mapping.conf
+dist_pkgdata_DATA += foxconn/mm-foxconn-t77w968-carrier-mapping.conf
 
 AM_CFLAGS += \
 	-DTESTUDEVRULESDIR_FOXCONN=\"${srcdir}/foxconn\" \
-	-DTESTKEYFILE_FOXCONN=\"${srcdir}/foxconn/mm-foxconn-carrier-mapping.conf\" \
+	-DTESTKEYFILE_FOXCONN=\"${srcdir}/foxconn/mm-foxconn-t77w968-carrier-mapping.conf\" \
 	$(NULL)
 
 endif
