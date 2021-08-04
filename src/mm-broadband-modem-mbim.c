@@ -3705,8 +3705,6 @@ ms_basic_connect_extensions_notification_lte_attach_info (MMBroadbandModemMbim *
     mm_iface_modem_3gpp_update_initial_eps_bearer (MM_IFACE_MODEM_3GPP (self), properties);
 }
 
-/* Modifies the sim at slot == index+1, based on the content of slot_status.
- * Primarily used when a hotswap occurs on the inactive slot */
 static void
 update_sim_from_slot_status (MMBroadbandModemMbim *self,
                              MbimUiccSlotState     slot_status,
@@ -3754,10 +3752,16 @@ ms_basic_connect_extensions_notification_slot_info_status (MMBroadbandModemMbim 
         return;
     }
 
-    if (self->priv->active_slot_index == slot_index + 1)
+
+    if (self->priv->active_slot_index == slot_index + 1) {
+        /* Major SIM event on the active slot, will request reprobing the
+         * modem from scratch. */
         mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
-    else
+    } else {
+        /* Modifies SIM object at the given slot based on the reported state,
+         * when the slot is not the active one. */
         update_sim_from_slot_status (self, slot_state, slot_index);
+    }
 }
 
 static void
