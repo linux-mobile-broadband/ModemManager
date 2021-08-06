@@ -75,10 +75,9 @@ build-qmi-qrtr-no-mbim:
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr  --disable-gtk-doc --disable-introspection --disable-mbim-qmux --enable-qrtr --enable-collection=basic
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=false -Dqrtr=true -Dcollection=basic
+    - ninja -C build
+    - ninja -C build install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr  --disable-gtk-doc --disable-introspection --without-mbim
@@ -99,10 +98,9 @@ build-qmi-no-qrtr-no-mbim:
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --disable-mbim-qmux --disable-qrtr --enable-collection=basic
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=false -Dqrtr=false -Dcollection=basic
+    - ninja -C build
+    - ninja -C build install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-mbim
@@ -140,10 +138,9 @@ build-qmi-newest-commands:
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --disable-mbim-qmux --enable-collection=basic
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=false -Dqrtr=false -Dcollection=basic
+    - ninja -C build
+    - ninja -C build install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --without-mbim CFLAGS="-DWITH_NEWEST_QMI_COMMANDS"
@@ -174,10 +171,9 @@ build-single-plugins:
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --enable-mbim-qmux --enable-qrtr --enable-collection=basic
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false -Dbash_completion=false -Dmbim_qmux=true -Dqrtr=true -Dcollection=basic
+    - ninja -C build
+    - ninja -C build install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
     - for plugin in generic altair-lte anydata broadmobi cinterion
@@ -215,10 +211,9 @@ build-default:
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --enable-introspection --enable-mbim-qmux --enable-qrtr --enable-collection=basic
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=true -Dbash_completion=false -Dmbim_qmux=true -Dqrtr=true -Dcollection=basic
+    - ninja -C build
+    - ninja -C build install
     - popd
     - NOCONFIGURE=1 ./autogen.sh
     - ./configure --prefix=/usr --enable-gtk-doc --enable-introspection --with-polkit=strict --with-suspend-resume=systemd --with-systemdsystemunitdir=/lib/systemd/system
