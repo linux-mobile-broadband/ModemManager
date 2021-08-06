@@ -68,10 +68,9 @@ build-qmi-qrtr-no-mbim:
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false
+    - ninja -C build
+    - ninja -C build install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
@@ -164,10 +163,9 @@ build-single-plugins:
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --disable-introspection
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=false
+    - ninja -C build
+    - ninja -C build install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
@@ -204,10 +202,9 @@ build-default:
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
     - pushd libqrtr-glib
-    - NOCONFIGURE=1 ./autogen.sh
-    - ./configure --prefix=/usr --disable-gtk-doc --enable-introspection
-    - make
-    - make install
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=true
+    - ninja -C build
+    - ninja -C build install
     - popd
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
     - pushd libqmi
