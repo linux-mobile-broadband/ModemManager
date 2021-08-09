@@ -9,53 +9,73 @@ Previous maintainers:
 Other contributors:
   Ben Chan
   Nathan Williams
-  Carlo Lobrano
   Daniele Palmas
+  Carlo Lobrano
+  Teijo Kinnunen
+  Eric Caruso
   Lubomir Rintel
+  Andrew Lassalle
+  Giacinto Cifelli
+  Dylan Van Assche
   Torgny Johansson
   Marco Bascetta
   Riccardo Vangelisti
   Alexander Sack
   Guido Günther
-  Eric Caruso
+  Joel Selvaraj
+  Loic Poulain
+  Michal Mazur
+  Pavan Holla
   Eric Shienbrood
   Elly Jones
   Bob Ham
-  Giacinto Cifelli
+  Yegor Yefremov
+  Bjørn Mork
   David McCullough
+  Freedom Liu
   Prathmesh Prabhu
   Thieu Le
   Thomas Tuttle
   Maxim Anisimov
-  Bjørn Mork
+  Torsten Hilbrich
   Marius B. Kotsbak
   Michael Biebl
   Paul Bartell
-  Torsten Hilbrich
+  Sven Schwermer
   Alfonso Sánchez-Beato
   Christian Persch
-  Sven Schwermer
+  Stephan Gerhold
   Thomas Sailer
   Colin Walters
   Franko Fang
+  Frederic Martinsons
   Jakub Sitnicki
   Jason Glasgow
   Jeroen Elebaut
   Matthew Starr
   Reinhard Speyerer
   Yunlian Jiang
-  Ori Inbar
+  ori inbar
   David Rochberg
+  Ivan Mikhanchuk
   Jiří Klimeš
   Krzysztof Drobinski
+  Louis-Alexis Eyraud
   Martyn Russell
   Thomas Haller
   Tomas Jura
+  ZhangMingjie
+  Alexander Dahl
   Amol Lad
+  Clayton Craft
   Colin Helliwell
+  David Leonard
   Graham Inggs
   Javier Viguera
+  Jessy Diamond Exum
+  Justin Standring
   Lionel Landwerlin
+  Madhav
   Maksim Salau
   Martin Pitt
   Matthew Stanger
@@ -64,19 +84,27 @@ Other contributors:
   Norbert Frese
   Piotr Drąg
   Thomas Bechtold
-  Yegor Yefremov
+  Vincent Palatin
   Yuri Chornoivan
   Adrian Bunk
+  Adrien Plazas
   Alexander Couzens
+  Alyssa Ross
   Amit Mendapara
+  Anders Jonsson
   Andika Triwidada
   Andrew Bird
   Anton Blanchard
+  ArenM
+  Arnaud Ferraris
   Arnd Hannemann
   Arto Jantunen
   Arun Raghavan
+  Balázs Úr
   Baruch Siach
   Beniamino Galvani
+  Benjamin Tissoires
+  Benoît Monin
   Brendan Peter
   Brian Norris
   Brian, Sam
@@ -88,15 +116,19 @@ Other contributors:
   David Härdeman
   David Khouya
   Dmitry Ivanyushin
+  Dušan Kazik
   Enrico Mioso
   Eugene Crosser
   Evan Nemerson
   Fabrice Bellet
   Fangxiaozhi (Franko)
+  Felipe Borges
   Felix Janda
   Gerald Richter
   Greg Suarez
   Iain Lane
+  Iñigo Martínez
+  Jarvis-Jiang-G
   Jason Simmons
   Jens Seidel
   Johny Mattsson
@@ -106,8 +138,8 @@ Other contributors:
   Krzysztof Kotlenga
   Lech Perczak
   LiuQiFeng
-  Louis-Alexis Eyraud
   Luis A. Lozano
+  Lukas Senger
   M. I. Spozta
   Marc Murphy
   Mario Blättermann
@@ -119,6 +151,7 @@ Other contributors:
   Moo
   Murithi Borona
   Nathan J. Williams
+  Nicholas Smith
   Noel J. Bergman
   Oskar Enoksson
   Piotr Figiel
@@ -128,9 +161,10 @@ Other contributors:
   Sam Spilsbury
   Sławomir Bocheński
   Tabor Kelly
-  Teijo Kinnunen
+  Thomas Dendale
   Thomas Grenman
   Thomas Voß
+  Timo Jyrinki
   Ting-Yuan Huang
   Tom Bechtold
   Tom Goetz
@@ -141,13 +175,19 @@ Other contributors:
   Ville Skyttä
   Vincent Untz
   Vitaly Gimly
-  Amol Lad
+  Walter Hagstrom
+  Yaron Shahrabani
+  Zrshuo Zhang
+  amol.lad
+  carlyin
   emintufan
+  goapunk
   kuonirat
   mozzwald
   mstanger
   poma
   scootergrisen
   wi24rd
+  wicadmin
   yparitcher
   Артемий Судаков
