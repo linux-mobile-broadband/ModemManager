@@ -1,4 +1,202 @@
 
+ModemManager 1.18.0
+-------------------------------------------
+This is a new stable release of ModemManager.
+
+The following notes are directed to package maintainers:
+
+ * This version now requires:
+   ** glib2 >= 2.56
+   ** libgudev >= 232
+   ** libmbim >= 1.16.0 (for the optional MBIM support)
+   ** libqmi >= 1.30.0 (for the optional QMI support)
+   ** libqrtr-glib >= 1.0.0 (for the optional QRTR support)
+
+ * The ModemManager.service file for systemd integration provided in the sources
+   is updated as follows:
+   ** 'CAP_NET_ADMIN' is now required in the 'CapabilityBoundingSet' field.
+   ** 'AF_NETLINK' and 'AF_QIPCRTR' are now required in the
+      'RestrictAddressFamilies' field.
+   If the system where ModemManager is being integrated provides a custom
+   systemd service configuration, these updates should be considered.
+
+ * The LEGACY and PARANOID filter types that were allowed options in the
+   '--filter-policy' option in the ModemManager daemon were deprecated in
+   version 1.16.0 and have now been completely removed, along with the vid:pid
+   blacklist of devices and the vid:pid greylist of RS232<->USB adapters.
+
+ * Building from git no longer requires autoconf-archive, the needed AX_ macros
+   are now shipped inside m4/.
+
+The most important features and changes in this release are the following:
+
+ * Data session multiplexing can now be enabled in QMI and MBIM modems, e.g. so
+   that multiple different APNs can be connected separately over a single
+   network interface. The multiplexing is disabled by default in this release,
+   except for cases where it's required (e.g. if non-multiplexed sessions aren't
+   supported) like IPA based Qualcomm SoCs. Users can request the multiplexing
+   support explicitly via settings when creating the connection bearer object.
+
+   In order to allow easy testing of the multiplexing feature without requiring
+   any additional change in the stack, a new '--test-multiplex-requested' option
+   in the daemon allows to switch the default (when not explicitly given by the
+   user) to attempt to use multiplexing.
+
+   It is worth noting that when multiplexing is enabled, the data network
+   interface used by the modem will be a virtual network interface created in
+   runtime, and will therefore have a different name than the real network
+   interface exposed by the modem. If there are additional settings in the
+   system relying on the data network interface name (e.g. iptables rules), they
+   may need to be updated.
+
+ * The ModemManager daemon can run now in a 'quick suspend/resume' mode, in
+   which no explicit data disconnection is triggered on suspend, and no explicit
+   device re-probing from scratch is launched on resume. Instead, the daemon
+   will try to refresh the state of all interfaces upon suspend, e.g. to see if
+   the module keeps registered to the same operator, to see if it is still
+   connected, and so on.
+
+   This mode of operation is useful when the WWAN module stays awake while the
+   host is suspended, and can be enabled with the '--test-quick-suspend-resume'
+   option in the daemon.
+
+ * API:
+   ** New '3gppProfileManager' interface, providing operations on the list of
+      connection profiles stored in the 3GPP module. This interface is
+      implemented for all AT, QMI and MBIM protocols.
+   ** New 'DisableFacilityLock()' method in the 3GPP interface, implemented for
+      QMI and MBIM devices.
+   ** The 'MaxBearers' property is now deprecated, as it didn't provide any
+      additional information to what 'MaxActiveBearers' already provides.
+   ** New 'MaxActiveMultiplexedBearers' property, listing how many bearers can
+      be connected at the same time if multiplexing is enabled.
+   ** New settings in the bearer properties, applicable to both the
+      'Simple.Connect()' and 'Modem.CreateBearer()' methods:
+      *** 'multiplex': which allows the user to specify whether multiplexing
+          should be avoided ('none'), whether it should be mandatory
+	  ('required') or whether it should be enabled if available or skipped
+	  if unavailable ('requested').
+      *** 'profile-id': which allows the user to request a connection attempt
+          with an existing profile stored in the module.
+      *** 'apn-type': which allows the user to specify the purpose of a given
+          connection, e.g. the user could create a connection to an APN
+	  providing default internet connectivity and another one to an APN
+	  providing access to the MMS gateway. This setting may or may not be
+	  stored in the module itself, it depends on the type of module.
+   ** New 'Multiplexed' boolean property in the Bearer object, specifying
+      whether the bearer is connected through a multiplexed interface.
+   ** New 'ConnectionError' property in the bearer object, specifying the last
+      error reported by the module during a failed connection attempt or during
+      a network-initiated disconnection.
+   ** Updated the list of enum values in the MMMobileEquipmentError' type,
+      according to the error codes defined in v17.1.0 of 3GPP TS 27.007.
+
+ * Core:
+   ** iconv() features support is detected at runtime, and logged when the
+      daemon starts.
+   ** Updated the base modem object to allow plugins to specify the types of
+      data ports they support, based on the specific plugin implementations,
+      e.g. so that a modem supporting only AT+PPP can ignore NET ports and
+      vice versa.
+   ** Added support for modems exposing control ports via QRTR channels.
+
+ * Modem interface:
+   ** The Dual SIM logic that would iterate over all slots during initialization
+      is updated, so that we only report the information that we can gather
+      without any explicit slot change. E.g. with QMI we can know whether there
+      is a SIM in the non-active slot, and the ICCID of that SIM, but we cannot
+      know the MCCMNC or the operator name of the SIM unless we change to that
+      slot. We must not do slot changes arbitrarily like that, and so that logic
+      is removed, even if we lose some of the information that we were providing
+      in the interface.
+
+ * SIM:
+   ** New 'PreferredNetworks' property and 'SetPreferredNetworks' method,
+      implemented using '+CPOL' for generic AT modems and 'NAS Get/Set Preferred
+      Networks' for QMI modems. Several different modules and plugins (e.g.
+      Sierra Wireless EM7345, Telit LN930, SIM7070, all Option and Iridium
+      devices...) have this feature explicitly disabled due to '+CPOL' not
+      behaving properly (even crashing the module sometimes).
+
+ * QMI:
+   ** The logic that decides which data mode (802.3 or raw-ip) is used in
+      modules managed by the qmi_wwan driver changes in this release. Until now,
+      if a module reported itself as configured in 802.3 mode on boot, that mode
+      would be the one used in normal operation. Due to the new multiplexing
+      feature, this is no longer true, and if possible the daemon will always
+      try to switch the module to raw-ip, and fallback to 802.3 only if raw-ip
+      is unsupported.
+   ** Enabled both AT and QMI indications for the messaging interface, so that
+      new SMS events are reported via both channels. This solves issues seen
+      in the Pinephone when waking up from suspend.
+   ** Enabled network reject indications.
+   ** If operator name not updated through standard indications, it will be
+      explicitly queried with 'NAS Get Plmn Name'.
+   ** Added support for transfer-route MT messages.
+   ** Increased the QMI open timeout to 45s, as required by the newest modules.
+   ** Implemented additional logic to read the status of the different facility
+      locks in the module.
+   ** Updated ICCID reading logic to parse it as hex instead of BCD.
+   ** Improved handling of the MNC PCS digit in the operations involving MCCMNC.
+   ** Automatically run the 'DPM Open Port' logic on IPA based setups to bind
+      the hardware tx/rx endpoints with the logical ones in the QMI protocol.
+   ** Implemented support for the Voice interface and its operations, not only
+      standard voice call management, but also support for the supplementary
+      services.
+
+ * MBIM:
+   ** Implemented support for Dual SIM in non-QMI MBIM devices, using the
+      Microsoft Basic Connect Extensions service.
+   ** Increased the timeout for the MBIM_CID_HOME_PROVIDER query to 30s.
+   ** Updated to load model string using QMI over MBIM if available.
+   ** Increased the MBIM open timeout to 45s, as required by the newest modules.
+
+ * SMS:
+   ** Defined a common timeout of 180s for all send operations.
+
+ * libmm-glib:
+   ** Updated with new methods and types to handle all the DBus API updates.
+   ** Extended with additional methods in the Location3gpp object to get/set the
+      full operator MCCMNC string, instead of integers without MNC PCS digit
+      info.
+   ** Extended the 'ModemLocation' interface with methods to get the signaled
+      location updates; i.e. without requiring an explicit GetLocation(), and
+      obviously only supported when location signaling is explicitly enabled.
+   ** Updated the way the internal monitored properties are handled in the
+      different types, now using some handy helper macros to share the same
+      logic among all.
+
+ * Plugins:
+   ** zte: disabled CIND/CMER support.
+   ** qcom-soc: added support for QRTR+IPA based setups.
+   ** qcom-soc: added support for the WWAN subsystem instead of RPMSG.
+   ** quectel: enabled QGPSXTRA by default when starting the GNSS engine.
+   ** quectel: add support for EM120/160 PCIe modules.
+   ** quectel: added Firehose update method.
+   ** ublox: added additional URAT combinations.
+   ** ublox: flagged UBANDSEL as unsupported in the SARA-R4 and -N4 modules.
+   ** cinterion: added new custom MBIM based modem with shared reset operation.
+   ** cinterion: ignored the MBIM Intel Firmware Update service completely.
+   ** foxconn: added custom carrier config setup for the T77W968 module.
+
+The following features which were backported to 1.16.x releases are also present
+in ModemManager 1.18.0:
+
+ * core: added support for the new 'WWAN' subsystem in Linux kernel 5.13,
+   enabling PCIe-only modules.
+ * core: The charset conversion methods rework, including the avoiding of the
+   iconv() //TRANSLIT extension support, which isn't available in all libc
+   implementations.
+ * qmi: the logic managing allowed/preferred modes was fixed for multimode
+   devices like the MC7304, making sure the acquisition order preference always
+   had the same items.
+ * serial: when modem is connected with AT+PPP, ignore forced disconnections, so
+   that we don't take ownership of the PPP port before pppd has released it.
+ * foxconn: added support for the T99W175 (SDX55) module, including built-in FCC
+   unlock procedure.
+ * foxconn: added new MBIM QDU firmware update method.
+
+
 ModemManager 1.16.0
 -------------------------------------------
 This is a new stable release of ModemManager.
@@ -142,6 +340,8 @@ in ModemManager 1.16.0:
  * cinterion: configure the PLAS9 to send URCs correctly.
  * quectel: add support for MBIM devices.
  * telit: add initial delay for AT ports to become responsive.
+ * udev: updated all AT/QCDM/GPS port type hints in all plugins to bind them to
+   TTY ports only.
 
 
 ModemManager 1.14.0
