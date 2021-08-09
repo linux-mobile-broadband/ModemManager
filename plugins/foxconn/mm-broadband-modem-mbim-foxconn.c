@@ -498,6 +498,16 @@ mm_broadband_modem_mbim_foxconn_new (const gchar  *device,
                                      guint16       vendor_id,
                                      guint16       product_id)
 {
+    const gchar *carrier_config_mapping = NULL;
+
+    /* T77W968 (DW5821e is also T77W968) modules use t77w968 carrier mapping table,
+     * T99W175 modules use t99w175 carrier mapping table. */
+    if ((vendor_id == 0x0489 && (product_id == 0xe0b4 || product_id == 0xe0b5)) ||
+        (vendor_id == 0x413c && (product_id == 0x81d7 || product_id == 0x81e0)))
+        carrier_config_mapping = PKGDATADIR "/mm-foxconn-t77w968-carrier-mapping.conf";
+    else if (vendor_id == 0x105b && (product_id == 0xe0ab || product_id == 0xe0b0 || product_id == 0xe0b1))
+        carrier_config_mapping = PKGDATADIR "/mm-foxconn-t99w175-carrier-mapping.conf";
+
     return g_object_new (MM_TYPE_BROADBAND_MODEM_MBIM_FOXCONN,
                          MM_BASE_MODEM_DEVICE,     device,
                          MM_BASE_MODEM_DRIVERS,    drivers,
@@ -511,7 +521,7 @@ mm_broadband_modem_mbim_foxconn_new (const gchar  *device,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED,             FALSE,
                          MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      TRUE,
                          MM_IFACE_MODEM_LOCATION_ALLOW_GPS_UNMANAGED_ALWAYS, TRUE,
-                         MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,              PKGDATADIR "/mm-foxconn-t77w968-carrier-mapping.conf",
+                         MM_IFACE_MODEM_CARRIER_CONFIG_MAPPING,              carrier_config_mapping,
                          NULL);
 }
 
