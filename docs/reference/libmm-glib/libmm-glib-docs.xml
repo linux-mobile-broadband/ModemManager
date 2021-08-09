@@ -238,10 +238,6 @@
     <xi:include href="xml/MmGdbusModemVoiceProxy.xml"/>
     <xi:include href="xml/MmGdbusModemVoiceSkeleton.xml"/>
 
-    <xi:include href="xml/MmGdbusModemSar.xml"/>
-    <xi:include href="xml/MmGdbusModemSarProxy.xml"/>
-    <xi:include href="xml/MmGdbusModemSarSkeleton.xml"/>
-
     <!--xi:include href="xml/MmGdbusModemContacts.xml"/>
     <xi:include href="xml/MmGdbusModemContactsProxy.xml"/>
     <xi:include href="xml/MmGdbusModemContactsSkeleton.xml"/-->

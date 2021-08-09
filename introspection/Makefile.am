@@ -21,7 +21,6 @@ xml_DATA = \
 	org.freedesktop.ModemManager1.Modem.Time.xml \
 	org.freedesktop.ModemManager1.Modem.Voice.xml \
 	org.freedesktop.ModemManager1.Call.xml \
-	org.freedesktop.ModemManager1.Modem.Sar.xml \
 	org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager.xml \
 	$(NULL)
 
