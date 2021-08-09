@@ -1,4 +1,28 @@
 
+ModemManager 1.16.10
+-------------------------------------------
+
+ * QMI:
+   ** Fixed use of uninitialized memory in the 3GPP registration logic when
+      running NAS Set System Selection Preference.
+
+ * MBIM:
+   ** Remove trailing 'F' in ICCIDs.
+   ** Increased the timeout of the first MBIM command after the port is opened,
+      in order to leave time to the module to finish booting properly.
+
+ * plugins:
+   ** icera: fixed segfault during the connection reset logic.
+   ** fibocom: add port type hints for the NL668-AM.
+   ** fibocom: fix supporting QMI based devices.
+   ** huawei: ignored ^LWURC URCs.
+   ** huawei: fixed memory leak when processing GETPORTMODE hints.
+   ** cinterion: increased ^SCFG? timeout to 120s.
+   ** Updated all AT/QCDM/GPS port type hints in all plugins to bind them
+      to TTY ports only.
+
+ * Several other minor improvements and fixes.
+
 ModemManager 1.16.8
 -------------------------------------------
 
