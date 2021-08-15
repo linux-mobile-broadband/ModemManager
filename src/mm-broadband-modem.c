@@ -129,6 +129,7 @@ enum {
     PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
     PROP_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED,
     PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED,
+    PROP_MODEM_INDICATION_CALL_LIST_RELOAD_ENABLED,
     PROP_MODEM_CARRIER_CONFIG_MAPPING,
     PROP_MODEM_FIRMWARE_IGNORE_CARRIER,
     PROP_FLOW_CONTROL,
@@ -246,6 +247,7 @@ struct _MMBroadbandModemPrivate {
     GObject    *modem_voice_dbus_skeleton;
     MMCallList *modem_voice_call_list;
     gboolean    periodic_call_list_check_disabled;
+    gboolean    indication_call_list_reload_enabled;
     gboolean    clcc_supported;
 
     /*<--- Modem Time interface --->*/
@@ -7852,6 +7854,17 @@ ccwa_received (MMPortSerialAt   *port,
                MMBroadbandModem *self)
 {
     MMCallInfo call_info;
+    gboolean   indication_call_list_reload_enabled = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED, &indication_call_list_reload_enabled,
+                  NULL);
+
+    if (indication_call_list_reload_enabled) {
+        mm_obj_dbg (self, "call waiting, refreshing call list");
+        mm_iface_modem_voice_reload_all_calls (MM_IFACE_MODEM_VOICE (self), NULL, NULL);
+        return;
+    }
 
     call_info.index     = 0;
     call_info.direction = MM_CALL_DIRECTION_INCOMING;
@@ -7870,6 +7883,17 @@ ring_received (MMPortSerialAt   *port,
                MMBroadbandModem *self)
 {
     MMCallInfo call_info;
+    gboolean   indication_call_list_reload_enabled = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED, &indication_call_list_reload_enabled,
+                  NULL);
+
+    if (indication_call_list_reload_enabled) {
+        mm_obj_dbg (self, "ringing, refreshing call list");
+        mm_iface_modem_voice_reload_all_calls (MM_IFACE_MODEM_VOICE (self), NULL, NULL);
+        return;
+    }
 
     call_info.index     = 0;
     call_info.direction = MM_CALL_DIRECTION_INCOMING;
@@ -7887,6 +7911,17 @@ cring_received (MMPortSerialAt   *port,
 {
     MMCallInfo  call_info;
     gchar      *str;
+    gboolean    indication_call_list_reload_enabled = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED, &indication_call_list_reload_enabled,
+                  NULL);
+
+    if (indication_call_list_reload_enabled) {
+        mm_obj_dbg (self, "ringing, refreshing call list");
+        mm_iface_modem_voice_reload_all_calls (MM_IFACE_MODEM_VOICE (self), NULL, NULL);
+        return;
+    }
 
     /* We could have "VOICE" or "DATA". Now consider only "VOICE" */
     str = mm_get_string_unquoted_from_match_info (info, 1);
@@ -7907,6 +7942,17 @@ clip_received (MMPortSerialAt   *port,
                MMBroadbandModem *self)
 {
     MMCallInfo call_info;
+    gboolean   indication_call_list_reload_enabled = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED, &indication_call_list_reload_enabled,
+                  NULL);
+
+    if (indication_call_list_reload_enabled) {
+        mm_obj_dbg (self, "ringing, refreshing call list");
+        mm_iface_modem_voice_reload_all_calls (MM_IFACE_MODEM_VOICE (self), NULL, NULL);
+        return;
+    }
 
     call_info.index     = 0;
     call_info.direction = MM_CALL_DIRECTION_INCOMING;
@@ -12942,6 +12988,9 @@ set_property (GObject *object,
     case PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED:
         self->priv->periodic_call_list_check_disabled = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_INDICATION_CALL_LIST_RELOAD_ENABLED:
+        self->priv->indication_call_list_reload_enabled = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_CARRIER_CONFIG_MAPPING:
         self->priv->carrier_config_mapping = g_value_dup_string (value);
         break;
@@ -13086,6 +13135,9 @@ get_property (GObject *object,
     case PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED:
         g_value_set_boolean (value, self->priv->periodic_call_list_check_disabled);
         break;
+    case PROP_MODEM_INDICATION_CALL_LIST_RELOAD_ENABLED:
+        g_value_set_boolean (value, self->priv->indication_call_list_reload_enabled);
+        break;
     case PROP_MODEM_CARRIER_CONFIG_MAPPING:
         g_value_set_string (value, self->priv->carrier_config_mapping);
         break;
@@ -13131,6 +13183,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->periodic_signal_check_disabled = FALSE;
     self->priv->periodic_access_tech_check_disabled = FALSE;
     self->priv->periodic_call_list_check_disabled = FALSE;
+    self->priv->indication_call_list_reload_enabled = FALSE;
     self->priv->modem_cmer_enable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_disable_mode = MM_3GPP_CMER_MODE_NONE;
     self->priv->modem_cmer_ind = MM_3GPP_CMER_IND_NONE;
@@ -13719,6 +13772,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED,
                                       MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_INDICATION_CALL_LIST_RELOAD_ENABLED,
+                                      MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_CARRIER_CONFIG_MAPPING,

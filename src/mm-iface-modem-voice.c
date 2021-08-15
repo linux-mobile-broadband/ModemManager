@@ -2503,6 +2503,54 @@ setup_call_list_polling (MMCallList        *call_list,
 }
 
 /*****************************************************************************/
+/* Call list reload */
+
+gboolean
+mm_iface_modem_voice_reload_all_calls_finish (MMIfaceModemVoice  *self,
+                                              GAsyncResult       *res,
+                                              GError            **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+reload_all_calls_ready (MMIfaceModemVoice *self,
+                        GAsyncResult      *res,
+                        GTask             *task)
+{
+    GList  *call_info_list = NULL;
+    GError *error = NULL;
+
+    g_assert (MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish);
+    if (!MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list_finish (self, res, &call_info_list, &error)) {
+        mm_obj_warn (self, "couldn't reload call list: %s", error->message);
+
+        g_task_return_error (task, error);
+    } else {
+        /* Always report the list even if NULL (it would mean no ongoing calls) */
+        mm_iface_modem_voice_report_all_calls (self, call_info_list);
+        mm_3gpp_call_info_list_free (call_info_list);
+
+        g_task_return_boolean (task, TRUE);
+    }
+
+    g_object_unref (task);
+}
+
+void
+mm_iface_modem_voice_reload_all_calls (MMIfaceModemVoice   *self,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list (self,
+                                                               reload_all_calls_ready,
+                                                               task);
+}
+
+/*****************************************************************************/
 
 static void
 update_call_list (MmGdbusModemVoice *skeleton,
@@ -3131,6 +3179,14 @@ iface_modem_voice_init (gpointer g_iface)
          g_param_spec_boolean (MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED,
                                "Periodic call list checks disabled",
                                "Whether periodic call list check are disabled.",
+                               FALSE,
+                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED,
+                               "Reload call list on call update",
+                               "Ignore call updates and forcefully reload all calls.",
                                FALSE,
                                G_PARAM_READWRITE));
 

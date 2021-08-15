@@ -65,6 +65,7 @@ static void shared_qmi_init (MMSharedQmi *iface);
 
 static MMIfaceModemLocation  *iface_modem_location_parent;
 static MMIfaceModemMessaging *iface_modem_messaging_parent;
+static MMIfaceModemVoice     *iface_modem_voice_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -8772,9 +8773,14 @@ modem_voice_check_support (MMIfaceModemVoice   *self,
         mm_obj_dbg (self, "Voice capabilities not supported");
         g_task_return_boolean (task, FALSE);
     } else {
-        /* In case of QMI, we don't need polling as call list will be dynamically updated by All Call Status indication */
+        /*
+         * In case of QMI, we don't need polling as call list
+         * will be dynamically updated by All Call Status indication.
+         * If an AT URC is received, reload the call list through QMI.
+         */
         g_object_set (self,
                       MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED, TRUE,
+                      MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED, TRUE,
                       NULL);
         mm_obj_dbg (self, "Voice capabilities supported");
         g_task_return_boolean (task, TRUE);
@@ -8927,6 +8933,38 @@ supplementary_service_indication_cb (QmiClientVoice                             
 /*****************************************************************************/
 /* Setup/cleanup unsolicited events */
 
+static void
+parent_voice_setup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                             GAsyncResult      *res,
+                                             GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->setup_unsolicited_events_finish (self, res, &error)) {
+        mm_obj_warn (self, "setting up parent voice unsolicited events failed: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+parent_voice_cleanup_unsolicited_events_ready (MMIfaceModemVoice *self,
+                                               GAsyncResult      *res,
+                                               GTask             *task)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_voice_parent->cleanup_unsolicited_events_finish (self, res, &error)) {
+        mm_obj_warn (self, "cleaning up parent voice unsolicited events failed: %s", error->message);
+        g_clear_error (&error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
 static gboolean
 common_voice_setup_cleanup_unsolicited_events_finish (MMIfaceModemVoice  *self,
                                                       GAsyncResult       *res,
@@ -8952,7 +8990,7 @@ common_voice_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
     task = g_task_new (self, NULL, callback, user_data);
 
     if (setup == self->priv->all_call_status_unsolicited_events_setup) {
-        mm_obj_dbg (self, "All Call Status unsolicited events already %s; skipping",
+        mm_obj_dbg (self, "voice unsolicited events already %s; skipping",
                     setup ? "setup" : "cleanup");
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -8961,16 +8999,37 @@ common_voice_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
     self->priv->all_call_status_unsolicited_events_setup = setup;
 
     if (setup) {
+        /* Connect QMI indications signals for calls */
         g_assert (self->priv->all_call_status_indication_id == 0);
         self->priv->all_call_status_indication_id =
             g_signal_connect (client,
                               "all-call-status",
                               G_CALLBACK (all_call_status_indication_cb),
                               self);
+
+        /* Setup AT URCs as fall back for calls */
+        if (iface_modem_voice_parent->setup_unsolicited_events) {
+            iface_modem_voice_parent->setup_unsolicited_events (
+                MM_IFACE_MODEM_VOICE (self),
+                (GAsyncReadyCallback) parent_voice_setup_unsolicited_events_ready,
+                task);
+            return;
+        }
+
     } else {
+        /* Disconnect QMI indications signals for calls */
         g_assert (self->priv->all_call_status_indication_id != 0);
         g_signal_handler_disconnect (client, self->priv->all_call_status_indication_id);
         self->priv->all_call_status_indication_id = 0;
+
+        /* Cleanup AT URCs as fall back for calls */
+        if (iface_modem_voice_parent->cleanup_unsolicited_events) {
+            iface_modem_voice_parent->cleanup_unsolicited_events (
+                MM_IFACE_MODEM_VOICE (self),
+                (GAsyncReadyCallback) parent_voice_cleanup_unsolicited_events_ready,
+                task);
+            return;
+        }
     }
 
     g_task_return_boolean (task, TRUE);
@@ -9144,6 +9203,172 @@ modem_voice_cleanup_in_call_unsolicited_events (MMIfaceModemVoice   *self,
                                                 gpointer             user_data)
 {
     common_voice_setup_in_call_cleanup_unsolicited_events (MM_BROADBAND_MODEM_QMI (self), FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Load full list of calls (Voice interface) */
+
+static gboolean
+modem_voice_load_call_list_finish (MMIfaceModemVoice  *self,
+                                   GAsyncResult       *res,
+                                   GList             **out_call_info_list,
+                                   GError            **error)
+{
+    GList  *call_info_list;
+    GError *inner_error = NULL;
+
+    call_info_list = g_task_propagate_pointer (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_assert (!call_info_list);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    *out_call_info_list = call_info_list;
+    return TRUE;
+}
+
+static void
+process_get_all_call_info (QmiClientVoice                      *client,
+                           QmiMessageVoiceGetAllCallInfoOutput *output,
+                           GTask                               *task)
+{
+    GArray *qmi_remote_party_number_list = NULL;
+    GArray *qmi_call_information_list = NULL;
+    GList  *call_info_list = NULL;
+    guint   i;
+    guint   j;
+
+    qmi_message_voice_get_all_call_info_output_get_remote_party_number (output, &qmi_remote_party_number_list, NULL);
+    qmi_message_voice_get_all_call_info_output_get_call_information (output, &qmi_call_information_list, NULL);
+
+    if (!qmi_remote_party_number_list || !qmi_call_information_list) {
+        mm_obj_dbg (client, "Ignoring Get All Call Status message. Remote party number or call information not available");
+        return;
+    }
+
+    for (i = 0; i < qmi_call_information_list->len; i++) {
+        QmiMessageVoiceGetAllCallInfoOutputCallInformationCall qmi_call_information;
+
+        qmi_call_information = g_array_index (qmi_call_information_list,
+                                              QmiMessageVoiceGetAllCallInfoOutputCallInformationCall,
+                                              i);
+        for (j = 0; j < qmi_remote_party_number_list->len; j++) {
+            QmiMessageVoiceGetAllCallInfoOutputRemotePartyNumberCall qmi_remote_party_number;
+
+            qmi_remote_party_number = g_array_index (qmi_remote_party_number_list,
+                                                     QmiMessageVoiceGetAllCallInfoOutputRemotePartyNumberCall,
+                                                     j);
+            if (qmi_call_information.id == qmi_remote_party_number.id) {
+                MMCallInfo *call_info;
+
+                call_info = g_slice_new0 (MMCallInfo);
+                call_info->index = qmi_call_information.id;
+                call_info->number = g_strdup (qmi_remote_party_number.type);
+
+                switch (qmi_call_information.state) {
+                case QMI_VOICE_CALL_STATE_UNKNOWN:
+                    call_info->state = MM_CALL_STATE_UNKNOWN;
+                    break;
+                case QMI_VOICE_CALL_STATE_ORIGINATION:
+                case QMI_VOICE_CALL_STATE_CC_IN_PROGRESS:
+                    call_info->state = MM_CALL_STATE_DIALING;
+                    break;
+                case QMI_VOICE_CALL_STATE_ALERTING:
+                    call_info->state = MM_CALL_STATE_RINGING_OUT;
+                    break;
+                case QMI_VOICE_CALL_STATE_SETUP:
+                case QMI_VOICE_CALL_STATE_INCOMING:
+                    call_info->state = MM_CALL_STATE_RINGING_IN;
+                    break;
+                case QMI_VOICE_CALL_STATE_CONVERSATION:
+                    call_info->state = MM_CALL_STATE_ACTIVE;
+                    break;
+                case QMI_VOICE_CALL_STATE_HOLD:
+                    call_info->state = MM_CALL_STATE_HELD;
+                    break;
+                case QMI_VOICE_CALL_STATE_WAITING:
+                    call_info->state = MM_CALL_STATE_WAITING;
+                    break;
+                case QMI_VOICE_CALL_STATE_DISCONNECTING:
+                case QMI_VOICE_CALL_STATE_END:
+                    call_info->state = MM_CALL_STATE_TERMINATED;
+                    break;
+                default:
+                    call_info->state = MM_CALL_STATE_UNKNOWN;
+                    break;
+                }
+
+                switch (qmi_call_information.direction) {
+                case QMI_VOICE_CALL_DIRECTION_UNKNOWN:
+                    call_info->direction = MM_CALL_DIRECTION_UNKNOWN;
+                    break;
+                case QMI_VOICE_CALL_DIRECTION_MO:
+                    call_info->direction = MM_CALL_DIRECTION_OUTGOING;
+                    break;
+                case QMI_VOICE_CALL_DIRECTION_MT:
+                    call_info->direction = MM_CALL_DIRECTION_INCOMING;
+                    break;
+                default:
+                    call_info->direction = MM_CALL_DIRECTION_UNKNOWN;
+                    break;
+                }
+
+                call_info_list = g_list_append (call_info_list, call_info);
+            }
+        }
+    }
+
+    g_task_return_pointer (task, call_info_list, (GDestroyNotify)mm_3gpp_call_info_list_free);
+}
+
+static void
+modem_voice_load_call_list_ready (QmiClientVoice *client,
+                                  GAsyncResult   *res,
+                                  GTask          *task)
+{
+    g_autoptr(QmiMessageVoiceGetAllCallInfoOutput)  output = NULL;
+    GError                                         *error = NULL;
+
+    /* Parse QMI message */
+    output = qmi_client_voice_get_all_call_info_finish (client, res, &error);
+
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_task_return_error (task, error);
+    } else if (!qmi_message_voice_get_all_call_info_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't process Get All Call Info action: ");
+        g_task_return_error (task, error);
+    } else {
+        process_get_all_call_info (client, output, task);
+    }
+
+    /* We're done, call list already returned */
+    g_object_unref (task);
+}
+
+static void
+modem_voice_load_call_list (MMIfaceModemVoice   *self,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+    QmiClient *client = NULL;
+    GTask *task;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_VOICE, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Update call list through QMI instead of AT+CLCC */
+    qmi_client_voice_get_all_call_info (QMI_CLIENT_VOICE (client),
+                                        NULL, /* no input data */
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback) modem_voice_load_call_list_ready,
+                                        task);
 }
 
 /*****************************************************************************/
@@ -12098,6 +12323,8 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
 static void
 iface_modem_voice_init (MMIfaceModemVoice *iface)
 {
+    iface_modem_voice_parent = g_type_interface_peek_parent (iface);
+
     iface->check_support = modem_voice_check_support;
     iface->check_support_finish = modem_voice_check_support_finish;
     iface->setup_unsolicited_events = modem_voice_setup_unsolicited_events;
@@ -12115,6 +12342,8 @@ iface_modem_voice_init (MMIfaceModemVoice *iface)
     iface->cleanup_in_call_unsolicited_events_finish = common_voice_setup_cleanup_in_call_unsolicited_events_finish;
 
     iface->create_call = modem_voice_create_call;
+    iface->load_call_list = modem_voice_load_call_list;
+    iface->load_call_list_finish = modem_voice_load_call_list_finish;
     iface->hold_and_accept = modem_voice_hold_and_accept;
     iface->hold_and_accept_finish = modem_voice_hold_and_accept_finish;
     iface->hangup_and_accept = modem_voice_hangup_and_accept;

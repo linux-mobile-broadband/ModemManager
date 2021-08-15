@@ -30,9 +30,10 @@
 #define MM_IS_IFACE_MODEM_VOICE(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_VOICE))
 #define MM_IFACE_MODEM_VOICE_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_VOICE, MMIfaceModemVoice))
 
-#define MM_IFACE_MODEM_VOICE_DBUS_SKELETON                     "iface-modem-voice-dbus-skeleton"
-#define MM_IFACE_MODEM_VOICE_CALL_LIST                         "iface-modem-voice-call-list"
-#define MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED "iface-modem-voice-periodic-call-list-check-disabled"
+#define MM_IFACE_MODEM_VOICE_DBUS_SKELETON                       "iface-modem-voice-dbus-skeleton"
+#define MM_IFACE_MODEM_VOICE_CALL_LIST                           "iface-modem-voice-call-list"
+#define MM_IFACE_MODEM_VOICE_PERIODIC_CALL_LIST_CHECK_DISABLED   "iface-modem-voice-periodic-call-list-check-disabled"
+#define MM_IFACE_MODEM_VOICE_INDICATION_CALL_LIST_RELOAD_ENABLED "iface-modem-voice-indication-call-list-reload-enabled"
 
 typedef struct _MMIfaceModemVoice MMIfaceModemVoice;
 
@@ -238,6 +239,14 @@ void mm_iface_modem_voice_report_call (MMIfaceModemVoice *self,
 /* Full current call list reporting (MMCallInfo list) */
 void mm_iface_modem_voice_report_all_calls (MMIfaceModemVoice *self,
                                             GList             *call_info_list);
+
+/* Full reload of call list (async) */
+void mm_iface_modem_voice_reload_all_calls            (MMIfaceModemVoice   *self,
+                                                       GAsyncReadyCallback  callback,
+                                                       gpointer             user_data);
+gboolean mm_iface_modem_voice_reload_all_calls_finish (MMIfaceModemVoice  *self,
+                                                       GAsyncResult       *res,
+                                                       GError            **error);
 
 /* Report an incoming DTMF received */
 void mm_iface_modem_voice_received_dtmf (MMIfaceModemVoice *self,
