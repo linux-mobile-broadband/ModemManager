@@ -44,6 +44,7 @@ typedef struct {
  * The expected USB interface mapping is:
  *   INTERFACE=usb0 -> ID_USB_INTERFACE_NUM=0a
  *   INTERFACE=usb1 -> ID_USB_INTERFACE_NUM=0c
+ *   INTERFACE=usb0 -> ID_USB_INTERFACE_NUM=08  (PLSx3w)
  */
 static const UsbInterfaceConfig usb_interface_configs[] = {
     {
@@ -53,6 +54,10 @@ static const UsbInterfaceConfig usb_interface_configs[] = {
     {
         .swwan_index   = 2,
         .usb_iface_num = 0x0c,
+    },
+    {
+        .swwan_index   = 1,
+        .usb_iface_num = 0x08,
     },
 };
 
