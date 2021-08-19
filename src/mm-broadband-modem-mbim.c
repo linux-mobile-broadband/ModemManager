@@ -1225,7 +1225,8 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
     }
 
     /* Initialized but locked? */
-    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED) {
+    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED ||
+        ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED) {
         MbimMessage *message;
 
         /* Query which lock is to unlock */
@@ -1237,13 +1238,6 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
                              (GAsyncReadyCallback)pin_query_ready,
                              task);
         mbim_message_unref (message);
-        goto out;
-    }
-
-    /* Initialized! */
-    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED) {
-        g_task_return_boolean (task, TRUE);
-        g_object_unref (task);
         goto out;
     }
 
@@ -2662,6 +2656,11 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Facility locks disabling (3GPP interface) */
 
+typedef struct _DisableFacilityLockContext DisableFacilityLockContext;
+struct _DisableFacilityLockContext {
+    MbimPinType pin_type;
+};
+
 static gboolean
 modem_3gpp_disable_facility_lock_finish (MMIfaceModem3gpp *self,
                                          GAsyncResult *res,
@@ -2675,11 +2674,14 @@ disable_facility_lock_ready (MbimDevice *device,
                              GAsyncResult *res,
                              GTask *task)
 {
+    DisableFacilityLockContext *ctx;
     MbimMessage *response = NULL;
     guint32 remaining_attempts;
     MbimPinState pin_state;
     MbimPinType pin_type;
     GError *error = NULL;
+
+    ctx = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response || !mbim_message_response_get_result (response,
@@ -2692,7 +2694,8 @@ disable_facility_lock_ready (MbimDevice *device,
                                                  &remaining_attempts,
                                                  &error)) {
         g_task_return_error (task, error);
-    } else if (pin_state == MBIM_PIN_STATE_LOCKED) {
+    } else if (pin_type == ctx->pin_type &&
+               pin_state == MBIM_PIN_STATE_LOCKED) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
@@ -2715,6 +2718,7 @@ modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
+    DisableFacilityLockContext *ctx;
     MbimMessage *message;
     MbimPinType pin_type;
     MbimDevice *device;
@@ -2736,6 +2740,10 @@ modem_3gpp_disable_facility_lock (MMIfaceModem3gpp *self,
 
     mm_obj_dbg (self, "Trying to disable %s lock using key: %s",
                 mbim_pin_type_get_string (pin_type), key);
+
+    ctx = g_new0 (DisableFacilityLockContext, 1);
+    ctx->pin_type = pin_type;
+    g_task_set_task_data (task, ctx, g_free);
 
     message = mbim_message_pin_set_new (pin_type,
                                         MBIM_PIN_OPERATION_DISABLE,
