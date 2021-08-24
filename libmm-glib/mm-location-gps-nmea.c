@@ -52,7 +52,7 @@ check_append_or_replace (MMLocationGpsNmea *self,
     GMatchInfo *match_info = NULL;
 
     if (G_UNLIKELY (!self->priv->sequence_regex))
-        self->priv->sequence_regex = g_regex_new ("\\$GPGSV,(\\d),(\\d).*",
+        self->priv->sequence_regex = g_regex_new ("\\$..(?:ALM|GSV|RTE|SFI),(\\d),(\\d).*",
                                                   G_REGEX_RAW | G_REGEX_OPTIMIZE,
                                                   0,
                                                   NULL);
