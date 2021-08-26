@@ -568,7 +568,7 @@ get_location_process_reply (MMLocation3gpp *location_3gpp,
     mmcli_output_string_take           (MMC_F_LOCATION_3GPP_LAC,    lac);
     mmcli_output_string_take           (MMC_F_LOCATION_3GPP_TAC,    tac);
     mmcli_output_string_take           (MMC_F_LOCATION_3GPP_CID,    cid);
-    mmcli_output_string_array_take     (MMC_F_LOCATION_GPS_NMEA,    nmea, TRUE);
+    mmcli_output_string_array_multiline_take (MMC_F_LOCATION_GPS_NMEA, nmea);
     mmcli_output_string                (MMC_F_LOCATION_GPS_UTC,     gps_utc);
     mmcli_output_string_take           (MMC_F_LOCATION_GPS_LONG,    gps_longitude);
     mmcli_output_string_take           (MMC_F_LOCATION_GPS_LAT,     gps_latitude);

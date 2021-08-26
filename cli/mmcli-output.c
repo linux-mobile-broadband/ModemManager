@@ -488,6 +488,42 @@ mmcli_output_string_array_take (MmcF       field,
 }
 
 void
+mmcli_output_string_array_multiline_take (MmcF       field,
+                                          gchar    **strv)
+{
+    gchar    **merged;
+    GPtrArray *pointers;
+
+    merged = NULL;
+    if (strv) {
+        guint i;
+
+        pointers = g_ptr_array_new ();
+        for (i = 0; strv[i]; i++) {
+            gchar **split;
+
+            split = strv[i] ? g_strsplit (strv[i], "\n", -1) : NULL;
+            if (split) {
+                guint n;
+
+                for (n = 0; split[n]; n++) {
+                    if (split[n][0]) {
+                        g_strstrip (split[n]);
+                        g_ptr_array_add (pointers, g_strdup (split[n]));
+                    }
+                }
+                g_strfreev (split);
+            }
+        }
+        g_strfreev (strv);
+        g_ptr_array_add (pointers, NULL);
+        merged = (gchar **)g_ptr_array_free (pointers, FALSE);
+    }
+
+    output_item_new_take_multiple (field, merged, TRUE);
+}
+
+void
 mmcli_output_string (MmcF         field,
                      const gchar *str)
 {

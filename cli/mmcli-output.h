@@ -341,6 +341,8 @@ void mmcli_output_string_array          (MmcF            field,
 void mmcli_output_string_array_take     (MmcF           field,
                                          gchar        **strv,
                                          gboolean       multiline);
+void mmcli_output_string_array_multiline_take (MmcF       field,
+                                               gchar    **strv);
 void mmcli_output_string_take_typed     (MmcF           field,
                                          gchar         *value,
                                          const gchar   *type);
