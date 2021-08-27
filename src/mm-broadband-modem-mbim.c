@@ -3126,7 +3126,7 @@ before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
         configurations[i]->user_name = g_strdup (mm_bearer_properties_get_user (config));
 
         g_clear_pointer (&(configurations[i]->password), g_free);
-        configurations[i]->password = g_strdup (mm_bearer_properties_get_user (config));
+        configurations[i]->password = g_strdup (mm_bearer_properties_get_password (config));
 
         configurations[i]->source = MBIM_CONTEXT_SOURCE_USER;
         configurations[i]->compression = MBIM_COMPRESSION_NONE;
