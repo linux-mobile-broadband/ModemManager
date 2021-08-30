@@ -1,4 +1,4 @@
-noinst_PROGRAMS = sms-c-sync
+noinst_PROGRAMS = sms-c-sync sms-c-async
 
 sms_c_sync_CPPFLAGS = \
 	$(WARN_CFLAGS) \
@@ -20,6 +20,30 @@ sms_c_sync_LDADD = \
 	$(NULL)
 
 sms_c_sync_LDFLAGS = \
+	$(WARN_LDFLAGS) \
+	$(MMCLI_LIBS) \
+	$(NULL)
+
+sms_c_async_CPPFLAGS = \
+	$(WARN_CFLAGS) \
+	$(MMCLI_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-glib \
+	-I${top_srcdir}/libmm-glib/generated \
+	-I${top_builddir}/libmm-glib/generated \
+	$(NULL)
+
+sms_c_async_SOURCES = \
+	sms-c-async.c \
+	$(NULL)
+
+sms_c_async_LDADD = \
+	$(top_builddir)/libmm-glib/libmm-glib.la \
+	$(NULL)
+
+sms_c_async_LDFLAGS = \
 	$(WARN_LDFLAGS) \
 	$(MMCLI_LIBS) \
 	$(NULL)

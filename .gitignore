@@ -181,6 +181,7 @@ Makefile.in
 /tools/tests/test-wrapper.sh
 
 /examples/sms-c/sms-c-sync
+/examples/sms-c/sms-c-async
 
 /ModemManager-*-coverage.info
 /ModemManager-*-coverage/
