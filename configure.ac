@@ -599,6 +599,7 @@ examples/modem-watcher-python/Makefile
 examples/modem-watcher-javascript/Makefile
 examples/sms-python/Makefile
 examples/network-scan-python/Makefile
+examples/sms-c/Makefile
 ])
 AC_OUTPUT
 
