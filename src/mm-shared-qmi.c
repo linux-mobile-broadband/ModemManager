@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <config.h>
@@ -1430,6 +1431,8 @@ mm_shared_qmi_set_current_modes (MMIfaceModem        *self,
             ctx->allowed |= MM_MODEM_MODE_3G;
         if (mm_iface_modem_is_4g (self))
             ctx->allowed |= MM_MODEM_MODE_4G;
+        if (mm_iface_modem_is_5g (self))
+            ctx->allowed |= MM_MODEM_MODE_5G;
         ctx->preferred = MM_MODEM_MODE_NONE;
     } else {
         ctx->allowed = allowed;
