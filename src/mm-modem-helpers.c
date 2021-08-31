@@ -645,6 +645,29 @@ mm_3gpp_parse_clcc_response (const gchar  *str,
         }
         call_info->state = call_state[aux];
 
+        if (!mm_get_uint_from_match_info (match_info, 4, &aux)) {
+            mm_obj_warn (log_object, "couldn't parse mode from +CLCC line");
+            goto next;
+        }
+
+        /*
+         * Skip calls in Fax-only and DATA-only mode (3GPP TS 27.007):
+         * 0: Voice
+         * 1: Data
+         * 2: Fax
+         * 3: Voice followed by data, voice mode
+         * 4: Alternating voice/data, voice mode
+         * 5: Alternating voice/fax, voice mode
+         * 6: Voice followed by data, data mode
+         * 7: Alternating voice/data, data mode
+         * 8: Alternating voice/fax, fax mode
+         * 9: unknown
+         */
+        if (aux != 0 && aux != 3 && aux != 4 && aux != 5) {
+            mm_obj_dbg (log_object, "+CLCC line is not a voice call, skipping.");
+            goto next;
+        }
+
         if (g_match_info_get_match_count (match_info) >= 7)
             call_info->number = mm_get_string_unquoted_from_match_info (match_info, 6);
 

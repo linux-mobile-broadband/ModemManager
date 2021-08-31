@@ -4356,6 +4356,31 @@ test_clcc_response_multiple (void)
     common_test_clcc_response (response, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
 }
 
+static void
+test_clcc_response_ignore_non_voice (void)
+{
+    static const MMCallInfo expected_call_info_list[] = {
+        { 1, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_RINGING_IN, (gchar *) "987654321" },
+        { 4, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_RINGING_IN, (gchar *) "111111111" },
+        { 5, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_RINGING_IN, (gchar *) "222222222" },
+        { 6, MM_CALL_DIRECTION_INCOMING, MM_CALL_STATE_RINGING_IN, (gchar *) "333333333" },
+    };
+
+    const gchar *response =
+        "+CLCC: 1,1,4,0,0,\"987654321\",161\r\n" /* voice mode */
+        "+CLCC: 2,1,4,1,0,\"123456789\",161\r\n" /* data mode, skip */
+        "+CLCC: 3,1,4,2,0,\"000000000\",161\r\n" /* fax data, skip */
+        "+CLCC: 4,1,4,3,0,\"111111111\",161\r\n" /* voice followed by data, voice mode */
+        "+CLCC: 5,1,4,4,0,\"222222222\",161\r\n" /* alternating voice/data, voice mode */
+        "+CLCC: 6,1,4,5,0,\"333333333\",161\r\n" /* alternating voice/fax, voice mode */
+        "+CLCC: 7,1,4,6,0,\"444444444\",161\r\n" /* voice followed by data, data mode, skip */
+        "+CLCC: 8,1,4,7,0,\"555555555\",161\r\n" /* alternating voice/data, data mode, skip */
+        "+CLCC: 9,1,4,8,0,\"666666666\",161\r\n" /* alternating voice/fax, fax mode, skip */
+        "+CLCC: 10,1,4,9,0,\"777777777\",161\r\n"; /* unknown mode, skip */
+
+    common_test_clcc_response (response, expected_call_info_list, G_N_ELEMENTS (expected_call_info_list));
+}
+
 /*****************************************************************************/
 /* Test +CRSM EF_ECC read data parsing */
 
@@ -4795,6 +4820,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_clcc_response_single, NULL));
     g_test_suite_add (suite, TESTCASE (test_clcc_response_single_long, NULL));
     g_test_suite_add (suite, TESTCASE (test_clcc_response_multiple, NULL));
+    g_test_suite_add (suite, TESTCASE (test_clcc_response_ignore_non_voice, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_emergency_numbers, NULL));
 
