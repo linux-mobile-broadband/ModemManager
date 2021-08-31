@@ -1,0 +1,115 @@
+# Galician translation for ModemManager.
+# Copyright (C) 2021 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Fran Dieguez <fran.dieguez@gnome.org>, 2021.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ModemManager master\n"
+"Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
+"ModemManager/issues\n"
+"POT-Creation-Date: 2021-11-19 15:29+0000\n"
+"PO-Revision-Date: 2021-11-19 22:43+0100\n"
+"Last-Translator: Fran Dieguez <fran.dieguez@gnome.org>\n"
+"Language-Team: Galician <proxecto@trasno.gal>\n"
+"Language: gl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1)\n"
+"X-Generator: Gtranslator 40.0\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "Controla o «daemon» do Modem Manager."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "A normativa do sistema prevén o control de Modem Manager."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "Desbloquear e controlar un dispositivo de banda larga móvil"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"A normativa do sistema prevén desbloquear ou controlar un dispositivo de "
+"banda larga móvil."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "Engadir, modificar e eliminar os contactos de banda larga móvil."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"A normativa do sistema prevén engadir, modificar ou eliminar os contactos "
+"deste dispositivo."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "Enviar, gardar, modificar e eliminar mensaxes de texto"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"A normativa do sistema prevén o envío e manipulación dos mensaxes de texto "
+"do dispositivo."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "Aceptar chamadas de voz entrantes ou comezar chamadas de voz saíntes."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "A normativa do sistema prevén as chamadas de voz."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr "Consultar informacións de hora e fuso horario"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid "System policy prevents querying network time information."
+msgstr ""
+"A normativa do sistema prevén a consulta da información da hora da rede."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Enable and view geographic location and positioning information"
+msgstr ""
+"Activar e ver a información de localización xeográfica e posicionamento"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"A normativa do sistema prevén activar ou ver a información de localización "
+"xeográfica."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and utilize network information and services"
+msgstr "Consultar e usar a información e servizos da ree"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr ""
+"A normativa do sistema prevén consultar ou usar a información e servizos da "
+"rede."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "Consultar e xeraionar o firmware nun dispositivo de banda larga móvil"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"A normativa do sistema prevén a consulta e xesión do firmware do dispositivo."
+
+#: src/mm-sleep-monitor.c:125
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager precisa reiniciar os dispositivos"
