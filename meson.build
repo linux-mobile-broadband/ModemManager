@@ -254,7 +254,10 @@ endif
 util_dep = cc.find_library('util')
 
 # introspection support
-enable_gir = dependency('gobject-introspection-1.0', version: '>= 0.9.6', required: get_option('introspection')).found()
+enable_gir = get_option('introspection')
+if enable_gir
+  dependency('gobject-introspection-1.0', version: '>= 0.9.6')
+endif
 
 # vala support
 enable_vapi = get_option('vapi')
