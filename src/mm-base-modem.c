@@ -30,7 +30,7 @@
 
 #include "mm-context.h"
 #include "mm-base-modem.h"
-#if defined WITH_QMI && QMI_QRTR_SUPPORTED
+#if defined WITH_QRTR
 #include "mm-kernel-device-qrtr.h"
 #endif
 

@@ -16,6 +16,8 @@
 #ifndef MM_PORT_QMI_H
 #define MM_PORT_QMI_H
 
+#include <config.h>
+
 #include <glib.h>
 #include <glib-object.h>
 #include <gio/gio.h>
@@ -66,7 +68,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMPortQmi, g_object_unref)
 
 MMPortQmi *mm_port_qmi_new          (const gchar          *name,
                                      MMPortSubsys          subsys);
-#if QMI_QRTR_SUPPORTED
+#if defined WITH_QRTR
 MMPortQmi *mm_port_qmi_new_from_node (const gchar *name,
                                       QrtrNode    *node);
 #endif
