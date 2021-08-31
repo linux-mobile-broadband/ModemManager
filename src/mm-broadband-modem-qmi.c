@@ -1294,6 +1294,13 @@ modem_load_supported_ip_families (MMIfaceModem *self,
 /*****************************************************************************/
 /* Load signal quality (Modem interface) */
 
+#define RSRP_MAX -44
+#define RSRP_MIN -140
+#define SNR_MAX 40
+#define SNR_MIN -23
+#define RSRQ_MAX 20
+#define RSRQ_MIN -43
+
 static gboolean
 qmi_dbm_valid (gint8 dbm, QmiNasRadioInterface radio_interface)
 {
@@ -1341,10 +1348,17 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
                                 gint8 gsm_rssi,
                                 gint8 wcdma_rssi,
                                 gint8 lte_rssi,
+                                gint16 nr5g_rsrp,
+                                gint16 nr5g_snr,
+                                gint16 nr5g_rsrq,
                                 guint8 *out_quality,
                                 MMModemAccessTechnology *out_act)
 {
     gint8 rssi_max = -125;
+    gint8 signal_quality = -1;
+    /* Valid nr5g signal quality will be in percentage [0,100].
+     * It is minimum of (rsrp, snr, rsrq) signal quality for 5G. */
+    guint8 nr5g_signal_quality_min = 101;
     QmiNasRadioInterface signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_UNKNOWN;
 
     g_assert (out_quality != NULL);
@@ -1396,12 +1410,41 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
         }
     }
 
+    if (nr5g_rsrp <= RSRP_MAX && nr5g_rsrp >= RSRP_MIN) {
+        mm_obj_dbg (self, "RSRP (5G): %d dBm", nr5g_rsrp);
+        nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
+                                       (guint8)((nr5g_rsrp - RSRP_MIN) * 100 / (RSRP_MAX - RSRP_MIN)));
+        signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_5GNR;
+    }
+
+    if (nr5g_snr <= SNR_MAX && nr5g_snr >= SNR_MIN) {
+        mm_obj_dbg (self, "SNR (5G): %d dB", nr5g_snr);
+        nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
+                                       (guint8)((nr5g_snr - SNR_MIN) * 100 / (SNR_MAX - SNR_MIN)));
+        signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_5GNR;
+    }
+
+    if (nr5g_rsrq <= RSRQ_MAX && nr5g_rsrq >= RSRQ_MIN) {
+        mm_obj_dbg (self, "RSRQ (5G): %d dB", nr5g_rsrq);
+        nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
+                                       (guint8)((nr5g_rsrq - RSRQ_MIN) * 100 / (RSRQ_MAX - RSRQ_MIN)));
+        signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_5GNR;
+    }
+
     if (rssi_max < 0 && rssi_max > -125) {
         /* This RSSI comes as negative dBms */
-        *out_quality = MM_RSSI_TO_QUALITY (rssi_max);
-        *out_act = mm_modem_access_technology_from_qmi_radio_interface (signal_info_radio_interface);
+        signal_quality = MM_RSSI_TO_QUALITY (rssi_max);
+        mm_obj_dbg (self, "RSSI: %d dBm --> %u%%", rssi_max, signal_quality);
+    }
 
-        mm_obj_dbg (self, "RSSI: %d dBm --> %u%%", rssi_max, *out_quality);
+    if (nr5g_signal_quality_min < 101 && nr5g_signal_quality_min >= signal_quality) {
+        signal_quality = nr5g_signal_quality_min;
+        mm_obj_dbg (self, "5G signal quality: %d%%", signal_quality);
+    }
+
+    if (signal_quality >= 0) {
+        *out_quality = signal_quality;
+        *out_act = mm_modem_access_technology_from_qmi_radio_interface (signal_info_radio_interface);
         return TRUE;
     }
 
@@ -1419,14 +1462,34 @@ signal_info_get_quality (MMBroadbandModemQmi *self,
     gint8 gsm_rssi = 0;
     gint8 wcdma_rssi = 0;
     gint8 lte_rssi = 0;
+    gint16 nr5g_rsrp = RSRP_MAX + 1;
+    /* Multiplying SNR_MAX by 10 as QMI gives SNR level
+     * as a scaled integer in units of 0.1 dB. */
+    gint16 nr5g_snr = 10 * SNR_MAX + 10;
+    gint16 nr5g_rsrq = RSRQ_MAX + 1;
 
     qmi_message_nas_get_signal_info_output_get_cdma_signal_strength (output, &cdma1x_rssi, NULL, NULL);
     qmi_message_nas_get_signal_info_output_get_hdr_signal_strength (output, &evdo_rssi, NULL, NULL, NULL, NULL);
     qmi_message_nas_get_signal_info_output_get_gsm_signal_strength (output, &gsm_rssi, NULL);
     qmi_message_nas_get_signal_info_output_get_wcdma_signal_strength (output, &wcdma_rssi, NULL, NULL);
     qmi_message_nas_get_signal_info_output_get_lte_signal_strength (output, &lte_rssi, NULL, NULL, NULL, NULL);
+    qmi_message_nas_get_signal_info_output_get_5g_signal_strength (output, &nr5g_rsrp, &nr5g_snr, NULL);
+    qmi_message_nas_get_signal_info_output_get_5g_signal_strength_extended (output, &nr5g_rsrq, NULL);
 
-    return common_signal_info_get_quality (self, cdma1x_rssi, evdo_rssi, gsm_rssi, wcdma_rssi, lte_rssi, out_quality, out_act);
+    /* Scale to integer values in units of 1 dB/dBm, if any */
+    nr5g_snr = 0.1 * nr5g_snr;
+
+    return common_signal_info_get_quality (self,
+                                           cdma1x_rssi,
+                                           evdo_rssi,
+                                           gsm_rssi,
+                                           wcdma_rssi,
+                                           lte_rssi,
+                                           nr5g_rsrp,
+                                           nr5g_snr,
+                                           nr5g_rsrq,
+                                           out_quality,
+                                           out_act);
 }
 
 static gboolean
@@ -5512,6 +5575,11 @@ nas_signal_info_indication_cb (QmiClientNas                     *client,
     gint8 gsm_rssi = 0;
     gint8 wcdma_rssi = 0;
     gint8 lte_rssi = 0;
+    gint16 nr5g_rsrp = RSRP_MAX + 1;
+    /* Multiplying SNR_MAX by 10 as QMI gives SNR level
+     * as a scaled integer in units of 0.1 dB. */
+    gint16 nr5g_snr = 10 * SNR_MAX + 10;
+    gint16 nr5g_rsrq = RSRQ_MAX + 1;
     guint8 quality;
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
@@ -5520,6 +5588,11 @@ nas_signal_info_indication_cb (QmiClientNas                     *client,
     qmi_indication_nas_signal_info_output_get_gsm_signal_strength (output, &gsm_rssi, NULL);
     qmi_indication_nas_signal_info_output_get_wcdma_signal_strength (output, &wcdma_rssi, NULL, NULL);
     qmi_indication_nas_signal_info_output_get_lte_signal_strength (output, &lte_rssi, NULL, NULL, NULL, NULL);
+    qmi_indication_nas_signal_info_output_get_5g_signal_strength (output, &nr5g_rsrp, &nr5g_snr, NULL);
+    qmi_indication_nas_signal_info_output_get_5g_signal_strength_extended (output, &nr5g_rsrq, NULL);
+
+    /* Scale to integer values in units of 1 dB/dBm, if any */
+    nr5g_snr = 0.1 * nr5g_snr;
 
     if (common_signal_info_get_quality (self,
                                         cdma1x_rssi,
@@ -5527,6 +5600,9 @@ nas_signal_info_indication_cb (QmiClientNas                     *client,
                                         gsm_rssi,
                                         wcdma_rssi,
                                         lte_rssi,
+                                        nr5g_rsrp,
+                                        nr5g_snr,
+                                        nr5g_rsrq,
                                         &quality,
                                         &act)) {
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
