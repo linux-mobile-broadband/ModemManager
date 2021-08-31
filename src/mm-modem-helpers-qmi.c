@@ -12,6 +12,7 @@
  *
  * Copyright (C) 2012-2018 Google, Inc.
  * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <string.h>
@@ -351,10 +352,43 @@ dms_add_extended_qmi_lte_bands (GArray   *mm_bands,
     }
 }
 
+static void
+dms_add_qmi_nr5g_bands (GArray   *mm_bands,
+                        GArray   *qmi_bands,
+                        gpointer  log_object)
+{
+    guint i;
+
+    g_assert (mm_bands != NULL);
+
+    if (!qmi_bands)
+        return;
+
+    for (i = 0; i < qmi_bands->len; i++) {
+        guint16 val;
+
+        val = g_array_index (qmi_bands, guint16, i);
+
+        /* MM_MODEM_BAND_NGRAN_1 = 301,
+         * ...
+         * MM_MODEM_BAND_NGRAN_261 = 561
+         */
+        if (val < 1 || val > 261)
+            mm_obj_dbg (log_object, "unexpected NR5G band supported by module: NGRAN %u", val);
+        else {
+            MMModemBand band;
+
+            band = (MMModemBand)(val + MM_MODEM_BAND_NGRAN_1 - 1);
+            g_array_append_val (mm_bands, band);
+        }
+    }
+}
+
 GArray *
 mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability     qmi_bands,
                                            QmiDmsLteBandCapability  qmi_lte_bands,
                                            GArray                  *extended_qmi_lte_bands,
+                                           GArray                  *qmi_nr5g_bands,
                                            gpointer                 log_object)
 {
     GArray *mm_bands;
@@ -366,6 +400,9 @@ mm_modem_bands_from_qmi_band_capabilities (QmiDmsBandCapability     qmi_bands,
         dms_add_extended_qmi_lte_bands (mm_bands, extended_qmi_lte_bands, log_object);
     else
         dms_add_qmi_lte_bands (mm_bands, qmi_lte_bands);
+
+    if (qmi_nr5g_bands)
+        dms_add_qmi_nr5g_bands (mm_bands, qmi_nr5g_bands, log_object);
 
     return mm_bands;
 }

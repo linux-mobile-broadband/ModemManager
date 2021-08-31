@@ -1845,6 +1845,7 @@ dms_get_band_capabilities_ready (QmiClientDms *client,
     QmiDmsBandCapability                    qmi_bands = 0;
     QmiDmsLteBandCapability                 qmi_lte_bands = 0;
     GArray                                 *extended_qmi_lte_bands = NULL;
+    GArray                                 *qmi_nr5g_bands = NULL;
 
     self = g_task_get_source_object (task);
     priv = get_private (self);
@@ -1867,8 +1868,12 @@ dms_get_band_capabilities_ready (QmiClientDms *client,
         output,
         &extended_qmi_lte_bands,
         NULL);
+    qmi_message_dms_get_band_capabilities_output_get_nr5g_band_capability (
+        output,
+        &qmi_nr5g_bands,
+        NULL);
 
-    mm_bands = mm_modem_bands_from_qmi_band_capabilities (qmi_bands, qmi_lte_bands, extended_qmi_lte_bands, self);
+    mm_bands = mm_modem_bands_from_qmi_band_capabilities (qmi_bands, qmi_lte_bands, extended_qmi_lte_bands, qmi_nr5g_bands, self);
     if (mm_bands->len == 0) {
         g_clear_pointer (&mm_bands, g_array_unref);
         error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
