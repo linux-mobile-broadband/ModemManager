@@ -12,6 +12,7 @@
  *
  * Copyright (C) 2012 Google Inc.
  * Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <config.h>
@@ -3199,7 +3200,6 @@ process_gsm_info (MMBroadbandModemQmi *self,
                 NULL, NULL, /* dtm_support */
                 NULL)) {
             mm_obj_dbg (self, "no GSM service reported");
-            /* No GSM service */
             return FALSE;
         }
     } else {
@@ -3223,7 +3223,6 @@ process_gsm_info (MMBroadbandModemQmi *self,
                 NULL, NULL, /* dtm_support */
                 NULL)) {
             mm_obj_dbg (self, "no GSM service reported");
-            /* No GSM service */
             return FALSE;
         }
     }
@@ -3308,7 +3307,6 @@ process_wcdma_info (MMBroadbandModemQmi *self,
                 NULL, NULL, /* primary_scrambling_code */
                 NULL)) {
             mm_obj_dbg (self, "no WCDMA service reported");
-            /* No GSM service */
             return FALSE;
         }
     } else {
@@ -3333,7 +3331,6 @@ process_wcdma_info (MMBroadbandModemQmi *self,
                 NULL, NULL, /* primary_scrambling_code */
                 NULL)) {
             mm_obj_dbg (self, "no WCDMA service reported");
-            /* No GSM service */
             return FALSE;
         }
     }
@@ -3418,7 +3415,6 @@ process_lte_info (MMBroadbandModemQmi *self,
                 &tac_valid,            &tac,
                 NULL)) {
             mm_obj_dbg (self, "no LTE service reported");
-            /* No GSM service */
             return FALSE;
         }
     } else {
@@ -3441,7 +3437,6 @@ process_lte_info (MMBroadbandModemQmi *self,
                 &tac_valid,            &tac,
                 NULL)) {
             mm_obj_dbg (self, "no LTE service reported");
-            /* No GSM service */
             return FALSE;
         }
     }
@@ -3467,6 +3462,112 @@ process_lte_info (MMBroadbandModemQmi *self,
     return TRUE;
 }
 
+static gboolean
+process_nr5g_info (MMBroadbandModemQmi *self,
+                  QmiMessageNasGetSystemInfoOutput *response_output,
+                  QmiIndicationNasSystemInfoOutput *indication_output,
+                  MMModem3gppRegistrationState *mm_cs_registration_state,
+                  MMModem3gppRegistrationState *mm_ps_registration_state,
+                  guint16 *mm_lac,
+                  guint16 *mm_tac,
+                  guint32 *mm_cid,
+                  gchar **mm_operator_id)
+{
+    QmiNasServiceStatus service_status;
+    gboolean domain_valid;
+    QmiNasNetworkServiceDomain domain;
+    gboolean roaming_status_valid;
+    QmiNasRoamingStatus roaming_status;
+    gboolean forbidden_valid;
+    gboolean forbidden;
+    gboolean lac_valid;
+    guint16 lac;
+    gboolean tac_valid;
+    guint16 tac;
+    gboolean cid_valid;
+    guint32 cid;
+    gboolean network_id_valid;
+    const gchar *mcc;
+    const gchar *mnc;
+
+    g_assert ((response_output != NULL && indication_output == NULL) ||
+              (response_output == NULL && indication_output != NULL));
+
+    *mm_ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    *mm_cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    *mm_lac = 0;
+    *mm_tac = 0;
+    *mm_cid = 0;
+    g_free (*mm_operator_id);
+    *mm_operator_id = NULL;
+
+    if (response_output) {
+        if (!qmi_message_nas_get_system_info_output_get_nr5g_service_status_info (
+                response_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_message_nas_get_system_info_output_get_nr5g_system_info (
+                response_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                &tac_valid,            &tac,
+                NULL)) {
+            mm_obj_dbg (self, "no NR5G service reported");
+            return FALSE;
+        }
+    } else {
+        if (!qmi_indication_nas_system_info_output_get_nr5g_service_status_info (
+                indication_output,
+                &service_status,
+                NULL, /* true_service_status */
+                NULL, /* preferred_data_path */
+                NULL) ||
+            !qmi_indication_nas_system_info_output_get_nr5g_system_info (
+                indication_output,
+                &domain_valid,         &domain,
+                NULL, NULL, /* service_capability */
+                &roaming_status_valid, &roaming_status,
+                &forbidden_valid,      &forbidden,
+                &lac_valid,            &lac,
+                &cid_valid,            &cid,
+                NULL, NULL, NULL, /* registration_reject_info */
+                &network_id_valid,     &mcc, &mnc,
+                &tac_valid,            &tac,
+                NULL)) {
+            mm_obj_dbg (self, "no NR5G service reported");
+            return FALSE;
+        }
+    }
+
+    if (!process_common_info (service_status,
+                              domain_valid,         domain,
+                              roaming_status_valid, roaming_status,
+                              forbidden_valid,      forbidden,
+                              lac_valid,            lac,
+                              tac_valid,            tac,
+                              cid_valid,            cid,
+                              network_id_valid,     mcc, mnc,
+                              mm_cs_registration_state,
+                              mm_ps_registration_state,
+                              mm_lac,
+                              mm_tac,
+                              mm_cid,
+                              mm_operator_id)) {
+        mm_obj_dbg (self, "no NR5G service registered");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 static void
 common_process_system_info_3gpp (MMBroadbandModemQmi *self,
                                  QmiMessageNasGetSystemInfoOutput *response_output,
@@ -3478,7 +3579,8 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     guint16 tac;
     guint32 cid;
     gchar *operator_id;
-    gboolean has_lte_info;
+    gboolean has_nr5g_info = FALSE;
+    gboolean has_lte_info = FALSE;
 
     ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
@@ -3488,17 +3590,23 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     operator_id = NULL;
 
     /* Process infos, with the following priority:
-     *   LTE > WCDMA > GSM
+     *   NR5G > LTE > WCDMA > GSM
      * The first one giving results will be the one reported.
      */
-    has_lte_info = process_lte_info (self, response_output, indication_output,
-                                     &cs_registration_state,
-                                     &ps_registration_state,
-                                     &lac,
-                                     &tac,
-                                     &cid,
-                                     &operator_id);
-    if (!has_lte_info &&
+    if (!(has_nr5g_info = process_nr5g_info (self, response_output, indication_output,
+                                             &cs_registration_state,
+                                             &ps_registration_state,
+                                             &lac,
+                                             &tac,
+                                             &cid,
+                                             &operator_id)) &&
+        !(has_lte_info = process_lte_info (self, response_output, indication_output,
+                                           &cs_registration_state,
+                                           &ps_registration_state,
+                                           &lac,
+                                           &tac,
+                                           &cid,
+                                           &operator_id)) &&
         !process_wcdma_info (self, response_output, indication_output,
                              &cs_registration_state,
                              &ps_registration_state,
@@ -3511,7 +3619,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
                            &lac,
                            &cid,
                            &operator_id)) {
-        mm_obj_dbg (self, "no service (GSM, WCDMA or LTE) reported");
+        mm_obj_dbg (self, "no service (GSM, WCDMA, LTE or NR5G) reported");
     }
 
     /* Cache current operator ID */
@@ -3523,10 +3631,12 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     /* Report new registration states */
     mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), cs_registration_state);
     mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
-    if (has_lte_info)
-        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), ps_registration_state);
-    else
-        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+    mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                       has_lte_info ?
+                                                       ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+    mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                       has_nr5g_info ?
+                                                       ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 }
 
