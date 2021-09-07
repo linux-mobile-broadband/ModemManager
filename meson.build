@@ -84,6 +84,8 @@ cc_args = cc.get_supported_arguments([
   '-Wno-packed',
   # we use some floating point ids as unknown, so we want to compare with them
   '-Wno-float-equal',
+  # avoid warning if we're ignoring fields on purpose
+  '-Wno-missing-field-initializers',
 ])
 
 # strict flags to use in debug builds
