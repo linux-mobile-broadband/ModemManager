@@ -419,15 +419,16 @@ MMSimpleStatus *
 mm_simple_status_new_from_dictionary (GVariant *dictionary,
                                       GError **error)
 {
-    GError *inner_error = NULL;
-    GVariantIter iter;
-    gchar *key;
-    GVariant *value;
-    MMSimpleStatus *properties;
+    GError                    *inner_error = NULL;
+    GVariantIter               iter;
+    gchar                     *key;
+    GVariant                  *value;
+    g_autoptr(MMSimpleStatus)  props = NULL;
 
-    properties = mm_simple_status_new ();
+    props = mm_simple_status_new ();
+
     if (!dictionary)
-        return properties;
+        return g_steal_pointer (&props);
 
     if (!g_variant_is_of_type (dictionary, G_VARIANT_TYPE ("a{sv}"))) {
         g_set_error (error,
@@ -435,13 +436,11 @@ mm_simple_status_new_from_dictionary (GVariant *dictionary,
                      MM_CORE_ERROR_INVALID_ARGS,
                      "Cannot create Simple status from dictionary: "
                      "invalid variant type received");
-        g_object_unref (properties);
         return NULL;
     }
 
     g_variant_iter_init (&iter, dictionary);
-    while (!inner_error &&
-           g_variant_iter_next (&iter, "{sv}", &key, &value)) {
+    while (!inner_error && g_variant_iter_next (&iter, "{sv}", &key, &value)) {
         /* Note: we could do a more efficient matching by checking the variant type
          * and just g_object_set()-ing they specific 'key' and value, but we do want
          * to check which input keys we receive, in order to propagate the error.
@@ -454,19 +453,19 @@ mm_simple_status_new_from_dictionary (GVariant *dictionary,
             g_str_equal (key, MM_SIMPLE_PROPERTY_CDMA_SID) ||
             g_str_equal (key, MM_SIMPLE_PROPERTY_CDMA_NID)) {
             /* uint properties */
-            g_object_set (properties,
+            g_object_set (props,
                           key, g_variant_get_uint32 (value),
                           NULL);
         } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE) ||
                    g_str_equal (key, MM_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME)) {
             /* string properties */
-            g_object_set (properties,
+            g_object_set (props,
                           key, g_variant_get_string (value, NULL),
                           NULL);
         } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_CURRENT_BANDS) ||
                    g_str_equal (key, MM_SIMPLE_PROPERTY_SIGNAL_QUALITY)) {
             /* remaining complex types, as variant */
-            g_object_set (properties,
+            g_object_set (props,
                           key, value,
                           NULL);
         } else {
@@ -484,11 +483,10 @@ mm_simple_status_new_from_dictionary (GVariant *dictionary,
     /* If error, destroy the object */
     if (inner_error) {
         g_propagate_error (error, inner_error);
-        g_object_unref (properties);
-        properties = NULL;
+        return NULL;
     }
 
-    return properties;
+    return g_steal_pointer (&props);
 }
 
 /*****************************************************************************/
