@@ -186,6 +186,7 @@ GENERATED_H = \
 	mm-gdbus-manager.h \
 	mm-gdbus-sim.h \
 	mm-gdbus-sms.h \
+	mm-gdbus-call.h \
 	mm-gdbus-bearer.h \
 	mm-gdbus-modem.h \
 	$(NULL)
@@ -197,6 +198,7 @@ GENERATED_C = \
 	mm-gdbus-manager.c \
 	mm-gdbus-sim.c \
 	mm-gdbus-sms.c \
+	mm-gdbus-call.c \
 	mm-gdbus-bearer.c \
 	mm-gdbus-modem.c \
 	$(NULL)
