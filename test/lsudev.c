@@ -50,6 +50,8 @@ setup_signals (void)
     sigaction (SIGINT,  &action, NULL);
 }
 
+static void println (guint indent, const char *fmt, ...) __attribute__((__format__ (__printf__, 2, 3)));
+
 static void
 println (guint indent, const char *fmt, ...)
 {
@@ -90,8 +92,7 @@ dump_device_and_parent (GUdevDevice *device, guint indent)
     println (indent, "Action:   %s", g_udev_device_get_action (device));
     println (indent, "Seq Num:  %lu", g_udev_device_get_seqnum (device));
     println (indent, "Dev File: %s", g_udev_device_get_device_file (device));
-
-    println (indent, "");
+	println (indent, "-----------");
     println (indent, "Properties:");
 
     /* Get longest property name length for alignment */
@@ -110,8 +111,6 @@ dump_device_and_parent (GUdevDevice *device, guint indent)
         strcat (propstr, g_udev_device_get_property (device, *iter));
         println (indent + 2, "%s", propstr);
     }
-
-    println (indent, "");
 
     parent = g_udev_device_get_parent (device);
     if (parent) {
