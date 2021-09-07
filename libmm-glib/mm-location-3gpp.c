@@ -397,7 +397,6 @@ mm_location_3gpp_new_from_string_variant (GVariant *string,
         validate_numeric_string_content ("Cell ID", split[3], TRUE, error) &&
         validate_string_length ("Tracking area code", split[4], 0, 8, error) &&
         validate_numeric_string_content ("Tracking area code", split[4], TRUE, error)) {
-        gchar *operator_code;
         /* Create new location object */
         self = mm_location_3gpp_new ();
         /* Join MCC and MNC and ensure they are zero-padded to required widths */
