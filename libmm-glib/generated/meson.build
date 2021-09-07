@@ -64,10 +64,10 @@ gen_sources += gnome.mkenums(
 )
 
 gdbus_ifaces = [
-  ['bearer', mm_ifaces_bearer, [], false, true],
-  ['call', mm_ifaces_call, [], false, false],
-  ['manager', mm_ifaces, [], false, true],
-  ['sim', mm_ifaces_sim, [], false, true],
+  ['bearer', mm_ifaces_bearer, [], false],
+  ['call', mm_ifaces_call, [], false],
+  ['manager', mm_ifaces, [], false],
+  ['sim', mm_ifaces_sim, [], false],
 ]
 
 annotations = [
@@ -77,14 +77,11 @@ annotations = [
   ['org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager', 'org.gtk.GDBus.C.Name', 'Modem3gppProfileManager'],
 ]
 
-gdbus_ifaces += [['modem', mm_ifaces_modem, annotations, true, true]]
+gdbus_ifaces += [['modem', mm_ifaces_modem, annotations, true]]
 
 annotations = [['org.freedesktop.ModemManager1.Sms:Data', 'org.gtk.GDBus.C.ForceGVariant', 'True']]
 
-gdbus_ifaces += [['sms', mm_ifaces_sms, annotations, false, true]]
-
-# FIXME: to avoid the inclusion of call gdbus (seems a mistake in autotools)
-gen_gir_sources = gen_sources + gen_headers
+gdbus_ifaces += [['sms', mm_ifaces_sms, annotations, false]]
 
 foreach gdbus_iface: gdbus_ifaces
   gdbus_sources = gnome.gdbus_codegen(
@@ -106,9 +103,6 @@ foreach gdbus_iface: gdbus_ifaces
   gen_headers += gdbus_sources[1]
   # FIXME: the `expand_content_files` must be strings
   gen_docs += gdbus_sources[2]
-  if gdbus_iface[4]
-    gen_gir_sources += [gdbus_sources[0], gdbus_sources[1]]
-  endif
 endforeach
 
 deps = [

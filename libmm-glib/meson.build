@@ -152,9 +152,7 @@ if enable_gir
 
   libmm_glib_gir = gnome.generate_gir(
     libmm_glib,
-    # FIXME: mm-gdbus-call.[ch] are not included
-    # sources: sources + headers + gen_sources + gen_headers + [mm_names_header, mm_version_header],
-    sources: sources + headers + gen_gir_sources + [mm_names_header, mm_version_header],
+    sources: sources + headers + gen_sources + gen_headers + [mm_names_header, mm_version_header],
     includes: incs,
     namespace: gir_ns,
     nsversion: mm_gir_version,
