@@ -82,6 +82,8 @@ cc_args = cc.get_supported_arguments([
   '-Wno-cast-function-type',
   # all message protocol structs are packed, never complain about it
   '-Wno-packed',
+  # we use some floating point ids as unknown, so we want to compare with them
+  '-Wno-float-equal',
 ])
 
 # strict flags to use in debug builds
@@ -94,7 +96,6 @@ if get_option('buildtype').contains('debug')
     '-Wdouble-promotion',
     '-Wduplicated-branches',
     '-Wduplicated-cond',
-    '-Wfloat-equal',
     '-Wformat=2',
     '-Wformat-nonliteral',
     '-Wformat-security',
