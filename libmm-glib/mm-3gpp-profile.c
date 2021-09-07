@@ -95,6 +95,8 @@ mm_3gpp_profile_cmp (MM3gppProfile         *a,
     if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_APN_TYPE) &&
         (a->priv->apn_type != b->priv->apn_type))
         return FALSE;
+
+    return TRUE;
 }
 
 /*****************************************************************************/
