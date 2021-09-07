@@ -789,8 +789,6 @@ if enable_plugins.contains('thuraya')
     'module': {'sources': sources, 'include_directories': top_inc, 'c_args': common_c_args},
     'test': {'sources': files('thuraya/tests/test-mm-modem-helpers-thuraya.c'), 'include_directories': include_directories('thuraya'), 'dependencies': libhelpers_dep},
   }}
-
-  plugins_udev_rules += files('simtech/77-mm-simtech-port-types.rules')
 endif
 
 # plugin: tplink
