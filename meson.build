@@ -54,7 +54,6 @@ source_root = meson.current_source_dir()
 build_root = meson.current_build_dir()
 
 build_aux_dir = source_root / 'build-aux'
-data_dir = source_root / 'data'
 plugins_dir = source_root / 'plugins'
 po_dir = source_root / 'po'
 src_dir = source_root / 'src'
@@ -128,8 +127,6 @@ if get_option('buildtype').contains('debug')
 endif
 
 add_project_arguments(common_args + cc_args, language: 'c')
-
-no_deprecated_declarations_flags = cc.get_supported_arguments('-Wno-deprecated-declarations')
 
 glib_version = '2.56'
 
