@@ -9228,10 +9228,11 @@ modem_voice_load_call_list_finish (MMIfaceModemVoice  *self,
     return TRUE;
 }
 
-static void
-process_get_all_call_info (QmiClientVoice                      *client,
-                           QmiMessageVoiceGetAllCallInfoOutput *output,
-                           GTask                               *task)
+static gboolean
+process_get_all_call_info (QmiClientVoice                       *client,
+                           QmiMessageVoiceGetAllCallInfoOutput  *output,
+                           GList                               **out_call_info_list,
+                           GError                              **error)
 {
     GArray *qmi_remote_party_number_list = NULL;
     GArray *qmi_call_information_list = NULL;
@@ -9243,8 +9244,9 @@ process_get_all_call_info (QmiClientVoice                      *client,
     qmi_message_voice_get_all_call_info_output_get_call_information (output, &qmi_call_information_list, NULL);
 
     if (!qmi_remote_party_number_list || !qmi_call_information_list) {
-        mm_obj_dbg (client, "Ignoring Get All Call Status message. Remote party number or call information not available");
-        return;
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Remote party number or call information not available");
+        return FALSE;
     }
 
     for (i = 0; i < qmi_call_information_list->len; i++) {
@@ -9319,7 +9321,8 @@ process_get_all_call_info (QmiClientVoice                      *client,
         }
     }
 
-    g_task_return_pointer (task, call_info_list, (GDestroyNotify)mm_3gpp_call_info_list_free);
+    *out_call_info_list = call_info_list;
+    return TRUE;
 }
 
 static void
@@ -9329,6 +9332,7 @@ modem_voice_load_call_list_ready (QmiClientVoice *client,
 {
     g_autoptr(QmiMessageVoiceGetAllCallInfoOutput)  output = NULL;
     GError                                         *error = NULL;
+    GList                                          *call_info_list = NULL;
 
     /* Parse QMI message */
     output = qmi_client_voice_get_all_call_info_finish (client, res, &error);
@@ -9337,13 +9341,14 @@ modem_voice_load_call_list_ready (QmiClientVoice *client,
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);
     } else if (!qmi_message_voice_get_all_call_info_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't run Get All Call Info action: ");
+        g_task_return_error (task, error);
+    } else if (!process_get_all_call_info (client, output, &call_info_list, &error)) {
         g_prefix_error (&error, "Couldn't process Get All Call Info action: ");
         g_task_return_error (task, error);
-    } else {
-        process_get_all_call_info (client, output, task);
-    }
+    } else
+        g_task_return_pointer (task, call_info_list, (GDestroyNotify)mm_3gpp_call_info_list_free);
 
-    /* We're done, call list already returned */
     g_object_unref (task);
 }
 
