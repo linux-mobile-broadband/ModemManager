@@ -9240,13 +9240,18 @@ process_get_all_call_info (QmiClientVoice                       *client,
     guint   i;
     guint   j;
 
-    qmi_message_voice_get_all_call_info_output_get_remote_party_number (output, &qmi_remote_party_number_list, NULL);
-    qmi_message_voice_get_all_call_info_output_get_call_information (output, &qmi_call_information_list, NULL);
-
-    if (!qmi_remote_party_number_list || !qmi_call_information_list) {
+    /* If TLVs missing, report an error */
+    if (!qmi_message_voice_get_all_call_info_output_get_remote_party_number (output, &qmi_remote_party_number_list, NULL) ||
+        !qmi_message_voice_get_all_call_info_output_get_call_information (output, &qmi_call_information_list, NULL)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
                      "Remote party number or call information not available");
         return FALSE;
+    }
+
+    /* If there are no ongoing calls, the lists will be NULL */
+    if (!qmi_remote_party_number_list || !qmi_call_information_list) {
+        *out_call_info_list = NULL;
+        return TRUE;
     }
 
     for (i = 0; i < qmi_call_information_list->len; i++) {
