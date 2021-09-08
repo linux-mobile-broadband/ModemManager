@@ -2546,7 +2546,7 @@ mm_iface_modem_voice_reload_all_calls (MMIfaceModemVoice   *self,
 
     task = g_task_new (self, NULL, callback, user_data);
     MM_IFACE_MODEM_VOICE_GET_INTERFACE (self)->load_call_list (self,
-                                                               reload_all_calls_ready,
+                                                               (GAsyncReadyCallback)reload_all_calls_ready,
                                                                task);
 }
 
