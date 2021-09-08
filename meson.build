@@ -360,6 +360,8 @@ subdir('cli')
 subdir('test')
 subdir('tools/tests')
 
+subdir('examples/sms-c')
+
 enable_man = get_option('man')
 if enable_man
   subdir('docs/man')
