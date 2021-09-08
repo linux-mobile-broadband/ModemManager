@@ -28,6 +28,17 @@ The following notes are directed to package maintainers:
  * Building from git no longer requires autoconf-archive, the needed AX_ macros
    are now shipped inside m4/.
 
+ * In addition to building from a source release tarball, or building from git
+   checkouts using the GNU autotools suite (autoconf/automake/libtool), this
+   release includes the initial support for the meson build system. The meson
+   port is not fully complete yet, as there are some missing things in the doc
+   generation and test steps, but for system integration or development
+   purposes, the port should be fully operational. This major release, including
+   all its stable updates in the 1.18.x series, will be the last ones providing
+   support for GNU autotools. The next major release will likely be a meson-only
+   one, and will therefore not be based on a source release tarball any more,
+   but on specific git tags instead.
+
 The most important features and changes in this release are the following:
 
  * Data session multiplexing can now be enabled in QMI and MBIM modems, e.g. so
@@ -110,6 +121,11 @@ The most important features and changes in this release are the following:
       is removed, even if we lose some of the information that we were providing
       in the interface.
 
+ * Location interface:
+   ** The multi-sentence NMEA trace support is updated to include additional
+      possible trace types in addition to GSV (e.g. ALM, GSV, RTE, SFI) and also
+      when coming from other constellations, not just GPS.
+
  * SIM:
    ** New 'PreferredNetworks' property and 'SetPreferredNetworks' method,
       implemented using '+CPOL' for generic AT modems and 'NAS Get/Set Preferred
@@ -126,9 +142,9 @@ The most important features and changes in this release are the following:
       feature, this is no longer true, and if possible the daemon will always
       try to switch the module to raw-ip, and fallback to 802.3 only if raw-ip
       is unsupported.
-   ** Enabled both AT and QMI indications for the messaging interface, so that
-      new SMS events are reported via both channels. This solves issues seen
-      in the Pinephone when waking up from suspend.
+   ** Enabled both AT and QMI indications for the messaging and voice interfaces
+      so that new SMS and call events are reported via both channels. This
+      solves issues seen in the Pinephone when waking up from suspend.
    ** Enabled network reject indications.
    ** If operator name not updated through standard indications, it will be
       explicitly queried with 'NAS Get Plmn Name'.
@@ -142,7 +158,8 @@ The most important features and changes in this release are the following:
       the hardware tx/rx endpoints with the logical ones in the QMI protocol.
    ** Implemented support for the Voice interface and its operations, not only
       standard voice call management, but also support for the supplementary
-      services.
+      services. Voice call management will be done completely using QMI, even
+      if the new call indications are notified via AT URCs.
 
  * MBIM:
    ** Implemented support for Dual SIM in non-QMI MBIM devices, using the
