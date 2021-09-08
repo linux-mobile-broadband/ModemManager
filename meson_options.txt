@@ -20,75 +20,73 @@ option('qrtr', type: 'feature', value: 'auto', description: 'enable QRTR support
 
 option('dist_version', type: 'string', value: '', description: 'define the custom version (like distribution package name and revision')
 
-option('plugin_disable_all', type: 'boolean', value: false, description: 'disable all plugin support')
-
-option('plugin_generic', type: 'boolean', value: true, description: 'enable generic plugin support')
-option('plugin_altair_lte', type: 'boolean', value: true, description: 'enable altair lte plugin support')
-option('plugin_anydata', type: 'boolean', value: true, description: 'enable anydata plugin support')
-option('plugin_broadmobi', type: 'boolean', value: true, description: 'enable broadmobi plugin support')
-option('plugin_cinterion', type: 'boolean', value: true, description: 'enable cinterion plugin support')
+option('plugin_generic', type: 'feature', value: 'auto', description: 'enable generic plugin support')
+option('plugin_altair_lte', type: 'feature', value: 'auto', description: 'enable altair lte plugin support')
+option('plugin_anydata', type: 'feature', value: 'auto', description: 'enable anydata plugin support')
+option('plugin_broadmobi', type: 'feature', value: 'auto', description: 'enable broadmobi plugin support')
+option('plugin_cinterion', type: 'feature', value: 'auto', description: 'enable cinterion plugin support')
 
 # shared_sierra, shared_novatel, shared_xmm, shared_telit, shared_foxonn
-option('plugin_dell', type: 'boolean', value: true, description: 'enable dell plugin support')
+option('plugin_dell', type: 'feature', value: 'auto', description: 'enable dell plugin support')
 
-option('plugin_dlink', type: 'boolean', value: true, description: 'enable dlink plugin support')
+option('plugin_dlink', type: 'feature', value: 'auto', description: 'enable dlink plugin support')
 
 # shared_xmm
-option('plugin_fibocom', type: 'boolean', value: true, description: 'enable fibocom plugin support')
+option('plugin_fibocom', type: 'feature', value: 'auto', description: 'enable fibocom plugin support')
 
 # shared_foxconn
-option('plugin_foxconn', type: 'boolean', value: true, description: 'enable foxconn plugin support')
-option('plugin_gosuncn', type: 'boolean', value: true, description: 'enable gosuncn plugin support')
-option('plugin_haier', type: 'boolean', value: true, description: 'enable haier plugin support')
-option('plugin_huawei', type: 'boolean', value: true, description: 'enable huawei plugin support')
-option('plugin_iridium', type: 'boolean', value: true, description: 'enable iridium plugin support')
-option('plugin_linktop', type: 'boolean', value: true, description: 'enable linktop plugin support')
-option('plugin_longcheer', type: 'boolean', value: true, description: 'enable longcheer plugin support')
-option('plugin_mbm', type: 'boolean', value: true, description: 'enable mbm plugin support')
-option('plugin_motorola', type: 'boolean', value: true, description: 'enable motorola plugin support')
-option('plugin_mtk', type: 'boolean', value: true, description: 'enable mtk plugin support')
-option('plugin_nokia', type: 'boolean', value: true, description: 'enable nokia plugin support')
+option('plugin_foxconn', type: 'feature', value: 'auto', description: 'enable foxconn plugin support')
+option('plugin_gosuncn', type: 'feature', value: 'auto', description: 'enable gosuncn plugin support')
+option('plugin_haier', type: 'feature', value: 'auto', description: 'enable haier plugin support')
+option('plugin_huawei', type: 'feature', value: 'auto', description: 'enable huawei plugin support')
+option('plugin_iridium', type: 'feature', value: 'auto', description: 'enable iridium plugin support')
+option('plugin_linktop', type: 'feature', value: 'auto', description: 'enable linktop plugin support')
+option('plugin_longcheer', type: 'feature', value: 'auto', description: 'enable longcheer plugin support')
+option('plugin_mbm', type: 'feature', value: 'auto', description: 'enable mbm plugin support')
+option('plugin_motorola', type: 'feature', value: 'auto', description: 'enable motorola plugin support')
+option('plugin_mtk', type: 'feature', value: 'auto', description: 'enable mtk plugin support')
+option('plugin_nokia', type: 'feature', value: 'auto', description: 'enable nokia plugin support')
 
 # shared_icera
-option('plugin_nokia_icera', type: 'boolean', value: true, description: 'enable nokia icera plugin support')
+option('plugin_nokia_icera', type: 'feature', value: 'auto', description: 'enable nokia icera plugin support')
 
 # shared_novatel
-option('plugin_novatel', type: 'boolean', value: true, description: 'enable novatel plugin support')
-option('plugin_novatel_lte', type: 'boolean', value: true, description: 'enable novatel lte plugin support')
+option('plugin_novatel', type: 'feature', value: 'auto', description: 'enable novatel plugin support')
+option('plugin_novatel_lte', type: 'feature', value: 'auto', description: 'enable novatel lte plugin support')
 
 # shared_option
-option('plugin_option', type: 'boolean', value: true, description: 'enable option plugin support')
+option('plugin_option', type: 'feature', value: 'auto', description: 'enable option plugin support')
 
 # shared_option
-option('plugin_option_hso', type: 'boolean', value: true, description: 'enable option hso plugin support')
-option('plugin_pantech', type: 'boolean', value: true, description: 'enable pantech plugin support')
+option('plugin_option_hso', type: 'feature', value: 'auto', description: 'enable option hso plugin support')
+option('plugin_pantech', type: 'feature', value: 'auto', description: 'enable pantech plugin support')
 
-option('plugin_qcom_soc', type: 'boolean', value: true, description: 'enable qcom soc plugin support')
-option('plugin_quectel', type: 'boolean', value: true, description: 'enable quectel plugin support')
+option('plugin_qcom_soc', type: 'feature', value: 'auto', description: 'enable qcom soc plugin support')
+option('plugin_quectel', type: 'feature', value: 'auto', description: 'enable quectel plugin support')
 
 # shared_icera
-option('plugin_samsung', type: 'boolean', value: true, description: 'enable samsung plugin support')
+option('plugin_samsung', type: 'feature', value: 'auto', description: 'enable samsung plugin support')
 
 # shared_icera, shared_sierra
-option('plugin_sierra_legacy', type: 'boolean', value: true, description: 'enable sierra legacy plugin support')
+option('plugin_sierra_legacy', type: 'feature', value: 'auto', description: 'enable sierra legacy plugin support')
 
 # shared_xmm
-option('plugin_sierra', type: 'boolean', value: true, description: 'enable sierra plugin support')
-option('plugin_simtech', type: 'boolean', value: true, description: 'enable simtech plugin support')
+option('plugin_sierra', type: 'feature', value: 'auto', description: 'enable sierra plugin support')
+option('plugin_simtech', type: 'feature', value: 'auto', description: 'enable simtech plugin support')
 
 # shared_telit
-option('plugin_telit', type: 'boolean', value: true, description: 'enable telit plugin support')
-option('plugin_thuraya', type: 'boolean', value: true, description: 'enable thuraya plugin support')
-option('plugin_tplink', type: 'boolean', value: true, description: 'enable tplink plugin support')
-option('plugin_ublox', type: 'boolean', value: true, description: 'enable ublox plugin support')
-option('plugin_via', type: 'boolean', value: true, description: 'enable via plugin support')
-option('plugin_wavecom', type: 'boolean', value: true, description: 'enable wavecom plugin support')
-option('plugin_x22x', type: 'boolean', value: true, description: 'enable x22x plugin support')
+option('plugin_telit', type: 'feature', value: 'auto', description: 'enable telit plugin support')
+option('plugin_thuraya', type: 'feature', value: 'auto', description: 'enable thuraya plugin support')
+option('plugin_tplink', type: 'feature', value: 'auto', description: 'enable tplink plugin support')
+option('plugin_ublox', type: 'feature', value: 'auto', description: 'enable ublox plugin support')
+option('plugin_via', type: 'feature', value: 'auto', description: 'enable via plugin support')
+option('plugin_wavecom', type: 'feature', value: 'auto', description: 'enable wavecom plugin support')
+option('plugin_x22x', type: 'feature', value: 'auto', description: 'enable x22x plugin support')
 
 # shared_icera
-option('plugin_zte', type: 'boolean', value: true, description: 'enable zte plugin support')
+option('plugin_zte', type: 'feature', value: 'auto', description: 'enable zte plugin support')
 
-option('qcdm_standalone', type: 'boolean', value: true, description: 'enable standalone qdcm')
+option('qcdm_standalone', type: 'feature', value: 'auto', description: 'enable standalone qdcm')
 
 option('introspection', type: 'feature', value: 'auto', description: 'build introspection support')
 option('vapi', type: 'boolean', value: false, description: 'build vala bindings')
