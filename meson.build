@@ -237,7 +237,7 @@ enable_mbim = mbim_glib_dep.found()
 config_h.set('WITH_MBIM', enable_mbim)
 
 # QMI support (enabled by default)
-qmi_glib_dep = dependency('qmi-glib', version: '>= 1.30.0', required: get_option('qmi'))
+qmi_glib_dep = dependency('qmi-glib', version: '>= 1.30.2', required: get_option('qmi'))
 enable_qmi = qmi_glib_dep.found()
 config_h.set('WITH_QMI', enable_qmi)
 

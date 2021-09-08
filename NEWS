@@ -9,7 +9,7 @@ The following notes are directed to package maintainers:
    ** glib2 >= 2.56
    ** libgudev >= 232
    ** libmbim >= 1.26.0 (for the optional MBIM support)
-   ** libqmi >= 1.30.0 (for the optional QMI support)
+   ** libqmi >= 1.30.2 (for the optional QMI support)
    ** libqrtr-glib >= 1.0.0 (for the optional QRTR support)
 
  * The ModemManager.service file for systemd integration provided in the sources
