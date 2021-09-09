@@ -18,11 +18,6 @@ sources = files(
 
 test_units += [['test-qcdm', sources, true]]
 
-incs = [
-  top_inc,
-  libqcdm_inc,
-]
-
 deps = [
   glib_deps,
   libqcdm_dep,
@@ -32,7 +27,7 @@ foreach test_unit: test_units
   exe = executable(
     test_unit[0],
     test_unit[1],
-    include_directories: incs,
+    include_directories: top_inc,
     dependencies: deps,
   )
 
