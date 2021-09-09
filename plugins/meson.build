@@ -918,13 +918,11 @@ endif
 foreach plugin_name, plugin_data: plugins
   libhelpers = []
   if plugin_data.has_key('helper')
-    libhelpers += [
-      static_library(
-        'helpers-' + plugin_name,
-        dependencies: libport_dep,
-        kwargs: plugin_data['helper'],
-      )
-    ]
+    libhelpers = static_library(
+      'helpers-' + plugin_name,
+      dependencies: libport_dep,
+      kwargs: plugin_data['helper'],
+    )
   endif
 
   module_args = plugin_data['module']
