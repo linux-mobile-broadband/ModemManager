@@ -257,7 +257,7 @@ if enable_qrtr
 endif
 
 # Additional suspend/resume support via systemd
-if enable_systemd_journal
+if enable_systemd_suspend_resume
   sources += files('mm-sleep-monitor.c')
 
   deps += [
