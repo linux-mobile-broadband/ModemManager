@@ -193,21 +193,24 @@ if install_systemdunitdir and systemd_systemdsystemunitdir == ''
 endif
 
 # Suspend/resume support
-libsystemd_dep = dependency('libsystemd', version: '>= 209', required: false)
-if not libsystemd_dep.found()
-  libsystemd_dep = dependency('libsystemd-login', version: '>= 183', required: false)
-  if not libsystemd_dep.found()
-    libsystemd_dep = dependency('libelogind', version: '>= 209', required: false)
-  endif
-endif
-
 enable_systemd_suspend_resume = get_option('systemd_suspend_resume')
-assert(not enable_systemd_suspend_resume or libsystemd_dep.found(), 'libsystemd, libsystemd-login or elogind must be available at runtime for suspend/resume support')
-config_h.set('WITH_SYSTEMD_SUSPEND_RESUME', enable_systemd_suspend_resume)
-
 # systemd journal support
 enable_systemd_journal = get_option('systemd_journal')
-assert(not enable_systemd_journal or libsystemd_dep.found(), 'libsystemd development headers are required')
+
+if enable_systemd_suspend_resume or enable_systemd_journal
+  libsystemd_dep = dependency('libsystemd', version: '>= 209', required: false)
+  if not libsystemd_dep.found()
+    libsystemd_dep = dependency('libsystemd-login', version: '>= 183', required: false)
+    if not libsystemd_dep.found()
+      libsystemd_dep = dependency(
+        'libelogind',
+        version: '>= 209',
+        not_found_message: 'libsystemd, libsystemd-login or elogind must be available at runtime for suspend/resume or systemd journal support',
+      )
+    endif
+  endif
+endif
+config_h.set('WITH_SYSTEMD_SUSPEND_RESUME', enable_systemd_suspend_resume)
 config_h.set('WITH_SYSTEMD_JOURNAL', enable_systemd_journal)
 
 # PolicyKit
