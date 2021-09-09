@@ -12,16 +12,15 @@ sources = files(
 )
 
 deps = [
-  gio_unix_dep,
   libhelpers_dep,
   libmm_test_generated_dep,
 ]
 
 libmm_test_common = shared_library(
-  'mm_test_common',
+  'mm-test-common',
   sources: sources,
   include_directories: top_inc,
-  dependencies: deps,
+  dependencies: deps + [gio_unix_dep],
   c_args: '-DTEST_SERVICES="@0@"'.format(source_root / 'data/tests'),
 )
 
