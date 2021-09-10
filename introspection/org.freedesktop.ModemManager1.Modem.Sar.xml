@@ -54,7 +54,7 @@
         When disabled, the modem's output power level is dynamically updated
         exclusively by the device.
 
-        Since: 1.18
+        Since: 1.20
     -->
     <method name="Enable">
       <arg name="enable" type="b" direction="in" />
@@ -71,7 +71,7 @@
 
         The index set here will apply to all antennas on the system.
 
-        Since: 1.18
+        Since: 1.20
     -->
     <method name="SetPowerLevel">
       <arg name="level" type="u" direction="in" />
@@ -82,7 +82,7 @@
 
         Boolean indicating whether dynamic SAR is currently enabled.
 
-        Since: 1.18
+        Since: 1.20
     -->
     <property name="State" type="b" access="read" />
 
@@ -94,7 +94,7 @@
 
         This value is only applicable when dynamic SAR is enabled.
 
-        Since: 1.18
+        Since: 1.20
     -->
     <property name="PowerLevel" type="u" access="read" />
 
