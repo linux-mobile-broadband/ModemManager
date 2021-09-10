@@ -210,6 +210,7 @@ sources = files(
   'mm-iface-modem-location.c',
   'mm-iface-modem-messaging.c',
   'mm-iface-modem-oma.c',
+  'mm-iface-modem-sar.c',
   'mm-iface-modem-signal.c',
   'mm-iface-modem-simple.c',
   'mm-iface-modem-time.c',
