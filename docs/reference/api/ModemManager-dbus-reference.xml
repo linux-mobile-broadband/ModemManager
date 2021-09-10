@@ -138,6 +138,7 @@
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Voice.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
+    <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Sar.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Signal.xml"/>
     <xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Oma.xml"/>
     <!--xi:include href="../../../../libmm-glib/generated/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml"/-->
