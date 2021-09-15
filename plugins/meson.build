@@ -83,7 +83,7 @@ if plugins_shared['icera']
   plugins += {'shared-icera': {
     'plugin': false,
     'helper': {'sources': files('icera/mm-modem-helpers-icera.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
-    'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
     'test': {'sources': files('icera/tests/test-modem-helpers-icera.c'), 'include_directories': plugins_incs + [icera_inc], 'dependencies': libhelpers_dep},
   }}
 endif
@@ -280,7 +280,7 @@ if plugins_options['cinterion']
   plugins += {'plugin-cinterion': {
     'plugin': true,
     'helper': {'sources': files('cinterion/mm-modem-helpers-cinterion.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
-    'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
     'test': {'sources': files('cinterion/tests/test-modem-helpers-cinterion.c'), 'include_directories': plugins_incs + [include_directories('cinterion')], 'dependencies': libport_dep},
   }}
 
@@ -456,7 +456,7 @@ if plugins_options['huawei']
   plugins += {'plugin-huawei': {
     'plugin': true,
     'helper': {'sources': files('huawei/mm-modem-helpers-huawei.c'), 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args + ['-DMM_MODULE_NAME="huawei"']},
-    'module': {'sources': sources + enums_sources + daemon_enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args + ['-DMM_MODULE_NAME="huawei"']},
+    'module': {'sources': sources + enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args + ['-DMM_MODULE_NAME="huawei"']},
     'test': {'sources': files('huawei/tests/test-modem-helpers-huawei.c') + enums_sources, 'include_directories': huawei_inc, 'dependencies': libhelpers_dep},
   }}
 
@@ -529,7 +529,7 @@ if plugins_options['mbm']
   plugins += {'plugin-ericsson-mbm': {
     'plugin': true,
     'helper': {'sources': files('mbm/mm-modem-helpers-mbm.c'), 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="ericsson-mbm"']},
-    'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="ericsson-mbm"']},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="ericsson-mbm"']},
     'test': {'sources': files('mbm/tests/test-modem-helpers-mbm.c'), 'include_directories': plugins_incs + [include_directories('mbm')], 'dependencies': libhelpers_dep},
   }}
 
@@ -639,7 +639,7 @@ if plugins_options['option-hso']
 
   plugins += {'plugin-option-hso': {
     'plugin': true,
-    'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs, 'c_args': '-DMM_MODULE_NAME="option-hso"'},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': '-DMM_MODULE_NAME="option-hso"'},
   }}
 endif
 
