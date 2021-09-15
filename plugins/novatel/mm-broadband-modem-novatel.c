@@ -1495,7 +1495,7 @@ modem_time_load_network_timezone_finish (MMIfaceModemTime *self,
     const gchar *response;
     MMNetworkTimezone *tz = NULL;
 
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, NULL);
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (response)
         parse_nwltime_reply (response, NULL, &tz, error);
     return tz;
