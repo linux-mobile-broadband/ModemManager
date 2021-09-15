@@ -90,7 +90,7 @@ option('plugin_zte', type: 'boolean', value: true, description: 'enable zte plug
 
 option('qcdm_standalone', type: 'boolean', value: true, description: 'enable standalone qdcm')
 
-option('introspection', type: 'boolean', value: true, description: 'build introspection support')
+option('introspection', type: 'feature', value: 'auto', description: 'build introspection support')
 option('vapi', type: 'boolean', value: false, description: 'build vala bindings')
 
 option('man', type: 'boolean', value: true, description: 'build manual pages')
