@@ -916,9 +916,9 @@ if plugins_options['zte']
 endif
 
 foreach plugin_name, plugin_data: plugins
-  libhelpers = []
+  libpluginhelpers = []
   if plugin_data.has_key('helper')
-    libhelpers = static_library(
+    libpluginhelpers = static_library(
       'helpers-' + plugin_name,
       dependencies: libport_dep,
       kwargs: plugin_data['helper'],
@@ -936,7 +936,7 @@ foreach plugin_name, plugin_data: plugins
   shared_module(
     'mm-' + plugin_name,
     dependencies: libhelpers_dep,
-    link_with: libhelpers,
+    link_with: libpluginhelpers,
     kwargs: module_args,
     install: true,
     install_dir: mm_pkglibdir,
@@ -947,7 +947,7 @@ foreach plugin_name, plugin_data: plugins
 
     exe = executable(
       test_unit,
-      link_with: libhelpers,
+      link_with: libpluginhelpers,
       kwargs: plugin_data['test'],
     )
 
