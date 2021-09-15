@@ -184,24 +184,6 @@ headers = files(
   'mm-port-probe.h',
 )
 
-enums_types = 'mm-daemon-enums-types'
-
-daemon_enums_sources = []
-daemon_enums_sources += gnome.mkenums(
-  enums_types + '.c',
-  sources: headers,
-  c_template: build_aux_dir / enums_types + '.c.template',
-  fhead: '#include "mm-daemon-enums-types.h"',
-)
-
-daemon_enums_sources += gnome.mkenums(
-  enums_types + '.h',
-  sources: headers,
-  h_template: build_aux_dir / enums_types + '.h.template',
-  fhead: '#include "mm-filter.h"\n#include "mm-base-bearer.h"\n#include "mm-port-probe.h"\n#ifndef __MM_DAEMON_ENUMS_TYPES_H__\n#define __MM_DAEMON_ENUMS_TYPES_H__\n',
-  ftail: '#endif /* __MM_DAEMON_ENUMS_TYPES_H__ */\n',
-)
-
 sources = files(
   'main.c',
   'mm-auth-provider.c',
@@ -238,6 +220,24 @@ sources = files(
   'mm-port-probe-at.c',
   'mm-private-boxed-types.c',
   'mm-sms-list.c',
+)
+
+enums_types = 'mm-daemon-enums-types'
+
+
+sources += gnome.mkenums(
+  enums_types + '.c',
+  sources: headers,
+  c_template: build_aux_dir / enums_types + '.c.template',
+  fhead: '#include "mm-daemon-enums-types.h"',
+)
+
+sources += gnome.mkenums(
+  enums_types + '.h',
+  sources: headers,
+  h_template: build_aux_dir / enums_types + '.h.template',
+  fhead: '#include "mm-filter.h"\n#include "mm-base-bearer.h"\n#include "mm-port-probe.h"\n#ifndef __MM_DAEMON_ENUMS_TYPES_H__\n#define __MM_DAEMON_ENUMS_TYPES_H__\n',
+  ftail: '#endif /* __MM_DAEMON_ENUMS_TYPES_H__ */\n',
 )
 
 deps = [
@@ -294,7 +294,7 @@ endif
 
 executable(
   'ModemManager',
-  sources: sources + daemon_enums_sources,
+  sources: sources,
   include_directories: top_inc,
   dependencies: deps,
   c_args: c_args,
