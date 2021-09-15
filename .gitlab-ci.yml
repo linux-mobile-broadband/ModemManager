@@ -12,13 +12,14 @@ stages:
   variables:
     FDO_UPSTREAM_REPO: mobile-broadband/ModemManager
     FDO_DISTRIBUTION_VERSION: '20.04'
-    FDO_DISTRIBUTION_TAG: '2021-07-28.2'
+    FDO_DISTRIBUTION_TAG: '2021-09-16.1'
     FDO_DISTRIBUTION_PACKAGES: ca-certificates git gcc autoconf automake libtool
                                libgettextpo-dev libgirepository1.0-dev libglib2.0-dev
                                libgudev-1.0-dev python3-dbus python3-gi autopoint
                                xsltproc dbus gettext gtk-doc-tools libglib2.0-doc
                                gobject-introspection python-is-python3 libsystemd-dev
                                libpolkit-gobject-1-dev valac meson ninja-build
+                               libdbus-1-dev bash-completion udev policykit-1
 
 build container:
   extends:
@@ -236,3 +237,37 @@ build-default-artifacts:
       - /builds/$CI_PROJECT_ROOT_NAMESPACE/$CI_PROJECT_NAME/$CI_PROJECT_NAME-*.tar.xz
       - /builds/$CI_PROJECT_ROOT_NAMESPACE/$CI_PROJECT_NAME/pkg_hash.txt
     expire_in: 2 days
+
+build-meson-release:
+  stage: build
+  extends:
+  - .fdo.distribution-image@ubuntu
+  - .common_variables
+  only:
+    - master
+    - merge_requests
+    - tags
+    - schedules
+  script:
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
+    - pushd libmbim
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=enabled -Dbash_completion=false
+    - ninja -C build
+    - ninja -C build install
+    - popd
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib.git
+    - pushd libqrtr-glib
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=enabled
+    - ninja -C build
+    - ninja -C build install
+    - popd
+    - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libqmi.git
+    - pushd libqmi
+    - meson setup build --prefix=/usr -Dgtk_doc=false -Dintrospection=enabled -Dbash_completion=false -Dmbim_qmux=enabled -Dqrtr=enabled -Dcollection=basic
+    - ninja -C build
+    - ninja -C build install
+    - popd
+    - meson setup build --buildtype=release --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dintrospection=enabled -Dqmi=enabled -Dmbim=enabled -Dqrtr=enabled -Dpolkit=strict -Dsystemd_suspend_resume=true -Dsystemdsystemunitdir=/lib/systemd/system
+    - ninja -C build
+    - ninja -C build install
+    - ninja -C build uninstall
