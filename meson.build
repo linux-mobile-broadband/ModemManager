@@ -265,85 +265,75 @@ enable_vapi = get_option('vapi')
 # gtkdoc support
 enable_gtk_doc = get_option('gtk_doc')
 
-enable_plugins = not get_option('plugin_disable_all')
-
 plugins_shared = {
-  'foxconn': enable_mbim and enable_plugins,
-  'icera': enable_plugins,
-  'novatel': enable_plugins,
-  'option': enable_plugins,
-  'sierra': enable_plugins,
-  'telit': enable_plugins,
-  'xmm': enable_plugins,
+  'foxconn': enable_mbim,
+  'icera': true,
+  'novatel': true,
+  'option': true,
+  'sierra': true,
+  'telit': true,
+  'xmm': true,
 }
 
 plugins_options = {
-  'altair-lte': enable_plugins,
-  'anydata': enable_plugins,
-  'broadmobi': enable_plugins,
-  'cinterion': enable_plugins,
-  'dell': enable_plugins,
-  'dlink': enable_plugins,
-  'fibocom': enable_plugins,
-  'foxconn': enable_plugins,
-  'generic': enable_plugins,
-  'gosuncn': enable_plugins,
-  'haier': enable_plugins,
-  'huawei': enable_plugins,
-  'iridium': enable_plugins,
-  'linktop': enable_plugins,
-  'longcheer': enable_plugins,
-  'mbm': enable_plugins,
-  'motorola': enable_plugins,
-  'mtk': enable_plugins,
-  'nokia': enable_plugins,
-  'nokia-icera': enable_plugins,
-  'novatel': enable_plugins,
-  'novatel-lte': enable_plugins,
-  'option': enable_plugins,
-  'option-hso': enable_plugins,
-  'pantech': enable_plugins,
-  'qcom-soc': enable_plugins,
-  'quectel': enable_plugins,
-  'samsung': enable_plugins,
-  'sierra-legacy': enable_plugins,
-  'sierra': enable_plugins,
-  'simtech': enable_plugins,
-  'telit': enable_plugins,
-  'thuraya': enable_plugins,
-  'tplink': enable_plugins,
-  'ublox': enable_plugins,
-  'via': enable_plugins,
-  'wavecom': enable_plugins,
-  'x22x': enable_plugins,
-  'zte': enable_plugins,
-}
-
-plugins_options_reqs = {
+  'altair-lte': [],
+  'anydata': [],
+  'broadmobi': [],
+  'cinterion': [],
   'dell': ['foxconn', 'novatel', 'sierra', 'telit', 'xmm'],
+  'dlink': [],
   'fibocom': ['xmm'],
   'foxconn': ['foxconn'],
+  'generic': [],
+  'gosuncn': [],
+  'haier': [],
+  'huawei': [],
+  'iridium': [],
+  'linktop': [],
+  'longcheer': [],
+  'mbm': [],
+  'motorola': [],
+  'mtk': [],
+  'nokia': [],
   'nokia-icera': ['icera'],
   'novatel': ['novatel'],
+  'novatel-lte': [],
   'option': ['option'],
   'option-hso': ['option'],
+  'pantech': [],
+  'qcom-soc': [],
+  'quectel': [],
   'samsung': ['icera'],
   'sierra-legacy': ['icera', 'sierra'],
   'sierra': ['xmm'],
+  'simtech': [],
   'telit': ['telit'],
+  'thuraya': [],
+  'tplink': [],
+  'ublox': [],
+  'via': [],
+  'wavecom': [],
+  'x22x': [],
   'zte': ['icera'],
 }
 
-foreach plugin_name, _: plugins_options
-  if get_option('plugin_' + plugin_name.underscorify())
-    foreach plugin_req: plugins_options_reqs.get(plugin_name, [])
-      if not plugins_shared[plugin_req]
-        assert(not enable_plugins, '@0@ required @1@ but is not available'.format(plugin_name, plugin_req))
-        plugins_shared += {plugin_req: true}
-      endif
-    endforeach
-  endif
-endforeach
+disable_all_plugins = get_option('plugin_disable_all')
+
+enable_plugins = []
+enable_plugins_shared = []
+if not disable_all_plugins
+  foreach plugin_name, plugin_shared_reqs: plugins_options
+    if get_option('plugin_' + plugin_name.underscorify())
+      enable_plugins += [plugin_name]
+      foreach plugin_req: plugin_shared_reqs
+        assert(plugins_shared[plugin_req], '@0@ required @1@ but is not available'.format(plugin_name, plugin_req))
+        if not enable_plugins_shared.contains(plugin_req)
+          enable_plugins_shared += [plugin_req]
+        endif
+      endforeach
+    endif
+  endforeach
+endif
 
 version_conf = {
   'MM_MAJOR_VERSION': mm_major_version,
@@ -407,9 +397,57 @@ summary({
   'at command via dbus': enable_at_command_via_dbus,
 }, section: 'Features')
 
-summary(plugins_shared, section: 'Shared utils')
+summary({
+  'foxconn': enable_plugins_shared.contains('foxconn'),
+  'icera': enable_plugins_shared.contains('icera'),
+  'novatel': enable_plugins_shared.contains('novatel'),
+  'option': enable_plugins_shared.contains('option'),
+  'sierra': enable_plugins_shared.contains('sierra'),
+  'telit': enable_plugins_shared.contains('telit'),
+  'xmm': enable_plugins_shared.contains('xmm'),
+}, section: 'Shared utils')
 
-summary(plugins_options, section: 'Plugins')
+summary({
+  'altair-lte': enable_plugins.contains('altair-lte'),
+  'anydata': enable_plugins.contains('anydata'),
+  'broadmobi': enable_plugins.contains('broadmobi'),
+  'cinterion': enable_plugins.contains('cinterion'),
+  'dell': enable_plugins.contains('dell'),
+  'dlink': enable_plugins.contains('dlink'),
+  'fibocom': enable_plugins.contains('fibocom'),
+  'foxconn': enable_plugins.contains('foxconn'),
+  'generic': enable_plugins.contains('generic'),
+  'gosuncn': enable_plugins.contains('gosuncn'),
+  'haier': enable_plugins.contains('haier'),
+  'huawei': enable_plugins.contains('huawei'),
+  'iridium': enable_plugins.contains('iridium'),
+  'linktop': enable_plugins.contains('linktop'),
+  'longcheer': enable_plugins.contains('longcheer'),
+  'mbm': enable_plugins.contains('mbm'),
+  'motorola': enable_plugins.contains('motorola'),
+  'mtk': enable_plugins.contains('mtk'),
+  'nokia': enable_plugins.contains('nokia'),
+  'nokia-icera': enable_plugins.contains('nokia-icera'),
+  'novatel': enable_plugins.contains('novatel'),
+  'novatel-lte': enable_plugins.contains('novatel-lte'),
+  'option': enable_plugins.contains('option'),
+  'option-hso': enable_plugins.contains('option-hso'),
+  'pantech': enable_plugins.contains('pantech'),
+  'qcom-soc': enable_plugins.contains('qcom-soc'),
+  'quectel': enable_plugins.contains('quectel'),
+  'samsung': enable_plugins.contains('samsung'),
+  'sierra': enable_plugins.contains('sierra'),
+  'sierra-legacy': enable_plugins.contains('sierra-legacy'),
+  'simtech': enable_plugins.contains('simtech'),
+  'telit': enable_plugins.contains('telit'),
+  'thuraya': enable_plugins.contains('thuraya'),
+  'tplink': enable_plugins.contains('tplink'),
+  'ublox': enable_plugins.contains('ublox'),
+  'via': enable_plugins.contains('via'),
+  'wavecom': enable_plugins.contains('wavecom'),
+  'x22x': enable_plugins.contains('x22x'),
+  'zte': enable_plugins.contains('zte'),
+}, section: 'Plugins')
 
 summary({
   'gobject introspection': enable_gir,
