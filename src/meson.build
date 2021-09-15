@@ -249,7 +249,7 @@ deps = [
 
 c_args = [
   '-DMM_COMPILATION',
-  '-DPLUGINDIR="@0@"'.format(mm_pkglibdir),
+  '-DPLUGINDIR="@0@"'.format(mm_prefix / mm_pkglibdir),
 ]
 
 if enable_qrtr
