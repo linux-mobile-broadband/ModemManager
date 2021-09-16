@@ -42,6 +42,7 @@ plugins_incs = [
   src_inc,
   kerneldevice_inc,
 ]
+
 plugins_deps = [
   libmm_glib_dep,
   mbim_glib_dep,
