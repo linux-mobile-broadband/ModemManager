@@ -86,8 +86,6 @@ option('plugin_x22x', type: 'feature', value: 'auto', description: 'enable x22x 
 # shared_icera
 option('plugin_zte', type: 'feature', value: 'auto', description: 'enable zte plugin support')
 
-option('qcdm_standalone', type: 'feature', value: 'auto', description: 'enable standalone qdcm')
-
 option('introspection', type: 'feature', value: 'auto', description: 'build introspection support')
 option('vapi', type: 'boolean', value: false, description: 'build vala bindings')
 
