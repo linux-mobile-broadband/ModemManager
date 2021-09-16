@@ -225,7 +225,6 @@ sources = files(
 
 enums_types = 'mm-daemon-enums-types'
 
-
 sources += gnome.mkenums(
   enums_types + '.c',
   sources: headers,
