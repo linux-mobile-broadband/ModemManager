@@ -3,7 +3,7 @@
 
 project(
   'ModemManager', 'c',
-  version: '1.18.1',
+  version: '1.18.2',
   license: 'GPL2',
   default_options: [
     'buildtype=debugoptimized',
