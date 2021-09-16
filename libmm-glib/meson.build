@@ -118,9 +118,9 @@ libmm_glib = shared_library(
 )
 
 libmm_glib_dep = declare_dependency(
-  sources: gen_headers,
-  include_directories: [libmm_glib_inc, generated_inc],
-  dependencies: deps + [glib_deps],
+  include_directories: libmm_glib_inc,
+  # FIXME: glib_deps is included because `dependencies` parameter is not part of partial_dependency
+  dependencies: deps + [glib_deps, libmm_generated_dep.partial_dependency(sources: true, includes: true)],
   link_with: libmm_glib,
 )
 
