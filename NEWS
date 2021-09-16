@@ -1,4 +1,22 @@
 
+ModemManager 1.18.2
+-------------------------------------------
+
+ * build,meson:
+   ** The minimum required meson version is now 0.53.0.
+   ** Fixed generation of shared utils and plugin modules, so that they don't
+      include and export symbols that are internal of the daemon.
+   ** Fixed the definition of the plugins directory path so that it's an
+      absolute one instead of one relative to the prefix.
+   ** Fixed the usage of the systemd suspend/resume build option.
+   ** Optional features like introspection support, QMI support, MBIM support,
+      QRTR support... are all now defined as meson 'features' (i.e. 'auto',
+      'enabled' or 'disabled') instead of booleans (i.e. 'false' or 'true').
+   ** Several other improvements and fixes.
+
+ * plugins:
+   ** novatel: fix crash when returning a NULL timezone without any error set.
+
 ModemManager 1.18.0
 -------------------------------------------
 This is a new stable release of ModemManager.
