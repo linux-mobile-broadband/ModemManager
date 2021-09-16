@@ -214,14 +214,14 @@ config_h.set('WITH_SYSTEMD_SUSPEND_RESUME', enable_systemd_suspend_resume)
 config_h.set('WITH_SYSTEMD_JOURNAL', enable_systemd_journal)
 
 # PolicyKit
-polkit = get_option('polkit')
-enable_polkit = (polkit != 'no')
+polkit_opt = get_option('polkit')
+enable_polkit = (polkit_opt != 'no')
 if enable_polkit
   polkit_gobject_dep = dependency('polkit-gobject-1', version: '>= 0.97', not_found_message: 'PolicyKit development headers are required')
 
   polkit_gobject_policydir = polkit_gobject_dep.get_pkgconfig_variable('policydir', define_variable: ['prefix', mm_prefix])
 
-  policy_conf = {'MM_DEFAULT_USER_POLICY': (polkit == 'permissive' ? 'yes' : 'auth_self_keep')}
+  policy_conf = {'MM_DEFAULT_USER_POLICY': (polkit_opt == 'permissive' ? 'yes' : 'auth_self_keep')}
 endif
 config_h.set('WITH_POLKIT', enable_polkit)
 
@@ -395,7 +395,7 @@ summary({
 
 summary({
   'udev': enable_udev,
-  'policykit': polkit,
+  'policykit': polkit_opt,
   'mbim': enable_mbim,
   'qmi': enable_qmi,
   'qrtr': enable_qrtr,
