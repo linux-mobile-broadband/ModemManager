@@ -63,7 +63,7 @@ option('plugin_option', type: 'boolean', value: true, description: 'enable optio
 option('plugin_option_hso', type: 'boolean', value: true, description: 'enable option hso plugin support')
 option('plugin_pantech', type: 'boolean', value: true, description: 'enable pantech plugin support')
 
-option('plugin_qcom_soc', type: 'boolean', value: false, description: 'enable qcom soc plugin support')
+option('plugin_qcom_soc', type: 'boolean', value: true, description: 'enable qcom soc plugin support')
 option('plugin_quectel', type: 'boolean', value: true, description: 'enable quectel plugin support')
 
 # shared_icera
