@@ -8615,7 +8615,7 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *_self,
     MMBroadbandModemQmi         *self = MM_BROADBAND_MODEM_QMI (_self);
     GTask                       *task;
     QmiClient                   *client;
-    QmiVoiceUssDataCodingScheme  scheme;
+    QmiVoiceUssDataCodingScheme  scheme = QMI_VOICE_USS_DATA_CODING_SCHEME_UNKNOWN;
     g_autoptr(GArray)            encoded = NULL;
     GError                      *error = NULL;
     MMModem3gppUssdSessionState  state;
