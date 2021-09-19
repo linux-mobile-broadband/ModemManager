@@ -25,6 +25,7 @@ Makefile.in
 /missing
 /stamp-h1
 /libtool
+/tags
 /TAGS
 /ABOUT-NLS
 /ChangeLog
