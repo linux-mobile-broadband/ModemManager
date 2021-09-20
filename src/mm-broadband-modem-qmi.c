@@ -842,7 +842,7 @@ unlock_required_uim_get_card_status_ready (QmiClientUim *client,
     if (!mm_qmi_uim_get_card_status_output_parse (self,
                                                   output,
                                                   &lock,
-                                                  NULL, NULL, NULL, NULL, NULL, NULL,
+                                                  NULL, NULL, NULL, NULL, NULL, NULL, NULL,
                                                   &error)) {
         /* The device may report a SIM NOT INSERTED error if we're querying the
          * card status soon after power on. We'll let the Modem interface generic
@@ -1079,7 +1079,9 @@ unlock_retries_uim_get_card_status_ready (QmiClientUim *client,
     guint puk1_retries = 0;
     guint pin2_retries = 0;
     guint puk2_retries = 0;
+    guint pers_retries = 0;
     MMUnlockRetries *retries;
+    MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
 
     self = g_task_get_source_object (task);
 
@@ -1093,9 +1095,10 @@ unlock_retries_uim_get_card_status_ready (QmiClientUim *client,
 
     if (!mm_qmi_uim_get_card_status_output_parse (self,
                                                   output,
-                                                  NULL,
+                                                  &lock,
                                                   NULL, &pin1_retries, &puk1_retries,
                                                   NULL, &pin2_retries, &puk2_retries,
+                                                  &pers_retries,
                                                   &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -1107,6 +1110,8 @@ unlock_retries_uim_get_card_status_ready (QmiClientUim *client,
     mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK,  puk1_retries);
     mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PIN2, pin2_retries);
     mm_unlock_retries_set (retries, MM_MODEM_LOCK_SIM_PUK2, puk2_retries);
+    if (lock >= MM_MODEM_LOCK_PH_SP_PIN)
+        mm_unlock_retries_set (retries, lock, pers_retries);
 
     qmi_message_uim_get_card_status_output_unref (output);
 
@@ -1952,7 +1957,7 @@ get_sim_lock_status_via_get_card_status_ready (QmiClientUim *client,
     if (!mm_qmi_uim_get_card_status_output_parse (self,
                                                   output,
                                                   &lock,
-                                                  &pin1_state, NULL, NULL, &pin2_state, NULL, NULL,
+                                                  &pin1_state, NULL, NULL, &pin2_state, NULL, NULL, NULL,
                                                   &error)) {
         g_prefix_error (&error, "QMI operation failed: ");
         g_task_return_error (task, error);

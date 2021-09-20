@@ -145,7 +145,7 @@ uim_get_card_status_ready (QmiClientUim *client,
     output = qmi_client_uim_get_card_status_finish (client, res, &error);
     if (!output ||
         !qmi_message_uim_get_card_status_output_get_result (output, &error) ||
-        (!mm_qmi_uim_get_card_status_output_parse (self, output, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &error) &&
+        (!mm_qmi_uim_get_card_status_output_parse (self, output, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &error) &&
          (g_error_matches (error, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
           g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY)))) {
         mm_obj_dbg (self, "sim not yet considered ready... retrying");

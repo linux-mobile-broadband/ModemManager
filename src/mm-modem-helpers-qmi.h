@@ -185,6 +185,7 @@ gboolean mm_qmi_uim_get_card_status_output_parse (gpointer                      
                                                   QmiUimPinState                    *o_pin2_state,
                                                   guint                             *o_pin2_retries,
                                                   guint                             *o_puk2_retries,
+                                                  guint                             *o_pers_retries,
                                                   GError                           **error);
 
 /*****************************************************************************/
