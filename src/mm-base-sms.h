@@ -31,7 +31,7 @@
 
 /* Default timeout value to be used when sending a SMS, long enough so that the
  * operation succeeds or fails under low signal conditions. */
-#define MM_BASE_SMS_DEFAULT_SEND_TIMEOUT 180
+#define MM_BASE_SMS_DEFAULT_SEND_TIMEOUT (5 * 60)
 
 /*****************************************************************************/
 
