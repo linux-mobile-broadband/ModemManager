@@ -40,6 +40,7 @@
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-iface-modem-signal.h"
+#include "mm-iface-modem-sar.h"
 #include "mm-sms-part-3gpp.h"
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
@@ -54,6 +55,7 @@ static void iface_modem_3gpp_ussd_init            (MMIfaceModem3gppUssd         
 static void iface_modem_location_init             (MMIfaceModemLocation           *iface);
 static void iface_modem_messaging_init            (MMIfaceModemMessaging          *iface);
 static void iface_modem_signal_init               (MMIfaceModemSignal             *iface);
+static void iface_modem_sar_init                  (MMIfaceModemSar                *iface);
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 static void shared_qmi_init                       (MMSharedQmi                    *iface);
 #endif
@@ -71,6 +73,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbim, mm_broadband_modem_mbim, MM_TYPE_B
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIGNAL, iface_modem_signal_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SAR, iface_modem_sar_init)
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_QMI, shared_qmi_init)
 #endif
@@ -120,6 +123,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_atds_signal_supported;
     gboolean is_intel_reset_supported;
     gboolean is_slot_info_status_supported;
+    gboolean is_ms_sar_supported;
 
     /* Process unsolicited notifications */
     guint notification_id;
@@ -2286,6 +2290,16 @@ query_device_services_ready (MbimDevice   *device,
                     if (device_services[i]->cids[j] == MBIM_CID_INTEL_FIRMWARE_UPDATE_MODEM_REBOOT) {
                         mm_obj_dbg (self, "Intel reset is supported");
                         self->priv->is_intel_reset_supported = TRUE;
+                    }
+                }
+                continue;
+            }
+
+            if (service == MBIM_SERVICE_MS_SAR) {
+                for (j = 0; j < device_services[i]->cids_count; j++) {
+                    if (device_services[i]->cids[j] == MBIM_CID_MS_SAR_CONFIG) {
+                        mm_obj_dbg (self, "SAR is supported");
+                        self->priv->is_ms_sar_supported = TRUE;
                     }
                 }
                 continue;
@@ -6204,7 +6218,339 @@ messaging_create_sms (MMIfaceModemMessaging *self)
 }
 
 /*****************************************************************************/
+/* Check support (SAR interface) */
 
+static gboolean
+sar_check_support_finish (MMIfaceModemSar *self,
+                          GAsyncResult    *res,
+                          GError         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+sar_check_support (MMIfaceModemSar    *_self,
+                   GAsyncReadyCallback callback,
+                   gpointer            user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    mm_obj_dbg (self, "SAR capabilities %s",self->priv->is_ms_sar_supported ? "supported" : "not supported");
+    g_task_return_boolean (task, self->priv->is_ms_sar_supported);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+
+static gboolean
+sar_load_state_finish (MMIfaceModemSar *self,
+                       GAsyncResult    *res,
+                       gboolean        *out_state,
+                       GError         **error)
+{
+    GError   *inner_error = NULL;
+    gboolean  result;
+
+    result = g_task_propagate_boolean (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (out_state)
+        *out_state = result;
+    return TRUE;
+}
+
+static void
+sar_config_query_state_ready (MbimDevice   *device,
+                              GAsyncResult *res,
+                              GTask        *task)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+    MbimSarBackoffState state;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_ms_sar_config_response_parse (
+            response,
+            NULL,
+            &state,
+            NULL,
+            NULL,
+            NULL,
+            &error)) {
+        g_task_return_boolean (task, state);
+    } else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+sar_load_state (MMIfaceModemSar    *_self,
+                GAsyncReadyCallback callback,
+                gpointer            user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice *device;
+    MbimMessage *message;
+    GTask *task;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    message = mbim_message_ms_sar_config_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)sar_config_query_state_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+
+static gboolean
+sar_load_power_level_finish (MMIfaceModemSar *self,
+                             GAsyncResult    *res,
+                             guint           *out_power_level,
+                             GError         **error)
+{
+    gssize result;
+
+    result = g_task_propagate_int(G_TASK (res), error);
+    if (result < 0)
+        return FALSE;
+
+    *out_power_level = (guint) result;
+    return TRUE;
+}
+
+static void
+sar_config_query_power_level_ready (MbimDevice   *device,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    MbimMessage             *response;
+    GError                  *error = NULL;
+    guint32                  states_count;
+    MbimSarConfigStateArray *config_states = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_ms_sar_config_response_parse (
+            response,
+            NULL,
+            NULL,
+            NULL,
+            &states_count,
+            &config_states,
+            &error)) {
+        MMBroadbandModemMbim *self;
+
+        self = g_task_get_source_object (task);
+        if (states_count == 0) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Couldn't load config states");
+        } else {
+            if (states_count > 1)
+                mm_obj_warn (self, "The count of config states is %d, We're just taking the state reported for the first antenna.", states_count);
+            g_task_return_int (task, config_states[0]->backoff_index);
+        }
+
+        mbim_sar_config_state_array_free (config_states);
+    } else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+sar_load_power_level (MMIfaceModemSar    *_self,
+                      GAsyncReadyCallback callback,
+                      gpointer            user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice *device;
+    MbimMessage *message;
+    GTask *task;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    message = mbim_message_ms_sar_config_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)sar_config_query_power_level_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+
+static gboolean
+sar_enable_finish (MMIfaceModemSar *self,
+                   GAsyncResult    *res,
+                   GError         **error)
+{
+     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+sar_config_set_enable_ready (MbimDevice   *device,
+                             GAsyncResult *res,
+                             GTask        *task)
+{
+    MbimMessage *response;
+    GError *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_boolean (task, TRUE);
+    } else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+static void
+sar_enable (MMIfaceModemSar    *_self,
+            gboolean            enable,
+            GAsyncReadyCallback callback,
+            gpointer            user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice *device;
+    MbimMessage *message;
+    GTask *task;
+    /*
+     * the value 0xFFFFFFFF means all antennas
+     * the backoff index set to the current index of modem
+     */
+    MbimSarConfigState state = {
+        .antenna_index = 0xFFFFFFFF,
+        .backoff_index = mm_iface_modem_sar_get_power_level(_self)
+    };
+    const MbimSarConfigState* states[] = { &state };
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    message = mbim_message_ms_sar_config_set_new (MBIM_SAR_CONTROL_MODE_OS,
+                                                  enable ? MBIM_SAR_BACKOFF_STATE_ENABLED : MBIM_SAR_BACKOFF_STATE_DISABLED,
+                                                  G_N_ELEMENTS (states), states, NULL);
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)sar_config_set_enable_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+
+static gboolean
+sar_set_power_level_finish (MMIfaceModemSar *self,
+                            GAsyncResult    *res,
+                            GError         **error)
+{
+     return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+sar_config_set_power_level_ready (MbimDevice   *device,
+                                  GAsyncResult *res,
+                                  GTask        *task)
+{
+    MbimMessage *response;
+    GError      *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_boolean (task, TRUE);
+    } else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+
+    if (response)
+        mbim_message_unref (response);
+}
+
+
+static void
+sar_set_power_level (MMIfaceModemSar    *_self,
+                     guint               power_level,
+                     GAsyncReadyCallback callback,
+                     gpointer            user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice           *device;
+    MbimMessage          *message;
+    GTask                *task;
+    MbimSarConfigState state = {
+        .antenna_index = 0xFFFFFFFF,
+        .backoff_index = power_level
+    };
+    const MbimSarConfigState* states[] = { &state };
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    if (!mm_iface_modem_get_sar_state (_self)) {
+        g_task_report_new_error (self,
+                                 callback,
+                                 user_data,
+                                 sar_set_power_level,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_WRONG_STATE,
+                                 "Couldn't set power level of SAR, because the SAR is disabled");
+        return;
+    }
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    message = mbim_message_ms_sar_config_set_new (MBIM_SAR_CONTROL_MODE_OS,
+                                                  MBIM_SAR_BACKOFF_STATE_ENABLED,
+                                                  G_N_ELEMENTS (states), states, NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)sar_config_set_power_level_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
 
 static void
 set_property (GObject *object,
@@ -7128,6 +7474,21 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
     iface->check_support_finish = modem_signal_check_support_finish;
     iface->load_values = modem_signal_load_values;
     iface->load_values_finish = modem_signal_load_values_finish;
+}
+
+static void
+iface_modem_sar_init (MMIfaceModemSar *iface)
+{
+    iface->check_support = sar_check_support;
+    iface->check_support_finish  = sar_check_support_finish;
+    iface->load_state = sar_load_state;
+    iface->load_state_finish = sar_load_state_finish;
+    iface->load_power_level = sar_load_power_level;
+    iface->load_power_level_finish = sar_load_power_level_finish;
+    iface->enable = sar_enable;
+    iface->enable_finish = sar_enable_finish;
+    iface->set_power_level = sar_set_power_level;
+    iface->set_power_level_finish = sar_set_power_level_finish;
 }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
