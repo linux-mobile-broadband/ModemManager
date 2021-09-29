@@ -723,7 +723,8 @@ static void load_unlock_retries_step (GTask *task);
 static void
 load_unlock_retries_context_free (LoadUnlockRetriesContext *ctx)
 {
-    g_object_unref (ctx->retries);
+    if (ctx->retries)
+        g_object_unref (ctx->retries);
     g_slice_free (LoadUnlockRetriesContext, ctx);
 }
 
