@@ -12784,6 +12784,8 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
                                              const gchar       *ati1,
                                              GError           **error)
 {
+    gchar *device_identifier;
+
     /* do nothing if device has gone already */
     if (!self->priv->modem_dbus_skeleton) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
@@ -12791,7 +12793,7 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
         return NULL;
     }
 
-    return (mm_create_device_identifier (
+    device_identifier = mm_create_device_identifier (
                 mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
                 mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
                 self,
@@ -12804,7 +12806,15 @@ mm_broadband_modem_create_device_identifier (MMBroadbandModem  *self,
                 mm_gdbus_modem_get_model (
                     MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
                 mm_gdbus_modem_get_manufacturer (
-                    MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton))));
+                    MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)));
+
+    if (!device_identifier) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Unable to generate a device identifier");
+        return NULL;
+    }
+
+    return device_identifier;
 }
 
 /*****************************************************************************/
