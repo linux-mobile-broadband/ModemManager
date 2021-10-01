@@ -137,7 +137,7 @@ profile_manager_get_profile_after_ready (MMIfaceModem3gppProfileManager *self,
                                          GTask                          *task)
 {
     SetProfileContext *ctx;
-    g_autoptr(GError)  error = NULL;
+    GError *error = NULL;
 
     ctx = g_task_get_task_data (task);
 
