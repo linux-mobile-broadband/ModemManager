@@ -5063,8 +5063,15 @@ common_enable_disable_unsolicited_events_signal_strength (GTask *task)
     g_autoptr(GArray)                            thresholds = NULL;
 
     /* The device doesn't really like to have many threshold values, so don't
-     * grow this array without checking first */
-    static const gint8 thresholds_data[] = { -80, -40, 0, 40, 80 };
+     * grow this array without checking first
+     * The values are chosen towards their results through STRENGTH_TO_QUALITY
+     *   -106 dBm gives 11%
+     *    -94 dBm gives 30%
+     *    -82 dBm gives 50%
+     *    -69 dBm gives 70%
+     *    -57 dBm gives 90%
+     */
+    static const gint8 thresholds_data[] = { -106, -94, -82, -69, -57 };
 
     ctx = g_task_get_task_data (task);
 
