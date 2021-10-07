@@ -2163,14 +2163,15 @@ handle_set_power_state_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
-    /* Going into LOW or ON only allowed in disabled state */
+    /* Going into LOW or ON only allowed in disabled and failed states */
     if ((ctx->power_state == MM_MODEM_POWER_STATE_LOW ||
          ctx->power_state == MM_MODEM_POWER_STATE_ON) &&
+        modem_state != MM_MODEM_STATE_FAILED &&
         modem_state != MM_MODEM_STATE_DISABLED) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot set power state: not in disabled state");
+                                               "Cannot set power state: not in disabled or failed state");
         handle_set_power_state_context_free (ctx);
         return;
     }
