@@ -65,7 +65,7 @@ load_supported_modes_ready (MMIfaceModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_prefix_error (&error, "ceneric query of supported 3GPP networks with WS46=? failed: ");
+        g_prefix_error (&error, "generic query of supported 3GPP networks with WS46=? failed: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
