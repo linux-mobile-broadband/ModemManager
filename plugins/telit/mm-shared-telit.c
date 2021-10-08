@@ -58,12 +58,14 @@ initialize_alternate_3g_band (MMSharedTelit *self,
     MMKernelDevice *port;
 
     primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
-    port = mm_port_peek_kernel_device (primary);
+    if (primary) {
+        port = mm_port_peek_kernel_device (primary);
 
-    /* Lookup for the tag specifying that we're using the alternate 3G band mapping */
-    priv->alternate_3g_bands = mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_TELIT_BND_ALTERNATE");
-    if (priv->alternate_3g_bands)
-        mm_obj_dbg (self, "telit modem using alternate 3G band mask setup");
+        /* Lookup for the tag specifying that we're using the alternate 3G band mapping */
+        priv->alternate_3g_bands = mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_TELIT_BND_ALTERNATE");
+        if (priv->alternate_3g_bands)
+            mm_obj_dbg (self, "telit modem using alternate 3G band mask setup");
+    }
 }
 
 static Private *
