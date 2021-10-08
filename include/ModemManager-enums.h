@@ -38,6 +38,7 @@
  * @MM_MODEM_CAPABILITY_LTE: Modem has LTE data capability.
  * @MM_MODEM_CAPABILITY_IRIDIUM: Modem has Iridium capabilities.
  * @MM_MODEM_CAPABILITY_5GNR: Modem has 5GNR capabilities. Since 1.14.
+ * @MM_MODEM_CAPABILITY_TDS: Modem has TDS capabilties. Since 1.20.
  * @MM_MODEM_CAPABILITY_ANY: Mask specifying all capabilities.
  *
  * Flags describing one or more of the general access technology families that a
@@ -54,6 +55,7 @@ typedef enum { /*< underscore_name=mm_modem_capability >*/
     /* MM_MODEM_CAPABILITY_LTE_ADVANCED deprecated */
     MM_MODEM_CAPABILITY_IRIDIUM      = 1 << 5,
     MM_MODEM_CAPABILITY_5GNR         = 1 << 6,
+    MM_MODEM_CAPABILITY_TDS          = 1 << 7,
     MM_MODEM_CAPABILITY_ANY          = 0xFFFFFFFF
 } MMModemCapability;
 

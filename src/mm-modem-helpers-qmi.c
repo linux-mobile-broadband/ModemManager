@@ -42,6 +42,8 @@ mm_modem_capability_from_qmi_radio_interface (QmiDmsRadioInterface network,
         return MM_MODEM_CAPABILITY_GSM_UMTS;
     case QMI_DMS_RADIO_INTERFACE_LTE:
         return MM_MODEM_CAPABILITY_LTE;
+    case QMI_DMS_RADIO_INTERFACE_TDS:
+        return MM_MODEM_CAPABILITY_TDS;
     case QMI_DMS_RADIO_INTERFACE_5GNR:
         return MM_MODEM_CAPABILITY_5GNR;
     default:
@@ -69,6 +71,7 @@ mm_modem_mode_from_qmi_radio_interface (QmiDmsRadioInterface network,
         return MM_MODEM_MODE_4G;
     case QMI_DMS_RADIO_INTERFACE_5GNR:
         return MM_MODEM_MODE_5G;
+    case QMI_DMS_RADIO_INTERFACE_TDS:
     default:
         mm_obj_warn (log_object, "unhandled QMI radio interface '%u'", (guint)network);
         return MM_MODEM_MODE_NONE;
