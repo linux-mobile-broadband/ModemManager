@@ -38,9 +38,10 @@
 static GQuark private_quark;
 
 typedef struct {
-    gboolean  alternate_3g_bands;
-    gboolean  ext_4g_bands;
-    GArray   *supported_bands;
+    MMIfaceModem *iface_modem_parent;
+    gboolean      alternate_3g_bands;
+    gboolean      ext_4g_bands;
+    GArray       *supported_bands;
 } Private;
 
 static void
@@ -82,6 +83,10 @@ get_private (MMSharedTelit *self)
         priv = g_slice_new0 (Private);
         initialize_alternate_3g_band (self, priv);
         /* ext_4g_bands field is initialized inside #BND=? response handler */
+
+        if (MM_SHARED_TELIT_GET_INTERFACE (self)->peek_parent_modem_interface)
+            priv->iface_modem_parent = MM_SHARED_TELIT_GET_INTERFACE (self)->peek_parent_modem_interface (self);
+
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
 
@@ -218,17 +223,59 @@ mm_shared_telit_load_supported_bands_ready (MMBaseModem  *self,
     g_object_unref (task);
 }
 
-void
-mm_shared_telit_modem_load_supported_bands (MMIfaceModem        *self,
-                                            GAsyncReadyCallback  callback,
-                                            gpointer             user_data)
+static void
+load_supported_bands_at (MMIfaceModem *self,
+                         GTask        *task)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "#BND=?",
                               3,
                               TRUE,
                               (GAsyncReadyCallback) mm_shared_telit_load_supported_bands_ready,
-                              g_task_new (self, NULL, callback, user_data));
+                              task);
+}
+
+static void
+mm_shared_parent_load_supported_bands_ready (MMIfaceModem *self,
+                                             GAsyncResult *res,
+                                             GTask        *task)
+{
+    GArray  *bands;
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    bands = priv->iface_modem_parent->load_supported_bands_finish (MM_IFACE_MODEM (self), res, &error);
+    if (bands) {
+        g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+        g_object_unref (task);
+    } else {
+        mm_obj_dbg (self, "parent load supported bands failure, falling back to AT commands");
+        load_supported_bands_at (self, task);
+        g_clear_error (&error);
+    }
+}
+
+void
+mm_shared_telit_modem_load_supported_bands (MMIfaceModem        *self,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data)
+{
+    GTask   *task;
+    Private *priv;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    if (priv->iface_modem_parent &&
+        priv->iface_modem_parent->load_supported_bands &&
+        priv->iface_modem_parent->load_supported_bands_finish) {
+        priv->iface_modem_parent->load_supported_bands (self,
+                                                        (GAsyncReadyCallback) mm_shared_parent_load_supported_bands_ready,
+                                                        task);
+    } else
+        load_supported_bands_at (self, task);
 }
 
 /*****************************************************************************/
