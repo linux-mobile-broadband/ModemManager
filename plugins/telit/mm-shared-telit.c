@@ -405,20 +405,19 @@ set_current_bands_ready (MMBaseModem  *self,
     g_object_unref (task);
 }
 
-void
-mm_shared_telit_modem_set_current_bands (MMIfaceModem        *self,
-                                         GArray              *bands_array,
-                                         GAsyncReadyCallback  callback,
-                                         gpointer             user_data)
+static void
+set_current_bands_at (MMIfaceModem *self,
+                      GTask        *task)
 {
-    GTask   *task;
     GError  *error = NULL;
     gchar   *cmd;
     Private *priv;
+    GArray  *bands_array;
 
     priv = get_private (MM_SHARED_TELIT (self));
 
-    task = g_task_new (self, NULL, callback, user_data);
+    bands_array = g_task_get_task_data (task);
+    g_assert (bands_array);
 
     if (bands_array->len == 1 && g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
         if (!priv->supported_bands) {
@@ -450,6 +449,50 @@ mm_shared_telit_modem_set_current_bands (MMIfaceModem        *self,
                               (GAsyncReadyCallback)set_current_bands_ready,
                               task);
     g_free (cmd);
+}
+
+static void
+parent_set_current_bands_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GTask        *task)
+{
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    if (priv->iface_modem_parent->set_current_bands_finish (MM_IFACE_MODEM (self), res, &error)) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+    } else {
+        g_clear_error (&error);
+        set_current_bands_at (self, task);
+    }
+}
+
+void
+mm_shared_telit_modem_set_current_bands (MMIfaceModem        *self,
+                                         GArray              *bands_array,
+                                         GAsyncReadyCallback  callback,
+                                         gpointer             user_data)
+{
+    GTask   *task;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, g_array_ref (bands_array), (GDestroyNotify)g_array_unref);
+
+    if (priv->iface_modem_parent &&
+        priv->iface_modem_parent->set_current_bands &&
+        priv->iface_modem_parent->set_current_bands_finish) {
+        priv->iface_modem_parent->set_current_bands (self,
+                                                     bands_array,
+                                                     (GAsyncReadyCallback) parent_set_current_bands_ready,
+                                                     task);
+    } else
+        set_current_bands_at (self, task);
 }
 
 /*****************************************************************************/
