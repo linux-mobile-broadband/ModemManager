@@ -323,17 +323,59 @@ mm_shared_telit_load_current_bands_ready (MMBaseModem  *self,
     g_object_unref (task);
 }
 
-void
-mm_shared_telit_modem_load_current_bands (MMIfaceModem        *self,
-                                          GAsyncReadyCallback  callback,
-                                          gpointer             user_data)
+static void
+load_current_bands_at (MMIfaceModem *self,
+                       GTask        *task)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "#BND?",
                               3,
                               FALSE,
                               (GAsyncReadyCallback) mm_shared_telit_load_current_bands_ready,
-                              g_task_new (self, NULL, callback, user_data));
+                              task);
+}
+
+static void
+mm_shared_parent_load_current_bands_ready (MMIfaceModem *self,
+                                           GAsyncResult *res,
+                                           GTask        *task)
+{
+    GArray  *bands;
+    GError  *error = NULL;
+    Private *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    bands = priv->iface_modem_parent->load_current_bands_finish (MM_IFACE_MODEM (self), res, &error);
+    if (bands) {
+        g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
+        g_object_unref (task);
+    } else {
+        mm_obj_dbg (self, "parent load current bands failure, falling back to AT commands");
+        load_current_bands_at (self, task);
+        g_clear_error (&error);
+    }
+}
+
+void
+mm_shared_telit_modem_load_current_bands (MMIfaceModem        *self,
+                                          GAsyncReadyCallback  callback,
+                                          gpointer             user_data)
+{
+    GTask   *task;
+    Private *priv;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    priv = get_private (MM_SHARED_TELIT (self));
+
+    if (priv->iface_modem_parent &&
+        priv->iface_modem_parent->load_current_bands &&
+        priv->iface_modem_parent->load_current_bands_finish) {
+        priv->iface_modem_parent->load_current_bands (self,
+                                                      (GAsyncReadyCallback) mm_shared_parent_load_current_bands_ready,
+                                                      task);
+    } else
+        load_current_bands_at (self, task);
 }
 
 /*****************************************************************************/
