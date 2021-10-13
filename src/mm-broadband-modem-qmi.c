@@ -2066,7 +2066,7 @@ get_sim_lock_status_via_pin_status_ready (QmiClientDms *client,
     LoadEnabledFacilityLocksContext *ctx;
     QmiMessageDmsUimGetPinStatusOutput *output;
     QmiDmsUimPinStatus current_status;
-    GError *error;
+    GError *error = NULL;
     gboolean pin1_enabled;
     gboolean pin2_enabled;
 
