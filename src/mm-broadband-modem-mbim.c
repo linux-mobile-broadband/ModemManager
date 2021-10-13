@@ -1192,6 +1192,7 @@ unlock_required_subscriber_ready_state_ready (MbimDevice *device,
             break;
         case MBIM_SUBSCRIBER_READY_STATE_FAILURE:
         case MBIM_SUBSCRIBER_READY_STATE_NOT_ACTIVATED:
+        case MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE:
         default:
             error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE, self);
             break;
