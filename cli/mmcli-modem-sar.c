@@ -55,11 +55,11 @@ static GOptionEntry entries[] = {
       "Current status of the SAR",
       NULL
     },
-    { "sar-set-enable", 0, 0, G_OPTION_ARG_NONE, &sar_enable_flag,
+    { "sar-enable", 0, 0, G_OPTION_ARG_NONE, &sar_enable_flag,
       "Enable dynamic SAR",
       NULL
     },
-    { "sar-set-disable", 0, 0, G_OPTION_ARG_NONE, &sar_disable_flag,
+    { "sar-disable", 0, 0, G_OPTION_ARG_NONE, &sar_disable_flag,
       "Disable dynamic SAR",
       NULL
     },
