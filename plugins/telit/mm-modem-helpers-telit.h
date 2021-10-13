@@ -25,6 +25,7 @@ GArray *mm_telit_parse_bnd_query_response (const gchar  *response,
                                            gboolean      modem_is_3g,
                                            gboolean      modem_is_4g,
                                            gboolean      modem_alternate_3g_bands,
+                                           gboolean      modem_ext_4g_bands,
                                            gpointer      log_object,
                                            GError      **error);
 GArray *mm_telit_parse_bnd_test_response  (const gchar  *response,
@@ -32,6 +33,7 @@ GArray *mm_telit_parse_bnd_test_response  (const gchar  *response,
                                            gboolean      modem_is_3g,
                                            gboolean      modem_is_4g,
                                            gboolean      modem_alternate_3g_bands,
+                                           gboolean      modem_ext_4g_bands,
                                            gpointer      log_object,
                                            GError      **error);
 gchar  *mm_telit_build_bnd_request        (GArray       *bands_array,
@@ -39,6 +41,7 @@ gchar  *mm_telit_build_bnd_request        (GArray       *bands_array,
                                            gboolean      modem_is_3g,
                                            gboolean      modem_is_4g,
                                            gboolean      modem_alternate_3g_bands,
+                                           gboolean      modem_ext_4g_bands,
                                            GError      **error);
 
 /* #QSS? response parser */
