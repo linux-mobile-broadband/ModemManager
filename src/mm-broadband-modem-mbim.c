@@ -6442,28 +6442,28 @@ sar_enable (MMIfaceModemSar    *_self,
             GAsyncReadyCallback callback,
             gpointer            user_data)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
-    /*
-     * the value 0xFFFFFFFF means all antennas
-     * the backoff index set to the current index of modem
-     */
-    MbimSarConfigState state = {
-        .antenna_index = 0xFFFFFFFF,
-        .backoff_index = mm_iface_modem_sar_get_power_level(_self)
-    };
-    const MbimSarConfigState* states[] = { &state };
+    MMBroadbandModemMbim          *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice                    *device;
+    GTask                         *task;
+    g_autoptr(MbimMessage)         message = NULL;
+    g_autofree MbimSarConfigState *config_state = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    /*
+     * the value 0xFFFFFFFF means all antennas
+     * the backoff index set to the current index of modem
+     */
+    config_state = g_new (MbimSarConfigState, 1);
+    config_state->antenna_index = 0xFFFFFFFF;
+    config_state->backoff_index = mm_iface_modem_sar_get_power_level (_self);
+
     message = mbim_message_ms_sar_config_set_new (MBIM_SAR_CONTROL_MODE_OS,
                                                   enable ? MBIM_SAR_BACKOFF_STATE_ENABLED : MBIM_SAR_BACKOFF_STATE_DISABLED,
-                                                  G_N_ELEMENTS (states), states, NULL);
+                                                  1, (const MbimSarConfigState **)&config_state, NULL);
 
     mbim_device_command (device,
                          message,
@@ -6471,7 +6471,6 @@ sar_enable (MMIfaceModemSar    *_self,
                          NULL,
                          (GAsyncReadyCallback)sar_config_set_enable_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
@@ -6512,15 +6511,11 @@ sar_set_power_level (MMIfaceModemSar    *_self,
                      GAsyncReadyCallback callback,
                      gpointer            user_data)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    MbimDevice           *device;
-    MbimMessage          *message;
-    GTask                *task;
-    MbimSarConfigState state = {
-        .antenna_index = 0xFFFFFFFF,
-        .backoff_index = power_level
-    };
-    const MbimSarConfigState* states[] = { &state };
+    MMBroadbandModemMbim          *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice                    *device;
+    GTask                         *task;
+    g_autoptr(MbimMessage)         message = NULL;
+    g_autofree MbimSarConfigState *config_state = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -6536,18 +6531,25 @@ sar_set_power_level (MMIfaceModemSar    *_self,
         return;
     }
 
+    /*
+     * the value 0xFFFFFFFF means all antennas
+     * the backoff index set to the input power level
+     */
+    config_state = g_new (MbimSarConfigState, 1);
+    config_state->antenna_index = 0xFFFFFFFF;
+    config_state->backoff_index = power_level;
+
     task = g_task_new (self, NULL, callback, user_data);
 
     message = mbim_message_ms_sar_config_set_new (MBIM_SAR_CONTROL_MODE_OS,
                                                   MBIM_SAR_BACKOFF_STATE_ENABLED,
-                                                  G_N_ELEMENTS (states), states, NULL);
+                                                  1, (const MbimSarConfigState **)&config_state, NULL);
     mbim_device_command (device,
                          message,
                          10,
                          NULL,
                          (GAsyncReadyCallback)sar_config_set_power_level_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
