@@ -6234,11 +6234,11 @@ sar_check_support (MMIfaceModemSar    *_self,
                    gpointer            user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GTask *task;
+    GTask                *task;
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    mm_obj_dbg (self, "SAR capabilities %s",self->priv->is_ms_sar_supported ? "supported" : "not supported");
+    mm_obj_dbg (self, "SAR capabilities %s", self->priv->is_ms_sar_supported ? "supported" : "not supported");
     g_task_return_boolean (task, self->priv->is_ms_sar_supported);
     g_object_unref (task);
 }
@@ -6270,9 +6270,9 @@ sar_config_query_state_ready (MbimDevice   *device,
                               GAsyncResult *res,
                               GTask        *task)
 {
-    MbimMessage *response;
-    GError *error = NULL;
-    MbimSarBackoffState state;
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
+    MbimSarBackoffState     state;
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -6284,15 +6284,12 @@ sar_config_query_state_ready (MbimDevice   *device,
             NULL,
             NULL,
             NULL,
-            &error)) {
+            &error))
         g_task_return_boolean (task, state);
-    } else
+    else
         g_task_return_error (task, error);
 
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
@@ -6300,10 +6297,10 @@ sar_load_state (MMIfaceModemSar    *_self,
                 GAsyncReadyCallback callback,
                 gpointer            user_data)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice             *device;
+    GTask                  *task;
+    g_autoptr(MbimMessage)  message = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -6317,7 +6314,6 @@ sar_load_state (MMIfaceModemSar    *_self,
                          NULL,
                          (GAsyncReadyCallback)sar_config_query_state_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
@@ -6330,7 +6326,7 @@ sar_load_power_level_finish (MMIfaceModemSar *self,
 {
     gssize result;
 
-    result = g_task_propagate_int(G_TASK (res), error);
+    result = g_task_propagate_int (G_TASK (res), error);
     if (result < 0)
         return FALSE;
 
@@ -6343,10 +6339,13 @@ sar_config_query_power_level_ready (MbimDevice   *device,
                                     GAsyncResult *res,
                                     GTask        *task)
 {
-    MbimMessage             *response;
-    GError                  *error = NULL;
-    guint32                  states_count;
-    MbimSarConfigStateArray *config_states = NULL;
+    MMBroadbandModemMbim               *self;
+    GError                             *error = NULL;
+    guint32                             states_count;
+    g_autoptr(MbimSarConfigStateArray)  config_states = NULL;
+    g_autoptr(MbimMessage)              response = NULL;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -6359,25 +6358,17 @@ sar_config_query_power_level_ready (MbimDevice   *device,
             &states_count,
             &config_states,
             &error)) {
-        MMBroadbandModemMbim *self;
-
-        self = g_task_get_source_object (task);
         if (states_count == 0) {
             g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE, "Couldn't load config states");
         } else {
             if (states_count > 1)
-                mm_obj_warn (self, "The count of config states is %d, We're just taking the state reported for the first antenna.", states_count);
+                mm_obj_dbg (self, "Device reports SAR config states for %u antennas separately, but only considering the first one", states_count);
             g_task_return_int (task, config_states[0]->backoff_index);
         }
-
-        mbim_sar_config_state_array_free (config_states);
     } else
         g_task_return_error (task, error);
 
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
@@ -6385,10 +6376,10 @@ sar_load_power_level (MMIfaceModemSar    *_self,
                       GAsyncReadyCallback callback,
                       gpointer            user_data)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice             *device;
+    GTask                  *task;
+    g_autoptr(MbimMessage)  message = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -6402,7 +6393,6 @@ sar_load_power_level (MMIfaceModemSar    *_self,
                          NULL,
                          (GAsyncReadyCallback)sar_config_query_power_level_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
@@ -6420,7 +6410,7 @@ sar_config_set_enable_ready (MbimDevice   *device,
                              GAsyncResult *res,
                              GTask        *task)
 {
-    MbimMessage *response;
+    g_autoptr(MbimMessage) response = NULL;
     GError *error = NULL;
 
     response = mbim_device_command_finish (device, res, &error);
@@ -6431,9 +6421,6 @@ sar_config_set_enable_ready (MbimDevice   *device,
         g_task_return_error (task, error);
 
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
@@ -6488,8 +6475,8 @@ sar_config_set_power_level_ready (MbimDevice   *device,
                                   GAsyncResult *res,
                                   GTask        *task)
 {
-    MbimMessage *response;
-    GError      *error = NULL;
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
 
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
@@ -6499,11 +6486,7 @@ sar_config_set_power_level_ready (MbimDevice   *device,
         g_task_return_error (task, error);
 
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
-
 
 static void
 sar_set_power_level (MMIfaceModemSar    *_self,
