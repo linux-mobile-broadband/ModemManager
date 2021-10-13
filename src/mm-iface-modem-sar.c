@@ -344,10 +344,11 @@ check_support_ready (MMIfaceModemSar *self,
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_SAR_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
-        /* This error shouldn't be treated as critical */
-        mm_obj_dbg (self, "SAR support check failed: %s", error->message);
-        g_error_free (error);
-        return;
+        if (error) {
+            /* This error shouldn't be treated as critical */
+            mm_obj_dbg (self, "SAR support check failed: %s", error->message);
+            g_error_free (error);
+        }
     } else {
         /* SAR is supported! */
         g_object_set_qdata (G_OBJECT (self),
