@@ -144,7 +144,8 @@ mm_kernel_device_qrtr_init (MMKernelDeviceQrtr *self)
     /* Set properties*/
     g_object_set_data_full (G_OBJECT (self), ID_MM_PORT_TYPE_QMI, g_strdup ("true"), g_free);
     g_object_set_data_full (G_OBJECT (self), ID_MM_CANDIDATE, g_strdup ("1"), g_free);
-
+    /* For now we're assuming that QRTR ports are available exclusively on Qualcomm SoCs */
+    g_object_set_data_full (G_OBJECT (self), "ID_MM_QCOM_SOC", g_strdup ("1"), g_free);
 }
 
 static void

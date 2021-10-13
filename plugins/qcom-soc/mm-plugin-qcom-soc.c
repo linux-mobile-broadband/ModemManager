@@ -68,6 +68,10 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "wwan", "rpmsg", "net", "qrtr", NULL };
+    static const gchar *udev_tags[] = {
+        "ID_MM_QCOM_SOC",
+        NULL
+    };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_QCOM_SOC,
@@ -75,6 +79,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_AT,         TRUE,
                       MM_PLUGIN_ALLOWED_QMI,        TRUE,
+                      MM_PLUGIN_ALLOWED_UDEV_TAGS,  udev_tags,
                       NULL));
 }
 
