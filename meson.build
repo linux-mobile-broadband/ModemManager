@@ -232,12 +232,12 @@ enable_at_command_via_dbus = get_option('at_command_via_dbus')
 config_h.set('WITH_AT_COMMAND_VIA_DBUS', enable_at_command_via_dbus)
 
 # MBIM support (enabled by default)
-mbim_glib_dep = dependency('mbim-glib', version: '>= 1.26.0', required: get_option('mbim'))
+mbim_glib_dep = dependency('mbim-glib', version: '>= 1.27.1', required: get_option('mbim'))
 enable_mbim = mbim_glib_dep.found()
 config_h.set('WITH_MBIM', enable_mbim)
 
 # QMI support (enabled by default)
-qmi_glib_dep = dependency('qmi-glib', version: '>= 1.30.2', required: get_option('qmi'))
+qmi_glib_dep = dependency('qmi-glib', version: '>= 1.31.1', required: get_option('qmi'))
 enable_qmi = qmi_glib_dep.found()
 config_h.set('WITH_QMI', enable_qmi)
 
