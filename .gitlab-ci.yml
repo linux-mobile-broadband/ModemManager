@@ -177,16 +177,14 @@ build-single-plugins:
     - ninja -C build
     - ninja -C build install
     - popd
-    - NOCONFIGURE=1 ./autogen.sh
-    - for plugin in generic altair-lte anydata broadmobi cinterion
+    - for plugin in generic altair_lte anydata broadmobi cinterion
                     dell dlink fibocom foxconn gosuncn haier huawei iridium
-                    linktop longcheer mbm motorola mtk nokia nokia-icera
-                    novatel novatel-lte option option-hso pantech
-                    qcom-soc quectel samsung sierra-legacy sierra simtech
+                    linktop longcheer mbm motorola mtk nokia nokia_icera
+                    novatel novatel_lte option option_hso pantech
+                    qcom_soc quectel samsung sierra_legacy sierra simtech
                     telit thuraya tplink ublox via wavecom x22x zte; do
-        ./configure --prefix=/usr --disable-gtk-doc --disable-introspection --disable-all-plugins --enable-plugin-$plugin;
-        make;
-        make clean;
+        meson setup build_$plugin --prefix=/usr -Dgtk_doc=false -Dintrospection=disabled -Dbash_completion=false -Dauto_features=disabled -Dqmi=enabled -Dmbim=enabled -Dqrtr=enabled -Dplugin_$plugin=enabled;
+        ninja -C build_$plugin;
       done
 
 build-default:
