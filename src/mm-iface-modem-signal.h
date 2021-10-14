@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2013-2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2021 Intel Corporation
  */
 
 #ifndef MM_IFACE_MODEM_SIGNAL_H
@@ -56,6 +57,17 @@ struct _MMIfaceModemSignal {
                                      MMSignal **lte,
                                      MMSignal **nr5g,
                                      GError **error);
+
+    /* Setup thresholds */
+    void     (* setup_thresholds)        (MMIfaceModemSignal   *self,
+                                          guint32               rssi_threshold,
+                                          gboolean              error_rate_threshold,
+                                          GAsyncReadyCallback   callback,
+                                          gpointer              user_data);
+    gboolean (* setup_thresholds_finish) (MMIfaceModemSignal   *self,
+                                          GAsyncResult         *res,
+                                          GError              **error);
+
 };
 
 GType mm_iface_modem_signal_get_type (void);
@@ -93,5 +105,14 @@ void mm_iface_modem_signal_shutdown (MMIfaceModemSignal *self);
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_signal_bind_simple_status (MMIfaceModemSignal *self,
                                                MMSimpleStatus *status);
+
+/* Allow signal quality updates via indications */
+void mm_iface_modem_signal_update (MMIfaceModemSignal *self,
+                                   MMSignal           *cdma,
+                                   MMSignal           *evdo,
+                                   MMSignal           *gsm,
+                                   MMSignal           *umts,
+                                   MMSignal           *lte,
+                                   MMSignal           *nr5g);
 
 #endif /* MM_IFACE_MODEM_SIGNAL_H */
