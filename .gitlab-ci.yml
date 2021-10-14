@@ -154,7 +154,6 @@ build-single-plugins:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - merge_requests
     - schedules
   script:
     - git clone --depth 1 https://gitlab.freedesktop.org/mobile-broadband/libmbim.git
