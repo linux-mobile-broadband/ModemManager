@@ -1588,6 +1588,8 @@ mm_3gpp_profile_get_ip_type
 mm_3gpp_profile_set_ip_type
 mm_3gpp_profile_get_profile_id
 mm_3gpp_profile_set_profile_id
+mm_3gpp_profile_get_profile_name
+mm_3gpp_profile_set_profile_name
 <SUBSECTION Private>
 mm_3gpp_profile_new_from_dictionary
 mm_3gpp_profile_new_from_string

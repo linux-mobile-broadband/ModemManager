@@ -69,6 +69,8 @@ MM3gppProfile *mm_3gpp_profile_new (void);
 
 void mm_3gpp_profile_set_profile_id   (MM3gppProfile       *self,
                                        gint                 profile_id);
+void mm_3gpp_profile_set_profile_name (MM3gppProfile       *self,
+                                       const gchar         *profile_name);
 void mm_3gpp_profile_set_apn          (MM3gppProfile       *self,
                                        const gchar         *apn);
 void mm_3gpp_profile_set_allowed_auth (MM3gppProfile       *self,
@@ -83,6 +85,7 @@ void mm_3gpp_profile_set_apn_type     (MM3gppProfile       *self,
                                        MMBearerApnType      apn_type);
 
 gint                 mm_3gpp_profile_get_profile_id   (MM3gppProfile *self);
+const gchar         *mm_3gpp_profile_get_profile_name (MM3gppProfile *self);
 const gchar         *mm_3gpp_profile_get_apn          (MM3gppProfile *self);
 MMBearerAllowedAuth  mm_3gpp_profile_get_allowed_auth (MM3gppProfile *self);
 const gchar         *mm_3gpp_profile_get_user         (MM3gppProfile *self);
@@ -112,11 +115,12 @@ gboolean       mm_3gpp_profile_consume_variant     (MM3gppProfile  *self,
                                                     GError        **error);
 
 typedef enum {
-    MM_3GPP_PROFILE_CMP_FLAGS_NONE          = 0,
-    MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_ID = 1 << 1,
-    MM_3GPP_PROFILE_CMP_FLAGS_NO_AUTH       = 1 << 2,
-    MM_3GPP_PROFILE_CMP_FLAGS_NO_APN_TYPE   = 1 << 3,
-    MM_3GPP_PROFILE_CMP_FLAGS_NO_IP_TYPE    = 1 << 4,
+    MM_3GPP_PROFILE_CMP_FLAGS_NONE            = 0,
+    MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_ID   = 1 << 1,
+    MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_NAME = 1 << 2,
+    MM_3GPP_PROFILE_CMP_FLAGS_NO_AUTH         = 1 << 3,
+    MM_3GPP_PROFILE_CMP_FLAGS_NO_APN_TYPE     = 1 << 4,
+    MM_3GPP_PROFILE_CMP_FLAGS_NO_IP_TYPE      = 1 << 5,
 } MM3gppProfileCmpFlags;
 
 gboolean mm_3gpp_profile_cmp (MM3gppProfile         *a,
