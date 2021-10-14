@@ -107,10 +107,6 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1051", ENV{ID_MM_TELIT_BND_ALTERNATE
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1060", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 
-# LN920 use extended 4G bands and 4G bands configured as hex mask
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1060", ENV{ID_MM_TELIT_BND_EXT}="1"
-ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1061", ENV{ID_MM_TELIT_BND_EXT}="1"
-
 # LM940/960 initial port delay
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_PORT_DELAY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_PORT_DELAY}="1"

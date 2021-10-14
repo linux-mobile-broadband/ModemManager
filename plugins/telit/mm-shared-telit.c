@@ -69,24 +69,6 @@ initialize_alternate_3g_band (MMSharedTelit *self,
     }
 }
 
-static void
-initialize_ext_4g_band (MMSharedTelit *self,
-                        Private       *priv)
-{
-    MMPort         *primary;
-    MMKernelDevice *port;
-
-    primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
-    if (primary) {
-        port = mm_port_peek_kernel_device (primary);
-
-        /* Lookup for the tag specifying that we're using the ext 4G band mapping */
-        priv->ext_4g_bands = mm_kernel_device_get_global_property_as_boolean (port, "ID_MM_TELIT_BND_EXT");
-        if (priv->ext_4g_bands)
-            mm_obj_dbg (self, "telit modem using extended 4G band setup");
-    }
-}
-
 static Private *
 get_private (MMSharedTelit *self)
 {
@@ -99,7 +81,7 @@ get_private (MMSharedTelit *self)
     if (!priv) {
         priv = g_slice_new0 (Private);
         initialize_alternate_3g_band (self, priv);
-        initialize_ext_4g_band (self, priv);
+        /* ext_4g_bands field is initialized inside #BND=? response handler */
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
 
@@ -219,7 +201,7 @@ mm_shared_telit_load_supported_bands_ready (MMBaseModem  *self,
                                                   mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
                                                   mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
                                                   priv->alternate_3g_bands,
-                                                  priv->ext_4g_bands,
+                                                  &priv->ext_4g_bands,
                                                   self,
                                                   &error);
         if (!bands)
@@ -227,6 +209,8 @@ mm_shared_telit_load_supported_bands_ready (MMBaseModem  *self,
         else {
             /* Store supported bands to be able to build ANY when setting */
             priv->supported_bands = g_array_ref (bands);
+            if (priv->ext_4g_bands)
+                mm_obj_dbg (self, "telit modem using extended 4G band setup");
             g_task_return_pointer (task, bands, (GDestroyNotify)g_array_unref);
         }
     }

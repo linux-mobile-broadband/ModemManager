@@ -658,6 +658,15 @@ typedef enum {
     LOAD_BANDS_TYPE_CURRENT,
 } LoadBandsType;
 
+static gboolean
+bnd_response_has_ext_4g_bands (const gchar *response)
+{
+    g_auto(GStrv) tokens = NULL;
+
+    tokens = mm_split_string_groups (response);
+    return g_strv_length (tokens) == 4;
+}
+
 static GArray *
 common_parse_bnd_response (const gchar    *response,
                            gboolean        modem_is_2g,
@@ -756,14 +765,15 @@ mm_telit_parse_bnd_test_response (const gchar  *response,
                                   gboolean      modem_is_3g,
                                   gboolean      modem_is_4g,
                                   gboolean      modem_alternate_3g_bands,
-                                  gboolean      modem_ext_4g_bands,
+                                  gboolean     *modem_ext_4g_bands,
                                   gpointer      log_object,
                                   GError      **error)
 {
+    *modem_ext_4g_bands = bnd_response_has_ext_4g_bands (response);
     return common_parse_bnd_response (response,
                                       modem_is_2g, modem_is_3g, modem_is_4g,
                                       modem_alternate_3g_bands,
-                                      modem_ext_4g_bands,
+                                      *modem_ext_4g_bands,
                                       LOAD_BANDS_TYPE_SUPPORTED,
                                       log_object,
                                       error);

@@ -182,17 +182,19 @@ test_parse_supported_bands_response (void)
     for (i = 0; i < G_N_ELEMENTS (supported_band_mapping_tests); i++) {
         GError *error = NULL;
         GArray *bands = NULL;
+        gboolean modem_ext_4g_bands;
 
         bands = mm_telit_parse_bnd_test_response (supported_band_mapping_tests[i].response,
                                                   supported_band_mapping_tests[i].modem_is_2g,
                                                   supported_band_mapping_tests[i].modem_is_3g,
                                                   supported_band_mapping_tests[i].modem_is_4g,
                                                   supported_band_mapping_tests[i].modem_alternate_3g_bands,
-                                                  supported_band_mapping_tests[i].modem_ext_4g_bands,
+                                                  &modem_ext_4g_bands,
                                                   NULL,
                                                   &error);
         g_assert_no_error (error);
         g_assert (bands);
+        g_assert (supported_band_mapping_tests[i].modem_ext_4g_bands == modem_ext_4g_bands);
 
         mm_test_helpers_compare_bands (bands,
                                        supported_band_mapping_tests[i].mm_bands,
