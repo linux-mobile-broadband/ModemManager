@@ -285,7 +285,7 @@ get_modem_ready (GObject      *source,
         guint rate;
 
         if (!mm_get_uint_from_str (setup_str, &rate)) {
-            g_printerr ("error: invalid rate value '%s'", setup_str);
+            g_printerr ("error: invalid rate value '%s'\n", setup_str);
             exit (EXIT_FAILURE);
         }
 
@@ -348,7 +348,7 @@ mmcli_modem_signal_run_synchronous (GDBusConnection *connection)
         gboolean result;
 
         if (!mm_get_uint_from_str (setup_str, &rate)) {
-            g_printerr ("error: invalid rate value '%s'", setup_str);
+            g_printerr ("error: invalid rate value '%s'\n", setup_str);
             exit (EXIT_FAILURE);
         }
 
