@@ -5658,6 +5658,9 @@ wds_profile_settings_to_3gpp_profile (MMBroadbandModemQmi                    *se
     if (qmi_message_wds_get_profile_settings_output_get_apn_name (output, &str, NULL))
         mm_3gpp_profile_set_apn (profile, str);
 
+    if (qmi_message_wds_get_profile_settings_output_get_profile_name (output, &str, NULL))
+        mm_3gpp_profile_set_profile_name (profile, str);
+
     if (qmi_message_wds_get_profile_settings_output_get_pdp_type (output, &pdp_type, NULL))
         mm_3gpp_profile_set_ip_type (profile, mm_bearer_ip_family_from_qmi_pdp_type (pdp_type));
 
@@ -5906,6 +5909,7 @@ modem_3gpp_profile_manager_list_profiles (MMIfaceModem3gppProfileManager  *self,
 typedef struct {
     QmiClientWds         *client;
     gint                  profile_id;
+    gchar                *profile_name;
     gchar                *apn;
     gchar                *user;
     gchar                *password;
@@ -5917,6 +5921,7 @@ typedef struct {
 static void
 store_profile_context_free (StoreProfileContext *ctx)
 {
+    g_free (ctx->profile_name);
     g_free (ctx->apn);
     g_free (ctx->user);
     g_free (ctx->password);
@@ -6039,6 +6044,7 @@ store_profile_run (GTask *task)
         /* when creating, we cannot select which profile id to use */
         input = qmi_message_wds_create_profile_input_new ();
         qmi_message_wds_create_profile_input_set_profile_type (input, QMI_WDS_PROFILE_TYPE_3GPP, NULL);
+        qmi_message_wds_create_profile_input_set_profile_name (input, ctx->profile_name, NULL);
         qmi_message_wds_create_profile_input_set_pdp_type (input, ctx->qmi_pdp_type, NULL);
         qmi_message_wds_create_profile_input_set_apn_name (input, ctx->apn, NULL);
         qmi_message_wds_create_profile_input_set_authentication (input, ctx->qmi_auth, NULL);
@@ -6058,6 +6064,7 @@ store_profile_run (GTask *task)
 
         input = qmi_message_wds_modify_profile_input_new ();
         qmi_message_wds_modify_profile_input_set_profile_identifier (input, QMI_WDS_PROFILE_TYPE_3GPP, ctx->profile_id, NULL);
+        qmi_message_wds_modify_profile_input_set_profile_name (input, ctx->profile_name, NULL);
         qmi_message_wds_modify_profile_input_set_pdp_type (input, ctx->qmi_pdp_type, NULL);
         qmi_message_wds_modify_profile_input_set_apn_name (input, ctx->apn, NULL);
         qmi_message_wds_modify_profile_input_set_authentication (input, ctx->qmi_auth, NULL);
@@ -6100,6 +6107,8 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
 
     /* Note: may be UNKNOWN */
     ctx->profile_id = mm_3gpp_profile_get_profile_id (profile);
+
+    ctx->profile_name = g_strdup (mm_3gpp_profile_get_profile_name (profile));
 
     ctx->apn = g_strdup (mm_3gpp_profile_get_apn (profile));
 
