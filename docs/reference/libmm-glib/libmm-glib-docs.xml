@@ -135,6 +135,7 @@
         <title>Extended signal information</title>
         <xi:include href="xml/mm-modem-signal.xml"/>
         <xi:include href="xml/mm-signal.xml"/>
+        <xi:include href="xml/mm-signal-threshold-properties.xml"/>
       </section>
       <section>
         <title>OMA support</title>

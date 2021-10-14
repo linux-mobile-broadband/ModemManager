@@ -31,6 +31,7 @@
 #include <ModemManager.h>
 
 #include "mm-signal.h"
+#include "mm-signal-threshold-properties.h"
 #include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS
@@ -72,30 +73,30 @@ guint        mm_modem_signal_get_rate                 (MMModemSignal *self);
 guint        mm_modem_signal_get_rssi_threshold       (MMModemSignal *self);
 gboolean     mm_modem_signal_get_error_rate_threshold (MMModemSignal *self);
 
-void     mm_modem_signal_setup                   (MMModemSignal        *self,
-                                                  guint                 rate,
-                                                  GCancellable         *cancellable,
-                                                  GAsyncReadyCallback   callback,
-                                                  gpointer              user_data);
-gboolean mm_modem_signal_setup_finish            (MMModemSignal        *self,
-                                                  GAsyncResult         *res,
-                                                  GError              **error);
-gboolean mm_modem_signal_setup_sync              (MMModemSignal        *self,
-                                                  guint                 rate,
-                                                  GCancellable         *cancellable,
-                                                  GError              **error);
-void     mm_modem_signal_setup_thresholds        (MMModemSignal        *self,
-                                                  GVariant             *settings,
-                                                  GCancellable         *cancellable,
-                                                  GAsyncReadyCallback   callback,
-                                                  gpointer              user_data);
-gboolean mm_modem_signal_setup_thresholds_finish (MMModemSignal        *self,
-                                                  GAsyncResult         *res,
-                                                  GError              **error);
-gboolean mm_modem_signal_setup_thresholds_sync   (MMModemSignal        *self,
-                                                  GVariant             *settings,
-                                                  GCancellable         *cancellable,
-                                                  GError              **error);
+void     mm_modem_signal_setup                   (MMModemSignal                *self,
+                                                  guint                         rate,
+                                                  GCancellable                 *cancellable,
+                                                  GAsyncReadyCallback           callback,
+                                                  gpointer                      user_data);
+gboolean mm_modem_signal_setup_finish            (MMModemSignal                *self,
+                                                  GAsyncResult                 *res,
+                                                  GError                      **error);
+gboolean mm_modem_signal_setup_sync              (MMModemSignal                *self,
+                                                  guint                         rate,
+                                                  GCancellable                 *cancellable,
+                                                  GError                      **error);
+void     mm_modem_signal_setup_thresholds        (MMModemSignal                *self,
+                                                  MMSignalThresholdProperties  *properties,
+                                                  GCancellable                 *cancellable,
+                                                  GAsyncReadyCallback           callback,
+                                                  gpointer                      user_data);
+gboolean mm_modem_signal_setup_thresholds_finish (MMModemSignal                *self,
+                                                  GAsyncResult                 *res,
+                                                  GError                      **error);
+gboolean mm_modem_signal_setup_thresholds_sync   (MMModemSignal                *self,
+                                                  MMSignalThresholdProperties  *properties,
+                                                  GCancellable                 *cancellable,
+                                                  GError                      **error);
 
 MMSignal *mm_modem_signal_get_cdma  (MMModemSignal *self);
 MMSignal *mm_modem_signal_peek_cdma (MMModemSignal *self);

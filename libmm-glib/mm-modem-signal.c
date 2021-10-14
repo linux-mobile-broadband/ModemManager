@@ -216,7 +216,7 @@ mm_modem_signal_setup_thresholds_finish (MMModemSignal  *self,
 /**
  * mm_modem_signal_setup_thresholds:
  * @self: A #MMModemSignal.
- * @settings: Threshold values to set.
+ * @properties: Threshold values to set.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
  *  %NULL.
@@ -236,21 +236,24 @@ mm_modem_signal_setup_thresholds_finish (MMModemSignal  *self,
  * Since: 1.20
  */
 void
-mm_modem_signal_setup_thresholds (MMModemSignal       *self,
-                                  GVariant            *settings,
-                                  GCancellable        *cancellable,
-                                  GAsyncReadyCallback  callback,
-                                  gpointer             user_data)
+mm_modem_signal_setup_thresholds (MMModemSignal               *self,
+                                  MMSignalThresholdProperties *properties,
+                                  GCancellable                *cancellable,
+                                  GAsyncReadyCallback          callback,
+                                  gpointer                     user_data)
 {
+    g_autoptr(GVariant) dictionary = NULL;
+
     g_return_if_fail (MM_IS_MODEM_SIGNAL (self));
 
-    mm_gdbus_modem_signal_call_setup_thresholds (MM_GDBUS_MODEM_SIGNAL (self), settings, cancellable, callback, user_data);
+    dictionary = mm_signal_threshold_properties_get_dictionary (properties);
+    mm_gdbus_modem_signal_call_setup_thresholds (MM_GDBUS_MODEM_SIGNAL (self), dictionary, cancellable, callback, user_data);
 }
 
 /**
  * mm_modem_signal_setup_thresholds_sync:
  * @self: A #MMModemSignal.
- * @settings: Threshold values to set.
+ * @properties: Threshold values to set.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
@@ -265,14 +268,17 @@ mm_modem_signal_setup_thresholds (MMModemSignal       *self,
  * Since: 1.20
  */
 gboolean
-mm_modem_signal_setup_thresholds_sync (MMModemSignal  *self,
-                                       GVariant       *settings,
-                                       GCancellable   *cancellable,
-                                       GError        **error)
+mm_modem_signal_setup_thresholds_sync (MMModemSignal                *self,
+                                       MMSignalThresholdProperties  *properties,
+                                       GCancellable                 *cancellable,
+                                       GError                      **error)
 {
+    g_autoptr(GVariant) dictionary = NULL;
+
     g_return_val_if_fail (MM_IS_MODEM_SIGNAL (self), FALSE);
 
-    return mm_gdbus_modem_signal_call_setup_thresholds_sync (MM_GDBUS_MODEM_SIGNAL (self), settings, cancellable, error);
+    dictionary = mm_signal_threshold_properties_get_dictionary (properties);
+    return mm_gdbus_modem_signal_call_setup_thresholds_sync (MM_GDBUS_MODEM_SIGNAL (self), dictionary, cancellable, error);
 }
 
 /*****************************************************************************/

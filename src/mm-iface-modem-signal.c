@@ -382,56 +382,14 @@ setup_thresholds_ready (MMIfaceModemSignal           *self,
     handle_setup_thresholds_context_free (ctx);
 }
 
-static gboolean
-select_new_threshold_settings (HandleSetupThresholdsContext  *ctx,
-                               GError                       **error)
-{
-    GError       *inner_error = NULL;
-    GVariantIter  iter;
-    gchar        *key;
-    GVariant     *value;
-
-    if (!g_variant_is_of_type (ctx->settings, G_VARIANT_TYPE ("a{sv}"))) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Cannot get threshold settings from dictionary: "
-                     "invalid variant type received");
-        return FALSE;
-    }
-
-    g_variant_iter_init (&iter, ctx->settings);
-    while (!inner_error && g_variant_iter_next (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, "rssi-threshold"))
-            ctx->rssi_threshold = g_variant_get_uint32 (value);
-        else if (g_str_equal (key, "error-rate-threshold"))
-            ctx->error_rate_threshold = g_variant_get_boolean (value);
-        else {
-            /* Set inner error, will stop the loop */
-            inner_error = g_error_new (MM_CORE_ERROR,
-                                       MM_CORE_ERROR_INVALID_ARGS,
-                                       "Invalid settings dictionary, unexpected key '%s'",
-                                       key);
-        }
-
-        g_free (key);
-        g_variant_unref (value);
-    }
-
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        return FALSE;
-    }
-    return TRUE;
-}
-
 static void
 handle_setup_thresholds_auth_ready (MMBaseModem                  *self,
                                     GAsyncResult                 *res,
                                     HandleSetupThresholdsContext *ctx)
 {
-    GError  *error = NULL;
-    Private *priv;
+    g_autoptr(MMSignalThresholdProperties)  properties = NULL;
+    GError                                 *error = NULL;
+    Private                                *priv;
 
     priv = get_private (MM_IFACE_MODEM_SIGNAL (self));
 
@@ -456,9 +414,19 @@ handle_setup_thresholds_auth_ready (MMBaseModem                  *self,
         return;
     }
 
-    /* Process received settings */
-    if (!select_new_threshold_settings (ctx, &error)) {
+    properties = mm_signal_threshold_properties_new_from_dictionary (ctx->settings, &error);
+    if (!properties) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_setup_thresholds_context_free (ctx);
+        return;
+    }
+    ctx->rssi_threshold       = mm_signal_threshold_properties_get_rssi       (properties);
+    ctx->error_rate_threshold = mm_signal_threshold_properties_get_error_rate (properties);
+
+    /* Already there? */
+    if ((ctx->rssi_threshold == mm_gdbus_modem_signal_get_rssi_threshold (ctx->skeleton)) &&
+        (ctx->error_rate_threshold == mm_gdbus_modem_signal_get_error_rate_threshold (ctx->skeleton))) {
+        mm_gdbus_modem_signal_complete_setup_thresholds (ctx->skeleton, ctx->invocation);
         handle_setup_thresholds_context_free (ctx);
         return;
     }

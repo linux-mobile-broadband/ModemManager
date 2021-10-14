@@ -1061,6 +1061,33 @@ mm_signal_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-signal-threshold-properties</FILE>
+<TITLE>MMSignalThresholdProperties</TITLE>
+MMSignalThresholdProperties
+<SUBSECTION New>
+mm_signal_threshold_properties_new
+<SUBSECTION GettersSetters>
+mm_signal_threshold_properties_get_rssi
+mm_signal_threshold_properties_set_rssi
+mm_signal_threshold_properties_get_error_rate
+mm_signal_threshold_properties_set_error_rate
+<SUBSECTION Private>
+mm_signal_threshold_properties_new_from_dictionary
+mm_signal_threshold_properties_new_from_string
+mm_signal_threshold_properties_get_dictionary
+<SUBSECTION Standard>
+MMSignalThresholdPropertiesClass
+MMSignalThresholdPropertiesPrivate
+MM_SIGNAL_THRESHOLD_PROPERTIES
+MM_SIGNAL_THRESHOLD_PROPERTIES_CLASS
+MM_SIGNAL_THRESHOLD_PROPERTIES_GET_CLASS
+MM_IS_SIGNAL_THRESHOLD_PROPERTIES
+MM_IS_SIGNAL_THRESHOLD_PROPERTIES_CLASS
+MM_TYPE_SIGNAL_THRESHOLD_PROPERTIES
+mm_signal_threshold_properties_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-modem-voice</FILE>
 <TITLE>MMModemVoice</TITLE>
 MMModemVoice

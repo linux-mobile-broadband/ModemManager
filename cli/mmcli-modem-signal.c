@@ -274,71 +274,6 @@ print_signal_info (void)
     mmcli_output_dump ();
 }
 
-typedef struct {
-    guint     rssi_threshold;
-    gboolean  rssi_set;
-    gboolean  error_rate_threshold;
-    gboolean  error_rate_set;
-    GError   *error;
-} ParseKeyValueContext;
-
-static gboolean
-key_value_foreach (const gchar          *key,
-                   const gchar          *value,
-                   ParseKeyValueContext *parse_ctx)
-{
-    if (g_str_equal (key, "rssi-threshold")) {
-        if (!mm_get_uint_from_str (value, &parse_ctx->rssi_threshold)) {
-            g_set_error (&parse_ctx->error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                         "invalid RSSI threshold value given: %s", value);
-            return FALSE;
-        }
-        parse_ctx->rssi_set = TRUE;
-    } else if (g_str_equal (key, "error-rate-threshold")) {
-        parse_ctx->error_rate_threshold = mm_common_get_boolean_from_string (value, &parse_ctx->error);
-        if (parse_ctx->error)
-            return FALSE;
-        parse_ctx->error_rate_set = TRUE;
-    } else {
-        g_set_error (&parse_ctx->error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                     "Invalid properties string, unsupported key '%s'", key);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-static GVariant *
-setup_thresholds_build_input (const gchar *str)
-{
-    ParseKeyValueContext parse_ctx = { 0 };
-    GVariantBuilder      builder;
-
-    mm_common_parse_key_value_string (setup_thresholds_str,
-                                      &parse_ctx.error,
-                                      (MMParseKeyValueForeachFn)key_value_foreach,
-                                      &parse_ctx);
-    /* If error, destroy the object */
-    if (parse_ctx.error) {
-        return NULL;
-    }
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-
-    if (parse_ctx.rssi_set)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               "rssi-threshold",
-                               g_variant_new_uint32 (parse_ctx.rssi_threshold));
-
-    if (parse_ctx.error_rate_set)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               "error-rate-threshold",
-                               g_variant_new_boolean (parse_ctx.error_rate_threshold));
-
-    return g_variant_ref_sink (g_variant_builder_end (&builder));
-}
-
 static void
 setup_thresholds_process_reply (gboolean      result,
                                 const GError *error)
@@ -427,17 +362,18 @@ get_modem_ready (GObject      *source,
 
     /* Request to setup threshold? */
     if (setup_thresholds_str) {
-        g_autoptr(GVariant) dictionary = NULL;
+        g_autoptr(MMSignalThresholdProperties) properties = NULL;
+        g_autoptr(GError)                      error = NULL;
 
-        dictionary = setup_thresholds_build_input (setup_thresholds_str);
-        if (!dictionary) {
-            g_printerr ("error: failed to parse input threshold setup settings: '%s'", setup_thresholds_str);
+        properties = mm_signal_threshold_properties_new_from_string (setup_thresholds_str, &error);
+        if (!properties) {
+            g_printerr ("error: failed to parse properties string: '%s'\n", error->message);
             exit (EXIT_FAILURE);
         }
 
         g_debug ("Asynchronously setting up threshold values...");
         mm_modem_signal_setup_thresholds (ctx->modem_signal,
-                                          dictionary,
+                                          properties,
                                           ctx->cancellable,
                                           (GAsyncReadyCallback)setup_thresholds_ready,
                                           NULL);
@@ -509,18 +445,18 @@ mmcli_modem_signal_run_synchronous (GDBusConnection *connection)
 
     /* Request to setup threshold? */
     if (setup_thresholds_str) {
-        g_autoptr(GVariant) dictionary = NULL;
-        gboolean            result;
+        g_autoptr(MMSignalThresholdProperties) properties = NULL;
+        gboolean                               result;
 
-        dictionary = setup_thresholds_build_input (setup_thresholds_str);
-        if (!dictionary) {
-            g_printerr ("error: failed to parse input threshold setup settings: '%s'", setup_thresholds_str);
+        properties = mm_signal_threshold_properties_new_from_string (setup_thresholds_str, &error);
+        if (!properties) {
+            g_printerr ("error: failed to parse properties string: '%s'\n", error->message);
             exit (EXIT_FAILURE);
         }
 
         g_debug ("Asynchronously setting up threshold values...");
         result = mm_modem_signal_setup_thresholds_sync (ctx->modem_signal,
-                                                        dictionary,
+                                                        properties,
                                                         NULL,
                                                         &error);
         setup_thresholds_process_reply (result, error);

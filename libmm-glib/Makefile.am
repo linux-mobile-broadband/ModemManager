@@ -97,6 +97,8 @@ libmm_glib_la_SOURCES = \
 	mm-sim-preferred-network.c \
 	mm-3gpp-profile.h \
 	mm-3gpp-profile.c \
+	mm-signal-threshold-properties.h \
+	mm-signal-threshold-properties.c \
 	mm-compat.h \
 	mm-compat.c \
 	$(NULL)
@@ -174,6 +176,7 @@ include_HEADERS = \
 	mm-call-audio-format.h \
 	mm-sim-preferred-network.h \
 	mm-3gpp-profile.h \
+	mm-signal-threshold-properties.h \
 	mm-compat.h \
 	$(NULL)
 
