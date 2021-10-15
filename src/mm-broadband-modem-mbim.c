@@ -5430,6 +5430,91 @@ modem_signal_load_values (MMIfaceModemSignal  *self,
 }
 
 /*****************************************************************************/
+/* Setup threshold values (Signal interface) */
+
+static gboolean
+modem_signal_setup_thresholds_finish (MMIfaceModemSignal  *self,
+                                      GAsyncResult        *res,
+                                      GError             **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+signal_state_set_thresholds_ready (MbimDevice   *device,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                  *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (response &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_signal_state_response_parse (
+            response,
+            NULL, /* rssi */
+            NULL, /* error_rate */
+            NULL, /* signal_strength_interval */
+            NULL, /* rssi_threshold */
+            NULL, /* error_rate_threshold */
+            &error))
+        g_task_return_boolean (task, TRUE);
+    else
+        g_task_return_error (task, error);
+
+    g_object_unref (task);
+}
+
+static void
+modem_signal_setup_thresholds (MMIfaceModemSignal  *self,
+                               guint                rssi_threshold,
+                               gboolean             error_rate_threshold,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
+{
+    g_autoptr(MbimMessage)  message = NULL;
+    MbimDevice             *device;
+    GTask                  *task;
+    guint                   coded_rssi_threshold = 0;
+    guint                   coded_error_rate_threshold = 0;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* the input RSSI threshold difference is given in dBm, and in the MBIM
+     * protocol we use a linear scale of coded values that correspond to 2dBm
+     * per code point. */
+    if (rssi_threshold) {
+        coded_rssi_threshold = rssi_threshold / 2;
+        if (!coded_rssi_threshold)
+            coded_rssi_threshold = 1; /* minimum value when enabled */
+    }
+
+    /* the input error rate threshold is given as a boolean to enable or
+     * disable, and in the MBIM protocol we have a non-linear scale of
+     * coded values. We just select the minimum coded value, so that we
+     * get all reports, i.e. every time it changes the coded value */
+    if (error_rate_threshold)
+        coded_error_rate_threshold = 1; /* minimum value when enabled */
+
+    message = (mbim_message_signal_state_set_new (
+                   0, /* signal strength interval set to default always */
+                   coded_rssi_threshold,
+                   coded_error_rate_threshold,
+                   NULL));
+
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)signal_state_set_thresholds_ready,
+                         task);
+}
+
+/*****************************************************************************/
 /* Check support (3GPP profile management interface) */
 
 static gboolean
@@ -7900,6 +7985,8 @@ iface_modem_signal_init (MMIfaceModemSignal *iface)
     iface->check_support_finish = modem_signal_check_support_finish;
     iface->load_values = modem_signal_load_values;
     iface->load_values_finish = modem_signal_load_values_finish;
+    iface->setup_thresholds = modem_signal_setup_thresholds;
+    iface->setup_thresholds_finish = modem_signal_setup_thresholds_finish;
 }
 
 static void
