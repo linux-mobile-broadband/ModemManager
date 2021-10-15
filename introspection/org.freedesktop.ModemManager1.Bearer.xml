@@ -379,6 +379,15 @@
     <property name="Stats" type="a{sv}" access="read" />
 
     <!--
+        ReloadStatsSupported:
+
+        Indicates whether or not the bearer support getting rx and tx bytes statistics.
+
+        Since: 1.20
+    -->
+    <property name="ReloadStatsSupported" type="b" access="read" />
+
+    <!--
         IpTimeout:
 
         Maximum time to wait for a successful IP establishment, when PPP is used.

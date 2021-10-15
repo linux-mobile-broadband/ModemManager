@@ -125,7 +125,7 @@ struct _MMBaseBearerPrivate {
     /* Timer to measure the duration of the connection */
     GTimer *duration_timer;
     /* Flag to specify whether reloading stats is supported or not */
-    gboolean reload_stats_unsupported;
+    gboolean reload_stats_supported;
 };
 
 /*****************************************************************************/
@@ -390,6 +390,25 @@ bearer_stats_stop (MMBaseBearer *self)
 }
 
 static void
+reload_stats_supported_ready (MMBaseBearer *self,
+                              GAsyncResult *res)
+{
+    GError  *error = NULL;
+    guint64  rx_bytes = 0;
+    guint64  tx_bytes = 0;
+
+    MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish (self, &rx_bytes, &tx_bytes, res, &error);
+    if (!error) {
+        mm_obj_info (self, "reloading stats is supported by the device");
+        self->priv->reload_stats_supported = TRUE;
+        mm_gdbus_bearer_set_reload_stats_supported (MM_GDBUS_BEARER (self), self->priv->reload_stats_supported);
+    } else {
+        mm_obj_info (self, "reloading stats is not supported by the device");
+        g_clear_error (&error);
+    }
+}
+
+static void
 reload_stats_ready (MMBaseBearer *self,
                     GAsyncResult *res)
 {
@@ -398,20 +417,9 @@ reload_stats_ready (MMBaseBearer *self,
     guint64  tx_bytes = 0;
 
     if (!MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish (self, &rx_bytes, &tx_bytes, res, &error)) {
-        /* If reloading stats fails, warn about it and don't update anything */
-        if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
-            mm_obj_warn (self, "reloading stats failed: %s", error->message);
-            g_error_free (error);
-            return;
-        }
-
-        /* If we're being told that reloading stats is unsupported, just ignore
-         * the error and update oly the duration timer. */
-        mm_obj_dbg (self, "reloading stats is unsupported by the device");
-        self->priv->reload_stats_unsupported = TRUE;
-        rx_bytes = 0;
-        tx_bytes = 0;
+        mm_obj_warn (self, "reloading stats failed: %s", error->message);
         g_error_free (error);
+        return;
     }
 
     /* We only update stats if they were retrieved properly */
@@ -429,9 +437,7 @@ stats_update_cb (MMBaseBearer *self)
         return G_SOURCE_CONTINUE;
 
     /* If the implementation knows how to update stat values, run it */
-    if (!self->priv->reload_stats_unsupported &&
-        MM_BASE_BEARER_GET_CLASS (self)->reload_stats &&
-        MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish) {
+    if (self->priv->reload_stats_supported) {
         MM_BASE_BEARER_GET_CLASS (self)->reload_stats (
             self,
             (GAsyncReadyCallback)reload_stats_ready,
@@ -538,7 +544,7 @@ bearer_update_status (MMBaseBearer *self,
                                 "connection #%u finished: duration %us",
                                 mm_bearer_stats_get_attempts (self->priv->stats),
                                 mm_bearer_stats_get_duration (self->priv->stats));
-        if (!self->priv->reload_stats_unsupported)
+        if (self->priv->reload_stats_supported)
             g_string_append_printf (report,
                                     ", tx: %" G_GUINT64_FORMAT " bytes, rx: %" G_GUINT64_FORMAT " bytes",
                                     mm_bearer_stats_get_tx_bytes (self->priv->stats),
@@ -582,6 +588,15 @@ bearer_update_status_connected (MMBaseBearer     *self,
     /* Update the property value */
     self->priv->status = MM_BEARER_STATUS_CONNECTED;
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+
+    /* Check that reload statistics is supported by the device */
+    if (MM_BASE_BEARER_GET_CLASS (self)->reload_stats &&
+        MM_BASE_BEARER_GET_CLASS (self)->reload_stats_finish) {
+        MM_BASE_BEARER_GET_CLASS (self)->reload_stats (
+            self,
+            (GAsyncReadyCallback)reload_stats_supported_ready,
+            NULL);
+    }
 
     /* Start statistics */
     bearer_stats_start (self, uplink_speed, downlink_speed);
@@ -1773,6 +1788,7 @@ mm_base_bearer_init (MMBaseBearer *self)
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
     self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
+    self->priv->reload_stats_supported = FALSE;
     self->priv->stats = mm_bearer_stats_new ();
 
     /* Set defaults */
