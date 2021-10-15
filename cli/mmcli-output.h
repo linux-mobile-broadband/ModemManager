@@ -266,6 +266,7 @@ typedef enum {
     MMC_F_BEARER_IPV6_CONFIG_GATEWAY,
     MMC_F_BEARER_IPV6_CONFIG_DNS,
     MMC_F_BEARER_IPV6_CONFIG_MTU,
+    MMC_F_BEARER_STATS_START_DATE,
     MMC_F_BEARER_STATS_DURATION,
     MMC_F_BEARER_STATS_BYTES_RX,
     MMC_F_BEARER_STATS_BYTES_TX,
@@ -367,6 +368,7 @@ void mmcli_output_listitem              (MmcF           field,
 
 void mmcli_output_signal_quality     (guint                      value,
                                       gboolean                   recent);
+void mmcli_output_start_date         (guint64                    value);
 void mmcli_output_state              (MMModemState               state,
                                       MMModemStateFailedReason   reason);
 void mmcli_output_sim_slots          (gchar                    **sim_slot_paths,

@@ -1661,6 +1661,47 @@ mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
     return str;
 }
 
+gchar *
+mm_format_iso8601 (guint64 timestamp)
+{
+    gchar *format_date = NULL;
+    GDateTime *datetime = NULL;
+
+    datetime = g_date_time_new_from_unix_utc ((gint64)timestamp);
+
+#if GLIB_CHECK_VERSION (2, 62, 0)
+    format_date = g_date_time_format_iso8601 (datetime);
+#else
+    {
+        GString *outstr = NULL;
+        gchar *main_date = NULL;
+        gint64 offset = 0;
+
+        main_date = g_date_time_format (datetime, "%Y-%m-%dT%H:%M:%S");
+        outstr = g_string_new (main_date);
+        g_free (main_date);
+
+        /* Timezone. Format it as `%:::z` unless the offset is zero, in which case
+         * we can simply use `Z`. */
+        offset = g_date_time_get_utc_offset (datetime);
+
+        if (offset == 0) {
+            g_string_append_c (outstr, 'Z');
+        } else {
+            gchar *time_zone;
+
+            time_zone = g_date_time_format (datetime, "%:::z");
+            g_string_append (outstr, time_zone);
+            g_free (time_zone);
+        }
+
+        format_date = g_string_free (outstr, FALSE);
+    }
+#endif
+    g_date_time_unref (datetime);
+    return format_date;
+}
+
 /*****************************************************************************/
 
 /* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */

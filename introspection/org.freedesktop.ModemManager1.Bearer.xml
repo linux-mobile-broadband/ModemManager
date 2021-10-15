@@ -309,6 +309,14 @@
               <literal>"t"</literal>).
             </listitem>
             </varlistentry>
+          <varlistentry><term><literal>"start-date"</literal></term>
+            <listitem>
+              Timestamp indicating when the ongoing connection started, given
+              as an unsigned 64-bit integer value representing seconds
+              since the epoch (signature <literal>"t"</literal>).
+              Since 1.20.
+            </listitem>
+          </varlistentry>
           <varlistentry><term><literal>"duration"</literal></term>
             <listitem>
               Duration of the ongoing connection, in seconds, given as an

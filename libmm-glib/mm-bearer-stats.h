@@ -61,6 +61,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerStats, g_object_unref)
 guint   mm_bearer_stats_get_duration        (MMBearerStats *self);
 guint64 mm_bearer_stats_get_rx_bytes        (MMBearerStats *self);
 guint64 mm_bearer_stats_get_tx_bytes        (MMBearerStats *self);
+guint64 mm_bearer_stats_get_start_date      (MMBearerStats *self);
 guint   mm_bearer_stats_get_attempts        (MMBearerStats *self);
 guint   mm_bearer_stats_get_failed_attempts (MMBearerStats *self);
 guint   mm_bearer_stats_get_total_duration  (MMBearerStats *self);
@@ -81,6 +82,7 @@ MMBearerStats *mm_bearer_stats_new_from_dictionary (GVariant *dictionary,
 void mm_bearer_stats_set_duration             (MMBearerStats *self, guint   duration);
 void mm_bearer_stats_set_rx_bytes             (MMBearerStats *self, guint64 rx_bytes);
 void mm_bearer_stats_set_tx_bytes             (MMBearerStats *self, guint64 tx_bytes);
+void mm_bearer_stats_set_start_date           (MMBearerStats *self, guint64 stats);
 void mm_bearer_stats_set_attempts             (MMBearerStats *self, guint   attempts);
 void mm_bearer_stats_set_failed_attempts      (MMBearerStats *self, guint   failed_attempts);
 void mm_bearer_stats_set_total_duration       (MMBearerStats *self, guint   duration);

@@ -248,6 +248,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_BEARER_IPV6_CONFIG_GATEWAY]             = { "bearer.ipv6-config.gateway",                      "gateway",                  MMC_S_BEARER_IPV6_CONFIG,         },
     [MMC_F_BEARER_IPV6_CONFIG_DNS]                 = { "bearer.ipv6-config.dns",                          "dns",                      MMC_S_BEARER_IPV6_CONFIG,         },
     [MMC_F_BEARER_IPV6_CONFIG_MTU]                 = { "bearer.ipv6-config.mtu",                          "mtu",                      MMC_S_BEARER_IPV6_CONFIG,         },
+    [MMC_F_BEARER_STATS_START_DATE]                = { "bearer.stats.start-date",                         "start date",               MMC_S_BEARER_STATS,               },
     [MMC_F_BEARER_STATS_DURATION]                  = { "bearer.stats.duration",                           "duration",                 MMC_S_BEARER_STATS,               },
     [MMC_F_BEARER_STATS_BYTES_RX]                  = { "bearer.stats.bytes-rx",                           "bytes rx",                 MMC_S_BEARER_STATS,               },
     [MMC_F_BEARER_STATS_BYTES_TX]                  = { "bearer.stats.bytes-tx",                           "bytes tx",                 MMC_S_BEARER_STATS,               },
@@ -592,6 +593,22 @@ mmcli_output_signal_quality (guint    value,
                                  g_strdup_printf ("%u", value));
     output_item_new_take_single (MMC_F_STATUS_SIGNAL_QUALITY_RECENT,
                                  g_strdup_printf ("%s", recent ? "yes" : "no"));
+}
+
+/******************************************************************************/
+/* (Custom) Bearer start date output */
+
+void
+mmcli_output_start_date (guint64    value)
+{
+    /* Merge value and recent flag in a single item in human output */
+    if (selected_type == MMC_OUTPUT_TYPE_HUMAN) {
+        output_item_new_take_single (MMC_F_BEARER_STATS_START_DATE, mm_format_iso8601 (value));
+        return;
+    }
+
+    output_item_new_take_single (MMC_F_BEARER_STATS_START_DATE,
+                                 g_strdup_printf ("%" G_GUINT64_FORMAT, value));
 }
 
 /******************************************************************************/

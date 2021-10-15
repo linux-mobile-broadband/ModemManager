@@ -314,6 +314,7 @@ bearer_reset_ongoing_interface_stats (MMBaseBearer *self)
     mm_bearer_stats_set_duration (self->priv->stats, 0);
     mm_bearer_stats_set_tx_bytes (self->priv->stats, 0);
     mm_bearer_stats_set_rx_bytes (self->priv->stats, 0);
+    mm_bearer_stats_set_start_date (self->priv->stats, 0);
     bearer_update_interface_stats (self);
 }
 
@@ -456,6 +457,9 @@ bearer_stats_start (MMBaseBearer *self)
     self->priv->stats_update_id = g_timeout_add_seconds (BEARER_STATS_UPDATE_TIMEOUT,
                                                          (GSourceFunc) stats_update_cb,
                                                          self);
+
+    mm_bearer_stats_set_start_date (self->priv->stats, (guint64)(g_get_real_time() / G_USEC_PER_SEC));
+
     /* Load initial values */
     stats_update_cb (self);
 }

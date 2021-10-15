@@ -270,17 +270,20 @@ print_bearer_info (MMBearer *bearer)
 
     /* Stats */
     {
-        gchar *duration = NULL;
-        gchar *bytes_rx = NULL;
-        gchar *bytes_tx = NULL;
-        gchar *attempts = NULL;
-        gchar *failed_attempts = NULL;
-        gchar *total_duration = NULL;
-        gchar *total_bytes_rx = NULL;
-        gchar *total_bytes_tx = NULL;
+        guint64  start_date = 0;
+        gchar   *duration = NULL;
+        gchar   *bytes_rx = NULL;
+        gchar   *bytes_tx = NULL;
+        gchar   *attempts = NULL;
+        gchar   *failed_attempts = NULL;
+        gchar   *total_duration = NULL;
+        gchar   *total_bytes_rx = NULL;
+        gchar   *total_bytes_tx = NULL;
 
         if (stats) {
             guint64 val;
+
+            start_date = mm_bearer_stats_get_start_date (stats);
 
             val = mm_bearer_stats_get_duration (stats);
             if (val)
@@ -308,6 +311,8 @@ print_bearer_info (MMBearer *bearer)
                 total_bytes_tx = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
         }
 
+        if (start_date)
+            mmcli_output_start_date (start_date);
         mmcli_output_string_take (MMC_F_BEARER_STATS_DURATION,        duration);
         mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_RX,        bytes_rx);
         mmcli_output_string_take (MMC_F_BEARER_STATS_BYTES_TX,        bytes_tx);

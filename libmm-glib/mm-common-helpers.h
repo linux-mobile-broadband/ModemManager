@@ -190,6 +190,7 @@ gboolean  mm_get_double_from_match_info          (GMatchInfo  *match_info,
                                                   gdouble     *out);
 gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo  *match_info,
                                                   guint32      match_index);
+gchar    *mm_format_iso8601                      (guint64 timestamp);
 
 /******************************************************************************/
 /* Type checkers and conversion utilities */
