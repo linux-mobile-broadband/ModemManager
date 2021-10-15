@@ -256,7 +256,7 @@
         <varlistentry><term><literal>"rsrp"</literal></term>
           <listitem>
             <para>
-              The 5G (Reference Signal Received Power), in dBm, given as
+              The 5G RSRP (Reference Signal Received Power), in dBm, given as
               a floating point value (signature <literal>"d"</literal>).
             </para>
           </listitem>
