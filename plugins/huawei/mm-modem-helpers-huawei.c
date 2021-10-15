@@ -23,6 +23,7 @@
 #include <libmm-glib.h>
 
 #include "mm-log-object.h"
+#include "mm-common-helpers.h"
 #include "mm-modem-helpers.h"
 #include "mm-modem-helpers-huawei.h"
 #include "mm-huawei-enums-types.h"

@@ -33,6 +33,7 @@
 #include "mm-broadband-modem-novatel.h"
 #include "mm-errors-types.h"
 #include "mm-modem-helpers.h"
+#include "mm-common-helpers.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/result.h"
 #include "mm-log-object.h"

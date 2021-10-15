@@ -28,6 +28,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-log-object.h"
 #include "mm-modem-helpers.h"
+#include "mm-common-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"

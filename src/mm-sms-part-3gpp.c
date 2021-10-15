@@ -23,6 +23,7 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include "mm-common-helpers.h"
 #include "mm-helper-enums-types.h"
 #include "mm-sms-part-3gpp.h"
 #include "mm-charsets.h"

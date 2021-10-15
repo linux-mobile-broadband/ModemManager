@@ -598,6 +598,24 @@ hexstr_wrong_digits_some (void)
     common_hexstr2bin_test_failure ("012345k7");
 }
 
+static void
+date_time_iso8601 (void)
+{
+    gchar *date = NULL;
+
+    date = mm_new_iso8601_time_from_unix_time (1634307342);
+    g_assert_cmpstr (date, ==, "2021-10-15T14:15:42Z");
+    g_free (date);
+
+    date = mm_new_iso8601_time (2021, 10, 15, 16, 15, 42, FALSE, 0);
+    g_assert_cmpstr (date, ==, "2021-10-15T16:15:42Z");
+    g_free (date);
+
+    date = mm_new_iso8601_time (2021, 10, 15, 16, 15, 42, TRUE, 120);
+    g_assert_cmpstr (date, ==, "2021-10-15T16:15:42+02");
+    g_free (date);
+}
+
 /**************************************************************/
 
 int main (int argc, char **argv)
@@ -644,5 +662,6 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/Common/HexStr/wrong-digits-all",  hexstr_wrong_digits_all);
     g_test_add_func ("/MM/Common/HexStr/wrong-digits-some", hexstr_wrong_digits_some);
 
+    g_test_add_func ("/MM/Common/DateTime/iso8601", date_time_iso8601);
     return g_test_run ();
 }
