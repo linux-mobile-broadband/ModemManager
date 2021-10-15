@@ -71,15 +71,6 @@ guint mm_netmask_to_cidr (const gchar *netmask);
 GArray *mm_filter_current_bands (const GArray *supported_bands,
                                  const GArray *current_bands);
 
-gchar *mm_new_iso8601_time (guint year,
-                            guint month,
-                            guint day,
-                            guint hour,
-                            guint minute,
-                            guint second,
-                            gboolean have_offset,
-                            gint offset_minutes);
-
 GArray *mm_filter_supported_modes (const GArray *all,
                                    const GArray *supported_combinations,
                                    gpointer      log_object);

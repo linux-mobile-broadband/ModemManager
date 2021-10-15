@@ -1359,7 +1359,7 @@ static void
 test_ctzu_urc_simple (void)
 {
     const gchar *urc = "\r\n+CTZU: \"19/07/09,11:15:40\",+08\r\n";
-    const gchar *expected_iso8601    = "2019-07-09T11:15:40+02:00";
+    const gchar *expected_iso8601    = "2019-07-09T11:15:40+02";
     gint         expected_offset     = 120;
     gint         expected_dst_offset = -1; /* not given */
 
@@ -1370,7 +1370,7 @@ static void
 test_ctzu_urc_full (void)
 {
     const gchar *urc = "\r\n+CTZU: \"19/07/09,11:15:40\",+08,1\r\n";
-    const gchar *expected_iso8601    = "2019-07-09T11:15:40+02:00";
+    const gchar *expected_iso8601    = "2019-07-09T11:15:40+02";
     gint         expected_offset     = 120;
     gint         expected_dst_offset = 60;
 

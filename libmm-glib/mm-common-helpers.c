@@ -1661,45 +1661,70 @@ mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
     return str;
 }
 
-gchar *
-mm_format_iso8601 (guint64 timestamp)
+/*
+ * The following implementation is taken from glib g_date_time_format_iso8601 code
+ * https://gitlab.gnome.org/GNOME/glib/-/blob/main/glib/gdatetime.c#L3490
+ */
+static gchar *
+date_time_format_iso8601 (GDateTime *dt)
 {
-    gchar *format_date = NULL;
-    GDateTime *datetime = NULL;
-
-    datetime = g_date_time_new_from_unix_utc ((gint64)timestamp);
-
 #if GLIB_CHECK_VERSION (2, 62, 0)
-    format_date = g_date_time_format_iso8601 (datetime);
+    return g_date_time_format_iso8601 (dt);
 #else
-    {
-        GString *outstr = NULL;
-        gchar *main_date = NULL;
-        gint64 offset = 0;
+    GString          *outstr = NULL;
+    g_autofree gchar *main_date = NULL;
+    gint64            offset = 0;
 
-        main_date = g_date_time_format (datetime, "%Y-%m-%dT%H:%M:%S");
-        outstr = g_string_new (main_date);
-        g_free (main_date);
+    main_date = g_date_time_format (dt, "%Y-%m-%dT%H:%M:%S");
+    outstr = g_string_new (main_date);
 
-        /* Timezone. Format it as `%:::z` unless the offset is zero, in which case
-         * we can simply use `Z`. */
-        offset = g_date_time_get_utc_offset (datetime);
+    /* Timezone. Format it as `%:::z` unless the offset is zero, in which case
+     * we can simply use `Z`. */
+    offset = g_date_time_get_utc_offset (dt);
+    if (offset == 0) {
+        g_string_append_c (outstr, 'Z');
+    } else {
+        g_autofree gchar *time_zone = NULL;
 
-        if (offset == 0) {
-            g_string_append_c (outstr, 'Z');
-        } else {
-            gchar *time_zone;
-
-            time_zone = g_date_time_format (datetime, "%:::z");
-            g_string_append (outstr, time_zone);
-            g_free (time_zone);
-        }
-
-        format_date = g_string_free (outstr, FALSE);
+        time_zone = g_date_time_format (dt, "%:::z");
+        g_string_append (outstr, time_zone);
     }
+
+    return g_string_free (outstr, FALSE);
 #endif
-    g_date_time_unref (datetime);
-    return format_date;
+}
+
+gchar *
+mm_new_iso8601_time_from_unix_time (guint64 timestamp)
+{
+    g_autoptr(GDateTime) dt = NULL;
+
+    dt = g_date_time_new_from_unix_utc ((gint64)timestamp);
+
+    return date_time_format_iso8601 (dt);
+}
+
+gchar *
+mm_new_iso8601_time (guint    year,
+                     guint    month,
+                     guint    day,
+                     guint    hour,
+                     guint    minute,
+                     guint    second,
+                     gboolean have_offset,
+                     gint     offset_minutes)
+{
+    g_autoptr(GDateTime) dt = NULL;
+
+    if (have_offset) {
+        g_autoptr(GTimeZone) tz = NULL;
+
+        tz = g_time_zone_new_offset (offset_minutes * 60);
+        dt = g_date_time_new (tz, year, month, day, hour, minute, second);
+    } else
+        dt = g_date_time_new_utc (year, month, day, hour, minute, second);
+
+    return date_time_format_iso8601 (dt);
 }
 
 /*****************************************************************************/

@@ -603,7 +603,7 @@ mmcli_output_start_date (guint64    value)
 {
     /* Merge value and recent flag in a single item in human output */
     if (selected_type == MMC_OUTPUT_TYPE_HUMAN) {
-        output_item_new_take_single (MMC_F_BEARER_STATS_START_DATE, mm_format_iso8601 (value));
+        output_item_new_take_single (MMC_F_BEARER_STATS_START_DATE, mm_new_iso8601_time_from_unix_time (value));
         return;
     }
 

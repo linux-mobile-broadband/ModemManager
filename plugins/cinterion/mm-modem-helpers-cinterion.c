@@ -29,6 +29,7 @@
 #include "mm-errors-types.h"
 #include "mm-modem-helpers-cinterion.h"
 #include "mm-modem-helpers.h"
+#include "mm-common-helpers.h"
 #include "mm-port-serial-at.h"
 
 /* Setup relationship between the 3G band bitmask in the modem and the bitmask

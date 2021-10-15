@@ -32,6 +32,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-3gpp-profile-manager.h"
 #include "mm-iface-modem-time.h"
+#include "mm-common-helpers.h"
 #include "mm-base-modem-at.h"
 #include "mm-bearer-list.h"
 #include "mm-broadband-bearer-icera.h"
