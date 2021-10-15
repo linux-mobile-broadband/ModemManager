@@ -56,6 +56,44 @@ struct _MMBearerPropertiesPrivate {
 /*****************************************************************************/
 
 /**
+ * mm_bearer_properties_set_profile_name:
+ * @self: a #MMBearerProperties.
+ * @profile_name: Name of the profile.
+ *
+ * Sets the name of the profile to use when connecting.
+ *
+ * Since: 1.20
+ */
+void
+mm_bearer_properties_set_profile_name (MMBearerProperties *self,
+                                       const gchar        *profile_name)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    mm_3gpp_profile_set_profile_name (self->priv->profile, profile_name);
+}
+
+/**
+ * mm_bearer_properties_get_profile_name:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the name of the profile to use when connecting.
+ *
+ * Returns: (transfer none): the profile name, or #NULL if not set. Do not free
+ * the returned value, it is owned by @self.
+ *
+ * Since: 1.20
+ */
+const gchar *
+mm_bearer_properties_get_profile_name (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
+    return mm_3gpp_profile_get_profile_name (self->priv->profile);
+}
+/*****************************************************************************/
+
+/**
  * mm_bearer_properties_set_apn:
  * @self: a #MMBearerProperties.
  * @apn: Name of the access point.
@@ -783,6 +821,9 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID) &&
         (mm_3gpp_profile_get_profile_id (a->priv->profile) != mm_3gpp_profile_get_profile_id (b->priv->profile)))
+        return FALSE;
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_NAME) &&
+        !cmp_str (mm_3gpp_profile_get_profile_name (a->priv->profile), mm_3gpp_profile_get_profile_name (b->priv->profile), flags))
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING)) {
         if (a->priv->allow_roaming != b->priv->allow_roaming)

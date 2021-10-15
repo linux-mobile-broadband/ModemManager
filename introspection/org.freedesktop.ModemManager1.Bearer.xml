@@ -454,6 +454,14 @@
 	      indicate an invalid or uninitialized profile id. Since 1.18.
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"profile-name"</literal></term>
+            <listitem><para>
+              The name of the profile, given as a string
+              value (signature <literal>"s"</literal>).
+              This value has no effect on the connection, but can be used by the host
+              to identify the profiles. Since 1.20.
+            </para></listitem>
+          </varlistentry>
         </variablelist>
 
         The following settings apply to 3GPP2 (CDMA/EVDO) devices:

@@ -73,6 +73,8 @@ void mm_bearer_properties_set_apn_type      (MMBearerProperties *self,
                                              MMBearerApnType apn_type);
 void mm_bearer_properties_set_profile_id    (MMBearerProperties *self,
                                              gint profile_id);
+void mm_bearer_properties_set_profile_name  (MMBearerProperties *self,
+                                             const gchar *profile_name);
 void mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
                                              gboolean allow_roaming);
 void mm_bearer_properties_set_rm_protocol   (MMBearerProperties *self,
@@ -87,6 +89,7 @@ const gchar              *mm_bearer_properties_get_password      (MMBearerProper
 MMBearerIpFamily          mm_bearer_properties_get_ip_type       (MMBearerProperties *self);
 MMBearerApnType           mm_bearer_properties_get_apn_type      (MMBearerProperties *self);
 gint                      mm_bearer_properties_get_profile_id    (MMBearerProperties *self);
+const gchar              *mm_bearer_properties_get_profile_name  (MMBearerProperties *self);
 gboolean                  mm_bearer_properties_get_allow_roaming (MMBearerProperties *self);
 MMModemCdmaRmProtocol     mm_bearer_properties_get_rm_protocol   (MMBearerProperties *self);
 MMBearerMultiplexSupport  mm_bearer_properties_get_multiplex     (MMBearerProperties *self);
@@ -126,6 +129,7 @@ typedef enum {
     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL   = 1 << 3,
     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE      = 1 << 4,
     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID    = 1 << 5,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_NAME  = 1 << 6,
 } MMBearerPropertiesCmpFlags;
 
 gboolean mm_bearer_properties_cmp (MMBearerProperties         *a,
