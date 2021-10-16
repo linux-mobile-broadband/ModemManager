@@ -32,6 +32,10 @@ MMModemLock mm_modem_lock_from_mbim_pin_type (MbimPinType pin_type);
 
 MMModem3gppRegistrationState mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState state);
 
+MMModemMode mm_modem_mode_from_mbim_data_class (MbimDataClass data_class);
+
+MbimDataClass mm_mbim_data_class_from_modem_mode (MMModemMode modem_mode);
+
 MMModemAccessTechnology mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class);
 
 MMModem3gppNetworkAvailability mm_modem_3gpp_network_availability_from_mbim_provider_state (MbimProviderState state);

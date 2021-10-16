@@ -123,6 +123,48 @@ mm_modem_3gpp_registration_state_from_mbim_register_state (MbimRegisterState sta
 
 /*****************************************************************************/
 
+MMModemMode
+mm_modem_mode_from_mbim_data_class (MbimDataClass data_class)
+{
+    MMModemMode mask = MM_MODEM_MODE_NONE;
+
+    if (data_class & MBIM_DATA_CLASS_GPRS)
+        mask |= MM_MODEM_MODE_2G;
+    if (data_class & MBIM_DATA_CLASS_EDGE)
+        mask |= MM_MODEM_MODE_2G;
+    if (data_class & MBIM_DATA_CLASS_UMTS)
+        mask |= MM_MODEM_MODE_3G;
+    if (data_class & MBIM_DATA_CLASS_HSDPA)
+        mask |= MM_MODEM_MODE_3G;
+    if (data_class & MBIM_DATA_CLASS_HSUPA)
+        mask |= MM_MODEM_MODE_3G;
+    if (data_class & MBIM_DATA_CLASS_LTE)
+        mask |= MM_MODEM_MODE_4G;
+    if(data_class & MBIM_DATA_CLASS_5G_NSA)
+        mask |= MM_MODEM_MODE_5G;
+    if(data_class & MBIM_DATA_CLASS_5G_SA)
+        mask |= MM_MODEM_MODE_5G;
+
+    return mask;
+}
+
+MbimDataClass
+mm_mbim_data_class_from_modem_mode (MMModemMode modem_mode)
+{
+    MbimDataClass mask = 0;
+
+    if (modem_mode & MM_MODEM_MODE_2G)
+        mask |= MBIM_DATA_CLASS_GPRS | MBIM_DATA_CLASS_EDGE;
+    if (modem_mode & MM_MODEM_MODE_3G)
+        mask |= MBIM_DATA_CLASS_UMTS | MBIM_DATA_CLASS_HSDPA | MBIM_DATA_CLASS_HSUPA;
+    if (modem_mode & MM_MODEM_MODE_4G)
+        mask |= MBIM_DATA_CLASS_LTE;
+    if (modem_mode & MM_MODEM_MODE_5G)
+        mask |= MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA;
+
+    return mask;
+}
+
 MMModemAccessTechnology
 mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class)
 {

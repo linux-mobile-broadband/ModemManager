@@ -983,30 +983,111 @@ modem_load_current_modes_finish (MMIfaceModem  *self,
                                  MMModemMode   *preferred,
                                  GError       **error)
 {
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
-        return mm_shared_qmi_load_current_modes_finish (self, res, allowed, preferred, error);
-#endif
-    g_assert (error);
-    return g_task_propagate_boolean (G_TASK (res), error);
+    g_autofree MMModemModeCombination *mode = NULL;
+
+    mode = g_task_propagate_pointer (G_TASK (res), error);
+    if (!mode)
+        return FALSE;
+
+    *allowed   = mode->allowed;
+    *preferred = mode->preferred;
+    return TRUE;
 }
+
+static void
+register_state_current_modes_query_ready (MbimDevice   *device,
+                                          GAsyncResult *res,
+                                          GTask        *task)
+{
+    g_autoptr(MbimMessage)  response = NULL;
+    MMModemModeCombination *mode = NULL;
+    GError                 *error = NULL;
+    MbimDataClass           preferred_data_classes;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_v2_register_state_response_parse (
+            response,
+            NULL, /* nw_error */
+            NULL, /* register_state */
+            NULL, /* register_mode */
+            NULL, /* available_data_classes */
+            NULL, /* current_cellular_class */
+            NULL, /* provider_id */
+            NULL, /* provider_name */
+            NULL, /* roaming_text */
+            NULL, /* registration_flag */
+            &preferred_data_classes,
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mode = g_new0 (MMModemModeCombination, 1);
+    mode->allowed = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
+    mode->preferred = MM_MODEM_MODE_NONE;
+    g_task_return_pointer (task, mode, (GDestroyNotify)g_free);
+    g_object_unref (task);
+}
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+shared_qmi_load_current_modes_ready (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    g_autofree MMModemModeCombination *mode = NULL;
+    GError                            *error = NULL;
+
+    mode = g_new0 (MMModemModeCombination, 1);
+    if (!mm_shared_qmi_load_current_modes_finish (self, res, &mode->allowed, &mode->preferred, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, g_steal_pointer (&mode), (GDestroyNotify)g_free);
+    g_object_unref (task);
+}
+
+#endif
 
 static void
 modem_load_current_modes (MMIfaceModem        *self,
                           GAsyncReadyCallback  callback,
                           gpointer             user_data)
 {
+    GTask      *task;
+    MbimDevice *device;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
-        mm_shared_qmi_load_current_modes (self, callback, user_data);
+        mm_shared_qmi_load_current_modes (self, (GAsyncReadyCallback)shared_qmi_load_current_modes_ready, task);
         return;
     }
 #endif
 
-    g_task_report_new_error (self, callback, user_data,
-                             modem_set_current_capabilities,
-                             MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        g_autoptr(MbimMessage) message = NULL;
+
+        message = mbim_message_register_state_query_new (NULL);
+        mbim_device_command (device,
+                             message,
+                             60,
+                             NULL,
+                             (GAsyncReadyCallback)register_state_current_modes_query_ready,
+                             task);
+        return;
+    }
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                              "Current mode loading is not supported");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
@@ -1017,13 +1098,86 @@ modem_set_current_modes_finish (MMIfaceModem  *self,
                                 GAsyncResult  *res,
                                 GError       **error)
 {
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
-        return mm_shared_qmi_set_current_modes_finish (self, res, error);
-#endif
-    g_assert (error);
     return g_task_propagate_boolean (G_TASK (res), error);
 }
+
+static void
+register_state_current_modes_set_ready (MbimDevice   *device,
+                                        GAsyncResult *res,
+                                        GTask        *task)
+{
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
+    MbimDataClass           preferred_data_classes;
+    MMModemMode             preferred_modes;
+    MbimDataClass           requested_data_classes;
+    MMModemMode             requested_modes;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_v2_register_state_response_parse (
+            response,
+            NULL, /* nw_error */
+            NULL, /* register_state */
+            NULL, /* register_mode */
+            NULL, /* available_data_classes */
+            NULL, /* current_cellular_class */
+            NULL, /* provider_id */
+            NULL, /* provider_name */
+            NULL, /* roaming_text */
+            NULL, /* registration_flag */
+            &preferred_data_classes,
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    requested_data_classes = (MbimDataClass) GPOINTER_TO_UINT (g_task_get_task_data (task));
+    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes);
+    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
+
+    if (requested_modes != preferred_modes) {
+        g_autofree gchar *requested_modes_str = NULL;
+        g_autofree gchar *preferred_modes_str = NULL;
+        g_autofree gchar *requested_data_classes_str = NULL;
+        g_autofree gchar *preferred_data_classes_str = NULL;
+
+        requested_modes_str = mm_modem_mode_build_string_from_mask (requested_modes);
+        preferred_modes_str = mm_modem_mode_build_string_from_mask (preferred_modes);
+        requested_data_classes_str = mbim_data_class_build_string_from_mask (requested_data_classes);
+        preferred_data_classes_str = mbim_data_class_build_string_from_mask (preferred_data_classes);
+
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                 "Current mode update failed: requested %s (%s) but reported preferred is %s (%s)",
+                                 requested_modes_str, requested_data_classes_str,
+                                 preferred_modes_str, preferred_data_classes_str);
+        g_object_unref (task);
+        return;
+    }
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+shared_qmi_set_current_modes_ready (MMIfaceModem *self,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    GError *error = NULL;
+
+    if (!mm_shared_qmi_set_current_modes_finish (self, res, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+#endif
 
 static void
 modem_set_current_modes (MMIfaceModem        *self,
@@ -1032,17 +1186,48 @@ modem_set_current_modes (MMIfaceModem        *self,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
 {
+    GTask      *task;
+    MbimDevice *device;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
-        mm_shared_qmi_set_current_modes (self, allowed, preferred, callback, user_data);
+        mm_shared_qmi_set_current_modes (self,
+                                         allowed,
+                                         preferred,
+                                         (GAsyncReadyCallback)shared_qmi_set_current_modes_ready,
+                                         task);
         return;
     }
 #endif
 
-    g_task_report_new_error (self, callback, user_data,
-                             modem_set_current_capabilities,
-                             MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
-                             "Capability switching is not supported");
+    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        g_autoptr(MbimMessage) message = NULL;
+        MbimDataClass          data_class;
+
+        data_class = mm_mbim_data_class_from_modem_mode (allowed);
+        g_task_set_task_data (task, GUINT_TO_POINTER (data_class), NULL);
+        message = mbim_message_register_state_set_new (
+                      NULL,
+                      MBIM_REGISTER_ACTION_AUTOMATIC,
+                      data_class,
+                      NULL);
+        mbim_device_command (device,
+                             message,
+                             60,
+                             NULL,
+                             (GAsyncReadyCallback)register_state_current_modes_set_ready,
+                             task);
+        return;
+    }
+
+    g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                             "Current mode switching is not supported");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/
