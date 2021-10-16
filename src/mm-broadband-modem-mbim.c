@@ -1694,34 +1694,59 @@ modem_load_signal_quality_finish (MMIfaceModem *self,
 }
 
 static void
-signal_state_query_ready (MbimDevice *device,
+signal_state_query_ready (MbimDevice   *device,
                           GAsyncResult *res,
-                          GTask *task)
+                          GTask        *task)
 {
-    MbimMessage *response;
-    GError *error = NULL;
-    guint32 rssi;
+    g_autoptr(MbimMessage)  response = NULL;
+    MMBroadbandModemMbim   *self;
+    GError                 *error = NULL;
+    guint32                 rssi;
+
+    self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_signal_state_response_parse (
-            response,
-            &rssi,
-            NULL, /* error_rate */
-            NULL, /* signal_strength_interval */
-            NULL, /* rssi_threshold */
-            NULL, /* error_rate_threshold */
-            &error)) {
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        if (!mbim_message_ms_basic_connect_v2_signal_state_response_parse (
+                response,
+                &rssi,
+                NULL, /* error_rate */
+                NULL, /* signal_strength_interval */
+                NULL, /* rssi_threshold */
+                NULL, /* error_rate_threshold */
+                NULL, /* rsrp_snr_count */
+                NULL, /* rsrp_snr */
+                &error))
+            g_prefix_error (&error, "Failed processing MBIMEx v2.0 signal state response: ");
+        else
+            mm_obj_dbg (self, "proccessed MBIMEx v2.0 signal state response");
+    } else {
+        if (!mbim_message_signal_state_response_parse (
+                response,
+                &rssi,
+                NULL, /* error_rate */
+                NULL, /* signal_strength_interval */
+                NULL, /* rssi_threshold */
+                NULL, /* error_rate_threshold */
+                &error))
+            g_prefix_error (&error, "Failed processing signal state response: ");
+        else
+            mm_obj_dbg (self, "proccessed signal state response");
+    }
+
+    if (error)
+        g_task_return_error (task, error);
+    else
         /* Normalize the quality. 99 means unknown, we default it to 0 */
         g_task_return_int (task, MM_CLAMP_HIGH (rssi == 99 ? 0 : rssi, 31) * 100 / 31);
-    } else
-        g_task_return_error (task, error);
 
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
@@ -3225,24 +3250,44 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
                                          MbimDevice           *device,
                                          MbimMessage          *notification)
 {
-    guint32 rssi;
+    g_autoptr(GError) error = NULL;
+    guint32           rssi;
+    guint32           quality;
 
-    if (mbim_message_signal_state_notification_parse (
-            notification,
-            &rssi,
-            NULL, /* error_rate */
-            NULL, /* signal_strength_interval */
-            NULL, /* rssi_threshold */
-            NULL, /* error_rate_threshold */
-            NULL)) {
-        guint32 quality;
-
-        /* Normalize the quality. 99 means unknown, we default it to 0 */
-        quality = MM_CLAMP_HIGH (rssi == 99 ? 0 : rssi, 31) * 100 / 31;
-
-        mm_obj_dbg (self, "signal state indication: %u --> %u%%", rssi, quality);
-        mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        if (!mbim_message_ms_basic_connect_v2_signal_state_notification_parse (
+                notification,
+                &rssi,
+                NULL, /* error_rate */
+                NULL, /* signal_strength_interval */
+                NULL, /* rssi_threshold */
+                NULL, /* error_rate_threshold */
+                NULL, /* rsrp_snr_count */
+                NULL, /* rsrp_snr */
+                &error)) {
+            mm_obj_warn (self, "failed processing MBIMEx v2.0 signal state indication: %s", error->message);
+            return;
+        }
+        mm_obj_dbg (self, "proccessed MBIMEx v2.0 signal state indication");
+    } else {
+        if (!mbim_message_signal_state_notification_parse (
+                notification,
+                &rssi,
+                NULL, /* error_rate */
+                NULL, /* signal_strength_interval */
+                NULL, /* rssi_threshold */
+                NULL, /* error_rate_threshold */
+                &error)) {
+            mm_obj_warn (self, "failed processing signal state indication: %s", error->message);
+            return;
+        }
+        mm_obj_dbg (self, "proccessed signal state indication");
     }
+
+    /* Normalize the quality. 99 means unknown, we default it to 0 */
+    quality = MM_CLAMP_HIGH (rssi == 99 ? 0 : rssi, 31) * 100 / 31;
+    mm_obj_dbg (self, "signal state indication: %u --> %u%%", rssi, quality);
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
 }
 
 static void
