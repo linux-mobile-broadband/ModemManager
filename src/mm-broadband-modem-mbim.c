@@ -3222,7 +3222,8 @@ modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
 
 static void
 basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
-                                         MbimMessage *notification)
+                                         MbimDevice           *device,
+                                         MbimMessage          *notification)
 {
     guint32 rssi;
 
@@ -3311,7 +3312,8 @@ update_registration_info (MMBroadbandModemMbim *self,
 
 static void
 basic_connect_notification_register_state (MMBroadbandModemMbim *self,
-                                           MbimMessage *notification)
+                                           MbimDevice           *device,
+                                           MbimMessage          *notification)
 {
     MbimRegisterState register_state;
     MbimDataClass available_data_classes;
@@ -3359,6 +3361,7 @@ bearer_list_report_disconnected_status (MMBaseBearer *bearer,
 
 static void
 basic_connect_notification_connect (MMBroadbandModemMbim *self,
+                                    MbimDevice           *device,
                                     MbimMessage          *notification)
 {
     guint32                  session_id;
@@ -3406,7 +3409,8 @@ basic_connect_notification_connect (MMBroadbandModemMbim *self,
 
 static void
 basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
-                                                    MbimMessage *notification)
+                                                    MbimDevice           *device,
+                                                    MbimMessage          *notification)
 {
     MbimSubscriberReadyState ready_state;
     gchar **telephone_numbers;
@@ -3441,7 +3445,8 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
 
 static void
 basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
-                                           MbimMessage *notification)
+                                           MbimDevice           *device,
+                                           MbimMessage          *notification)
 {
     MbimPacketServiceState packet_service_state;
     MbimDataClass highest_available_data_class;
@@ -3474,6 +3479,7 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
 
 static void
 basic_connect_notification_provisioned_contexts (MMBroadbandModemMbim *self,
+                                                 MbimDevice           *device,
                                                  MbimMessage          *notification)
 {
     /* We don't even attempt to parse the indication, we just need to notify that
@@ -3486,7 +3492,8 @@ static void add_sms_part (MMBroadbandModemMbim *self,
 
 static void
 sms_notification_read_flash_sms (MMBroadbandModemMbim *self,
-                                 MbimMessage *notification)
+                                 MbimDevice           *device,
+                                 MbimMessage          *notification)
 {
     MbimSmsFormat format;
     guint32 messages_count;
@@ -3513,32 +3520,33 @@ sms_notification_read_flash_sms (MMBroadbandModemMbim *self,
 
 static void
 basic_connect_notification (MMBroadbandModemMbim *self,
-                            MbimMessage *notification)
+                            MbimDevice           *device,
+                            MbimMessage          *notification)
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
     case MBIM_CID_BASIC_CONNECT_SIGNAL_STATE:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY)
-            basic_connect_notification_signal_state (self, notification);
+            basic_connect_notification_signal_state (self, device, notification);
         break;
     case MBIM_CID_BASIC_CONNECT_REGISTER_STATE:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_REGISTRATION_UPDATES)
-            basic_connect_notification_register_state (self, notification);
+            basic_connect_notification_register_state (self, device, notification);
         break;
     case MBIM_CID_BASIC_CONNECT_CONNECT:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_CONNECT)
-            basic_connect_notification_connect (self, notification);
+            basic_connect_notification_connect (self, device, notification);
         break;
     case MBIM_CID_BASIC_CONNECT_SUBSCRIBER_READY_STATUS:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO)
-            basic_connect_notification_subscriber_ready_status (self, notification);
+            basic_connect_notification_subscriber_ready_status (self, device, notification);
         break;
     case MBIM_CID_BASIC_CONNECT_PACKET_SERVICE:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE)
-            basic_connect_notification_packet_service (self, notification);
+            basic_connect_notification_packet_service (self, device, notification);
         break;
     case MBIM_CID_BASIC_CONNECT_PROVISIONED_CONTEXTS:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PROVISIONED_CONTEXTS)
-            basic_connect_notification_provisioned_contexts (self, notification);
+            basic_connect_notification_provisioned_contexts (self, device, notification);
     default:
         /* Ignore */
         break;
@@ -3614,13 +3622,14 @@ sms_notification_read_stored_sms (MMBroadbandModemMbim *self,
 
 static void
 sms_notification (MMBroadbandModemMbim *self,
-                  MbimMessage *notification)
+                  MbimDevice           *device,
+                  MbimMessage          *notification)
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
     case MBIM_CID_SMS_READ:
         /* New flash/alert message? */
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SMS_READ)
-            sms_notification_read_flash_sms (self, notification);
+            sms_notification_read_flash_sms (self, device, notification);
         break;
 
     case MBIM_CID_SMS_MESSAGE_STORE_STATUS: {
@@ -3648,7 +3657,8 @@ sms_notification (MMBroadbandModemMbim *self,
 
 static void
 ms_basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
-                                              MbimMessage *notification)
+                                              MbimDevice           *device,
+                                              MbimMessage          *notification)
 {
     MbimPcoValue *pco_value;
     GError *error = NULL;
@@ -3690,7 +3700,8 @@ ms_basic_connect_extensions_notification_pco (MMBroadbandModemMbim *self,
 
 static void
 ms_basic_connect_extensions_notification_lte_attach_info (MMBroadbandModemMbim *self,
-                                                          MbimMessage *notification)
+                                                          MbimDevice           *device,
+                                                          MbimMessage          *notification)
 {
     g_autoptr(GError)              error = NULL;
     g_autoptr(MMBearerProperties)  properties = NULL;
@@ -3760,6 +3771,7 @@ update_sim_from_slot_status (MMBroadbandModemMbim *self,
 
 static void
 ms_basic_connect_extensions_notification_slot_info_status (MMBroadbandModemMbim *self,
+                                                           MbimDevice           *device,
                                                            MbimMessage          *notification)
 {
     g_autoptr(GError) error = NULL;
@@ -3789,20 +3801,21 @@ ms_basic_connect_extensions_notification_slot_info_status (MMBroadbandModemMbim 
 
 static void
 ms_basic_connect_extensions_notification (MMBroadbandModemMbim *self,
-                                          MbimMessage *notification)
+                                          MbimDevice           *device,
+                                          MbimMessage          *notification)
 {
     switch (mbim_message_indicate_status_get_cid (notification)) {
     case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PCO:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_PCO)
-            ms_basic_connect_extensions_notification_pco (self, notification);
+            ms_basic_connect_extensions_notification_pco (self, device, notification);
         break;
     case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_LTE_ATTACH_INFO:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_LTE_ATTACH_INFO)
-            ms_basic_connect_extensions_notification_lte_attach_info (self, notification);
+            ms_basic_connect_extensions_notification_lte_attach_info (self, device, notification);
         break;
     case MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_SLOT_INFO_STATUS:
         if (self->priv->setup_flags & PROCESS_NOTIFICATION_FLAG_SLOT_INFO_STATUS)
-            ms_basic_connect_extensions_notification_slot_info_status (self, notification);
+            ms_basic_connect_extensions_notification_slot_info_status (self, device, notification);
         break;
     default:
         /* Ignore */
@@ -3816,6 +3829,7 @@ process_ussd_notification (MMBroadbandModemMbim *self,
 
 static void
 ussd_notification (MMBroadbandModemMbim *self,
+                   MbimDevice           *device,
                    MbimMessage          *notification)
 {
     if (mbim_message_indicate_status_get_cid (notification) != MBIM_CID_USSD) {
@@ -3843,13 +3857,13 @@ device_notification_cb (MbimDevice *device,
                                         mbim_message_indicate_status_get_cid (notification)));
 
     if (service == MBIM_SERVICE_BASIC_CONNECT)
-        basic_connect_notification (self, notification);
+        basic_connect_notification (self, device, notification);
     else if (service == MBIM_SERVICE_MS_BASIC_CONNECT_EXTENSIONS)
-        ms_basic_connect_extensions_notification (self, notification);
+        ms_basic_connect_extensions_notification (self, device, notification);
     else if (service == MBIM_SERVICE_SMS)
-        sms_notification (self, notification);
+        sms_notification (self, device, notification);
     else if (service == MBIM_SERVICE_USSD)
-        ussd_notification (self, notification);
+        ussd_notification (self, device, notification);
 }
 
 static void
