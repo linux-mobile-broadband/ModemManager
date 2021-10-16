@@ -814,9 +814,10 @@ packet_service_set_ready (MbimDevice *device,
     g_autoptr(MbimMessage)  response = NULL;
     guint32                 nw_error;
     MbimPacketServiceState  packet_service_state;
-    MbimDataClass           highest_available_data_class;
+    MbimDataClass           data_class;
     guint64                 uplink_speed;
     guint64                 downlink_speed;
+    MbimFrequencyRange      frequency_range = MBIM_FREQUENCY_RANGE_UNKNOWN;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -827,26 +828,43 @@ packet_service_set_ready (MbimDevice *device,
          error->code == MBIM_STATUS_ERROR_FAILURE)) {
         g_autoptr(GError) inner_error = NULL;
 
-        if (mbim_message_packet_service_response_parse (
+        if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+            mbim_message_ms_basic_connect_v2_packet_service_response_parse (
                 response,
                 &nw_error,
                 &packet_service_state,
-                &highest_available_data_class,
+                &data_class,
                 &uplink_speed,
                 &downlink_speed,
-                &inner_error)) {
+                &frequency_range,
+                &inner_error);
+        } else {
+            mbim_message_packet_service_response_parse (
+                response,
+                &nw_error,
+                &packet_service_state,
+                &data_class,
+                &uplink_speed,
+                &downlink_speed,
+                &inner_error);
+        }
+
+        if (!inner_error) {
             if (nw_error) {
                 g_clear_error (&error);
                 error = mm_mobile_equipment_error_from_mbim_nw_error (nw_error, self);
             } else {
-                g_autofree gchar *str = NULL;
+                g_autofree gchar *data_class_str = NULL;
+                g_autofree gchar *frequency_range_str = NULL;
 
-                str = mbim_data_class_build_string_from_mask (highest_available_data_class);
+                data_class_str = mbim_data_class_build_string_from_mask (data_class);
+                frequency_range_str = mbim_frequency_range_build_string_from_mask (frequency_range);
                 mm_obj_dbg (self, "packet service update:");
-                mm_obj_dbg (self, "         state: '%s'", mbim_packet_service_state_get_string (packet_service_state));
-                mm_obj_dbg (self, "    data class: '%s'", str);
-                mm_obj_dbg (self, "        uplink: '%" G_GUINT64_FORMAT "' bps", uplink_speed);
-                mm_obj_dbg (self, "      downlink: '%" G_GUINT64_FORMAT "' bps", downlink_speed);
+                mm_obj_dbg (self, "           state: '%s'", mbim_packet_service_state_get_string (packet_service_state));
+                mm_obj_dbg (self, "      data class: '%s'", data_class_str);
+                mm_obj_dbg (self, "          uplink: '%" G_GUINT64_FORMAT "' bps", uplink_speed);
+                mm_obj_dbg (self, "        downlink: '%" G_GUINT64_FORMAT "' bps", downlink_speed);
+                mm_obj_dbg (self, " frequency range: '%s'", frequency_range_str);
             }
         } else {
             /* Prefer the error from the result to the parsing error */
