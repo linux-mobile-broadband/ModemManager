@@ -133,8 +133,10 @@ struct _MMBroadbandModemMbimPrivate {
     GList *pco_list;
 
     /* 3GPP registration helpers */
-    gchar *current_operator_id;
-    gchar *current_operator_name;
+    gchar         *current_operator_id;
+    gchar         *current_operator_name;
+    gchar         *requested_operator_id;
+    MbimDataClass  requested_data_class; /* 0 for defaults/auto */
 
     /* USSD helpers */
     GTask *pending_ussd_action;
@@ -1251,20 +1253,21 @@ modem_set_current_modes (MMIfaceModem        *_self,
 
     if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
         g_autoptr(MbimMessage) message = NULL;
-        MbimDataClass          data_class;
 
         /* Limit ANY to the currently supported modes */
         if (allowed == MM_MODEM_MODE_ANY)
             allowed = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class);
 
-        data_class = mm_mbim_data_class_from_modem_mode (allowed,
-                                                         mm_iface_modem_is_3gpp (_self),
-                                                         mm_iface_modem_is_cdma (_self));
-        g_task_set_task_data (task, GUINT_TO_POINTER (data_class), NULL);
+        self->priv->requested_data_class = mm_mbim_data_class_from_modem_mode (allowed,
+                                                                               mm_iface_modem_is_3gpp (_self),
+                                                                               mm_iface_modem_is_cdma (_self));
+        g_task_set_task_data (task, GUINT_TO_POINTER (self->priv->requested_data_class), NULL);
+        /* use the last requested operator id to determine whether the
+         * registration should be manual or automatic */
         message = mbim_message_register_state_set_new (
-                      NULL,
-                      MBIM_REGISTER_ACTION_AUTOMATIC,
-                      data_class,
+                      self->priv->requested_operator_id ? self->priv->requested_operator_id : "",
+                      self->priv->requested_operator_id ? MBIM_REGISTER_ACTION_MANUAL : MBIM_REGISTER_ACTION_AUTOMATIC,
+                      self->priv->requested_data_class,
                       NULL);
         mbim_device_command (device,
                              message,
@@ -5004,23 +5007,24 @@ register_state_set_ready (MbimDevice *device,
 }
 
 static void
-modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
+modem_3gpp_register_in_network (MMIfaceModem3gpp *_self,
                                 const gchar *operator_id,
                                 GCancellable *cancellable,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    MbimDevice             *device;
+    GTask                  *task;
+    g_autoptr(MbimMessage)  message = NULL;
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     /* data_class set to 0 in the MBIM register state set message ends up
      * selecting some "auto" mode that would overwrite whatever capabilities
      * and modes we had set. So, if we're using QMI-based capability and
      * mode switching, also use QMI-based network registration. */
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
-        mm_shared_qmi_3gpp_register_in_network (self, operator_id, cancellable, callback, user_data);
+    if (self->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_3gpp_register_in_network (_self, operator_id, cancellable, callback, user_data);
         return;
     }
 #endif
@@ -5030,25 +5034,22 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    /* keep track of which operator id is selected */
+    g_clear_pointer (&self->priv->requested_operator_id, g_free);
     if (operator_id && operator_id[0])
-        message = (mbim_message_register_state_set_new (
-                       operator_id,
-                       MBIM_REGISTER_ACTION_MANUAL,
-                       0, /* data_class, none preferred */
-                       NULL));
-    else
-        message = (mbim_message_register_state_set_new (
-                       "",
-                       MBIM_REGISTER_ACTION_AUTOMATIC,
-                       0, /* data_class, none preferred */
-                       NULL));
+        self->priv->requested_operator_id = g_strdup (operator_id);
+
+    message = (mbim_message_register_state_set_new (
+                   self->priv->requested_operator_id ? self->priv->requested_operator_id : "",
+                   self->priv->requested_operator_id ? MBIM_REGISTER_ACTION_MANUAL : MBIM_REGISTER_ACTION_AUTOMATIC,
+                   self->priv->requested_data_class,
+                   NULL));
     mbim_device_command (device,
                          message,
                          60,
                          NULL,
                          (GAsyncReadyCallback)register_state_set_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 /*****************************************************************************/
@@ -7560,6 +7561,7 @@ finalize (GObject *object)
     g_free (self->priv->caps_hardware_info);
     g_free (self->priv->current_operator_id);
     g_free (self->priv->current_operator_name);
+    g_free (self->priv->requested_operator_id);
     g_list_free_full (self->priv->pco_list, g_object_unref);
 
     G_OBJECT_CLASS (mm_broadband_modem_mbim_parent_class)->finalize (object);
