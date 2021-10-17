@@ -457,9 +457,6 @@ gboolean mm_3gpp_rsrq_level_to_rsrq   (guint     rsrq_level,
 gboolean mm_3gpp_rsrp_level_to_rsrp   (guint     rsrp_level,
                                        gpointer  log_object,
                                        gdouble  *out_rsrp);
-gboolean mm_3gpp_rssnr_level_to_rssnr (gint      rssnr_level,
-                                       gpointer  log_object,
-                                       gdouble  *out_rssnr);
 
 GStrv mm_3gpp_parse_emergency_numbers (const char *raw, GError **error);
 
