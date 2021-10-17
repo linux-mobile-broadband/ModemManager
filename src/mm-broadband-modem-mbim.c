@@ -932,6 +932,9 @@ load_supported_modes_mbim (GTask *task)
         all |= MM_MODEM_MODE_3G;
     if (self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
         all |= MM_MODEM_MODE_4G;
+    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_5G_NSA |
+                                       MBIM_DATA_CLASS_5G_SA))
+        all |= MM_MODEM_MODE_5G;
 
     /* 3GPP2... */
     if (self->priv->caps_data_class & MBIM_DATA_CLASS_1XRTT)
