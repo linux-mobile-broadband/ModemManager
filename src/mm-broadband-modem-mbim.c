@@ -137,6 +137,7 @@ struct _MMBroadbandModemMbimPrivate {
     gchar         *current_operator_name;
     gchar         *requested_operator_id;
     MbimDataClass  requested_data_class; /* 0 for defaults/auto */
+    GTask         *pending_allowed_modes_action;
 
     /* USSD helpers */
     GTask *pending_ussd_action;
@@ -1147,16 +1148,60 @@ modem_set_current_modes_finish (MMIfaceModem  *self,
 }
 
 static void
+complete_pending_allowed_modes_action (MMBroadbandModemMbim *self,
+                                       MbimDataClass         preferred_data_classes)
+{
+    MbimDataClass requested_data_classes;
+    MMModemMode   preferred_modes;
+    MMModemMode   requested_modes;
+
+    if (!self->priv->pending_allowed_modes_action)
+        return;
+
+    requested_data_classes = (MbimDataClass) GPOINTER_TO_UINT (g_task_get_task_data (self->priv->pending_allowed_modes_action));
+    requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes);
+    preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
+
+    /* only early complete on success, as we don't know if they're going to be
+     * intermediate indications emitted before the preference change is valid */
+    if (requested_modes == preferred_modes) {
+        GTask *task;
+
+        task = g_steal_pointer (&self->priv->pending_allowed_modes_action);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+    }
+}
+
+static void
 register_state_current_modes_set_ready (MbimDevice   *device,
                                         GAsyncResult *res,
                                         GTask        *task)
 {
     g_autoptr(MbimMessage)  response = NULL;
+    MMBroadbandModemMbim   *self;
     GError                 *error = NULL;
     MbimDataClass           preferred_data_classes;
     MMModemMode             preferred_modes;
     MbimDataClass           requested_data_classes;
     MMModemMode             requested_modes;
+
+    self = g_task_get_source_object (task);
+    requested_data_classes = (MbimDataClass) GPOINTER_TO_UINT (g_task_get_task_data (task));
+
+    /* If the task is still in the private info, it means it wasn't either
+     * cancelled or completed, so we just unref that reference and go on
+     * with out response processing. But if the task is no longer in the
+     * private info (or if there's a different task), then it means we're
+     * either cancelled (by some new incoming user request) or otherwise
+     * successfully completed (if completed via a Register State indication).
+     * In both those cases, just unref the incoming task and go on. */
+    if (self->priv->pending_allowed_modes_action != task) {
+        g_assert (g_task_get_completed (task));
+        g_object_unref (task);
+        return;
+    }
+    g_clear_object (&self->priv->pending_allowed_modes_action);
 
     response = mbim_device_command_finish (device, res, &error);
     if (!response ||
@@ -1179,7 +1224,6 @@ register_state_current_modes_set_ready (MbimDevice   *device,
         return;
     }
 
-    requested_data_classes = (MbimDataClass) GPOINTER_TO_UINT (g_task_get_task_data (task));
     requested_modes = mm_modem_mode_from_mbim_data_class (requested_data_classes);
     preferred_modes = mm_modem_mode_from_mbim_data_class (preferred_data_classes);
 
@@ -1231,14 +1275,16 @@ modem_set_current_modes (MMIfaceModem        *_self,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GTask                *task;
-    MbimDevice           *device;
+    MMBroadbandModemMbim    *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                   *task;
+    MbimDevice              *device;
+    g_autoptr(GCancellable)  cancellable = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
-    task = g_task_new (self, NULL, callback, user_data);
+    cancellable = g_cancellable_new ();
+    task = g_task_new (self, cancellable, callback, user_data);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (self->priv->qmi_capability_and_mode_switching) {
@@ -1261,7 +1307,20 @@ modem_set_current_modes (MMIfaceModem        *_self,
         self->priv->requested_data_class = mm_mbim_data_class_from_modem_mode (allowed,
                                                                                mm_iface_modem_is_3gpp (_self),
                                                                                mm_iface_modem_is_cdma (_self));
+
+        /* Store the ongoing allowed modes action, so that we can finish the
+         * operation early via indications, instead of waiting for the modem
+         * to be registered on the requested access technologies */
         g_task_set_task_data (task, GUINT_TO_POINTER (self->priv->requested_data_class), NULL);
+        if (self->priv->pending_allowed_modes_action) {
+            /* cancel the task and clear this reference; the _set_ready()
+             * will take care of completing the task */
+            g_cancellable_cancel (g_task_get_cancellable (self->priv->pending_allowed_modes_action));
+            g_task_return_error_if_cancelled (self->priv->pending_allowed_modes_action);
+            g_clear_object (&self->priv->pending_allowed_modes_action);
+        }
+        self->priv->pending_allowed_modes_action = g_object_ref (task);
+
         /* use the last requested operator id to determine whether the
          * registration should be manual or automatic */
         message = mbim_message_register_state_set_new (
@@ -3606,6 +3665,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
     MbimDataClass      available_data_classes;
     gchar             *provider_id;
     gchar             *provider_name;
+    MbimDataClass      preferred_data_classes = 0;
 
     if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
         if (!mbim_message_ms_basic_connect_v2_register_state_notification_parse (
@@ -3619,7 +3679,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
                 &provider_name,
                 NULL, /* roaming_text */
                 NULL, /* registration_flag */
-                NULL, /* preferred_data_classes */
+                &preferred_data_classes,
                 &error)) {
             mm_obj_warn (self, "failed processing MBIMEx v2.0 register state indication: %s", error->message);
             return;
@@ -3649,6 +3709,9 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
                               available_data_classes,
                               provider_id,
                               provider_name);
+
+    if (preferred_data_classes)
+        complete_pending_allowed_modes_action (self, preferred_data_classes);
 }
 
 typedef struct {
