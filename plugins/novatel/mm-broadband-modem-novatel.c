@@ -767,10 +767,8 @@ get_one_quality (const gchar *reply,
         }
     }
 
-    if (success) {
-        dbm = CLAMP (dbm, -113, -51);
-        quality = 100 - ((dbm + 51) * 100 / (-113 + 51));
-    }
+    if (success)
+        quality = MM_RSSI_TO_QUALITY (dbm);
 
     g_free (temp);
     return quality;

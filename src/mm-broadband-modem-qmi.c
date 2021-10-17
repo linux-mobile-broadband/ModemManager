@@ -1297,10 +1297,6 @@ modem_load_supported_ip_families (MMIfaceModem *self,
 /*****************************************************************************/
 /* Load signal quality (Modem interface) */
 
-/* Limit the value betweeen [-113,-51] and scale it to a percentage */
-#define STRENGTH_TO_QUALITY(strength)                                   \
-    (guint8)(100 - ((CLAMP (strength, -113, -51) + 51) * 100 / (-113 + 51)))
-
 static gboolean
 qmi_dbm_valid (gint8 dbm, QmiNasRadioInterface radio_interface)
 {
@@ -1407,7 +1403,7 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
 
     if (rssi_max < 0 && rssi_max > -125) {
         /* This RSSI comes as negative dBms */
-        *out_quality = STRENGTH_TO_QUALITY (rssi_max);
+        *out_quality = MM_RSSI_TO_QUALITY (rssi_max);
         *out_act = mm_modem_access_technology_from_qmi_radio_interface (signal_info_radio_interface);
 
         mm_obj_dbg (self, "RSSI: %d dBm --> %u%%", rssi_max, *out_quality);
@@ -1538,7 +1534,7 @@ signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
 
     if (signal_max < 0) {
         /* This signal strength comes as negative dBms */
-        *o_quality = STRENGTH_TO_QUALITY (signal_max);
+        *o_quality = MM_RSSI_TO_QUALITY (signal_max);
         *o_act = act;
 
         mm_obj_dbg (self, "signal strength: %d dBm --> %u%%", signal_max, *o_quality);
@@ -5064,7 +5060,7 @@ common_enable_disable_unsolicited_events_signal_strength (GTask *task)
 
     /* The device doesn't really like to have many threshold values, so don't
      * grow this array without checking first
-     * The values are chosen towards their results through STRENGTH_TO_QUALITY
+     * The values are chosen towards their results through MM_RSSI_TO_QUALITY
      *   -106 dBm gives 11%
      *    -94 dBm gives 30%
      *    -82 dBm gives 50%
@@ -5377,7 +5373,7 @@ nas_event_report_indication_cb (QmiClientNas                      *client,
             guint8 quality;
 
             /* This signal strength comes as negative dBms */
-            quality = STRENGTH_TO_QUALITY (signal_strength);
+            quality = MM_RSSI_TO_QUALITY (signal_strength);
 
             mm_obj_dbg (self, "signal strength indication (%s): %d dBm --> %u%%",
                         qmi_nas_radio_interface_get_string (signal_strength_radio_interface),

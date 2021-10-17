@@ -2068,16 +2068,13 @@ modem_load_signal_quality_finish (MMIfaceModem *self,
 static guint
 signal_quality_evdo_pilot_sets (MMBroadbandModem *self)
 {
-    gint dbm;
-
     if (self->priv->modem_cdma_evdo_registration_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
         return 0;
 
     if (self->priv->evdo_pilot_rssi >= 0)
         return 0;
 
-    dbm = CLAMP (self->priv->evdo_pilot_rssi, -113, -51);
-    return 100 - ((dbm + 51) * 100 / (-113 + 51));
+    return MM_RSSI_TO_QUALITY (self->priv->evdo_pilot_rssi);
 }
 
 static void

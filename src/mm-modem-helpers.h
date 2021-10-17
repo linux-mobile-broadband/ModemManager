@@ -570,6 +570,13 @@ gboolean mm_sim_parse_cpol_test_response (const gchar  *response,
 #define MM_CLAMP_HIGH(x, high) (((x) > (high)) ? (high) : (x))
 
 /*****************************************************************************/
+/* Signal quality percentage from different sources */
+
+/* Limit the value betweeen [-113,-51] and scale it to a percentage */
+#define MM_RSSI_TO_QUALITY(rssi)                                   \
+    (guint8)(100 - ((CLAMP (rssi, -113, -51) + 51) * 100 / (-113 + 51)))
+
+/*****************************************************************************/
 
 /* Helper function to decode eid read from esim */
 gchar *mm_decode_eid (const gchar *eid, gsize eid_len);
