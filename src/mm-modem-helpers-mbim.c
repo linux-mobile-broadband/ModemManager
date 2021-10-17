@@ -503,3 +503,44 @@ mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
     return MM_SMS_STATE_UNKNOWN;
 }
 
+/*****************************************************************************/
+
+guint
+mm_signal_quality_from_mbim_signal_state (guint                 rssi,
+                                          MbimRsrpSnrInfoArray *rsrp_snr,
+                                          guint32               rsrp_snr_count,
+                                          gpointer              log_object)
+{
+    guint quality;
+
+    /* When MBIMEx is enabled we may get RSSI unset, but per access technology
+     * RSRP available. When more than one access technology in use (e.g. 4G+5G in
+     * 5G NSA), take the highest RSRP value reported. */
+    if (rssi == 99 && rsrp_snr && rsrp_snr_count) {
+        guint i;
+        gint  max_rsrp = G_MININT;
+
+        for (i = 0; i < rsrp_snr_count; i++) {
+            MbimRsrpSnrInfo  *info;
+
+            info = rsrp_snr[i];
+            /* scale the value to dBm */
+            if (info->rsrp < 127) {
+                gint rsrp;
+
+                rsrp = -157 + info->rsrp;
+                if (rsrp > max_rsrp)
+                    max_rsrp = rsrp;
+            }
+        }
+        quality = MM_RSRP_TO_QUALITY (max_rsrp);
+        mm_obj_dbg (log_object, "signal state update: %ddBm --> %u%%", max_rsrp, quality);
+    } else {
+        /* Normalize the quality. 99 means unknown, we default it to 0 */
+        quality = MM_CLAMP_HIGH (rssi == 99 ? 0 : rssi, 31) * 100 / 31;
+        mm_obj_dbg (log_object, "signal state update: %u --> %u%%", rssi, quality);
+    }
+
+    return quality;
+}
+

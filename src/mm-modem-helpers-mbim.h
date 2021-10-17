@@ -60,4 +60,11 @@ MbimContextType     mm_bearer_apn_type_to_mbim_context_type        (MMBearerApnT
 
 MMSmsState mm_sms_state_from_mbim_message_status (MbimSmsStatus status);
 
+/*****************************************************************************/
+
+guint mm_signal_quality_from_mbim_signal_state (guint                 rssi,
+                                                MbimRsrpSnrInfoArray *rsrp_snr,
+                                                guint32               rsrp_snr_count,
+                                                gpointer              log_object);
+
 #endif  /* MM_MODEM_HELPERS_MBIM_H */

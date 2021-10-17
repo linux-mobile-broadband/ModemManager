@@ -576,6 +576,10 @@ gboolean mm_sim_parse_cpol_test_response (const gchar  *response,
 #define MM_RSSI_TO_QUALITY(rssi)                                   \
     (guint8)(100 - ((CLAMP (rssi, -113, -51) + 51) * 100 / (-113 + 51)))
 
+/* Limit the value betweeen [-110,-60] and scale it to a percentage */
+#define MM_RSRP_TO_QUALITY(rsrp)                                   \
+    (guint8)(100 - ((CLAMP (rsrp, -110, -60) + 60) * 100 / (-110 + 60)))
+
 /*****************************************************************************/
 
 /* Helper function to decode eid read from esim */
