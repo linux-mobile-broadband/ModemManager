@@ -890,24 +890,26 @@ modem_load_device_identifier (MMIfaceModem *self,
 /* Supported modes loading (Modem interface) */
 
 static GArray *
-modem_load_supported_modes_finish (MMIfaceModem *self,
-                                   GAsyncResult *res,
-                                   GError **error)
+modem_load_supported_modes_finish (MMIfaceModem  *self,
+                                   GAsyncResult  *res,
+                                   GError       **error)
 {
-#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching)
-        return mm_shared_qmi_load_supported_modes_finish (self, res, error);
-#endif
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
 static void
-load_supported_modes_mbim (GTask *task)
+load_supported_modes_mbim (GTask      *task,
+                           MbimDevice *device)
 {
     MMBroadbandModemMbim   *self;
-    MMModemModeCombination  mode;
-    MMModemMode             all;
-    GArray                 *supported;
+    GArray                 *all;
+    GArray                 *combinations;
+    GArray                 *filtered;
+    MMModemMode             mask_all;
+    MMModemModeCombination  mode = {
+        .allowed   = MM_MODEM_MODE_NONE,
+        .preferred = MM_MODEM_MODE_NONE,
+    };
 
     self = g_task_get_source_object (task);
 
@@ -920,60 +922,98 @@ load_supported_modes_mbim (GTask *task)
         return;
     }
 
-    all = 0;
-
-    /* 3GPP... */
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_GPRS |
-                                       MBIM_DATA_CLASS_EDGE))
-        all |= MM_MODEM_MODE_2G;
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_UMTS |
-                                       MBIM_DATA_CLASS_HSDPA |
-                                       MBIM_DATA_CLASS_HSUPA))
-        all |= MM_MODEM_MODE_3G;
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_LTE)
-        all |= MM_MODEM_MODE_4G;
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_5G_NSA |
-                                       MBIM_DATA_CLASS_5G_SA))
-        all |= MM_MODEM_MODE_5G;
-
-    /* 3GPP2... */
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_1XRTT)
-        all |= MM_MODEM_MODE_2G;
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_1XEVDO |
-                                       MBIM_DATA_CLASS_1XEVDO_REVA |
-                                       MBIM_DATA_CLASS_1XEVDV |
-                                       MBIM_DATA_CLASS_3XRTT |
-                                       MBIM_DATA_CLASS_1XEVDO_REVB))
-        all |= MM_MODEM_MODE_3G;
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_UMB)
-        all |= MM_MODEM_MODE_4G;
-
-    /* Build a mask with all supported modes */
-    supported = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
-    mode.allowed = all;
+    /* Build all */
+    mask_all = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class);
+    mode.allowed = mask_all;
     mode.preferred = MM_MODEM_MODE_NONE;
-    g_array_append_val (supported, mode);
+    all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
+    g_array_append_val (all, mode);
 
-    g_task_return_pointer (task, supported, (GDestroyNotify) g_array_unref);
+    combinations = g_array_new (FALSE, FALSE, sizeof (MMModemModeCombination));
+
+    /* When using MBIMEx we can enable the mode switching operation because
+     * we'll be able to know if the modes requested are the ones configured
+     * as preferred after the operation. */
+    if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+#define ADD_MODE_PREFERENCE(MODE_MASK) do {                             \
+            mode.allowed = MODE_MASK;                                   \
+            mode.preferred = MM_MODEM_MODE_NONE;                        \
+            g_array_append_val (combinations, mode);                    \
+        } while (0)
+
+        /* 2G, 3G */
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+
+        /* +4G */
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+
+        /* +5G */
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_5G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G | MM_MODEM_MODE_5G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G | MM_MODEM_MODE_5G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_5G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G);
+
+        filtered = mm_filter_supported_modes (all, combinations, self);
+        g_array_unref (combinations);
+        g_array_unref (all);
+#undef ADD_MODE_PREFERENCE
+    } else
+        filtered = all;
+
+    g_task_return_pointer (task, filtered, (GDestroyNotify)g_array_unref);
     g_object_unref (task);
 }
+
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
+
+static void
+shared_qmi_load_supported_modes_ready (MMIfaceModem *self,
+                                       GAsyncResult *res,
+                                       GTask        *task)
+{
+    GArray *combinations;
+    GError *error = NULL;
+
+    combinations = mm_shared_qmi_load_supported_modes_finish (self, res, &error);
+    if (!combinations)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task, combinations, (GDestroyNotify)g_array_unref);
+    g_object_unref (task);
+}
+
+#endif
 
 static void
 modem_load_supported_modes (MMIfaceModem        *self,
                             GAsyncReadyCallback  callback,
                             gpointer             user_data)
 {
-    GTask *task;
+    GTask      *task;
+    MbimDevice *device;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
-        mm_shared_qmi_load_supported_modes (self, callback, user_data);
+        mm_shared_qmi_load_supported_modes (self, (GAsyncReadyCallback)shared_qmi_load_supported_modes_ready, task);
         return;
     }
 #endif
 
-    task = g_task_new (self, NULL, callback, user_data);
-    load_supported_modes_mbim (task);
+    load_supported_modes_mbim (task, device);
 }
 
 /*****************************************************************************/

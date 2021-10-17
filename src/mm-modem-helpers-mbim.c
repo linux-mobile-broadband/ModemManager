@@ -143,16 +143,16 @@ mm_modem_mode_from_mbim_data_class (MbimDataClass data_class)
         mask |= MM_MODEM_MODE_5G;
 
     /* 3GPP2... */
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_1XRTT)
-        all |= MM_MODEM_MODE_2G;
-    if (self->priv->caps_data_class & (MBIM_DATA_CLASS_1XEVDO |
-                                       MBIM_DATA_CLASS_1XEVDO_REVA |
-                                       MBIM_DATA_CLASS_1XEVDV |
-                                       MBIM_DATA_CLASS_3XRTT |
-                                       MBIM_DATA_CLASS_1XEVDO_REVB))
-        all |= MM_MODEM_MODE_3G;
-    if (self->priv->caps_data_class & MBIM_DATA_CLASS_UMB)
-        all |= MM_MODEM_MODE_4G;
+    if (data_class & MBIM_DATA_CLASS_1XRTT)
+        mask |= MM_MODEM_MODE_2G;
+    if (data_class & (MBIM_DATA_CLASS_1XEVDO |
+                      MBIM_DATA_CLASS_1XEVDO_REVA |
+                      MBIM_DATA_CLASS_1XEVDV |
+                      MBIM_DATA_CLASS_3XRTT |
+                      MBIM_DATA_CLASS_1XEVDO_REVB))
+        mask |= MM_MODEM_MODE_3G;
+    if (data_class & MBIM_DATA_CLASS_UMB)
+        mask |= MM_MODEM_MODE_4G;
 
     return mask;
 }
