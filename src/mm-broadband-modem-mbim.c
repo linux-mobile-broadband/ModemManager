@@ -1212,7 +1212,9 @@ modem_set_current_modes (MMIfaceModem        *self,
         g_autoptr(MbimMessage) message = NULL;
         MbimDataClass          data_class;
 
-        data_class = mm_mbim_data_class_from_modem_mode (allowed);
+        data_class = mm_mbim_data_class_from_modem_mode (allowed,
+                                                         mm_iface_modem_is_3gpp (self),
+                                                         mm_iface_modem_is_cdma (self));
         g_task_set_task_data (task, GUINT_TO_POINTER (data_class), NULL);
         message = mbim_message_register_state_set_new (
                       NULL,
