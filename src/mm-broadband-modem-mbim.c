@@ -1223,14 +1223,15 @@ shared_qmi_set_current_modes_ready (MMIfaceModem *self,
 #endif
 
 static void
-modem_set_current_modes (MMIfaceModem        *self,
+modem_set_current_modes (MMIfaceModem        *_self,
                          MMModemMode          allowed,
                          MMModemMode          preferred,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
 {
-    GTask      *task;
-    MbimDevice *device;
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                *task;
+    MbimDevice           *device;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
@@ -1238,8 +1239,8 @@ modem_set_current_modes (MMIfaceModem        *self,
     task = g_task_new (self, NULL, callback, user_data);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
-    if (MM_BROADBAND_MODEM_MBIM (self)->priv->qmi_capability_and_mode_switching) {
-        mm_shared_qmi_set_current_modes (self,
+    if (self->priv->qmi_capability_and_mode_switching) {
+        mm_shared_qmi_set_current_modes (MM_IFACE_MODEM (self),
                                          allowed,
                                          preferred,
                                          (GAsyncReadyCallback)shared_qmi_set_current_modes_ready,
@@ -1252,9 +1253,13 @@ modem_set_current_modes (MMIfaceModem        *self,
         g_autoptr(MbimMessage) message = NULL;
         MbimDataClass          data_class;
 
+        /* Limit ANY to the currently supported modes */
+        if (allowed == MM_MODEM_MODE_ANY)
+            allowed = mm_modem_mode_from_mbim_data_class (self->priv->caps_data_class);
+
         data_class = mm_mbim_data_class_from_modem_mode (allowed,
-                                                         mm_iface_modem_is_3gpp (self),
-                                                         mm_iface_modem_is_cdma (self));
+                                                         mm_iface_modem_is_3gpp (_self),
+                                                         mm_iface_modem_is_cdma (_self));
         g_task_set_task_data (task, GUINT_TO_POINTER (data_class), NULL);
         message = mbim_message_register_state_set_new (
                       NULL,
