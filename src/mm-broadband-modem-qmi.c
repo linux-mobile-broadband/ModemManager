@@ -2797,8 +2797,6 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
-#if !defined WITH_NEWEST_QMI_COMMANDS
-
 static void
 common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
                                     QmiMessageNasGetServingSystemOutput *response_output,
@@ -3059,8 +3057,6 @@ get_serving_system_3gpp_ready (QmiClientNas *client,
     g_object_unref (task);
     qmi_message_nas_get_serving_system_output_unref (output);
 }
-
-#else /* WITH_NEWEST_QMI_COMMANDS */
 
 static gboolean
 process_common_info (QmiNasServiceStatus service_status,
@@ -3547,23 +3543,46 @@ get_system_info_ready (QmiClientNas *client,
     QmiMessageNasGetSystemInfoOutput *output;
     GError *error = NULL;
 
+    self = g_task_get_source_object (task);
+
     output = qmi_client_nas_get_system_info_finish (client, res, &error);
     if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        mm_obj_dbg (self, "couldn't get system info: '%s', falling back to nas get serving system 3gpp",
+                    error->message);
+        qmi_client_nas_get_serving_system (QMI_CLIENT_NAS (client),
+                                           NULL,
+                                           10,
+                                           NULL,
+                                           (GAsyncReadyCallback)get_serving_system_3gpp_ready,
+                                           task);
+        g_clear_error (&error);
         return;
     }
 
     if (!qmi_message_nas_get_system_info_output_get_result (output, &error)) {
+        qmi_message_nas_get_system_info_output_unref (output);
+        if (g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND) ||
+            g_error_matches (error,
+                             QMI_PROTOCOL_ERROR,
+                             QMI_PROTOCOL_ERROR_NOT_SUPPORTED)) {
+            mm_obj_dbg (self, "couldn't get system info: '%s', falling back to nas get serving system 3gpp",
+                        error->message);
+            qmi_client_nas_get_serving_system (QMI_CLIENT_NAS (client),
+                                               NULL,
+                                               10,
+                                               NULL,
+                                               (GAsyncReadyCallback)get_serving_system_3gpp_ready,
+                                               task);
+            g_clear_error (&error);
+            return;
+        }
         g_prefix_error (&error, "Couldn't get system info: ");
         g_task_return_error (task, error);
-        qmi_message_nas_get_system_info_output_unref (output);
         g_object_unref (task);
         return;
     }
-
-    self = g_task_get_source_object (task);
 
     common_process_system_info_3gpp (self, output, NULL);
 
@@ -3571,8 +3590,6 @@ get_system_info_ready (QmiClientNas *client,
     g_object_unref (task);
     qmi_message_nas_get_system_info_output_unref (output);
 }
-
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 
 static void
 modem_3gpp_run_registration_checks (MMIfaceModem3gpp    *self,
@@ -3593,21 +3610,12 @@ modem_3gpp_run_registration_checks (MMIfaceModem3gpp    *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-#if defined WITH_NEWEST_QMI_COMMANDS
     qmi_client_nas_get_system_info (QMI_CLIENT_NAS (client),
                                     NULL,
                                     10,
                                     NULL,
                                     (GAsyncReadyCallback)get_system_info_ready,
                                     task);
-#else
-    qmi_client_nas_get_serving_system (QMI_CLIENT_NAS (client),
-                                       NULL,
-                                       10,
-                                       NULL,
-                                       (GAsyncReadyCallback)get_serving_system_3gpp_ready,
-                                       task);
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 }
 
 /*****************************************************************************/
