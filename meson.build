@@ -278,45 +278,45 @@ plugins_shared_reqs = {
 }
 
 plugins_options_reqs = {
-  'altair-lte': [],
-  'anydata': [],
-  'broadmobi': [],
-  'cinterion': [],
-  'dell': ['foxconn', 'novatel', 'sierra', 'telit', 'xmm'],
-  'dlink': [],
-  'fibocom': ['xmm'],
-  'foxconn': ['foxconn'],
-  'generic': [],
-  'gosuncn': [],
-  'haier': [],
-  'huawei': [],
-  'iridium': [],
-  'linktop': [],
-  'longcheer': [],
-  'mbm': [],
-  'motorola': [],
-  'mtk': [],
-  'nokia': [],
-  'nokia-icera': ['icera'],
-  'novatel': ['novatel'],
-  'novatel-lte': [],
-  'option': ['option'],
-  'option-hso': ['option'],
-  'pantech': [],
-  'qcom-soc': [],
-  'quectel': [],
-  'samsung': ['icera'],
-  'sierra-legacy': ['icera', 'sierra'],
-  'sierra': ['xmm'],
-  'simtech': [],
-  'telit': ['telit'],
-  'thuraya': [],
-  'tplink': [],
-  'ublox': [],
-  'via': [],
-  'wavecom': [],
-  'x22x': [],
-  'zte': ['icera'],
+  'altair-lte': {'available': true, 'shared': []},
+  'anydata': {'available': true, 'shared': []},
+  'broadmobi': {'available': true, 'shared': []},
+  'cinterion': {'available': true, 'shared': []},
+  'dell': {'available': true, 'shared': ['foxconn', 'novatel', 'sierra', 'telit', 'xmm']},
+  'dlink': {'available': true, 'shared': []},
+  'fibocom': {'available': true, 'shared': ['xmm']},
+  'foxconn': {'available': true, 'shared': ['foxconn']},
+  'generic': {'available': true, 'shared': []},
+  'gosuncn': {'available': true, 'shared': []},
+  'haier': {'available': true, 'shared': []},
+  'huawei': {'available': true, 'shared': []},
+  'iridium': {'available': true, 'shared': []},
+  'linktop': {'available': true, 'shared': []},
+  'longcheer': {'available': true, 'shared': []},
+  'mbm': {'available': true, 'shared': []},
+  'motorola': {'available': true, 'shared': []},
+  'mtk': {'available': true, 'shared': []},
+  'nokia': {'available': true, 'shared': []},
+  'nokia-icera': {'available': true, 'shared': ['icera']},
+  'novatel': {'available': true, 'shared': ['novatel']},
+  'novatel-lte': {'available': true, 'shared': []},
+  'option': {'available': true, 'shared': ['option']},
+  'option-hso': {'available': true, 'shared': ['option']},
+  'pantech': {'available': true, 'shared': []},
+  'qcom-soc': {'available': enable_qmi, 'shared': []},
+  'quectel': {'available': true, 'shared': []},
+  'samsung': {'available': true, 'shared': ['icera']},
+  'sierra-legacy': {'available': true, 'shared': ['icera', 'sierra']},
+  'sierra': {'available': true, 'shared': ['xmm']},
+  'simtech': {'available': true, 'shared': []},
+  'telit': {'available': true, 'shared': ['telit']},
+  'thuraya': {'available': true, 'shared': []},
+  'tplink': {'available': true, 'shared': []},
+  'ublox': {'available': true, 'shared': []},
+  'via': {'available': true, 'shared': []},
+  'wavecom': {'available': true, 'shared': []},
+  'x22x': {'available': true, 'shared': []},
+  'zte': {'available': true, 'shared': ['icera']},
 }
 
 plugins_shared = {}
@@ -327,9 +327,10 @@ endforeach
 plugins_options = {}
 foreach plugin_name, plugin_reqs: plugins_options_reqs
   plugin_opt = get_option('plugin_' + plugin_name.underscorify())
-  plugin_enabled = not plugin_opt.disabled()
+  assert(plugin_reqs['available'] or not plugin_opt.enabled(), '@0@ is not available'.format(plugin_name))
+  plugin_enabled = not plugin_opt.disabled() and plugin_reqs['available']
   if plugin_enabled
-    foreach plugin_req: plugin_reqs
+    foreach plugin_req: plugin_reqs['shared']
       if plugins_shared_reqs[plugin_req]
         plugins_shared += {plugin_req: true}
       else
