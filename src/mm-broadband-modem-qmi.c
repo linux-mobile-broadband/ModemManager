@@ -96,9 +96,7 @@ struct _MMBroadbandModemQmiPrivate {
     gboolean unsolicited_events_setup;
     guint nas_event_report_indication_id;
     guint wds_event_report_indication_id;
-#if defined WITH_NEWEST_QMI_COMMANDS
     guint nas_signal_info_indication_id;
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 
     /* New devices may not support the legacy DMS UIM commands */
     gboolean dms_uim_deprecated;
@@ -5032,8 +5030,6 @@ common_enable_disable_unsolicited_events_data_system_status (GTask *task)
                                      task);
 }
 
-#if !defined WITH_NEWEST_QMI_COMMANDS
-
 static void
 ser_signal_strength_ready (QmiClientNas *client,
                            GAsyncResult *res,
@@ -5108,8 +5104,6 @@ common_enable_disable_unsolicited_events_signal_strength (GTask *task)
         task);
 }
 
-#else /* WITH_NEWEST_QMI_COMMANDS */
-
 static void
 ri_signal_info_ready (QmiClientNas *client,
                       GAsyncResult *res,
@@ -5124,11 +5118,14 @@ ri_signal_info_ready (QmiClientNas *client,
     ctx  = g_task_get_task_data     (task);
 
     output = qmi_client_nas_register_indications_finish (client, res, &error);
-    if (!output || !qmi_message_nas_register_indications_output_get_result (output, &error))
-        mm_obj_dbg (self, "couldn't register signal info indications: '%s'", error->message);
-    else {
+    if (!output || !qmi_message_nas_register_indications_output_get_result (output, &error)) {
+        mm_obj_dbg (self, "couldn't register signal info indications: '%s', falling back to signal strength", error->message);
+        common_enable_disable_unsolicited_events_signal_strength (task);
+        g_clear_error (&error);
+        return;
+    } else {
         /* Disable access technology and signal quality polling if we can use the indications */
-        mm_obj_dbg (self, "signal strength indications enabled: polling disabled");
+        mm_obj_dbg (self, "signal info indications enabled: polling disabled");
         g_object_set (self,
                       MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      TRUE,
                       MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, TRUE,
@@ -5221,8 +5218,6 @@ common_enable_disable_unsolicited_events_signal_info_config (GTask *task)
         task);
 }
 
-#endif /* WITH_NEWEST_QMI_COMMANDS */
-
 static void
 common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
                                           gboolean             enable,
@@ -5262,11 +5257,7 @@ common_enable_disable_unsolicited_events (MMBroadbandModemQmi *self,
     g_task_set_task_data (task, ctx, (GDestroyNotify)enable_unsolicited_events_context_free);
 
     if (ctx->client_nas) {
-#if defined WITH_NEWEST_QMI_COMMANDS
         common_enable_disable_unsolicited_events_signal_info_config (task);
-#else
-        common_enable_disable_unsolicited_events_signal_strength (task);
-#endif /* WITH_NEWEST_QMI_COMMANDS */
         return;
     }
 
@@ -5410,8 +5401,6 @@ nas_event_report_indication_cb (QmiClientNas                      *client,
     }
 }
 
-#if defined WITH_NEWEST_QMI_COMMANDS
-
 static void
 nas_signal_info_indication_cb (QmiClientNas                     *client,
                                QmiIndicationNasSignalInfoOutput *output,
@@ -5446,8 +5435,6 @@ nas_signal_info_indication_cb (QmiClientNas                     *client,
             (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
     }
 }
-
-#endif /* WITH_NEWEST_QMI_COMMANDS */
 
 static void
 common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
@@ -5493,7 +5480,6 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
             self->priv->nas_event_report_indication_id = 0;
         }
 
-#if defined WITH_NEWEST_QMI_COMMANDS
         if (enable) {
             g_assert (self->priv->nas_signal_info_indication_id == 0);
             self->priv->nas_signal_info_indication_id =
@@ -5505,7 +5491,6 @@ common_setup_cleanup_unsolicited_events (MMBroadbandModemQmi *self,
             g_signal_handler_disconnect (client_nas, self->priv->nas_signal_info_indication_id);
             self->priv->nas_signal_info_indication_id = 0;
         }
-#endif /* WITH_NEWEST_QMI_COMMANDS */
     }
 
     if (client_wds) {
