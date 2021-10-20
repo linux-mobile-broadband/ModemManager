@@ -987,6 +987,8 @@ MMModemSignal
 mm_modem_signal_get_path
 mm_modem_signal_dup_path
 mm_modem_signal_get_rate
+mm_modem_signal_get_rssi_threshold
+mm_modem_signal_get_error_rate_threshold
 mm_modem_signal_peek_cdma
 mm_modem_signal_get_cdma
 mm_modem_signal_peek_evdo
@@ -1003,6 +1005,9 @@ mm_modem_signal_get_nr5g
 mm_modem_signal_setup
 mm_modem_signal_setup_finish
 mm_modem_signal_setup_sync
+mm_modem_signal_setup_thresholds
+mm_modem_signal_setup_thresholds_finish
+mm_modem_signal_setup_thresholds_sync
 <SUBSECTION Standard>
 MMModemSignalPrivate
 MMModemSignalClass
