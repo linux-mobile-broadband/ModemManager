@@ -3553,14 +3553,22 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
     g_autoptr(GError)               error = NULL;
     g_autoptr(MbimRsrpSnrInfoArray) rsrp_snr = NULL;
     guint32                         rsrp_snr_count = 0;
-    guint32                         rssi;
+    guint32                         coded_rssi;
+    guint32                         coded_error_rate;
     guint32                         quality;
+    MbimDataClass                   data_class;
+    g_autoptr(MMSignal)             cdma = NULL;
+    g_autoptr(MMSignal)             evdo = NULL;
+    g_autoptr(MMSignal)             gsm = NULL;
+    g_autoptr(MMSignal)             umts = NULL;
+    g_autoptr(MMSignal)             lte = NULL;
+    g_autoptr(MMSignal)             nr5g = NULL;
 
     if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
         if (!mbim_message_ms_basic_connect_v2_signal_state_notification_parse (
                 notification,
-                &rssi,
-                NULL, /* error_rate */
+                &coded_rssi,
+                &coded_error_rate,
                 NULL, /* signal_strength_interval */
                 NULL, /* rssi_threshold */
                 NULL, /* error_rate_threshold */
@@ -3574,8 +3582,8 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
     } else {
         if (!mbim_message_signal_state_notification_parse (
                 notification,
-                &rssi,
-                NULL, /* error_rate */
+                &coded_rssi,
+                &coded_error_rate,
                 NULL, /* signal_strength_interval */
                 NULL, /* rssi_threshold */
                 NULL, /* error_rate_threshold */
@@ -3586,8 +3594,17 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
         mm_obj_dbg (self, "proccessed signal state indication");
     }
 
-    quality = mm_signal_quality_from_mbim_signal_state (rssi, rsrp_snr, rsrp_snr_count, self);
+    quality = mm_signal_quality_from_mbim_signal_state (coded_rssi, rsrp_snr, rsrp_snr_count, self);
     mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
+
+    /* Best guess of current data class */
+    data_class = self->priv->highest_available_data_class;
+    if (data_class == 0)
+        data_class = self->priv->available_data_classes;
+
+    if (mm_signal_from_mbim_signal_state (data_class, coded_rssi, coded_error_rate, rsrp_snr, rsrp_snr_count,
+                                          self, &cdma, &evdo, &gsm, &umts, &lte, &nr5g))
+        mm_iface_modem_signal_update (MM_IFACE_MODEM_SIGNAL (self), cdma, evdo, gsm, umts, lte, nr5g);
 }
 
 static void

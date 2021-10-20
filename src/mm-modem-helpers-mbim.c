@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2013-2021 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include "mm-modem-helpers-mbim.h"
@@ -558,6 +558,84 @@ mm_bearer_ip_family_to_mbim_context_ip_type (MMBearerIpFamily   ip_family,
 
 /*****************************************************************************/
 
+/* index in the array is the code point (8 possible values), and the actual
+ * value is the lower limit of the error rate range. */
+static const gdouble bit_error_rate_ranges[] =   { 0.00, 0.20, 0.40, 0.80, 1.60, 3.20, 6.40, 12.80 };
+static const gdouble frame_error_rate_ranges[] = { 0.00, 0.01, 0.10, 0.50, 1.00, 2.00, 4.00,  8.00 };
+
+gboolean
+mm_signal_error_rate_percentage_from_coded_value (guint      coded_value,
+                                                  gdouble   *out_percentage,
+                                                  gboolean   is_gsm,
+                                                  GError   **error)
+{
+    if ((is_gsm && (coded_value >= G_N_ELEMENTS (bit_error_rate_ranges))) ||
+        (!is_gsm && (coded_value >= G_N_ELEMENTS (frame_error_rate_ranges)))) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "error rate coded value out of range: %u", coded_value);
+        return FALSE;
+    }
+
+    *out_percentage = (is_gsm ? bit_error_rate_ranges[coded_value] : frame_error_rate_ranges[coded_value]);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_signal_rssi_from_coded_value (guint      coded_value,
+                                 gdouble   *out_rssi,
+                                 GError   **error)
+{
+    /* expected values between 0 and 31 */
+    if (coded_value > 31) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "rssi coded value out of range: %u", coded_value);
+        return FALSE;
+    }
+
+    *out_rssi = (gdouble)coded_value - 113;
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_signal_rsrp_from_coded_value (guint     coded_value,
+                                 gdouble  *out_rsrp,
+                                 GError  **error)
+{
+    /* expected values between 0 and 126 */
+    if (coded_value > 126) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "rsrp coded value out of range: %u", coded_value);
+        return FALSE;
+    }
+
+    *out_rsrp = (gdouble)coded_value - 156;
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_signal_snr_from_coded_value (guint     coded_value,
+                                gdouble  *out_snr,
+                                GError  **error)
+{
+    /* expected values between 0 and 126 */
+    if (coded_value > 127) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "snr coded value out of range: %u", coded_value);
+        return FALSE;
+    }
+
+    *out_snr = ((gdouble)coded_value)/2 - 23;
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 MMSmsState
 mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
 {
@@ -616,4 +694,160 @@ mm_signal_quality_from_mbim_signal_state (guint                 rssi,
     }
 
     return quality;
+}
+
+static MMSignal **
+select_mbim_signal_with_data_class (MbimDataClass   data_class,
+                                    MMSignal      **cdma,
+                                    MMSignal      **evdo,
+                                    MMSignal      **gsm,
+                                    MMSignal      **umts,
+                                    MMSignal      **lte,
+                                    MMSignal      **nr5g)
+{
+    switch (data_class) {
+    case MBIM_DATA_CLASS_5G_NSA:
+    case MBIM_DATA_CLASS_5G_SA:
+        return nr5g;
+    case MBIM_DATA_CLASS_LTE:
+        return lte;
+    case MBIM_DATA_CLASS_UMTS:
+    case MBIM_DATA_CLASS_HSDPA:
+    case MBIM_DATA_CLASS_HSUPA:
+        return umts;
+    case MBIM_DATA_CLASS_GPRS:
+    case MBIM_DATA_CLASS_EDGE:
+        return gsm;
+    case MBIM_DATA_CLASS_1XEVDO:
+    case MBIM_DATA_CLASS_1XEVDO_REVA:
+    case MBIM_DATA_CLASS_1XEVDV:
+    case MBIM_DATA_CLASS_3XRTT:
+    case MBIM_DATA_CLASS_1XEVDO_REVB:
+        return evdo;
+    case MBIM_DATA_CLASS_1XRTT:
+        return cdma;
+    case MBIM_DATA_CLASS_UMB:
+    case MBIM_DATA_CLASS_CUSTOM:
+    default:
+        return NULL;
+    }
+}
+
+gboolean
+mm_signal_from_mbim_signal_state (MbimDataClass          data_class,
+                                  guint                  coded_rssi,
+                                  guint                  coded_error_rate,
+                                  MbimRsrpSnrInfoArray  *rsrp_snr,
+                                  guint32                rsrp_snr_count,
+                                  gpointer               log_object,
+                                  MMSignal             **out_cdma,
+                                  MMSignal             **out_evdo,
+                                  MMSignal             **out_gsm,
+                                  MMSignal             **out_umts,
+                                  MMSignal             **out_lte,
+                                  MMSignal             **out_nr5g)
+{
+    MMSignal **tmp;
+    MMSignal **last_updated = NULL;
+    guint      n_out_updated = 0;
+
+    *out_cdma = NULL;
+    *out_evdo = NULL;
+    *out_gsm = NULL;
+    *out_umts = NULL;
+    *out_lte = NULL;
+    *out_nr5g = NULL;
+
+    /* When MBIMEx v2.0 is available, we get LTE+5GNR information reported
+     * in the RSRP/SNR list of items. */
+    if (rsrp_snr && rsrp_snr_count) {
+        guint i;
+
+        for (i = 0; i < rsrp_snr_count; i++) {
+            MbimRsrpSnrInfo *info;
+
+            info = rsrp_snr[i];
+
+            tmp = select_mbim_signal_with_data_class (info->system_type,
+                                                      out_cdma, out_evdo,
+                                                      out_gsm, out_umts, out_lte, out_nr5g);
+            if (!tmp || ((info->rsrp == 0xFFFFFFFF) && (info->snr == 0xFFFFFFFF)))
+                continue;
+
+            last_updated = tmp;
+            n_out_updated++;
+
+            *tmp = mm_signal_new ();
+
+            mm_signal_set_rsrp (*tmp, MM_SIGNAL_UNKNOWN);
+            if (info->rsrp != 0xFFFFFFFF) {
+                g_autoptr(GError) error = NULL;
+                gdouble           rsrp;
+
+                if (!mm_signal_rsrp_from_coded_value (info->rsrp, &rsrp, &error))
+                    mm_obj_dbg (log_object, "couldn't convert RSRP coded value '%u': %s", info->rsrp, error->message);
+                else
+                    mm_signal_set_rsrp (*tmp, rsrp);
+            }
+
+            mm_signal_set_snr (*tmp, MM_SIGNAL_UNKNOWN);
+            if (info->snr != 0xFFFFFFFF) {
+                g_autoptr(GError) error = NULL;
+                gdouble           snr;
+
+                if (!mm_signal_snr_from_coded_value (info->snr, &snr, &error))
+                    mm_obj_dbg (log_object, "couldn't convert SNR coded value '%u': %s", info->snr, error->message);
+                else
+                    mm_signal_set_snr (*tmp, snr);
+            }
+        }
+    }
+
+    /* The MBIM v1.0 details (RSSI, error rate) will only be set if
+     * the target access technology is known without any doubt.
+     * E.g. if we are in 5GNSA (4G+5G), we will only set the fields
+     * if one of them has valid values. If both have valid values,
+     * we'll skip updating RSSI and error rate, as we wouldn't know
+     * to which of them applies. */
+    if (n_out_updated > 1)
+        return TRUE;
+
+    if (n_out_updated == 0) {
+        tmp = select_mbim_signal_with_data_class (data_class,
+                                                  out_cdma, out_evdo,
+                                                  out_gsm, out_umts, out_lte, out_nr5g);
+        if (!tmp)
+            return FALSE;
+        *tmp = mm_signal_new ();
+    } else {
+        tmp = last_updated;
+        g_assert (tmp && *tmp);
+    }
+
+    mm_signal_set_error_rate (*tmp, MM_SIGNAL_UNKNOWN);
+    if (coded_error_rate != 99) {
+        g_autoptr(GError) error = NULL;
+        gdouble           error_rate;
+
+        if (!mm_signal_error_rate_percentage_from_coded_value (coded_error_rate,
+                                                               &error_rate,
+                                                               data_class == (MBIM_DATA_CLASS_GPRS | MBIM_DATA_CLASS_EDGE),
+                                                               &error))
+            mm_obj_dbg (log_object, "couldn't convert error rate coded value '%u': %s", coded_error_rate, error->message);
+        else
+            mm_signal_set_error_rate (*tmp, error_rate);
+    }
+
+    mm_signal_set_rssi (*tmp, MM_SIGNAL_UNKNOWN);
+    if (coded_rssi != 99) {
+        g_autoptr(GError) error = NULL;
+        gdouble           rssi;
+
+        if (!mm_signal_rssi_from_coded_value (coded_rssi, &rssi, &error))
+            mm_obj_dbg (log_object, "couldn't convert RSSI coded value '%u': %s", coded_rssi, error->message);
+        else
+            mm_signal_set_rssi (*tmp, rssi);
+    }
+
+    return TRUE;
 }
