@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2013-2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2021 Intel Corporation
  */
 
 #include <string.h>
@@ -31,14 +32,15 @@
 
 G_DEFINE_TYPE (MMSignal, mm_signal, G_TYPE_OBJECT)
 
-#define PROPERTY_RSSI "rssi"
-#define PROPERTY_RSCP "rscp"
-#define PROPERTY_ECIO "ecio"
-#define PROPERTY_SINR "sinr"
-#define PROPERTY_IO   "io"
-#define PROPERTY_RSRQ "rsrq"
-#define PROPERTY_RSRP "rsrp"
-#define PROPERTY_SNR  "snr"
+#define PROPERTY_RSSI        "rssi"
+#define PROPERTY_RSCP        "rscp"
+#define PROPERTY_ECIO        "ecio"
+#define PROPERTY_SINR        "sinr"
+#define PROPERTY_IO          "io"
+#define PROPERTY_RSRQ        "rsrq"
+#define PROPERTY_RSRP        "rsrp"
+#define PROPERTY_SNR         "snr"
+#define PROPERTY_ERROR_RATE  "error-rate"
 
 struct _MMSignalPrivate {
     gdouble rssi;
@@ -49,6 +51,7 @@ struct _MMSignalPrivate {
     gdouble rsrq;
     gdouble rsrp;
     gdouble snr;
+    gdouble error_rate;
 };
 
 /*****************************************************************************/
@@ -322,6 +325,41 @@ mm_signal_set_snr (MMSignal *self,
 /*****************************************************************************/
 
 /**
+ * mm_signal_get_error_rate:
+ * @self: a #MMSignal.
+ *
+ * Gets the channel error rate (BER, BLER,... depends on the RAT), in
+ * percentage.
+ *
+ * Applicable to all RAT.
+ *
+ * Returns: the error rate, or %MM_SIGNAL_UNKNOWN if unknown.
+ *
+ * Since: 1.20
+ */
+gdouble
+mm_signal_get_error_rate (MMSignal *self)
+{
+    g_return_val_if_fail (MM_IS_SIGNAL (self), MM_SIGNAL_UNKNOWN);
+
+    return self->priv->error_rate;
+}
+
+/**
+ * mm_signal_set_error_rate: (skip)
+ */
+void
+mm_signal_set_error_rate (MMSignal *self,
+                          gdouble   value)
+{
+    g_return_if_fail (MM_IS_SIGNAL (self));
+
+    self->priv->error_rate = value;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_signal_get_dictionary: (skip)
  */
 GVariant *
@@ -385,6 +423,12 @@ mm_signal_get_dictionary (MMSignal *self)
                                PROPERTY_SNR,
                                g_variant_new_double (self->priv->snr));
 
+    if (self->priv->error_rate != MM_SIGNAL_UNKNOWN)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_ERROR_RATE,
+                               g_variant_new_double (self->priv->error_rate));
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -412,6 +456,8 @@ consume_variant (MMSignal *self,
         self->priv->rsrq = g_variant_get_double (value);
     else if (g_str_equal (key, PROPERTY_SNR))
         self->priv->snr = g_variant_get_double (value);
+    else if (g_str_equal (key, PROPERTY_ERROR_RATE))
+        self->priv->error_rate = g_variant_get_double (value);
     else {
         /* Set error */
         g_set_error (error,
@@ -499,6 +545,7 @@ mm_signal_init (MMSignal *self)
     self->priv->rsrq = MM_SIGNAL_UNKNOWN;
     self->priv->rsrp = MM_SIGNAL_UNKNOWN;
     self->priv->snr  = MM_SIGNAL_UNKNOWN;
+    self->priv->error_rate = MM_SIGNAL_UNKNOWN;
 }
 
 static void

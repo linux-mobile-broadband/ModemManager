@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2013-2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2021 Intel Corporation
  */
 
 #ifndef MM_SIGNAL_H
@@ -28,7 +29,7 @@ G_BEGIN_DECLS
 /**
  * MM_SIGNAL_UNKNOWN:
  *
- * Identifier for an unknown signal value.
+ * Identifier for an unknown signal or error rate value.
  *
  * Since: 1.2
  */
@@ -65,14 +66,15 @@ struct _MMSignalClass {
 GType mm_signal_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMSignal, g_object_unref)
 
-gdouble  mm_signal_get_rssi (MMSignal *self);
-gdouble  mm_signal_get_rscp (MMSignal *self);
-gdouble  mm_signal_get_ecio (MMSignal *self);
-gdouble  mm_signal_get_sinr (MMSignal *self);
-gdouble  mm_signal_get_io   (MMSignal *self);
-gdouble  mm_signal_get_rsrq (MMSignal *self);
-gdouble  mm_signal_get_rsrp (MMSignal *self);
-gdouble  mm_signal_get_snr  (MMSignal *self);
+gdouble  mm_signal_get_rssi       (MMSignal *self);
+gdouble  mm_signal_get_rscp       (MMSignal *self);
+gdouble  mm_signal_get_ecio       (MMSignal *self);
+gdouble  mm_signal_get_sinr       (MMSignal *self);
+gdouble  mm_signal_get_io         (MMSignal *self);
+gdouble  mm_signal_get_rsrq       (MMSignal *self);
+gdouble  mm_signal_get_rsrp       (MMSignal *self);
+gdouble  mm_signal_get_snr        (MMSignal *self);
+gdouble  mm_signal_get_error_rate (MMSignal *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -87,14 +89,15 @@ MMSignal *mm_signal_new (void);
 MMSignal *mm_signal_new_from_dictionary (GVariant *dictionary,
                                          GError **error);
 
-void mm_signal_set_rssi (MMSignal *self, gdouble value);
-void mm_signal_set_rscp (MMSignal *self, gdouble value);
-void mm_signal_set_ecio (MMSignal *self, gdouble value);
-void mm_signal_set_sinr (MMSignal *self, gdouble value);
-void mm_signal_set_io   (MMSignal *self, gdouble value);
-void mm_signal_set_rsrq (MMSignal *self, gdouble value);
-void mm_signal_set_rsrp (MMSignal *self, gdouble value);
-void mm_signal_set_snr  (MMSignal *self, gdouble value);
+void mm_signal_set_rssi       (MMSignal *self, gdouble value);
+void mm_signal_set_rscp       (MMSignal *self, gdouble value);
+void mm_signal_set_ecio       (MMSignal *self, gdouble value);
+void mm_signal_set_sinr       (MMSignal *self, gdouble value);
+void mm_signal_set_io         (MMSignal *self, gdouble value);
+void mm_signal_set_rsrq       (MMSignal *self, gdouble value);
+void mm_signal_set_rsrp       (MMSignal *self, gdouble value);
+void mm_signal_set_snr        (MMSignal *self, gdouble value);
+void mm_signal_set_error_rate (MMSignal *self, gdouble value);
 
 #endif
 
