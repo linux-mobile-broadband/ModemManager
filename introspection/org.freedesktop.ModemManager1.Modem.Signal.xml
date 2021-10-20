@@ -69,6 +69,15 @@
             </para>
           </listitem>
         </varlistentry>
+        <varlistentry><term><literal>"error-rate"</literal></term>
+          <listitem>
+            <para>
+              Frame error rate, in percentage value, given as a
+              floating point value (signature <literal>"d"</literal>).
+              Since: 1.20.
+            </para>
+          </listitem>
+        </varlistentry>
         </variablelist>
 
         Since: 1.2
@@ -117,6 +126,15 @@
             </para>
           </listitem>
         </varlistentry>
+        <varlistentry><term><literal>"error-rate"</literal></term>
+          <listitem>
+            <para>
+              Packet error rate, in percentage value, given as a
+              floating point value (signature <literal>"d"</literal>).
+              Since: 1.20.
+            </para>
+          </listitem>
+        </varlistentry>
         </variablelist>
 
         Since: 1.2
@@ -138,6 +156,15 @@
             <para>
               The GSM RSSI (Received Signal Strength Indication), in dBm,
               given as a floating point value (signature <literal>"d"</literal>).
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"error-rate"</literal></term>
+          <listitem>
+            <para>
+              Bit error rate (BER), in percentage value, given as a
+              floating point value (signature <literal>"d"</literal>).
+              Since: 1.20.
             </para>
           </listitem>
         </varlistentry>
@@ -178,6 +205,15 @@
             <para>
               The UMTS Ec/Io, in dB, given as a floating point value
               (signature <literal>"d"</literal>).
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"error-rate"</literal></term>
+          <listitem>
+            <para>
+              Block error rate (BLER), in percentage value, given as a
+              floating point value (signature <literal>"d"</literal>).
+              Since: 1.20.
             </para>
           </listitem>
         </varlistentry>
@@ -229,6 +265,15 @@
             </para>
           </listitem>
         </varlistentry>
+        <varlistentry><term><literal>"error-rate"</literal></term>
+          <listitem>
+            <para>
+              Block error rate (BLER), in percentage value, given as a
+              floating point value (signature <literal>"d"</literal>).
+              Since: 1.20.
+            </para>
+          </listitem>
+        </varlistentry>
         </variablelist>
 
         Since: 1.2
@@ -266,6 +311,15 @@
             <para>
               The 5G S/R ratio, in dB, given as
               a floating point value (signature <literal>"d"</literal>).
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"error-rate"</literal></term>
+          <listitem>
+            <para>
+              Block error rate (BLER), in percentage value, given as a
+              floating point value (signature <literal>"d"</literal>).
+              Since: 1.20.
             </para>
           </listitem>
         </varlistentry>
