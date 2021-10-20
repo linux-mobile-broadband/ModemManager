@@ -3,7 +3,8 @@
 <!--
  ModemManager 0.8 Interface Specification
 
-   Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+   Copyright (C) 2013-2021 Aleksander Morgado <aleksander@aleksander.es>
+   Copyright (C) 2021 Intel Corporation
 -->
 
 <node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
@@ -18,14 +19,27 @@
       registered in the cellular network. 3GPP devices will require a valid
       unlocked SIM card before any of the features in the interface can be
       used.
+
+      There are two different ways defined to use the interface: either enabling
+      peridic polling (with the Setup() method), or configuring the device with
+      thresholds so that it reports the value updates automatically (with the
+      SetupThresholds() method, since 1.20).
+
+      Both Setup() and SetupThresholds() can also be used at the same time if
+      required, e.g. if they report different signal quality measurement types.
   -->
   <interface name="org.freedesktop.ModemManager1.Modem.Signal">
 
     <!--
         Setup:
-        @rate: refresh rate to set, in seconds. 0 to disable retrieval.
+        @rate: refresh rate to set, in seconds. Use 0 to disable periodic polling.
 
-        Setup extended signal quality information retrieval.
+        Enable or disable the extended signal quality information retrieval via
+        periodic polling.
+
+        Polling is less than optimal; a better way to be notified of extended
+        signal quality updates is to configure the modem to trigger the reports
+        when the signal changes, i.e. with SetupThresholds().
 
         Since: 1.2
     -->
@@ -34,14 +48,87 @@
     </method>
 
     <!--
+        SetupThresholds:
+        @settings: threshold values to set.
+
+        Setup thresholds so that the device itself decides when to report the
+        extended signal quality information updates.
+
+        The thresholds configured via this method specify the delta between
+        specific signal quality measurements that would trigger a report by the
+        modem. For example, the user may want to be notified every time the
+        signal RSSI changes more than 10dBm, so a value of 10 would be
+        configured as <literal>"rssi-threshold"</literal>.
+
+        The device may not support this kind of threshold setting, and instead
+        support fixed signal levels as thresholds (e.g. trigger reports when
+        signal RSSI crosses -90dBm). On these devices, the threshold configured
+        by the user as a difference between measurements is converted to fixed
+        signal levels automatically, depending on the expected range for each of
+        the configured values. E.g. if the user configures 10dBm as
+        <literal>"rssi-threshold"</literal>, the fixed signal levels could be
+        automatically set to -100dBm, -90dBm, -80dBm, -70dBm and -60dBm.
+
+        <variablelist>
+          <varlistentry><term><literal>"rssi-threshold"</literal></term>
+            <listitem>
+              The difference of signal RSSI measurements, in dBm, that should
+              trigger a signal quality report update, given as an unsigned
+              integer (signature <literal>"u"</literal>). Use 0 to disable this
+              threshold.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"error-rate-threshold"</literal></term>
+            <listitem>
+              A boolean value, indicating whether signal quality report updates
+              should be triggered when error rate measurements change (signature
+              <literal>"b"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        If any of the settings is not given as input, the corresponding threshold
+        will be considered disabled, and device defaults will apply.
+
+        Since: 1.20
+    -->
+    <method name="SetupThresholds">
+      <arg name="settings" type="a{sv}" direction="in" />
+    </method>
+
+    <!--
         Rate:
 
-        Refresh rate for the extended signal quality information updates,
-        in seconds. A value of 0 disables the retrieval of the values.
+        Refresh rate, in seconds, for the extended signal quality information
+        periodic polling, as configured via the Setup() method.
+
+        A value of 0 indicates the periodic polling is disabled.
 
         Since: 1.2
     -->
     <property name="Rate" type="u" access="read" />
+
+    <!--
+        RssiThreshold:
+
+        The difference of signal RSSI measurements, in dBm, that should trigger
+        a signal quality report update.
+
+        A value of 0 indicates the threshold is disabled.
+
+        Since: 1.20
+    -->
+    <property name="RssiThreshold" type="u" access="read" />
+
+    <!--
+        ErrorRateThreshold:
+
+        Flag indicating whether signal quality report updates should be triggered
+        on error rate measurement changes.
+
+        Since: 1.20
+    -->
+    <property name="ErrorRateThreshold" type="b" access="read" />
 
     <!--
         Cdma:
