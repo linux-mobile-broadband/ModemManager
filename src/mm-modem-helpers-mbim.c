@@ -42,11 +42,15 @@ mm_modem_capability_from_mbim_device_caps (MbimCellularClass  caps_cellular_clas
     if (caps_data_class & MBIM_DATA_CLASS_LTE)
         mask |= MM_MODEM_CAPABILITY_LTE;
 
+    /* e.g. Gosuncn GM800 reports MBIM custom data class "5G/TDS" */
     if ((caps_data_class & MBIM_DATA_CLASS_CUSTOM) && caps_custom_data_class) {
-        /* e.g. Gosuncn GM800 reports MBIM custom data class "5G/TDS" */
         if (strstr (caps_custom_data_class, "5G"))
             mask |= MM_MODEM_CAPABILITY_5GNR;
     }
+
+    /* Support for devices with Microsoft extensions */
+    if (caps_data_class & (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA))
+        mask |= MM_MODEM_CAPABILITY_5GNR;
 
     return mask;
 }
