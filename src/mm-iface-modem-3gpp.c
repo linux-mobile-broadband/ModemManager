@@ -145,6 +145,26 @@ mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
      state == MM_MODEM_3GPP_REGISTRATION_STATE_IDLE ||                    \
      state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
 
+static MMModem3gppPacketServiceState
+get_consolidated_packet_service_state (MMIfaceModem3gpp *self)
+{
+    Private *priv;
+
+    priv = get_private (self);
+
+    /* If registered in any of PS, EPS or 5GS, then packet service domain is
+     * implicitly attached. */
+    if (REG_STATE_IS_REGISTERED (priv->state_ps) ||
+        REG_STATE_IS_REGISTERED (priv->state_eps) ||
+        REG_STATE_IS_REGISTERED (priv->state_5gs))
+        return MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED;
+
+    if (REG_STATE_IS_REGISTERED (priv->state_cs))
+        return MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED;
+
+    return MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+}
+
 static MMModem3gppRegistrationState
 get_consolidated_reg_state (MMIfaceModem3gpp *self)
 {
@@ -1602,6 +1622,21 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 
 static void
+update_packet_service_state (MMIfaceModem3gpp              *self,
+                             MMModem3gppPacketServiceState  state)
+{
+    g_autoptr(MmGdbusModem3gppSkeleton) skeleton = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (skeleton)
+        mm_gdbus_modem3gpp_set_packet_service_state (MM_GDBUS_MODEM3GPP (skeleton), state);
+}
+
+/*****************************************************************************/
+
+static void
 update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *self,
                                                             GAsyncResult     *res,
                                                             gpointer          user_data)
@@ -1621,6 +1656,9 @@ update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *se
                 mm_modem_3gpp_registration_state_get_string (priv->state_eps),
                 mm_modem_3gpp_registration_state_get_string (priv->state_5gs),
                 mm_modem_3gpp_registration_state_get_string (new_state));
+
+    /* Packet service state refresh */
+    update_packet_service_state (self, get_consolidated_packet_service_state (self));
 
     /* The property in the interface is bound to the property
      * in the skeleton, so just updating here is enough */
@@ -1643,6 +1681,9 @@ update_non_registered_state (MMIfaceModem3gpp             *self,
 {
     /* Not registered neither in home nor roaming network */
     mm_iface_modem_3gpp_clear_current_operator (self);
+
+    /* Packet service detached */
+    update_packet_service_state (self, MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED);
 
     /* The property in the interface is bound to the property
      * in the skeleton, so just updating here is enough */
