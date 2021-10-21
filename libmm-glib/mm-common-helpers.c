@@ -669,6 +669,16 @@ mm_common_get_3gpp_facility_from_string (const gchar  *str,
                                error);
 }
 
+MMModem3gppPacketServiceState
+mm_common_get_3gpp_packet_service_state_from_string (const gchar  *str,
+                                                     GError      **error)
+{
+    return _enum_from_string (MM_TYPE_MODEM_3GPP_PACKET_SERVICE_STATE,
+                              str,
+                              MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN,
+                              error);
+}
+
 /******************************************************************************/
 /* MMModemPortInfo array management */
 

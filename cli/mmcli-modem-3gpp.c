@@ -52,6 +52,7 @@ static gchar    *register_in_operator_str;
 static gchar    *set_eps_ue_mode_operation_str;
 static gchar    *set_initial_eps_bearer_settings_str;
 static gchar    *disable_facility_lock_str;
+static gchar    *set_packet_service_state_str;
 
 static GOptionEntry entries[] = {
     { "3gpp-scan", 0, 0, G_OPTION_ARG_NONE, &scan_flag,
@@ -77,6 +78,10 @@ static GOptionEntry entries[] = {
     { "3gpp-disable-facility-lock", 0, 0, G_OPTION_ARG_STRING, &disable_facility_lock_str,
       "Disable facility personalization",
       "[facility,key]"
+    },
+    { "3gpp-set-packet-service-state", 0, 0, G_OPTION_ARG_STRING, &set_packet_service_state_str,
+      "Set packet service state",
+      "[attached|detached]"
     },
     { NULL }
 };
@@ -110,7 +115,8 @@ mmcli_modem_3gpp_options_enabled (void)
                  !!register_in_operator_str +
                  !!set_eps_ue_mode_operation_str +
                  !!set_initial_eps_bearer_settings_str +
-                 !!disable_facility_lock_str);
+                 !!disable_facility_lock_str +
+                 !!set_packet_service_state_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many 3GPP actions requested\n");
@@ -341,6 +347,47 @@ disable_facility_lock_ready (MMModem3gpp  *modem_3gpp,
 }
 
 static void
+set_packet_service_state_process_reply (gboolean      result,
+                                        const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set packet service state: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set packet service state\n");
+}
+
+static void
+set_packet_service_state_ready (MMModem3gpp  *modem_3gpp,
+                                GAsyncResult *result,
+                                gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_3gpp_set_packet_service_state_finish (modem_3gpp, result, &error);
+    set_packet_service_state_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static gboolean
+set_packet_service_state_parse_input (const gchar                   *str,
+                                      MMModem3gppPacketServiceState *out_state)
+{
+    MMModem3gppPacketServiceState state;
+
+    state = mm_common_get_3gpp_packet_service_state_from_string (str, NULL);
+    if (state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN)
+        return FALSE;
+
+    *out_state = state;
+    return TRUE;
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result)
 {
@@ -433,6 +480,24 @@ get_modem_ready (GObject      *source,
         g_object_unref (config);
         return;
 
+    }
+
+    /* Request to set packet service state */
+    if (set_packet_service_state_str) {
+        MMModem3gppPacketServiceState  state;
+
+        if (!set_packet_service_state_parse_input (set_packet_service_state_str, &state)) {
+            g_printerr ("Error parsing packet service state string.\n");
+            exit (EXIT_FAILURE);
+        }
+
+        g_debug ("Asynchronously setting packet service state...");
+        mm_modem_3gpp_set_packet_service_state (ctx->modem_3gpp,
+                                                state,
+                                                ctx->cancellable,
+                                                (GAsyncReadyCallback)set_packet_service_state_ready,
+                                                NULL);
+        return;
     }
 
     g_warn_if_reached ();
@@ -549,6 +614,25 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
                                                                      &error);
         set_initial_eps_bearer_settings_process_reply (result, error);
         g_object_unref (config);
+        return;
+    }
+
+    /* Request to set packet service state */
+    if (set_packet_service_state_str) {
+        gboolean                       result;
+        MMModem3gppPacketServiceState  state;
+
+        if (!set_packet_service_state_parse_input (set_packet_service_state_str, &state)) {
+            g_printerr ("Error parsing packet service state string.\n");
+            exit (EXIT_FAILURE);
+        }
+
+        g_debug ("Asynchronously setting packet service state...");
+        result = mm_modem_3gpp_set_packet_service_state_sync (ctx->modem_3gpp,
+                                                              state,
+                                                              NULL,
+                                                              &error);
+        set_packet_service_state_process_reply (result, error);
         return;
     }
 

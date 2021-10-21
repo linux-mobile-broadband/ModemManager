@@ -85,6 +85,8 @@ MMBearerApnType               mm_common_get_apn_type_from_string                
                                                                                    GError      **error);
 MMModem3gppFacility           mm_common_get_3gpp_facility_from_string             (const gchar  *str,
                                                                                    GError      **error);
+MMModem3gppPacketServiceState mm_common_get_3gpp_packet_service_state_from_string (const gchar  *str,
+                                                                                   GError      **error);
 
 /******************************************************************************/
 

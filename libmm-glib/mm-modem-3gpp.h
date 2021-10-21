@@ -189,6 +189,19 @@ gboolean mm_modem_3gpp_disable_facility_lock_sync   (MMModem3gpp          *self,
                                                      GCancellable         *cancellable,
                                                      GError              **error);
 
+void     mm_modem_3gpp_set_packet_service_state        (MMModem3gpp                    *self,
+                                                        MMModem3gppPacketServiceState   state,
+                                                        GCancellable                   *cancellable,
+                                                        GAsyncReadyCallback             callback,
+                                                        gpointer                        user_data);
+gboolean mm_modem_3gpp_set_packet_service_state_finish (MMModem3gpp                    *self,
+                                                        GAsyncResult                   *res,
+                                                        GError                        **error);
+gboolean mm_modem_3gpp_set_packet_service_state_sync   (MMModem3gpp                    *self,
+                                                        MMModem3gppPacketServiceState   state,
+                                                        GCancellable                   *cancellable,
+                                                        GError                        **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_3GPP_H_ */

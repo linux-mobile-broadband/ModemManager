@@ -214,6 +214,18 @@
     </method>
 
     <!--
+        SetPacketServiceState:
+        @state: a <link linkend="MMModem3gppPacketServiceState">MMModem3gppPacketServiceState</link>.
+
+        Explicitly attach or detach packet service on the current registered network.
+
+        Since: 1.20
+    -->
+    <method name="SetPacketServiceState">
+      <arg name="state" type="u" direction="in" />
+    </method>
+
+    <!--
         SubscriptionState:
 
         A <link linkend="MMModem3gppSubscriptionState">MMModem3gppSubscriptionState</link>

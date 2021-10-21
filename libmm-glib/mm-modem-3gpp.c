@@ -1281,6 +1281,93 @@ mm_modem_3gpp_disable_facility_lock_sync (MMModem3gpp          *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_3gpp_set_packet_service_state_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_set_packet_service_state().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_set_packet_service_state().
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.20
+ */
+gboolean
+mm_modem_3gpp_set_packet_service_state_finish (MMModem3gpp   *self,
+                                               GAsyncResult  *res,
+                                               GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    return mm_gdbus_modem3gpp_call_set_packet_service_state_finish (MM_GDBUS_MODEM3GPP (self), res, error);
+}
+
+/**
+ * mm_modem_3gpp_set_packet_service_state:
+ * @self: A #MMModem3gpp.
+ * @state: A #MMModem3gppPacketServiceState.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously tries to attach or detach from the packet domain service.
+ *
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_3gpp_set_packet_service_state_finish() to get the result of the operation.
+ *
+ * See mm_modem_3gpp_set_packet_service_state_sync() for the synchronous,
+ * blocking version of this method.
+ *
+ * Since: 1.20
+ */
+void
+mm_modem_3gpp_set_packet_service_state (MMModem3gpp                   *self,
+                                        MMModem3gppPacketServiceState  state,
+                                        GCancellable                  *cancellable,
+                                        GAsyncReadyCallback            callback,
+                                        gpointer                       user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_3GPP (self));
+
+    mm_gdbus_modem3gpp_call_set_packet_service_state (MM_GDBUS_MODEM3GPP (self), state, cancellable, callback, user_data);
+}
+
+/**
+ * mm_modem_3gpp_set_packet_service_state_sync:
+ * @self: A #MMModem3gpp.
+ * @state: A #MMModem3gppPacketServiceState.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously tries to attach or detach from the packet domain service.
+ *
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_3gpp_set_packet_service_state() for the asynchronous version of
+ * this method.
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.20
+ */
+gboolean
+mm_modem_3gpp_set_packet_service_state_sync (MMModem3gpp                    *self,
+                                             MMModem3gppPacketServiceState   state,
+                                             GCancellable                   *cancellable,
+                                             GError                        **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    return mm_gdbus_modem3gpp_call_set_packet_service_state_sync (MM_GDBUS_MODEM3GPP (self), state, cancellable, error);
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_3gpp_init (MMModem3gpp *self)
 {
