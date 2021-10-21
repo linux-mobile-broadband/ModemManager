@@ -1601,4 +1601,20 @@ typedef enum { /*< underscore_name=mm_bearer_apn_type >*/
     MM_BEARER_APN_TYPE_PRIVATE    = 1 << 7,
 } MMBearerApnType;
 
+/**
+ * MMModem3gppPacketServiceState:
+ * @MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN: Unknown.
+ * @MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED: Detached.
+ * @MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED: Attached.
+ *
+ * The packet domain service state.
+ *
+ * Since 1.20
+ */
+typedef enum { /*< underscore_name=mm_modem_3gpp_packet_service_state >*/
+    MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN  = 0,
+    MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED = 1,
+    MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED = 2,
+} MMModem3gppPacketServiceState;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

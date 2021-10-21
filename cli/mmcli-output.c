@@ -131,6 +131,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_3GPP_OPERATOR_ID]                       = { "modem.3gpp.operator-code",                        "operator id",              MMC_S_MODEM_3GPP,                 },
     [MMC_F_3GPP_OPERATOR_NAME]                     = { "modem.3gpp.operator-name",                        "operator name",            MMC_S_MODEM_3GPP,                 },
     [MMC_F_3GPP_REGISTRATION]                      = { "modem.3gpp.registration-state",                   "registration",             MMC_S_MODEM_3GPP,                 },
+    [MMC_F_3GPP_PACKET_SERVICE_STATE]              = { "modem.3gpp.packet-service-state",                 "packet service state",     MMC_S_MODEM_3GPP,                 },
     [MMC_F_3GPP_PCO]                               = { "modem.3gpp.pco",                                  "pco",                      MMC_S_MODEM_3GPP,                 },
     [MMC_F_3GPP_EPS_UE_MODE]                       = { "modem.3gpp.eps.ue-mode-operation",                "ue mode of operation",     MMC_S_MODEM_3GPP_EPS,             },
     [MMC_F_3GPP_EPS_INITIAL_BEARER_PATH]           = { "modem.3gpp.eps.initial-bearer.dbus-path",         "initial bearer path",      MMC_S_MODEM_3GPP_EPS,             },

@@ -405,6 +405,27 @@ mm_modem_3gpp_dup_initial_eps_bearer_path (MMModem3gpp *self)
 /*****************************************************************************/
 
 /**
+ * mm_modem_3gpp_get_packet_service_state:
+ * @self: A #MMModem.
+ *
+ * Get the packet domain service state.
+ *
+ * Returns: A #MMModem3gppPacketServiceState value, specifying the current PS attach
+ *  state.
+ *
+ * Since: 1.20
+ */
+MMModem3gppPacketServiceState
+mm_modem_3gpp_get_packet_service_state (MMModem3gpp *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN);
+
+    return mm_gdbus_modem3gpp_get_packet_service_state (MM_GDBUS_MODEM3GPP (self));
+}
+
+/*****************************************************************************/
+
+/**
  * mm_modem_3gpp_register_finish:
  * @self: A #MMModem3gpp.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to

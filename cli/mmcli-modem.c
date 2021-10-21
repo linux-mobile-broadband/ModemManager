@@ -395,6 +395,7 @@ print_modem_info (void)
         const gchar *operator_code = NULL;
         const gchar *operator_name = NULL;
         const gchar *registration = NULL;
+        const gchar *packet_service_state = NULL;
         const gchar *eps_ue_mode = NULL;
         GList       *pco_list = NULL;
         const gchar *initial_eps_bearer_path = NULL;
@@ -409,6 +410,7 @@ print_modem_info (void)
             operator_code = mm_modem_3gpp_get_operator_code (ctx->modem_3gpp);
             operator_name = mm_modem_3gpp_get_operator_name (ctx->modem_3gpp);
             registration = mm_modem_3gpp_registration_state_get_string (mm_modem_3gpp_get_registration_state (ctx->modem_3gpp));
+            packet_service_state = mm_modem_3gpp_packet_service_state_get_string (mm_modem_3gpp_get_packet_service_state (ctx->modem_3gpp));
             eps_ue_mode = mm_modem_3gpp_eps_ue_mode_operation_get_string (mm_modem_3gpp_get_eps_ue_mode_operation (ctx->modem_3gpp));
             pco_list = mm_modem_3gpp_get_pco (ctx->modem_3gpp);
             initial_eps_bearer_path = mm_modem_3gpp_get_initial_eps_bearer_path (ctx->modem_3gpp);
@@ -426,12 +428,13 @@ print_modem_info (void)
             }
         }
 
-        mmcli_output_string      (MMC_F_3GPP_IMEI,          imei);
-        mmcli_output_string_list (MMC_F_3GPP_ENABLED_LOCKS, facility_locks);
-        mmcli_output_string      (MMC_F_3GPP_OPERATOR_ID,   operator_code);
-        mmcli_output_string      (MMC_F_3GPP_OPERATOR_NAME, operator_name);
-        mmcli_output_string      (MMC_F_3GPP_REGISTRATION,  registration);
-        mmcli_output_string      (MMC_F_3GPP_EPS_UE_MODE,   eps_ue_mode);
+        mmcli_output_string      (MMC_F_3GPP_IMEI,                         imei);
+        mmcli_output_string_list (MMC_F_3GPP_ENABLED_LOCKS,                facility_locks);
+        mmcli_output_string      (MMC_F_3GPP_OPERATOR_ID,                  operator_code);
+        mmcli_output_string      (MMC_F_3GPP_OPERATOR_NAME,                operator_name);
+        mmcli_output_string      (MMC_F_3GPP_REGISTRATION,                 registration);
+        mmcli_output_string      (MMC_F_3GPP_PACKET_SERVICE_STATE,         packet_service_state);
+        mmcli_output_string      (MMC_F_3GPP_EPS_UE_MODE,                  eps_ue_mode);
         mmcli_output_string      (MMC_F_3GPP_EPS_INITIAL_BEARER_PATH,      g_strcmp0 (initial_eps_bearer_path, "/") != 0 ? initial_eps_bearer_path : NULL);
         mmcli_output_string      (MMC_F_3GPP_EPS_BEARER_SETTINGS_APN,      initial_eps_bearer_apn);
         mmcli_output_string_take (MMC_F_3GPP_EPS_BEARER_SETTINGS_IP_TYPE,  initial_eps_bearer_ip_family_str);

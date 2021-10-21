@@ -295,5 +295,15 @@
     -->
     <property name="InitialEpsBearerSettings" type="a{sv}" access="read" />
 
+    <!--
+        PacketServiceState:
+
+        A <link linkend="MMModem3gppPacketServiceState">MMModem3gppPacketServiceState</link>
+        value specifying the packet domain service state.
+
+        Since: 1.20
+    -->
+    <property name="PacketServiceState" type="u" access="read" />
+
   </interface>
 </node>
