@@ -218,6 +218,11 @@ mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class)
         mask |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     if (data_class & MBIM_DATA_CLASS_LTE)
         mask |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    if (data_class & MBIM_DATA_CLASS_5G_NSA)
+        mask |= (MM_MODEM_ACCESS_TECHNOLOGY_LTE | MM_MODEM_ACCESS_TECHNOLOGY_5GNR);
+    if (data_class & MBIM_DATA_CLASS_5G_SA)
+        mask |= MM_MODEM_ACCESS_TECHNOLOGY_5GNR;
+
     if (data_class & MBIM_DATA_CLASS_1XRTT)
         mask |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
     if (data_class & MBIM_DATA_CLASS_1XEVDO)
