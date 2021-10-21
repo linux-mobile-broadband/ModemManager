@@ -10,8 +10,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2015 Azimut Electronics
- * Copyright (C) 2015-2020 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2015-2021 Azimut Electronics
+ * Copyright (C) 2015-2021 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (C) 2021 Intel Corporation
  */
 
 #include <string.h>
@@ -42,6 +43,8 @@ G_DEFINE_TYPE (MMBearerStats, mm_bearer_stats, G_TYPE_OBJECT)
 #define PROPERTY_TOTAL_DURATION  "total-duration"
 #define PROPERTY_TOTAL_RX_BYTES  "total-rx-bytes"
 #define PROPERTY_TOTAL_TX_BYTES  "total-tx-bytes"
+#define PROPERTY_UPLINK_SPEED    "uplink-speed"
+#define PROPERTY_DOWNLINK_SPEED  "downlink-speed"
 
 struct _MMBearerStatsPrivate {
     guint   duration;
@@ -53,6 +56,8 @@ struct _MMBearerStatsPrivate {
     guint   total_duration;
     guint64 total_rx_bytes;
     guint64 total_tx_bytes;
+    guint64 uplink_speed;
+    guint64 downlink_speed;
 };
 
 /*****************************************************************************/
@@ -349,6 +354,70 @@ mm_bearer_stats_set_total_tx_bytes (MMBearerStats *self,
 /*****************************************************************************/
 
 /**
+ * mm_bearer_stats_get_uplink_speed:
+ * @self: a #MMBearerStats.
+ *
+ * Gets the speed of the uplink, in bits per second.
+ *
+ * Returns: a #guint64.
+ *
+ * Since: 1.20
+ */
+guint64
+mm_bearer_stats_get_uplink_speed (MMBearerStats *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_STATS (self), 0);
+
+    return self->priv->uplink_speed;
+}
+
+/**
+ * mm_bearer_stats_set_uplink_speed: (skip)
+ */
+void
+mm_bearer_stats_set_uplink_speed (MMBearerStats *self,
+                                  guint64        speed)
+{
+    g_return_if_fail (MM_IS_BEARER_STATS (self));
+
+    self->priv->uplink_speed = speed;
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_stats_get_downlink_speed:
+ * @self: a #MMBearerStats.
+ *
+ * Gets the speed of the downlink, in bits per second.
+ *
+ * Returns: a #guint64.
+ *
+ * Since: 1.20
+ */
+guint64
+mm_bearer_stats_get_downlink_speed (MMBearerStats *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_STATS (self), 0);
+
+    return self->priv->downlink_speed;
+}
+
+/**
+ * mm_bearer_stats_set_downlink_speed: (skip)
+ */
+void
+mm_bearer_stats_set_downlink_speed (MMBearerStats *self,
+                                    guint64        speed)
+{
+    g_return_if_fail (MM_IS_BEARER_STATS (self));
+
+    self->priv->downlink_speed = speed;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_stats_get_dictionary: (skip)
  */
 GVariant *
@@ -397,6 +466,14 @@ mm_bearer_stats_get_dictionary (MMBearerStats *self)
                             "{sv}",
                             PROPERTY_TOTAL_TX_BYTES,
                             g_variant_new_uint64 (self->priv->total_tx_bytes));
+    g_variant_builder_add  (&builder,
+                            "{sv}",
+                            PROPERTY_UPLINK_SPEED,
+                            g_variant_new_uint64 (self->priv->uplink_speed));
+    g_variant_builder_add  (&builder,
+                            "{sv}",
+                            PROPERTY_DOWNLINK_SPEED,
+                            g_variant_new_uint64 (self->priv->downlink_speed));
     return g_variant_builder_end (&builder);
 }
 
@@ -464,6 +541,14 @@ mm_bearer_stats_new_from_dictionary (GVariant *dictionary,
                 g_variant_get_uint64 (value));
         } else if (g_str_equal (key, PROPERTY_TOTAL_TX_BYTES)) {
             mm_bearer_stats_set_total_tx_bytes (
+                self,
+                g_variant_get_uint64 (value));
+        } else if (g_str_equal (key, PROPERTY_UPLINK_SPEED)) {
+            mm_bearer_stats_set_uplink_speed (
+                self,
+                g_variant_get_uint64 (value));
+        } else if (g_str_equal (key, PROPERTY_DOWNLINK_SPEED)) {
+            mm_bearer_stats_set_downlink_speed (
                 self,
                 g_variant_get_uint64 (value));
         }

@@ -1231,6 +1231,8 @@ mm_bearer_stats_get_failed_attempts
 mm_bearer_stats_get_total_duration
 mm_bearer_stats_get_total_rx_bytes
 mm_bearer_stats_get_total_tx_bytes
+mm_bearer_stats_get_uplink_speed
+mm_bearer_stats_get_downlink_speed
 <SUBSECTION Private>
 mm_bearer_stats_get_dictionary
 mm_bearer_stats_new
@@ -1243,6 +1245,8 @@ mm_bearer_stats_set_failed_attempts
 mm_bearer_stats_set_total_duration
 mm_bearer_stats_set_total_rx_bytes
 mm_bearer_stats_set_total_tx_bytes
+mm_bearer_stats_set_uplink_speed
+mm_bearer_stats_set_downlink_speed
 <SUBSECTION Standard>
 MMBearerStatsClass
 MMBearerStatsPrivate

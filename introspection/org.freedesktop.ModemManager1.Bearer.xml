@@ -358,6 +358,20 @@
               <literal>"u"</literal>). Since 1.14.
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"uplink-speed"</literal></term>
+            <listitem>
+              Uplink bit rate negotiated with network, in bits per second, given
+              as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+              Since 1.20.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"downlink-speed"</literal></term>
+            <listitem>
+              Downlink bit rate negotiated with network, in bits per second, given
+              as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+              Since 1.20.
+            </listitem>
+          </varlistentry>
         </variablelist>
 
         Since: 1.6

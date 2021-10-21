@@ -279,6 +279,8 @@ print_bearer_info (MMBearer *bearer)
         gchar   *total_duration = NULL;
         gchar   *total_bytes_rx = NULL;
         gchar   *total_bytes_tx = NULL;
+        gchar   *uplink_speed = NULL;
+        gchar   *downlink_speed = NULL;
 
         if (stats) {
             guint64 val;
@@ -309,6 +311,12 @@ print_bearer_info (MMBearer *bearer)
             val = mm_bearer_stats_get_total_tx_bytes (stats);
             if (val)
                 total_bytes_tx = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
+            val = mm_bearer_stats_get_uplink_speed (stats);
+            if (val)
+                uplink_speed = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
+            val = mm_bearer_stats_get_downlink_speed (stats);
+            if (val)
+                downlink_speed = g_strdup_printf ("%" G_GUINT64_FORMAT, val);
         }
 
         if (start_date)
@@ -321,6 +329,8 @@ print_bearer_info (MMBearer *bearer)
         mmcli_output_string_take (MMC_F_BEARER_STATS_TOTAL_DURATION,  total_duration);
         mmcli_output_string_take (MMC_F_BEARER_STATS_TOTAL_BYTES_RX,  total_bytes_rx);
         mmcli_output_string_take (MMC_F_BEARER_STATS_TOTAL_BYTES_TX,  total_bytes_tx);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_UPLINK_SPEED,    uplink_speed);
+        mmcli_output_string_take (MMC_F_BEARER_STATS_DOWNLINK_SPEED,  downlink_speed);
     }
 
     mmcli_output_dump ();
