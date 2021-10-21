@@ -4617,6 +4617,34 @@ modem_3gpp_set_eps_ue_mode_operation (MMIfaceModem3gpp              *self,
 }
 
 /*****************************************************************************/
+/* Set packet service state (3GPP interface) */
+
+static gboolean
+modem_3gpp_set_packet_service_state_finish (MMIfaceModem3gpp  *self,
+                                            GAsyncResult      *res,
+                                            GError          **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_3gpp_set_packet_service_state (MMIfaceModem3gpp              *self,
+                                     MMModem3gppPacketServiceState  state,
+                                     GAsyncReadyCallback            callback,
+                                     gpointer                       user_data)
+{
+    g_autofree gchar *cmd = NULL;
+
+    cmd = mm_3gpp_build_cgatt_set_request (state);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              10,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Unsolicited registration messages handling (3GPP interface) */
 
 static gboolean
@@ -13427,6 +13455,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->set_eps_ue_mode_operation = modem_3gpp_set_eps_ue_mode_operation;
     iface->set_eps_ue_mode_operation_finish = modem_3gpp_set_eps_ue_mode_operation_finish;
     iface->create_initial_eps_bearer = modem_3gpp_create_initial_eps_bearer;
+    iface->set_packet_service_state = modem_3gpp_set_packet_service_state;
+    iface->set_packet_service_state_finish = modem_3gpp_set_packet_service_state_finish;
 }
 
 static void

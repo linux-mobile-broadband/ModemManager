@@ -408,6 +408,9 @@ gboolean mm_3gpp_parse_ccwa_service_query_response (const gchar  *response,
                                                     gboolean     *status,
                                                     GError      **error);
 
+/* CGATT helpers */
+gchar *mm_3gpp_build_cgatt_set_request (MMModem3gppPacketServiceState state);
+
 
 /* Additional 3GPP-specific helpers */
 

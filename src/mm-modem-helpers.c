@@ -2937,6 +2937,29 @@ out:
 }
 
 /*************************************************************************/
+/* CGATT helpers */
+
+gchar *
+mm_3gpp_build_cgatt_set_request (MMModem3gppPacketServiceState state)
+{
+    guint cgatt_action;
+
+    switch (state) {
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED:
+        cgatt_action = 1;
+        break;
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED:
+        cgatt_action = 0;
+        break;
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN:
+    default:
+        return NULL;
+    }
+
+    return g_strdup_printf ("+CGATT=%u", cgatt_action);
+}
+
+/*************************************************************************/
 
 static MMSmsStorage
 storage_from_str (const gchar *str)
