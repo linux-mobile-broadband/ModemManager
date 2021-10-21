@@ -1341,6 +1341,105 @@ handle_disable_facility_lock (MmGdbusModem3gpp      *skeleton,
 }
 
 /*****************************************************************************/
+/* Set Packet Service State */
+
+typedef struct {
+    MMIfaceModem3gpp               *self;
+    MmGdbusModem3gpp               *skeleton;
+    GDBusMethodInvocation          *invocation;
+    MMModem3gppPacketServiceState   packet_service_state;
+} HandlePacketServiceStateContext;
+
+static void
+handle_set_packet_service_state_context_free (HandlePacketServiceStateContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->self);
+    g_slice_free (HandlePacketServiceStateContext,ctx);
+}
+
+static void
+set_packet_service_state_ready(MMIfaceModem3gpp                *self,
+                               GAsyncResult                    *res,
+                               HandlePacketServiceStateContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_packet_service_state_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem3gpp_complete_set_packet_service_state (ctx->skeleton, ctx->invocation);
+    handle_set_packet_service_state_context_free (ctx);
+}
+
+static void
+set_packet_service_state_auth_ready (MMBaseModem                     *self,
+                                     GAsyncResult                    *res,
+                                     HandlePacketServiceStateContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_set_packet_service_state_context_free (ctx);
+        return;
+    }
+
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (MM_IFACE_MODEM (self),
+                                                              ctx->invocation,
+                                                              MM_MODEM_STATE_ENABLED)) {
+        handle_set_packet_service_state_context_free (ctx);
+        return;
+    }
+
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->set_packet_service_state ||
+        !MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->set_packet_service_state_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Explicit packet service attach/detach operation not supported");
+        handle_set_packet_service_state_context_free (ctx);
+        return;
+    }
+
+    if ((ctx->packet_service_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED) &&
+        (ctx->packet_service_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                               "Invalid packet service state requested");
+        handle_set_packet_service_state_context_free (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->set_packet_service_state (ctx->self,
+                                                                        ctx->packet_service_state,
+                                                                        (GAsyncReadyCallback)set_packet_service_state_ready,
+                                                                        ctx);
+}
+
+static gboolean
+handle_set_packet_service_state (MmGdbusModem3gpp              *skeleton,
+                                 GDBusMethodInvocation         *invocation,
+                                 MMModem3gppPacketServiceState  packet_service_state,
+                                 MMIfaceModem3gpp              *self)
+{
+    HandlePacketServiceStateContext *ctx;
+
+    ctx = g_slice_new (HandlePacketServiceStateContext);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->packet_service_state = packet_service_state;
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)set_packet_service_state_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
 
 gboolean
 mm_iface_modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp *self,
@@ -2973,6 +3072,10 @@ interface_initialization_step (GTask *task)
         g_signal_connect (ctx->skeleton,
                           "handle-set-initial-eps-bearer-settings",
                           G_CALLBACK (handle_set_initial_eps_bearer_settings),
+                          self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-packet-service-state",
+                          G_CALLBACK (handle_set_packet_service_state),
                           self);
 
         ctx->step++;

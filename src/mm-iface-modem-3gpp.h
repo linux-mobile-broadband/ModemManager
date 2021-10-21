@@ -245,6 +245,15 @@ struct _MMIfaceModem3gpp {
     gboolean (* disable_facility_lock_finish) (MMIfaceModem3gpp  *self,
                                                GAsyncResult      *res,
                                                GError           **error);
+
+    /* Set Packet service */
+    void     (*set_packet_service_state)        (MMIfaceModem3gpp              *self,
+                                                 MMModem3gppPacketServiceState  state,
+                                                 GAsyncReadyCallback            callback,
+                                                 gpointer                       user_data);
+    gboolean (*set_packet_service_state_finish) (MMIfaceModem3gpp              *self,
+                                                 GAsyncResult                  *res,
+                                                 GError                       **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
