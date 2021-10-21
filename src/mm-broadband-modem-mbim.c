@@ -142,9 +142,11 @@ struct _MMBroadbandModemMbimPrivate {
     /* USSD helpers */
     GTask *pending_ussd_action;
 
-    /* Access technology updates */
+    /* Access technology and registration updates */
     MbimDataClass available_data_classes;
     MbimDataClass highest_available_data_class;
+    MbimRegisterState reg_state;
+    MbimPacketServiceState packet_service_state;
 
     MbimSubscriberReadyState last_ready_state;
 
@@ -3621,13 +3623,19 @@ update_access_technologies (MMBroadbandModemMbim *self)
 
 static void
 update_registration_info (MMBroadbandModemMbim *self,
-                          MbimRegisterState state,
-                          MbimDataClass available_data_classes,
-                          gchar *operator_id_take,
-                          gchar *operator_name_take)
+                          MbimRegisterState     state,
+                          MbimDataClass         available_data_classes,
+                          gchar                *operator_id_take,
+                          gchar                *operator_name_take)
 {
     MMModem3gppRegistrationState reg_state;
+    MMModem3gppRegistrationState reg_state_cs;
+    MMModem3gppRegistrationState reg_state_ps;
+    MMModem3gppRegistrationState reg_state_eps;
+    MMModem3gppRegistrationState reg_state_5gs;
     gboolean                     operator_updated = FALSE;
+
+    self->priv->reg_state = state;
 
     reg_state = mm_modem_3gpp_registration_state_from_mbim_register_state (state);
 
@@ -3659,9 +3667,30 @@ update_registration_info (MMBroadbandModemMbim *self,
         g_free (operator_name_take);
     }
 
-    mm_iface_modem_3gpp_update_ps_registration_state (
-        MM_IFACE_MODEM_3GPP (self),
-        reg_state);
+    reg_state_cs = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+    reg_state_ps = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+    reg_state_eps = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+    reg_state_5gs = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+
+    if (available_data_classes & (MBIM_DATA_CLASS_GPRS  | MBIM_DATA_CLASS_EDGE  |
+                                  MBIM_DATA_CLASS_UMTS  | MBIM_DATA_CLASS_HSDPA | MBIM_DATA_CLASS_HSUPA)) {
+        reg_state_cs = reg_state;
+        if (self->priv->packet_service_state == MBIM_PACKET_SERVICE_STATE_ATTACHED)
+            reg_state_ps = reg_state;
+    }
+
+    if (available_data_classes & (MBIM_DATA_CLASS_LTE))
+        reg_state_eps = reg_state;
+
+    if (available_data_classes & (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA))
+        reg_state_5gs = reg_state;
+
+    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_cs);
+    mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_ps);
+    if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
+        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_eps);
+    if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
+        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_5gs);
 
     self->priv->available_data_classes = available_data_classes;
     update_access_technologies (self);
@@ -3899,8 +3928,16 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     } else if (packet_service_state == MBIM_PACKET_SERVICE_STATE_DETACHED) {
         self->priv->highest_available_data_class = 0;
     }
-
     update_access_technologies (self);
+
+    if (self->priv->packet_service_state != packet_service_state) {
+        self->priv->packet_service_state = packet_service_state;
+        update_registration_info (self,
+                                  self->priv->reg_state,
+                                  self->priv->available_data_classes,
+                                  NULL,
+                                  NULL);
+    }
 }
 
 static void
@@ -7689,6 +7726,7 @@ mm_broadband_modem_mbim_init (MMBroadbandModemMbim *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_BROADBAND_MODEM_MBIM,
                                               MMBroadbandModemMbimPrivate);
+    self->priv->packet_service_state = MBIM_PACKET_SERVICE_STATE_UNKNOWN;
 }
 
 static void
