@@ -3863,6 +3863,24 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     g_strfreev (telephone_numbers);
 }
 
+typedef struct {
+    MMBroadbandModemMbim *self;
+    guint64               uplink_speed;
+    guint64               downlink_speed;
+} ReportSpeedsContext;
+
+static void
+bearer_list_report_speeds (MMBaseBearer *bearer,
+                           gpointer      user_data)
+{
+    ReportSpeedsContext *ctx = user_data;
+
+    if (MM_IS_BEARER_MBIM (bearer)) {
+        mm_obj_dbg (ctx->self, "bearer '%s' speeds updated", mm_base_bearer_get_path (bearer));
+        mm_base_bearer_report_speeds (bearer, ctx->uplink_speed, ctx->downlink_speed);
+    }
+}
+
 static void
 basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
                                            MbimDevice           *device,
@@ -3878,6 +3896,7 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     g_autofree gchar       *frequency_range_str = NULL;
     const gchar            *nw_error_str;
     g_autoptr(GError)       error = NULL;
+    g_autoptr(MMBearerList) bearer_list = NULL;
 
     if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
         if (!mbim_message_ms_basic_connect_v2_packet_service_notification_parse (
@@ -3937,6 +3956,20 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
                                   self->priv->available_data_classes,
                                   NULL,
                                   NULL);
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
+                  NULL);
+    if (bearer_list) {
+        ReportSpeedsContext ctx = {
+            .uplink_speed = uplink_speed,
+            .downlink_speed = downlink_speed,
+        };
+
+        mm_bearer_list_foreach (bearer_list,
+                                (MMBearerListForeachFunc)bearer_list_report_speeds,
+                                &ctx);
     }
 }
 

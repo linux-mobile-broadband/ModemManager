@@ -473,6 +473,21 @@ bearer_stats_start (MMBaseBearer *self,
 
 /*****************************************************************************/
 
+void
+mm_base_bearer_report_speeds (MMBaseBearer *self,
+                              guint64       uplink_speed,
+                              guint64       downlink_speed)
+{
+    /* Ignore speeds update if we're not connected */
+    if (self->priv->status != MM_BEARER_STATUS_CONNECTED)
+        return;
+    mm_bearer_stats_set_uplink_speed (self->priv->stats, uplink_speed);
+    mm_bearer_stats_set_downlink_speed (self->priv->stats, downlink_speed);
+    bearer_update_interface_stats (self);
+}
+
+/*****************************************************************************/
+
 static void
 bearer_reset_interface_status (MMBaseBearer *self)
 {

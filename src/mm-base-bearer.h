@@ -221,6 +221,10 @@ void mm_base_bearer_report_connection_status_detailed (MMBaseBearer             
 /* When unknown, just pass NULL */
 #define mm_base_bearer_report_connection_status(self, status) mm_base_bearer_report_connection_status_detailed (self, status, NULL)
 
+void mm_base_bearer_report_speeds (MMBaseBearer *self,
+                                   guint64       uplink_speed,
+                                   guint64       downlink_speed);
+
 #if defined WITH_SYSTEMD_SUSPEND_RESUME
 
 /* Sync Broadband Bearer (async) */
