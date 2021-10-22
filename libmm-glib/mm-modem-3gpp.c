@@ -1159,6 +1159,26 @@ mm_modem_3gpp_set_initial_eps_bearer_settings_sync (MMModem3gpp         *self,
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_3gpp_disable_facility_lock:
+ * @self: A #MMModem3gpp.
+ * @facility: Single bit value describing the modem personalization lock to disable.
+ * @control_key: String with control key required to unlock the personalization.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously disables the modem personalization lock.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_3gpp_disable_facility_lock_finish() to get the result of
+ * the operation.
+ *
+ * Since: 1.20
+ */
 void
 mm_modem_3gpp_disable_facility_lock (MMModem3gpp         *self,
                                      MMModem3gppFacility  facility,
@@ -1178,6 +1198,19 @@ mm_modem_3gpp_disable_facility_lock (MMModem3gpp         *self,
     g_variant_unref (properties);
 }
 
+/**
+ * mm_modem_3gpp_disable_facility_lock_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_disable_facility_lock().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_disable_facility_lock().
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.20
+ */
 gboolean
 mm_modem_3gpp_disable_facility_lock_finish (MMModem3gpp   *self,
                                             GAsyncResult  *res,
@@ -1188,6 +1221,24 @@ mm_modem_3gpp_disable_facility_lock_finish (MMModem3gpp   *self,
                                                                  error);
 }
 
+/**
+ * mm_modem_3gpp_disable_facility_lock_sync:
+ * @self: A #MMModem3gpp.
+ * @facility: Single bit value describing the modem personalization lock to disable.
+ * @control_key: String with control key required to unlock the personalization.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously disables facility lock.
+ *
+ * The calling thread is blocked until a reply is received.
+ * See mm_modem_3gpp_disable_facility_lock() for the asynchronous
+ * version of this method.
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.20
+ */
 gboolean
 mm_modem_3gpp_disable_facility_lock_sync (MMModem3gpp          *self,
                                           MMModem3gppFacility   facility,
