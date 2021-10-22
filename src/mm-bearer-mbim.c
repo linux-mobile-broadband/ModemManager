@@ -215,6 +215,8 @@ typedef struct {
     ConnectStep            step;
     MMPort                *data;
     MMBearerConnectResult *connect_result;
+    guint64                uplink_speed;
+    guint64                downlink_speed;
     /* settings to use */
     gint                   profile_id;
     gchar                 *apn;
@@ -578,6 +580,9 @@ ip_configuration_query_ready (MbimDevice   *device,
 
         if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)
             mm_bearer_connect_result_set_profile_id (ctx->connect_result, ctx->profile_id);
+
+        mm_bearer_connect_result_set_uplink_speed (ctx->connect_result, ctx->uplink_speed);
+        mm_bearer_connect_result_set_downlink_speed (ctx->connect_result, ctx->downlink_speed);
     }
 
     if (error) {
@@ -815,8 +820,8 @@ packet_service_set_ready (MbimDevice *device,
     guint32                 nw_error;
     MbimPacketServiceState  packet_service_state;
     MbimDataClass           data_class;
-    guint64                 uplink_speed;
-    guint64                 downlink_speed;
+    guint64                 uplink_speed = 0;
+    guint64                 downlink_speed = 0;
     MbimFrequencyRange      frequency_range = MBIM_FREQUENCY_RANGE_UNKNOWN;
 
     self = g_task_get_source_object (task);
@@ -886,6 +891,10 @@ packet_service_set_ready (MbimDevice *device,
             return;
         }
     }
+
+    /* store speeds to include in the connection result later on */
+    ctx->uplink_speed = uplink_speed;
+    ctx->downlink_speed = downlink_speed;
 
     /* Keep on */
     ctx->step++;
