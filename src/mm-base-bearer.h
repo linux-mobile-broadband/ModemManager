@@ -54,6 +54,14 @@ void                   mm_bearer_connect_result_set_profile_id   (MMBearerConnec
                                                                   gint                   profile_id);
 gint                   mm_bearer_connect_result_get_profile_id   (MMBearerConnectResult *result);
 
+/* speed, for stats */
+void                   mm_bearer_connect_result_set_uplink_speed   (MMBearerConnectResult *result,
+                                                                    guint64                speed);
+guint64                mm_bearer_connect_result_get_uplink_speed   (MMBearerConnectResult *result);
+void                   mm_bearer_connect_result_set_downlink_speed (MMBearerConnectResult *result,
+                                                                    guint64                speed);
+guint64                mm_bearer_connect_result_get_downlink_speed (MMBearerConnectResult *result);
+
 /*****************************************************************************/
 
 /* Default timeout values to be used in the steps of a connection or
