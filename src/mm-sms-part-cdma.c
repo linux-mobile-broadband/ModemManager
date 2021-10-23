@@ -13,6 +13,7 @@
  * Copyright (C) 2013 Google, Inc.
  */
 
+#include "mm-sms-part.h"
 #include <ctype.h>
 #include <string.h>
 
@@ -760,6 +761,7 @@ read_bearer_data_message_identifier (MMSmsPart              *sms_part,
     message_id = ((read_bits (&subparameter->parameter_value[0], 4, 8) << 8) |
                   (read_bits (&subparameter->parameter_value[1], 4, 8)));
     message_id = GUINT16_FROM_BE (message_id);
+    mm_sms_part_set_message_id (sms_part, message_id);
     mm_obj_dbg (log_object, "            message id: %u", (guint) message_id);
 
     header_ind = read_bits (&subparameter->parameter_value[2], 4, 1);
@@ -774,6 +776,8 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
     guint8 message_encoding;
     guint8 message_type = 0;
     guint8 num_fields;
+    guint wdp_total_segments;
+    guint wdp_segment_number;
     guint byte_offset = 0;
     guint bit_offset = 0;
 
@@ -828,6 +832,32 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
         for (i = 0; i < num_fields; i++) {
             data->data[i] = read_bits (&subparameter->parameter_value[byte_offset], bit_offset, 8);
             OFFSETS_UPDATE (8);
+        }
+
+        if ((mm_sms_part_get_cdma_teleservice_id (sms_part) == MM_SMS_CDMA_TELESERVICE_ID_WAP) &&
+            (num_fields >= 3) &&
+            (data->data[0] == 0x00)) {
+            /* This is a CDMA WAP WDP message with a segmentation header, as
+             * defined in section 6.5 of WAP-256-WDP-20010614-a */
+            wdp_total_segments = data->data[1];
+            wdp_segment_number = data->data[2];
+            mm_obj_dbg (log_object, "    WAP WDP Payload, segment: %d total: %d", 
+                        wdp_segment_number, wdp_total_segments); 
+
+            /* Use message id as the reference number, since it is the same
+             * across message sets*/
+            mm_sms_part_set_concat_reference (sms_part, mm_sms_part_get_message_id (sms_part));
+            mm_sms_part_set_concat_max (sms_part, wdp_total_segments);
+            /* Segment Number is 0-indexed, concat_sequence expects 1-indexed values */
+            mm_sms_part_set_concat_sequence (sms_part, wdp_segment_number + 1);
+
+            if (wdp_segment_number == 0) {
+                /* Remove the 3 byte segmentation header as well as the 16 bit source and dest port fields */
+                g_byte_array_remove_range (data, 0, 7);
+            } else { 
+                /* Remove segmentation header from additional segments to merge cleanly */
+                g_byte_array_remove_range (data, 0, 3);
+            }
         }
 
         mm_obj_dbg (log_object, "            data: (%u bytes)", num_fields);

@@ -41,6 +41,7 @@ struct _MMSmsPart {
     guint validity_relative;
     gboolean delivery_report_request;
     guint message_reference;
+    guint message_id;
     /* NOT a MMSmsDeliveryState, which just includes the known values */
     guint delivery_state;
 
@@ -125,6 +126,8 @@ PART_GET_FUNC (guint, validity_relative)
 PART_SET_FUNC (guint, validity_relative)
 PART_GET_FUNC (gboolean, delivery_report_request)
 PART_SET_FUNC (gboolean, delivery_report_request)
+PART_GET_FUNC (guint, message_id)
+PART_SET_FUNC (guint, message_id)
 PART_GET_FUNC (guint, message_reference)
 PART_SET_FUNC (guint, message_reference)
 PART_GET_FUNC (guint, delivery_state)
