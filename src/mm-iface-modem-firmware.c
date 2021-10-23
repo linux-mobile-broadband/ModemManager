@@ -160,7 +160,7 @@ handle_list (MmGdbusModemFirmware *skeleton,
 {
     HandleListContext *ctx;
 
-    ctx = g_slice_new (HandleListContext);
+    ctx = g_slice_new0 (HandleListContext);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
