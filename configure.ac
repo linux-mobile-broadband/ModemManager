@@ -48,6 +48,7 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
+AC_PROG_LN_S
 
 dnl Initialize libtool
 LT_PREREQ([2.2])
@@ -567,6 +568,7 @@ Makefile
 data/Makefile
 data/ModemManager.pc
 data/mm-glib.pc
+data/fcc-unlock/Makefile
 data/tests/Makefile
 data/tests/org.freedesktop.ModemManager1.service
 include/Makefile
