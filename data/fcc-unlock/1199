@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: CC0-1.0
+# 2021 Aleksander Morgado <aleksander@aleksander.es>
+#
+# Sierra Wireless FCC unlock mechanism
+#  HP 820 G1 (EM7355),    03f0:4e1d
+#  Dell DW5570 (MC8805),  413c:81a3
+#  Dell DW5808 (MC7355),  413c:81a8
+#  Lenovo-shipped EM7455, 1199:9079
+#
+
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
+
+# first argument is DBus path, not needed here
+shift
+
+# second and next arguments are control port names
+for PORT in "$@"; do
+  # match port name
+  [[ $PORT == *"cdc-wdm"* ]] && {
+    CDC_WDM_PORT=$PORT
+    break
+  }
+done
+
+# fail if no cdc-wdm port exposed
+[ -n "${CDC_WDM_PORT}" ] || exit 2
+
+# run qmicli operation
+qmicli --device-open-proxy --device=/dev/${CDC_WDM_PORT} --dms-set-fcc-authentication
+exit $?

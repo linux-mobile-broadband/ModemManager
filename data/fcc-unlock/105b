@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: CC0-1.0
+# 2021 Aleksander Morgado <aleksander@aleksander.es>
+#
+# Foxconn SDX55 FCC unlock operation
+#
+
+# require program name and at least 2 arguments
+[ $# -lt 2 ] && exit 1
+
+# first argument is DBus path, not needed here
+shift
+
+# second and next arguments are control port names
+for PORT in "$@"; do
+  # match port type in Linux 5.14 and newer
+  grep -q MBIM /sys/class/wwan/${PORT}/type 2>/dev/null && {
+    MBIM_PORT=$PORT
+    break
+  }
+  # match port name in Linux 5.13
+  [[ $PORT == *"MBIM"* ]] && {
+    MBIM_PORT=$PORT
+    break
+  }
+done
+
+# fail if no MBIM port exposed
+[ -n "${MBIM_PORT}" ] || exit 2
+
+# run qmicli operation over MBIM
+qmicli --device-open-proxy --device=/dev/${MBIM_PORT} --dms-foxconn-set-fcc-authentication=0
+exit $?

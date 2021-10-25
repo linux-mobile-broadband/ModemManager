@@ -364,6 +364,7 @@ version_conf = {
 
 subdir('po')
 subdir('data')
+subdir('data/fcc-unlock')
 subdir('introspection')
 subdir('include')
 
