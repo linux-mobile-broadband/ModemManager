@@ -4221,56 +4221,6 @@ mm_shared_qmi_setup_sim_hot_swap (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
-/* FCC unlock (Modem interface) */
-
-gboolean
-mm_shared_qmi_fcc_unlock_finish (MMIfaceModem  *self,
-                                 GAsyncResult  *res,
-                                 GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static void
-dms_set_fcc_authentication_ready (QmiClientDms *client,
-                                  GAsyncResult *res,
-                                  GTask        *task)
-{
-    GError                                             *error = NULL;
-    g_autoptr(QmiMessageDmsSetFccAuthenticationOutput)  output = NULL;
-
-    output = qmi_client_dms_set_fcc_authentication_finish (client, res, &error);
-    if (!output || !qmi_message_dms_set_fcc_authentication_output_get_result (output, &error))
-        g_task_return_error (task, error);
-    else
-        g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
-
-void
-mm_shared_qmi_fcc_unlock (MMIfaceModem        *self,
-                          GAsyncReadyCallback  callback,
-                          gpointer             user_data)
-{
-    GTask     *task;
-    QmiClient *client = NULL;
-
-    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
-                                      QMI_SERVICE_DMS, &client,
-                                      callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    qmi_client_dms_set_fcc_authentication (QMI_CLIENT_DMS (client),
-                                           NULL,
-                                           5,
-                                           NULL,
-                                           (GAsyncReadyCallback)dms_set_fcc_authentication_ready,
-                                           task);
-}
-
-/*****************************************************************************/
 /* Location: Set SUPL server */
 
 typedef struct {

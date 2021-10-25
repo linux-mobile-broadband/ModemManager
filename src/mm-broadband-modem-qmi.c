@@ -12381,8 +12381,6 @@ iface_modem_init (MMIfaceModem *iface)
     /* Enabling/disabling */
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_down_off_finish;
-    iface->fcc_unlock = mm_shared_qmi_fcc_unlock;
-    iface->fcc_unlock_finish = mm_shared_qmi_fcc_unlock_finish;
     iface->modem_after_power_up = NULL;
     iface->modem_after_power_up_finish = NULL;
     iface->modem_power_down = modem_power_down;

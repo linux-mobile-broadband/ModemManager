@@ -28,6 +28,7 @@
 #include "mm-private-boxed-types.h"
 #include "mm-log-object.h"
 #include "mm-context.h"
+#include "mm-fcc-unlock-dispatcher.h"
 #if defined WITH_QMI
 # include "mm-broadband-modem-qmi.h"
 #endif
@@ -3844,20 +3845,71 @@ modem_after_power_up_ready (MMIfaceModem *self,
 }
 
 static void
-fcc_unlock_ready (MMIfaceModem *self,
-                  GAsyncResult *res,
-                  GTask        *task)
+fcc_unlock_dispatcher_ready (MMFccUnlockDispatcher *dispatcher,
+                             GAsyncResult          *res,
+                             GTask                 *task)
 {
+    MMIfaceModem         *self;
     SetPowerStateContext *ctx;
     g_autoptr(GError)     error = NULL;
 
+    self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->fcc_unlock_finish (self, res, &error))
+
+    if (!mm_fcc_unlock_dispatcher_run_finish (dispatcher, res, &error))
         mm_obj_dbg (self, "couldn't run FCC unlock: %s", error->message);
 
     /* always retry, even on reported error */
     ctx->step = SET_POWER_STATE_STEP_UPDATE;
     set_power_state_step (task);
+}
+
+static void
+fcc_unlock (GTask *task)
+{
+    MMIfaceModem          *self;
+    MMFccUnlockDispatcher *dispatcher;
+    MMModemPortInfo       *port_infos;
+    guint                  n_port_infos = 0;
+    guint                  i;
+    GPtrArray             *aux;
+    g_auto(GStrv)          modem_ports = NULL;
+
+    self = g_task_get_source_object (task);
+
+    dispatcher = mm_fcc_unlock_dispatcher_get ();
+
+    aux = g_ptr_array_new ();
+    port_infos = mm_base_modem_get_port_infos (MM_BASE_MODEM (self), &n_port_infos);
+    for (i = 0; i < n_port_infos; i++) {
+        switch (port_infos[i].type) {
+        case MM_MODEM_PORT_TYPE_AT:
+        case MM_MODEM_PORT_TYPE_QMI:
+        case MM_MODEM_PORT_TYPE_MBIM:
+            g_ptr_array_add (aux, g_strdup (port_infos[i].name));
+            break;
+        case MM_MODEM_PORT_TYPE_UNKNOWN:
+        case MM_MODEM_PORT_TYPE_NET:
+        case MM_MODEM_PORT_TYPE_QCDM:
+        case MM_MODEM_PORT_TYPE_GPS:
+        case MM_MODEM_PORT_TYPE_AUDIO:
+        case MM_MODEM_PORT_TYPE_IGNORED:
+        default:
+            break;
+        }
+    }
+    mm_modem_port_info_array_free (port_infos, n_port_infos);
+    g_ptr_array_add (aux, NULL);
+    modem_ports = (GStrv) g_ptr_array_free (aux, FALSE);
+
+    mm_fcc_unlock_dispatcher_run (dispatcher,
+                                  mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
+                                  mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
+                                  g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
+                                  modem_ports,
+                                  g_task_get_cancellable (task),
+                                  (GAsyncReadyCallback)fcc_unlock_dispatcher_ready,
+                                  task);
 }
 
 static void
@@ -3959,13 +4011,11 @@ set_power_state_step (GTask *task)
         if ((ctx->requested_power_state == MM_MODEM_POWER_STATE_ON) &&
             ctx->saved_error &&
             g_error_matches (ctx->saved_error, MM_CORE_ERROR, MM_CORE_ERROR_RETRY) &&
-            !ctx->fcc_unlock_attempted &&
-            MM_IFACE_MODEM_GET_INTERFACE (self)->fcc_unlock &&
-            MM_IFACE_MODEM_GET_INTERFACE (self)->fcc_unlock_finish) {
+            !ctx->fcc_unlock_attempted) {
             mm_obj_dbg (self, "attempting fcc unlock...");
-            ctx->fcc_unlock_attempted = TRUE;
             g_clear_error (&ctx->saved_error);
-            MM_IFACE_MODEM_GET_INTERFACE (self)->fcc_unlock (self, (GAsyncReadyCallback)fcc_unlock_ready, task);
+            ctx->fcc_unlock_attempted = TRUE;
+            fcc_unlock (task);
             return;
         }
         ctx->step++;

@@ -7975,8 +7975,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = mm_shared_qmi_load_current_bands_finish;
     iface->set_current_bands = mm_shared_qmi_set_current_bands;
     iface->set_current_bands_finish = mm_shared_qmi_set_current_bands_finish;
-    iface->fcc_unlock = mm_shared_qmi_fcc_unlock;
-    iface->fcc_unlock_finish = mm_shared_qmi_fcc_unlock_finish;
 #endif
 
     /* Additional actions */
