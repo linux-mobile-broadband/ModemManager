@@ -79,6 +79,18 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="00", ENV{
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="110a", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
+# LE910S1 (RNDIS)
+# The following port is ignored since it's a diagnostic port for collecting proprietary modem traces
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7010", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7010", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7010", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+
+# LE910S1 (ECM)
+# The following port is ignored since it's a diagnostic port for collecting proprietary modem traces
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="7011", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+
 # LM940/960 use alternate settings for 3G band management
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1041", ENV{ID_MM_TELIT_BND_ALTERNATE}="1"
