@@ -830,7 +830,10 @@ csim_lock_ready (MMBaseModem  *_self,
     if (!response) {
         if (g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
-                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED)) {
+                             MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN)) {
             self->priv->csim_lock_support = FEATURE_NOT_SUPPORTED;
             mm_obj_warn (self, "couldn't lock SIM card: %s; continuing without CSIM lock", error->message);
             g_error_free (error);
