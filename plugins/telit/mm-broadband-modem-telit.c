@@ -607,6 +607,27 @@ next_step:
 }
 
 static void
+telit_qss_support_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         GTask *task)
+{
+    GError *error = NULL;
+    QssSetupContext *ctx;
+
+    ctx = g_task_get_task_data (task);
+
+    if (!mm_base_modem_at_command_finish (self, res, &error)) {
+        mm_obj_dbg (self, "#QSS command unsupported: '%s'", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx->step++;
+    qss_setup_step (task);
+}
+
+static void
 qss_setup_step (GTask *task)
 {
     QssSetupContext *ctx;
@@ -617,8 +638,13 @@ qss_setup_step (GTask *task)
 
     switch (ctx->step) {
         case QSS_SETUP_STEP_FIRST:
-            ctx->step++;
-            /* fall through */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "#QSS=?",
+                                      3,
+                                      TRUE,
+                                      (GAsyncReadyCallback) telit_qss_support_ready,
+                                      task);
+            return;
         case QSS_SETUP_STEP_QUERY:
             mm_base_modem_at_command (MM_BASE_MODEM (self),
                                       "#QSS?",
