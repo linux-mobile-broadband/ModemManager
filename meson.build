@@ -30,6 +30,7 @@ mm_sysconfdir = get_option('sysconfdir')
 mm_pkgdatadir = mm_datadir / mm_name
 mm_pkgincludedir = mm_includedir / mm_name
 mm_pkglibdir = mm_libdir / mm_name
+mm_pkgsysconfdir = mm_sysconfdir / mm_name
 
 mm_glib_name = 'libmm-glib'
 mm_glib_pkgincludedir = mm_includedir / mm_glib_name
@@ -400,6 +401,7 @@ summary({
 
 summary({
   'prefix': mm_prefix,
+  'configuration directory': mm_pkgsysconfdir,
   'D-Bus policy directory': dbus_policy_dir,
   'udev base directory': udev_udevdir,
   'systemd user unit directory': systemd_systemdsystemunitdir,

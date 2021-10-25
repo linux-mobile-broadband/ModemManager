@@ -191,12 +191,6 @@ void               mm_shared_qmi_setup_sim_hot_swap                 (MMIfaceMode
 gboolean           mm_shared_qmi_setup_sim_hot_swap_finish          (MMIfaceModem         *self,
                                                                      GAsyncResult         *res,
                                                                      GError              **error);
-void               mm_shared_qmi_fcc_unlock                         (MMIfaceModem         *self,
-                                                                     GAsyncReadyCallback   callback,
-                                                                     gpointer              user_data);
-gboolean           mm_shared_qmi_fcc_unlock_finish                  (MMIfaceModem         *self,
-                                                                     GAsyncResult         *res,
-                                                                     GError              **error);
 
 /* Shared QMI location support */
 

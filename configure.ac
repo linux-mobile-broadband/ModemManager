@@ -190,6 +190,10 @@ dnl-----------------------------------------------------------------------------
 dnl System paths
 dnl
 
+dnl ModemManager configuration directory
+pkgsysconfdir="${sysconfdir}/ModemManager"
+AC_SUBST(pkgsysconfdir)
+
 dnl DBus system directory
 AC_ARG_WITH(dbus-sys-dir, AS_HELP_STRING([--with-dbus-sys-dir=DIR], [where D-BUS system.d directory is]))
 if test -n "$with_dbus_sys_dir" ; then
@@ -618,6 +622,7 @@ echo "
 
     System paths:
       prefix:                  ${prefix}
+      configuration directory: ${pkgsysconfdir}
       D-Bus system directory:  ${DBUS_SYS_DIR}
       udev base directory:     ${UDEV_BASE_DIR}
       systemd unit directory:  ${with_systemdsystemunitdir}

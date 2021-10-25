@@ -292,6 +292,8 @@ CLEANFILES    += $(DAEMON_ENUMS_GENERATED)
 
 ModemManager_CPPFLAGS = \
 	-DPLUGINDIR=\"$(pkglibdir)\" \
+	-DFCCUNLOCKDIRPACKAGE=\"${pkglibdir}/fcc-unlock.d\" \
+	-DFCCUNLOCKDIRUSER=\"${pkgsysconfdir}/fcc-unlock.d\" \
 	-DMM_COMPILATION \
 	$(NULL)
 
@@ -311,6 +313,8 @@ ModemManager_SOURCES = \
 	mm-private-boxed-types.c \
 	mm-auth-provider.h \
 	mm-auth-provider.c \
+	mm-fcc-unlock-dispatcher.h \
+	mm-fcc-unlock-dispatcher.c \
 	mm-filter.h \
 	mm-filter.c \
 	mm-base-manager.c \
