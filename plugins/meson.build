@@ -349,7 +349,6 @@ if plugins_options['foxconn']
     '-DMM_MODULE_NAME="foxconn"',
     '-DTESTUDEVRULESDIR_FOXCONN="@0@"'.format(foxconn_dir),
 	'-DTESTKEYFILE_FOXCONN_T77W968="@0@"'.format(foxconn_dir / 'mm-foxconn-t77w968-carrier-mapping.conf'),
-	'-DTESTKEYFILE_FOXCONN_T99W175="@0@"'.format(foxconn_dir / 'mm-foxconn-t99w175-carrier-mapping.conf'),
   ]
 
   plugins += {'plugin-foxconn': {
@@ -359,7 +358,6 @@ if plugins_options['foxconn']
 
   plugins_data += files(
     'foxconn/mm-foxconn-t77w968-carrier-mapping.conf',
-    'foxconn/mm-foxconn-t99w175-carrier-mapping.conf',
   )
   plugins_udev_rules += files('foxconn/77-mm-foxconn-port-types.rules')
 endif
