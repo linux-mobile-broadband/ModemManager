@@ -1561,6 +1561,12 @@ typedef enum { /*< underscore_name=mm_bearer_multiplex_support >*/
  * @MM_BEARER_APN_TYPE_VOICE: APN providing access to voice-over-IP services.
  * @MM_BEARER_APN_TYPE_EMERGENCY: APN providing access to emergency services.
  * @MM_BEARER_APN_TYPE_PRIVATE: APN providing access to private networks.
+ * @MM_BEARER_APN_TYPE_PURCHASE: APN providing access to over-the-air activation sites. Since 1.20.
+ * @MM_BEARER_APN_TYPE_VIDEO_SHARE: APN providing access to video sharing service. Since 1.20.
+ * @MM_BEARER_APN_TYPE_LOCAL: APN providing access to a local connection with the device. Since 1.20.
+ * @MM_BEARER_APN_TYPE_APP: APN providing access to certain applications allowed  by mobile operators. Since 1.20.
+ * @MM_BEARER_APN_TYPE_XCAP: APN providing access to XCAP provisioning on IMS services. Since 1.20.
+ * @MM_BEARER_APN_TYPE_TETHERING: APN providing access to mobile hotspot tethering. Since 1.20.
  *
  * Purpose of the APN used in a given Bearer.
  *
@@ -1590,15 +1596,21 @@ typedef enum { /*< underscore_name=mm_bearer_multiplex_support >*/
  * Since: 1.18
  */
 typedef enum { /*< underscore_name=mm_bearer_apn_type >*/
-    MM_BEARER_APN_TYPE_NONE       = 0,
-    MM_BEARER_APN_TYPE_INITIAL    = 1 << 0,
-    MM_BEARER_APN_TYPE_DEFAULT    = 1 << 1,
-    MM_BEARER_APN_TYPE_IMS        = 1 << 2,
-    MM_BEARER_APN_TYPE_MMS        = 1 << 3,
-    MM_BEARER_APN_TYPE_MANAGEMENT = 1 << 4,
-    MM_BEARER_APN_TYPE_VOICE      = 1 << 5,
-    MM_BEARER_APN_TYPE_EMERGENCY  = 1 << 6,
-    MM_BEARER_APN_TYPE_PRIVATE    = 1 << 7,
+    MM_BEARER_APN_TYPE_NONE        = 0,
+    MM_BEARER_APN_TYPE_INITIAL     = 1 << 0,
+    MM_BEARER_APN_TYPE_DEFAULT     = 1 << 1,
+    MM_BEARER_APN_TYPE_IMS         = 1 << 2,
+    MM_BEARER_APN_TYPE_MMS         = 1 << 3,
+    MM_BEARER_APN_TYPE_MANAGEMENT  = 1 << 4,
+    MM_BEARER_APN_TYPE_VOICE       = 1 << 5,
+    MM_BEARER_APN_TYPE_EMERGENCY   = 1 << 6,
+    MM_BEARER_APN_TYPE_PRIVATE     = 1 << 7,
+    MM_BEARER_APN_TYPE_PURCHASE    = 1 << 8,
+    MM_BEARER_APN_TYPE_VIDEO_SHARE = 1 << 9,
+    MM_BEARER_APN_TYPE_LOCAL       = 1 << 10,
+    MM_BEARER_APN_TYPE_APP         = 1 << 11,
+    MM_BEARER_APN_TYPE_XCAP        = 1 << 12,
+    MM_BEARER_APN_TYPE_TETHERING   = 1 << 13,
 } MMBearerApnType;
 
 /**
