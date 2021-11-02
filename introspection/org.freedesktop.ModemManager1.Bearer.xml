@@ -482,6 +482,13 @@
               value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"access-type-preference"</literal></term>
+            <listitem><para>
+              Access type preference for 5G devices, given as a
+              <link linkend="MMBearerAccessTypePreference">MMBearerAccessTypePreference</link>
+              value (signature <literal>"u"</literal>. Since 1.20.
+            </para></listitem>
+          </varlistentry>
           <varlistentry><term><literal>"profile-id"</literal></term>
             <listitem>
               The ID of the 3GPP profile to connect to (signature
