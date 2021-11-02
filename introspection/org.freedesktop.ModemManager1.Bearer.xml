@@ -414,7 +414,8 @@
           <varlistentry><term><literal>"apn"</literal></term>
             <listitem><para>
               The Access Point Name to use in the connection, given as a string
-              value (signature <literal>"s"</literal>).
+              value (signature <literal>"s"</literal>). For 5G NGC, this field
+              contains the Data Network Name (DNN).
             </para></listitem>
           </varlistentry>
           <varlistentry><term><literal>"ip-type"</literal></term>
