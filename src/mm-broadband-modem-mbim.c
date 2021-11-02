@@ -3171,25 +3171,46 @@ lte_attach_info_query_ready (MbimDevice   *device,
     g_autofree gchar       *password = NULL;
     guint32                 compression;
     guint32                 auth_protocol;
+    MbimNwError             nw_error = 0;
 
     self = g_task_get_source_object (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (!response ||
-        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
-        !mbim_message_ms_basic_connect_extensions_lte_attach_info_response_parse (
-            response,
-            &lte_attach_state,
-            &ip_type,
-            &access_string,
-            &user_name,
-            &password,
-            &compression,
-            &auth_protocol,
-            &error)) {
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
+    }
+
+    if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+        if (!mbim_message_ms_basic_connect_extensions_v3_lte_attach_info_response_parse (
+                response,
+                &lte_attach_state,
+                &nw_error,
+                &ip_type,
+                &access_string,
+                &user_name,
+                &password,
+                &compression,
+                &auth_protocol,
+                &error))
+            g_prefix_error (&error, "Failed processing MBIMEx v3.0 LTE attach info response: ");
+        else
+            mm_obj_dbg (self, "processed MBIMEx v3.0 LTE attach info response");
+    } else {
+        if (!mbim_message_ms_basic_connect_extensions_lte_attach_info_response_parse (
+                response,
+                &lte_attach_state,
+                &ip_type,
+                &access_string,
+                &user_name,
+                &password,
+                &compression,
+                &auth_protocol,
+                &error))
+            g_prefix_error (&error, "Failed processing LTE attach info response: ");
+        else
+            mm_obj_dbg (self, "processed LTE attach info response");
     }
 
     properties = common_process_lte_attach_info (self,
@@ -3202,10 +3223,22 @@ lte_attach_info_query_ready (MbimDevice   *device,
                                                  auth_protocol,
                                                  &error);
     g_assert (properties || error);
-    if (properties)
+
+    if (!error) {
+        /* If network error is reported, then log it */
+        if (nw_error) {
+            const gchar *nw_error_str;
+
+            nw_error_str = mbim_nw_error_get_string (nw_error);
+            if (nw_error_str)
+                mm_obj_dbg (self, "LTE attach info network error reported: %s", nw_error_str);
+            else
+                mm_obj_dbg (self, "LTE attach info network error reported: 0x%x", nw_error);
+        }
         g_task_return_pointer (task, properties, g_object_unref);
-    else
+    } else {
         g_task_return_error (task, error);
+    }
     g_object_unref (task);
 }
 
@@ -4208,8 +4241,26 @@ ms_basic_connect_extensions_notification_lte_attach_info (MMBroadbandModemMbim *
     g_autofree gchar              *password = NULL;
     guint32                        compression;
     guint32                        auth_protocol;
+    MbimNwError                    nw_error = 0;
 
-    if (!mbim_message_ms_basic_connect_extensions_lte_attach_info_notification_parse (
+    if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+        if (!mbim_message_ms_basic_connect_extensions_v3_lte_attach_info_notification_parse (
+                notification,
+                &lte_attach_state,
+                &nw_error,
+                &ip_type,
+                &access_string,
+                &user_name,
+                &password,
+                &compression,
+                &auth_protocol,
+                &error)) {
+            mm_obj_warn (self, "Failed processing MBIMEx v3.0 LTE attach info notification: %s", error->message);
+            return;
+        }
+        mm_obj_dbg (self, "Processed MBIMEx v3.0 LTE attach info notification");
+    } else {
+        if (!mbim_message_ms_basic_connect_extensions_lte_attach_info_notification_parse (
             notification,
             &lte_attach_state,
             &ip_type,
@@ -4219,8 +4270,10 @@ ms_basic_connect_extensions_notification_lte_attach_info (MMBroadbandModemMbim *
             &compression,
             &auth_protocol,
             &error)) {
-        mm_obj_warn (self, "couldn't parse LTE attach status notification: %s", error->message);
-        return;
+            mm_obj_warn (self, "Failed processing LTE attach info notification: %s", error->message);
+            return;
+        }
+        mm_obj_dbg (self, "Processed LTE attach info notification");
     }
 
     properties = common_process_lte_attach_info (self,
@@ -4233,6 +4286,17 @@ ms_basic_connect_extensions_notification_lte_attach_info (MMBroadbandModemMbim *
                                                  auth_protocol,
                                                  NULL);
     mm_iface_modem_3gpp_update_initial_eps_bearer (MM_IFACE_MODEM_3GPP (self), properties);
+
+    /* If network error is reported, then log it */
+    if (nw_error) {
+        const gchar *nw_error_str;
+
+        nw_error_str = mbim_nw_error_get_string (nw_error);
+        if (nw_error_str)
+            mm_obj_dbg (self, "LTE attach info network error reported: %s", nw_error_str);
+        else
+            mm_obj_dbg (self, "LTE attach info network error reported: 0x%x", nw_error);
+    }
 }
 
 static void
