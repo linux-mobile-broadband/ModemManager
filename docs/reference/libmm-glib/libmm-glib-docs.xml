@@ -146,6 +146,10 @@
         <title>Voice support</title>
         <xi:include href="xml/mm-modem-voice.xml"/>
       </section>
+      <section>
+        <title>SAR support</title>
+        <xi:include href="xml/mm-modem-sar.xml"/>
+      </section>
     </chapter>
 
     <chapter>
