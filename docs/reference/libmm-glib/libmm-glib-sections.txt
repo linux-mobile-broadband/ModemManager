@@ -107,6 +107,8 @@ mm_object_peek_modem_signal
 mm_object_get_modem_signal
 mm_object_peek_modem_voice
 mm_object_get_modem_voice
+mm_object_peek_modem_sar
+mm_object_get_modem_sar
 <SUBSECTION Standard>
 MMObjectClass
 MM_IS_OBJECT
