@@ -1224,6 +1224,7 @@ mm_bearer_ip_config_get_type
 MMBearerStats
 <SUBSECTION Getters>
 mm_bearer_stats_get_duration
+mm_bearer_stats_get_start_date
 mm_bearer_stats_get_rx_bytes
 mm_bearer_stats_get_tx_bytes
 mm_bearer_stats_get_attempts
@@ -1238,6 +1239,7 @@ mm_bearer_stats_get_dictionary
 mm_bearer_stats_new
 mm_bearer_stats_new_from_dictionary
 mm_bearer_stats_set_duration
+mm_bearer_stats_set_start_date
 mm_bearer_stats_set_rx_bytes
 mm_bearer_stats_set_tx_bytes
 mm_bearer_stats_set_attempts
