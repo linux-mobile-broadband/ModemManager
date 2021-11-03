@@ -458,17 +458,29 @@ mm_bearer_apn_type_from_mbim_context_type (MbimContextType context_type)
             return MM_BEARER_APN_TYPE_PRIVATE;
         case MBIM_CONTEXT_TYPE_VOICE:
             return MM_BEARER_APN_TYPE_VOICE;
+        case MBIM_CONTEXT_TYPE_VIDEO_SHARE:
+            return MM_BEARER_APN_TYPE_VIDEO_SHARE;
         case MBIM_CONTEXT_TYPE_PURCHASE:
-            return MM_BEARER_APN_TYPE_MANAGEMENT;
+            return MM_BEARER_APN_TYPE_PURCHASE;
         case MBIM_CONTEXT_TYPE_IMS:
             return MM_BEARER_APN_TYPE_IMS;
         case MBIM_CONTEXT_TYPE_MMS:
             return MM_BEARER_APN_TYPE_MMS;
+        case MBIM_CONTEXT_TYPE_LOCAL:
+            return MM_BEARER_APN_TYPE_LOCAL;
+        case MBIM_CONTEXT_TYPE_ADMIN:
+            return MM_BEARER_APN_TYPE_MANAGEMENT;
+        case MBIM_CONTEXT_TYPE_APP:
+            return MM_BEARER_APN_TYPE_APP;
+        case MBIM_CONTEXT_TYPE_XCAP:
+            return MM_BEARER_APN_TYPE_XCAP;
+        case MBIM_CONTEXT_TYPE_TETHERING:
+            return MM_BEARER_APN_TYPE_TETHERING;
+        case MBIM_CONTEXT_TYPE_EMERGENCY_CALLING:
+            return MM_BEARER_APN_TYPE_EMERGENCY;
+            /* some types unused right now */
         case MBIM_CONTEXT_TYPE_INVALID:
         case MBIM_CONTEXT_TYPE_NONE:
-        case MBIM_CONTEXT_TYPE_LOCAL:
-        case MBIM_CONTEXT_TYPE_VIDEO_SHARE:
-            /* some types unused right now */
         default:
             return MM_BEARER_APN_TYPE_NONE;
     }
@@ -495,11 +507,23 @@ mm_bearer_apn_type_to_mbim_context_type (MMBearerApnType   apn_type,
     if (apn_type & MM_BEARER_APN_TYPE_MMS)
         return MBIM_CONTEXT_TYPE_MMS;
     if (apn_type &MM_BEARER_APN_TYPE_MANAGEMENT)
-        return MBIM_CONTEXT_TYPE_PURCHASE;
+        return MBIM_CONTEXT_TYPE_ADMIN;
     if (apn_type & MM_BEARER_APN_TYPE_VOICE)
         return MBIM_CONTEXT_TYPE_VOICE;
     if (apn_type & MM_BEARER_APN_TYPE_PRIVATE)
         return MBIM_CONTEXT_TYPE_VPN;
+    if (apn_type & MM_BEARER_APN_TYPE_PURCHASE)
+        return MBIM_CONTEXT_TYPE_PURCHASE;
+    if (apn_type & MM_BEARER_APN_TYPE_VIDEO_SHARE)
+        return MBIM_CONTEXT_TYPE_VIDEO_SHARE;
+    if (apn_type & MM_BEARER_APN_TYPE_LOCAL)
+        return MBIM_CONTEXT_TYPE_LOCAL;
+    if (apn_type & MM_BEARER_APN_TYPE_APP)
+        return MBIM_CONTEXT_TYPE_APP;
+    if (apn_type & MM_BEARER_APN_TYPE_XCAP)
+        return MBIM_CONTEXT_TYPE_XCAP;
+    if (apn_type & MM_BEARER_APN_TYPE_TETHERING)
+        return MBIM_CONTEXT_TYPE_TETHERING;
 
     str = mm_bearer_apn_type_build_string_from_mask (apn_type);
     g_set_error (error,
