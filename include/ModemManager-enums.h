@@ -1621,7 +1621,7 @@ typedef enum { /*< underscore_name=mm_bearer_apn_type >*/
  *
  * The packet domain service state.
  *
- * Since 1.20
+ * Since: 1.20
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_packet_service_state >*/
     MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN  = 0,
