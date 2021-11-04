@@ -44,10 +44,10 @@ common_test (const gchar *keyfile_path)
     g_key_file_unref (keyfile);
 }
 
-/* Dummy test to avoid compiler warning about common_test() being unused
+/* Placeholder test to avoid compiler warning about common_test() being unused
  * when none of the plugins enabled in build have custom key files. */
 static void
-test_dummy (void)
+test_placeholder (void)
 {
     common_test (NULL);
 }
@@ -69,7 +69,7 @@ int main (int argc, char **argv)
     setlocale (LC_ALL, "");
 
     g_test_init (&argc, &argv, NULL);
-    g_test_add_func ("/MM/test-keyfiles/dummy", test_dummy);
+    g_test_add_func ("/MM/test-keyfiles/placeholder", test_placeholder);
 
 #if defined ENABLE_PLUGIN_FOXCONN
     g_test_add_func ("/MM/test-keyfiles/foxconn/t77w968", test_foxconn_t77w968);

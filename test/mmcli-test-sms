@@ -2,7 +2,7 @@
 
 print_usage () {
     echo "usage: $0 [MODEM INDEX] [all|ucs2|gsm7|data] [NUMBER]"
-    echo "   if no [NUMBER] is given, a dummy one will be used and no SMS will be sent"
+    echo "   if no [NUMBER] is given, a placeholder one will be used and no SMS will be sent"
 }
 
 test () {

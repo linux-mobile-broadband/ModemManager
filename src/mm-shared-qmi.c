@@ -3616,15 +3616,15 @@ uim_refresh_complete (QmiClientUim      *client,
                       QmiUimSessionType  session_type)
 {
     g_autoptr(QmiMessageUimRefreshCompleteInput)  refresh_complete_input = NULL;
-    GArray                                       *dummy_aid;
+    GArray                                       *placeholder_aid;
 
-    dummy_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
+    placeholder_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
 
     refresh_complete_input = qmi_message_uim_refresh_complete_input_new ();
     qmi_message_uim_refresh_complete_input_set_session (
         refresh_complete_input,
         session_type,
-        dummy_aid, /* ignored */
+        placeholder_aid, /* ignored */
         NULL);
     qmi_message_uim_refresh_complete_input_set_info (
         refresh_complete_input,
@@ -3638,7 +3638,7 @@ uim_refresh_complete (QmiClientUim      *client,
         NULL,
         NULL,
         NULL);
-    g_array_unref (dummy_aid);
+    g_array_unref (placeholder_aid);
 }
 
 static gboolean
@@ -3916,7 +3916,7 @@ uim_refresh_register_iccid_change (GTask *task)
     QmiMessageUimRefreshRegisterInputInfoFilesElement  file_element;
     guint8                                             val;
     g_autoptr(QmiMessageUimRefreshRegisterInput)       refresh_register_input = NULL;
-    g_autoptr(GArray)                                  dummy_aid = NULL;
+    g_autoptr(GArray)                                  placeholder_aid = NULL;
     g_autoptr(GArray)                                  file = NULL;
     g_autoptr(GArray)                                  file_element_path = NULL;
 
@@ -3925,7 +3925,7 @@ uim_refresh_register_iccid_change (GTask *task)
 
     mm_obj_dbg (self, "register for refresh file indication");
 
-    dummy_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
+    placeholder_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
 
     file = g_array_sized_new (FALSE, FALSE, sizeof (QmiMessageUimRefreshRegisterInputInfoFilesElement), 1);
 
@@ -3949,7 +3949,7 @@ uim_refresh_register_iccid_change (GTask *task)
                                                      NULL);
     qmi_message_uim_refresh_register_input_set_session (refresh_register_input,
                                                         QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING,
-                                                        dummy_aid,
+                                                        placeholder_aid,
                                                         NULL);
 
     qmi_client_uim_refresh_register (QMI_CLIENT_UIM (priv->uim_client),
@@ -4013,7 +4013,7 @@ uim_slot_status_not_supported (GTask *task)
     MMIfaceModem                                    *self;
     Private                                         *priv;
     g_autoptr(QmiMessageUimRefreshRegisterAllInput)  refresh_register_all_input = NULL;
-    g_autoptr(GArray)                                dummy_aid = NULL;
+    g_autoptr(GArray)                                placeholder_aid = NULL;
 
     self = g_task_get_source_object (task);
     priv = get_private (MM_SHARED_QMI (self));
@@ -4022,7 +4022,7 @@ uim_slot_status_not_supported (GTask *task)
 
     mm_obj_dbg (self, "slot status not supported by modem: register for refresh indications");
 
-    dummy_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
+    placeholder_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
     refresh_register_all_input = qmi_message_uim_refresh_register_all_input_new ();
 
     qmi_message_uim_refresh_register_all_input_set_info (refresh_register_all_input,
@@ -4030,7 +4030,7 @@ uim_slot_status_not_supported (GTask *task)
                                                          NULL);
     qmi_message_uim_refresh_register_all_input_set_session (refresh_register_all_input,
                                                             QMI_UIM_SESSION_TYPE_CARD_SLOT_1,
-                                                            dummy_aid,
+                                                            placeholder_aid,
                                                             NULL);
 
     qmi_client_uim_refresh_register_all (QMI_CLIENT_UIM (priv->uim_client),

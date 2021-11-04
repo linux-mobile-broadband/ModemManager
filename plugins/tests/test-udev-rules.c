@@ -46,10 +46,10 @@ common_test (const gchar *plugindir)
     g_array_unref (rules);
 }
 
-/* Dummy test to avoid compiler warning about common_test() being unused
+/* Placeholder test to avoid compiler warning about common_test() being unused
  * when none of the plugins enabled in build have custom udev rules. */
 static void
-test_dummy (void)
+test_placeholder (void)
 {
     common_test (NULL);
 }
@@ -191,7 +191,7 @@ int main (int argc, char **argv)
     setlocale (LC_ALL, "");
 
     g_test_init (&argc, &argv, NULL);
-    g_test_add_func ("/MM/test-udev-rules/dummy", test_dummy);
+    g_test_add_func ("/MM/test-udev-rules/placeholder", test_placeholder);
 
 #if defined ENABLE_PLUGIN_HUAWEI
     g_test_add_func ("/MM/test-udev-rules/huawei", test_huawei);

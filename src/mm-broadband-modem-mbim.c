@@ -881,7 +881,7 @@ modem_load_device_identifier (MMIfaceModem *self,
 
     task = g_task_new (self, NULL, callback, user_data);
 
-    /* Just use dummy ATI/ATI1 replies, all the other internal info should be
+    /* Just use placeholder ATI/ATI1 replies, all the other internal info should be
      * enough for uniqueness */
     device_identifier = mm_broadband_modem_create_device_identifier (MM_BROADBAND_MODEM (self), "", "", &error);
     if (!device_identifier)
