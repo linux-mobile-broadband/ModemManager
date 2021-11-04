@@ -1646,8 +1646,7 @@ cgact_periodic_query_ready (MMBaseModem  *modem,
     for (l = pdp_active_list; l; l = g_list_next (l)) {
         MM3gppPdpContextActive *pdp_active;
 
-        /* We look for he just assume the first active PDP context found is the one we're
-         * looking for. */
+        /* Just assume the first active PDP context found is the one we're looking for. */
         pdp_active = (MM3gppPdpContextActive *)(l->data);
         if (pdp_active->cid == (guint)self->priv->profile_id) {
             status = (pdp_active->active ? MM_BEARER_CONNECTION_STATUS_CONNECTED : MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
