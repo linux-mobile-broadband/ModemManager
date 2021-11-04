@@ -96,7 +96,7 @@ peek_port_qmi_for_data_ipa (MMBroadbandModemQmi  *self,
 {
     MMPortQmi *found = NULL;
 
-    /* when using IPA, we have a master network interface that will be multiplexed
+    /* when using IPA, we have a main network interface that will be multiplexed
      * to create link interfaces. We can assume any of the available QMI ports is
      * able to manage that. */
 

@@ -425,7 +425,7 @@ load_connection_status (MMBaseBearer        *_self,
     /* Connection status polling is an optional feature that must be
      * enabled explicitly via udev tags. If not set, out as unsupported.
      * Note that when connected via a muxed link, the udev tag should be
-     * checked on the master interface (lower device) */
+     * checked on the main interface (lower device) */
     if ((self->priv->data &&
          !mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (self->priv->data),
                                                            "ID_MM_QMI_CONNECTION_STATUS_POLLING_ENABLE")) ||
@@ -467,7 +467,7 @@ typedef enum {
     CONNECT_STEP_OPEN_QMI_PORT,
     CONNECT_STEP_SETUP_DATA_FORMAT,
     CONNECT_STEP_SETUP_LINK,
-    CONNECT_STEP_SETUP_LINK_MASTER_UP,
+    CONNECT_STEP_SETUP_LINK_MAIN_UP,
     CONNECT_STEP_IP_METHOD,
     CONNECT_STEP_IPV4,
     CONNECT_STEP_WDS_CLIENT_IPV4,
@@ -1436,9 +1436,9 @@ qmi_port_allocate_client_ready (MMPortQmi *qmi,
 }
 
 static void
-master_interface_up_ready (MMPortNet    *link,
-                           GAsyncResult *res,
-                           GTask        *task)
+main_interface_up_ready (MMPortNet    *link,
+                         GAsyncResult *res,
+                         GTask        *task)
 {
     ConnectContext *ctx;
     GError         *error = NULL;
@@ -1446,7 +1446,7 @@ master_interface_up_ready (MMPortNet    *link,
     ctx = g_task_get_task_data (task);
 
     if (!mm_port_net_link_setup_finish (link, res, &error)) {
-        g_prefix_error (&error, "Couldn't bring master interface up: ");
+        g_prefix_error (&error, "Couldn't bring main interface up: ");
         complete_connect (task, NULL, error);
         return;
     }
@@ -1743,15 +1743,15 @@ connect_context_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case CONNECT_STEP_SETUP_LINK_MASTER_UP:
-        /* if the connection is done through a new link, we need to ifup the master interface */
+    case CONNECT_STEP_SETUP_LINK_MAIN_UP:
+        /* if the connection is done through a new link, we need to ifup the main interface */
         if (ctx->link) {
-            mm_obj_dbg (self, "bringing master interface %s up...", mm_port_get_device (ctx->data));
+            mm_obj_dbg (self, "bringing main interface %s up...", mm_port_get_device (ctx->data));
             mm_port_net_link_setup (MM_PORT_NET (ctx->data),
                                     TRUE,
                                     0, /* ignore */
                                     g_task_get_cancellable (task),
-                                    (GAsyncReadyCallback) master_interface_up_ready,
+                                    (GAsyncReadyCallback) main_interface_up_ready,
                                     task);
             return;
         }

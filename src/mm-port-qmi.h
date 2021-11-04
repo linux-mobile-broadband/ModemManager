@@ -28,9 +28,9 @@
 
 typedef enum { /*< underscore_name=mm_port_qmi_kernel_data_mode >*/
     MM_PORT_QMI_KERNEL_DATA_MODE_NONE = 0,
-    /* ethernet packets over the master network interface */
+    /* ethernet packets over the main network interface */
     MM_PORT_QMI_KERNEL_DATA_MODE_802_3 = 1 << 0,
-    /* raw-ip packets over the master network interface */
+    /* raw-ip packets over the main network interface */
     MM_PORT_QMI_KERNEL_DATA_MODE_RAW_IP = 1 << 1,
     /* multiplexing support setup with rmnet */
     MM_PORT_QMI_KERNEL_DATA_MODE_MUX_RMNET = 1 << 2,

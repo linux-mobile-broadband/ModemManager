@@ -37,7 +37,7 @@
 #include "mm-log-test.h"
 
 typedef struct {
-    int master;
+    int main;
     int slave;
     gboolean valid;
     pid_t child;
@@ -259,11 +259,11 @@ test_verinfo (TestData *d)
     /* Parent */
     d->child = cpid;
 
-    req_len = server_wait_request (d->master, req, sizeof (req));
+    req_len = server_wait_request (d->main, req, sizeof (req));
     g_assert (req_len == 1);
     g_assert_cmpint (req[0], ==, 0x00);
 
-    server_send_response (d->master, rsp, sizeof (rsp));
+    server_send_response (d->main, rsp, sizeof (rsp));
     g_assert (wait_for_child (d, 3));
 }
 
@@ -311,11 +311,11 @@ test_sierra_cns_rejected (TestData *d)
     /* Parent */
     d->child = cpid;
 
-    req_len = server_wait_request (d->master, req, sizeof (req));
+    req_len = server_wait_request (d->main, req, sizeof (req));
     g_assert (req_len == 1);
     g_assert_cmpint (req[0], ==, 0x00);
 
-    server_send_response (d->master, rsp, sizeof (rsp));
+    server_send_response (d->main, rsp, sizeof (rsp));
 
     /* We expect the child to exit normally */
     g_assert (wait_for_child (d, 3));
@@ -347,11 +347,11 @@ test_random_data_rejected (TestData *d)
     /* Parent */
     d->child = cpid;
 
-    req_len = server_wait_request (d->master, req, sizeof (req));
+    req_len = server_wait_request (d->main, req, sizeof (req));
     g_assert (req_len == 1);
     g_assert_cmpint (req[0], ==, 0x00);
 
-    server_send_response (d->master, rsp, sizeof (rsp));
+    server_send_response (d->main, rsp, sizeof (rsp));
 
     /* We expect the child to exit normally */
     g_assert (wait_for_child (d, 3));
@@ -387,11 +387,11 @@ test_leading_frame_markers (TestData *d)
     /* Parent */
     d->child = cpid;
 
-    req_len = server_wait_request (d->master, req, sizeof (req));
+    req_len = server_wait_request (d->main, req, sizeof (req));
     g_assert (req_len == 1);
     g_assert_cmpint (req[0], ==, 0x00);
 
-    server_send_response (d->master, rsp, sizeof (rsp));
+    server_send_response (d->main, rsp, sizeof (rsp));
 
     /* We expect the child to exit normally */
     g_assert (wait_for_child (d, 3));
@@ -403,7 +403,7 @@ test_pty_create (TestData *d)
     struct termios stbuf;
     int ret, err;
 
-    ret = openpty (&d->master, &d->slave, NULL, NULL, NULL);
+    ret = openpty (&d->main, &d->slave, NULL, NULL, NULL);
     g_assert (ret == 0);
     d->valid = TRUE;
 
@@ -415,8 +415,8 @@ test_pty_create (TestData *d)
     tcsetattr (d->slave, TCSANOW, &stbuf);
     fcntl (d->slave, F_SETFL, O_NONBLOCK);
 
-    fcntl (d->master, F_SETFL, O_NONBLOCK);
-    err = qcdm_port_setup (d->master);
+    fcntl (d->main, F_SETFL, O_NONBLOCK);
+    err = qcdm_port_setup (d->main);
     g_assert_cmpint (err, ==, QCDM_SUCCESS);
 }
 
@@ -429,8 +429,8 @@ test_pty_cleanup (TestData *d)
     if (d->valid) {
         if (d->child)
             kill (d->child, SIGKILL);
-        if (d->master >= 0)
-            close (d->master);
+        if (d->main >= 0)
+            close (d->main);
         if (d->slave >= 0)
             close (d->slave);
         memset (d, 0, sizeof (*d));

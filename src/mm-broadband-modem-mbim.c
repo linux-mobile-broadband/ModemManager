@@ -2202,7 +2202,7 @@ modem_create_bearer (MMIfaceModem        *self,
 
     /* Note: the session id to be used by the bearer will always be 0
      * for non-multiplexed sessions, bound to the non-VLAN-tagged traffic
-     * managed by the master network interface */
+     * managed by the main network interface */
 
     task = g_task_new (self, NULL, callback, user_data);
     mm_obj_dbg (self, "creating MBIM bearer in MBIM modem");

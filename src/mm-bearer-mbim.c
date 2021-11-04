@@ -201,7 +201,7 @@ typedef enum {
     CONNECT_STEP_LOAD_PROFILE_SETTINGS,
     CONNECT_STEP_PACKET_SERVICE,
     CONNECT_STEP_SETUP_LINK,
-    CONNECT_STEP_SETUP_LINK_MASTER_UP,
+    CONNECT_STEP_SETUP_LINK_MAIN_UP,
     CONNECT_STEP_CHECK_DISCONNECTED,
     CONNECT_STEP_ENSURE_DISCONNECTED,
     CONNECT_STEP_CONNECT,
@@ -725,9 +725,9 @@ check_disconnected_ready (MbimDevice   *device,
 }
 
 static void
-master_interface_up_ready (MMPortNet    *link,
-                           GAsyncResult *res,
-                           GTask        *task)
+main_interface_up_ready (MMPortNet    *link,
+                         GAsyncResult *res,
+                         GTask        *task)
 {
     ConnectContext *ctx;
     GError         *error = NULL;
@@ -735,7 +735,7 @@ master_interface_up_ready (MMPortNet    *link,
     ctx = g_task_get_task_data (task);
 
     if (!mm_port_net_link_setup_finish (link, res, &error)) {
-        g_prefix_error (&error, "Couldn't bring master interface up: ");
+        g_prefix_error (&error, "Couldn't bring main interface up: ");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -1054,15 +1054,15 @@ connect_context_step (GTask *task)
         ctx->step++;
         /* fall through */
 
-    case CONNECT_STEP_SETUP_LINK_MASTER_UP:
-        /* if the connection is done through a new link, we need to ifup the master interface */
+    case CONNECT_STEP_SETUP_LINK_MAIN_UP:
+        /* if the connection is done through a new link, we need to ifup the main interface */
         if (ctx->link) {
-            mm_obj_dbg (self, "bringing master interface %s up...", mm_port_get_device (ctx->data));
+            mm_obj_dbg (self, "bringing main interface %s up...", mm_port_get_device (ctx->data));
             mm_port_net_link_setup (MM_PORT_NET (ctx->data),
                                     TRUE,
                                     0, /* ignore */
                                     g_task_get_cancellable (task),
-                                    (GAsyncReadyCallback) master_interface_up_ready,
+                                    (GAsyncReadyCallback) main_interface_up_ready,
                                     task);
             return;
         }

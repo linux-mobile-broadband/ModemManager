@@ -2020,7 +2020,7 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
     properties[PROP_DEVICE] =
         g_param_spec_string (MM_BASE_MODEM_DEVICE,
                              "Device",
-                             "Master modem parent device of all the modem's ports",
+                             "Main modem parent device of all the modem's ports",
                              NULL,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_DEVICE, properties[PROP_DEVICE]);
