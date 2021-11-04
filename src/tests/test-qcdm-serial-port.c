@@ -38,7 +38,7 @@
 
 typedef struct {
     int main;
-    int slave;
+    int secondary;
     gboolean valid;
     pid_t child;
 } TestData;
@@ -253,7 +253,7 @@ test_verinfo (TestData *d)
 
     if (cpid == 0) {
         /* In the child */
-        qcdm_test_child (d->slave, (GAsyncReadyCallback)qcdm_verinfo_expect_success_cb);
+        qcdm_test_child (d->secondary, (GAsyncReadyCallback)qcdm_verinfo_expect_success_cb);
         exit (0);
     }
     /* Parent */
@@ -305,7 +305,7 @@ test_sierra_cns_rejected (TestData *d)
 
     if (cpid == 0) {
         /* In the child */
-        qcdm_test_child (d->slave, (GAsyncReadyCallback)qcdm_verinfo_expect_fail_cb);
+        qcdm_test_child (d->secondary, (GAsyncReadyCallback)qcdm_verinfo_expect_fail_cb);
         exit (0);
     }
     /* Parent */
@@ -341,7 +341,7 @@ test_random_data_rejected (TestData *d)
 
     if (cpid == 0) {
         /* In the child */
-        qcdm_test_child (d->slave, (GAsyncReadyCallback)qcdm_verinfo_expect_fail_cb);
+        qcdm_test_child (d->secondary, (GAsyncReadyCallback)qcdm_verinfo_expect_fail_cb);
         exit (0);
     }
     /* Parent */
@@ -381,7 +381,7 @@ test_leading_frame_markers (TestData *d)
 
     if (cpid == 0) {
         /* In the child */
-        qcdm_test_child (d->slave, (GAsyncReadyCallback)qcdm_verinfo_expect_success_cb);
+        qcdm_test_child (d->secondary, (GAsyncReadyCallback)qcdm_verinfo_expect_success_cb);
         exit (0);
     }
     /* Parent */
@@ -403,17 +403,17 @@ test_pty_create (TestData *d)
     struct termios stbuf;
     int ret, err;
 
-    ret = openpty (&d->main, &d->slave, NULL, NULL, NULL);
+    ret = openpty (&d->main, &d->secondary, NULL, NULL, NULL);
     g_assert (ret == 0);
     d->valid = TRUE;
 
-    /* set raw mode on the slave using kernel default parameters */
+    /* set raw mode on the secondary using kernel default parameters */
     memset (&stbuf, 0, sizeof (stbuf));
-    tcgetattr (d->slave, &stbuf);
-    tcflush (d->slave, TCIOFLUSH);
+    tcgetattr (d->secondary, &stbuf);
+    tcflush (d->secondary, TCIOFLUSH);
     cfmakeraw (&stbuf);
-    tcsetattr (d->slave, TCSANOW, &stbuf);
-    fcntl (d->slave, F_SETFL, O_NONBLOCK);
+    tcsetattr (d->secondary, TCSANOW, &stbuf);
+    fcntl (d->secondary, F_SETFL, O_NONBLOCK);
 
     fcntl (d->main, F_SETFL, O_NONBLOCK);
     err = qcdm_port_setup (d->main);
@@ -431,8 +431,8 @@ test_pty_cleanup (TestData *d)
             kill (d->child, SIGKILL);
         if (d->main >= 0)
             close (d->main);
-        if (d->slave >= 0)
-            close (d->slave);
+        if (d->secondary >= 0)
+            close (d->secondary);
         memset (d, 0, sizeof (*d));
     }
 }
