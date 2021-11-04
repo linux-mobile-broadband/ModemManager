@@ -27,7 +27,7 @@ build container:
   - .common_variables
   stage: container prep
   only:
-    - master
+    - main
     - branches
     - merge_requests
     - tags
@@ -39,7 +39,7 @@ build-no-qmi:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - master
+    - main
     - merge_requests
     - tags
     - schedules
@@ -62,7 +62,7 @@ build-qmi-qrtr-no-mbim:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - master
+    - main
     - merge_requests
     - tags
     - schedules
@@ -91,7 +91,7 @@ build-qmi-no-qrtr-no-mbim:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - master
+    - main
     - merge_requests
     - tags
     - schedules
@@ -114,7 +114,7 @@ build-no-qmi-no-mbim:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - master
+    - main
     - merge_requests
     - tags
     - schedules
@@ -131,7 +131,7 @@ build-qmi-newest-commands:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - master
+    - main
     - merge_requests
     - tags
     - schedules
@@ -224,7 +224,7 @@ build-default-artifacts:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - master
+    - main
     - tags
   script:
     - !reference [build-default, script]
@@ -242,7 +242,7 @@ build-meson-release:
   - .fdo.distribution-image@ubuntu
   - .common_variables
   only:
-    - master
+    - main
     - merge_requests
     - tags
     - schedules
