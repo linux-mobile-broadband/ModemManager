@@ -6,7 +6,7 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: ModemManager master\n"
+"Project-Id-Version: ModemManager main\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
 "POT-Creation-Date: 2020-09-18 10:30+0200\n"
