@@ -542,8 +542,12 @@
           <varlistentry><term><literal>"allow-roaming"</literal></term>
             <listitem>
               Specifies whether the connections are allowed even when the device
-              is registered in a roaming network, given as a boolean value (signature
-              <literal>"b"</literal>).
+              is registered in a roaming (partner or non-partner) network, given as
+              a boolean value (signature <literal>"b"</literal>). This setting
+              applies only to the connection attempts started via
+              <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">Simple.Connect()</link>
+              or <link linkend="gdbus-method-org-freedesktop-ModemManager1-Bearer.Connect">Bearer.Connect()</link>.
+              This is a volatile setting, never stored in the device.
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"multiplex"</literal></term>
