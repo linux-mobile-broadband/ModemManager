@@ -482,7 +482,9 @@
               The name of the profile, given as a string
               value (signature <literal>"s"</literal>).
               This value has no effect on the connection, but can be used by the host
-              to identify the profiles. Since 1.20.
+              to identify the profiles. This setting only applies on profile management
+              operations, it should not be used as part of the settings of an explicit
+              connection attempt. Since 1.20.
             </para></listitem>
           </varlistentry>
         </variablelist>
