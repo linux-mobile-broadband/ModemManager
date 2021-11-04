@@ -48,8 +48,12 @@ filter_policy_option_arg (const gchar  *option_name,
                           gpointer      data,
                           GError      **error)
 {
-    if (!g_ascii_strcasecmp (value, "whitelist-only")) {
-        filter_policy = MM_FILTER_POLICY_WHITELIST_ONLY;
+    if (!g_ascii_strcasecmp (value, "allowlist-only")
+#ifndef MM_DISABLE_DEPRECATED
+        || !g_ascii_strcasecmp (value, "whitelist-only")
+#endif
+        ) {
+        filter_policy = MM_FILTER_POLICY_ALLOWLIST_ONLY;
         return TRUE;
     }
 
@@ -67,7 +71,7 @@ filter_policy_option_arg (const gchar  *option_name,
 static const GOptionEntry entries[] = {
     {
         "filter-policy", 0, 0, G_OPTION_ARG_CALLBACK, filter_policy_option_arg,
-        "Filter policy: one of WHITELIST-ONLY, STRICT",
+        "Filter policy: one of ALLOWLIST-ONLY, STRICT",
         "[POLICY]"
     },
     {

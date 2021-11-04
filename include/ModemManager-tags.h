@@ -68,8 +68,8 @@
  *
  * This is a device-specific tag that allows explicitly requesting the
  * processing of all ports exposed by the device. This tag is usually
- * used by users when the daemon runs with WHITELIST-ONLY filter policy
- * type, and is associated to the MM_FILTER_RULE_EXPLICIT_WHITELIST rule.
+ * used by users when the daemon runs with ALLOWLIST-ONLY filter policy
+ * type, and is associated to the MM_FILTER_RULE_EXPLICIT_ALLOWLIST rule.
  *
  * This tag may also be specified in specific ports, e.g. when the modem
  * exposes a single platform port without any parent device.
@@ -87,7 +87,7 @@
  * This tag was originally applicable to TTY ports and only when running
  * in certain filter policy types. Since 1.12, this tag applies to all
  * filter types and to all port types (not only TTYs), and is associated
- * to the MM_FILTER_RULE_EXPLICIT_BLACKLIST rule.
+ * to the MM_FILTER_RULE_EXPLICIT_BLOCKLIST rule.
  *
  * Since: 1.10
  */

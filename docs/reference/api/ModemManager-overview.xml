@@ -107,7 +107,7 @@
         predefined filter policies are based on one or more of these predefined filter rules.
         <itemizedlist>
           <listitem>
-            <para><emphasis>MM_FILTER_RULE_EXPLICIT_WHITELIST</emphasis></para>
+            <para><emphasis>MM_FILTER_RULE_EXPLICIT_ALLOWLIST</emphasis></para>
             <para>
               This filter allows users to manually tag devices and/or device ports with the
               <emphasis>ID_MM_DEVICE_PROCESS</emphasis> udev tag. If the filter finds this tag,
@@ -115,10 +115,10 @@
               will be allowed.
             </para>
             <programlisting>
-$ sudo vim /lib/udev/rules.d/78-mm-whitelist-internal-modem.rules
-    ACTION!="add|change|move", GOTO="mm_whitelist_internal_modem_end"
+$ sudo vim /lib/udev/rules.d/78-mm-allowlist-internal-modem.rules
+    ACTION!="add|change|move", GOTO="mm_allowlist_internal_modem_end"
     ATTRS{idVendor}=="1199", ATTRS{idProduct}=="a001", ENV{ID_MM_DEVICE_PROCESS}="1"
-    LABEL="mm_whitelist_internal_modem_end"
+    LABEL="mm_allowlist_internal_modem_end"
 // Apply new rules without reboot
 $ sudo udevadm control --reload
 $ sudo udevadm trigger
@@ -143,10 +143,10 @@ $ sudo udevadm trigger
             </programlisting>
           </listitem>
           <listitem>
-            <para><emphasis>MM_FILTER_RULE_PLUGIN_WHITELIST</emphasis></para>
+            <para><emphasis>MM_FILTER_RULE_PLUGIN_ALLOWLIST</emphasis></para>
             <para>
-              This filter will automatically whitelist devices that are explicitly referenced
-              by plugins, either with plugin-specific whitelist tags, with exact
+              This filter will automatically allowlist devices that are explicitly referenced
+              by plugins, either with plugin-specific allowlist tags, with exact
               <emphasis>vid:pid</emphasis> matches, or just with <emphasis>vid</emphasis> matches.
             </para>
           </listitem>
@@ -279,20 +279,20 @@ $ sudo udevadm trigger
         The predefined filter policies are:
         <itemizedlist>
           <listitem>
-            <para><emphasis>Whitelist only</emphasis></para>
+            <para><emphasis>Allowlist only</emphasis></para>
             <para>
-              This is a policy where only the MM_FILTER_RULE_EXPLICIT_WHITELIST rule is enabled.
+              This is a policy where only the MM_FILTER_RULE_EXPLICIT_ALLOWLIST rule is enabled.
             </para>
-            <programlisting># /usr/sbin/ModemManager --filter-policy=WHITELIST-ONLY</programlisting>
+            <programlisting># /usr/sbin/ModemManager --filter-policy=ALLOWLIST-ONLY</programlisting>
           </listitem>
           <listitem>
             <para><emphasis>Strict</emphasis></para>
             <para>
               This is a policy where the following rules are enabled:
               <itemizedlist>
-                <listitem>MM_FILTER_RULE_EXPLICIT_WHITELIST</listitem>
-                <listitem>MM_FILTER_RULE_EXPLICIT_BLACKLIST</listitem>
-                <listitem>MM_FILTER_RULE_PLUGIN_WHITELIST</listitem>
+                <listitem>MM_FILTER_RULE_EXPLICIT_ALLOWLIST</listitem>
+                <listitem>MM_FILTER_RULE_EXPLICIT_BLOCKLIST</listitem>
+                <listitem>MM_FILTER_RULE_PLUGIN_ALLOWLIST</listitem>
                 <listitem>MM_FILTER_RULE_QRTR</listitem>
                 <listitem>MM_FILTER_RULE_VIRTUAL</listitem>
                 <listitem>MM_FILTER_RULE_NET</listitem>
@@ -329,13 +329,13 @@ $ sudo udevadm trigger
   /usr/sbin/ModemManager --filter-policy=STRICT</programlisting>
             </para>
             <para>
-              E.g. this would launch ModemManager with the Whitelist-only filter policy but also
+              E.g. this would launch ModemManager with the allowlist-only filter policy but also
               explicitly allowing all net and cdc-wdm ports. Note that in this case, all virtual
               net ports (e.g. 'lo') are also being allowed.
               <programlisting>
 # MM_FILTER_RULE_NET=1 \
   MM_FILTER_RULE_USBMISC=1 \
-  /usr/sbin/ModemManager --filter-policy=WHITELIST-ONLY</programlisting>
+  /usr/sbin/ModemManager --filter-policy=ALLOWLIST-ONLY</programlisting>
             </para>
           </listitem>
         </itemizedlist>
