@@ -1797,4 +1797,28 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_mico_mode >*/
     MM_MODEM_3GPP_MICO_MODE_ENABLED     = 3,
 } MMModem3gppMicoMode;
 
+/**
+ * MMModem3gppDrxCycle:
+ * @MM_MODEM_3GPP_DRX_CYCLE_UNKNOWN: Unknown or not specified.
+ * @MM_MODEM_3GPP_DRX_CYCLE_UNSUPPORTED: Unsupported.
+ * @MM_MODEM_3GPP_DRX_CYCLE_32: DRX cycle T=32.
+ * @MM_MODEM_3GPP_DRX_CYCLE_64: DRX cycle T=64.
+ * @MM_MODEM_3GPP_DRX_CYCLE_128: DRX cycle T=128.
+ * @MM_MODEM_3GPP_DRX_CYCLE_256: DRX cycle T=256.
+ *
+ * DRX cycle.
+ *
+ * This is a 5G-specific registration setting.
+ *
+ * Since: 1.20
+ */
+typedef enum { /*< underscore_name=mm_modem_3gpp_drx_cycle >*/
+    MM_MODEM_3GPP_DRX_CYCLE_UNKNOWN     = 0,
+    MM_MODEM_3GPP_DRX_CYCLE_UNSUPPORTED = 1,
+    MM_MODEM_3GPP_DRX_CYCLE_32          = 2,
+    MM_MODEM_3GPP_DRX_CYCLE_64          = 3,
+    MM_MODEM_3GPP_DRX_CYCLE_128         = 4,
+    MM_MODEM_3GPP_DRX_CYCLE_256         = 5,
+} MMModem3gppDrxCycle;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

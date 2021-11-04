@@ -132,7 +132,7 @@
 
         The allowed properties in this method are all the ones specified in the
         <link linkend="gdbus-property-org-freedesktop-ModemManager1-Modem-Modem3gpp.Nr5gRegistrationSettings">Nr5gRegistrationSettings</link>;
-        i.e.: <literal>"mico-mode"</literal>.
+        i.e.: <literal>"mico-mode"</literal> and <literal>"drx-cycle"</literal>.
 
         Since: 1.20
     -->
@@ -349,6 +349,15 @@
               A <link linkend="MMModem3gppMicoMode">MMModem3gppMicoMode</link> value
               representing the Mobile Initiated Connection (MICO) mode requested by the host,
               given as an unsigned integer (signature <literal>"u"</literal>).
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry><term>"drx-cycle"</term>
+          <listitem>
+            <para>
+              A <link linkend="MMModem3gppDrxCycle">MMModem3gppDrxCycle</link> value,
+              representing the DRX settings requested by the host, given as an
+              unsigned integer (signature <literal>"u"</literal>).
             </para>
           </listitem>
         </varlistentry>
