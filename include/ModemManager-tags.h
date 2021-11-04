@@ -263,7 +263,7 @@
 /**
  * ID_MM_TTY_MANUAL_SCAN_ONLY:
  *
- * This was a device-specific tag that allowed explicitly greylisting
+ * This was a device-specific tag that allowed explicitly allowlisting
  * devices that exposed TTY devices so that they were never probed
  * automatically. Instead, an explicit manual scan request could
  * be sent to the daemon so that the TTY ports exposed by the device
