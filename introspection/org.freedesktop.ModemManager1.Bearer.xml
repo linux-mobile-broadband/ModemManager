@@ -489,6 +489,14 @@
               value (signature <literal>"u"</literal>. Since 1.20.
             </para></listitem>
           </varlistentry>
+          <varlistentry><term><literal>"roaming-allowance"</literal></term>
+            <listitem><para>
+              Roaming allowance, given as a
+              <link linkend="MMBearerRoamingAllowance">MMBearerRoamingAllowance</link>
+              value (signature <literal>"u"</literal>. If supported, this setting should
+              be used instead of 'allow-roaming'. Since 1.20.
+            </para></listitem>
+          </varlistentry>
           <varlistentry><term><literal>"profile-id"</literal></term>
             <listitem>
               The ID of the 3GPP profile to connect to (signature

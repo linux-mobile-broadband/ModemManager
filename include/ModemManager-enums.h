@@ -1840,4 +1840,22 @@ typedef enum { /*< underscore_name=mm_bearer_access_type_preference >*/
     MM_BEARER_ACCESS_TYPE_PREFERENCE_NON_3GPP_ONLY  = 3,
 } MMBearerAccessTypePreference;
 
+/**
+ * MMBearerRoamingAllowance:
+ * @MM_BEARER_ROAMING_ALLOWANCE_NONE: No explicit roaming allowance rules.
+ * @MM_BEARER_ROAMING_ALLOWANCE_HOME: Home network allowed.
+ * @MM_BEARER_ROAMING_ALLOWANCE_PARTNER: Partner network allowed.
+ * @MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER: Non-parter network allowed.
+ *
+ * Bitmask specifying roaming allowance rules for different network types.
+ *
+ * Since: 1.20
+ */
+typedef enum { /*< underscore_name=mm_bearer_roaming_allowance >*/
+    MM_BEARER_ROAMING_ALLOWANCE_NONE        = 0,
+    MM_BEARER_ROAMING_ALLOWANCE_HOME        = 1 << 0,
+    MM_BEARER_ROAMING_ALLOWANCE_PARTNER     = 1 << 1,
+    MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER = 1 << 2,
+} MMBearerRoamingAllowance;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */
