@@ -65,7 +65,7 @@ The ModemManager releases are generated using the GNU autotools.
 
 10.1) For major releases:
      * Fork new stable branch (e.g. mm-${MAJOR}-${MINOR})
-     * Post-release version bump in the master branch, increment mm_minor_version.
+     * Post-release version bump in the main branch, increment mm_minor_version.
      * Post-release version bump in the stable branch, increment mm_micro_version.
 
 10.2) For stable branch releases:
