@@ -1858,4 +1858,26 @@ typedef enum { /*< underscore_name=mm_bearer_roaming_allowance >*/
     MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER = 1 << 2,
 } MMBearerRoamingAllowance;
 
+/**
+ * MMBearerProfileSource:
+ * @MM_BEARER_PROFILE_SOURCE_UNKNOWN: Unknown.
+ * @MM_BEARER_PROFILE_SOURCE_ADMIN: Profile created by an enterprise IT admin from the OS.
+ * @MM_BEARER_PROFILE_SOURCE_USER: Profile created by the user.
+ * @MM_BEARER_PROFILE_SOURCE_OPERATOR: Profile created by the operator through OMA-DM or similar.
+ * @MM_BEARER_PROFILE_SOURCE_MODEM: Profile created by the OEM that was included with the modem firmware.
+ * @MM_BEARER_PROFILE_SOURCE_DEVICE: Profile created by the OS APN database.
+ *
+ * Value specifying how a given context was created, mostly for informative purposes.
+ *
+ * Since: 1.20
+ */
+typedef enum { /*< underscore_name=mm_bearer_profile_source >*/
+    MM_BEARER_PROFILE_SOURCE_UNKNOWN  = 0,
+    MM_BEARER_PROFILE_SOURCE_ADMIN    = 1,
+    MM_BEARER_PROFILE_SOURCE_USER     = 2,
+    MM_BEARER_PROFILE_SOURCE_OPERATOR = 3,
+    MM_BEARER_PROFILE_SOURCE_MODEM    = 4,
+    MM_BEARER_PROFILE_SOURCE_DEVICE   = 5,
+} MMBearerProfileSource;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */

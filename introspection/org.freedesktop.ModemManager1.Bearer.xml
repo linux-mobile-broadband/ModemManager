@@ -530,6 +530,15 @@
               Since 1.20.
             </para></listitem>
           </varlistentry>
+          <varlistentry><term><literal>"profile-source"</literal></term>
+            <listitem><para>
+              A <link linkend="MMBearerProfileSource">MMBearerProfileSource</link>
+              value (signature <literal>"u"</literal>, specifying how the profile
+              was created. This setting only applies on profile management operations,
+              it should not be used as part of the settings of an explicit connection
+              attempt. Since 1.20.
+            </para></listitem>
+          </varlistentry>
         </variablelist>
 
         The following settings apply to 3GPP2 (CDMA/EVDO) devices:
