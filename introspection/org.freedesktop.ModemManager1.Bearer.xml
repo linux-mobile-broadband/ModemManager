@@ -511,6 +511,17 @@
               connection attempt. Since 1.20.
             </para></listitem>
           </varlistentry>
+          <varlistentry><term><literal>"profile-enabled"</literal></term>
+            <listitem><para>
+              Boolean flag specifying whether the profile is enabled or disabled,
+              given as a boolean value (signature <literal>"b"</literal>).
+              Profiles that are disabled will not be automatically connected by the
+              modem in any way, and attempting to connect them explicitly will fail.
+              This setting only applies on profile management operations, it should
+              not be used as part of the settings of an explicit connection attempt.
+              Since 1.20.
+            </para></listitem>
+          </varlistentry>
         </variablelist>
 
         The following settings apply to 3GPP2 (CDMA/EVDO) devices:
