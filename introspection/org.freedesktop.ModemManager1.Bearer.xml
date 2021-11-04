@@ -105,11 +105,11 @@
         ConnectionError:
 
         Provides additional information specifying the reason why the modem is
-	not connected (either due to a failed connection attempt, or due to a
-	a network initiated disconnection).
+        not connected (either due to a failed connection attempt, or due to a
+        a network initiated disconnection).
 
         The value is composed of two strings: the registered DBus error name,
-	and an optional error message.
+        and an optional error message.
 
         Since: 1.18
     -->
@@ -474,7 +474,7 @@
               and they already exist in the profile (e.g. <literal>"apn"</literal>),
               the new settings will be explicitly ignored; the settings stored in the
               profile itself always take preference. The value -1 is used to
-	      indicate an invalid or uninitialized profile id. Since 1.18.
+              indicate an invalid or uninitialized profile id. Since 1.18.
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"profile-name"</literal></term>
