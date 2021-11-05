@@ -45,20 +45,20 @@ incs = [
   kerneldevice_inc,
 ]
 
-deps = [
-  libmm_glib_dep,
-  mbim_glib_dep,
-  qmi_glib_dep,
-]
+deps = [libmm_glib_dep]
 
 private_deps = []
 
 if enable_qmi
   sources += files('mm-modem-helpers-qmi.c')
+
+  deps += qmi_glib_dep
 endif
 
 if enable_mbim
   sources += files('mm-modem-helpers-mbim.c')
+
+  deps += mbim_glib_dep
 endif
 
 if enable_systemd_journal
@@ -87,18 +87,18 @@ sources = files(
   'kerneldevice/mm-kernel-device-helpers.c',
 )
 
-deps = [
-  gudev_dep,
-  libhelpers_dep,
-  qrtr_glib_dep,
-]
+deps = [libhelpers_dep]
 
 if enable_qrtr
   sources += files('kerneldevice/mm-kernel-device-qrtr.c')
+
+  deps += qrtr_glib_dep
 endif
 
 if enable_udev
   sources += files('kerneldevice/mm-kernel-device-udev.c')
+
+  deps += gudev_dep
 endif
 
 libkerneldevice = static_library(

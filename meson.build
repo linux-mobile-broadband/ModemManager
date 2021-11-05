@@ -172,8 +172,10 @@ if enable_bash_completion
 endif
 
 # udev support (enabled by default)
-gudev_dep = dependency('gudev-1.0', version: '>= 232', required: get_option('udev'))
-enable_udev = gudev_dep.found()
+enable_udev = get_option('udev')
+if enable_udev
+  gudev_dep = dependency('gudev-1.0', version: '>= 232')
+endif
 config_h.set('WITH_UDEV', enable_udev)
 
 # udev base directory
@@ -232,20 +234,26 @@ enable_at_command_via_dbus = get_option('at_command_via_dbus')
 config_h.set('WITH_AT_COMMAND_VIA_DBUS', enable_at_command_via_dbus)
 
 # MBIM support (enabled by default)
-mbim_glib_dep = dependency('mbim-glib', version: '>= 1.27.3', required: get_option('mbim'))
-enable_mbim = mbim_glib_dep.found()
+enable_mbim = get_option('mbim')
+if enable_mbim
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.27.3')
+endif
 config_h.set('WITH_MBIM', enable_mbim)
 
 # QMI support (enabled by default)
-qmi_glib_dep = dependency('qmi-glib', version: '>= 1.31.1', required: get_option('qmi'))
-enable_qmi = qmi_glib_dep.found()
+enable_qmi = get_option('qmi')
+if enable_qmi
+  qmi_glib_dep = dependency('qmi-glib', version: '>= 1.31.1')
+endif
 config_h.set('WITH_QMI', enable_qmi)
 
 # QRTR support (both as qrtr-glib and qmi-glib apis)
-qrtr_glib_dep = dependency('qrtr-glib', version: '>= 1.0.0', required: get_option('qrtr'))
-enable_qrtr = qrtr_glib_dep.found()
-assert(not enable_qrtr or enable_qmi, 'QRTR support requires QMI enabled')
-assert(not enable_qrtr or qmi_glib_dep.get_pkgconfig_variable('qmi_qrtr_supported').to_int().is_odd(), 'Couldn\'t find QRTR support in qmi-glib.')
+enable_qrtr = get_option('qrtr')
+if enable_qrtr
+  assert(enable_qmi, 'QRTR support requires QMI enabled')
+  assert(qmi_glib_dep.get_pkgconfig_variable('qmi_qrtr_supported').to_int().is_odd(), 'Couldn\'t find QRTR support in qmi-glib.')
+  qrtr_glib_dep = dependency('qrtr-glib', version: '>= 1.0.0')
+endif
 config_h.set('WITH_QRTR', enable_qrtr)
 
 # Distribution version string
@@ -257,7 +265,10 @@ endif
 util_dep = cc.find_library('util')
 
 # introspection support
-enable_gir = dependency('gobject-introspection-1.0', version: '>= 0.9.6', required: get_option('introspection')).found()
+enable_gir = get_option('introspection')
+if enable_gir
+  dependency('gobject-introspection-1.0', version: '>= 0.9.6')
+endif
 
 # vala support
 enable_vapi = get_option('vapi')
