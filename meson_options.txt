@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2021 Iñigo Martinez <inigomartinez@gmail.com>
 
-option('udev', type: 'feature', value: 'auto', description: 'enable udev support')
+option('udev', type: 'boolean', value: true, description: 'enable udev support')
 option('udevdir', type: 'string', value: '', description: 'udev base directory')
 
 option('dbus_policy_dir', type: 'string', value: '', description: 'd-bus system policy directory')
@@ -14,9 +14,9 @@ option('polkit', type: 'combo', choices: ['strict', 'permissive', 'no'], value: 
 
 option('at_command_via_dbus', type: 'boolean', value: false, description: 'enable at commands vida d-bus')
 
-option('mbim', type: 'feature', value: 'auto', description: 'enable MBIM support')
-option('qmi', type: 'feature', value: 'auto', description: 'enable QMI support')
-option('qrtr', type: 'feature', value: 'auto', description: 'enable QRTR support')
+option('mbim', type: 'boolean', value: true, description: 'enable MBIM support')
+option('qmi', type: 'boolean', value: true, description: 'enable QMI support')
+option('qrtr', type: 'boolean', value: true, description: 'enable QRTR support')
 
 option('dist_version', type: 'string', value: '', description: 'define the custom version (like distribution package name and revision')
 
@@ -86,7 +86,7 @@ option('plugin_x22x', type: 'feature', value: 'auto', description: 'enable x22x 
 # shared_icera
 option('plugin_zte', type: 'feature', value: 'auto', description: 'enable zte plugin support')
 
-option('introspection', type: 'feature', value: 'auto', description: 'build introspection support')
+option('introspection', type: 'boolean', value: true, description: 'build introspection support')
 option('vapi', type: 'boolean', value: false, description: 'build vala bindings')
 
 option('man', type: 'boolean', value: true, description: 'build manual pages')

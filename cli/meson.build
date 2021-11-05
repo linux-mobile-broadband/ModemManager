@@ -25,10 +25,11 @@ sources = files(
   'mmcli-sms.c',
 )
 
-deps = [
-  gudev_dep,
-  libmm_glib_dep,
-]
+deps = [libmm_glib_dep]
+
+if enable_udev
+  deps += gudev_dep
+endif
 
 executable(
   'mmcli',

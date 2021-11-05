@@ -43,11 +43,15 @@ plugins_incs = [
   kerneldevice_inc,
 ]
 
-plugins_deps = [
-  libmm_glib_dep,
-  mbim_glib_dep,
-  qmi_glib_dep,
-]
+plugins_deps = [libmm_glib_dep]
+
+if enable_mbim
+  plugins_deps += mbim_glib_dep
+endif
+
+if enable_qmi
+  plugins_deps += qmi_glib_dep
+endif
 
 # Common Foxconn modem support library (MBIM only)
 if plugins_shared['foxconn']

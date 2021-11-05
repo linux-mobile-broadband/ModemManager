@@ -8,7 +8,7 @@ test_units = {
   'mmtty': libport_dep,
 }
 
-if gudev_dep.found()
+if enable_udev
   test_units += {'lsudev': gudev_dep}
 endif
 
