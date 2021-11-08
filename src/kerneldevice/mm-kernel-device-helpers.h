@@ -23,4 +23,9 @@
  * (e.g. lower_device_name(qmimux0) == wwan0) */
 gchar *mm_kernel_device_get_lower_device_name (const gchar *sysfs_path);
 
-#endif /* MM_KERNEL_DEVICE_HERLPERS_H */
+/* Generic string matching logic */
+gboolean mm_kernel_device_generic_string_match (const gchar *str,
+                                                const gchar *pattern,
+                                                gpointer     log_object);
+
+#endif /* MM_KERNEL_DEVICE_HELPERS_H */

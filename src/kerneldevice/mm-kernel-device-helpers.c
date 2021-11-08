@@ -19,7 +19,10 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#include "mm-log-object.h"
 #include "mm-kernel-device-helpers.h"
+
+/******************************************************************************/
 
 gchar *
 mm_kernel_device_get_lower_device_name (const gchar *sysfs_path)
@@ -58,4 +61,33 @@ mm_kernel_device_get_lower_device_name (const gchar *sysfs_path)
     }
 
     return NULL;
+}
+
+/******************************************************************************/
+
+gboolean
+mm_kernel_device_generic_string_match (const gchar *str,
+                                       const gchar *pattern,
+                                       gpointer     log_object)
+{
+    g_autoptr(GError)     inner_error = NULL;
+    g_autoptr(GRegex)     regex = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
+
+    regex = g_regex_new (pattern, 0, 0, &inner_error);
+    if (!regex) {
+        mm_obj_warn (log_object, "invalid pattern in rule '%s': %s", pattern, inner_error->message);
+        return FALSE;
+    }
+    g_regex_match_full (regex, str, -1, 0, 0, &match_info, &inner_error);
+    if (inner_error) {
+        mm_obj_warn (log_object, "couldn't apply pattern match in rule '%s': %s", pattern, inner_error->message);
+        return FALSE;
+    }
+
+    if (!g_match_info_matches (match_info))
+        return FALSE;
+
+    mm_obj_dbg (log_object, "pattern '%s' matched: '%s'", pattern, str);
+    return TRUE;
 }
