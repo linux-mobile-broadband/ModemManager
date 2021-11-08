@@ -796,7 +796,7 @@ check_condition (MMKernelDeviceGeneric *self,
 
     /* Device name checks */
     if (g_str_equal (match->parameter, "KERNEL"))
-        return (string_match (self, mm_kernel_device_get_name (MM_KERNEL_DEVICE (self)), match->value) == condition_equal);
+        return (mm_kernel_device_generic_string_match (mm_kernel_device_get_name (MM_KERNEL_DEVICE (self)), match->value, self) == condition_equal);
 
     /* Device sysfs path checks; we allow both a direct match and a prefix patch */
     if (g_str_equal (match->parameter, "DEVPATH")) {
@@ -813,22 +813,22 @@ check_condition (MMKernelDeviceGeneric *self,
         if (match->value[0] && match->value[strlen (match->value) - 1] != '*')
             prefix_match = g_strdup_printf ("%s/*", match->value);
 
-        if (string_match (self, self->priv->sysfs_path, match->value) == condition_equal) {
+        if (mm_kernel_device_generic_string_match (self->priv->sysfs_path, match->value, self) == condition_equal) {
             result = TRUE;
             goto out;
         }
 
-        if (prefix_match && string_match (self, self->priv->sysfs_path, prefix_match) == condition_equal) {
+        if (prefix_match && mm_kernel_device_generic_string_match (self->priv->sysfs_path, prefix_match, self) == condition_equal) {
             result = TRUE;
             goto out;
         }
 
         if (g_str_has_prefix (self->priv->sysfs_path, "/sys")) {
-            if (string_match (self, &self->priv->sysfs_path[4], match->value) == condition_equal) {
+            if (mm_kernel_device_generic_string_match (&self->priv->sysfs_path[4], match->value, self) == condition_equal) {
                 result = TRUE;
                 goto out;
             }
-            if (prefix_match && string_match (self, &self->priv->sysfs_path[4], prefix_match) == condition_equal) {
+            if (prefix_match && mm_kernel_device_generic_string_match (&self->priv->sysfs_path[4], prefix_match, self) == condition_equal) {
                 result = TRUE;
                 goto out;
             }
