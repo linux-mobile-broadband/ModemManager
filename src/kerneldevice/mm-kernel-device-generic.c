@@ -740,33 +740,6 @@ kernel_device_cmp (MMKernelDevice *a,
 /*****************************************************************************/
 
 static gboolean
-string_match (MMKernelDeviceGeneric *self,
-              const gchar           *str,
-              const gchar           *pattern)
-{
-    g_autoptr(GError)     inner_error = NULL;
-    g_autoptr(GRegex)     regex = NULL;
-    g_autoptr(GMatchInfo) match_info = NULL;
-
-    regex = g_regex_new (pattern, 0, 0, &inner_error);
-    if (!regex) {
-        mm_obj_warn (self, "invalid pattern in rule '%s': %s", pattern, inner_error->message);
-        return FALSE;
-    }
-    g_regex_match_full (regex, str, -1, 0, 0, &match_info, &inner_error);
-    if (inner_error) {
-        mm_obj_warn (self, "couldn't apply pattern match in rule '%s': %s", pattern, inner_error->message);
-        return FALSE;
-    }
-
-    if (!g_match_info_matches (match_info))
-        return FALSE;
-
-    mm_obj_dbg (self, "pattern '%s' matched: '%s'", pattern, str);
-    return TRUE;
-}
-
-static gboolean
 check_condition (MMKernelDeviceGeneric *self,
                  MMUdevRuleMatch       *match)
 {

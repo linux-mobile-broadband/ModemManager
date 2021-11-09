@@ -65,29 +65,81 @@ mm_kernel_device_get_lower_device_name (const gchar *sysfs_path)
 
 /******************************************************************************/
 
+static gchar *
+build_string_match_pattern (const gchar *str)
+{
+    GString     *regex_pattern;
+    const gchar *str_start;
+    gsize        len;
+    gchar       *aux;
+    gboolean     prefix_match = FALSE;
+    gboolean     suffix_match = FALSE;
+
+    /* We allow prefix and suffix matches given as input, by means of the
+     * single '*' character given either at the beginning or the end of the
+     * string. If given in another place, it will assumed to be explicitly
+     * the '*' character, not a catch-all indication. */
+
+    regex_pattern = g_string_new (NULL);
+
+    /* suffix match? */
+    if (str[0] == '*') {
+        str_start = &str[1];
+        suffix_match = TRUE;
+    } else
+        str_start = str;
+
+    /* prefix match? */
+    len = strlen (str_start);
+    if (len > 0 && str_start[len - 1] == '*') {
+        len--;
+        prefix_match = TRUE;
+    }
+
+    /* match start of string */
+    g_string_append (regex_pattern, "^");
+
+    if (suffix_match)
+        g_string_append (regex_pattern, ".*");
+
+    aux = g_regex_escape_string (str_start, len);
+    g_string_append (regex_pattern, aux);
+
+    if (prefix_match)
+        g_string_append (regex_pattern, ".*");
+
+    /* match end of string */
+    g_string_append (regex_pattern, "$");
+
+    return g_string_free (regex_pattern, FALSE);
+}
+
 gboolean
 mm_kernel_device_generic_string_match (const gchar *str,
                                        const gchar *pattern,
                                        gpointer     log_object)
 {
-    g_autoptr(GError)     inner_error = NULL;
-    g_autoptr(GRegex)     regex = NULL;
-    g_autoptr(GMatchInfo) match_info = NULL;
+    g_autoptr(GError)      inner_error = NULL;
+    g_autoptr(GRegex)      regex = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    g_autofree gchar      *regex_pattern = NULL;
 
-    regex = g_regex_new (pattern, 0, 0, &inner_error);
+    regex_pattern = build_string_match_pattern (pattern);
+
+    regex = g_regex_new (regex_pattern, G_REGEX_UNGREEDY, 0, &inner_error);
     if (!regex) {
-        mm_obj_warn (log_object, "invalid pattern in rule '%s': %s", pattern, inner_error->message);
+        mm_obj_warn (log_object, "invalid pattern in rule '%s': %s", regex_pattern, inner_error->message);
         return FALSE;
     }
     g_regex_match_full (regex, str, -1, 0, 0, &match_info, &inner_error);
     if (inner_error) {
-        mm_obj_warn (log_object, "couldn't apply pattern match in rule '%s': %s", pattern, inner_error->message);
+        mm_obj_warn (log_object, "couldn't apply pattern match in rule '%s': %s", regex_pattern, inner_error->message);
         return FALSE;
     }
 
     if (!g_match_info_matches (match_info))
         return FALSE;
 
-    mm_obj_dbg (log_object, "pattern '%s' matched: '%s'", pattern, str);
+    mm_obj_dbg (log_object, "pattern '%s' matched: '%s'", regex_pattern, str);
     return TRUE;
 }

@@ -58,6 +58,7 @@ noinst_PROGRAMS = \
 	test-sms-part-cdma \
 	test-udev-rules \
 	test-error-helpers \
+	test-kernel-device-helpers \
 	$(NULL)
 
 if WITH_QMI

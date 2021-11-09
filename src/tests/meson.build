@@ -5,6 +5,7 @@ test_units = {
   'at-serial-port': libport_dep,
   'charsets': libhelpers_dep,
   'error-helpers': libhelpers_dep,
+  'kernel-device-helpers': libkerneldevice_dep,
   'modem-helpers': libhelpers_dep,
   'sms-part-3gpp': libhelpers_dep,
   'sms-part-cdma': libhelpers_dep,
