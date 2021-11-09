@@ -773,8 +773,7 @@ check_condition (MMKernelDeviceGeneric *self,
 
     /* Device sysfs path checks; we allow both a direct match and a prefix patch */
     if (g_str_equal (match->parameter, "DEVPATH")) {
-        gchar    *prefix_match = NULL;
-        gboolean  result = FALSE;
+        g_autofree gchar *prefix_match = NULL;
 
         /* If sysfs path invalid (e.g. path doesn't exist), no match */
         if (!self->priv->sysfs_path)
@@ -786,29 +785,16 @@ check_condition (MMKernelDeviceGeneric *self,
         if (match->value[0] && match->value[strlen (match->value) - 1] != '*')
             prefix_match = g_strdup_printf ("%s/*", match->value);
 
-        if (mm_kernel_device_generic_string_match (self->priv->sysfs_path, match->value, self) == condition_equal) {
-            result = TRUE;
-            goto out;
-        }
-
-        if (prefix_match && mm_kernel_device_generic_string_match (self->priv->sysfs_path, prefix_match, self) == condition_equal) {
-            result = TRUE;
-            goto out;
-        }
+        if ((mm_kernel_device_generic_string_match (self->priv->sysfs_path, match->value, self) == condition_equal) ||
+            (prefix_match && mm_kernel_device_generic_string_match (self->priv->sysfs_path, prefix_match, self) == condition_equal))
+            return TRUE;
 
         if (g_str_has_prefix (self->priv->sysfs_path, "/sys")) {
-            if (mm_kernel_device_generic_string_match (&self->priv->sysfs_path[4], match->value, self) == condition_equal) {
-                result = TRUE;
-                goto out;
-            }
-            if (prefix_match && mm_kernel_device_generic_string_match (&self->priv->sysfs_path[4], prefix_match, self) == condition_equal) {
-                result = TRUE;
-                goto out;
-            }
+            if ((mm_kernel_device_generic_string_match (&self->priv->sysfs_path[4], match->value, self) == condition_equal) ||
+                (prefix_match && mm_kernel_device_generic_string_match (&self->priv->sysfs_path[4], prefix_match, self) == condition_equal))
+                return TRUE;
         }
-    out:
-        g_free (prefix_match);
-        return result;
+        return FALSE;
     }
 
     /* Attributes checks */
