@@ -164,6 +164,11 @@ struct _MMBroadbandModemQmiPrivate {
 
     /* Power Set Operating Mode Helper */
     GTask *set_operating_mode_task;
+
+    /* PDC Refresh notifications ID (3gpp Profile Manager) */
+    gboolean profile_manager_unsolicited_events_enabled;
+    gboolean profile_manager_unsolicited_events_setup;
+    guint refresh_indication_id;
 };
 
 /*****************************************************************************/
@@ -6592,6 +6597,197 @@ modem_3gpp_profile_manager_delete_profile (MMIfaceModem3gppProfileManager *self,
 }
 
 /*****************************************************************************/
+/* Register PDC Refresh events (3gppProfileManager interface) */
+
+static void
+pdc_refresh_received (QmiClientPdc                  *client,
+                      QmiIndicationPdcRefreshOutput *output,
+                      MMBroadbandModemQmi           *self)
+{
+    mm_obj_dbg (self, "Profile refresh indication was received");
+    mm_iface_modem_3gpp_profile_manager_updated (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self));
+}
+
+static void
+register_pdc_refresh_ready (QmiClientPdc *client,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    g_autoptr(QmiMessagePdcRegisterOutput)  output = NULL;
+    MMBroadbandModemQmi                    *self;
+    gboolean                                enable;
+    GError                                 *error = NULL;
+
+    self = g_task_get_source_object (task);
+    enable = GPOINTER_TO_UINT (g_task_get_task_data (task));
+
+    output = qmi_client_pdc_register_finish (client, res, &error);
+    if (!output) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!qmi_message_pdc_register_output_get_result (output, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    self->priv->profile_manager_unsolicited_events_enabled = enable;
+    mm_obj_dbg (self, "%s for refresh events", enable ? "Registered" : "Unregistered");
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+common_enable_disable_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQmi *self,
+                                                               gboolean enable,
+                                                               GAsyncReadyCallback callback,
+                                                               gpointer user_data)
+{
+    g_autoptr(QmiMessagePdcRegisterInput)  input = NULL;
+    GTask                                 *task;
+    QmiClient                             *client = NULL;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_PDC, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    g_task_set_task_data (task, GUINT_TO_POINTER (enable), NULL);
+
+    if (enable == self->priv->profile_manager_unsolicited_events_enabled) {
+        mm_obj_dbg (self, "profile manager unsolicited events already %s; skipping",
+                    enable ? "enabled" : "disabled");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    input = qmi_message_pdc_register_input_new ();
+    qmi_message_pdc_register_input_set_enable_reporting (input, enable, NULL);
+    qmi_message_pdc_register_input_set_enable_refresh (input, enable, NULL);
+    qmi_client_pdc_register (QMI_CLIENT_PDC (client),
+                             input,
+                             10,
+                             NULL,
+                             (GAsyncReadyCallback) register_pdc_refresh_ready,
+                             task);
+}
+
+static void
+common_setup_cleanup_unsolicited_events_3gpp_profile_manager (MMBroadbandModemQmi *self,
+                                                              gboolean enable,
+                                                              GAsyncReadyCallback callback,
+                                                              gpointer user_data)
+
+{
+    GTask     *task;
+    QmiClient *client = NULL;
+
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_PDC, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (enable == self->priv->profile_manager_unsolicited_events_setup) {
+        mm_obj_dbg (self, "profile manager unsolicited events already %s; skipping",
+                    enable ? "set up" : "cleaned up");
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    self->priv->profile_manager_unsolicited_events_setup = enable;
+
+    if (enable) {
+        g_assert (self->priv->refresh_indication_id == 0);
+        self->priv->refresh_indication_id =
+            g_signal_connect (client,
+                              "refresh",
+                              G_CALLBACK (pdc_refresh_received),
+                              self);
+    } else {
+        g_assert (self->priv->refresh_indication_id != 0);
+        g_signal_handler_disconnect (client, self->priv->refresh_indication_id);
+        self->priv->refresh_indication_id = 0;
+    }
+
+    mm_obj_dbg (self, "%s profile events handler", enable ? "Set up" : "Cleaned up");
+
+    g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* Enable/Disable unsolicited events (3gppProfileManager interface) */
+
+static gboolean
+modem_3gpp_profile_manager_enable_disable_unsolicited_events_finish (MMIfaceModem3gppProfileManager  *self,
+                                                                     GAsyncResult                    *res,
+                                                                     GError                         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_3gpp_profile_manager_disable_unsolicited_events (MMIfaceModem3gppProfileManager *self,
+                                                       GAsyncReadyCallback             callback,
+                                                       gpointer                        user_data)
+{
+    common_enable_disable_unsolicited_events_3gpp_profile_manager (MM_BROADBAND_MODEM_QMI (self),
+                                                                   FALSE,
+                                                                   callback,
+                                                                   user_data);
+}
+
+static void
+modem_3gpp_profile_manager_enable_unsolicited_events (MMIfaceModem3gppProfileManager *self,
+                                                      GAsyncReadyCallback             callback,
+                                                      gpointer                        user_data)
+{
+    common_enable_disable_unsolicited_events_3gpp_profile_manager (MM_BROADBAND_MODEM_QMI (self),
+                                                                   TRUE,
+                                                                   callback,
+                                                                   user_data);
+}
+
+static gboolean
+modem_3gpp_profile_manager_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gppProfileManager  *self,
+                                                                    GAsyncResult                    *res,
+                                                                    GError                         **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+modem_3gpp_profile_manager_cleanup_unsolicited_events (MMIfaceModem3gppProfileManager *self,
+                                                       GAsyncReadyCallback             callback,
+                                                       gpointer                        user_data)
+{
+    common_setup_cleanup_unsolicited_events_3gpp_profile_manager (MM_BROADBAND_MODEM_QMI (self),
+                                                                  FALSE,
+                                                                  callback,
+                                                                  user_data);
+}
+
+static void
+modem_3gpp_profile_manager_setup_unsolicited_events (MMIfaceModem3gppProfileManager *self,
+                                                     GAsyncReadyCallback             callback,
+                                                     gpointer                        user_data)
+{
+    common_setup_cleanup_unsolicited_events_3gpp_profile_manager (MM_BROADBAND_MODEM_QMI (self),
+                                                                  TRUE,
+                                                                  callback,
+                                                                  user_data);
+}
+
+/*****************************************************************************/
 /* Check support (Messaging interface) */
 
 static gboolean
@@ -12699,6 +12895,15 @@ iface_modem_3gpp_profile_manager_init (MMIfaceModem3gppProfileManager *iface)
      * rely on the generic way to check for support */
     iface->check_support = NULL;
     iface->check_support_finish = NULL;
+
+    iface->setup_unsolicited_events = modem_3gpp_profile_manager_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_profile_manager_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_profile_manager_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_profile_manager_setup_cleanup_unsolicited_events_finish;
+    iface->enable_unsolicited_events = modem_3gpp_profile_manager_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_3gpp_profile_manager_enable_disable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_3gpp_profile_manager_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_3gpp_profile_manager_enable_disable_unsolicited_events_finish;
 
     /* Additional actions */
     iface->get_profile = modem_3gpp_profile_manager_get_profile;
