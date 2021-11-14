@@ -659,6 +659,30 @@ typedef enum { /*< underscore_name=mm_modem_port_type >*/
 } MMModemPortType;
 
 /**
+ * MMCellType:
+ * @MM_CELL_TYPE_UNKNOWN: Unknown.
+ * @MM_CELL_TYPE_CDMA: CDMA cell.
+ * @MM_CELL_TYPE_GSM: GSM cell.
+ * @MM_CELL_TYPE_UMTS: UMTS cell.
+ * @MM_CELL_TYPE_TDSCDMA: TD-SCDMA cell.
+ * @MM_CELL_TYPE_LTE: LTE cell.
+ * @MM_CELL_TYPE_5GNR: 5GNR cell.
+ *
+ * Type of cell information reported.
+ *
+ * Since: 1.20
+ */
+typedef enum { /*< underscore_name=mm_cell_type >*/
+    MM_CELL_TYPE_UNKNOWN = 0,
+    MM_CELL_TYPE_CDMA    = 1,
+    MM_CELL_TYPE_GSM     = 2,
+    MM_CELL_TYPE_UMTS    = 3,
+    MM_CELL_TYPE_TDSCDMA = 4,
+    MM_CELL_TYPE_LTE     = 5,
+    MM_CELL_TYPE_5GNR    = 6,
+} MMCellType;
+
+/**
  * MMSmsPduType:
  * @MM_SMS_PDU_TYPE_UNKNOWN: Unknown type.
  * @MM_SMS_PDU_TYPE_DELIVER: 3GPP Mobile-Terminated (MT) message.

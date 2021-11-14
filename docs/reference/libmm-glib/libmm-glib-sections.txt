@@ -1791,6 +1791,7 @@ mm_oma_session_state_failed_reason_get_string
 mm_call_direction_get_string
 mm_call_state_get_string
 mm_call_state_reason_get_string
+mm_cell_type_get_string
 <SUBSECTION Private>
 mm_modem_capability_get_string
 mm_modem_lock_build_string_from_mask
@@ -1845,6 +1846,7 @@ mm_call_direction_build_string_from_mask
 mm_call_state_build_string_from_mask
 mm_call_state_reason_build_string_from_mask
 mm_modem_firmware_update_method_get_string
+mm_cell_type_build_string_from_mask
 <SUBSECTION Standard>
 MM_TYPE_BEARER_TYPE
 MM_TYPE_BEARER_IP_FAMILY
@@ -1899,6 +1901,7 @@ MM_TYPE_CALL_DIRECTION
 MM_TYPE_CALL_STATE
 MM_TYPE_CALL_STATE_REASON
 MM_TYPE_MODEM_FIRMWARE_UPDATE_METHOD
+MM_TYPE_CELL_TYPE
 mm_bearer_type_get_type
 mm_bearer_ip_family_get_type
 mm_bearer_ip_method_get_type
@@ -1952,6 +1955,7 @@ mm_call_direction_get_type
 mm_call_state_get_type
 mm_call_state_reason_get_type
 mm_modem_firmware_update_method_get_type
+mm_cell_type_get_type
 </SECTION>
 
 <SECTION>
@@ -2563,6 +2567,9 @@ mm_gdbus_modem_call_set_primary_sim_slot_sync
 mm_gdbus_modem_call_command
 mm_gdbus_modem_call_command_finish
 mm_gdbus_modem_call_command_sync
+mm_gdbus_modem_call_get_cell_info
+mm_gdbus_modem_call_get_cell_info_finish
+mm_gdbus_modem_call_get_cell_info_sync
 <SUBSECTION Private>
 mm_gdbus_modem_set_access_technologies
 mm_gdbus_modem_set_bearers
@@ -2612,6 +2619,7 @@ mm_gdbus_modem_complete_set_current_modes
 mm_gdbus_modem_complete_set_current_bands
 mm_gdbus_modem_complete_set_current_capabilities
 mm_gdbus_modem_complete_set_primary_sim_slot
+mm_gdbus_modem_complete_get_cell_info
 mm_gdbus_modem_interface_info
 mm_gdbus_modem_override_properties
 <SUBSECTION Standard>

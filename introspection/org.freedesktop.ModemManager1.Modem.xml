@@ -201,6 +201,423 @@
       <arg name="sim_slot" type="u" direction="in" />
     </method>
 
+
+    <!--
+        GetCellInfo:
+
+        Get information for available cells in different access technologies,
+        either serving or neighboring.
+
+        An array of dictionaries is returned, where each dictionary reports information for
+        one single cell.
+
+        The dictionaries have mandatory keys that are always given, including:
+
+        <variablelist>
+          <varlistentry><term><literal>"cell-type"</literal></term>
+            <listitem>
+              The <link linkend="MMCellType">MMCellType</link>, given as an unsigned integer
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"serving"</literal></term>
+            <listitem>
+              Flag specifying whether the cell is a serving cell or otherwise a neighboring cell,
+              given as a boolean value (signature <literal>"b"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        For each different cell type, other optional keys may be given.
+
+        <variablelist>
+          <varlistentry><term><link linkend="MM-CELL-TYPE-CDMA:CAPS">MM_CELL_TYPE_CDMA</link></term>
+            <listitem>
+              <para>
+                The CDMA cell information may include the following additional keys:
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>"nid"</literal></term>
+                  <listitem>
+                    Network id, given as a string value (signature <literal>"s"</literal>)
+                    in upper-case hexadecimal format without leading zeros. E.g. <literal>"12345"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"sid"</literal></term>
+                  <listitem>
+                    System id, given as a string value (signature <literal>"s"</literal>)
+                    in upper-case hexadecimal format without leading zeros. E.g. <literal>"ABCD"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"base-station-id"</literal></term>
+                  <listitem>
+                    Base station id, given as a string value (signature <literal>"s"</literal>)
+                    in upper-case hexadecimal format without leading zeros. E.g. <literal>"3F"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"ref-pn"</literal></term>
+                  <listitem>
+                    Base station PN number, given as a string value (signature <literal>"s"</literal>)
+                    in upper-case hexadecimal format without leading zeros. E.g. <literal>"3F"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"pilot-strength"</literal></term>
+                  <listitem>
+                    The signal strength of the pilot, given in the same format and scale as the GSM
+                    SINR level, given as an unsigned integer value (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><link linkend="MM-CELL-TYPE-GSM:CAPS">MM_CELL_TYPE_GSM</link></term>
+            <listitem>
+              <para>
+                The GSM cell information may include the following additional keys:
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>"operator-id"</literal></term>
+                  <listitem>
+                    PLMN MCC/MNC, given as a string value (signature <literal>"s"</literal>).
+                    E.g. <literal>21034</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"lac"</literal></term>
+                  <listitem>
+                    This is the two-byte Location Area Code of the base station, given
+                    as a string value (signature <literal>"s"</literal>) in upper-case
+                    hexadecimal format without leading zeros, as specified in 3GPP TS
+                    27.007. E.g. <literal>"84CD"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"ci"</literal></term>
+                  <listitem>
+                    This is the two- or four-byte Cell Identifier, given as a string value
+                    (signature <literal>"s"</literal>) in upper-case hexadecimal format
+                    without leading zeros, as specified in 3GPP TS 27.007.
+                    E.g. <literal>"2BAF"</literal> or <literal>"D30156"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"timing-advance"</literal></term>
+                  <listitem>
+                    Measured delay (in bit periods; 1 bit period = 48/13 microsecond)
+                    of an access burst transmission on the RACH or PRACH to the expected
+                    signal from a mobile station at zero distance under static channel
+                    conditions, given as an unsigned integer value (signature
+                    <literal>"u"</literal>). Only applicable for the serving cell (i.e.
+                    "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"arfcn"</literal></term>
+                  <listitem>
+                    Absolute RF channel number, given as an unsigned integer value (signature
+                    <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"base-station-id"</literal></term>
+                  <listitem>
+                    Base station id, given as a string value (signature <literal>"s"</literal>)
+                    in upper-case hexadecimal format without leading zeros, as specified in
+                    3GPP TS 27.007. E.g. <literal>"3F"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"rx-level"</literal></term>
+                  <listitem>
+                    Serving cell Rx measurement, given as a unsigned integer value
+                    (signature <literal>"u"</literal>. Values range between 0 and 63.
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><link linkend="MM-CELL-TYPE-UMTS:CAPS">MM_CELL_TYPE_UMTS</link></term>
+            <listitem>
+              <para>
+                The UMTS cell information may include the following additional keys:
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>"operator-id"</literal></term>
+                  <listitem>
+                    PLMN MCC/MNC, given as a string value (signature <literal>"s"</literal>).
+                    E.g. <literal>21034</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"lac"</literal></term>
+                  <listitem>
+                    This is the two-byte Location Area Code of the base station, given
+                    as a string value (signature <literal>"s"</literal>) in upper-case
+                    hexadecimal format without leading zeros, as specified in 3GPP TS
+                    27.007. E.g. <literal>"84CD"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"ci"</literal></term>
+                  <listitem>
+                    This is the two- or four-byte Cell Identifier, given as a string value
+                    (signature <literal>"s"</literal>) in upper-case hexadecimal format
+                    without leading zeros, as specified in 3GPP TS 27.007.
+                    e.g. <literal>"2BAF"</literal> or <literal>"D30156"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"frequency-fdd-ul"</literal></term>
+                  <listitem>
+                    In FDD, the frequency of the uplink in kHz, given as an unsigned integer value
+                    (signature <literal>"u"</literal>). Values range between 0 and 16383.
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"frequency-fdd-dl"</literal></term>
+                  <listitem>
+                    In FDD, the frequency of the downlink in kHz, given as an unsigned integer value
+                    (signature <literal>"u"</literal>). Values range between 0 and 16383.
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"frequency-tdd"</literal></term>
+                  <listitem>
+                    In TDD, the frequency in kHz, given as an unsigned integer value
+                    (signature <literal>"u"</literal>). Values range between 0 and 16383.
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"uarfcn"</literal></term>
+                  <listitem>
+                    UTRA absolute RF channel number, given as an unsigned integer value
+                    (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"psc"</literal></term>
+                  <listitem>
+                    Primary scrambling code, given as an unsigned integer value
+                    (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"rscp"</literal></term>
+                  <listitem>
+                    Received signal code power; the received power on one code measured
+                    in dBm on the primary CPICH channel of the cell, given as a
+                    signed integer value (signature <literal>"d"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"ecio"</literal></term>
+                  <listitem>
+                    ECIO; the received energy per chip divided by the power density in the
+                    band measured in dBm on the primary CPICH channel of the cell, given as a
+                    signed integer value (signature <literal>"d"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"path-loss"</literal></term>
+                  <listitem>
+                    The path loss of the cell, given as an unsigned integer value (signature
+                    <literal>"u"</literal>.
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><link linkend="MM-CELL-TYPE-TDSCDMA:CAPS">MM_CELL_TYPE_TDSCDMA</link></term>
+            <listitem>
+              <para>
+                The TD-SCDMA cell information may include the following additional keys:
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>"operator-id"</literal></term>
+                  <listitem>
+                    PLMN MCC/MNC, given as a string value (signature <literal>"s"</literal>).
+                    E.g. <literal>21034</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"lac"</literal></term>
+                  <listitem>
+                    This is the two-byte Location Area Code of the base station, given
+                    as a string value (signature <literal>"s"</literal>) in upper-case
+                    hexadecimal format without leading zeros, as specified in 3GPP TS
+                    27.007. E.g. <literal>"84CD"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"ci"</literal></term>
+                  <listitem>
+                    This is the two- or four-byte Cell Identifier, given as a string value
+                    (signature <literal>"s"</literal>) in upper-case hexadecimal format
+                    without leading zeros, as specified in 3GPP TS 27.007.
+                    e.g. <literal>"2BAF"</literal> or <literal>"D30156"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"uarfcn"</literal></term>
+                  <listitem>
+                    UTRA absolute RF channel number, given as an unsigned integer value
+                    (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"cell-parameter-id"</literal></term>
+                  <listitem>
+                    The cell parameter ID, given as an unsigned integer value
+                    (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"timing-advance"</literal></term>
+                  <listitem>
+                    Measured delay (in bit periods; 1 bit period = 48/13 microsecond)
+                    of an access burst transmission on the RACH or PRACH to the expected
+                    signal from an MS at zero distance under static channel conditions,
+                    given as a unsigned integer value (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"rscp"</literal></term>
+                  <listitem>
+                    Received signal code power; the received power on one code measured
+                    in dBm on the primary CPICH channel of the cell, given as a
+                    signed integer value (signature <literal>"d"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"path-loss"</literal></term>
+                  <listitem>
+                    The path loss of the cell, given as an unsigned integer value (signature
+                    <literal>"u"</literal>.
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><link linkend="MM-CELL-TYPE-LTE:CAPS">MM_CELL_TYPE_LTE</link></term>
+            <listitem>
+              <para>
+                The LTE cell information may include the following additional keys:
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>"operator-id"</literal></term>
+                  <listitem>
+                    PLMN MCC/MNC, given as a string value (signature <literal>"s"</literal>).
+                    E.g. <literal>21034</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"tac"</literal></term>
+                  <listitem>
+                    This is the two- or three-byte Tracking Area Code of the base station, given
+                    as a string value (signature <literal>"s"</literal>) in upper-case
+                    hexadecimal format without leading zeros, as specified in 3GPP TS
+                    27.007. E.g. <literal>"84CD"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"ci"</literal></term>
+                  <listitem>
+                    This is the two- or four-byte Cell Identifier, given as a string value
+                    (signature <literal>"s"</literal>) in upper-case hexadecimal format
+                    without leading zeros, as specified in 3GPP TS 27.007.
+                    e.g. <literal>"2BAF"</literal> or <literal>"D30156"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"physical-ci"</literal></term>
+                  <listitem>
+                    The physical cell id, given as a string value
+                    (signature <literal>"s"</literal>) in upper-case hexadecimal format
+                    without leading zeros. E.g. <literal>"1A0"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"earfcn"</literal></term>
+                  <listitem>
+                    E-UTRA absolute RF channel number, given as an unsigned integer value
+                    (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"rsrp"</literal></term>
+                  <listitem>
+                    The average reference signal received power in dBm, given as a signed
+                    integer value (signature <literal>"d"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"rsrq"</literal></term>
+                  <listitem>
+                    The average reference signal received quality in dB, given as a signed
+                    integer value (signature <literal>"d"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"timing-advance"</literal></term>
+                  <listitem>
+                    The timing advance, given as an unsigned integer value (signature <literal>"u"</literal>).
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><link linkend="MM-CELL-TYPE-5GNR:CAPS">MM_CELL_TYPE_5GNR</link></term>
+            <listitem>
+              <para>
+                The 5GNR cell information may include the following additional keys:
+              </para>
+              <variablelist>
+                <varlistentry><term><literal>"operator-id"</literal></term>
+                  <listitem>
+                    PLMN MCC/MNC, given as a string value (signature <literal>"s"</literal>).
+                    E.g. <literal>21034</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"tac"</literal></term>
+                  <listitem>
+                    This is the two- or three-byte Tracking Area Code of the base station, given
+                    as a string value (signature <literal>"s"</literal>) in upper-case
+                    hexadecimal format without leading zeros, as specified in 3GPP TS
+                    27.007. E.g. <literal>"84CD"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"ci"</literal></term>
+                  <listitem>
+                    This is the two- or four-byte Cell Identifier, given as a string value
+                    (signature <literal>"s"</literal>) in upper-case hexadecimal format
+                    without leading zeros, as specified in 3GPP TS 27.007.
+                    e.g. <literal>"2BAF"</literal> or <literal>"D30156"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"physical-ci"</literal></term>
+                  <listitem>
+                    The physical cell id, given as a string value
+                    (signature <literal>"s"</literal>) in upper-case hexadecimal format
+                    without leading zeros. E.g. <literal>"1A0"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"nrarfcn"</literal></term>
+                  <listitem>
+                    NR absolute RF channel number, given as an unsigned integer value
+                    (signature <literal>"u"</literal>).
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"rsrp"</literal></term>
+                  <listitem>
+                    The average reference signal received power in dBm, given as a signed
+                    integer value (signature <literal>"d"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"rsrq"</literal></term>
+                  <listitem>
+                    The average reference signal received quality in dB, given as a signed
+                    integer value (signature <literal>"d"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"sinr"</literal></term>
+                  <listitem>
+                    The signal to interference and noise ratio, given as a signed integer value
+                    (signature <literal>"d"</literal>.
+                  </listitem>
+                </varlistentry>
+                <varlistentry><term><literal>"timing-advance"</literal></term>
+                  <listitem>
+                    The timing advance, given as an unsigned integer value (signature
+                    <literal>"u"</literal>).
+                    Only applicable for the serving cell (i.e. "serving" must be TRUE).
+                  </listitem>
+                </varlistentry>
+              </variablelist>
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        Since: 1.20
+    -->
+    <method name="GetCellInfo">
+      <arg name="cell_info" type="aa{sv}" direction="out" />
+    </method>
+
     <!--
         Command:
         @cmd: The command string, e.g. "AT+GCAP" or "+GCAP" (leading AT is inserted if necessary).

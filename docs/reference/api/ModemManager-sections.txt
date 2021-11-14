@@ -63,6 +63,7 @@ MMSmsCdmaServiceCategory
 MMSimType
 MMSimEsimStatus
 MMSimRemovability
+MMCellType
 </SECTION>
 
 <SECTION>
