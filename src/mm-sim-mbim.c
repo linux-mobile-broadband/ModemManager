@@ -34,11 +34,14 @@
 G_DEFINE_TYPE (MMSimMbim, mm_sim_mbim, MM_TYPE_BASE_SIM)
 
 struct _MMSimMbimPrivate {
-    gboolean  preload;
-    GError   *preload_error;
-    gchar    *imsi;
-    gchar    *iccid;
-    GError   *iccid_error;
+    gboolean           preload;
+    GError            *preload_error;
+    gchar             *imsi;
+    gchar             *iccid;
+    GError            *iccid_error;
+    MMSimType          sim_type;
+    MMSimEsimStatus    esim_status;
+    MMSimRemovability  removability;
 };
 
 /*****************************************************************************/
@@ -105,10 +108,13 @@ subscriber_ready_status_ready (MbimDevice   *device,
     response = mbim_device_command_finish (device, res, &self->priv->preload_error);
     if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->preload_error)) {
         if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+            MbimSubscriberReadyStatusFlag flags = MBIM_SUBSCRIBER_READY_STATUS_FLAG_NONE;
+            MbimSubscriberReadyState ready_state = MBIM_SUBSCRIBER_READY_STATE_NOT_INITIALIZED;
+
             if (!mbim_message_ms_basic_connect_v3_subscriber_ready_status_response_parse (
                     response,
-                    NULL, /* ready_state */
-                    NULL, /* flags */
+                    &ready_state,
+                    &flags,
                     &self->priv->imsi,
                     &raw_iccid,
                     NULL, /* ready_info */
@@ -116,8 +122,30 @@ subscriber_ready_status_ready (MbimDevice   *device,
                     NULL, /* telephone_numbers */
                     &self->priv->preload_error))
                 g_prefix_error (&self->priv->preload_error, "Failed processing MBIMEx v3.0 subscriber ready status response: ");
-            else
+            else {
                 mm_obj_dbg (self, "processed MBIMEx v3.0 subscriber ready status response");
+
+                /* SIM type */
+                if (flags & MBIM_SUBSCRIBER_READY_STATUS_FLAG_ESIM) {
+                    self->priv->sim_type = MM_SIM_TYPE_ESIM;
+                    /* eSIM status */
+                    if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED)
+                        self->priv->esim_status = MM_SIM_ESIM_STATUS_WITH_PROFILES;
+                    else if (ready_state == MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE)
+                        self->priv->esim_status = MM_SIM_ESIM_STATUS_NO_PROFILES;
+                    else
+                        mm_obj_warn (self, "couldn't load esim status: %s", mbim_subscriber_ready_state_get_string (ready_state));
+                } else
+                    self->priv->sim_type = MM_SIM_TYPE_PHYSICAL;
+
+                /* Removability */
+                if (flags & MBIM_SUBSCRIBER_READY_STATUS_FLAG_SIM_REMOVABILITY_KNOWN) {
+                    if (flags & MBIM_SUBSCRIBER_READY_STATUS_FLAG_SIM_REMOVABLE)
+                        self->priv->removability = MM_SIM_REMOVABILITY_REMOVABLE;
+                    else
+                        self->priv->removability = MM_SIM_REMOVABILITY_NOT_REMOVABLE;
+                }
+            }
         } else {
             if (!mbim_message_subscriber_ready_status_response_parse (
                     response,
@@ -238,6 +266,94 @@ static void
 load_imsi (MMBaseSim           *self,
            GAsyncReadyCallback  callback,
            gpointer             user_data)
+{
+    preload_subscriber_info (MM_SIM_MBIM (self), callback, user_data);
+}
+
+
+/*****************************************************************************/
+/* Load SIM identifier */
+
+static MMSimType
+load_sim_type_finish (MMBaseSim     *_self,
+                      GAsyncResult  *res,
+                      GError       **error)
+{
+    MMSimMbim *self = MM_SIM_MBIM (_self);
+
+    if (!preload_subscriber_info_finish (self, res, error))
+        return MM_SIM_TYPE_UNKNOWN;
+
+    g_assert (self->priv->preload);
+    if (self->priv->preload_error) {
+        g_propagate_error (error, g_error_copy (self->priv->preload_error));
+        return MM_SIM_TYPE_UNKNOWN;
+    }
+    return self->priv->sim_type;
+}
+
+static void
+load_sim_type (MMBaseSim           *self,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
+{
+    preload_subscriber_info (MM_SIM_MBIM (self), callback, user_data);
+}
+
+/*****************************************************************************/
+/* Load eSIM status */
+
+static MMSimEsimStatus
+load_esim_status_finish (MMBaseSim     *_self,
+                         GAsyncResult  *res,
+                         GError       **error)
+{
+    MMSimMbim *self = MM_SIM_MBIM (_self);
+
+    if (!preload_subscriber_info_finish (self, res, error))
+        return MM_SIM_ESIM_STATUS_UNKNOWN;
+
+    g_assert (self->priv->preload);
+    if (self->priv->preload_error) {
+        g_propagate_error (error, g_error_copy (self->priv->preload_error));
+        return MM_SIM_ESIM_STATUS_UNKNOWN;
+    }
+    return self->priv->esim_status;
+}
+
+static void
+load_esim_status (MMBaseSim           *self,
+                  GAsyncReadyCallback  callback,
+                  gpointer             user_data)
+{
+    preload_subscriber_info (MM_SIM_MBIM (self), callback, user_data);
+}
+
+/*****************************************************************************/
+/* Load eSIM status */
+
+static MMSimRemovability
+load_removability_finish (MMBaseSim     *_self,
+                          GAsyncResult  *res,
+                          GError       **error)
+{
+    MMSimMbim *self = MM_SIM_MBIM (_self);
+
+    if (!preload_subscriber_info_finish (self, res, error))
+        return MM_SIM_REMOVABILITY_UNKNOWN;
+
+    g_assert (self->priv->preload);
+    if (self->priv->preload_error) {
+        g_propagate_error (error, g_error_copy (self->priv->preload_error));
+        return MM_SIM_REMOVABILITY_UNKNOWN;
+    }
+    return self->priv->removability;
+}
+
+static void
+load_removability (MMBaseSim           *self,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
 {
     preload_subscriber_info (MM_SIM_MBIM (self), callback, user_data);
 }
@@ -1048,6 +1164,9 @@ mm_sim_mbim_init (MMSimMbim *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_SIM_MBIM,
                                               MMSimMbimPrivate);
+    self->priv->sim_type = MM_SIM_TYPE_UNKNOWN;
+    self->priv->esim_status = MM_SIM_ESIM_STATUS_UNKNOWN;
+    self->priv->removability = MM_SIM_REMOVABILITY_UNKNOWN;
 }
 
 static void
@@ -1082,6 +1201,12 @@ mm_sim_mbim_class_init (MMSimMbimClass *klass)
     base_sim_class->load_operator_identifier_finish = load_operator_identifier_finish;
     base_sim_class->load_operator_name = load_operator_name;
     base_sim_class->load_operator_name_finish = load_operator_name_finish;
+    base_sim_class->load_sim_type = load_sim_type;
+    base_sim_class->load_sim_type_finish = load_sim_type_finish;
+    base_sim_class->load_esim_status = load_esim_status;
+    base_sim_class->load_esim_status_finish = load_esim_status_finish;
+    base_sim_class->load_removability = load_removability;
+    base_sim_class->load_removability_finish = load_removability_finish;
     base_sim_class->send_pin = send_pin;
     base_sim_class->send_pin_finish = send_pin_finish;
     base_sim_class->send_puk = send_puk;
