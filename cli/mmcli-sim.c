@@ -177,6 +177,9 @@ print_sim_info (MMSim *sim)
     preferred_nets_list = mm_sim_get_preferred_networks (sim);
     mmcli_output_preferred_networks (preferred_nets_list);
     g_list_free_full (preferred_nets_list, (GDestroyNotify) mm_sim_preferred_network_free);
+    mmcli_output_string       (MMC_F_SIM_PROPERTIES_SIM_TYPE,          mm_sim_type_get_string (mm_sim_get_sim_type (sim)));
+    mmcli_output_string       (MMC_F_SIM_PROPERTIES_ESIM_STATUS,       mm_sim_esim_status_get_string (mm_sim_get_esim_status (sim)));
+    mmcli_output_string       (MMC_F_SIM_PROPERTIES_REMOVABILITY,      mm_sim_removability_get_string (mm_sim_get_removability (sim)));
     mmcli_output_dump ();
 }
 
