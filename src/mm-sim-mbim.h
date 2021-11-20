@@ -30,9 +30,11 @@
 
 typedef struct _MMSimMbim MMSimMbim;
 typedef struct _MMSimMbimClass MMSimMbimClass;
+typedef struct _MMSimMbimPrivate MMSimMbimPrivate;
 
 struct _MMSimMbim {
-    MMBaseSim parent;
+    MMBaseSim         parent;
+    MMSimMbimPrivate *priv;
 };
 
 struct _MMSimMbimClass {

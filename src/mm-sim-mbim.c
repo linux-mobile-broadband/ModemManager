@@ -33,6 +33,14 @@
 
 G_DEFINE_TYPE (MMSimMbim, mm_sim_mbim, MM_TYPE_BASE_SIM)
 
+struct _MMSimMbimPrivate {
+    gboolean  preload;
+    GError   *preload_error;
+    gchar    *imsi;
+    gchar    *iccid;
+    GError   *iccid_error;
+};
+
 /*****************************************************************************/
 
 static gboolean
@@ -68,138 +76,150 @@ peek_device (gpointer self,
 }
 
 /*****************************************************************************/
-/* Load SIM identifier */
+/* Preload subscriber info */
 
-static gchar *
-load_sim_identifier_finish (MMBaseSim *self,
-                            GAsyncResult *res,
-                            GError **error)
+static gboolean
+preload_subscriber_info_finish (MMSimMbim     *self,
+                                GAsyncResult  *res,
+                                GError       **error)
 {
-    return g_task_propagate_pointer (G_TASK (res), error);
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
-simid_subscriber_ready_state_ready (MbimDevice *device,
-                                    GAsyncResult *res,
-                                    GTask *task)
+subscriber_ready_status_ready (MbimDevice   *device,
+                               GAsyncResult *res,
+                               GTask        *task)
 {
-    MbimMessage *response;
-    GError *error = NULL;
-    gchar *sim_iccid = NULL;
-    g_autofree gchar *raw_iccid = NULL;
+    MMSimMbim              *self;
+    g_autoptr(MbimMessage)  response = NULL;
+    g_autofree gchar       *raw_iccid = NULL;
 
-    response = mbim_device_command_finish (device, res, &error);
+    self = g_task_get_source_object (task);
+
+    g_assert (!self->priv->preload_error);
+    g_assert (!self->priv->imsi);
+    g_assert (!self->priv->iccid);
+    g_assert (!self->priv->iccid_error);
+
+    response = mbim_device_command_finish (device, res, &self->priv->preload_error);
     if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
+        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->preload_error) &&
         mbim_message_subscriber_ready_status_response_parse (
             response,
             NULL, /* ready_state */
-            NULL, /* subscriber_id */
+            &self->priv->imsi,
             &raw_iccid,
             NULL, /* ready_info */
             NULL, /* telephone_numbers_count */
             NULL, /* telephone_numbers */
-            &error))
-        sim_iccid = mm_3gpp_parse_iccid (raw_iccid, &error);
+            &self->priv->preload_error)) {
+        self->priv->iccid = mm_3gpp_parse_iccid (raw_iccid, &self->priv->iccid_error);
+    }
 
-    if (error)
-        g_task_return_error (task, error);
-    else
-        g_task_return_pointer (task, sim_iccid, g_free);
-
+    /* At this point we just complete, as all the info and errors have already
+     * been stored */
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
 }
 
 static void
-load_sim_identifier (MMBaseSim *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+preload_subscriber_info (MMSimMbim           *self,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
 {
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
+    GTask                  *task;
+    MbimDevice             *device;
+    g_autoptr(MbimMessage)  message = NULL;
 
     if (!peek_device (self, &device, callback, user_data))
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
 
+    /* only preload one single time; the info of the SIM should not
+     * change during runtime, unless we're handling hotplug events */
+    if (self->priv->preload) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+    self->priv->preload = TRUE;
+
     message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
                          NULL,
-                         (GAsyncReadyCallback)simid_subscriber_ready_state_ready,
+                         (GAsyncReadyCallback)subscriber_ready_status_ready,
                          task);
-    mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+/* Load SIM identifier */
+
+static gchar *
+load_sim_identifier_finish (MMBaseSim     *_self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    MMSimMbim *self = MM_SIM_MBIM (_self);
+
+    if (!preload_subscriber_info_finish (self, res, error))
+        return NULL;
+
+    g_assert (self->priv->preload);
+    if (self->priv->iccid_error) {
+        g_propagate_error (error, g_error_copy (self->priv->iccid_error));
+        return NULL;
+    }
+    if (self->priv->preload_error) {
+        g_propagate_error (error, g_error_copy (self->priv->preload_error));
+        return NULL;
+    }
+    if (!self->priv->iccid) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "SIM iccid not available");
+        return NULL;
+    }
+    return g_strdup (self->priv->iccid);
+}
+
+static void
+load_sim_identifier (MMBaseSim           *self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    preload_subscriber_info (MM_SIM_MBIM (self), callback, user_data);
 }
 
 /*****************************************************************************/
 /* Load IMSI */
 
 static gchar *
-load_imsi_finish (MMBaseSim *self,
-                  GAsyncResult *res,
-                  GError **error)
+load_imsi_finish (MMBaseSim     *_self,
+                  GAsyncResult  *res,
+                  GError       **error)
 {
-    return g_task_propagate_pointer (G_TASK (res), error);
+    MMSimMbim *self = MM_SIM_MBIM (_self);
+
+    if (!preload_subscriber_info_finish (self, res, error))
+        return NULL;
+
+    g_assert (self->priv->preload);
+    if (self->priv->preload_error) {
+        g_propagate_error (error, g_error_copy (self->priv->preload_error));
+        return NULL;
+    }
+    g_assert (self->priv->imsi);
+    return g_strdup (self->priv->imsi);
 }
 
 static void
-imsi_subscriber_ready_state_ready (MbimDevice *device,
-                                   GAsyncResult *res,
-                                   GTask *task)
+load_imsi (MMBaseSim           *self,
+           GAsyncReadyCallback  callback,
+           gpointer             user_data)
 {
-    MbimMessage *response;
-    GError *error = NULL;
-    gchar *subscriber_id;
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-        mbim_message_subscriber_ready_status_response_parse (
-            response,
-            NULL, /* ready_state */
-            &subscriber_id,
-            NULL, /* sim_iccid */
-            NULL, /* ready_info */
-            NULL, /* telephone_numbers_count */
-            NULL, /* telephone_numbers */
-            &error))
-        g_task_return_pointer (task, subscriber_id, g_free);
-    else
-        g_task_return_error (task, error);
-    g_object_unref (task);
-
-    if (response)
-        mbim_message_unref (response);
-}
-
-static void
-load_imsi (MMBaseSim *self,
-           GAsyncReadyCallback callback,
-           gpointer user_data)
-{
-    MbimDevice *device;
-    MbimMessage *message;
-    GTask *task;
-
-    if (!peek_device (self, &device, callback, user_data))
-        return;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    message = mbim_message_subscriber_ready_status_query_new (NULL);
-    mbim_device_command (device,
-                         message,
-                         10,
-                         NULL,
-                         (GAsyncReadyCallback)imsi_subscriber_ready_state_ready,
-                         task);
-    mbim_message_unref (message);
+    preload_subscriber_info (MM_SIM_MBIM (self), callback, user_data);
 }
 
 /*****************************************************************************/
@@ -1004,13 +1024,34 @@ mm_sim_mbim_new_initialized (MMBaseModem *modem,
 static void
 mm_sim_mbim_init (MMSimMbim *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_SIM_MBIM,
+                                              MMSimMbimPrivate);
+}
+
+static void
+finalize (GObject *object)
+{
+    MMSimMbim *self = MM_SIM_MBIM (object);
+
+    g_clear_error (&self->priv->preload_error);
+    g_free (self->priv->imsi);
+    g_free (self->priv->iccid);
+    g_clear_error (&self->priv->iccid_error);
+
+    G_OBJECT_CLASS (mm_sim_mbim_parent_class)->finalize (object);
 }
 
 static void
 mm_sim_mbim_class_init (MMSimMbimClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMBaseSimClass *base_sim_class = MM_BASE_SIM_CLASS (klass);
 
+    g_type_class_add_private (object_class, sizeof (MMSimMbimPrivate));
+
+    object_class->finalize = finalize;
     base_sim_class->load_sim_identifier = load_sim_identifier;
     base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
     base_sim_class->load_imsi = load_imsi;
