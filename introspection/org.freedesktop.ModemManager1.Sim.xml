@@ -185,5 +185,36 @@
     -->
     <property name="PreferredNetworks" type="a(su)" access="read" />
 
+    <!--
+        SimType:
+
+        Indicates whether the current primary SIM is a ESIM or a physical SIM,
+        given as <link linkend="MMSimType">MMSimType</link> value.
+
+        Since: 1.20
+    -->
+    <property name="SimType" type="u" access="read" />
+
+    <!--
+        EsimStatus:
+
+        If current SIM is ESIM then this indicates whether there
+        is a profile or not, given as
+        <link linkend="MMSimEsimStatus">MMSimEsimStatus</link> value.
+
+        Since: 1.20
+    -->
+    <property name="EsimStatus" type="u" access="read" />
+
+    <!--
+        Removability:
+
+        Indicates whether the current SIM is a removable SIM or not, given as a
+        <link linkend="MMSimRemovability">MMSimRemovability</link> value.
+
+        Since: 1.20
+    -->
+    <property name="Removability" type="u" access="read" />
+
   </interface>
 </node>
