@@ -103,18 +103,38 @@ subscriber_ready_status_ready (MbimDevice   *device,
     g_assert (!self->priv->iccid_error);
 
     response = mbim_device_command_finish (device, res, &self->priv->preload_error);
-    if (response &&
-        mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->preload_error) &&
-        mbim_message_subscriber_ready_status_response_parse (
-            response,
-            NULL, /* ready_state */
-            &self->priv->imsi,
-            &raw_iccid,
-            NULL, /* ready_info */
-            NULL, /* telephone_numbers_count */
-            NULL, /* telephone_numbers */
-            &self->priv->preload_error)) {
-        self->priv->iccid = mm_3gpp_parse_iccid (raw_iccid, &self->priv->iccid_error);
+    if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &self->priv->preload_error)) {
+        if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+            if (!mbim_message_ms_basic_connect_v3_subscriber_ready_status_response_parse (
+                    response,
+                    NULL, /* ready_state */
+                    NULL, /* flags */
+                    &self->priv->imsi,
+                    &raw_iccid,
+                    NULL, /* ready_info */
+                    NULL, /* telephone_numbers_count */
+                    NULL, /* telephone_numbers */
+                    &self->priv->preload_error))
+                g_prefix_error (&self->priv->preload_error, "Failed processing MBIMEx v3.0 subscriber ready status response: ");
+            else
+                mm_obj_dbg (self, "processed MBIMEx v3.0 subscriber ready status response");
+        } else {
+            if (!mbim_message_subscriber_ready_status_response_parse (
+                    response,
+                    NULL, /* ready_state */
+                    &self->priv->imsi,
+                    &raw_iccid,
+                    NULL, /* ready_info */
+                    NULL, /* telephone_numbers_count */
+                    NULL, /* telephone_numbers */
+                    &self->priv->preload_error))
+                g_prefix_error (&self->priv->preload_error, "Failed processing subscriber ready status response: ");
+            else
+                mm_obj_dbg (self, "processed subscriber ready status response");
+        }
+
+        if (raw_iccid)
+            self->priv->iccid = mm_3gpp_parse_iccid (raw_iccid, &self->priv->iccid_error);
     }
 
     /* At this point we just complete, as all the info and errors have already
