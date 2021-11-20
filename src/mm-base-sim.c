@@ -2257,6 +2257,9 @@ typedef enum {
     INITIALIZATION_STEP_OPERATOR_NAME,
     INITIALIZATION_STEP_EMERGENCY_NUMBERS,
     INITIALIZATION_STEP_PREFERRED_NETWORKS,
+    INITIALIZATION_STEP_SIM_TYPE,
+    INITIALIZATION_STEP_ESIM_STATUS,
+    INITIALIZATION_STEP_REMOVABILITY,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -2318,6 +2321,33 @@ initable_init_finish (GAsyncInitable  *initable,
         ctx->step++;                                                    \
         interface_initialization_step (task);                           \
     }
+
+#undef UINT_REPLY_READY_FN
+#define UINT_REPLY_READY_FN(NAME,DISPLAY)                               \
+    static void                                                         \
+    init_load_##NAME##_ready (MMBaseSim    *self,                       \
+                              GAsyncResult *res,                        \
+                              GTask        *task)                       \
+    {                                                                   \
+        InitAsyncContext  *ctx;                                         \
+        g_autoptr(GError)  error = NULL;                                \
+        guint              val;                                         \
+                                                                        \
+        val = (guint) MM_BASE_SIM_GET_CLASS (self)->load_##NAME##_finish (self, res, &error); \
+        mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self), val);             \
+                                                                        \
+        if (error)                                                      \
+            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message); \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx = g_task_get_task_data (task);                              \
+        ctx->step++;                                                    \
+        interface_initialization_step (task);                           \
+    }
+
+UINT_REPLY_READY_FN (removability, "removability")
+UINT_REPLY_READY_FN (esim_status,  "esim status")
+UINT_REPLY_READY_FN (sim_type,     "sim type")
 
 static void
 init_load_preferred_networks_ready (MMBaseSim    *self,
@@ -2561,6 +2591,42 @@ interface_initialization_step (GTask *task)
             MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks (
                 self,
                 (GAsyncReadyCallback)init_load_preferred_networks_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case INITIALIZATION_STEP_SIM_TYPE:
+        if (MM_BASE_SIM_GET_CLASS (self)->load_sim_type &&
+            MM_BASE_SIM_GET_CLASS (self)->load_sim_type_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_sim_type (
+                self,
+                (GAsyncReadyCallback)init_load_sim_type_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case INITIALIZATION_STEP_ESIM_STATUS:
+        if (MM_BASE_SIM_GET_CLASS (self)->load_esim_status &&
+            MM_BASE_SIM_GET_CLASS (self)->load_esim_status_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_esim_status (
+                self,
+                (GAsyncReadyCallback)init_load_esim_status_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case INITIALIZATION_STEP_REMOVABILITY:
+        if (MM_BASE_SIM_GET_CLASS (self)->load_removability &&
+            MM_BASE_SIM_GET_CLASS (self)->load_removability_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_removability (
+                self,
+                (GAsyncReadyCallback)init_load_removability_ready,
                 task);
             return;
         }

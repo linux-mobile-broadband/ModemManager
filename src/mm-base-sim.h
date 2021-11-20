@@ -116,6 +116,30 @@ struct _MMBaseSimClass {
                                                 GAsyncResult *res,
                                                 GError **error);
 
+    /* Load sim type (async) */
+    void      (* load_sim_type)        (MMBaseSim            *self,
+                                        GAsyncReadyCallback   callback,
+                                        gpointer              user_data);
+    MMSimType (* load_sim_type_finish) (MMBaseSim            *self,
+                                        GAsyncResult         *res,
+                                        GError              **error);
+
+    /* Load esim status (async) */
+    void            (* load_esim_status)        (MMBaseSim            *self,
+                                                 GAsyncReadyCallback   callback,
+                                                 gpointer              user_data);
+    MMSimEsimStatus (* load_esim_status_finish) (MMBaseSim            *self,
+                                                 GAsyncResult         *res,
+                                                 GError              **error);
+
+    /* Load removabilitu (async) */
+    void              (* load_removability)        (MMBaseSim            *self,
+                                                    GAsyncReadyCallback   callback,
+                                                    gpointer              user_data);
+    MMSimRemovability (* load_removability_finish) (MMBaseSim            *self,
+                                                    GAsyncResult         *res,
+                                                    GError              **error);
+
     /* Change PIN (async) */
     void     (* change_pin)        (MMBaseSim *self,
                                     const gchar *old_pin,
