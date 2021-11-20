@@ -411,6 +411,62 @@ mm_sim_get_preferred_networks (MMSim *self)
     return network_list;
 }
 
+/**
+ * mm_sim_get_sim_type:
+ * @self: A #MMSim.
+ *
+ * Gets the SIM type.
+ *
+ * Returns: a #MMSimType.
+ *
+ * Since: 1.20
+ */
+MMSimType
+mm_sim_get_sim_type (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), MM_SIM_TYPE_UNKNOWN);
+
+    return mm_gdbus_sim_get_sim_type (MM_GDBUS_SIM (self));
+}
+
+/**
+ * mm_sim_get_esim_status:
+ * @self: A #MMSim.
+ *
+ * Gets the eSIM status.
+ *
+ * Only applicable if the SIM type is %MM_SIM_TYPE_ESIM.
+ *
+ * Returns: a #MMSimEsimStatus.
+ *
+ * Since: 1.20
+ */
+MMSimEsimStatus
+mm_sim_get_esim_status (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), MM_SIM_ESIM_STATUS_UNKNOWN);
+
+    return mm_gdbus_sim_get_esim_status (MM_GDBUS_SIM (self));
+}
+
+/**
+ * mm_sim_get_removability:
+ * @self: A #MMSim.
+ *
+ * Gets whether the SIM is removable or not.
+ *
+ * Returns: a #MMSimRemovability.
+ *
+ * Since: 1.20
+ */
+MMSimRemovability
+mm_sim_get_removability (MMSim *self)
+{
+    g_return_val_if_fail (MM_IS_SIM (self), MM_SIM_REMOVABILITY_UNKNOWN);
+
+    return mm_gdbus_sim_get_removability (MM_GDBUS_SIM (self));
+}
+
 /*****************************************************************************/
 
 /**

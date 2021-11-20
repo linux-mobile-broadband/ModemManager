@@ -55,6 +55,9 @@ MMSmsStorage
 MMSmsValidityType
 MMSmsCdmaTeleserviceId
 MMSmsCdmaServiceCategory
+MMSimType
+MMSimEsimStatus
+MMSimRemovability
 </SECTION>
 
 <SECTION>

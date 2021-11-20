@@ -89,6 +89,10 @@ gchar               **mm_sim_dup_emergency_numbers (MMSim *self);
 
 GList*       mm_sim_get_preferred_networks  (MMSim *self);
 
+MMSimType         mm_sim_get_sim_type     (MMSim *self);
+MMSimEsimStatus   mm_sim_get_esim_status  (MMSim *self);
+MMSimRemovability mm_sim_get_removability (MMSim *self);
+
 void     mm_sim_send_pin        (MMSim *self,
                                  const gchar *pin,
                                  GCancellable *cancellable,
