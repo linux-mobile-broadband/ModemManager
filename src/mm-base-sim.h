@@ -108,6 +108,14 @@ struct _MMBaseSimClass {
                                              GAsyncResult *res,
                                              GError **error);
 
+    /* Load preferred networks (async) */
+    void  (* load_preferred_networks)          (MMBaseSim *self,
+                                                GAsyncReadyCallback callback,
+                                                gpointer user_data);
+    GList * (* load_preferred_networks_finish) (MMBaseSim *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+
     /* Change PIN (async) */
     void     (* change_pin)        (MMBaseSim *self,
                                     const gchar *old_pin,
@@ -150,14 +158,6 @@ struct _MMBaseSimClass {
     /* Signals */
     void     (* pin_lock_enabled) (MMBaseSim *self,
                                    gboolean enabled);
-
-    /* Load preferred networks (async) */
-    void  (* load_preferred_networks)          (MMBaseSim *self,
-                                                GAsyncReadyCallback callback,
-                                                gpointer user_data);
-    GList * (* load_preferred_networks_finish) (MMBaseSim *self,
-                                                GAsyncResult *res,
-                                                GError **error);
 
     /* Set preferred networks (async) */
     void  (* set_preferred_networks)           (MMBaseSim *self,
