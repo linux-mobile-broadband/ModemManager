@@ -1565,8 +1565,8 @@ reload_connection_status_ready (MbimDevice   *device,
     guint32                   session_id;
     MbimActivationState       activation_state;
     MMBearerConnectionStatus  bearer_connection_status = MM_BEARER_CONNECTION_STATUS_UNKNOWN;
+    GError                   *error = NULL;
     g_autoptr(MbimMessage)    response = NULL;
-    g_autoptr(GError)         error = NULL;
 
     self = g_task_get_source_object (task);
 
