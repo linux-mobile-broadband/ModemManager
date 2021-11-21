@@ -201,6 +201,27 @@ mm_mbim_data_class_from_modem_mode (MMModemMode modem_mode,
     return mask;
 }
 
+MbimDataClass
+mm_mbim_data_class_from_mbim_data_class_v3_and_subclass (MbimDataClassV3  data_class_v3,
+                                                         MbimDataSubclass data_subclass)
+{
+    MbimDataClass data_class;
+
+    data_class = data_class_v3 & ~(MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA);
+    if (data_class_v3 & MBIM_DATA_CLASS_V3_5G) {
+        if (data_subclass & MBIM_DATA_SUBCLASS_5G_NR)
+            data_class |= MBIM_DATA_CLASS_5G_SA;
+        else if (data_subclass & (MBIM_DATA_SUBCLASS_5G_ENDC |
+                                  MBIM_DATA_SUBCLASS_5G_NEDC |
+                                  MBIM_DATA_SUBCLASS_5G_NGENDC))
+            data_class |= (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_LTE);
+        else if (data_subclass & MBIM_DATA_SUBCLASS_5G_ELTE)
+            data_class |= MBIM_DATA_CLASS_LTE;
+    }
+
+    return data_class;
+}
+
 MMModemAccessTechnology
 mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class)
 {
