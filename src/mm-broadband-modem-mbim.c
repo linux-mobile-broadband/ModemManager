@@ -3871,17 +3871,39 @@ basic_connect_notification_connect (MMBroadbandModemMbim *self,
     const MbimUuid          *context_type;
     guint32                  nw_error;
     g_autoptr(MMBearerList)  bearer_list = NULL;
+    g_autoptr(GError)        error = NULL;
 
-    if (!mbim_message_connect_notification_parse (
-            notification,
-            &session_id,
-            &activation_state,
-            NULL, /* voice_call_state */
-            NULL, /* ip_type */
-            &context_type,
-            &nw_error,
-            NULL)) {
-        return;
+    if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+        if (!mbim_message_ms_basic_connect_v3_connect_notification_parse (
+                notification,
+                &session_id,
+                &activation_state,
+                NULL, /* voice_call_state */
+                NULL, /* ip_type */
+                &context_type, /* context_type */
+                &nw_error,
+                NULL, /* media_preference */
+                NULL, /* access_string */
+                NULL, /* unnamed_ies */
+                &error)) {
+            mm_obj_warn (self, "Failed processing MBIMEx v3.0 connect notification: %s", error->message);
+            return;
+        }
+        mm_obj_dbg (self, "processed MBIMEx v3.0 connect notification");
+    } else {
+        if (!mbim_message_connect_notification_parse (
+                notification,
+                &session_id,
+                &activation_state,
+                NULL, /* voice_call_state */
+                NULL, /* ip_type */
+                &context_type,
+                &nw_error,
+                &error)) {
+            mm_obj_warn (self, "Failed processing connect notification: %s", error->message);
+            return;
+        }
+        mm_obj_dbg (self, "processed connect notification");
     }
 
     g_object_get (self,
