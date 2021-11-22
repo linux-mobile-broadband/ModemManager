@@ -2926,7 +2926,8 @@ static void
 list_sim_slots_context_free (ListSimSlotsContext *ctx)
 {
     g_strfreev (ctx->sim_paths);
-    g_ptr_array_unref (ctx->sim_slots);
+    if (ctx->sim_slots)
+        g_ptr_array_unref (ctx->sim_slots);
     g_slice_free (ListSimSlotsContext, ctx);
 }
 
