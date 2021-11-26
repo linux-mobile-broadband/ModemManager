@@ -6059,9 +6059,11 @@ modem_3gpp_profile_manager_check_format_finish (MMIfaceModem3gppProfileManager  
     /* use default string comparison method */
     if (apn_cmp)
         *apn_cmp = NULL;
-    /* we don't support IP type in the profiles */
     if (profile_cmp_flags)
-        *profile_cmp_flags = MM_3GPP_PROFILE_CMP_FLAGS_NO_IP_TYPE;
+        *profile_cmp_flags = (MM_3GPP_PROFILE_CMP_FLAGS_NO_IP_TYPE |
+                              MM_3GPP_PROFILE_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE |
+                              MM_3GPP_PROFILE_CMP_FLAGS_NO_ROAMING_ALLOWANCE |
+                              MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_SOURCE);
     return TRUE;
 }
 
