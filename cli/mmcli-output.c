@@ -950,7 +950,7 @@ build_profile_human (GPtrArray     *array,
         g_autofree gchar *allowed_auth_str = NULL;
 
         allowed_auth_str = mm_bearer_allowed_auth_build_string_from_mask (allowed_auth);
-        g_ptr_array_add (array, g_strdup_printf ("                allowed-auth: %s", allowed_auth_str));
+        g_ptr_array_add (array, g_strdup_printf ("                allowed auth: %s", allowed_auth_str));
     }
 
     if ((aux = mm_3gpp_profile_get_user (profile)) != NULL)
@@ -964,7 +964,7 @@ build_profile_human (GPtrArray     *array,
         g_autofree gchar *ip_type_str = NULL;
 
         ip_type_str = mm_bearer_ip_family_build_string_from_mask (ip_type);
-        g_ptr_array_add (array, g_strdup_printf ("                ip-type: %s", ip_type_str));
+        g_ptr_array_add (array, g_strdup_printf ("                ip type: %s", ip_type_str));
     }
 
     apn_type = mm_3gpp_profile_get_apn_type (profile);
@@ -972,7 +972,7 @@ build_profile_human (GPtrArray     *array,
         g_autofree gchar *apn_type_str = NULL;
 
         apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
-        g_ptr_array_add (array, g_strdup_printf ("                apn-type: %s", apn_type_str));
+        g_ptr_array_add (array, g_strdup_printf ("                apn type: %s", apn_type_str));
     }
 
     access_type_preference = mm_3gpp_profile_get_access_type_preference (profile);
