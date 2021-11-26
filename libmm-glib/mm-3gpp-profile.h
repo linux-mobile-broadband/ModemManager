@@ -92,6 +92,8 @@ void mm_3gpp_profile_set_apn_type               (MM3gppProfile                *s
                                                  MMBearerApnType               apn_type);
 void mm_3gpp_profile_set_access_type_preference (MM3gppProfile                *self,
                                                  MMBearerAccessTypePreference  access_type_preference);
+void mm_3gpp_profile_set_enabled                (MM3gppProfile                *self,
+                                                 gboolean                      enabled);
 
 gint                          mm_3gpp_profile_get_profile_id             (MM3gppProfile *self);
 const gchar                  *mm_3gpp_profile_get_profile_name           (MM3gppProfile *self);
@@ -102,6 +104,7 @@ const gchar                  *mm_3gpp_profile_get_password               (MM3gpp
 MMBearerIpFamily              mm_3gpp_profile_get_ip_type                (MM3gppProfile *self);
 MMBearerApnType               mm_3gpp_profile_get_apn_type               (MM3gppProfile *self);
 MMBearerAccessTypePreference  mm_3gpp_profile_get_access_type_preference (MM3gppProfile *self);
+gboolean                      mm_3gpp_profile_get_enabled                (MM3gppProfile *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -132,6 +135,7 @@ typedef enum {
     MM_3GPP_PROFILE_CMP_FLAGS_NO_APN_TYPE               = 1 << 4,
     MM_3GPP_PROFILE_CMP_FLAGS_NO_IP_TYPE                = 1 << 5,
     MM_3GPP_PROFILE_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE = 1 << 6,
+    MM_3GPP_PROFILE_CMP_FLAGS_NO_ENABLED                = 1 << 7,
 } MM3gppProfileCmpFlags;
 
 gboolean mm_3gpp_profile_cmp (MM3gppProfile         *a,

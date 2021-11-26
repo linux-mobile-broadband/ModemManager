@@ -46,6 +46,7 @@ G_DEFINE_TYPE (MM3gppProfile, mm_3gpp_profile, G_TYPE_OBJECT)
 #define PROPERTY_IP_TYPE                "ip-type"
 #define PROPERTY_APN_TYPE               "apn-type"
 #define PROPERTY_ACCESS_TYPE_PREFERENCE "access-type-preference"
+#define PROPERTY_ENABLED                "profile-enabled"
 
 struct _MM3gppProfilePrivate {
     gint                          profile_id;
@@ -54,6 +55,8 @@ struct _MM3gppProfilePrivate {
     MMBearerIpFamily              ip_type;
     MMBearerApnType               apn_type;
     MMBearerAccessTypePreference  access_type_preference;
+    gboolean                      enabled;
+    gboolean                      enabled_set;
 
     /* Optional authentication settings */
     MMBearerAllowedAuth  allowed_auth;
@@ -111,6 +114,9 @@ mm_3gpp_profile_cmp (MM3gppProfile         *a,
         return FALSE;
     if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE) &&
         (a->priv->access_type_preference != b->priv->access_type_preference))
+        return FALSE;
+    if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_ENABLED) &&
+        ((a->priv->enabled != b->priv->enabled) || (a->priv->enabled_set != b->priv->enabled_set)))
         return FALSE;
 
     return TRUE;
@@ -474,6 +480,45 @@ mm_3gpp_profile_get_access_type_preference (MM3gppProfile *self)
 /*****************************************************************************/
 
 /**
+ * mm_3gpp_profile_set_enabled:
+ * @self: a #MM3gppProfile.
+ * @enabled: boolean value.
+ *
+ * Sets the flag to indicate whether the profile is enabled or disabled.
+ *
+ * Since: 1.20
+ */
+void
+mm_3gpp_profile_set_enabled (MM3gppProfile *self,
+                             gboolean       enabled)
+{
+    g_return_if_fail (MM_IS_3GPP_PROFILE (self));
+
+    self->priv->enabled_set = TRUE;
+    self->priv->enabled = enabled;
+}
+
+/**
+ * mm_3gpp_profile_get_enabled:
+ * @self: a #MM3gppProfile.
+ *
+ * Checks whether the profile is enabled or disabled.
+ *
+ * Returns: %TRUE if the profile is enabled, %FALSE otherwise.
+ *
+ * Since: 1.20
+ */
+gboolean
+mm_3gpp_profile_get_enabled (MM3gppProfile *self)
+{
+    g_return_val_if_fail (MM_IS_3GPP_PROFILE (self), FALSE);
+
+    return self->priv->enabled;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_3gpp_profile_get_dictionary: (skip)
  */
 GVariant *
@@ -541,6 +586,13 @@ mm_3gpp_profile_get_dictionary (MM3gppProfile *self)
                                "{sv}",
                                PROPERTY_ACCESS_TYPE_PREFERENCE,
                                g_variant_new_uint32 (self->priv->access_type_preference));
+
+    if (self->priv->enabled_set)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_ENABLED,
+                               g_variant_new_boolean (self->priv->enabled));
+
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
@@ -612,6 +664,16 @@ mm_3gpp_profile_consume_string (MM3gppProfile  *self,
             return FALSE;
         }
         mm_3gpp_profile_set_access_type_preference (self, access_type_preference);
+    } else if (g_str_equal (key, PROPERTY_ENABLED)) {
+        GError   *inner_error = NULL;
+        gboolean  profile_enabled;
+
+        profile_enabled = mm_common_get_boolean_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_3gpp_profile_set_enabled (self, profile_enabled);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -712,6 +774,10 @@ mm_3gpp_profile_consume_variant (MM3gppProfile  *self,
         mm_3gpp_profile_set_access_type_preference (
             self,
             g_variant_get_uint32 (value));
+    else if (g_str_equal (key, PROPERTY_ENABLED))
+        mm_3gpp_profile_set_enabled (
+            self,
+            g_variant_get_boolean (value));
     else {
         /* Set error */
         g_set_error (error,
@@ -798,6 +864,7 @@ mm_3gpp_profile_init (MM3gppProfile *self)
     self->priv->ip_type = MM_BEARER_IP_FAMILY_NONE;
     self->priv->apn_type = MM_BEARER_APN_TYPE_NONE;
     self->priv->access_type_preference = MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE;
+    self->priv->enabled = TRUE;
 }
 
 static void
