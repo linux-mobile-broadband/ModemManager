@@ -33,6 +33,7 @@
 /* When comparing EPS bearer settings take into account that:
  *  -  'password' may not always be readable.
  *  -  'apn-type' may not always be supported.
+ *  -  'access-type-preference' may not always be reported.
  *  -  'profile-id' will not be known in the requested settings
  *  -  we ignore settings not applicable to profiles, like 'allow-roaming' or
  *     'rm-protocol'.
@@ -44,7 +45,10 @@
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD |       \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING |  \
      MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE |       \
-     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL)
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL |    \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE | \
+     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ROAMING_ALLOWANCE)
+
 
 /*****************************************************************************/
 /* Private data context */
