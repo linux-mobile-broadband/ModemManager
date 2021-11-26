@@ -10352,7 +10352,11 @@ modem_3gpp_profile_manager_check_format_finish (MMIfaceModem3gppProfileManager  
     if (apn_cmp)
         *apn_cmp = (GEqualFunc) mm_3gpp_cmp_apn_name;
     if (profile_cmp_flags)
-        *profile_cmp_flags = (MM_3GPP_PROFILE_CMP_FLAGS_NO_AUTH | MM_3GPP_PROFILE_CMP_FLAGS_NO_APN_TYPE);
+        *profile_cmp_flags = (MM_3GPP_PROFILE_CMP_FLAGS_NO_AUTH |
+                              MM_3GPP_PROFILE_CMP_FLAGS_NO_APN_TYPE |
+                              MM_3GPP_PROFILE_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE |
+                              MM_3GPP_PROFILE_CMP_FLAGS_NO_ROAMING_ALLOWANCE |
+                              MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_SOURCE);
     return TRUE;
 }
 
