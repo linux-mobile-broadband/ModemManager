@@ -174,6 +174,7 @@ print_bearer_info (MMBearer *bearer)
         gchar       *allowed_auth_str = NULL;
         gchar       *properties_profile_id_str = NULL;
         const gchar *access_type_preference_str = NULL;
+        gchar       *roaming_allowance_str = NULL;
 
         if (properties) {
             gint properties_profile_id;
@@ -193,6 +194,7 @@ print_bearer_info (MMBearer *bearer)
                 rm_protocol = mm_modem_cdma_rm_protocol_get_string (mm_bearer_properties_get_rm_protocol (properties));
             }
             access_type_preference_str = mm_bearer_access_type_preference_get_string (mm_bearer_properties_get_access_type_preference (properties));
+            roaming_allowance_str      = mm_bearer_roaming_allowance_build_string_from_mask (mm_bearer_properties_get_roaming_allowance (properties));
         }
 
         mmcli_output_string_take      (MMC_F_BEARER_PROPERTIES_PROFILE_ID,             properties_profile_id_str);
@@ -205,6 +207,7 @@ print_bearer_info (MMBearer *bearer)
         mmcli_output_string           (MMC_F_BEARER_PROPERTIES_RM_PROTOCOL,            rm_protocol);
         mmcli_output_string_list_take (MMC_F_BEARER_PROPERTIES_ALLOWED_AUTH,           allowed_auth_str);
         mmcli_output_string           (MMC_F_BEARER_PROPERTIES_ACCESS_TYPE_PREFERENCE, access_type_preference_str);
+        mmcli_output_string_take      (MMC_F_BEARER_PROPERTIES_ROAMING_ALLOWANCE,      roaming_allowance_str);
     }
 
     /* IPv4 config */

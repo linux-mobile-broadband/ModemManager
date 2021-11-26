@@ -241,6 +241,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_BEARER_PROPERTIES_NUMBER]                 = { "bearer.properties.number",                        "number",                   MMC_S_BEARER_PROPERTIES,          },
     [MMC_F_BEARER_PROPERTIES_RM_PROTOCOL]            = { "bearer.properties.rm-protocol",                   "rm protocol",              MMC_S_BEARER_PROPERTIES,          },
     [MMC_F_BEARER_PROPERTIES_ACCESS_TYPE_PREFERENCE] = { "bearer.properties.access-type-preference",        "access type preference",   MMC_S_BEARER_PROPERTIES,          },
+    [MMC_F_BEARER_PROPERTIES_ROAMING_ALLOWANCE]      = { "bearer.properties.roaming-allowance",             "roaming allowance",        MMC_S_BEARER_PROPERTIES,          },
     [MMC_F_BEARER_IPV4_CONFIG_METHOD]                = { "bearer.ipv4-config.method",                       "method",                   MMC_S_BEARER_IPV4_CONFIG,         },
     [MMC_F_BEARER_IPV4_CONFIG_ADDRESS]               = { "bearer.ipv4-config.address",                      "address",                  MMC_S_BEARER_IPV4_CONFIG,         },
     [MMC_F_BEARER_IPV4_CONFIG_PREFIX]                = { "bearer.ipv4-config.prefix",                       "prefix",                   MMC_S_BEARER_IPV4_CONFIG,         },
@@ -931,6 +932,7 @@ build_profile_human (GPtrArray     *array,
     MMBearerIpFamily              ip_type;
     MMBearerApnType               apn_type;
     MMBearerAccessTypePreference  access_type_preference;
+    MMBearerRoamingAllowance      roaming_allowance;
 
     g_ptr_array_add (array, g_strdup_printf ("profile-id: %u", mm_3gpp_profile_get_profile_id (profile)));
     g_ptr_array_add (array, g_strdup_printf ("         profile enabled: %s",
@@ -977,6 +979,14 @@ build_profile_human (GPtrArray     *array,
         aux = mm_bearer_access_type_preference_get_string (access_type_preference);
         g_ptr_array_add (array, g_strdup_printf ("  access type preference: %s", aux));
     }
+
+    roaming_allowance = mm_3gpp_profile_get_roaming_allowance (profile);
+    if (roaming_allowance != MM_BEARER_ROAMING_ALLOWANCE_NONE) {
+        g_autofree gchar *roaming_allowance_str = NULL;
+
+        roaming_allowance_str = mm_bearer_roaming_allowance_build_string_from_mask (roaming_allowance);
+        g_ptr_array_add (array, g_strdup_printf ("       roaming allowance: %s", roaming_allowance_str));
+    }
 }
 
 static void
@@ -989,6 +999,7 @@ build_profile_keyvalue (GPtrArray     *array,
     MMBearerIpFamily              ip_type;
     MMBearerApnType               apn_type;
     MMBearerAccessTypePreference  access_type_preference;
+    MMBearerRoamingAllowance      roaming_allowance;
 
     str = g_string_new ("");
     g_string_append_printf (str, "profile-id: %u", mm_3gpp_profile_get_profile_id (profile));
@@ -1033,6 +1044,14 @@ build_profile_keyvalue (GPtrArray     *array,
     if (access_type_preference != MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE) {
         aux = mm_bearer_access_type_preference_get_string (access_type_preference);
         g_string_append_printf (str, ", access-type-preference: %s", aux);
+    }
+
+    roaming_allowance = mm_3gpp_profile_get_roaming_allowance (profile);
+    if (roaming_allowance != MM_BEARER_ROAMING_ALLOWANCE_NONE) {
+        g_autofree gchar *roaming_allowance_str = NULL;
+
+        roaming_allowance_str = mm_bearer_roaming_allowance_build_string_from_mask (roaming_allowance);
+        g_string_append_printf (str, ", roaming-allowance: %s", roaming_allowance_str);
     }
 
     g_ptr_array_add (array, g_string_free (str, FALSE));
