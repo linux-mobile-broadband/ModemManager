@@ -841,8 +841,8 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
              * defined in section 6.5 of WAP-256-WDP-20010614-a */
             wdp_total_segments = data->data[1];
             wdp_segment_number = data->data[2];
-            mm_obj_dbg (log_object, "    WAP WDP Payload, segment: %d total: %d", 
-                        wdp_segment_number, wdp_total_segments); 
+            mm_obj_dbg (log_object, "    WAP WDP Payload, segment: %d total: %d",
+                        wdp_segment_number, wdp_total_segments);
 
             /* Use message id as the reference number, since it is the same
              * across message sets*/
@@ -854,7 +854,7 @@ read_bearer_data_user_data (MMSmsPart              *sms_part,
             if (wdp_segment_number == 0) {
                 /* Remove the 3 byte segmentation header as well as the 16 bit source and dest port fields */
                 g_byte_array_remove_range (data, 0, 7);
-            } else { 
+            } else {
                 /* Remove segmentation header from additional segments to merge cleanly */
                 g_byte_array_remove_range (data, 0, 3);
             }
