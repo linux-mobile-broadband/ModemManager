@@ -48,6 +48,7 @@ G_DEFINE_TYPE (MM3gppProfile, mm_3gpp_profile, G_TYPE_OBJECT)
 #define PROPERTY_ACCESS_TYPE_PREFERENCE "access-type-preference"
 #define PROPERTY_ENABLED                "profile-enabled"
 #define PROPERTY_ROAMING_ALLOWANCE      "roaming-allowance"
+#define PROPERTY_SOURCE                 "profile-source"
 
 struct _MM3gppProfilePrivate {
     gint                          profile_id;
@@ -59,6 +60,7 @@ struct _MM3gppProfilePrivate {
     gboolean                      enabled;
     gboolean                      enabled_set;
     MMBearerRoamingAllowance      roaming_allowance;
+    MMBearerProfileSource         profile_source;
 
     /* Optional authentication settings */
     MMBearerAllowedAuth  allowed_auth;
@@ -122,6 +124,9 @@ mm_3gpp_profile_cmp (MM3gppProfile         *a,
         return FALSE;
     if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_ROAMING_ALLOWANCE) &&
         (a->priv->roaming_allowance != b->priv->roaming_allowance))
+        return FALSE;
+    if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_SOURCE) &&
+        (a->priv->profile_source != b->priv->profile_source))
         return FALSE;
 
     return TRUE;
@@ -562,6 +567,44 @@ mm_3gpp_profile_get_roaming_allowance (MM3gppProfile *self)
 /*****************************************************************************/
 
 /**
+ * mm_3gpp_profile_set_profile_source:
+ * @self: a #MM3gppProfile.
+ * @profile_source: a #MMBearerProfileSource.
+ *
+ * Sets profile source.
+ *
+ * Since: 1.20
+ */
+void
+mm_3gpp_profile_set_profile_source (MM3gppProfile         *self,
+                                    MMBearerProfileSource  profile_source)
+{
+    g_return_if_fail (MM_IS_3GPP_PROFILE (self));
+
+    self->priv->profile_source = profile_source;
+}
+
+/**
+ * mm_3gpp_profile_get_profile_source:
+ * @self: a #MM3gppProfile.
+ *
+ * Gets the profile source.
+ *
+ * Returns: a #MMBearerProfileSource.
+ *
+ * Since: 1.20
+ */
+MMBearerProfileSource
+mm_3gpp_profile_get_profile_source (MM3gppProfile *self)
+{
+    g_return_val_if_fail (MM_IS_3GPP_PROFILE (self), MM_BEARER_PROFILE_SOURCE_UNKNOWN);
+
+    return self->priv->profile_source;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_3gpp_profile_get_dictionary: (skip)
  */
 GVariant *
@@ -717,6 +760,16 @@ mm_3gpp_profile_consume_string (MM3gppProfile  *self,
             return FALSE;
         }
         mm_3gpp_profile_set_enabled (self, profile_enabled);
+    } else if (g_str_equal (key, PROPERTY_SOURCE)) {
+        GError                *inner_error = NULL;
+        MMBearerProfileSource  profile_source;
+
+        profile_source = mm_common_get_profile_source_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_3gpp_profile_set_profile_source (self, profile_source);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -821,6 +874,10 @@ mm_3gpp_profile_consume_variant (MM3gppProfile  *self,
         mm_3gpp_profile_set_enabled (
             self,
             g_variant_get_boolean (value));
+    else if (g_str_equal (key, PROPERTY_SOURCE))
+        mm_3gpp_profile_set_profile_source (
+            self,
+            g_variant_get_uint32 (value));
     else {
         /* Set error */
         g_set_error (error,
@@ -909,6 +966,7 @@ mm_3gpp_profile_init (MM3gppProfile *self)
     self->priv->access_type_preference = MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE;
     self->priv->enabled = TRUE;
     self->priv->roaming_allowance = MM_BEARER_ROAMING_ALLOWANCE_NONE;
+    self->priv->profile_source = MM_BEARER_PROFILE_SOURCE_UNKNOWN;
 }
 
 static void

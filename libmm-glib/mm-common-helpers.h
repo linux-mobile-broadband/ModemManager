@@ -100,6 +100,8 @@ MMModem3gppDrxCycle           mm_common_get_3gpp_drx_cycle_from_string          
                                                                                    GError      **error);
 MMBearerAccessTypePreference  mm_common_get_access_type_preference_from_string    (const gchar  *str,
                                                                                    GError      **error);
+MMBearerProfileSource         mm_common_get_profile_source_from_string            (const gchar  *str,
+                                                                                   GError      **error);
 
 /******************************************************************************/
 

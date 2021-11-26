@@ -96,6 +96,8 @@ void mm_3gpp_profile_set_enabled                (MM3gppProfile                *s
                                                  gboolean                      enabled);
 void mm_3gpp_profile_set_roaming_allowance      (MM3gppProfile                *self,
                                                  MMBearerRoamingAllowance      roaming_allowance);
+void mm_3gpp_profile_set_profile_source         (MM3gppProfile                *self,
+                                                 MMBearerProfileSource         profile_source);
 
 gint                          mm_3gpp_profile_get_profile_id             (MM3gppProfile *self);
 const gchar                  *mm_3gpp_profile_get_profile_name           (MM3gppProfile *self);
@@ -108,6 +110,7 @@ MMBearerApnType               mm_3gpp_profile_get_apn_type               (MM3gpp
 MMBearerAccessTypePreference  mm_3gpp_profile_get_access_type_preference (MM3gppProfile *self);
 gboolean                      mm_3gpp_profile_get_enabled                (MM3gppProfile *self);
 MMBearerRoamingAllowance      mm_3gpp_profile_get_roaming_allowance      (MM3gppProfile *self);
+MMBearerProfileSource         mm_3gpp_profile_get_profile_source         (MM3gppProfile *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -140,6 +143,7 @@ typedef enum {
     MM_3GPP_PROFILE_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE = 1 << 6,
     MM_3GPP_PROFILE_CMP_FLAGS_NO_ENABLED                = 1 << 7,
     MM_3GPP_PROFILE_CMP_FLAGS_NO_ROAMING_ALLOWANCE      = 1 << 8,
+    MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_SOURCE         = 1 << 9,
 } MM3gppProfileCmpFlags;
 
 gboolean mm_3gpp_profile_cmp (MM3gppProfile         *a,
