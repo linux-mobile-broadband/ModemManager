@@ -933,6 +933,7 @@ build_profile_human (GPtrArray     *array,
     MMBearerApnType               apn_type;
     MMBearerAccessTypePreference  access_type_preference;
     MMBearerRoamingAllowance      roaming_allowance;
+    MMBearerProfileSource         profile_source;
 
     g_ptr_array_add (array, g_strdup_printf ("profile-id: %u", mm_3gpp_profile_get_profile_id (profile)));
     g_ptr_array_add (array, g_strdup_printf ("         profile enabled: %s",
@@ -986,6 +987,12 @@ build_profile_human (GPtrArray     *array,
 
         roaming_allowance_str = mm_bearer_roaming_allowance_build_string_from_mask (roaming_allowance);
         g_ptr_array_add (array, g_strdup_printf ("       roaming allowance: %s", roaming_allowance_str));
+    }
+
+    profile_source = mm_3gpp_profile_get_profile_source (profile);
+    if (profile_source != MM_BEARER_PROFILE_SOURCE_UNKNOWN) {
+        aux = mm_bearer_profile_source_get_string (profile_source);
+        g_ptr_array_add (array, g_strdup_printf ("          profile source: %s", aux));
     }
 }
 
