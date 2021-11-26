@@ -17,7 +17,7 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.o
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011-2021 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #ifndef MM_BEARER_PROPERTIES_H
@@ -66,40 +66,43 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMBearerProperties, g_object_unref)
 
 MMBearerProperties *mm_bearer_properties_new (void);
 
-void mm_bearer_properties_set_apn           (MMBearerProperties *self,
-                                             const gchar *apn);
-void mm_bearer_properties_set_allowed_auth  (MMBearerProperties *self,
-                                             MMBearerAllowedAuth allowed_auth);
-void mm_bearer_properties_set_user          (MMBearerProperties *self,
-                                             const gchar *user);
-void mm_bearer_properties_set_password      (MMBearerProperties *self,
-                                             const gchar *password);
-void mm_bearer_properties_set_ip_type       (MMBearerProperties *self,
-                                             MMBearerIpFamily ip_type);
-void mm_bearer_properties_set_apn_type      (MMBearerProperties *self,
-                                             MMBearerApnType apn_type);
-void mm_bearer_properties_set_profile_id    (MMBearerProperties *self,
-                                             gint profile_id);
-void mm_bearer_properties_set_profile_name  (MMBearerProperties *self,
-                                             const gchar *profile_name);
-void mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
-                                             gboolean allow_roaming);
-void mm_bearer_properties_set_rm_protocol   (MMBearerProperties *self,
-                                             MMModemCdmaRmProtocol protocol);
-void mm_bearer_properties_set_multiplex     (MMBearerProperties       *self,
-                                             MMBearerMultiplexSupport  multiplex);
+void mm_bearer_properties_set_apn                    (MMBearerProperties           *self,
+                                                      const gchar                  *apn);
+void mm_bearer_properties_set_allowed_auth           (MMBearerProperties           *self,
+                                                      MMBearerAllowedAuth           allowed_auth);
+void mm_bearer_properties_set_user                   (MMBearerProperties           *self,
+                                                      const gchar                  *user);
+void mm_bearer_properties_set_password               (MMBearerProperties           *self,
+                                                      const gchar                  *password);
+void mm_bearer_properties_set_ip_type                (MMBearerProperties           *self,
+                                                      MMBearerIpFamily              ip_type);
+void mm_bearer_properties_set_apn_type               (MMBearerProperties           *self,
+                                                      MMBearerApnType               apn_type);
+void mm_bearer_properties_set_profile_id             (MMBearerProperties           *self,
+                                                      gint                          profile_id);
+void mm_bearer_properties_set_profile_name           (MMBearerProperties           *self,
+                                                      const gchar                  *profile_name);
+void mm_bearer_properties_set_allow_roaming          (MMBearerProperties           *self,
+                                                      gboolean                      allow_roaming);
+void mm_bearer_properties_set_rm_protocol            (MMBearerProperties           *self,
+                                                      MMModemCdmaRmProtocol         protocol);
+void mm_bearer_properties_set_multiplex              (MMBearerProperties           *self,
+                                                      MMBearerMultiplexSupport      multiplex);
+void mm_bearer_properties_set_access_type_preference (MMBearerProperties           *self,
+                                                      MMBearerAccessTypePreference  access_type_preference);
 
-const gchar              *mm_bearer_properties_get_apn           (MMBearerProperties *self);
-MMBearerAllowedAuth       mm_bearer_properties_get_allowed_auth  (MMBearerProperties *self);
-const gchar              *mm_bearer_properties_get_user          (MMBearerProperties *self);
-const gchar              *mm_bearer_properties_get_password      (MMBearerProperties *self);
-MMBearerIpFamily          mm_bearer_properties_get_ip_type       (MMBearerProperties *self);
-MMBearerApnType           mm_bearer_properties_get_apn_type      (MMBearerProperties *self);
-gint                      mm_bearer_properties_get_profile_id    (MMBearerProperties *self);
-const gchar              *mm_bearer_properties_get_profile_name  (MMBearerProperties *self);
-gboolean                  mm_bearer_properties_get_allow_roaming (MMBearerProperties *self);
-MMModemCdmaRmProtocol     mm_bearer_properties_get_rm_protocol   (MMBearerProperties *self);
-MMBearerMultiplexSupport  mm_bearer_properties_get_multiplex     (MMBearerProperties *self);
+const gchar                 *mm_bearer_properties_get_apn                    (MMBearerProperties *self);
+MMBearerAllowedAuth          mm_bearer_properties_get_allowed_auth           (MMBearerProperties *self);
+const gchar                 *mm_bearer_properties_get_user                   (MMBearerProperties *self);
+const gchar                 *mm_bearer_properties_get_password               (MMBearerProperties *self);
+MMBearerIpFamily             mm_bearer_properties_get_ip_type                (MMBearerProperties *self);
+MMBearerApnType              mm_bearer_properties_get_apn_type               (MMBearerProperties *self);
+gint                         mm_bearer_properties_get_profile_id             (MMBearerProperties *self);
+const gchar                 *mm_bearer_properties_get_profile_name           (MMBearerProperties *self);
+gboolean                     mm_bearer_properties_get_allow_roaming          (MMBearerProperties *self);
+MMModemCdmaRmProtocol        mm_bearer_properties_get_rm_protocol            (MMBearerProperties *self);
+MMBearerMultiplexSupport     mm_bearer_properties_get_multiplex              (MMBearerProperties *self);
+MMBearerAccessTypePreference mm_bearer_properties_get_access_type_preference (MMBearerProperties *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -129,14 +132,15 @@ GVariant      *mm_bearer_properties_get_dictionary    (MMBearerProperties *self)
 MM3gppProfile *mm_bearer_properties_peek_3gpp_profile (MMBearerProperties *self);
 
 typedef enum {
-    MM_BEARER_PROPERTIES_CMP_FLAGS_NONE             = 0,
-    MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE            = 1 << 0,
-    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD      = 1 << 1,
-    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING = 1 << 2,
-    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL   = 1 << 3,
-    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE      = 1 << 4,
-    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID    = 1 << 5,
-    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_NAME  = 1 << 6,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NONE                      = 0,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE                     = 1 << 0,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PASSWORD               = 1 << 1,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING          = 1 << 2,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_RM_PROTOCOL            = 1 << 3,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_APN_TYPE               = 1 << 4,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID             = 1 << 5,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_NAME           = 1 << 6,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE = 1 << 7,
 } MMBearerPropertiesCmpFlags;
 
 gboolean mm_bearer_properties_cmp (MMBearerProperties         *a,

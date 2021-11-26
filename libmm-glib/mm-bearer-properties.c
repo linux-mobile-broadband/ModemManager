@@ -17,7 +17,7 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011-2021 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <string.h>
@@ -368,6 +368,44 @@ mm_bearer_properties_get_profile_id (MMBearerProperties *self)
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_3GPP_PROFILE_ID_UNKNOWN);
 
     return mm_3gpp_profile_get_profile_id (self->priv->profile);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_bearer_properties_set_access_type_preference:
+ * @self: a #MMBearerProperties.
+ * @access_type_preference: a #MMBearerAccessTypePreference value.
+ *
+ * Sets the 5G network access type preference.
+ *
+ * Since: 1.20
+ */
+void
+mm_bearer_properties_set_access_type_preference (MMBearerProperties           *self,
+                                                 MMBearerAccessTypePreference  access_type_preference)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    mm_3gpp_profile_set_access_type_preference (self->priv->profile, access_type_preference);
+}
+
+/**
+ * mm_bearer_properties_get_access_type_preference:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the 5G network access type preference.
+ *
+ * Returns: a #MMBearerAccessTypePreference value.
+ *
+ * Since: 1.20
+ */
+MMBearerAccessTypePreference
+mm_bearer_properties_get_access_type_preference (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE);
+
+    return mm_3gpp_profile_get_access_type_preference (self->priv->profile);
 }
 
 /*****************************************************************************/
@@ -831,6 +869,9 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_NAME) &&
         !cmp_str (mm_3gpp_profile_get_profile_name (a->priv->profile), mm_3gpp_profile_get_profile_name (b->priv->profile), flags))
+        return FALSE;
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE) &&
+        (mm_3gpp_profile_get_access_type_preference (a->priv->profile) != mm_3gpp_profile_get_access_type_preference (b->priv->profile)))
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING)) {
         if (a->priv->allow_roaming != b->priv->allow_roaming)

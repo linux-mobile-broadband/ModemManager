@@ -37,21 +37,23 @@
 
 G_DEFINE_TYPE (MM3gppProfile, mm_3gpp_profile, G_TYPE_OBJECT)
 
-#define PROPERTY_ID           "profile-id"
-#define PROPERTY_NAME         "profile-name"
-#define PROPERTY_APN          "apn"
-#define PROPERTY_ALLOWED_AUTH "allowed-auth"
-#define PROPERTY_USER         "user"
-#define PROPERTY_PASSWORD     "password"
-#define PROPERTY_IP_TYPE      "ip-type"
-#define PROPERTY_APN_TYPE     "apn-type"
+#define PROPERTY_ID                     "profile-id"
+#define PROPERTY_NAME                   "profile-name"
+#define PROPERTY_APN                    "apn"
+#define PROPERTY_ALLOWED_AUTH           "allowed-auth"
+#define PROPERTY_USER                   "user"
+#define PROPERTY_PASSWORD               "password"
+#define PROPERTY_IP_TYPE                "ip-type"
+#define PROPERTY_APN_TYPE               "apn-type"
+#define PROPERTY_ACCESS_TYPE_PREFERENCE "access-type-preference"
 
 struct _MM3gppProfilePrivate {
-    gint              profile_id;
-    gchar            *profile_name;
-    gchar            *apn;
-    MMBearerIpFamily  ip_type;
-    MMBearerApnType   apn_type;
+    gint                          profile_id;
+    gchar                        *profile_name;
+    gchar                        *apn;
+    MMBearerIpFamily              ip_type;
+    MMBearerApnType               apn_type;
+    MMBearerAccessTypePreference  access_type_preference;
 
     /* Optional authentication settings */
     MMBearerAllowedAuth  allowed_auth;
@@ -106,6 +108,9 @@ mm_3gpp_profile_cmp (MM3gppProfile         *a,
         return FALSE;
     if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_PROFILE_NAME) &&
         (a->priv->profile_name != b->priv->profile_name))
+        return FALSE;
+    if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE) &&
+        (a->priv->access_type_preference != b->priv->access_type_preference))
         return FALSE;
 
     return TRUE;
@@ -431,6 +436,44 @@ mm_3gpp_profile_get_apn_type (MM3gppProfile *self)
 /*****************************************************************************/
 
 /**
+ * mm_3gpp_profile_set_access_type_preference:
+ * @self: a #MM3gppProfile.
+ * @access_type_preference: a #MMBearerAccessTypePreference.
+ *
+ * Sets the 5G network access type preference.
+ *
+ * Since: 1.20
+ */
+void
+mm_3gpp_profile_set_access_type_preference (MM3gppProfile                *self,
+                                            MMBearerAccessTypePreference  access_type_preference)
+{
+    g_return_if_fail (MM_IS_3GPP_PROFILE (self));
+
+    self->priv->access_type_preference = access_type_preference;
+}
+
+/**
+ * mm_3gpp_profile_get_access_type_preference:
+ * @self: a #MM3gppProfile.
+ *
+ * Gets 5G network access type preference.
+ *
+ * Returns: a #MMBearerAccessTypePreference.
+ *
+ * Since: 1.20
+ */
+MMBearerAccessTypePreference
+mm_3gpp_profile_get_access_type_preference (MM3gppProfile *self)
+{
+    g_return_val_if_fail (MM_IS_3GPP_PROFILE (self), MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE);
+
+    return self->priv->access_type_preference;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_3gpp_profile_get_dictionary: (skip)
  */
 GVariant *
@@ -493,6 +536,12 @@ mm_3gpp_profile_get_dictionary (MM3gppProfile *self)
                                PROPERTY_APN_TYPE,
                                g_variant_new_uint32 (self->priv->apn_type));
 
+    if (self->priv->access_type_preference != MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_ACCESS_TYPE_PREFERENCE,
+                               g_variant_new_uint32 (self->priv->access_type_preference));
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -553,6 +602,16 @@ mm_3gpp_profile_consume_string (MM3gppProfile  *self,
             return FALSE;
         }
         mm_3gpp_profile_set_apn_type (self, apn_type);
+    } else if (g_str_equal (key, PROPERTY_ACCESS_TYPE_PREFERENCE)) {
+        GError                       *inner_error = NULL;
+        MMBearerAccessTypePreference  access_type_preference;
+
+        access_type_preference = mm_common_get_access_type_preference_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_3gpp_profile_set_access_type_preference (self, access_type_preference);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -649,6 +708,10 @@ mm_3gpp_profile_consume_variant (MM3gppProfile  *self,
         mm_3gpp_profile_set_apn_type (
             self,
             g_variant_get_uint32 (value));
+    else if (g_str_equal (key, PROPERTY_ACCESS_TYPE_PREFERENCE))
+        mm_3gpp_profile_set_access_type_preference (
+            self,
+            g_variant_get_uint32 (value));
     else {
         /* Set error */
         g_set_error (error,
@@ -734,6 +797,7 @@ mm_3gpp_profile_init (MM3gppProfile *self)
     self->priv->allowed_auth = MM_BEARER_ALLOWED_AUTH_UNKNOWN;
     self->priv->ip_type = MM_BEARER_IP_FAMILY_NONE;
     self->priv->apn_type = MM_BEARER_APN_TYPE_NONE;
+    self->priv->access_type_preference = MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE;
 }
 
 static void
