@@ -47,6 +47,7 @@ G_DEFINE_TYPE (MM3gppProfile, mm_3gpp_profile, G_TYPE_OBJECT)
 #define PROPERTY_APN_TYPE               "apn-type"
 #define PROPERTY_ACCESS_TYPE_PREFERENCE "access-type-preference"
 #define PROPERTY_ENABLED                "profile-enabled"
+#define PROPERTY_ROAMING_ALLOWANCE      "roaming-allowance"
 
 struct _MM3gppProfilePrivate {
     gint                          profile_id;
@@ -57,6 +58,7 @@ struct _MM3gppProfilePrivate {
     MMBearerAccessTypePreference  access_type_preference;
     gboolean                      enabled;
     gboolean                      enabled_set;
+    MMBearerRoamingAllowance      roaming_allowance;
 
     /* Optional authentication settings */
     MMBearerAllowedAuth  allowed_auth;
@@ -117,6 +119,9 @@ mm_3gpp_profile_cmp (MM3gppProfile         *a,
         return FALSE;
     if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_ENABLED) &&
         ((a->priv->enabled != b->priv->enabled) || (a->priv->enabled_set != b->priv->enabled_set)))
+        return FALSE;
+    if (!(flags & MM_3GPP_PROFILE_CMP_FLAGS_NO_ROAMING_ALLOWANCE) &&
+        (a->priv->roaming_allowance != b->priv->roaming_allowance))
         return FALSE;
 
     return TRUE;
@@ -519,6 +524,44 @@ mm_3gpp_profile_get_enabled (MM3gppProfile *self)
 /*****************************************************************************/
 
 /**
+ * mm_3gpp_profile_set_roaming_allowance:
+ * @self: a #MM3gppProfile.
+ * @roaming_allowance: a mask of #MMBearerRoamingAllowance values.
+ *
+ * Sets the roaming allowance rules.
+ *
+ * Since: 1.20
+ */
+void
+mm_3gpp_profile_set_roaming_allowance (MM3gppProfile            *self,
+                                       MMBearerRoamingAllowance  roaming_allowance)
+{
+    g_return_if_fail (MM_IS_3GPP_PROFILE (self));
+
+    self->priv->roaming_allowance = roaming_allowance;
+}
+
+/**
+ * mm_3gpp_profile_get_roaming_allowance:
+ * @self: a #MM3gppProfile.
+ *
+ * Gets the roaming allowance rules.
+ *
+ * Returns: a mask of #MMBearerRoamingAllowance values.
+ *
+ * Since: 1.20
+ */
+MMBearerRoamingAllowance
+mm_3gpp_profile_get_roaming_allowance (MM3gppProfile *self)
+{
+    g_return_val_if_fail (MM_IS_3GPP_PROFILE (self), MM_BEARER_ROAMING_ALLOWANCE_NONE);
+
+    return self->priv->roaming_allowance;
+}
+
+/*****************************************************************************/
+
+/**
  * mm_3gpp_profile_get_dictionary: (skip)
  */
 GVariant *
@@ -865,6 +908,7 @@ mm_3gpp_profile_init (MM3gppProfile *self)
     self->priv->apn_type = MM_BEARER_APN_TYPE_NONE;
     self->priv->access_type_preference = MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE;
     self->priv->enabled = TRUE;
+    self->priv->roaming_allowance = MM_BEARER_ROAMING_ALLOWANCE_NONE;
 }
 
 static void

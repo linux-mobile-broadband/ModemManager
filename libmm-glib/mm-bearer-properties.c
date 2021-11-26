@@ -411,6 +411,44 @@ mm_bearer_properties_get_access_type_preference (MMBearerProperties *self)
 /*****************************************************************************/
 
 /**
+ * mm_bearer_properties_set_roaming_allowance:
+ * @self: a #MMBearerProperties.
+ * @roaming_allowance: a mask of #MMBearerRoamingAllowance values
+ *
+ * Sets the roaming allowance rules.
+ *
+ * Since: 1.20
+ */
+void
+mm_bearer_properties_set_roaming_allowance (MMBearerProperties       *self,
+                                            MMBearerRoamingAllowance  roaming_allowance)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    mm_3gpp_profile_set_roaming_allowance (self->priv->profile, roaming_allowance);
+}
+
+/**
+ * mm_bearer_properties_get_roaming_allowance:
+ * @self: a #MMBearerProperties.
+ *
+ * Gets the roaming allowance rules.
+ *
+ * Returns: a mask of #MMBearerRoamingAllowance values.
+ *
+ * Since: 1.20
+ */
+MMBearerRoamingAllowance
+mm_bearer_properties_get_roaming_allowance (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_BEARER_ROAMING_ALLOWANCE_NONE);
+
+    return mm_3gpp_profile_get_roaming_allowance (self->priv->profile);
+}
+
+/*****************************************************************************/
+
+/**
  * mm_bearer_properties_set_allow_roaming:
  * @self: a #MMBearerProperties.
  * @allow_roaming: boolean value.
@@ -872,6 +910,9 @@ mm_bearer_properties_cmp (MMBearerProperties         *a,
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE) &&
         (mm_3gpp_profile_get_access_type_preference (a->priv->profile) != mm_3gpp_profile_get_access_type_preference (b->priv->profile)))
+        return FALSE;
+    if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ROAMING_ALLOWANCE) &&
+        (mm_3gpp_profile_get_roaming_allowance (a->priv->profile) != mm_3gpp_profile_get_roaming_allowance (b->priv->profile)))
         return FALSE;
     if (!(flags & MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ALLOW_ROAMING)) {
         if (a->priv->allow_roaming != b->priv->allow_roaming)

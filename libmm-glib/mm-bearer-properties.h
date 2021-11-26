@@ -90,6 +90,8 @@ void mm_bearer_properties_set_multiplex              (MMBearerProperties        
                                                       MMBearerMultiplexSupport      multiplex);
 void mm_bearer_properties_set_access_type_preference (MMBearerProperties           *self,
                                                       MMBearerAccessTypePreference  access_type_preference);
+void mm_bearer_properties_set_roaming_allowance      (MMBearerProperties           *self,
+                                                      MMBearerRoamingAllowance      roaming_allowance);
 
 const gchar                 *mm_bearer_properties_get_apn                    (MMBearerProperties *self);
 MMBearerAllowedAuth          mm_bearer_properties_get_allowed_auth           (MMBearerProperties *self);
@@ -103,6 +105,7 @@ gboolean                     mm_bearer_properties_get_allow_roaming          (MM
 MMModemCdmaRmProtocol        mm_bearer_properties_get_rm_protocol            (MMBearerProperties *self);
 MMBearerMultiplexSupport     mm_bearer_properties_get_multiplex              (MMBearerProperties *self);
 MMBearerAccessTypePreference mm_bearer_properties_get_access_type_preference (MMBearerProperties *self);
+MMBearerRoamingAllowance     mm_bearer_properties_get_roaming_allowance      (MMBearerProperties *self);
 
 /*****************************************************************************/
 /* ModemManager/libmm-glib/mmcli specific methods */
@@ -141,6 +144,7 @@ typedef enum {
     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_ID             = 1 << 5,
     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_PROFILE_NAME           = 1 << 6,
     MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ACCESS_TYPE_PREFERENCE = 1 << 7,
+    MM_BEARER_PROPERTIES_CMP_FLAGS_NO_ROAMING_ALLOWANCE      = 1 << 8,
 } MMBearerPropertiesCmpFlags;
 
 gboolean mm_bearer_properties_cmp (MMBearerProperties         *a,
