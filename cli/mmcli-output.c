@@ -933,6 +933,8 @@ build_profile_human (GPtrArray     *array,
     MMBearerAccessTypePreference  access_type_preference;
 
     g_ptr_array_add (array, g_strdup_printf ("profile-id: %u", mm_3gpp_profile_get_profile_id (profile)));
+    g_ptr_array_add (array, g_strdup_printf ("         profile enabled: %s",
+                                             mm_3gpp_profile_get_enabled (profile) ? "yes" : "no"));
 
     if ((aux = mm_3gpp_profile_get_profile_name (profile)) != NULL)
         g_ptr_array_add (array, g_strdup_printf ("                profile name: %s", aux));
