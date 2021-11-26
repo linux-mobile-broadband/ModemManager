@@ -1,4 +1,86 @@
 
+ModemManager 1.18.4
+-------------------------------------------
+
+ * A new FCC unlock operation management via external scripts is introduced,
+   which will avoid to automatically unlock FCC locked devices unless the user
+   has configured the operation manually, or unless an official vendor-provided
+   FCC unlock tool is found in the system.
+
+   Please refer to the following URL for full details:
+   https://modemmanager.org/docs/modemmanager/fcc-unlock/
+
+   The following changes should be taken into account by distribution packagers:
+   ** A set of FCC unlock scripts named as the specific vendor 'vid' will be
+      installed in ${datadir}/ModemManager/fcc-unlock.available.d.
+   ** A set of symlinks is created named as the specific device 'vid:pid', and
+      pointing to the per-vendor 'vid' files, in the same location inside
+      ${datadir}.
+   ** A new ${sysconfdir}/ModemManager/fcc-unlock.d directory is created, where
+      users will manually install additional symlinks to the scripts shipped in
+      ${datadir}.
+   ** A new ${libdir}/ModemManager/fcc-unlock.d directory is created, where
+      vendors will install their own official FCC unlock tools.
+   ** Both fcc-unlock.d directories should be empty on a new install, and their
+      contents (if any) should not be removed on ModemManager upgrades.
+
+ * build,meson:
+   ** All optional settings in the build (e.g. introspection, systemd
+      suspend/resume support, udev...) are now booleans (true/false) instead
+      of features. Having dependencies as 'auto' has given problems since the
+      very beginning when using autotools, because sometimes the build goes on
+      even if all the features required by the user were not enabled. This
+      change in the meson build now requires the user to explicitly enable or
+      disable features. This is for consistency across all libqrtr-glib, libqmi,
+      libmbim and ModemManager.
+   ** If the build relies on enabling specific plugins, though, these are still
+      features (enable/disable/auto). The user may disable all plugins with
+      `-Dauto_features=disabled` and then enable specific plugins independently.
+   ** Fixed the plugin dependency on build options.
+
+ * libmm-glib:
+   ** The license text in several source files of the library is fixed to reflect
+      that they are LGPLv2+, as the whole library. This is not a relicense of any
+      kind, just a fix in the wording.
+
+ * modem interface:
+   ** Always set error if creating device identifier fails.
+
+ * firmware interface:
+   ** Fix missing context initialization leading to crash.
+
+ * profile manager interface:
+   ** Fix incorrect GError ownership management.
+
+ * mbim:
+   ** Fix crash when processing DNS addresses on a connection attempt.
+   ** Fix incorrect GError ownership management when reloading connection status.
+
+ * qmi:
+   ** Fix non-initialized GError.
+
+ * sms:
+   ** Merge WDP multipart CDMA WAP messages.
+   ** Increase default send timeout from 180s to 300s.
+
+ * kerneldevice:
+   ** Fix pattern matching logic in the custom udev rules parser, required to
+      correctly handle devices in the WWAN subsystem in kernel 5.13.
+
+ * plugins:
+   ** qcom-soc: this plugin is now enabled by default, so that it can be used on
+      several new laptops based on Qualcomm SoCs.
+   ** qcom-soc: updated to require the explicit ID_MM_QCOM_SOC udev tag.
+   ** telit: fix critical message when attempting to unref a NULL object.
+   ** telit: allow unlock retries loading for unknown error csim reply.
+   ** telit: avoid sim hot swap procedure if #QSS is not supported.
+   ** telit: add port type hints for LE910S1 0x7010, 0x7011 compositions.
+   ** quectel: fix non-initialized GError.
+   ** foxconn: added support for T99W265 modules.
+
+ * Several other improvements and fixes.
+
+
 ModemManager 1.18.2
 -------------------------------------------
 
