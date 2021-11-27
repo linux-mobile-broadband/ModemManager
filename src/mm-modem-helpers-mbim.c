@@ -612,6 +612,202 @@ mm_bearer_ip_family_to_mbim_context_ip_type (MMBearerIpFamily   ip_family,
 
 /*****************************************************************************/
 
+gboolean
+mm_bearer_roaming_allowance_to_mbim_context_roaming_control (MMBearerRoamingAllowance    mask,
+                                                             gpointer                    log_object,
+                                                             MbimContextRoamingControl  *out_value,
+                                                             GError                    **error)
+{
+    if (mask == MM_BEARER_ROAMING_ALLOWANCE_NONE) {
+        mm_obj_dbg (log_object, "using default (all) roaming allowance");
+        *out_value = MBIM_CONTEXT_ROAMING_CONTROL_ALLOW_ALL;
+    } else if (mask == MM_BEARER_ROAMING_ALLOWANCE_HOME)
+        *out_value =MBIM_CONTEXT_ROAMING_CONTROL_HOME_ONLY;
+    else if (mask == MM_BEARER_ROAMING_ALLOWANCE_PARTNER)
+        *out_value =MBIM_CONTEXT_ROAMING_CONTROL_PARTNER_ONLY;
+    else if (mask == MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER)
+        *out_value =MBIM_CONTEXT_ROAMING_CONTROL_NON_PARTNER_ONLY;
+    else if (mask == (MM_BEARER_ROAMING_ALLOWANCE_HOME | MM_BEARER_ROAMING_ALLOWANCE_PARTNER))
+        *out_value =MBIM_CONTEXT_ROAMING_CONTROL_HOME_AND_PARTNER;
+    else if (mask == (MM_BEARER_ROAMING_ALLOWANCE_HOME | MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER))
+        *out_value =MBIM_CONTEXT_ROAMING_CONTROL_HOME_AND_NON_PARTNER;
+    else if (mask == (MM_BEARER_ROAMING_ALLOWANCE_PARTNER | MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER))
+        *out_value =MBIM_CONTEXT_ROAMING_CONTROL_PARTNER_AND_NON_PARTNER;
+    else if (mask == (MM_BEARER_ROAMING_ALLOWANCE_HOME | MM_BEARER_ROAMING_ALLOWANCE_PARTNER | MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER))
+        *out_value = MBIM_CONTEXT_ROAMING_CONTROL_ALLOW_ALL;
+    else {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported roaming allowance mask: 0x%x", mask);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+MMBearerRoamingAllowance
+mm_bearer_roaming_allowance_from_mbim_context_roaming_control (MbimContextRoamingControl   value,
+                                                               GError                    **error)
+{
+    switch (value) {
+    case MBIM_CONTEXT_ROAMING_CONTROL_HOME_ONLY:
+        return MM_BEARER_ROAMING_ALLOWANCE_HOME;
+    case MBIM_CONTEXT_ROAMING_CONTROL_PARTNER_ONLY:
+        return MM_BEARER_ROAMING_ALLOWANCE_PARTNER;
+    case MBIM_CONTEXT_ROAMING_CONTROL_NON_PARTNER_ONLY:
+        return MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER;
+    case MBIM_CONTEXT_ROAMING_CONTROL_HOME_AND_PARTNER:
+        return (MM_BEARER_ROAMING_ALLOWANCE_HOME | MM_BEARER_ROAMING_ALLOWANCE_PARTNER);
+    case MBIM_CONTEXT_ROAMING_CONTROL_HOME_AND_NON_PARTNER:
+        return (MM_BEARER_ROAMING_ALLOWANCE_HOME | MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER);
+    case MBIM_CONTEXT_ROAMING_CONTROL_PARTNER_AND_NON_PARTNER:
+        return (MM_BEARER_ROAMING_ALLOWANCE_PARTNER | MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER);
+    case MBIM_CONTEXT_ROAMING_CONTROL_ALLOW_ALL:
+        return (MM_BEARER_ROAMING_ALLOWANCE_HOME | MM_BEARER_ROAMING_ALLOWANCE_PARTNER | MM_BEARER_ROAMING_ALLOWANCE_NON_PARTNER);
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported roaming control value: 0x%x", value);
+        return MM_BEARER_ROAMING_ALLOWANCE_NONE;
+    }
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_bearer_access_type_preference_to_mbim_context_media_type (MMBearerAccessTypePreference   value,
+                                                             gpointer                       log_object,
+                                                             MbimContextMediaType          *out_value,
+                                                             GError                       **error)
+{
+    switch (value) {
+    case MM_BEARER_ACCESS_TYPE_PREFERENCE_NONE:
+        mm_obj_dbg (log_object, "using default (cellular only) context media type");
+        *out_value = MBIM_CONTEXT_MEDIA_TYPE_CELLULAR_ONLY;
+        return TRUE;
+    case MM_BEARER_ACCESS_TYPE_PREFERENCE_3GPP_ONLY:
+        *out_value = MBIM_CONTEXT_MEDIA_TYPE_CELLULAR_ONLY;
+        return TRUE;
+    case MM_BEARER_ACCESS_TYPE_PREFERENCE_3GPP_PREFERRED:
+        *out_value = MBIM_CONTEXT_MEDIA_TYPE_ALL;
+        return TRUE;
+    case MM_BEARER_ACCESS_TYPE_PREFERENCE_NON_3GPP_ONLY:
+        *out_value = MBIM_CONTEXT_MEDIA_TYPE_WIFI_ONLY;
+        return TRUE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported roaming control value: 0x%x", value);
+        return FALSE;
+    }
+}
+
+gboolean
+mm_bearer_access_type_preference_from_mbim_context_media_type (MbimContextMediaType           value,
+                                                               MMBearerAccessTypePreference  *out_value,
+                                                               GError                       **error)
+{
+    switch (value) {
+    case MBIM_CONTEXT_MEDIA_TYPE_CELLULAR_ONLY:
+        *out_value =  MM_BEARER_ACCESS_TYPE_PREFERENCE_3GPP_ONLY;
+        return TRUE;
+    case MBIM_CONTEXT_MEDIA_TYPE_WIFI_ONLY:
+        *out_value = MM_BEARER_ACCESS_TYPE_PREFERENCE_NON_3GPP_ONLY;
+        return TRUE;
+    case MBIM_CONTEXT_MEDIA_TYPE_ALL:
+        *out_value = MM_BEARER_ACCESS_TYPE_PREFERENCE_3GPP_PREFERRED;
+        return TRUE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported roaming control value: 0x%x", value);
+        return FALSE;
+    }
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_boolean_from_mbim_context_state (MbimContextState   value,
+                                    gboolean          *out_value,
+                                    GError           **error)
+{
+    switch (value) {
+    case MBIM_CONTEXT_STATE_DISABLED:
+        *out_value = FALSE;
+        return TRUE;
+    case MBIM_CONTEXT_STATE_ENABLED:
+        *out_value = TRUE;
+        return TRUE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported context state value: 0x%x", value);
+        return FALSE;
+    }
+
+}
+
+MbimContextState
+mm_boolean_to_mbim_context_state (gboolean value)
+{
+    return (value ? MBIM_CONTEXT_STATE_ENABLED: MBIM_CONTEXT_STATE_DISABLED);
+}
+
+/*****************************************************************************/
+
+MMBearerProfileSource
+mm_bearer_profile_source_from_mbim_context_source (MbimContextSource   value,
+                                                   GError            **error)
+{
+    switch (value) {
+    case MBIM_CONTEXT_SOURCE_ADMIN:
+        return MM_BEARER_PROFILE_SOURCE_ADMIN;
+    case MBIM_CONTEXT_SOURCE_USER:
+        return MM_BEARER_PROFILE_SOURCE_USER;
+    case MBIM_CONTEXT_SOURCE_OPERATOR:
+        return MM_BEARER_PROFILE_SOURCE_OPERATOR;
+    case MBIM_CONTEXT_SOURCE_MODEM:
+        return MM_BEARER_PROFILE_SOURCE_MODEM;
+    case MBIM_CONTEXT_SOURCE_DEVICE:
+        return MM_BEARER_PROFILE_SOURCE_DEVICE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported context source value: 0x%x", value);
+        return MM_BEARER_PROFILE_SOURCE_UNKNOWN;
+    }
+}
+
+gboolean
+mm_bearer_profile_source_to_mbim_context_source (MMBearerProfileSource   value,
+                                                 gpointer                log_object,
+                                                 MbimContextSource      *out_value,
+                                                 GError                **error)
+{
+    switch (value) {
+    case MM_BEARER_PROFILE_SOURCE_UNKNOWN:
+        mm_obj_dbg (log_object, "using default (admin) context source");
+        *out_value = MBIM_CONTEXT_SOURCE_ADMIN;
+        return TRUE;
+    case MM_BEARER_PROFILE_SOURCE_ADMIN:
+        *out_value = MBIM_CONTEXT_SOURCE_ADMIN;
+        return TRUE;
+    case MM_BEARER_PROFILE_SOURCE_USER:
+        *out_value = MBIM_CONTEXT_SOURCE_USER;
+        return TRUE;
+    case MM_BEARER_PROFILE_SOURCE_OPERATOR:
+        *out_value = MBIM_CONTEXT_SOURCE_OPERATOR;
+        return TRUE;
+    case MM_BEARER_PROFILE_SOURCE_MODEM:
+        *out_value = MBIM_CONTEXT_SOURCE_MODEM;
+        return TRUE;
+    case MM_BEARER_PROFILE_SOURCE_DEVICE:
+        *out_value = MBIM_CONTEXT_SOURCE_DEVICE;
+        return TRUE;
+    default:
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                     "Unsupported profile source value: 0x%x", value);
+        return FALSE;
+    }
+}
+
+/*****************************************************************************/
+
 /* index in the array is the code point (8 possible values), and the actual
  * value is the lower limit of the error rate range. */
 static const gdouble bit_error_rate_ranges[] =   { 0.00, 0.20, 0.40, 0.80, 1.60, 3.20, 6.40, 12.80 };

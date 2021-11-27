@@ -67,6 +67,33 @@ MbimContextType     mm_bearer_apn_type_to_mbim_context_type        (MMBearerApnT
                                                                     gpointer              log_object,
                                                                     GError              **error);
 
+gboolean                 mm_bearer_roaming_allowance_to_mbim_context_roaming_control   (MMBearerRoamingAllowance    mask,
+                                                                                        gpointer                    log_object,
+                                                                                        MbimContextRoamingControl  *out_value,
+                                                                                        GError                    **error);
+MMBearerRoamingAllowance mm_bearer_roaming_allowance_from_mbim_context_roaming_control (MbimContextRoamingControl   value,
+                                                                                        GError                    **error);
+
+gboolean mm_bearer_access_type_preference_to_mbim_context_media_type   (MMBearerAccessTypePreference   value,
+                                                                        gpointer                       log_object,
+                                                                        MbimContextMediaType          *out_value,
+                                                                        GError                       **error);
+gboolean mm_bearer_access_type_preference_from_mbim_context_media_type (MbimContextMediaType           value,
+                                                                        MMBearerAccessTypePreference  *out_value,
+                                                                        GError                       **error);
+
+gboolean         mm_boolean_from_mbim_context_state (MbimContextState   value,
+                                                     gboolean          *out_value,
+                                                     GError           **error);
+MbimContextState mm_boolean_to_mbim_context_state   (gboolean           value);
+
+MMBearerProfileSource mm_bearer_profile_source_from_mbim_context_source (MbimContextSource   value,
+                                                                         GError            **error);
+gboolean              mm_bearer_profile_source_to_mbim_context_source   (MMBearerProfileSource   value,
+                                                                         gpointer                log_object,
+                                                                         MbimContextSource      *out_value,
+                                                                         GError                **error);
+
 gboolean mm_signal_error_rate_percentage_from_coded_value (guint      coded_value,
                                                            gdouble   *out_percentage,
                                                            gboolean   is_gsm,
