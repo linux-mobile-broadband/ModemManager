@@ -690,6 +690,45 @@ mm_signal_snr_from_coded_value (guint     coded_value,
 
 /*****************************************************************************/
 
+MMModem3gppMicoMode
+mm_modem_3gpp_mico_mode_from_mbim_mico_mode (MbimMicoMode mico_mode)
+{
+    switch (mico_mode) {
+    case MBIM_MICO_MODE_DISABLED:
+        return MM_MODEM_3GPP_MICO_MODE_DISABLED;
+    case MBIM_MICO_MODE_ENABLED:
+        return MM_MODEM_3GPP_MICO_MODE_ENABLED;
+    case MBIM_MICO_MODE_UNSUPPORTED:
+        return MM_MODEM_3GPP_MICO_MODE_UNSUPPORTED;
+    case MBIM_MICO_MODE_DEFAULT:
+        /* default expected only in set requests */
+    default:
+        return MM_MODEM_3GPP_MICO_MODE_UNKNOWN;
+    }
+}
+
+MMModem3gppDrxCycle
+mm_modem_3gpp_drx_cycle_from_mbim_drx_cycle (MbimDrxCycle drx_cycle)
+{
+    switch (drx_cycle) {
+    case MBIM_DRX_CYCLE_NOT_SUPPORTED:
+        return MM_MODEM_3GPP_DRX_CYCLE_UNSUPPORTED;
+    case MBIM_DRX_CYCLE_32:
+        return MM_MODEM_3GPP_DRX_CYCLE_32;
+    case MBIM_DRX_CYCLE_64:
+        return MM_MODEM_3GPP_DRX_CYCLE_64;
+    case MBIM_DRX_CYCLE_128:
+        return MM_MODEM_3GPP_DRX_CYCLE_128;
+    case MBIM_DRX_CYCLE_256:
+        return MM_MODEM_3GPP_DRX_CYCLE_256;
+    case MBIM_DRX_CYCLE_NOT_SPECIFIED:
+    default:
+        return MM_MODEM_3GPP_DRX_CYCLE_UNKNOWN;
+    }
+}
+
+/*****************************************************************************/
+
 MMSmsState
 mm_sms_state_from_mbim_message_status (MbimSmsStatus status)
 {

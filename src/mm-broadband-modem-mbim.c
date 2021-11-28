@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2013-2021 Aleksander Morgado <aleksander@aleksander.es>
  */
 
 #include <config.h>
@@ -118,6 +118,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_profile_management_supported;
     gboolean is_pco_supported;
     gboolean is_lte_attach_info_supported;
+    gboolean is_nr5g_registration_settings_supported;
     gboolean is_ussd_supported;
     gboolean is_atds_location_supported;
     gboolean is_atds_signal_supported;
@@ -2628,6 +2629,9 @@ query_device_services_ready (MbimDevice   *device,
                     } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_SLOT_INFO_STATUS) {
                         mm_obj_dbg (self, "Slot info status is supported");
                         self->priv->is_slot_info_status_supported = TRUE;
+                    } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_REGISTRATION_PARAMETERS) {
+                        mm_obj_dbg (self, "5GNR registration settings are supported");
+                        self->priv->is_nr5g_registration_settings_supported = TRUE;
                     }
                 }
                 continue;
@@ -3624,6 +3628,84 @@ modem_3gpp_set_initial_eps_bearer_settings (MMIfaceModem3gpp    *_self,
                          (GAsyncReadyCallback)before_set_lte_attach_configuration_query_ready,
                          task);
     mbim_message_unref (message);
+}
+
+/*****************************************************************************/
+/* 5GNR registration settings loading */
+
+static MMNr5gRegistrationSettings *
+modem_3gpp_load_nr5g_registration_settings_finish (MMIfaceModem3gpp  *self,
+                                                   GAsyncResult      *res,
+                                                   GError           **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+registration_parameters_query_ready (MbimDevice   *device,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    GError                     *error = NULL;
+    MMNr5gRegistrationSettings *settings;
+    MbimMicoMode                mico_mode = MBIM_MICO_MODE_DEFAULT;
+    MbimDrxCycle                drx_cycle = MBIM_DRX_CYCLE_NOT_SPECIFIED;
+    g_autoptr(MbimMessage)      response = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_ms_basic_connect_extensions_v3_registration_parameters_response_parse (
+            response,
+            &mico_mode,
+            &drx_cycle,
+            NULL, /* ladn info */
+            NULL, /* default pdu activation hint */
+            NULL, /* reregister if needed */
+            NULL, /* unnamed ies */
+            &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    settings = mm_nr5g_registration_settings_new ();
+    mm_nr5g_registration_settings_set_mico_mode (settings, mm_modem_3gpp_mico_mode_from_mbim_mico_mode (mico_mode));
+    mm_nr5g_registration_settings_set_drx_cycle (settings, mm_modem_3gpp_drx_cycle_from_mbim_drx_cycle (drx_cycle));
+
+    g_task_return_pointer (task, settings, (GDestroyNotify) g_object_unref);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_load_nr5g_registration_settings (MMIfaceModem3gpp    *_self,
+                                            GAsyncReadyCallback  callback,
+                                            gpointer             user_data)
+{
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                  *task;
+    MbimDevice             *device;
+    g_autoptr(MbimMessage)  message = NULL;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_nr5g_registration_settings_supported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "5GNR registration settings are unsupported");
+        g_object_unref (task);
+        return;
+    }
+
+    message = mbim_message_ms_basic_connect_extensions_v3_registration_parameters_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)registration_parameters_query_ready,
+                         task);
 }
 
 /*****************************************************************************/
@@ -8247,6 +8329,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_initial_eps_bearer_finish = modem_3gpp_load_initial_eps_bearer_finish;
     iface->load_initial_eps_bearer_settings = modem_3gpp_load_initial_eps_bearer_settings;
     iface->load_initial_eps_bearer_settings_finish = modem_3gpp_load_initial_eps_bearer_settings_finish;
+    iface->load_nr5g_registration_settings = modem_3gpp_load_nr5g_registration_settings;
+    iface->load_nr5g_registration_settings_finish = modem_3gpp_load_nr5g_registration_settings_finish;
     iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
     iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
