@@ -29,6 +29,8 @@
 #include "mm-bearer.h"
 #include "mm-pco.h"
 
+#define MM_GDBUS_MODEM_3GPP MM_GDBUS_MODEM3GPP
+
 /**
  * SECTION: mm-modem-3gpp
  * @title: MMModem3gpp
@@ -49,6 +51,7 @@ struct _MMModem3gppPrivate {
     GMutex mutex;
 
     PROPERTY_OBJECT_DECLARE (initial_eps_bearer_settings, MMBearerProperties)
+    PROPERTY_OBJECT_DECLARE (nr5g_registration_settings,  MMNr5gRegistrationSettings)
 };
 
 /*****************************************************************************/
@@ -687,7 +690,6 @@ mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network)
 
 /* helpers to match the property substring name with the one in our API */
 #define mm_gdbus_modem_3gpp_dup_initial_eps_bearer_settings mm_gdbus_modem3gpp_dup_initial_eps_bearer_settings
-#define MM_GDBUS_MODEM_3GPP MM_GDBUS_MODEM3GPP
 
 PROPERTY_OBJECT_DEFINE_FAILABLE (initial_eps_bearer_settings,
                                  Modem3gpp, modem_3gpp, MODEM_3GPP,
@@ -1368,6 +1370,144 @@ mm_modem_3gpp_set_packet_service_state_sync (MMModem3gpp                    *sel
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_3gpp_get_nr5g_registration_settings:
+ * @self: A #MMModem3gpp.
+ *
+ * Gets a #MMNr5gRegistrationSettings object including the configured 5GNR
+ * registration settings.
+ *
+ * <warning>The values reported by @self are not updated when the values in the
+ * interface change. Instead, the client is expected to call
+ * mm_modem_3gpp_get_nr5g_registration_settings() again to get a new
+ * #MMNr5gRegistrationSettings with the new values.</warning>
+ *
+ * Returns: (transfer full): A #MMNr5gRegistrationSettings that must be freed with
+ * g_object_unref() or %NULL if unknown.
+ *
+ * Since: 1.20
+ */
+
+/**
+ * mm_modem_3gpp_peek_nr5g_registration_settings:
+ * @self: A #MMModem3gpp.
+ *
+ * Gets a #MMNr5gRegistrationSettings object including the configured 5GNR
+ * registration settings.
+ *
+ * <warning>The returned value is only valid until the property changes so
+ * it is only safe to use this function on the thread where
+ * @self was constructed. Use mm_modem_3gpp_get_nr5g_registration_settings()
+ * if on another thread.</warning>
+ *
+ * Returns: (transfer none): A #MMNr5gRegistrationSettings Do not free the returned
+ * value, it belongs to @self.
+ *
+ * Since: 1.20
+ */
+
+/* helpers to match the property substring name with the one in our API */
+#define mm_gdbus_modem_3gpp_dup_nr5g_registration_settings mm_gdbus_modem3gpp_dup_nr5g_registration_settings
+PROPERTY_OBJECT_DEFINE_FAILABLE (nr5g_registration_settings,
+                                 Modem3gpp, modem_3gpp, MODEM_3GPP,
+                                 MMNr5gRegistrationSettings,
+                                 mm_nr5g_registration_settings_new_from_dictionary)
+
+/*****************************************************************************/
+
+/**
+ * mm_modem_3gpp_set_nr5g_registration_settings_finish:
+ * @self: A #MMModem3gpp.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_3gpp_set_nr5g_registration_settings().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_3gpp_set_nr5g_registration_settings().
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.20
+ */
+gboolean
+mm_modem_3gpp_set_nr5g_registration_settings_finish (MMModem3gpp   *self,
+                                                     GAsyncResult  *res,
+                                                     GError       **error)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    return mm_gdbus_modem3gpp_call_set_nr5g_registration_settings_finish (MM_GDBUS_MODEM3GPP (self), res, error);
+}
+
+/**
+ * mm_modem_3gpp_set_nr5g_registration_settings:
+ * @self: A #MMModem3gpp.
+ * @settings: A #MMNr5gRegistrationSettings.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously configures the 5GNR registration settings.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_3gpp_set_nr5g_registration_settings_finish() to get the result of the operation.
+ *
+ * See mm_modem_3gpp_set_nr5g_registration_settings_sync() for the synchronous,
+ * blocking version of this method.
+ *
+ * Since: 1.20
+ */
+void
+mm_modem_3gpp_set_nr5g_registration_settings (MMModem3gpp                *self,
+                                              MMNr5gRegistrationSettings *settings,
+                                              GCancellable               *cancellable,
+                                              GAsyncReadyCallback         callback,
+                                              gpointer                    user_data)
+{
+    g_autoptr(GVariant) dictionary = NULL;
+
+    g_return_if_fail (MM_IS_MODEM_3GPP (self));
+
+    dictionary = mm_nr5g_registration_settings_get_dictionary (settings);
+
+    mm_gdbus_modem3gpp_call_set_nr5g_registration_settings (MM_GDBUS_MODEM3GPP (self), dictionary, cancellable, callback, user_data);
+}
+
+/**
+ * mm_modem_3gpp_set_nr5g_registration_settings_sync:
+ * @self: A #MMModem3gpp.
+ * @settings: A #MMNr5gRegistrationSettings.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously configures the 5GNR registration settings.
+ *
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_3gpp_set_nr5g_registration_settings() for the asynchronous
+ * version of this method.
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if @error is set.
+ *
+ * Since: 1.20
+ */
+gboolean
+mm_modem_3gpp_set_nr5g_registration_settings_sync (MMModem3gpp                 *self,
+                                                   MMNr5gRegistrationSettings  *settings,
+                                                   GCancellable                *cancellable,
+                                                   GError                     **error)
+{
+    g_autoptr(GVariant) dictionary = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM_3GPP (self), FALSE);
+
+    dictionary = mm_nr5g_registration_settings_get_dictionary (settings);
+
+    return mm_gdbus_modem3gpp_call_set_nr5g_registration_settings_sync (MM_GDBUS_MODEM3GPP (self), dictionary, cancellable, error);
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_3gpp_init (MMModem3gpp *self)
 {
@@ -1375,6 +1515,7 @@ mm_modem_3gpp_init (MMModem3gpp *self)
     g_mutex_init (&self->priv->mutex);
 
     PROPERTY_INITIALIZE (initial_eps_bearer_settings, "initial-eps-bearer-settings")
+    PROPERTY_INITIALIZE (nr5g_registration_settings,  "nr5g-registration-settings")
 }
 
 static void
@@ -1385,6 +1526,7 @@ finalize (GObject *object)
     g_mutex_clear (&self->priv->mutex);
 
     PROPERTY_OBJECT_FINALIZE (initial_eps_bearer_settings);
+    PROPERTY_OBJECT_FINALIZE (nr5g_registration_settings);
 
     G_OBJECT_CLASS (mm_modem_3gpp_parent_class)->finalize (object);
 }

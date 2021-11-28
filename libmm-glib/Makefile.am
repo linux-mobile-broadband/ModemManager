@@ -179,6 +179,7 @@ include_HEADERS = \
 	mm-sim-preferred-network.h \
 	mm-3gpp-profile.h \
 	mm-signal-threshold-properties.h \
+	mm-nr5g-registration-settings.h \
 	mm-compat.h \
 	$(NULL)
 

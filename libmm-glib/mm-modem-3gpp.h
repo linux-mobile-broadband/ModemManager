@@ -31,6 +31,7 @@
 #include <ModemManager.h>
 
 #include "mm-bearer.h"
+#include "mm-nr5g-registration-settings.h"
 #include "mm-gdbus-modem.h"
 
 G_BEGIN_DECLS
@@ -93,6 +94,9 @@ MMBearerProperties *mm_modem_3gpp_get_initial_eps_bearer_settings  (MMModem3gpp 
 MMBearerProperties *mm_modem_3gpp_peek_initial_eps_bearer_settings (MMModem3gpp *self);
 
 MMModem3gppPacketServiceState mm_modem_3gpp_get_packet_service_state (MMModem3gpp *self);
+
+MMNr5gRegistrationSettings *mm_modem_3gpp_get_nr5g_registration_settings  (MMModem3gpp *self);
+MMNr5gRegistrationSettings *mm_modem_3gpp_peek_nr5g_registration_settings (MMModem3gpp *self);
 
 void     mm_modem_3gpp_register        (MMModem3gpp *self,
                                         const gchar *network_id,
@@ -201,6 +205,19 @@ gboolean mm_modem_3gpp_set_packet_service_state_sync   (MMModem3gpp             
                                                         MMModem3gppPacketServiceState   state,
                                                         GCancellable                   *cancellable,
                                                         GError                        **error);
+
+void     mm_modem_3gpp_set_nr5g_registration_settings        (MMModem3gpp                    *self,
+                                                              MMNr5gRegistrationSettings     *settings,
+                                                              GCancellable                   *cancellable,
+                                                              GAsyncReadyCallback             callback,
+                                                              gpointer                        user_data);
+gboolean mm_modem_3gpp_set_nr5g_registration_settings_finish (MMModem3gpp                    *self,
+                                                              GAsyncResult                   *res,
+                                                              GError                        **error);
+gboolean mm_modem_3gpp_set_nr5g_registration_settings_sync   (MMModem3gpp                    *self,
+                                                              MMNr5gRegistrationSettings     *settings,
+                                                              GCancellable                   *cancellable,
+                                                              GError                        **error);
 
 G_END_DECLS
 
