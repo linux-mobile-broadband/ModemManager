@@ -166,12 +166,12 @@ struct _MMIfaceModem3gpp {
                                                                      GError              **error);
 
     /* Asynchronous 5GNR registration settings loading */
-    void                                  (*load_nr5g_registration_settings)        (MMIfaceModem3gpp     *self,
-                                                                                     GAsyncReadyCallback   callback,
-                                                                                     gpointer              user_data);
-    MMModem3gppNr5gRegistrationSettings * (*load_nr5g_registration_settings_finish) (MMIfaceModem3gpp     *self,
-                                                                                     GAsyncResult         *res,
-                                                                                     GError              **error);
+    void                         (*load_nr5g_registration_settings)        (MMIfaceModem3gpp     *self,
+                                                                            GAsyncReadyCallback   callback,
+                                                                            gpointer              user_data);
+    MMNr5gRegistrationSettings * (*load_nr5g_registration_settings_finish) (MMIfaceModem3gpp     *self,
+                                                                            GAsyncResult         *res,
+                                                                            GError              **error);
 
     /* Create initial default EPS bearer object */
     MMBaseBearer * (*create_initial_eps_bearer) (MMIfaceModem3gpp   *self,
@@ -262,6 +262,15 @@ struct _MMIfaceModem3gpp {
     gboolean (*set_packet_service_state_finish) (MMIfaceModem3gpp              *self,
                                                  GAsyncResult                  *res,
                                                  GError                       **error);
+
+    /* Set 5GNR registration settings */
+    void     (* set_nr5g_registration_settings)        (MMIfaceModem3gpp             *self,
+                                                        MMNr5gRegistrationSettings   *settings,
+                                                        GAsyncReadyCallback           callback,
+                                                        gpointer                      user_data);
+    gboolean (* set_nr5g_registration_settings_finish) (MMIfaceModem3gpp             *self,
+                                                        GAsyncResult                 *res,
+                                                        GError                      **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
