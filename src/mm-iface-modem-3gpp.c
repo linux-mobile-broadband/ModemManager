@@ -2816,6 +2816,7 @@ typedef enum {
     INITIALIZATION_STEP_IMEI,
     INITIALIZATION_STEP_EPS_UE_MODE_OPERATION,
     INITIALIZATION_STEP_EPS_INITIAL_BEARER_SETTINGS,
+    INITIALIZATION_STEP_NR5G_REGISTRATION_SETTINGS,
     INITIALIZATION_STEP_CONNECT_SIGNALS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
@@ -2846,6 +2847,32 @@ sim_pin_lock_enabled_cb (MMBaseSim *self,
         facilities &= ~MM_MODEM_3GPP_FACILITY_SIM;
 
     mm_gdbus_modem3gpp_set_enabled_facility_locks (skeleton, facilities);
+}
+
+static void
+load_nr5g_registration_settings_ready (MMIfaceModem3gpp *self,
+                                       GAsyncResult     *res,
+                                       GTask            *task)
+{
+    InitializationContext                 *ctx;
+    g_autoptr(GError)                      error = NULL;
+    g_autoptr(MMNr5gRegistrationSettings)  settings = NULL;
+
+    ctx = g_task_get_task_data (task);
+
+    settings = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_nr5g_registration_settings_finish (self, res, &error);
+    if (!settings) {
+        mm_obj_warn (self, "couldn't load 5GNR registration settings: %s", error->message);
+    } else {
+        g_autoptr(GVariant) dictionary = NULL;
+
+        dictionary = mm_nr5g_registration_settings_get_dictionary (settings);
+        mm_gdbus_modem3gpp_set_nr5g_registration_settings (ctx->skeleton, dictionary);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (task);
 }
 
 static void
@@ -3047,6 +3074,18 @@ interface_initialization_step (GTask *task)
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_initial_eps_bearer_settings (
                 self,
                 (GAsyncReadyCallback)load_initial_eps_bearer_settings_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* fall through */
+
+    case INITIALIZATION_STEP_NR5G_REGISTRATION_SETTINGS:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_nr5g_registration_settings &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_nr5g_registration_settings_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_nr5g_registration_settings (
+                self,
+                (GAsyncReadyCallback)load_nr5g_registration_settings_ready,
                 task);
             return;
         }

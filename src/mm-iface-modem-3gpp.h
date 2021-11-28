@@ -165,6 +165,14 @@ struct _MMIfaceModem3gpp {
                                                                      GAsyncResult         *res,
                                                                      GError              **error);
 
+    /* Asynchronous 5GNR registration settings loading */
+    void                                  (*load_nr5g_registration_settings)        (MMIfaceModem3gpp     *self,
+                                                                                     GAsyncReadyCallback   callback,
+                                                                                     gpointer              user_data);
+    MMModem3gppNr5gRegistrationSettings * (*load_nr5g_registration_settings_finish) (MMIfaceModem3gpp     *self,
+                                                                                     GAsyncResult         *res,
+                                                                                     GError              **error);
+
     /* Create initial default EPS bearer object */
     MMBaseBearer * (*create_initial_eps_bearer) (MMIfaceModem3gpp   *self,
                                                  MMBearerProperties *properties);
