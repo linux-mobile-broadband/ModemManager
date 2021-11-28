@@ -1360,9 +1360,9 @@ handle_set_packet_service_state_context_free (HandlePacketServiceStateContext *c
 }
 
 static void
-set_packet_service_state_ready(MMIfaceModem3gpp                *self,
-                               GAsyncResult                    *res,
-                               HandlePacketServiceStateContext *ctx)
+set_packet_service_state_ready (MMIfaceModem3gpp                *self,
+                                GAsyncResult                    *res,
+                                HandlePacketServiceStateContext *ctx)
 {
     GError *error = NULL;
 
