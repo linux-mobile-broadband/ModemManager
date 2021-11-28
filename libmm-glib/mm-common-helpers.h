@@ -94,6 +94,10 @@ MMModem3gppFacility           mm_common_get_3gpp_facility_from_string           
                                                                                    GError      **error);
 MMModem3gppPacketServiceState mm_common_get_3gpp_packet_service_state_from_string (const gchar  *str,
                                                                                    GError      **error);
+MMModem3gppMicoMode           mm_common_get_3gpp_mico_mode_from_string            (const gchar  *str,
+                                                                                   GError      **error);
+MMModem3gppDrxCycle           mm_common_get_3gpp_drx_cycle_from_string            (const gchar  *str,
+                                                                                   GError      **error);
 
 /******************************************************************************/
 

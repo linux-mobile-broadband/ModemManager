@@ -85,6 +85,7 @@
 #include <mm-sim-preferred-network.h>
 #include <mm-3gpp-profile.h>
 #include <mm-signal-threshold-properties.h>
+#include <mm-nr5g-registration-settings.h>
 #include <mm-compat.h>
 
 /* generated */

@@ -99,6 +99,8 @@ libmm_glib_la_SOURCES = \
 	mm-3gpp-profile.c \
 	mm-signal-threshold-properties.h \
 	mm-signal-threshold-properties.c \
+	mm-nr5g-registration-settings.h \
+	mm-nr5g-registration-settings.c \
 	mm-compat.h \
 	mm-compat.c \
 	$(NULL)
