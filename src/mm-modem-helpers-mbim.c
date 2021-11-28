@@ -707,6 +707,22 @@ mm_modem_3gpp_mico_mode_from_mbim_mico_mode (MbimMicoMode mico_mode)
     }
 }
 
+MbimMicoMode
+mm_modem_3gpp_mico_mode_to_mbim_mico_mode (MMModem3gppMicoMode mico_mode)
+{
+    switch (mico_mode) {
+    case MM_MODEM_3GPP_MICO_MODE_DISABLED:
+        return MBIM_MICO_MODE_DISABLED;
+    case MM_MODEM_3GPP_MICO_MODE_ENABLED:
+        return MBIM_MICO_MODE_ENABLED;
+    case MM_MODEM_3GPP_MICO_MODE_UNSUPPORTED:
+        return MBIM_MICO_MODE_UNSUPPORTED;
+    case MM_MODEM_3GPP_MICO_MODE_UNKNOWN:
+    default:
+        return MBIM_MICO_MODE_DEFAULT;
+    }
+}
+
 MMModem3gppDrxCycle
 mm_modem_3gpp_drx_cycle_from_mbim_drx_cycle (MbimDrxCycle drx_cycle)
 {
@@ -724,6 +740,26 @@ mm_modem_3gpp_drx_cycle_from_mbim_drx_cycle (MbimDrxCycle drx_cycle)
     case MBIM_DRX_CYCLE_NOT_SPECIFIED:
     default:
         return MM_MODEM_3GPP_DRX_CYCLE_UNKNOWN;
+    }
+}
+
+MbimDrxCycle
+mm_modem_3gpp_drx_cycle_to_mbim_drx_cycle (MMModem3gppDrxCycle drx_cycle)
+{
+    switch (drx_cycle) {
+    case MM_MODEM_3GPP_DRX_CYCLE_UNSUPPORTED:
+        return MBIM_DRX_CYCLE_NOT_SUPPORTED;
+    case MM_MODEM_3GPP_DRX_CYCLE_32:
+        return MBIM_DRX_CYCLE_32;
+    case MM_MODEM_3GPP_DRX_CYCLE_64:
+        return MBIM_DRX_CYCLE_64;
+    case MM_MODEM_3GPP_DRX_CYCLE_128:
+        return MBIM_DRX_CYCLE_128;
+    case MM_MODEM_3GPP_DRX_CYCLE_256:
+        return MBIM_DRX_CYCLE_256;
+    case MM_MODEM_3GPP_DRX_CYCLE_UNKNOWN:
+    default:
+        return MBIM_DRX_CYCLE_NOT_SPECIFIED;
     }
 }
 

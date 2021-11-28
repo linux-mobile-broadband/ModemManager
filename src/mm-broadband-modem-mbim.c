@@ -3709,6 +3709,76 @@ modem_3gpp_load_nr5g_registration_settings (MMIfaceModem3gpp    *_self,
 }
 
 /*****************************************************************************/
+/* Set 5GNR registration settings */
+
+static gboolean
+modem_3gpp_set_nr5g_registration_settings_finish (MMIfaceModem3gpp  *self,
+                                                  GAsyncResult      *res,
+                                                  GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_nr5g_registration_settings_ready (MbimDevice   *device,
+                                      GAsyncResult *res,
+                                      GTask        *task)
+{
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error))
+        g_task_return_error (task, error);
+    else
+        g_task_return_boolean (task, TRUE);
+    g_object_unref (task);
+}
+
+static void
+modem_3gpp_set_nr5g_registration_settings (MMIfaceModem3gpp           *_self,
+                                           MMNr5gRegistrationSettings *settings,
+                                           GAsyncReadyCallback         callback,
+                                           gpointer                    user_data)
+{
+    MMBroadbandModemMbim   *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                  *task;
+    MbimDevice             *device;
+    g_autoptr(MbimMessage)  message = NULL;
+    MbimMicoMode            mico_mode;
+    MbimDrxCycle            drx_cycle;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_nr5g_registration_settings_supported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "5GNR registration settings are unsupported");
+        g_object_unref (task);
+        return;
+    }
+
+    mico_mode = mm_modem_3gpp_mico_mode_to_mbim_mico_mode (mm_nr5g_registration_settings_get_mico_mode (settings));
+    drx_cycle = mm_modem_3gpp_drx_cycle_to_mbim_drx_cycle (mm_nr5g_registration_settings_get_drx_cycle (settings));
+
+    message = mbim_message_ms_basic_connect_extensions_v3_registration_parameters_set_new (mico_mode,
+                                                                                           drx_cycle,
+                                                                                           MBIM_LADN_INFO_NOT_NEEDED,
+                                                                                           MBIM_DEFAULT_PDU_ACTIVATION_HINT_LIKELY,
+                                                                                           TRUE,
+                                                                                           NULL, /* unnamed ies */
+                                                                                           NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)set_nr5g_registration_settings_ready,
+                         task);
+}
+
+/*****************************************************************************/
 /* Common unsolicited events setup and cleanup */
 
 static void
@@ -8333,6 +8403,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_nr5g_registration_settings_finish = modem_3gpp_load_nr5g_registration_settings_finish;
     iface->set_initial_eps_bearer_settings = modem_3gpp_set_initial_eps_bearer_settings;
     iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
+    iface->set_nr5g_registration_settings = modem_3gpp_set_nr5g_registration_settings;
+    iface->set_nr5g_registration_settings_finish = modem_3gpp_set_nr5g_registration_settings_finish;
     iface->run_registration_checks = modem_3gpp_run_registration_checks;
     iface->run_registration_checks_finish = modem_3gpp_run_registration_checks_finish;
     iface->register_in_network = modem_3gpp_register_in_network;

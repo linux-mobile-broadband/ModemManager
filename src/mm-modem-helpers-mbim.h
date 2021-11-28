@@ -84,8 +84,10 @@ gboolean mm_signal_snr_from_coded_value (guint      coded_value,
                                          gdouble   *out_snr,
                                          GError   **error);
 
-MMModem3gppMicoMode mm_modem_3gpp_mico_mode_from_mbim_mico_mode (MbimMicoMode mico_mode);
-MMModem3gppDrxCycle mm_modem_3gpp_drx_cycle_from_mbim_drx_cycle (MbimDrxCycle drx_cycle);
+MMModem3gppMicoMode mm_modem_3gpp_mico_mode_from_mbim_mico_mode (MbimMicoMode        mico_mode);
+MbimMicoMode        mm_modem_3gpp_mico_mode_to_mbim_mico_mode   (MMModem3gppMicoMode mico_mode);
+MMModem3gppDrxCycle mm_modem_3gpp_drx_cycle_from_mbim_drx_cycle (MbimDrxCycle        drx_cycle);
+MbimDrxCycle        mm_modem_3gpp_drx_cycle_to_mbim_drx_cycle   (MMModem3gppDrxCycle drx_cycle);
 
 /*****************************************************************************/
 /* MBIM/SMS to MM translations */
