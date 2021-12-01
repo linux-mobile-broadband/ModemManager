@@ -24,17 +24,17 @@ ENV{ID_MM_QCOM_SOC}="1"
 ENV{ID_MM_PHYSDEV_UID}="qcom-soc"
 
 # port type hints for the rpmsgexport-ed ports
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA[0-9]*_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
-SUBSYSTEM=="rpmsg", ATTR{name}=="DATA[0-9]",       ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+SUBSYSTEM=="rpmsg", ATTR{name}=="DATA*", ATTR{name}=="*_CNTL", ENV{ID_MM_PORT_TYPE_QMI}="1"
+SUBSYSTEM=="rpmsg", ATTR{name}=="DATA*", ATTR{name}!="*_CNTL", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
 # ignore every other port without explicit hints
 SUBSYSTEM=="rpmsg", ENV{ID_MM_PORT_TYPE_QMI}!="1", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}!="1", ENV{ID_MM_PORT_IGNORE}="1"
 
 # explicitly ignore ports intended for USB tethering (DATA40, DATA40_CNTL)
 SUBSYSTEM=="rpmsg", ATTR{name}=="DATA40*", ENV{ID_MM_PORT_IGNORE}="1"
-KERNEL=="rmnet_usb[0-9]*", ENV{ID_MM_PORT_IGNORE}="1"
+KERNEL=="rmnet_usb*", ENV{ID_MM_PORT_IGNORE}="1"
 
 # flag all rpmsg ports under this plugin as candidate
-KERNEL=="rpmsg[0-9]*", SUBSYSTEM=="rpmsg", ENV{ID_MM_CANDIDATE}="1"
+KERNEL=="rpmsg*", SUBSYSTEM=="rpmsg", ENV{ID_MM_CANDIDATE}="1"
 
 LABEL="mm_qcom_soc_end"
