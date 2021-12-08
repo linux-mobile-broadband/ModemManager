@@ -246,7 +246,8 @@ mm_filter_port (MMFilter        *self,
         /* If the TTY kernel driver is one expected modem kernel driver, allow it */
         driver = mm_kernel_device_get_driver (port);
         if ((self->priv->enabled_rules & MM_FILTER_RULE_TTY_DRIVER) &&
-            (!g_strcmp0 (driver, "option1") ||
+            (!g_strcmp0 (driver, "option") ||
+             !g_strcmp0 (driver, "option1") ||
              !g_strcmp0 (driver, "qcserial") ||
              !g_strcmp0 (driver, "qcaux") ||
              !g_strcmp0 (driver, "nozomi") ||
