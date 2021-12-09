@@ -32,16 +32,14 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0104", ENV{.MM_USBIFNUM}=="02", SUBS
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0104", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
 
 # Fibocom FM101-GL (MBIM)
-#  ttyUSB0 (if #2): debug port (ignore)
+#  ttyUSB0 (if #2): AT port
 #  ttyUSB1 (if #3): AT port
-#  ttyUSB2 (if #4): AT port
+#  ttyUSB2 (if #4): debug port (ignore)
 #  ttyUSB3 (if #5): debug port (ignore)
-#  ttyUSB4 (if #6): debug port (ignore)
-ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
-ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
-ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="04", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="03", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_IGNORE}="1"
-ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a2", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 
 # Fibocom FM101-GL (ADB)
 #  ttyUSB0 (if #2): debug port (ignore)
