@@ -1754,15 +1754,15 @@ mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx
         else if (ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO)
             tmp = mm_modem_capability_from_qmi_radio_technology_preference (ctx->nas_tp_mask);
 
-        /* Final capabilities are the intersection between the Technology
-         * Preference or SSP and the device's capabilities.
+        /* Final capabilities are the union of the active multimode capability
+         * (GSM/UMTS or CDMA/EVDO or both or none) in TP or SSP and other supported device's capabilities.
          * If the Technology Preference was "auto" or unknown we just fall back
          * to the Get Capabilities response.
          */
         if (tmp == MM_MODEM_CAPABILITY_NONE)
             tmp = ctx->dms_capabilities;
         else
-            tmp &= ctx->dms_capabilities;
+            tmp = (tmp & MULTIMODE) | (MULTIMODE ^ ctx->dms_capabilities);
     }
 
     /* Log about the logic applied */
