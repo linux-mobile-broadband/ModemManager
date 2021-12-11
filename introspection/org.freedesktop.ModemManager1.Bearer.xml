@@ -381,7 +381,15 @@
     <!--
         ReloadStatsSupported:
 
-        Indicates whether or not the bearer support getting rx and tx bytes statistics.
+        Indicates whether reloading ongoing statistics is supported or not.
+
+        This property applies exclusively to the statistics that are queried from
+        the modem periodically; i.e. "rx-bytes", "tx-bytes", "uplink-speed" and
+        "downlink-speed".
+
+        The property is initialized to a fixed value as soon as the first
+        connection attempt has successfully finished. Reading this value before
+        the first successful connection attempt will always report %FALSE.
 
         Since: 1.20
     -->
