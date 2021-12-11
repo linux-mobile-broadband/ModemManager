@@ -65,47 +65,49 @@ struct _MMModem3gppProfileManagerClass {
 GType mm_modem_3gpp_profile_manager_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMModem3gppProfileManager, g_object_unref)
 
-const gchar   *mm_modem_3gpp_profile_manager_get_path      (MMModem3gppProfileManager  *self);
-gchar         *mm_modem_3gpp_profile_manager_dup_path      (MMModem3gppProfileManager  *self);
+const gchar   *mm_modem_3gpp_profile_manager_get_path        (MMModem3gppProfileManager  *self);
+gchar         *mm_modem_3gpp_profile_manager_dup_path        (MMModem3gppProfileManager  *self);
+const gchar   *mm_modem_3gpp_profile_manager_get_index_field (MMModem3gppProfileManager  *self);
+gchar         *mm_modem_3gpp_profile_manager_dup_index_field (MMModem3gppProfileManager  *self);
 
-void           mm_modem_3gpp_profile_manager_list          (MMModem3gppProfileManager  *self,
-                                                            GCancellable               *cancellable,
-                                                            GAsyncReadyCallback         callback,
-                                                            gpointer                    user_data);
-gboolean       mm_modem_3gpp_profile_manager_list_finish   (MMModem3gppProfileManager  *self,
-                                                            GAsyncResult               *res,
-                                                            GList                     **profiles,
-                                                            GError                    **error);
-gboolean       mm_modem_3gpp_profile_manager_list_sync     (MMModem3gppProfileManager  *self,
-                                                            GCancellable               *cancellable,
-                                                            GList                     **profiles,
-                                                            GError                    **error);
+void           mm_modem_3gpp_profile_manager_list            (MMModem3gppProfileManager  *self,
+                                                              GCancellable               *cancellable,
+                                                              GAsyncReadyCallback         callback,
+                                                              gpointer                    user_data);
+gboolean       mm_modem_3gpp_profile_manager_list_finish     (MMModem3gppProfileManager  *self,
+                                                              GAsyncResult               *res,
+                                                              GList                     **profiles,
+                                                              GError                    **error);
+gboolean       mm_modem_3gpp_profile_manager_list_sync       (MMModem3gppProfileManager  *self,
+                                                              GCancellable               *cancellable,
+                                                              GList                     **profiles,
+                                                              GError                    **error);
 
-void           mm_modem_3gpp_profile_manager_set           (MMModem3gppProfileManager  *self,
-                                                            MM3gppProfile              *requested,
-                                                            GCancellable               *cancellable,
-                                                            GAsyncReadyCallback         callback,
-                                                            gpointer                    user_data);
-MM3gppProfile *mm_modem_3gpp_profile_manager_set_finish    (MMModem3gppProfileManager  *self,
-                                                            GAsyncResult               *res,
-                                                            GError                    **error);
-MM3gppProfile *mm_modem_3gpp_profile_manager_set_sync      (MMModem3gppProfileManager  *self,
-                                                            MM3gppProfile              *requested,
-                                                            GCancellable               *cancellable,
-                                                            GError                    **error);
+void           mm_modem_3gpp_profile_manager_set             (MMModem3gppProfileManager  *self,
+                                                              MM3gppProfile              *requested,
+                                                              GCancellable               *cancellable,
+                                                              GAsyncReadyCallback         callback,
+                                                              gpointer                    user_data);
+MM3gppProfile *mm_modem_3gpp_profile_manager_set_finish      (MMModem3gppProfileManager  *self,
+                                                              GAsyncResult               *res,
+                                                              GError                    **error);
+MM3gppProfile *mm_modem_3gpp_profile_manager_set_sync        (MMModem3gppProfileManager  *self,
+                                                              MM3gppProfile              *requested,
+                                                              GCancellable               *cancellable,
+                                                              GError                    **error);
 
-void           mm_modem_3gpp_profile_manager_delete        (MMModem3gppProfileManager  *self,
-                                                            MM3gppProfile              *profile,
-                                                            GCancellable               *cancellable,
-                                                            GAsyncReadyCallback         callback,
-                                                            gpointer                    user_data);
-gboolean       mm_modem_3gpp_profile_manager_delete_finish (MMModem3gppProfileManager  *self,
-                                                            GAsyncResult               *res,
-                                                            GError                    **error);
-gboolean       mm_modem_3gpp_profile_manager_delete_sync   (MMModem3gppProfileManager  *self,
-                                                            MM3gppProfile              *profile,
-                                                            GCancellable               *cancellable,
-                                                            GError                    **error);
+void           mm_modem_3gpp_profile_manager_delete          (MMModem3gppProfileManager  *self,
+                                                              MM3gppProfile              *profile,
+                                                              GCancellable               *cancellable,
+                                                              GAsyncReadyCallback         callback,
+                                                              gpointer                    user_data);
+gboolean       mm_modem_3gpp_profile_manager_delete_finish   (MMModem3gppProfileManager  *self,
+                                                              GAsyncResult               *res,
+                                                              GError                    **error);
+gboolean       mm_modem_3gpp_profile_manager_delete_sync     (MMModem3gppProfileManager  *self,
+                                                              MM3gppProfile              *profile,
+                                                              GCancellable               *cancellable,
+                                                              GError                    **error);
 
 G_END_DECLS
 

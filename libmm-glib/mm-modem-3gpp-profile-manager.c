@@ -89,6 +89,50 @@ mm_modem_3gpp_profile_manager_dup_path (MMModem3gppProfileManager *self)
 
 /*****************************************************************************/
 
+/**
+ * mm_modem_3gpp_profile_manager_get_index_field:
+ * @self: A #MMModem3gppProfileManager.
+ *
+ * Gets the name of the field used as index in profile management
+ * operations.
+ *
+ * Returns: (transfer none): The index field, or %NULL if none available.
+ * Do not free the returned value, it belongs to @self.
+ *
+ * Since: 1.20
+ */
+const gchar *
+mm_modem_3gpp_profile_manager_get_index_field (MMModem3gppProfileManager *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP_PROFILE_MANAGER (self), NULL);
+
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem3gpp_profile_manager_get_index_field (MM_GDBUS_MODEM3GPP_PROFILE_MANAGER (self)));
+}
+
+/**
+ * mm_modem_3gpp_profile_manager_dup_index_field:
+ * @self: A #MMModem3gppProfileManager.
+ *
+ * Gets a copy of the name of the field used as index in profile management
+ * operations.
+ *
+ * Returns: (transfer full): The index field, or %NULL if none available.
+ * The returned value should be freed with g_free().
+ *
+ * Since: 1.20
+ */
+gchar *
+mm_modem_3gpp_profile_manager_dup_index_field (MMModem3gppProfileManager *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_3GPP_PROFILE_MANAGER (self), NULL);
+
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem3gpp_profile_manager_dup_index_field (MM_GDBUS_MODEM3GPP_PROFILE_MANAGER (self)));
+}
+
+/*****************************************************************************/
+
 static gboolean
 build_list_results (GVariant  *dictionaries,
                     GList    **out_profiles,
