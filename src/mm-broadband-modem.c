@@ -10184,9 +10184,15 @@ modem_signal_load_values (MMIfaceModemSignal  *self,
 static gboolean
 modem_3gpp_profile_manager_check_support_finish (MMIfaceModem3gppProfileManager  *self,
                                                  GAsyncResult                    *res,
+                                                 gchar                          **index_field,
                                                  GError                         **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
+    if (g_task_propagate_boolean (G_TASK (res), error)) {
+        *index_field = g_strdup ("profile-id");;
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 static void

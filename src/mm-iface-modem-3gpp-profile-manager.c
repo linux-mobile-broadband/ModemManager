@@ -1465,19 +1465,22 @@ check_support_ready (MMIfaceModem3gppProfileManager *self,
 {
     InitializationContext *ctx;
     g_autoptr(GError)      error = NULL;
+    g_autofree gchar      *index_field = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->check_support_finish (self, res, &error)) {
+    ctx = g_task_get_task_data (task);
+
+    if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->check_support_finish (self, res, &index_field, &error)) {
         if (error) {
             /* This error shouldn't be treated as critical */
             mm_obj_dbg (self, "profile management support check failed: %s", error->message);
         }
     } else {
         /* profile management is supported! */
+        mm_gdbus_modem3gpp_profile_manager_set_index_field (ctx->skeleton, index_field);
         g_object_set_qdata (G_OBJECT (self), supported_quark, GUINT_TO_POINTER (TRUE));
     }
 
     /* Go on to next step */
-    ctx = g_task_get_task_data (task);
     ctx->step++;
     interface_initialization_step (task);
 }

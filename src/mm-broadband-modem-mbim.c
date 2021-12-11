@@ -5946,27 +5946,38 @@ modem_signal_setup_thresholds (MMIfaceModemSignal  *self,
 /* Check support (3GPP profile management interface) */
 
 static gboolean
-modem_3gpp_profile_manager_check_support_finish (MMIfaceModem3gppProfileManager  *self,
+modem_3gpp_profile_manager_check_support_finish (MMIfaceModem3gppProfileManager  *_self,
                                                  GAsyncResult                    *res,
+                                                 gchar                          **index_field,
                                                  GError                         **error)
 {
-    return g_task_propagate_boolean (G_TASK (res), error);
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+
+    g_assert (g_task_propagate_boolean (G_TASK (res), NULL));
+
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
+        if (self->priv->is_profile_management_ext_supported) {
+            *index_field = g_strdup ("apn-type");
+            return TRUE;
+        }
+        if (self->priv->is_profile_management_supported) {
+            *index_field = g_strdup ("profile-id");
+            return TRUE;
+        }
+    }
+    return FALSE;
+
 }
 
 static void
-modem_3gpp_profile_manager_check_support (MMIfaceModem3gppProfileManager  *_self,
+modem_3gpp_profile_manager_check_support (MMIfaceModem3gppProfileManager  *self,
                                           GAsyncReadyCallback              callback,
                                           gpointer                         user_data)
 {
-    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    GTask                *task;
+    GTask *task;
 
     task = g_task_new (self, NULL, callback, user_data);
-
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self)) && self->priv->is_profile_management_supported)
-        g_task_return_boolean (task, TRUE);
-    else
-        g_task_return_boolean (task, FALSE);
+    g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
 

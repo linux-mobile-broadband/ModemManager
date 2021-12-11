@@ -41,6 +41,7 @@ struct _MMIfaceModem3gppProfileManager {
                                        gpointer                         user_data);
     gboolean (* check_support_finish) (MMIfaceModem3gppProfileManager  *self,
                                        GAsyncResult                    *res,
+                                       gchar                          **index_field,
                                        GError                         **error);
 
     /* Asynchronous setup of unsolicited events */
