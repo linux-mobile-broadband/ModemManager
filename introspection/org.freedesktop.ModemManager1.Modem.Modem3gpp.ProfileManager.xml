@@ -64,9 +64,11 @@
         @requested_properties: the requested profile properties.
         @stored_properties: the stored profile properties.
 
-        Creates or updates a connection profile on this modem. If
-        <literal>"profile-id"</literal> is not given, a new profile will be
-        created; otherwise, the profile with the given ID will be updated.
+        Creates or updates a connection profile on this modem, depending on
+        whether the expected
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Modem-Modem3gpp-ProfileManager.IndexField">index field</link>
+        is given or not. If not given, a new profile will be created; otherwise,
+        the profile with the given index will be updated.
 
         Profiles are represented as dictionaries of properties, and any of the
         3GPP-specific properties defined in the
@@ -102,7 +104,9 @@
         Delete:
         @properties: the profile properties.
 
-        Deletes the profile with the <literal>"profile-id"</literal> given in @properties.
+        Deletes the profile with the
+        <link linkend="gdbus-property-org-freedesktop-ModemManager1-Modem-Modem3gpp-ProfileManager.IndexField">index field</link>
+        given in @properties.
 
         If additional settings are given in @properties they are ignored. This
         allows the user to easily request the deletion of a profile that has been
@@ -113,7 +117,7 @@
         cannot be fully removed. In this case, the method will succeed, but the
         size of the list of profiles will not change.
 
-        This method will fail if <literal>"profile-id"</literal> is not given.
+        This method will fail if the expected index field is not given.
 
         The operation may fail if it is attempting to delete a profile
         for which connected bearer objects already exist. In this case,
@@ -141,6 +145,20 @@
         Since: 1.18
     -->
     <signal name="Updated" />
+
+    <!--
+        IndexField:
+
+        Indicates which field should be considered as unique index, depending
+        on the underlying protocol.
+
+        This will be 'profile-id' by default for all implementations, and only
+        set to 'apn-type' for MBIM devices implementing the Microsoft profile
+        management interface extensions.
+
+        Since: 1.20
+    -->
+    <property name="IndexField" type="s" access="read" />
 
   </interface>
 </node>
