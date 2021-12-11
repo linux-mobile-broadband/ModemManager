@@ -1730,15 +1730,15 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_packet_service_state >*/
 } MMModem3gppPacketServiceState;
 
 /**
-* MMSimType:
-* @MM_SIM_TYPE_UNKNOWN: SIM type is not known.
-* @MM_SIM_TYPE_PHYSICAL: SIM is a pysical SIM.
-* @MM_SIM_TYPE_ESIM: SIM is a ESIM.
-*
-* SIM type indicating whether ESIM or not
-*
-* Since: 1.20
-*/
+ * MMSimType:
+ * @MM_SIM_TYPE_UNKNOWN: SIM type is not known.
+ * @MM_SIM_TYPE_PHYSICAL: SIM is a pysical SIM.
+ * @MM_SIM_TYPE_ESIM: SIM is a ESIM.
+ *
+ * SIM type indicating whether ESIM or not
+ *
+ * Since: 1.20
+ */
 typedef enum { /*< underscore_name=mm_sim_type >*/
     MM_SIM_TYPE_UNKNOWN  = 0,
     MM_SIM_TYPE_PHYSICAL = 1,
@@ -1746,15 +1746,15 @@ typedef enum { /*< underscore_name=mm_sim_type >*/
 } MMSimType;
 
 /**
-* MMSimEsimStatus:
-* @MM_SIM_ESIM_STATUS_UNKNOWN: ESIM status unknown.
-* @MM_SIM_ESIM_STATUS_NO_PROFILES: ESIM with no profiles.
-* @MM_SIM_ESIM_STATUS_WITH_PROFILES: ESIM with profiles.
-*
-* Status of the profiles for ESIM
-*
-* Since: 1.20
-*/
+ * MMSimEsimStatus:
+ * @MM_SIM_ESIM_STATUS_UNKNOWN: ESIM status unknown.
+ * @MM_SIM_ESIM_STATUS_NO_PROFILES: ESIM with no profiles.
+ * @MM_SIM_ESIM_STATUS_WITH_PROFILES: ESIM with profiles.
+ *
+ * Status of the profiles for ESIM
+ *
+ * Since: 1.20
+ */
 typedef enum { /*< underscore_name=mm_sim_esim_status >*/
     MM_SIM_ESIM_STATUS_UNKNOWN       = 0,
     MM_SIM_ESIM_STATUS_NO_PROFILES   = 1,
@@ -1762,15 +1762,15 @@ typedef enum { /*< underscore_name=mm_sim_esim_status >*/
 } MMSimEsimStatus;
 
 /**
-* MMSimRemovability:
-* @MM_SIM_REMOVABILITY_UNKNOWN: SIM removability not known.
-* @MM_SIM_REMOVABILITY_REMOVABLE: SIM is a removable SIM.
-* @MM_SIM_REMOVABILITY_NOT_REMOVABLE: SIM is not a removable SIM.
-*
-* Respresents SIM removability of the current SIM.
-*
-* Since: 1.20
-*/
+ * MMSimRemovability:
+ * @MM_SIM_REMOVABILITY_UNKNOWN: SIM removability not known.
+ * @MM_SIM_REMOVABILITY_REMOVABLE: SIM is a removable SIM.
+ * @MM_SIM_REMOVABILITY_NOT_REMOVABLE: SIM is not a removable SIM.
+ *
+ * Respresents SIM removability of the current SIM.
+ *
+ * Since: 1.20
+ */
 typedef enum { /*< underscore_name=mm_sim_removability >*/
     MM_SIM_REMOVABILITY_UNKNOWN       = 0,
     MM_SIM_REMOVABILITY_REMOVABLE     = 1,
