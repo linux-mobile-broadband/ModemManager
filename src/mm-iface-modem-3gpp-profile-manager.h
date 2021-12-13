@@ -101,6 +101,7 @@ struct _MMIfaceModem3gppProfileManager {
     /* Delete */
     void     (* delete_profile)        (MMIfaceModem3gppProfileManager  *self,
                                         MM3gppProfile                   *requested,
+                                        const gchar                     *index_field,
                                         GAsyncReadyCallback              callback,
                                         gpointer                         user_data);
     gboolean (* delete_profile_finish) (MMIfaceModem3gppProfileManager  *self,
@@ -177,10 +178,13 @@ struct _MMIfaceModem3gppProfileManager {
     /* Store profile (substep of 'set profiles') */
     void     (* store_profile)        (MMIfaceModem3gppProfileManager  *self,
                                        MM3gppProfile                   *requested,
+                                       const gchar                     *index_field,
                                        GAsyncReadyCallback              callback,
                                        gpointer                         user_data);
-    gint     (* store_profile_finish) (MMIfaceModem3gppProfileManager  *self,
+    gboolean (* store_profile_finish) (MMIfaceModem3gppProfileManager  *self,
                                        GAsyncResult                    *res,
+                                       gint                            *out_profile_id,
+                                       MMBearerApnType                 *out_apn_type,
                                        GError                         **error);
 };
 
@@ -238,6 +242,7 @@ gboolean       mm_iface_modem_3gpp_profile_manager_list_profiles_finish (MMIface
                                                                          GError                         **error);
 void           mm_iface_modem_3gpp_profile_manager_set_profile          (MMIfaceModem3gppProfileManager  *self,
                                                                          MM3gppProfile                   *requested,
+                                                                         const gchar                     *index_field,
                                                                          gboolean                         strict,
                                                                          GAsyncReadyCallback              callback,
                                                                          gpointer                         user_data);

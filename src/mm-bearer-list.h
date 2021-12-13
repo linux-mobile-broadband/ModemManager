@@ -76,6 +76,8 @@ MMBaseBearer *mm_bearer_list_find_by_path       (MMBearerList       *self,
                                                  const gchar        *path);
 MMBaseBearer *mm_bearer_list_find_by_profile_id (MMBearerList       *self,
                                                  gint                profile_id);
+MMBaseBearer *mm_bearer_list_find_by_apn_type   (MMBearerList       *self,
+                                                 MMBearerApnType     apn_type);
 
 void     mm_bearer_list_disconnect_all_bearers        (MMBearerList *self,
                                                        GAsyncReadyCallback callback,

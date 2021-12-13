@@ -479,6 +479,10 @@ MM3gppProfile *mm_3gpp_profile_list_find_by_profile_id (GList   *profile_list,
                                                         gint     profile_id,
                                                         GError **error);
 
+MM3gppProfile *mm_3gpp_profile_list_find_by_apn_type (GList            *profile_list,
+                                                      MMBearerApnType   apn_type,
+                                                      GError          **error);
+
 /*****************************************************************************/
 /* CDMA specific helpers and utilities */
 /*****************************************************************************/

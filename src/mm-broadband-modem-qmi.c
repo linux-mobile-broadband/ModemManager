@@ -6118,18 +6118,24 @@ store_profile_context_free (StoreProfileContext *ctx)
     g_slice_free (StoreProfileContext, ctx);
 }
 
-static gint
+static gboolean
 modem_3gpp_profile_manager_store_profile_finish (MMIfaceModem3gppProfileManager  *self,
                                                  GAsyncResult                    *res,
+                                                 gint                            *out_profile_id,
+                                                 MMBearerApnType                 *out_apn_type,
                                                  GError                         **error)
 {
     StoreProfileContext *ctx;
 
     if (!g_task_propagate_boolean (G_TASK (res), error))
-        return MM_3GPP_PROFILE_ID_UNKNOWN;
+        return FALSE;
 
     ctx = g_task_get_task_data (G_TASK (res));
-    return ctx->profile_id;
+    if (out_profile_id)
+        *out_profile_id = ctx->profile_id;
+    if (out_apn_type)
+        *out_apn_type = MM_BEARER_APN_TYPE_NONE;
+    return TRUE;
 }
 
 static void store_profile_run (GTask *task);
@@ -6274,6 +6280,7 @@ store_profile_run (GTask *task)
 static void
 modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
                                           MM3gppProfile                  *profile,
+                                          const gchar                    *index_field,
                                           GAsyncReadyCallback             callback,
                                           gpointer                        user_data)
 {
@@ -6283,6 +6290,8 @@ modem_3gpp_profile_manager_store_profile (MMIfaceModem3gppProfileManager *self,
     MMBearerIpFamily      ip_type;
     MMBearerApnType       apn_type;
     MMBearerAllowedAuth   allowed_auth;
+
+    g_assert (g_strcmp0 (index_field, "profile-id") == 0);
 
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
                                       QMI_SERVICE_WDS, &client,
@@ -6363,6 +6372,7 @@ delete_profile_ready (QmiClientWds *client,
 static void
 modem_3gpp_profile_manager_delete_profile (MMIfaceModem3gppProfileManager *self,
                                            MM3gppProfile                  *profile,
+                                           const gchar                    *index_field,
                                            GAsyncReadyCallback             callback,
                                            gpointer                        user_data)
 {
@@ -6370,6 +6380,8 @@ modem_3gpp_profile_manager_delete_profile (MMIfaceModem3gppProfileManager *self,
     QmiClient *client = NULL;
     gint       profile_id;
     g_autoptr(QmiMessageWdsDeleteProfileInput) input = NULL;
+
+    g_assert (g_strcmp0 (index_field, "profile-id") == 0);
 
     if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
                                       QMI_SERVICE_WDS, &client,
@@ -10164,6 +10176,7 @@ set_initial_eps_bearer_modify_profile (GTask *task)
 
     mm_iface_modem_3gpp_profile_manager_set_profile (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
                                                      ctx->profile,
+                                                     "profile-id",
                                                      TRUE,
                                                      (GAsyncReadyCallback)set_initial_eps_bearer_modify_profile_ready,
                                                      task);

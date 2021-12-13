@@ -1427,6 +1427,15 @@ mm_base_bearer_get_profile_id (MMBaseBearer *self)
     return mm_gdbus_bearer_get_profile_id (MM_GDBUS_BEARER (self));
 }
 
+MMBearerApnType
+mm_base_bearer_get_apn_type (MMBaseBearer *self)
+{
+    /* when none explicitly requested, apn type always defaults to internet */
+    return (self->priv->config ?
+            mm_bearer_properties_get_apn_type (self->priv->config) :
+            MM_BEARER_APN_TYPE_DEFAULT);
+}
+
 /*****************************************************************************/
 
 static void

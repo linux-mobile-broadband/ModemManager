@@ -197,6 +197,7 @@ MMBearerStatus      mm_base_bearer_get_status     (MMBaseBearer *self);
 MMBearerProperties *mm_base_bearer_peek_config    (MMBaseBearer *self);
 MMBearerProperties *mm_base_bearer_get_config     (MMBaseBearer *self);
 gint                mm_base_bearer_get_profile_id (MMBaseBearer *self);
+MMBearerApnType     mm_base_bearer_get_apn_type   (MMBaseBearer *self);
 
 void     mm_base_bearer_connect        (MMBaseBearer *self,
                                         GAsyncReadyCallback callback,

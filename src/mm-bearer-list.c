@@ -171,6 +171,22 @@ mm_bearer_list_find_by_profile_id (MMBearerList *self,
     return NULL;
 }
 
+MMBaseBearer *
+mm_bearer_list_find_by_apn_type (MMBearerList    *self,
+                                 MMBearerApnType  apn_type)
+{
+    GList *l;
+
+    g_assert (apn_type != MM_BEARER_APN_TYPE_NONE);
+
+    for (l = self->priv->bearers; l; l = g_list_next (l)) {
+        if (mm_base_bearer_get_apn_type (MM_BASE_BEARER (l->data)) == apn_type)
+            return g_object_ref (l->data);
+    }
+
+    return NULL;
+}
+
 /*****************************************************************************/
 
 typedef struct {

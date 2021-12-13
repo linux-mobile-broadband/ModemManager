@@ -660,6 +660,7 @@ select_profile_3gpp (MMBroadbandBearer   *self,
         mm_iface_modem_3gpp_profile_manager_set_profile (
             MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (modem),
             mm_bearer_properties_peek_3gpp_profile (bearer_properties),
+            "profile-id",
             FALSE, /* not strict! */
             (GAsyncReadyCallback)select_profile_3gpp_set_profile_ready,
             task);

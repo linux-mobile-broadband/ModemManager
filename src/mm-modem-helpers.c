@@ -1549,6 +1549,27 @@ mm_3gpp_profile_list_find_by_profile_id (GList   *profile_list,
     return NULL;
 }
 
+MM3gppProfile *
+mm_3gpp_profile_list_find_by_apn_type (GList            *profile_list,
+                                       MMBearerApnType   apn_type,
+                                       GError          **error)
+{
+    g_autofree gchar *apn_type_str = NULL;
+    GList             *l;
+
+    for (l = profile_list; l; l = g_list_next (l)) {
+        MM3gppProfile *iter_profile = l->data;
+
+        if (mm_3gpp_profile_get_apn_type (iter_profile) == apn_type)
+            return g_object_ref (iter_profile);
+    }
+
+    apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
+                 "Profile '%s' not found", apn_type_str);
+    return NULL;
+}
+
 gint
 mm_3gpp_profile_list_find_empty (GList   *profile_list,
                                  gint     min_profile_id,

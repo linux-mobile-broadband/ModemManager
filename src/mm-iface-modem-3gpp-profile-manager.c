@@ -59,24 +59,39 @@ mm_iface_modem_3gpp_profile_manager_updated (MMIfaceModem3gppProfileManager *sel
 
 static gboolean
 profile_manager_fail_if_connected_bearer (MMIfaceModem3gppProfileManager  *self,
+                                          const gchar                     *index_field,
                                           gint                             profile_id,
+                                          MMBearerApnType                  apn_type,
                                           GError                         **error)
 {
     g_autoptr(MMBearerList) bearer_list = NULL;
     g_autoptr(MMBaseBearer) bearer = NULL;
 
-    g_assert (profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
-
     g_object_get (self, MM_IFACE_MODEM_BEARER_LIST, &bearer_list, NULL);
-    if (bearer_list)
-        bearer = mm_bearer_list_find_by_profile_id (bearer_list, profile_id);
+    if (bearer_list) {
+        if (g_strcmp0 (index_field, "profile-id") == 0)
+            bearer = mm_bearer_list_find_by_profile_id (bearer_list, profile_id);
+        else if (g_strcmp0 (index_field, "apn-type") == 0)
+            bearer = mm_bearer_list_find_by_apn_type (bearer_list, apn_type);
+        else
+            g_assert_not_reached ();
+    }
 
     /* If a bearer is found reporting the profile id we're targeting to use,
      * it means we have a known connected bearer, and we must abort the
      * operation right away. */
     if (bearer) {
-        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
-                     "Cannot use profile %d: found an already connected bearer", profile_id);
+        if (g_strcmp0 (index_field, "profile-id") == 0) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
+                         "Cannot use profile %d: found an already connected bearer", profile_id);
+        } else if (g_strcmp0 (index_field, "apn-type") == 0) {
+            g_autofree gchar *apn_type_str;
+
+            apn_type_str = mm_bearer_apn_type_build_string_from_mask (apn_type);
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_CONNECTED,
+                         "Cannot use profile %s: found an already connected bearer", apn_type_str);
+        } else
+            g_assert_not_reached ();
         return FALSE;
     }
 
@@ -101,6 +116,8 @@ typedef enum {
 typedef struct {
     SetProfileStep         step;
     MM3gppProfile         *requested;
+    gchar                 *index_field;
+    gchar                 *index_field_value_str;
     gboolean               strict;
     gboolean               new_id;
     gint                   min_profile_id;
@@ -108,6 +125,8 @@ typedef struct {
     GEqualFunc             profile_apn_cmp;
     MM3gppProfileCmpFlags  profile_cmp_flags;
     gint                   profile_id;
+    MMBearerApnType        apn_type;
+    gchar                 *apn_type_str;
     GList                 *before_list;
     MM3gppProfile         *stored;
 } SetProfileContext;
@@ -118,6 +137,9 @@ set_profile_context_free (SetProfileContext *ctx)
     mm_3gpp_profile_list_free (ctx->before_list);
     g_clear_object (&ctx->requested);
     g_clear_object (&ctx->stored);
+    g_free (ctx->apn_type_str);
+    g_free (ctx->index_field);
+    g_free (ctx->index_field_value_str);
     g_slice_free (SetProfileContext, ctx);
 }
 
@@ -177,11 +199,11 @@ profile_manager_store_profile_ready (MMIfaceModem3gppProfileManager *self,
     SetProfileContext *ctx;
     GError            *error = NULL;
     gint               profile_id;
+    MMBearerApnType    apn_type;
 
     ctx = g_task_get_task_data (task);
 
-    profile_id = MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->store_profile_finish (self, res, &error);
-    if (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
+    if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->store_profile_finish (self, res, &profile_id, &apn_type, &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -189,11 +211,16 @@ profile_manager_store_profile_ready (MMIfaceModem3gppProfileManager *self,
 
     /* when creating a new profile with an unbound input profile id, store the
      * one received after store */
-    if (ctx->profile_id == MM_3GPP_PROFILE_ID_UNKNOWN)
-        ctx->profile_id = profile_id;
+    if (g_strcmp0 (ctx->index_field, "profile-id") == 0) {
+        if (ctx->profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
+            ctx->profile_id = profile_id;
+            g_free (ctx->index_field_value_str);
+            ctx->index_field_value_str = g_strdup_printf ("%d", ctx->profile_id);
+        }
+        g_assert (ctx->profile_id == profile_id);
+    }
 
-    g_assert (ctx->profile_id == profile_id);
-    mm_obj_dbg (self, "stored profile with id '%d'", ctx->profile_id);
+    mm_obj_dbg (self, "stored profile '%s'", ctx->index_field_value_str);
 
     ctx->step++;
     set_profile_step (task);
@@ -213,6 +240,7 @@ set_profile_step_store_profile (GTask *task)
     MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->store_profile (
         self,
         ctx->requested,
+        ctx->index_field,
         (GAsyncReadyCallback) profile_manager_store_profile_ready,
         task);
 }
@@ -229,9 +257,9 @@ profile_manager_deactivate_profile_ready (MMIfaceModem3gppProfileManager *self,
 
     /* profile deactivation errors aren't fatal per se */
     if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->deactivate_profile_finish (self, res, &error))
-        mm_obj_dbg (self, "couldn't deactivate profile with id '%d': %s", ctx->profile_id, error->message);
+        mm_obj_dbg (self, "couldn't deactivate profile '%s': %s", ctx->index_field_value_str, error->message);
     else
-        mm_obj_dbg (self, "deactivated profile with id '%d'", ctx->profile_id);
+        mm_obj_dbg (self, "deactivated profile '%s'", ctx->index_field_value_str);
 
     ctx->step++;
     set_profile_step (task);
@@ -278,14 +306,14 @@ profile_manager_check_activated_profile_ready (MMIfaceModem3gppProfileManager *s
     ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->check_activated_profile_finish (self, res, &activated, &error)) {
-        mm_obj_dbg (self, "couldn't check if profile '%d' is activated: %s", ctx->profile_id, error->message);
+        mm_obj_dbg (self, "couldn't check if profile '%s' is activated: %s", ctx->index_field_value_str, error->message);
         ctx->step = SET_PROFILE_STEP_DEACTIVATE_PROFILE;
     }
     else if (activated) {
-        mm_obj_dbg (self, "profile '%d' is activated", ctx->profile_id);
+        mm_obj_dbg (self, "profile '%s' is activated", ctx->index_field_value_str);
         ctx->step = SET_PROFILE_STEP_DEACTIVATE_PROFILE;
     } else {
-        mm_obj_dbg (self, "profile '%d' is not activated", ctx->profile_id);
+        mm_obj_dbg (self, "profile '%s' is not activated", ctx->index_field_value_str);
         ctx->step = SET_PROFILE_STEP_STORE_PROFILE;
     }
     set_profile_step (task);
@@ -301,11 +329,16 @@ set_profile_step_check_activated_profile (GTask *task)
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
-    g_assert (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
+    g_assert (((g_strcmp0 (ctx->index_field, "profile-id") == 0) && (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)) ||
+              ((g_strcmp0 (ctx->index_field, "apn-type") == 0) && (ctx->apn_type != MM_BEARER_APN_TYPE_NONE)));
 
     /* First, a quick check on our own bearer list. If we have a known bearer
      * connected using the same profile id, we fail the operation right away. */
-    if (!profile_manager_fail_if_connected_bearer (self, ctx->profile_id, &error)) {
+    if (!profile_manager_fail_if_connected_bearer (self,
+                                                   ctx->index_field,
+                                                   ctx->profile_id,
+                                                   ctx->apn_type,
+                                                   &error)) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
@@ -338,12 +371,19 @@ set_profile_step_select_profile_exact (GTask *task)
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
-    g_assert (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
-
     /* Look for the exact profile we want to use */
-    existing = mm_3gpp_profile_list_find_by_profile_id (ctx->before_list,
-                                                        ctx->profile_id,
-                                                        &error);
+    if (g_strcmp0 (ctx->index_field, "profile-id") == 0) {
+        g_assert (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
+        existing = mm_3gpp_profile_list_find_by_profile_id (ctx->before_list,
+                                                            ctx->profile_id,
+                                                            &error);
+    } else if (g_strcmp0 (ctx->index_field, "apn-type") == 0) {
+        g_assert (ctx->apn_type != MM_BEARER_APN_TYPE_NONE);
+        existing = mm_3gpp_profile_list_find_by_apn_type (ctx->before_list,
+                                                          ctx->apn_type,
+                                                          &error);
+    } else
+        g_assert_not_reached ();
     if (!existing) {
         g_task_return_error (task, error);
         g_object_unref (task);
@@ -352,10 +392,10 @@ set_profile_step_select_profile_exact (GTask *task)
 
     /* If the profile is 100% equal to what we require, nothing to do */
     if (mm_3gpp_profile_cmp (existing, ctx->requested, ctx->profile_apn_cmp, ctx->profile_cmp_flags)) {
+        mm_obj_dbg (self, "reusing profile '%s'", ctx->index_field_value_str);
         ctx->stored = g_object_ref (existing);
-        mm_obj_dbg (self, "reusing profile '%d'", ctx->profile_id);
     } else
-        mm_obj_dbg (self, "overwriting profile '%d'", ctx->profile_id);
+        mm_obj_dbg (self, "overwritting profile '%s'", ctx->index_field_value_str);
 
     ctx->step++;
     set_profile_step (task);
@@ -371,6 +411,7 @@ set_profile_step_select_profile_new (GTask *task)
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
+    g_assert (g_strcmp0 (ctx->index_field, "profile-id") == 0);
     g_assert (ctx->profile_id == MM_3GPP_PROFILE_ID_UNKNOWN);
     g_assert (ctx->strict);
 
@@ -404,6 +445,7 @@ set_profile_step_select_profile_best (GTask *task)
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
 
+    g_assert (g_strcmp0 (ctx->index_field, "profile-id") == 0);
     g_assert (ctx->profile_id == MM_3GPP_PROFILE_ID_UNKNOWN);
     g_assert (!ctx->strict);
 
@@ -532,12 +574,14 @@ set_profile_step (GTask *task)
         return;
 
     case SET_PROFILE_STEP_SELECT_PROFILE:
-        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+        if (((g_strcmp0 (ctx->index_field, "profile-id") == 0) && (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)) ||
+            (g_strcmp0 (ctx->index_field, "apn-type") == 0)) {
             mm_obj_dbg (self, "set profile state (%d/%d): select profile (exact)",
                         ctx->step, SET_PROFILE_STEP_LAST);
             set_profile_step_select_profile_exact (task);
             return;
         }
+        /* when using profile-id, allow non-strict and new */
         if (!ctx->strict) {
             mm_obj_dbg (self, "set profile state (%d/%d): select profile (best)",
                         ctx->step, SET_PROFILE_STEP_LAST);
@@ -560,7 +604,8 @@ set_profile_step (GTask *task)
         /* If the modem/protocol doesn't allow preselecting the profile id of
          * a new profile we're going to create, then we won't have a profile id
          * set at this point. If so, just skip this step. */
-        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+        if (((g_strcmp0 (ctx->index_field, "profile-id") == 0) && (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)) ||
+            (g_strcmp0 (ctx->index_field, "apn-type") == 0)) {
             mm_obj_dbg (self, "set profile state (%d/%d): check activated profile",
                         ctx->step, SET_PROFILE_STEP_LAST);
             set_profile_step_check_activated_profile (task);
@@ -573,7 +618,8 @@ set_profile_step (GTask *task)
         /* If the modem/protocol doesn't allow preselecting the profile id of
          * a new profile we're going to create, then we won't have a profile id
          * set at this point. If so, just skip this step. */
-        if (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN) {
+        if (((g_strcmp0 (ctx->index_field, "profile-id") == 0) && (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN)) ||
+            (g_strcmp0 (ctx->index_field, "apn-type") == 0)) {
             mm_obj_dbg (self, "set profile state (%d/%d): deactivate profile",
                         ctx->step, SET_PROFILE_STEP_LAST);
             set_profile_step_deactivate_profile (task);
@@ -586,7 +632,6 @@ set_profile_step (GTask *task)
         /* if we're reusing an already existing profile, we can jump
          * to the last step now, there is no need to store any update */
         if (ctx->stored) {
-            g_assert (ctx->profile_id != MM_3GPP_PROFILE_ID_UNKNOWN);
             mm_obj_dbg (self, "set profile state (%d/%d): profile already stored",
                         ctx->step, SET_PROFILE_STEP_LAST);
             ctx->step = SET_PROFILE_STEP_LAST;
@@ -620,6 +665,7 @@ set_profile_step (GTask *task)
 void
 mm_iface_modem_3gpp_profile_manager_set_profile (MMIfaceModem3gppProfileManager *self,
                                                  MM3gppProfile                  *requested,
+                                                 const gchar                    *index_field,
                                                  gboolean                        strict,
                                                  GAsyncReadyCallback             callback,
                                                  gpointer                        user_data)
@@ -633,9 +679,32 @@ mm_iface_modem_3gpp_profile_manager_set_profile (MMIfaceModem3gppProfileManager 
     ctx = g_slice_new0 (SetProfileContext);
     ctx->step = SET_PROFILE_STEP_FIRST;
     ctx->requested = g_object_ref (requested);
+    ctx->index_field = g_strdup (index_field);
     ctx->strict = strict;
     ctx->profile_id = mm_3gpp_profile_get_profile_id (requested);
+    ctx->apn_type = mm_3gpp_profile_get_apn_type (requested);
+    ctx->apn_type_str = mm_bearer_apn_type_build_string_from_mask (ctx->apn_type);
     g_task_set_task_data (task, ctx, (GDestroyNotify)set_profile_context_free);
+
+    /* Validate input setup:
+     * - allow 'profile-id' as index field, both strict and not strict.
+     * - allow 'apn-type' as index field, always strict.
+     */
+    if (g_strcmp0 (ctx->index_field, "profile-id") == 0)
+        ctx->index_field_value_str = g_strdup_printf ("%d", ctx->profile_id);
+    else if (g_strcmp0 (ctx->index_field, "apn-type") == 0) {
+        g_assert (ctx->strict);
+        ctx->index_field_value_str = g_strdup (ctx->apn_type_str);
+        /* when using apn-type as index, the field is mandatory because both "create"
+         * and "update" are actually the same operation. */
+        if (ctx->apn_type == MM_BEARER_APN_TYPE_NONE) {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                     "Missing index field ('apn-type') in profile settings");
+            g_object_unref (task);
+            return;
+        }
+    } else
+        g_assert_not_reached ();
 
     /* normalize IP family right away */
     ip_family = mm_3gpp_profile_get_ip_type (requested);
@@ -944,8 +1013,11 @@ handle_set_auth_ready (MMBaseModem      *self,
                        GAsyncResult     *res,
                        HandleSetContext *ctx)
 {
+    const gchar              *index_field;
     GError                   *error = NULL;
     g_autoptr(MM3gppProfile)  profile_requested = NULL;
+    gint                      profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
+    MMBearerApnType           apn_type = MM_BEARER_APN_TYPE_NONE;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -974,11 +1046,32 @@ handle_set_auth_ready (MMBaseModem      *self,
         return;
     }
 
+    index_field = mm_gdbus_modem3gpp_profile_manager_get_index_field (ctx->skeleton);
+    if (g_strcmp0 (index_field, "profile-id") == 0) {
+        profile_id = mm_3gpp_profile_get_profile_id (profile_requested);
+        if (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
+            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                           "Missing index field ('profile-id') in profile settings");
+            handle_set_context_free (ctx);
+            return;
+        }
+    } else if (g_strcmp0 (index_field, "apn-type") == 0) {
+        apn_type = mm_3gpp_profile_get_apn_type (profile_requested);
+        if (apn_type == MM_BEARER_APN_TYPE_NONE) {
+            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                           "Missing index field ('apn-type') in profile settings");
+            handle_set_context_free (ctx);
+            return;
+        }
+    } else
+        g_assert_not_reached ();
+
     /* Don't call the class callback directly, use the common helper method
      * that is also used by other internal operations. */
     mm_iface_modem_3gpp_profile_manager_set_profile (
         MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
         profile_requested,
+        index_field,
         TRUE, /* strict always! */
         (GAsyncReadyCallback)set_profile_ready,
         ctx);
@@ -1044,9 +1137,11 @@ handle_delete_auth_ready (MMBaseModem         *self,
                           GAsyncResult        *res,
                           HandleDeleteContext *ctx)
 {
-    gint                      profile_id;
+    const gchar              *index_field;
     GError                   *error = NULL;
     g_autoptr(MM3gppProfile)  profile = NULL;
+    gint                      profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
+    MMBearerApnType           apn_type = MM_BEARER_APN_TYPE_NONE;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -1083,15 +1178,31 @@ handle_delete_auth_ready (MMBaseModem         *self,
         return;
     }
 
-    profile_id = mm_3gpp_profile_get_profile_id (profile);
-    if (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
-        g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                                       "Missing 'profile-id' in profile settings");
-        handle_delete_context_free (ctx);
-        return;
-    }
+    index_field = mm_gdbus_modem3gpp_profile_manager_get_index_field (ctx->skeleton);
+    if (g_strcmp0 (index_field, "profile-id") == 0) {
+        profile_id = mm_3gpp_profile_get_profile_id (profile);
+        if (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
+            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                           "Missing index field ('profile-id') in profile settings");
+            handle_delete_context_free (ctx);
+            return;
+        }
+    } else if (g_strcmp0 (index_field, "apn-type") == 0) {
+        apn_type = mm_3gpp_profile_get_apn_type (profile);
+        if (apn_type == MM_BEARER_APN_TYPE_NONE) {
+            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                                           "Missing index field ('apn-type') in profile settings");
+            handle_delete_context_free (ctx);
+            return;
+        }
+    } else
+        g_assert_not_reached ();
 
-    if (!profile_manager_fail_if_connected_bearer (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self), profile_id, &error)) {
+    if (!profile_manager_fail_if_connected_bearer (MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
+                                                   index_field,
+                                                   profile_id,
+                                                   apn_type,
+                                                   &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_delete_context_free (ctx);
         return;
@@ -1100,6 +1211,7 @@ handle_delete_auth_ready (MMBaseModem         *self,
     MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->delete_profile (
         MM_IFACE_MODEM_3GPP_PROFILE_MANAGER (self),
         profile,
+        index_field,
         (GAsyncReadyCallback)delete_profile_ready,
         ctx);
 }
