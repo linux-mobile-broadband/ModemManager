@@ -77,7 +77,6 @@ typedef struct {
     Feature            feature_nas_ssp_extended_lte_band_preference;
     Feature            feature_nas_ssp_acquisition_order_preference;
     GArray            *feature_nas_ssp_acquisition_order_preference_array;
-    gboolean           disable_4g_only_mode;
     GArray            *supported_bands;
 
     /* Location helpers */
@@ -1133,35 +1132,23 @@ mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
      * switching only when switching GSM/UMTS+CDMA/EVDO multimode devices, and only if
      * we have support for the commands doing it.
      */
+#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
     if (priv->feature_nas_tp == FEATURE_SUPPORTED || priv->feature_nas_ssp == FEATURE_SUPPORTED) {
-        if (mask == (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)) {
-            /* Multimode GSM/UMTS+CDMA/EVDO device switched to GSM/UMTS only */
-            single = MM_MODEM_CAPABILITY_GSM_UMTS;
+        if ((mask & MULTIMODE) == MULTIMODE) {
+            /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to GSM/UMTS+(LTE/5GNR) device */
+            single = MM_MODEM_CAPABILITY_GSM_UMTS | (MULTIMODE ^ mask);
             g_array_append_val (supported_combinations, single);
-            /* Multimode GSM/UMTS+CDMA/EVDO device switched to CDMA/EVDO only */
-            single = MM_MODEM_CAPABILITY_CDMA_EVDO;
-            g_array_append_val (supported_combinations, single);
-        } else if (mask == (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE)) {
-            /* Multimode GSM/UMTS+CDMA/EVDO+LTE device switched to GSM/UMTS+LTE only */
-            single = MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE;
-            g_array_append_val (supported_combinations, single);
-            /* Multimode GSM/UMTS+CDMA/EVDO+LTE device switched to CDMA/EVDO+LTE only */
-            single = MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE;
+            /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to CDMA/EVDO+(LTE/5GNR) device */
+            single = MM_MODEM_CAPABILITY_CDMA_EVDO | (MULTIMODE ^ mask);
             g_array_append_val (supported_combinations, single);
             /*
-             * Multimode GSM/UMTS+CDMA/EVDO+LTE device switched to LTE only.
+             * Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to (LTE/5GNR) device
              *
              * This case is required because we use the same methods and operations to
-             * switch capabilities and modes. For the LTE capability there is a direct
-             * related 4G mode, and so we cannot select a '4G only' mode in this device
-             * because we wouldn't be able to know the full list of current capabilities
-             * if the device was rebooted, as we would only see LTE capability. So,
-             * handle this special case so that the LTE/4G-only mode can exclusively be
-             * selected as capability switching in this kind of devices.
-             */
-            priv->disable_4g_only_mode = TRUE;
-            single = MM_MODEM_CAPABILITY_LTE;
-            g_array_append_val (supported_combinations, single);
+             * switch capabilities and modes.
+            */
+            if ((single = (MULTIMODE ^ mask)))
+                g_array_append_val (supported_combinations, single);
         }
     }
 
@@ -1731,6 +1718,7 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
 
     priv = get_private (MM_SHARED_QMI (self));
     g_assert (priv->supported_radio_interfaces);
+    g_assert (priv->current_capabilities);
 
     /* Build all, based on the supported radio interfaces */
     mask_all = MM_MODEM_MODE_NONE;
@@ -1782,34 +1770,42 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
             g_array_append_val (combinations, mode);                    \
         }                                                               \
     } while (0)
+#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
 
-    /* 2G-only, 3G-only */
-    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-    ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    if ((priv->current_capabilities & MULTIMODE)) {
+        /* 2G-only, 3G-only */
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    }
 
-    /* 4G-only mode is not possible in multimode GSM/UMTS+CDMA/EVDO+LTE
-     * devices. This configuration may be selected as "LTE only" capability
-     * instead. */
-    if (!priv->disable_4g_only_mode)
+    if (!(priv->current_capabilities & MULTIMODE)) {
+        /* 4G-only */
         ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    }
 
-    /* 2G, 3G, 4G combinations */
-    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-    ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_NONE);
+    if ((priv->current_capabilities & MULTIMODE)) {
+        /* 2G, 3G, 4G combinations */
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_NONE);
+    }
 
     /* 5G related mode combinations are only supported when NAS SSP is supported,
      * as there is no 5G support in NAS TP. */
     if (priv->feature_nas_ssp != FEATURE_UNSUPPORTED) {
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_5G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G);
+        if (!(priv->current_capabilities & MULTIMODE)) {
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_5G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        }
+        if ((priv->current_capabilities & MULTIMODE)) {
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G);
+        }
     }
 
     /* Filter out unsupported modes */

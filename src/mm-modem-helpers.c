@@ -13,6 +13,7 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <config.h>
@@ -393,7 +394,6 @@ mm_filter_supported_modes (const GArray *all,
     MMModemModeCombination all_item;
     guint i;
     GArray *filtered_combinations;
-    gboolean all_item_added = FALSE;
 
     g_return_val_if_fail (all != NULL, NULL);
     g_return_val_if_fail (all->len == 1, NULL);
@@ -416,20 +416,12 @@ mm_filter_supported_modes (const GArray *all,
              * containing all supported modes, we're already good to go. This allows us to have a
              * default with preferred != NONE (e.g. Wavecom 2G modem with allowed=CS+2G and
              * preferred=2G */
-            if (all_item.allowed == mode->allowed)
-                all_item_added = TRUE;
             g_array_append_val (filtered_combinations, *mode);
         }
     }
 
     if (filtered_combinations->len == 0)
         mm_obj_warn (log_object, "all supported mode combinations were filtered out");
-
-    /* Add default entry with the generic mask including all items */
-    if (!all_item_added) {
-        mm_obj_dbg (log_object, "adding an explicit item with all supported modes allowed");
-        g_array_append_val (filtered_combinations, all_item);
-    }
 
     mm_obj_dbg (log_object, "device supports %u different mode combinations",
                 filtered_combinations->len);
