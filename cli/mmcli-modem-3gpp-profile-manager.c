@@ -48,7 +48,7 @@ static Context *ctx;
 /* Options */
 static gboolean  list_flag;
 static gchar    *set_str;
-static gint      delete_int = MM_3GPP_PROFILE_ID_UNKNOWN;
+static gchar    *delete_str;
 
 static GOptionEntry entries[] = {
     { "3gpp-profile-manager-list", 0, 0, G_OPTION_ARG_NONE, &list_flag,
@@ -56,12 +56,12 @@ static GOptionEntry entries[] = {
       NULL
     },
     { "3gpp-profile-manager-set", 0, 0, G_OPTION_ARG_STRING, &set_str,
-      "Create or update a profile with the given settings.",
+      "Create or update (if unique key given) a profile with the given settings.",
       "[\"key=value,...\"]"
     },
-    { "3gpp-profile-manager-delete", 0, 0, G_OPTION_ARG_INT, &delete_int,
-      "Delete the profile with the given ID",
-      "[Profile ID]"
+    { "3gpp-profile-manager-delete", 0, 0, G_OPTION_ARG_STRING, &delete_str,
+      "Delete the profile with the given unique key.",
+      "[\"key=value,...\"]"
     },
     { NULL }
 };
@@ -92,7 +92,7 @@ mmcli_modem_3gpp_profile_manager_options_enabled (void)
 
     n_actions = (list_flag +
                  !!set_str +
-                 (delete_int != MM_3GPP_PROFILE_ID_UNKNOWN));
+                 !!delete_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many 3GPP profile management actions requested\n");
@@ -165,6 +165,30 @@ delete_ready (MMModem3gppProfileManager *modem_3gpp_profile_manager,
     delete_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
+}
+
+static MM3gppProfile *
+delete_build_input (const gchar  *str,
+                    GError      **error)
+{
+    /* Legacy command format, expecting just an integer */
+    if (!strchr (delete_str, '=')) {
+        MM3gppProfile *profile;
+        guint          delete_int;
+
+        if (!mm_get_uint_from_str (delete_str, &delete_int)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                         "Failed parsing string as integer");
+            return NULL;
+        }
+
+        profile = mm_3gpp_profile_new ();
+        mm_3gpp_profile_set_profile_id (profile, delete_int);
+        return profile;
+    }
+
+    /* New command format, expecting a unique key value */
+    return mm_3gpp_profile_new_from_string (delete_str, error);
 }
 
 static void
@@ -268,12 +292,18 @@ get_modem_ready (GObject      *source,
     }
 
     /* Request to delete? */
-    if (delete_int != MM_3GPP_PROFILE_ID_UNKNOWN) {
+    if (delete_str) {
         g_autoptr(MM3gppProfile) profile = NULL;
+        g_autoptr(GError)        error = NULL;
 
         g_debug ("Asynchronously deleting profile...");
-        profile = mm_3gpp_profile_new ();
-        mm_3gpp_profile_set_profile_id (profile, delete_int);
+
+        profile = delete_build_input (delete_str, &error);
+        if (!profile) {
+            g_printerr ("Error parsing profile string: '%s'\n", error->message);
+            exit (EXIT_FAILURE);
+        }
+
         mm_modem_3gpp_profile_manager_delete (ctx->modem_3gpp_profile_manager,
                                               profile,
                                               ctx->cancellable,
@@ -354,13 +384,18 @@ mmcli_modem_3gpp_profile_manager_run_synchronous (GDBusConnection *connection)
     }
 
     /* Request to delete? */
-    if (delete_int != MM_3GPP_PROFILE_ID_UNKNOWN) {
-        g_autoptr(MM3gppProfile) profile = NULL;
+    if (delete_str) {
         gboolean                 result;
+        g_autoptr(MM3gppProfile) profile = NULL;
 
         g_debug ("Synchronously deleting profile...");
-        profile = mm_3gpp_profile_new ();
-        mm_3gpp_profile_set_profile_id (profile, delete_int);
+
+        profile = delete_build_input (delete_str, &error);
+        if (!profile) {
+            g_printerr ("Error parsing profile string: '%s'\n", error->message);
+            exit (EXIT_FAILURE);
+        }
+
         result = mm_modem_3gpp_profile_manager_delete_sync (ctx->modem_3gpp_profile_manager,
                                                             profile,
                                                             ctx->cancellable,
