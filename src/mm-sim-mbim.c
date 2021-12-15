@@ -73,20 +73,15 @@ update_modem_unlock_retries (MMSimMbim *self,
                              guint32 remaining_attempts)
 {
     MMBaseModem *modem = NULL;
-    MMUnlockRetries *unlock_retries;
 
     g_object_get (G_OBJECT (self),
                   MM_BASE_SIM_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
-    unlock_retries = mm_unlock_retries_new ();
-    mm_unlock_retries_set (unlock_retries,
-                           mm_modem_lock_from_mbim_pin_type (pin_type),
-                           remaining_attempts);
-    mm_iface_modem_update_unlock_retries (MM_IFACE_MODEM (modem),
-                                          unlock_retries);
-    g_object_unref (unlock_retries);
+    mm_broadband_modem_mbim_set_unlock_retries (MM_BROADBAND_MODEM_MBIM (modem),
+                                                mm_modem_lock_from_mbim_pin_type (pin_type),
+                                                remaining_attempts);
     g_object_unref (modem);
 }
 
