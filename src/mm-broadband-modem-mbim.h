@@ -62,4 +62,8 @@ MMPortMbim *mm_broadband_modem_mbim_get_port_mbim           (MMBroadbandModemMbi
 MMPortMbim *mm_broadband_modem_mbim_get_port_mbim_for_data  (MMBroadbandModemMbim  *self,
                                                              MMPort                *data,
                                                              GError               **error);
+
+void mm_broadband_modem_mbim_set_unlock_retries (MMBroadbandModemMbim *self,
+                                                 MMModemLock           lock_type,
+                                                 guint32               remaining_attempts);
 #endif /* MM_BROADBAND_MODEM_MBIM_H */

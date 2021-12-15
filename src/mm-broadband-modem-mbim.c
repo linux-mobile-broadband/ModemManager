@@ -169,6 +169,8 @@ struct _MMBroadbandModemMbimPrivate {
     /* Multi-SIM support */
     guint32 executor_index;
     guint active_slot_index;
+
+    MMUnlockRetries *unlock_retries;
 };
 
 /*****************************************************************************/
@@ -1654,51 +1656,14 @@ pin_query_unlock_retries_ready (MbimDevice *device,
             NULL,
             &remaining_attempts,
             &error)) {
-        MMIfaceModem *self;
+        MMBroadbandModemMbim *self;
         MMModemLock lock;
-        MMUnlockRetries *retries;
 
-        self = g_task_get_source_object (task);
+        self = MM_BROADBAND_MODEM_MBIM (g_task_get_source_object (task));
         lock = mm_modem_lock_from_mbim_pin_type (pin_type);
-        retries = mm_unlock_retries_new ();
 
-        /* If PIN1 is disabled and we have tried to enable it with a wrong PIN,
-         * the modem would have indicated the number of remaining attempts for
-         * PIN1 (unless PUK1 is engaged) in the response to the failed
-         * MBIM_CID_PIN set operation. Thus, MMSimMbim would have updated
-         * MMIfaceModem's MMUnlockRetries with information about PIN1.
-         *
-         * However, a MBIM_CID_PIN query may be issued (e.g. MMBaseSim calls
-         * mm_iface_modem_update_lock_info()) after the MBIM_CID_PIN set
-         * operation to query the number of remaining attempts for a PIN type.
-         * Unfortunately, we can't specify a particular PIN type in a
-         * MBIM_CID_PIN query. The modem may not reply with information about
-         * PIN1 if PIN1 is disabled. When that happens, we would like to
-         * preserve our knowledge about the number of remaining attempts for
-         * PIN1. Here we thus carry over any existing information on PIN1 from
-         * MMIfaceModem's MMUnlockRetries if the MBIM_CID_PIN query reports
-         * something other than PIN1. */
-        if (lock != MM_MODEM_LOCK_SIM_PIN) {
-            MMUnlockRetries *previous_retries;
-            guint previous_sim_pin_retries;
-
-            previous_retries = mm_iface_modem_get_unlock_retries (self);
-            previous_sim_pin_retries = mm_unlock_retries_get (previous_retries,
-                                                              MM_MODEM_LOCK_SIM_PIN);
-            if (previous_sim_pin_retries != MM_UNLOCK_RETRIES_UNKNOWN) {
-                mm_unlock_retries_set (retries,
-                                       MM_MODEM_LOCK_SIM_PIN,
-                                       previous_sim_pin_retries);
-            }
-            g_object_unref (previous_retries);
-        }
-
-        /* According to the MBIM specification, RemainingAttempts is set to
-         * 0xffffffff if the device does not support this information. */
-        if (remaining_attempts != G_MAXUINT32)
-            mm_unlock_retries_set (retries, lock, remaining_attempts);
-
-        g_task_return_pointer (task, retries, g_object_unref);
+        mm_broadband_modem_mbim_set_unlock_retries (self, lock, remaining_attempts);
+        g_task_return_pointer (task, g_object_ref (self->priv->unlock_retries), g_object_unref);
     } else
         g_task_return_error (task, error);
 
@@ -1730,6 +1695,24 @@ modem_load_unlock_retries (MMIfaceModem *self,
                          (GAsyncReadyCallback)pin_query_unlock_retries_ready,
                          task);
     mbim_message_unref (message);
+}
+
+void
+mm_broadband_modem_mbim_set_unlock_retries (MMBroadbandModemMbim *self,
+                                            MMModemLock           lock_type,
+                                            guint32               remaining_attempts)
+{
+    g_assert (MM_IS_BROADBAND_MODEM_MBIM (self));
+
+    if (!self->priv->unlock_retries)
+        self->priv->unlock_retries = mm_unlock_retries_new ();
+
+    /* According to the MBIM specification, RemainingAttempts is set to
+     * 0xffffffff if the device does not support this information. */
+    if (remaining_attempts != G_MAXUINT32)
+        mm_unlock_retries_set (self->priv->unlock_retries,
+                               lock_type,
+                               remaining_attempts);
 }
 
 /*****************************************************************************/
@@ -8991,6 +8974,8 @@ dispose (GObject *object)
         if (mm_port_mbim_is_open (mbim))
             mm_port_mbim_close (mbim, NULL, NULL);
     }
+
+    g_clear_object (&self->priv->unlock_retries);
 
     G_OBJECT_CLASS (mm_broadband_modem_mbim_parent_class)->dispose (object);
 }
