@@ -46,11 +46,16 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
+static gboolean  status_flag;
 static gboolean  list_flag;
 static gchar    *set_str;
 static gchar    *delete_str;
 
 static GOptionEntry entries[] = {
+    { "3gpp-profile-manager-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
+      "Show status of the profile management features.",
+      NULL
+    },
     { "3gpp-profile-manager-list", 0, 0, G_OPTION_ARG_NONE, &list_flag,
       "List available profiles",
       NULL
@@ -90,7 +95,8 @@ mmcli_modem_3gpp_profile_manager_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (list_flag +
+    n_actions = (status_flag +
+                 list_flag +
                  !!set_str +
                  !!delete_str);
 
@@ -98,6 +104,9 @@ mmcli_modem_3gpp_profile_manager_options_enabled (void)
         g_printerr ("error: too many 3GPP profile management actions requested\n");
         exit (EXIT_FAILURE);
     }
+
+    if (status_flag)
+        mmcli_force_sync_operation ();
 
     checked = TRUE;
     return !!n_actions;
@@ -140,6 +149,16 @@ void
 mmcli_modem_3gpp_profile_manager_shutdown (void)
 {
     context_free ();
+}
+
+static void
+print_status (void)
+{
+    const gchar *index_field;
+
+    index_field = mm_modem_3gpp_profile_manager_get_index_field (ctx->modem_3gpp_profile_manager);
+    mmcli_output_string (MMC_F_3GPP_PROFILE_MANAGER_INDEX_FIELD, index_field);
+    mmcli_output_dump ();
 }
 
 static void
@@ -261,6 +280,9 @@ get_modem_ready (GObject      *source,
 
     ensure_modem_3gpp_profile_manager ();
 
+    if (status_flag)
+        g_assert_not_reached ();
+
     /* Request to list? */
     if (list_flag) {
         g_debug ("Asynchronously listing profiles...");
@@ -349,6 +371,13 @@ mmcli_modem_3gpp_profile_manager_run_synchronous (GDBusConnection *connection)
         mmcli_force_operation_timeout (G_DBUS_PROXY (ctx->modem_3gpp_profile_manager));
 
     ensure_modem_3gpp_profile_manager ();
+
+    /* Request to get location status? */
+    if (status_flag) {
+        g_debug ("Printing profile management status...");
+        print_status ();
+        return;
+    }
 
     /* Request to list? */
     if (list_flag) {

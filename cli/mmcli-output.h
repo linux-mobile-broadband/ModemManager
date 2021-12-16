@@ -147,6 +147,7 @@ typedef enum {
     /* 3GPP scan section */
     MMC_F_3GPP_SCAN_NETWORKS,
     /* 3GPP profile management section */
+    MMC_F_3GPP_PROFILE_MANAGER_INDEX_FIELD,
     MMC_F_3GPP_PROFILE_MANAGER_LIST,
     MMC_F_3GPP_PROFILE_MANAGER_SET,
     /* USSD section */

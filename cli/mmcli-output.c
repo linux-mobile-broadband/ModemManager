@@ -146,6 +146,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_3GPP_USSD_STATUS]                         = { "modem.3gpp.ussd.status",                          "status",                   MMC_S_MODEM_3GPP_USSD,            },
     [MMC_F_3GPP_USSD_NETWORK_REQUEST]                = { "modem.3gpp.ussd.network-request",                 "network request",          MMC_S_MODEM_3GPP_USSD,            },
     [MMC_F_3GPP_USSD_NETWORK_NOTIFICATION]           = { "modem.3gpp.ussd.network-notification",            "network notification",     MMC_S_MODEM_3GPP_USSD,            },
+    [MMC_F_3GPP_PROFILE_MANAGER_INDEX_FIELD]         = { "modem.3gpp.profile-manager.index-field",          "index field",              MMC_S_MODEM_3GPP_PROFILE_MANAGER, },
     [MMC_F_3GPP_PROFILE_MANAGER_LIST]                = { "modem.3gpp.profile-manager.list",                 "list",                     MMC_S_MODEM_3GPP_PROFILE_MANAGER, },
     [MMC_F_3GPP_PROFILE_MANAGER_SET]                 = { "modem.3gpp.profile-manager.set",                  "set",                      MMC_S_MODEM_3GPP_PROFILE_MANAGER, },
     [MMC_F_CDMA_MEID]                                = { "modem.cdma.meid",                                 "meid",                     MMC_S_MODEM_CDMA,                 },
