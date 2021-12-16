@@ -3864,7 +3864,32 @@ update_access_technologies (MMBroadbandModemMbim *self)
 }
 
 static void
+atds_location_query_ready (MbimDevice           *device,
+                           GAsyncResult         *res,
+                           MMBroadbandModemMbim *self)
+{
+    g_autoptr(MbimMessage)  response = NULL;
+    GError                 *error = NULL;
+    guint32                 lac;
+    guint32                 tac;
+    guint32                 cid;
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response ||
+        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
+        !mbim_message_atds_location_response_parse (response, &lac, &tac, &cid, &error)) {
+        mm_obj_warn (self, "failed processing ATDS location query response: %s", error->message);
+        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0, 0);
+    } else {
+        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
+    }
+
+    g_object_unref (self);
+}
+
+static void
 update_registration_info (MMBroadbandModemMbim *self,
+                          MbimDevice           *device,
                           MbimRegisterState     state,
                           MbimDataClass         available_data_classes,
                           gchar                *operator_id_take,
@@ -3876,7 +3901,10 @@ update_registration_info (MMBroadbandModemMbim *self,
     MMModem3gppRegistrationState reg_state_eps;
     MMModem3gppRegistrationState reg_state_5gs;
     gboolean                     operator_updated = FALSE;
+    gboolean                     reg_state_updated = FALSE;
 
+    if (self->priv->reg_state != state)
+        reg_state_updated = TRUE;
     self->priv->reg_state = state;
 
     reg_state = mm_modem_3gpp_registration_state_from_mbim_register_state (state);
@@ -3941,6 +3969,23 @@ update_registration_info (MMBroadbandModemMbim *self,
      * operator name and code is propagated to the DBus interface */
     if (operator_updated)
         mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
+
+    /* request to reload location info */
+    if (reg_state_updated && self->priv->is_atds_location_supported) {
+        if (self->priv->reg_state < MBIM_REGISTER_STATE_HOME) {
+            mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0, 0);
+        } else {
+            g_autoptr(MbimMessage) message = NULL;
+
+            message = mbim_message_atds_location_query_new (NULL);
+            mbim_device_command (device,
+                                 message,
+                                 10,
+                                 NULL,
+                                 (GAsyncReadyCallback)atds_location_query_ready,
+                                 g_object_ref (self));
+        }
+    }
 }
 
 static void
@@ -3993,6 +4038,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
     }
 
     update_registration_info (self,
+                              device,
                               register_state,
                               available_data_classes,
                               provider_id,
@@ -4266,6 +4312,7 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     if (self->priv->packet_service_state != packet_service_state) {
         self->priv->packet_service_state = packet_service_state;
         update_registration_info (self,
+                                  device,
                                   self->priv->reg_state,
                                   self->priv->available_data_classes,
                                   NULL,
@@ -5290,32 +5337,6 @@ modem_3gpp_run_registration_checks_finish (MMIfaceModem3gpp  *self,
 }
 
 static void
-atds_location_query_ready (MbimDevice   *device,
-                           GAsyncResult *res,
-                           GTask        *task)
-{
-    g_autoptr(MbimMessage)  response = NULL;
-    MMBroadbandModemMbim   *self;
-    GError                 *error = NULL;
-    guint32                 lac;
-    guint32                 tac;
-    guint32                 cid;
-
-    self = g_task_get_source_object (task);
-
-    response = mbim_device_command_finish (device, res, &error);
-    if (!response ||
-        !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) ||
-        !mbim_message_atds_location_response_parse (response, &lac, &tac, &cid, &error)) {
-        g_task_return_error (task, error);
-    } else {
-        mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
-        g_task_return_boolean (task, TRUE);
-    }
-    g_object_unref (task);
-}
-
-static void
 register_state_query_ready (MbimDevice   *device,
                             GAsyncResult *res,
                             GTask        *task)
@@ -5379,23 +5400,11 @@ register_state_query_ready (MbimDevice   *device,
     }
 
     update_registration_info (self,
+                              device,
                               register_state,
                               available_data_classes,
                               provider_id,
                               provider_name);
-
-    if (self->priv->is_atds_location_supported) {
-        g_autoptr(MbimMessage) message = NULL;
-
-        message = mbim_message_atds_location_query_new (NULL);
-        mbim_device_command (device,
-                             message,
-                             10,
-                             NULL,
-                             (GAsyncReadyCallback)atds_location_query_ready,
-                             task);
-        return;
-    }
 
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
