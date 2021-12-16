@@ -3322,6 +3322,10 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *_self,
 /*****************************************************************************/
 /* Facility locks status loading (3GPP interface) */
 
+typedef struct {
+    MMModem3gppFacility facilities;
+} LoadEnabledFacilityLocksContext;
+
 static MMModem3gppFacility
 modem_3gpp_load_enabled_facility_locks_finish (MMIfaceModem3gpp *self,
                                                GAsyncResult *res,
@@ -3343,6 +3347,7 @@ pin_list_query_ready (MbimDevice *device,
                       GAsyncResult *res,
                       GTask *task)
 {
+    LoadEnabledFacilityLocksContext *ctx;
     MbimMessage *response;
     GError *error = NULL;
     MbimPinDesc *pin_desc_pin1;
@@ -3354,6 +3359,7 @@ pin_list_query_ready (MbimDevice *device,
     MbimPinDesc *pin_desc_service_provider_pin;
     MbimPinDesc *pin_desc_corporate_pin;
 
+    ctx = g_task_get_task_data (task);
     response = mbim_device_command_finish (device, res, &error);
     if (response &&
         mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
@@ -3370,7 +3376,7 @@ pin_list_query_ready (MbimDevice *device,
             NULL, /* pin_desc_subsidy_lock */
             NULL, /* pin_desc_custom */
             &error)) {
-        MMModem3gppFacility mask = MM_MODEM_3GPP_FACILITY_NONE;
+        MMModem3gppFacility mask = ctx->facilities;
 
         if (pin_desc_pin1->pin_mode == MBIM_PIN_MODE_ENABLED)
             mask |= MM_MODEM_3GPP_FACILITY_SIM;
@@ -3415,10 +3421,44 @@ pin_list_query_ready (MbimDevice *device,
 }
 
 static void
+load_enabled_facility_pin_query_ready (MbimDevice *device,
+                                       GAsyncResult *res,
+                                       GTask *task)
+{
+    LoadEnabledFacilityLocksContext *ctx;
+    MbimMessage *response;
+    MbimMessage *message;
+    GError *error = NULL;
+    MbimPinType pin_type;
+    MbimPinState pin_state;
+
+    ctx = g_task_get_task_data (task);
+    response = mbim_device_command_finish (device, res, &error);
+    if (response) {
+        if (mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, NULL) &&
+            mbim_message_pin_response_parse (response, &pin_type, &pin_state, NULL, NULL) &&
+            (pin_state == MBIM_PIN_STATE_LOCKED))
+            ctx->facilities |= mm_modem_3gpp_facility_from_mbim_pin_type (pin_type);
+
+        mbim_message_unref (response);
+    }
+
+    message = mbim_message_pin_list_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)pin_list_query_ready,
+                         task);
+    mbim_message_unref (message);
+}
+
+static void
 modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
                                         GAsyncReadyCallback callback,
                                         gpointer user_data)
 {
+    LoadEnabledFacilityLocksContext *ctx;
     MbimDevice *device;
     MbimMessage *message;
     GTask *task;
@@ -3427,13 +3467,19 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
         return;
 
     task = g_task_new (self, NULL, callback, user_data);
+    ctx = g_new0 (LoadEnabledFacilityLocksContext, 1);
+    g_task_set_task_data (task, ctx, g_free);
 
-    message = mbim_message_pin_list_query_new (NULL);
+    /* The PIN LIST command returns status of pin locks but omits PUK locked
+     * facilities. To workaround this limitation additional PIN command query
+     * was added to get currently active PIN or PUK lock.
+     */
+    message = mbim_message_pin_query_new (NULL);
     mbim_device_command (device,
                          message,
                          10,
                          NULL,
-                         (GAsyncReadyCallback)pin_list_query_ready,
+                         (GAsyncReadyCallback)load_enabled_facility_pin_query_ready,
                          task);
     mbim_message_unref (message);
 }
