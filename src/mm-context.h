@@ -57,5 +57,8 @@ gboolean     mm_context_get_test_quick_suspend_resume (void);
 gboolean     mm_context_get_test_no_qrtr (void);
 #endif
 gboolean     mm_context_get_test_multiplex_requested (void);
+#if defined WITH_MBIM
+gboolean     mm_context_get_test_mbimex_profile_management (void);
+#endif
 
 #endif /* MM_CONTEXT_H */

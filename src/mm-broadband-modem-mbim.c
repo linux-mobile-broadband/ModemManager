@@ -28,6 +28,7 @@
 #include "mm-sms-mbim.h"
 
 #include "ModemManager.h"
+#include "mm-context.h"
 #include "mm-log-object.h"
 #include "mm-errors-types.h"
 #include "mm-error-helpers.h"
@@ -2634,8 +2635,11 @@ query_device_services_ready (MbimDevice   *device,
                         mm_obj_dbg (self, "5GNR registration settings are supported");
                         self->priv->is_nr5g_registration_settings_supported = TRUE;
                     } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PROVISIONED_CONTEXTS) {
-                        mm_obj_dbg (self, "Profile management extension is supported");
-                        self->priv->is_profile_management_ext_supported = TRUE;
+                        if (mm_context_get_test_mbimex_profile_management ()) {
+                            mm_obj_dbg (self, "Profile management extension is supported");
+                            self->priv->is_profile_management_ext_supported = TRUE;
+                        } else
+                            mm_obj_dbg (self, "Profile management extension is supported but not allowed");
                     }
                 }
                 continue;

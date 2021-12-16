@@ -227,6 +227,9 @@ static gboolean  test_quick_suspend_resume;
 static gboolean  test_no_qrtr;
 #endif
 static gboolean  test_multiplex_requested;
+#if defined WITH_MBIM
+static gboolean  test_mbimex_profile_management;
+#endif
 
 static const GOptionEntry test_entries[] = {
     {
@@ -275,6 +278,13 @@ static const GOptionEntry test_entries[] = {
         "Default to request multiplex support if no explicitly given",
         NULL
     },
+#if defined WITH_MBIM
+    {
+        "test-mbimex-profile-management", 0, 0, G_OPTION_ARG_NONE, &test_mbimex_profile_management,
+        "Default to use profile management MBIM extensions",
+        NULL
+    },
+#endif
     { NULL }
 };
 
@@ -344,6 +354,14 @@ mm_context_get_test_multiplex_requested (void)
 {
     return test_multiplex_requested;
 }
+
+#if defined WITH_MBIM
+gboolean
+mm_context_get_test_mbimex_profile_management (void)
+{
+    return test_mbimex_profile_management;
+}
+#endif
 
 /*****************************************************************************/
 
