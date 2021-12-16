@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2012 Lanedo GmbH.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <glib.h>
@@ -68,7 +69,9 @@ test_uml290 (void)
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_capabilities_expected (&ctx,
+                                (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                 MM_MODEM_CAPABILITY_LTE));
 
     /* QCDM -> GSM/UMTS */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_GSM |
@@ -77,7 +80,9 @@ test_uml290 (void)
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_capabilities_expected (&ctx,
+                                (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                 MM_MODEM_CAPABILITY_LTE));
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0;
