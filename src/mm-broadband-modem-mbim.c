@@ -141,6 +141,7 @@ struct _MMBroadbandModemMbimPrivate {
     gchar         *requested_operator_id;
     MbimDataClass  requested_data_class; /* 0 for defaults/auto */
     GTask         *pending_allowed_modes_action;
+    gulong         enabling_signal_id;
 
     /* USSD helpers */
     GTask *pending_ussd_action;
@@ -3787,7 +3788,7 @@ modem_3gpp_set_nr5g_registration_settings (MMIfaceModem3gpp           *_self,
 }
 
 /*****************************************************************************/
-/* Common unsolicited events setup and cleanup */
+/* Signal state updates */
 
 static void
 basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
@@ -3851,17 +3852,8 @@ basic_connect_notification_signal_state (MMBroadbandModemMbim *self,
         mm_iface_modem_signal_update (MM_IFACE_MODEM_SIGNAL (self), cdma, evdo, gsm, umts, lte, nr5g);
 }
 
-static void
-update_access_technologies (MMBroadbandModemMbim *self)
-{
-    MMModemAccessTechnology act;
-
-    act = mm_modem_access_technology_from_mbim_data_class (self->priv->highest_available_data_class);
-    if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
-        act = mm_modem_access_technology_from_mbim_data_class (self->priv->available_data_classes);
-
-    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
-}
+/*****************************************************************************/
+/* ATDS location update */
 
 static void
 atds_location_query_ready (MbimDevice           *device,
@@ -3888,8 +3880,83 @@ atds_location_query_ready (MbimDevice           *device,
 }
 
 static void
+update_atds_location (MMBroadbandModemMbim *self)
+{
+    g_autoptr(MbimMessage)  message = NULL;
+    MMPortMbim             *port;
+    MbimDevice             *device;
+
+    port = mm_broadband_modem_mbim_peek_port_mbim (self);
+    if (!port)
+        return;
+    device = mm_port_mbim_peek_device (port);
+    if (!device)
+        return;
+
+    message = mbim_message_atds_location_query_new (NULL);
+    mbim_device_command (device,
+                         message,
+                         10,
+                         NULL,
+                         (GAsyncReadyCallback)atds_location_query_ready,
+                         g_object_ref (self));
+}
+
+/*****************************************************************************/
+/* Access technology updates */
+
+static void
+update_access_technologies (MMBroadbandModemMbim *self)
+{
+    MMModemAccessTechnology act;
+
+    act = mm_modem_access_technology_from_mbim_data_class (self->priv->highest_available_data_class);
+    if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+        act = mm_modem_access_technology_from_mbim_data_class (self->priv->available_data_classes);
+
+    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
+}
+
+/*****************************************************************************/
+/* Registration info updates */
+
+static void update_registration_info (MMBroadbandModemMbim *self,
+                                      gboolean              scheduled,
+                                      MbimRegisterState     state,
+                                      MbimDataClass         available_data_classes,
+                                      gchar                *operator_id_take,
+                                      gchar                *operator_name_take);
+
+static void
+enabling_state_changed (MMBroadbandModemMbim *self)
+{
+    MMModemState state;
+
+    g_object_get (self, MM_IFACE_MODEM_STATE, &state, NULL);
+
+    /* if we've reached a enabled state, we can trigger the update */
+    if (state > MM_MODEM_STATE_ENABLING) {
+        mm_obj_dbg (self, "triggering 3GPP registration info update");
+        update_registration_info (self,
+                                  TRUE,
+                                  self->priv->reg_state,
+                                  self->priv->available_data_classes,
+                                  g_strdup (self->priv->current_operator_id),
+                                  g_strdup (self->priv->current_operator_name));
+    }
+    /* if something bad happened during enabling, we can ignore any pending
+     * registration info update */
+    else if (state < MM_MODEM_STATE_ENABLING)
+        mm_obj_dbg (self, "discarding pending 3GPP registration info update");
+
+    /* this signal is expected to be fired just once */
+    g_signal_handler_disconnect (self, self->priv->enabling_signal_id);
+    self->priv->enabling_signal_id = 0;
+}
+
+static void
 update_registration_info (MMBroadbandModemMbim *self,
-                          MbimDevice           *device,
+                          gboolean              scheduled,
                           MbimRegisterState     state,
                           MbimDataClass         available_data_classes,
                           gchar                *operator_id_take,
@@ -3902,6 +3969,14 @@ update_registration_info (MMBroadbandModemMbim *self,
     MMModem3gppRegistrationState reg_state_5gs;
     gboolean                     operator_updated = FALSE;
     gboolean                     reg_state_updated = FALSE;
+    MMModemState                 modem_state;
+    gboolean                     schedule_update_in_enabled = FALSE;
+
+    /* If we're enabling, we will not attempt to update anything yet, we will
+     * instead store the info and schedule the updates for when we're enabled */
+    g_object_get (self, MM_IFACE_MODEM_STATE, &modem_state, NULL);
+    if (modem_state == MM_MODEM_STATE_ENABLING)
+        schedule_update_in_enabled = TRUE;
 
     if (self->priv->reg_state != state)
         reg_state_updated = TRUE;
@@ -3937,54 +4012,59 @@ update_registration_info (MMBroadbandModemMbim *self,
         g_free (operator_name_take);
     }
 
-    reg_state_cs = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
-    reg_state_ps = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
-    reg_state_eps = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
-    reg_state_5gs = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+    /* If we can update domain registration states right now, do it */
+    if (!schedule_update_in_enabled) {
+        reg_state_cs = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+        reg_state_ps = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+        reg_state_eps = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+        reg_state_5gs = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
 
-    if (available_data_classes & (MBIM_DATA_CLASS_GPRS  | MBIM_DATA_CLASS_EDGE  |
-                                  MBIM_DATA_CLASS_UMTS  | MBIM_DATA_CLASS_HSDPA | MBIM_DATA_CLASS_HSUPA)) {
-        reg_state_cs = reg_state;
-        if (self->priv->packet_service_state == MBIM_PACKET_SERVICE_STATE_ATTACHED)
-            reg_state_ps = reg_state;
+        if (available_data_classes & (MBIM_DATA_CLASS_GPRS  | MBIM_DATA_CLASS_EDGE  |
+                                      MBIM_DATA_CLASS_UMTS  | MBIM_DATA_CLASS_HSDPA | MBIM_DATA_CLASS_HSUPA)) {
+            reg_state_cs = reg_state;
+            if (self->priv->packet_service_state == MBIM_PACKET_SERVICE_STATE_ATTACHED)
+                reg_state_ps = reg_state;
+        }
+
+        if (available_data_classes & (MBIM_DATA_CLASS_LTE))
+            reg_state_eps = reg_state;
+
+        if (available_data_classes & (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA))
+            reg_state_5gs = reg_state;
+
+        mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_cs);
+        mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_ps);
+        if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
+            mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_eps);
+        if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
+            mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_5gs);
+
+        /* request to reload operator info explicitly, so that the new
+         * operator name and code is propagated to the DBus interface */
+        if (operator_updated || scheduled)
+            mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
     }
 
-    if (available_data_classes & (MBIM_DATA_CLASS_LTE))
-        reg_state_eps = reg_state;
-
-    if (available_data_classes & (MBIM_DATA_CLASS_5G_NSA | MBIM_DATA_CLASS_5G_SA))
-        reg_state_5gs = reg_state;
-
-    mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_cs);
-    mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_ps);
-    if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
-        mm_iface_modem_3gpp_update_eps_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_eps);
-    if (mm_iface_modem_is_3gpp_5gnr (MM_IFACE_MODEM (self)))
-        mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self), reg_state_5gs);
-
     self->priv->available_data_classes = available_data_classes;
-    update_access_technologies (self);
-
-    /* request to reload operator info explicitly, so that the new
-     * operator name and code is propagated to the DBus interface */
-    if (operator_updated)
-        mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
+    /* If we can update access technologies right now, do it */
+    if (!schedule_update_in_enabled)
+        update_access_technologies (self);
 
     /* request to reload location info */
-    if (reg_state_updated && self->priv->is_atds_location_supported) {
+    if (!schedule_update_in_enabled && self->priv->is_atds_location_supported && (reg_state_updated || scheduled)) {
         if (self->priv->reg_state < MBIM_REGISTER_STATE_HOME) {
             mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), 0, 0, 0);
-        } else {
-            g_autoptr(MbimMessage) message = NULL;
 
-            message = mbim_message_atds_location_query_new (NULL);
-            mbim_device_command (device,
-                                 message,
-                                 10,
-                                 NULL,
-                                 (GAsyncReadyCallback)atds_location_query_ready,
-                                 g_object_ref (self));
-        }
+        } else
+            update_atds_location (self);
+    }
+
+    if (schedule_update_in_enabled && !self->priv->enabling_signal_id) {
+        mm_obj_dbg (self, "Scheduled registration info update once the modem is enabled");
+        self->priv->enabling_signal_id = g_signal_connect (self,
+                                                           "notify::" MM_IFACE_MODEM_STATE,
+                                                           G_CALLBACK (enabling_state_changed),
+                                                           NULL);
     }
 }
 
@@ -4038,7 +4118,7 @@ basic_connect_notification_register_state (MMBroadbandModemMbim *self,
     }
 
     update_registration_info (self,
-                              device,
+                              FALSE,
                               register_state,
                               available_data_classes,
                               provider_id,
@@ -4312,7 +4392,7 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
     if (self->priv->packet_service_state != packet_service_state) {
         self->priv->packet_service_state = packet_service_state;
         update_registration_info (self,
-                                  device,
+                                  FALSE,
                                   self->priv->reg_state,
                                   self->priv->available_data_classes,
                                   g_strdup (self->priv->current_operator_id),
@@ -5400,7 +5480,7 @@ register_state_query_ready (MbimDevice   *device,
     }
 
     update_registration_info (self,
-                              device,
+                              FALSE,
                               register_state,
                               available_data_classes,
                               provider_id,
@@ -8493,6 +8573,11 @@ dispose (GObject *object)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (object);
     MMPortMbim *mbim;
+
+    if (self->priv->enabling_signal_id && g_signal_handler_is_connected (self, self->priv->enabling_signal_id)) {
+        g_signal_handler_disconnect (self, self->priv->enabling_signal_id);
+        self->priv->enabling_signal_id = 0;
+    }
 
     /* If any port cleanup is needed, it must be done during dispose(), as
      * the modem object will be affected by an explciit g_object_run_dispose()
