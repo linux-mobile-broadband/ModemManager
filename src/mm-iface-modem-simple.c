@@ -765,17 +765,18 @@ connect_auth_ready (MMBaseModem *self,
 
     case MM_MODEM_STATE_ENABLING:
     case MM_MODEM_STATE_DISCONNECTING:
-        /* If we are transitioning to the ENABLED/REGISTERED state,
-         * wait to get there before going on */
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_CONNECTING:
+        /* Wait to get to a final state before going on */
         ctx->step = CONNECTION_STEP_WAIT_FOR_ENABLED;
         break;
 
     case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        ctx->step = CONNECTION_STEP_ENABLE + 1;
+        /* If we are at least already enabled, start at the registration check
+         * right away */
+        ctx->step = CONNECTION_STEP_REGISTER;
         break;
 
     default:
