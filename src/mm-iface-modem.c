@@ -1762,10 +1762,10 @@ bearer_list_count_connected (MMBaseBearer *bearer,
 }
 
 static void
-__iface_modem_update_state_internal (MMIfaceModem *self,
-                                     MMModemState new_state,
-                                     MMModemStateChangeReason reason,
-                                     MMModemStateFailedReason failed_reason)
+update_state_internal (MMIfaceModem *self,
+                       MMModemState new_state,
+                       MMModemStateChangeReason reason,
+                       MMModemStateFailedReason failed_reason)
 {
     MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
     MmGdbusModem *skeleton = NULL;
@@ -1851,23 +1851,23 @@ __iface_modem_update_state_internal (MMIfaceModem *self,
 }
 
 void
-mm_iface_modem_update_state (MMIfaceModem *self,
-                             MMModemState new_state,
-                             MMModemStateChangeReason reason)
+mm_iface_modem_update_state (MMIfaceModem             *self,
+                             MMModemState              new_state,
+                             MMModemStateChangeReason  reason)
 {
     if (new_state == MM_MODEM_STATE_FAILED) {
         mm_iface_modem_update_failed_state (self, MM_MODEM_STATE_FAILED_REASON_UNKNOWN);
         return;
     }
 
-    __iface_modem_update_state_internal (self, new_state, reason, MM_MODEM_STATE_FAILED_REASON_NONE);
+    update_state_internal (self, new_state, reason, MM_MODEM_STATE_FAILED_REASON_NONE);
 }
 
 void
-mm_iface_modem_update_failed_state (MMIfaceModem *self,
-                                    MMModemStateFailedReason failed_reason)
+mm_iface_modem_update_failed_state (MMIfaceModem             *self,
+                                    MMModemStateFailedReason  failed_reason)
 {
-    __iface_modem_update_state_internal (self, MM_MODEM_STATE_FAILED, MM_MODEM_STATE_CHANGE_REASON_FAILURE, failed_reason);
+    update_state_internal (self, MM_MODEM_STATE_FAILED, MM_MODEM_STATE_CHANGE_REASON_FAILURE, failed_reason);
 }
 
 /*****************************************************************************/
