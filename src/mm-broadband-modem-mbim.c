@@ -4315,8 +4315,8 @@ basic_connect_notification_packet_service (MMBroadbandModemMbim *self,
                                   device,
                                   self->priv->reg_state,
                                   self->priv->available_data_classes,
-                                  NULL,
-                                  NULL);
+                                  g_strdup (self->priv->current_operator_id),
+                                  g_strdup (self->priv->current_operator_name));
     }
 
     g_object_get (self,
