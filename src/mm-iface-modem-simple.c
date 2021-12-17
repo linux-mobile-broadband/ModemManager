@@ -215,6 +215,7 @@ typedef enum {
     CONNECTION_STEP_WAIT_FOR_INITIALIZED,
     CONNECTION_STEP_ENABLE,
     CONNECTION_STEP_WAIT_FOR_ENABLED,
+    CONNECTION_STEP_WAIT_AFTER_ENABLED,
     CONNECTION_STEP_REGISTER,
     CONNECTION_STEP_BEARER,
     CONNECTION_STEP_CONNECT,
@@ -329,6 +330,15 @@ register_in_3gpp_or_cdma_network_ready (MMIfaceModemSimple *self,
     /* Registered now! */
     ctx->step++;
     connection_step (ctx);
+}
+
+static gboolean
+wait_after_enabled_ready (ConnectionContext *ctx)
+{
+    /* Just go on now */
+    ctx->step++;
+    connection_step (ctx);
+    return G_SOURCE_REMOVE;
 }
 
 static void
@@ -560,6 +570,17 @@ connection_step (ConnectionContext *ctx)
                                              (GAsyncReadyCallback)wait_for_enabled_ready,
                                              ctx);
         return;
+
+    case CONNECTION_STEP_WAIT_AFTER_ENABLED:
+        mm_obj_info (ctx->self, "simple connect state (%d/%d): wait after enabled",
+                     ctx->step, CONNECTION_STEP_LAST);
+        /* When we have just enabled, we want to give it some time before starting
+         * the registration process, so that any pending registration update that may
+         * have been scheduled during the enabling phase is applied. We don't want to
+         * trigger a new automatic registration if e.g. we're already registered.  */
+        g_timeout_add (100, (GSourceFunc)wait_after_enabled_ready, ctx);
+        return;
+
 
     case CONNECTION_STEP_REGISTER:
         mm_obj_info (ctx->self, "simple connect state (%d/%d): register",
