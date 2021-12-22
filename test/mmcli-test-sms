@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 print_usage () {
     echo "usage: $0 [MODEM INDEX] [all|ucs2|gsm7|data] [NUMBER]"

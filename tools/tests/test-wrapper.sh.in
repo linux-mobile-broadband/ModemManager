@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # For debugging behavior of test-modemmanager-service.py, you can modify
 # this line to add --log-file option
