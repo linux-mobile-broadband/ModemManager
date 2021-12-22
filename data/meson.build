@@ -38,7 +38,6 @@ if enable_polkit
 
   # build file with translations, which we will include in dist
   i18n.merge_file(
-    policy,
     input: configure_file(
       input: policy + '.in.in',
       output: '@BASENAME@',
