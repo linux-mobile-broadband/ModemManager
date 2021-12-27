@@ -144,12 +144,33 @@ mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *s
 }
 
 static void
+quectel_get_firmware_version_ready (MMBaseModem  *modem,
+                                    GAsyncResult *res,
+                                    GTask        *task)
+{
+    MMFirmwareUpdateSettings *update_settings;
+    const gchar              *version;
+
+    update_settings = g_task_get_task_data (task);
+
+    /* Set full firmware version */
+    version = mm_base_modem_at_command_finish (modem, res, NULL);
+    if (version)
+        mm_firmware_update_settings_set_version (update_settings, version);
+
+    g_task_return_pointer (task, update_settings, g_object_unref);
+    g_object_unref (task);
+    g_object_ref(update_settings);
+}
+
+static void
 qfastboot_test_ready (MMBaseModem  *self,
                       GAsyncResult *res,
                       GTask        *task)
 {
     MMFirmwareUpdateSettings *update_settings;
 
+    /* Set update method */
     if (!mm_base_modem_at_command_finish (self, res, NULL))
         update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
     else {
@@ -157,8 +178,14 @@ qfastboot_test_ready (MMBaseModem  *self,
         mm_firmware_update_settings_set_fastboot_at (update_settings, "AT+QFASTBOOT");
     }
 
-    g_task_return_pointer (task, update_settings, g_object_unref);
-    g_object_unref (task);
+    /* Get full firmware version */
+    g_task_set_task_data (task, update_settings, g_object_unref);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+QGMR?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback) quectel_get_firmware_version_ready,
+                              task);
 }
 
 void
