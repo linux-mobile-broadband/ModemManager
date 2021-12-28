@@ -93,6 +93,7 @@
         <xi:include href="xml/mm-cdma-manual-activation-properties.xml"/>
         <xi:include href="xml/mm-unlock-retries.xml"/>
         <xi:include href="xml/mm-cell-info.xml"/>
+        <xi:include href="xml/mm-cell-info-cdma.xml"/>
         <xi:include href="xml/mm-pco.xml"/>
         <xi:include href="xml/mm-nr5g-registration-settings.xml"/>
       </section>

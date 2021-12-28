@@ -307,6 +307,35 @@ mm_cell_info_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-cell-info-cdma</FILE>
+<TITLE>MMCellInfoCdma</TITLE>
+MMCellInfoCdma
+<SUBSECTION Getters>
+mm_cell_info_cdma_get_nid
+mm_cell_info_cdma_get_sid
+mm_cell_info_cdma_get_base_station_id
+mm_cell_info_cdma_get_ref_pn
+mm_cell_info_cdma_get_pilot_strength
+<SUBSECTION Private>
+mm_cell_info_cdma_new_from_dictionary
+mm_cell_info_cdma_set_nid
+mm_cell_info_cdma_set_sid
+mm_cell_info_cdma_set_base_station_id
+mm_cell_info_cdma_set_ref_pn
+mm_cell_info_cdma_set_pilot_strength
+<SUBSECTION Standard>
+MMCellInfoCdmaClass
+MMCellInfoCdmaPrivate
+MM_IS_CELL_INFO_CDMA
+MM_IS_CELL_INFO_CDMA_CLASS
+MM_TYPE_CELL_INFO_CDMA
+MM_CELL_INFO_CDMA
+MM_CELL_INFO_CDMA_CLASS
+MM_CELL_INFO_CDMA_GET_CLASS
+mm_cell_info_cdma_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-modem-3gpp</FILE>
 <TITLE>MMModem3gpp</TITLE>
 MMModem3gpp

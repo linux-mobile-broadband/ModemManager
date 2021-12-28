@@ -103,6 +103,8 @@ libmm_glib_la_SOURCES = \
 	mm-nr5g-registration-settings.c \
 	mm-cell-info.h \
 	mm-cell-info.c \
+	mm-cell-info-cdma.h \
+	mm-cell-info-cdma.c \
 	mm-compat.h \
 	mm-compat.c \
 	$(NULL)
@@ -183,6 +185,7 @@ include_HEADERS = \
 	mm-signal-threshold-properties.h \
 	mm-nr5g-registration-settings.h \
 	mm-cell-info.h \
+	mm-cell-info-cdma.h \
 	mm-compat.h \
 	$(NULL)
 

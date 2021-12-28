@@ -21,6 +21,7 @@
  */
 
 #include "mm-cell-info.h"
+#include "mm-cell-info-cdma.h"
 
 #include "mm-enums-types.h"
 #include "mm-errors-types.h"
@@ -54,7 +55,9 @@ ensure_cell_type (MMCellInfo *self)
     if (self->priv->cell_type != MM_CELL_TYPE_UNKNOWN)
         return;
 
-    /* MM_CELL_TYPE_CDMA; */
+    if (MM_IS_CELL_INFO_CDMA (self))
+        self->priv->cell_type = MM_CELL_TYPE_CDMA;
+
     /* MM_CELL_TYPE_GSM; */
     /* MM_CELL_TYPE_UMTS; */
     /* MM_CELL_TYPE_TDSCDMA; */
@@ -154,6 +157,8 @@ mm_cell_info_new_from_dictionary (GVariant  *dictionary,
     }
     switch (g_variant_get_uint32 (aux)) {
         case MM_CELL_TYPE_CDMA:
+            self = mm_cell_info_cdma_new_from_dictionary (dict);
+            break;
         case MM_CELL_TYPE_GSM:
         case MM_CELL_TYPE_UMTS:
         case MM_CELL_TYPE_TDSCDMA:
