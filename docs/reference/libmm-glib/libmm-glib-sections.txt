@@ -278,6 +278,35 @@ mm_unlock_retries_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-cell-info</FILE>
+<TITLE>MMCellInfo</TITLE>
+MMCellInfo
+<SUBSECTION Getters>
+mm_cell_info_get_cell_type
+mm_cell_info_get_serving
+<SUBSECTION Private>
+mm_cell_info_set_cell_type
+mm_cell_info_set_serving
+mm_cell_info_build_string
+mm_cell_info_get_dictionary
+mm_cell_info_new_from_dictionary
+MM_CELL_INFO_GET_DICTIONARY_INSERT
+MM_CELL_INFO_BUILD_STRING_APPEND
+MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET
+MM_CELL_INFO_NEW_FROM_DICTIONARY_STRING_SET
+<SUBSECTION Standard>
+MMCellInfoClass
+MMCellInfoPrivate
+MM_IS_CELL_INFO
+MM_IS_CELL_INFO_CLASS
+MM_TYPE_CELL_INFO
+MM_CELL_INFO
+MM_CELL_INFO_CLASS
+MM_CELL_INFO_GET_CLASS
+mm_cell_info_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-modem-3gpp</FILE>
 <TITLE>MMModem3gpp</TITLE>
 MMModem3gpp

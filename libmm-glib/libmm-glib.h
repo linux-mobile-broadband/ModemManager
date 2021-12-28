@@ -86,6 +86,7 @@
 #include <mm-3gpp-profile.h>
 #include <mm-signal-threshold-properties.h>
 #include <mm-nr5g-registration-settings.h>
+#include <mm-cell-info.h>
 #include <mm-compat.h>
 
 /* generated */

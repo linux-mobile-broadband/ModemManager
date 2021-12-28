@@ -101,6 +101,8 @@ libmm_glib_la_SOURCES = \
 	mm-signal-threshold-properties.c \
 	mm-nr5g-registration-settings.h \
 	mm-nr5g-registration-settings.c \
+	mm-cell-info.h \
+	mm-cell-info.c \
 	mm-compat.h \
 	mm-compat.c \
 	$(NULL)
@@ -180,6 +182,7 @@ include_HEADERS = \
 	mm-3gpp-profile.h \
 	mm-signal-threshold-properties.h \
 	mm-nr5g-registration-settings.h \
+	mm-cell-info.h \
 	mm-compat.h \
 	$(NULL)
 
