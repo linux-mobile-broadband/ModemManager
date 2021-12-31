@@ -105,6 +105,8 @@ libmm_glib_la_SOURCES = \
 	mm-cell-info.c \
 	mm-cell-info-cdma.h \
 	mm-cell-info-cdma.c \
+	mm-cell-info-gsm.h \
+	mm-cell-info-gsm.c \
 	mm-compat.h \
 	mm-compat.c \
 	$(NULL)
@@ -186,6 +188,7 @@ include_HEADERS = \
 	mm-nr5g-registration-settings.h \
 	mm-cell-info.h \
 	mm-cell-info-cdma.h \
+	mm-cell-info-gsm.h \
 	mm-compat.h \
 	$(NULL)
 

@@ -88,6 +88,7 @@
 #include <mm-nr5g-registration-settings.h>
 #include <mm-cell-info.h>
 #include <mm-cell-info-cdma.h>
+#include <mm-cell-info-gsm.h>
 #include <mm-compat.h>
 
 /* generated */

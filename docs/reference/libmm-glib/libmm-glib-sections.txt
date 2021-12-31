@@ -336,6 +336,39 @@ mm_cell_info_cdma_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-cell-info-gsm</FILE>
+<TITLE>MMCellInfoGsm</TITLE>
+MMCellInfoGsm
+<SUBSECTION Getters>
+mm_cell_info_gsm_gsm_get_operator_id
+mm_cell_info_gsm_gsm_get_lac
+mm_cell_info_gsm_gsm_get_ci
+mm_cell_info_gsm_gsm_get_timing_advance
+mm_cell_info_gsm_gsm_get_arfcn
+mm_cell_info_gsm_gsm_get_base_station_id
+mm_cell_info_gsm_gsm_get_rx_level
+<SUBSECTION Private>
+mm_cell_info_gsm_new_from_dictionary
+mm_cell_info_gsm_set_operator_id
+mm_cell_info_gsm_set_lac
+mm_cell_info_gsm_set_ci
+mm_cell_info_gsm_set_timing_advance
+mm_cell_info_gsm_set_arfcn
+mm_cell_info_gsm_set_base_station_id
+mm_cell_info_gsm_set_rx_level
+<SUBSECTION Standard>
+MMCellInfoGsmClass
+MMCellInfoGsmPrivate
+MM_IS_CELL_INFO_GSM
+MM_IS_CELL_INFO_GSM_CLASS
+MM_TYPE_CELL_INFO_GSM
+MM_CELL_INFO_GSM
+MM_CELL_INFO_GSM_CLASS
+MM_CELL_INFO_GSM_GET_CLASS
+mm_cell_info_gsm_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-modem-3gpp</FILE>
 <TITLE>MMModem3gpp</TITLE>
 MMModem3gpp
