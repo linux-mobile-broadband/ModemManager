@@ -86,6 +86,38 @@ MMCellInfo *mm_cell_info_new_from_dictionary (GVariant    *dictionary,
                                               GError     **error);
 gchar      *mm_cell_info_build_string        (MMCellInfo  *self);
 
+/* helpers to implement methods */
+
+#define MM_CELL_INFO_NEW_FROM_DICTIONARY_STRING_SET(celltype,NAME,name) do {               \
+        GVariant *aux;                                                                     \
+                                                                                           \
+        aux = g_variant_dict_lookup_value (dict, PROPERTY_##NAME, G_VARIANT_TYPE_STRING);  \
+        if (aux) {                                                                         \
+            mm_cell_info_##celltype##_set_##name (self, g_variant_get_string (aux, NULL)); \
+            g_variant_unref (aux);                                                         \
+        }                                                                                  \
+    } while (0)
+
+#define MM_CELL_INFO_NEW_FROM_DICTIONARY_NUM_SET(celltype,NAME,name,NUMTYPE,numtype) do {    \
+        GVariant *aux;                                                                       \
+                                                                                             \
+        aux = g_variant_dict_lookup_value (dict, PROPERTY_##NAME, G_VARIANT_TYPE_##NUMTYPE); \
+        if (aux) {                                                                           \
+            mm_cell_info_##celltype##_set_##name (self, g_variant_get_##numtype (aux));      \
+            g_variant_unref (aux);                                                           \
+        }                                                                                    \
+    } while (0)
+
+#define MM_CELL_INFO_GET_DICTIONARY_INSERT(NAME,name,vartype,INVALID) do {                                   \
+        if (self->priv->name != INVALID)                                                                     \
+            g_variant_dict_insert_value (dict, PROPERTY_##NAME, g_variant_new_##vartype (self->priv->name)); \
+    } while (0)
+
+#define MM_CELL_INFO_BUILD_STRING_APPEND(STR,FORMAT,name,INVALID) do {            \
+        if (self->priv->name != INVALID)                                          \
+            g_string_append_printf (str, ", " STR ": " FORMAT, self->priv->name); \
+    } while (0)
+
 #endif
 
 G_END_DECLS
