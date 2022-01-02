@@ -410,6 +410,41 @@ mm_cell_info_umts_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-cell-info-tdscdma</FILE>
+<TITLE>MMCellInfoTdscdma</TITLE>
+MMCellInfoTdscdma
+<SUBSECTION Getters>
+mm_cell_info_tdscdma_get_operator_id
+mm_cell_info_tdscdma_get_lac
+mm_cell_info_tdscdma_get_ci
+mm_cell_info_tdscdma_get_uarfcn
+mm_cell_info_tdscdma_get_cell_parameter_id
+mm_cell_info_tdscdma_get_timing_advance
+mm_cell_info_tdscdma_get_rscp
+mm_cell_info_tdscdma_get_path_loss
+<SUBSECTION Private>
+mm_cell_info_tdscdma_new_from_dictionary
+mm_cell_info_tdscdma_set_operator_id
+mm_cell_info_tdscdma_set_lac
+mm_cell_info_tdscdma_set_ci
+mm_cell_info_tdscdma_set_uarfcn
+mm_cell_info_tdscdma_set_cell_parameter_id
+mm_cell_info_tdscdma_set_timing_advance
+mm_cell_info_tdscdma_set_rscp
+mm_cell_info_tdscdma_set_path_loss
+<SUBSECTION Standard>
+MMCellInfoTdscdmaClass
+MMCellInfoTdscdmaPrivate
+MM_IS_CELL_INFO_TDSCDMA
+MM_IS_CELL_INFO_TDSCDMA_CLASS
+MM_TYPE_CELL_INFO_TDSCDMA
+MM_CELL_INFO_TDSCDMA
+MM_CELL_INFO_TDSCDMA_CLASS
+MM_CELL_INFO_TDSCDMA_GET_CLASS
+mm_cell_info_tdscdma_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-modem-3gpp</FILE>
 <TITLE>MMModem3gpp</TITLE>
 MMModem3gpp
