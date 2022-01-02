@@ -107,6 +107,8 @@ libmm_glib_la_SOURCES = \
 	mm-cell-info-cdma.c \
 	mm-cell-info-gsm.h \
 	mm-cell-info-gsm.c \
+	mm-cell-info-umts.h \
+	mm-cell-info-umts.c \
 	mm-compat.h \
 	mm-compat.c \
 	$(NULL)
@@ -189,6 +191,7 @@ include_HEADERS = \
 	mm-cell-info.h \
 	mm-cell-info-cdma.h \
 	mm-cell-info-gsm.h \
+	mm-cell-info-umts.h \
 	mm-compat.h \
 	$(NULL)
 
