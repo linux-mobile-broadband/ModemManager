@@ -26,6 +26,7 @@
 #include "mm-cell-info-umts.h"
 #include "mm-cell-info-tdscdma.h"
 #include "mm-cell-info-lte.h"
+#include "mm-cell-info-nr5g.h"
 
 #include "mm-enums-types.h"
 #include "mm-errors-types.h"
@@ -69,7 +70,8 @@ ensure_cell_type (MMCellInfo *self)
         self->priv->cell_type = MM_CELL_TYPE_TDSCDMA;
     else if (MM_IS_CELL_INFO_LTE (self))
         self->priv->cell_type = MM_CELL_TYPE_LTE;
-    /* MM_CELL_TYPE_5GNR; */
+    else if (MM_IS_CELL_INFO_NR5G (self))
+        self->priv->cell_type = MM_CELL_TYPE_5GNR;
 }
 
 /**
@@ -179,6 +181,8 @@ mm_cell_info_new_from_dictionary (GVariant  *dictionary,
             self = mm_cell_info_lte_new_from_dictionary (dict);
             break;
         case MM_CELL_TYPE_5GNR:
+            self = mm_cell_info_nr5g_new_from_dictionary (dict);
+            break;
         default:
             break;
     }

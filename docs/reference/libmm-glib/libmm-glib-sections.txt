@@ -480,6 +480,43 @@ mm_cell_info_lte_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-cell-info-nr5g</FILE>
+<TITLE>MMCellInfoNr5g</TITLE>
+MMCellInfoNr5g
+<SUBSECTION Getters>
+mm_cell_info_nr5g_get_operator_id
+mm_cell_info_nr5g_get_tac
+mm_cell_info_nr5g_get_ci
+mm_cell_info_nr5g_get_physical_ci
+mm_cell_info_nr5g_get_nrarfcn
+mm_cell_info_nr5g_get_rsrp
+mm_cell_info_nr5g_get_rsrq
+mm_cell_info_nr5g_get_sinr
+mm_cell_info_nr5g_get_timing_advance
+<SUBSECTION Private>
+mm_cell_info_nr5g_new_from_dictionary
+mm_cell_info_nr5g_set_operator_id
+mm_cell_info_nr5g_set_tac
+mm_cell_info_nr5g_set_ci
+mm_cell_info_nr5g_set_physical_ci
+mm_cell_info_nr5g_set_nrarfcn
+mm_cell_info_nr5g_set_rsrp
+mm_cell_info_nr5g_set_rsrq
+mm_cell_info_nr5g_set_sinr
+mm_cell_info_nr5g_set_timing_advance
+<SUBSECTION Standard>
+MMCellInfoNr5gClass
+MMCellInfoNr5gPrivate
+MM_IS_CELL_INFO_NR5G
+MM_IS_CELL_INFO_NR5G_CLASS
+MM_TYPE_CELL_INFO_NR5G
+MM_CELL_INFO_NR5G
+MM_CELL_INFO_NR5G_CLASS
+MM_CELL_INFO_NR5G_GET_CLASS
+mm_cell_info_nr5g_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-modem-3gpp</FILE>
 <TITLE>MMModem3gpp</TITLE>
 MMModem3gpp

@@ -92,6 +92,7 @@
 #include <mm-cell-info-umts.h>
 #include <mm-cell-info-tdscdma.h>
 #include <mm-cell-info-lte.h>
+#include <mm-cell-info-nr5g.h>
 #include <mm-compat.h>
 
 /* generated */

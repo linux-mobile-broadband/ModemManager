@@ -113,6 +113,8 @@ libmm_glib_la_SOURCES = \
 	mm-cell-info-tdscdma.c \
 	mm-cell-info-lte.h \
 	mm-cell-info-lte.c \
+	mm-cell-info-nr5g.h \
+	mm-cell-info-nr5g.c \
 	mm-compat.h \
 	mm-compat.c \
 	$(NULL)
@@ -198,6 +200,7 @@ include_HEADERS = \
 	mm-cell-info-umts.h \
 	mm-cell-info-tdscdma.h \
 	mm-cell-info-lte.h \
+	mm-cell-info-nr5g.h \
 	mm-compat.h \
 	$(NULL)
 
