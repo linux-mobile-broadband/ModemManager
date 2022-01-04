@@ -97,6 +97,7 @@
         <xi:include href="xml/mm-cell-info-gsm.xml"/>
         <xi:include href="xml/mm-cell-info-umts.xml"/>
         <xi:include href="xml/mm-cell-info-tdscdma.xml"/>
+        <xi:include href="xml/mm-cell-info-lte.xml"/>
         <xi:include href="xml/mm-pco.xml"/>
         <xi:include href="xml/mm-nr5g-registration-settings.xml"/>
       </section>

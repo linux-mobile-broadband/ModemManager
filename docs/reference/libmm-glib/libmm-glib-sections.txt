@@ -445,6 +445,41 @@ mm_cell_info_tdscdma_get_type
 </SECTION>
 
 <SECTION>
+<FILE>mm-cell-info-lte</FILE>
+<TITLE>MMCellInfoLte</TITLE>
+MMCellInfoLte
+<SUBSECTION Getters>
+mm_cell_info_lte_get_operator_id
+mm_cell_info_lte_get_tac
+mm_cell_info_lte_get_ci
+mm_cell_info_lte_get_physical_ci
+mm_cell_info_lte_get_earfcn
+mm_cell_info_lte_get_rsrp
+mm_cell_info_lte_get_rsrq
+mm_cell_info_lte_get_timing_advance
+<SUBSECTION Private>
+mm_cell_info_lte_new_from_dictionary
+mm_cell_info_lte_set_operator_id
+mm_cell_info_lte_set_tac
+mm_cell_info_lte_set_ci
+mm_cell_info_lte_set_physical_ci
+mm_cell_info_lte_set_earfcn
+mm_cell_info_lte_set_rsrp
+mm_cell_info_lte_set_rsrq
+mm_cell_info_lte_set_timing_advance
+<SUBSECTION Standard>
+MMCellInfoLteClass
+MMCellInfoLtePrivate
+MM_IS_CELL_INFO_LTE
+MM_IS_CELL_INFO_LTE_CLASS
+MM_TYPE_CELL_INFO_LTE
+MM_CELL_INFO_LTE
+MM_CELL_INFO_LTE_CLASS
+MM_CELL_INFO_LTE_GET_CLASS
+mm_cell_info_lte_get_type
+</SECTION>
+
+<SECTION>
 <FILE>mm-modem-3gpp</FILE>
 <TITLE>MMModem3gpp</TITLE>
 MMModem3gpp
