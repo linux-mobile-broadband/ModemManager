@@ -690,6 +690,8 @@ if ENABLE_PLUGIN_FIBOCOM
 
 pkglib_LTLIBRARIES += libmm-plugin-fibocom.la
 libmm_plugin_fibocom_la_SOURCES = \
+	fibocom/mm-broadband-bearer-fibocom-ecm.c \
+	fibocom/mm-broadband-bearer-fibocom-ecm.h \
 	fibocom/mm-broadband-modem-fibocom.c \
 	fibocom/mm-broadband-modem-fibocom.h \
 	fibocom/mm-plugin-fibocom.c \

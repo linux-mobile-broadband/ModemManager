@@ -338,6 +338,7 @@ if plugins_options['fibocom']
   ]
 
   sources = files(
+    'fibocom/mm-broadband-bearer-fibocom-ecm.c',
     'fibocom/mm-broadband-modem-fibocom.c',
     'fibocom/mm-plugin-fibocom.c',
   )
