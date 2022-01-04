@@ -337,9 +337,14 @@ if plugins_options['fibocom']
     '-DTESTUDEVRULESDIR_FIBOCOM="@0@"'.format(plugins_dir / 'fibocom'),
   ]
 
+  sources = files(
+    'fibocom/mm-broadband-modem-fibocom.c',
+    'fibocom/mm-plugin-fibocom.c',
+  )
+
   plugins += {'plugin-fibocom': {
     'plugin': true,
-    'module': {'sources': files('fibocom/mm-plugin-fibocom.c'), 'include_directories': plugins_incs + [xmm_inc], 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc], 'c_args': c_args},
   }}
 
   plugins_udev_rules += files('fibocom/77-mm-fibocom-port-types.rules')

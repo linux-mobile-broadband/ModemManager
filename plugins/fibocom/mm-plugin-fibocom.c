@@ -23,6 +23,7 @@
 #include "mm-plugin-fibocom.h"
 #include "mm-broadband-modem.h"
 #include "mm-broadband-modem-xmm.h"
+#include "mm-broadband-modem-fibocom.h"
 
 #if defined WITH_MBIM
 #include "mm-broadband-modem-mbim.h"
@@ -89,11 +90,11 @@ create_modem (MMPlugin     *self,
     }
 
     mm_obj_dbg (self, "Fibocom modem found...");
-    return MM_BASE_MODEM (mm_broadband_modem_new (uid,
-                                                  drivers,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_fibocom_new (uid,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
 }
 
 /*****************************************************************************/
