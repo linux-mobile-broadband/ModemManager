@@ -53,4 +53,12 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="04", ENV{
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="05", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="01a4", ENV{.MM_USBIFNUM}=="06", ENV{ID_MM_PORT_IGNORE}="1"
 
+# Fibocom MA510-GL (GTUSBMODE=31)
+#  ttyUSB0 (if #0): debug port (ignore)
+#  ttyUSB1 (if #1): AT port
+#  ttyUSB2 (if #2): AT port
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0106", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0106", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0106", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
 LABEL="mm_fibocom_port_types_end"
