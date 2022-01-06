@@ -1850,8 +1850,8 @@ MM_TYPE_BEARER_ALLOWED_AUTH
 MM_TYPE_BEARER_MULTIPLEX_SUPPORT
 MM_TYPE_BEARER_APN_TYPE
 MM_TYPE_SIM_TYPE
-MM_TYPE_ESIM_STATUS
-MM_TYPE_SIM_REMOVAL_STATUS
+MM_TYPE_SIM_ESIM_STATUS
+MM_TYPE_SIM_REMOVABILITY
 MM_TYPE_BEARER_ACCESS_TYPE_PREFERENCE
 MM_TYPE_BEARER_ROAMING_ALLOWANCE
 MM_TYPE_BEARER_PROFILE_SOURCE
@@ -3653,6 +3653,9 @@ mm_gdbus_sim_complete_send_puk
 mm_gdbus_sim_complete_set_preferred_networks
 mm_gdbus_sim_interface_info
 mm_gdbus_sim_override_properties
+mm_gdbus_sim_set_esim_status
+mm_gdbus_sim_set_removability
+mm_gdbus_sim_set_sim_type
 <SUBSECTION Standard>
 MM_GDBUS_IS_SIM
 MM_GDBUS_SIM
