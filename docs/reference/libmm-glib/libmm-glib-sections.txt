@@ -1172,6 +1172,7 @@ mm_bearer_peek_stats
 mm_bearer_get_stats
 mm_bearer_get_connection_error
 mm_bearer_peek_connection_error
+mm_bearer_get_reload_stats_supported
 <SUBSECTION Methods>
 mm_bearer_connect
 mm_bearer_connect_finish
@@ -2036,6 +2037,7 @@ mm_gdbus_bearer_get_bearer_type
 mm_gdbus_bearer_get_profile_id
 mm_gdbus_bearer_get_stats
 mm_gdbus_bearer_dup_stats
+mm_gdbus_bearer_get_reload_stats_supported
 <SUBSECTION Methods>
 mm_gdbus_bearer_call_connect
 mm_gdbus_bearer_call_connect_finish
@@ -2057,6 +2059,7 @@ mm_gdbus_bearer_set_bearer_type
 mm_gdbus_bearer_set_profile_id
 mm_gdbus_bearer_set_stats
 mm_gdbus_bearer_set_multiplexed
+mm_gdbus_bearer_set_reload_stats_supported
 mm_gdbus_bearer_override_properties
 mm_gdbus_bearer_complete_connect
 mm_gdbus_bearer_complete_disconnect
