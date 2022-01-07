@@ -718,6 +718,8 @@ create_networks_list (GVariant *variant)
         g_variant_unref (dict);
     }
 
+    g_variant_unref (variant);
+
     return list;
 }
 
