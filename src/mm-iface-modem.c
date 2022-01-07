@@ -1234,6 +1234,115 @@ handle_set_primary_sim_slot (MmGdbusModem          *skeleton,
 
 /*****************************************************************************/
 
+typedef struct {
+    MmGdbusModem          *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem          *self;
+} HandleGetCellInfoContext;
+
+static void
+handle_get_cell_info_context_free (HandleGetCellInfoContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static GVariant *
+get_cell_info_build_result (GList *info_list)
+{
+    GList *l;
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("aa{sv}"));
+
+    for (l = info_list; l; l = g_list_next (l)) {
+        g_autoptr(GVariant) dict = NULL;
+
+        dict = mm_cell_info_get_dictionary (MM_CELL_INFO (l->data));
+        g_variant_builder_add_value (&builder, dict);
+    }
+
+    return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
+static void
+get_cell_info_ready (MMIfaceModem             *self,
+                     GAsyncResult             *res,
+                     HandleGetCellInfoContext *ctx)
+{
+    GError *error = NULL;
+    GList  *info_list;
+
+    info_list = MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info_finish (self, res, &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else {
+        g_autoptr(GVariant) dict_array = NULL;
+
+        dict_array = get_cell_info_build_result (info_list);
+        mm_gdbus_modem_complete_get_cell_info (ctx->skeleton, ctx->invocation, dict_array);
+    }
+
+    g_list_free_full (info_list, (GDestroyNotify)g_object_unref);
+    handle_get_cell_info_context_free (ctx);
+}
+
+static void
+handle_get_cell_info_auth_ready (MMBaseModem              *self,
+                                 GAsyncResult             *res,
+                                 HandleGetCellInfoContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_get_cell_info_context_free (ctx);
+        return;
+    }
+
+    /* If getting cell info is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot get cell info: operation not supported");
+        handle_get_cell_info_context_free (ctx);
+        return;
+    }
+
+    if (mm_iface_modem_abort_invocation_if_state_not_reached (ctx->self, ctx->invocation, MM_MODEM_STATE_ENABLED)) {
+        handle_get_cell_info_context_free (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->get_cell_info (ctx->self,
+                                                        (GAsyncReadyCallback)get_cell_info_ready,
+                                                        ctx);
+}
+
+static gboolean
+handle_get_cell_info (MmGdbusModem          *skeleton,
+                      GDBusMethodInvocation *invocation,
+                      MMIfaceModem          *self)
+{
+    HandleGetCellInfoContext *ctx;
+
+    ctx = g_new (HandleGetCellInfoContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_get_cell_info_auth_ready,
+                             ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 void
 mm_iface_modem_update_access_technologies (MMIfaceModem *self,
                                            MMModemAccessTechnology new_access_tech,
@@ -5891,6 +6000,7 @@ interface_initialization_step (GTask *task)
                           "signal::handle-set-current-bands",        G_CALLBACK (handle_set_current_bands),        self,
                           "signal::handle-set-current-modes",        G_CALLBACK (handle_set_current_modes),        self,
                           "signal::handle-set-primary-sim-slot",     G_CALLBACK (handle_set_primary_sim_slot),     self,
+                          "signal::handle-get-cell-info",            G_CALLBACK (handle_get_cell_info),            self,
                           NULL);
 
         /* Finally, export the new interface, even if we got errors, but only if not

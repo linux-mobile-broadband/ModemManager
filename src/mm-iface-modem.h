@@ -405,6 +405,14 @@ struct _MMIfaceModem {
     gboolean (* setup_carrier_config_finish) (MMIfaceModem         *self,
                                               GAsyncResult         *res,
                                               GError              **error);
+
+    /* Asynchronous cell info retrieval operation */
+    void    (* get_cell_info)        (MMIfaceModem         *self,
+                                      GAsyncReadyCallback   callback,
+                                      gpointer              user_data);
+    GList * (* get_cell_info_finish) (MMIfaceModem         *self,
+                                      GAsyncResult         *res,
+                                      GError              **error);
 };
 
 GType mm_iface_modem_get_type (void);
