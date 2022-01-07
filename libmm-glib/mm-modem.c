@@ -23,7 +23,6 @@
 
 #include <gio/gio.h>
 #include <string.h>
-
 #include "mm-common-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-helpers.h"
@@ -3243,6 +3242,135 @@ mm_modem_set_primary_sim_slot_sync (MMModem       *self,
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
 
     return mm_gdbus_modem_call_set_primary_sim_slot_sync (MM_GDBUS_MODEM (self), sim_slot, cancellable, error);
+}
+
+/*****************************************************************************/
+
+static GList *
+create_cell_info_list (GVariant  *variant,
+                       GError   **error)
+{
+    GError       *inner_error = NULL;
+    GList        *list = NULL;
+    GVariantIter  dict_iter;
+    GVariant     *dict;
+
+    /* Input is aa{sv} */
+    g_variant_iter_init (&dict_iter, variant);
+    while ((dict = g_variant_iter_next_value (&dict_iter))) {
+        MMCellInfo *cell_info;
+
+        cell_info = mm_cell_info_new_from_dictionary (dict, &inner_error);
+        if (inner_error)
+            break;
+
+        list = g_list_prepend (list, cell_info);
+        g_variant_unref (dict);
+    }
+
+    if (inner_error) {
+        g_list_free_full (g_steal_pointer (&list), g_object_unref);
+        g_propagate_error (error, inner_error);
+    }
+
+    g_variant_unref (variant);
+
+    return list;
+}
+
+/**
+ * mm_modem_get_cell_info_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to
+ *  mm_modem_get_cell_info().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_get_cell_info().
+ *
+ * Returns: (transfer full) (element-type ModemManager.CellInfo): a list
+ * of #MMCellInfo objects, or #NULL if @error is set. The returned value
+ * should be freed with g_list_free_full() using g_object_unref() as
+ * #GDestroyNotify function.
+ *
+ * Since: 1.20
+ */
+GList *
+mm_modem_get_cell_info_finish (MMModem       *self,
+                               GAsyncResult  *res,
+                               GError       **error)
+{
+    GVariant *result = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    if (!mm_gdbus_modem_call_get_cell_info_finish (MM_GDBUS_MODEM (self), &result, res, error))
+        return NULL;
+
+    return create_cell_info_list (result, error);
+}
+
+/**
+ * mm_modem_get_cell_info:
+ * @self: A #MMModem.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or
+ *  %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously requests to get info about serving and neighboring cells.
+ *
+ * When the operation is finished, @callback will be invoked in the
+ * <link linkend="g-main-context-push-thread-default">thread-default main loop</link>
+ * of the thread you are calling this method from. You can then call
+ * mm_modem_get_cell_info_finish() to get the result of the operation.
+ *
+ * See mm_modem_get_cell_info_sync() for the synchronous, blocking version of this
+ * method.
+ *
+ * Since: 1.20
+ */
+void
+mm_modem_get_cell_info (MMModem             *self,
+                        GCancellable        *cancellable,
+                        GAsyncReadyCallback  callback,
+                        gpointer             user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+
+    mm_gdbus_modem_call_get_cell_info (MM_GDBUS_MODEM (self), cancellable, callback, user_data);
+}
+
+/**
+ * mm_modem_get_cell_info_sync:
+ * @self: A #MMModem.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously requests to get info about serving and neighboring cells.
+ *
+ * The calling thread is blocked until a reply is received. See
+ * mm_modem_get_cell_info() for the asynchronous version of this method.
+ *
+ * Returns: (transfer full) (element-type ModemManager.CellInfo): a list
+ * of #MMCellInfo objects, or #NULL if @error is set. The returned value
+ * should be freed with g_list_free_full() using g_object_unref() as
+ * #GDestroyNotify function.
+ *
+ * Since: 1.20
+ */
+GList *
+mm_modem_get_cell_info_sync (MMModem       *self,
+                             GCancellable  *cancellable,
+                             GError       **error)
+{
+    GVariant *result = NULL;
+
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    if (!mm_gdbus_modem_call_get_cell_info_sync (MM_GDBUS_MODEM (self), &result, cancellable, error))
+        return NULL;
+
+    return create_cell_info_list (result, error);
 }
 
 /*****************************************************************************/

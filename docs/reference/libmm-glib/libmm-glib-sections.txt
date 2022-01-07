@@ -230,6 +230,9 @@ mm_modem_create_bearer_sync
 mm_modem_delete_bearer
 mm_modem_delete_bearer_finish
 mm_modem_delete_bearer_sync
+mm_modem_get_cell_info
+mm_modem_get_cell_info_finish
+mm_modem_get_cell_info_sync
 <SUBSECTION DebugMethods>
 mm_modem_command
 mm_modem_command_finish

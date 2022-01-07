@@ -34,6 +34,7 @@
 #include "mm-unlock-retries.h"
 #include "mm-sim.h"
 #include "mm-bearer.h"
+#include "mm-cell-info.h"
 #include "mm-helper-types.h"
 
 G_BEGIN_DECLS
@@ -371,6 +372,17 @@ gboolean mm_modem_set_primary_sim_slot_sync   (MMModem              *self,
                                                guint                 sim_slot,
                                                GCancellable         *cancellable,
                                                GError              **error);
+
+void   mm_modem_get_cell_info        (MMModem              *self,
+                                      GCancellable         *cancellable,
+                                      GAsyncReadyCallback   callback,
+                                      gpointer              user_data);
+GList *mm_modem_get_cell_info_finish (MMModem              *self,
+                                      GAsyncResult         *res,
+                                      GError              **error);
+GList *mm_modem_get_cell_info_sync   (MMModem              *self,
+                                      GCancellable         *cancellable,
+                                      GError              **error);
 
 G_END_DECLS
 
