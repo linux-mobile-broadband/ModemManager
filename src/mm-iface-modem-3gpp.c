@@ -710,7 +710,7 @@ scan_networks_build_result (GList *info_list)
         g_variant_builder_close (&builder);
     }
 
-    return g_variant_ref (g_variant_builder_end (&builder));
+    return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
 static void
