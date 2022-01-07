@@ -61,6 +61,7 @@ Makefile.in
 /src/tests/test-sms-part-cdma
 /src/tests/test-udev-rules
 /src/tests/test-error-helpers
+/src/tests/test-kernel-device-helpers
 
 /cli/mmcli
 
