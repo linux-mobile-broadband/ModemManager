@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#define _LIBMM_INSIDE_MMCLI
 #include <libmm-glib.h>
 #include "mm-common-helpers.h"
 #include "mmcli-output.h"
@@ -41,6 +42,7 @@ static SectionInfo section_infos[] = {
     [MMC_S_MODEM_MODES]                = { "Modes"                },
     [MMC_S_MODEM_BANDS]                = { "Bands"                },
     [MMC_S_MODEM_IP]                   = { "IP"                   },
+    [MMC_S_MODEM_CELL_INFO]            = { "Cell info"            },
     [MMC_S_MODEM_3GPP]                 = { "3GPP"                 },
     [MMC_S_MODEM_3GPP_EPS]             = { "3GPP EPS"             },
     [MMC_S_MODEM_3GPP_5GNR]            = { "3GPP 5GNR"            },
@@ -127,6 +129,7 @@ static FieldInfo field_infos[] = {
     [MMC_F_BANDS_SUPPORTED]                          = { "modem.generic.supported-bands",                   "supported",                MMC_S_MODEM_BANDS,                },
     [MMC_F_BANDS_CURRENT]                            = { "modem.generic.current-bands",                     "current",                  MMC_S_MODEM_BANDS,                },
     [MMC_F_IP_SUPPORTED]                             = { "modem.generic.supported-ip-families",             "supported",                MMC_S_MODEM_IP,                   },
+    [MMC_F_CELL_INFO]                                = { "modem.generic.cell-info",                         "cells",                    MMC_S_MODEM_CELL_INFO,            },
     [MMC_F_3GPP_IMEI]                                = { "modem.3gpp.imei",                                 "imei",                     MMC_S_MODEM_3GPP,                 },
     [MMC_F_3GPP_ENABLED_LOCKS]                       = { "modem.3gpp.enabled-locks",                        "enabled locks",            MMC_S_MODEM_3GPP,                 },
     [MMC_F_3GPP_OPERATOR_ID]                         = { "modem.3gpp.operator-code",                        "operator id",              MMC_S_MODEM_3GPP,                 },
@@ -1110,6 +1113,33 @@ mmcli_output_profile_set (MM3gppProfile *profile)
     profile_list = g_list_append (profile_list, profile);
     output_profile_list (MMC_F_3GPP_PROFILE_MANAGER_SET, profile_list);
     g_list_free (profile_list);
+}
+
+/******************************************************************************/
+/* (Custom) Cell info output */
+
+void
+mmcli_output_cell_info (GList *cell_info_list)
+{
+    gchar **cell_infos = NULL;
+
+    if (cell_info_list) {
+        GPtrArray *aux;
+        GList     *l;
+
+        aux = g_ptr_array_new ();
+        for (l = cell_info_list; l; l = g_list_next (l))
+            g_ptr_array_add (aux, mm_cell_info_build_string (MM_CELL_INFO (l->data)));
+        g_ptr_array_add (aux, NULL);
+        cell_infos = (gchar **) g_ptr_array_free (aux, FALSE);
+    }
+
+    /* When printing human result, we want to show some result even if no networks
+     * are found, so we force a explicit string result. */
+    if (selected_type == MMC_OUTPUT_TYPE_HUMAN && !cell_infos)
+        output_item_new_take_single (MMC_F_CELL_INFO, g_strdup ("n/a"));
+    else
+        output_item_new_take_multiple (MMC_F_CELL_INFO, cell_infos, TRUE);
 }
 
 /******************************************************************************/

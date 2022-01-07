@@ -64,6 +64,7 @@ static gchar *set_allowed_modes_str;
 static gchar *set_preferred_mode_str;
 static gchar *set_current_bands_str;
 static gint set_primary_sim_slot_int;
+static gboolean get_cell_info_flag;
 static gboolean inhibit_flag;
 
 static GOptionEntry entries[] = {
@@ -131,6 +132,10 @@ static GOptionEntry entries[] = {
       "Switch to the selected SIM slot",
       "[SLOT NUMBER]"
     },
+    { "get-cell-info", 0, 0, G_OPTION_ARG_NONE, &get_cell_info_flag,
+      "Get cell info",
+      NULL
+    },
     { "inhibit", 0, 0, G_OPTION_ARG_NONE, &inhibit_flag,
       "Inhibit the modem",
       NULL
@@ -179,6 +184,7 @@ mmcli_modem_options_enabled (void)
                  !!set_preferred_mode_str +
                  !!set_current_bands_str +
                  (set_primary_sim_slot_int > 0) +
+                 get_cell_info_flag +
                  inhibit_flag);
 
     if (n_actions == 0 && mmcli_get_common_modem_string ()) {
@@ -940,6 +946,35 @@ set_primary_sim_slot_ready (MMModem      *modem,
 }
 
 static void
+get_cell_info_process_reply (GList        *list,
+                             const GError *error)
+{
+    if (!list) {
+        g_printerr ("error: couldn't get cell info in the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    mmcli_output_cell_info (list);
+    mmcli_output_dump ();
+
+    g_list_free_full (list, (GDestroyNotify) g_object_unref);
+}
+
+static void
+get_cell_info_ready (MMModem      *modem,
+                     GAsyncResult *result)
+{
+    GList             *list;
+    g_autoptr(GError)  error = NULL;
+
+    list = mm_modem_get_cell_info_finish (modem, result, &error);
+    get_cell_info_process_reply (list, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 state_changed (MMModem                  *modem,
                MMModemState              old_state,
                MMModemState              new_state,
@@ -1188,6 +1223,15 @@ get_modem_ready (GObject      *source,
                                        ctx->cancellable,
                                        (GAsyncReadyCallback)set_primary_sim_slot_ready,
                                        NULL);
+        return;
+    }
+
+    /* Request to get cell info? */
+    if (get_cell_info_flag) {
+        mm_modem_get_cell_info (ctx->modem,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)get_cell_info_ready,
+                                NULL);
         return;
     }
 
@@ -1456,6 +1500,15 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
         result = mm_modem_set_primary_sim_slot_sync (ctx->modem, set_primary_sim_slot_int, NULL, &error);
         set_primary_sim_slot_process_reply (result, error);
+        return;
+    }
+
+    /* Request to get cell info? */
+    if (get_cell_info_flag) {
+        GList *list;
+
+        list = mm_modem_get_cell_info_sync (ctx->modem, NULL, &error);
+        get_cell_info_process_reply (list, error);
         return;
     }
 

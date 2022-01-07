@@ -38,6 +38,7 @@ typedef enum {
     MMC_S_MODEM_MODES,
     MMC_S_MODEM_BANDS,
     MMC_S_MODEM_IP,
+    MMC_S_MODEM_CELL_INFO,
     MMC_S_MODEM_3GPP,
     MMC_S_MODEM_3GPP_EPS,
     MMC_S_MODEM_3GPP_5GNR,
@@ -127,6 +128,8 @@ typedef enum {
     MMC_F_BANDS_CURRENT,
     /* IP section */
     MMC_F_IP_SUPPORTED,
+    /* Cell info section */
+    MMC_F_CELL_INFO,
     /* 3GPP section */
     MMC_F_3GPP_IMEI,
     MMC_F_3GPP_ENABLED_LOCKS,
@@ -392,6 +395,7 @@ void mmcli_output_pco_list           (GList                     *pco_list);
 void mmcli_output_preferred_networks (GList                     *preferred_nets_list);
 void mmcli_output_profile_list       (GList                     *profile_list);
 void mmcli_output_profile_set        (MM3gppProfile             *profile);
+void mmcli_output_cell_info          (GList                     *cell_info_list);
 
 /******************************************************************************/
 /* Dump output */
