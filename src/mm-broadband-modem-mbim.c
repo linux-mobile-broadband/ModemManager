@@ -121,6 +121,7 @@ struct _MMBroadbandModemMbimPrivate {
     gboolean is_pco_supported;
     gboolean is_lte_attach_info_supported;
     gboolean is_nr5g_registration_settings_supported;
+    gboolean is_base_stations_info_supported;
     gboolean is_ussd_supported;
     gboolean is_atds_location_supported;
     gboolean is_atds_signal_supported;
@@ -2234,6 +2235,400 @@ modem_reset (MMIfaceModem        *_self,
 }
 
 /*****************************************************************************/
+/* Cell info retrieval */
+
+static GList *
+modem_get_cell_info_finish (MMIfaceModem  *self,
+                            GAsyncResult  *res,
+                            GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+cell_info_list_free (GList *list)
+{
+    g_list_free_full (list, (GDestroyNotify)g_object_unref);
+}
+
+static void
+base_stations_info_query_ready (MbimDevice   *device,
+                                GAsyncResult *res,
+                                GTask        *task)
+{
+    MMBroadbandModemMbim                          *self;
+    g_autoptr(MbimMessage)                         response = NULL;
+    GError                                        *error = NULL;
+    GList                                         *list = NULL;
+    MMCellInfo                                    *info = NULL;
+    g_autoptr(MbimCellInfoServingGsm)              gsm_serving_cell = NULL;
+    g_autoptr(MbimCellInfoServingUmts)             umts_serving_cell = NULL;
+    g_autoptr(MbimCellInfoServingTdscdma)          tdscdma_serving_cell = NULL;
+    g_autoptr(MbimCellInfoServingLte)              lte_serving_cell = NULL;
+    guint32                                        gsm_neighboring_cells_count = 0;
+    g_autoptr(MbimCellInfoNeighboringGsmArray)     gsm_neighboring_cells = NULL;
+    guint32                                        umts_neighboring_cells_count = 0;
+    g_autoptr(MbimCellInfoNeighboringUmtsArray)    umts_neighboring_cells = NULL;
+    guint32                                        tdscdma_neighboring_cells_count = 0;
+    g_autoptr(MbimCellInfoNeighboringTdscdmaArray) tdscdma_neighboring_cells = NULL;
+    guint32                                        lte_neighboring_cells_count = 0;
+    g_autoptr(MbimCellInfoNeighboringLteArray)     lte_neighboring_cells = NULL;
+    guint32                                        cdma_cells_count = 0;
+    g_autoptr(MbimCellInfoCdmaArray)               cdma_cells = NULL;
+    guint32                                        nr_serving_cells_count = 0;
+    g_autoptr(MbimCellInfoServingNrArray)          nr_serving_cells = NULL;
+    guint32                                        nr_neighboring_cells_count = 0;
+    g_autoptr(MbimCellInfoNeighboringNrArray)      nr_neighboring_cells = NULL;
+
+    self = g_task_get_source_object (task);
+
+    response = mbim_device_command_finish (device, res, &error);
+    if (!response || !mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* MBIMEx 3.0 support */
+    if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
+        if (!mbim_message_ms_basic_connect_extensions_v3_base_stations_info_response_parse (
+                response,
+                NULL, /* system_type_v3 */
+                NULL, /* system_subtype */
+                &gsm_serving_cell,
+                &umts_serving_cell,
+                &tdscdma_serving_cell,
+                &lte_serving_cell,
+                &gsm_neighboring_cells_count,
+                &gsm_neighboring_cells,
+                &umts_neighboring_cells_count,
+                &umts_neighboring_cells,
+                &tdscdma_neighboring_cells_count,
+                &tdscdma_neighboring_cells,
+                &lte_neighboring_cells_count,
+                &lte_neighboring_cells,
+                &cdma_cells_count,
+                &cdma_cells,
+                &nr_serving_cells_count,
+                &nr_serving_cells,
+                &nr_neighboring_cells_count,
+                &nr_neighboring_cells,
+                &error))
+            g_prefix_error (&error, "Failed processing MBIMEx v3.0 base stations info response: ");
+        else
+            mm_obj_dbg (self, "processed MBIMEx v3.0 base stations info response");
+    }
+    /* MBIMEx 1.0 support */
+    else {
+        if (!mbim_message_ms_basic_connect_extensions_base_stations_info_response_parse (
+                response,
+                NULL, /* system_type */
+                &gsm_serving_cell,
+                &umts_serving_cell,
+                &tdscdma_serving_cell,
+                &lte_serving_cell,
+                &gsm_neighboring_cells_count,
+                &gsm_neighboring_cells,
+                &umts_neighboring_cells_count,
+                &umts_neighboring_cells,
+                &tdscdma_neighboring_cells_count,
+                &tdscdma_neighboring_cells,
+                &lte_neighboring_cells_count,
+                &lte_neighboring_cells,
+                &cdma_cells_count,
+                &cdma_cells,
+                &error))
+            g_prefix_error (&error, "Failed processing MBIMEx v1.0 base stations info response: ");
+        else
+            mm_obj_dbg (self, "processed MBIMEx v1.0 base stations info response");
+    }
+
+    if (error) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+#define CELL_INFO_SET_STR(VALUE, SETTER, CELL_TYPE) do {    \
+        if (VALUE) {                                        \
+            mm_cell_info_##SETTER (CELL_TYPE (info), VALUE); \
+        }                                                   \
+    } while (0)
+
+#define CELL_INFO_SET_HEXSTR(VALUE, UNKNOWN, MODIFIER, SETTER, CELL_TYPE) do { \
+        if (VALUE != UNKNOWN) {                                                \
+            g_autofree gchar *str = NULL;                                      \
+                                                                               \
+            str = g_strdup_printf ("%" MODIFIER "X", VALUE);                   \
+            mm_cell_info_##SETTER (CELL_TYPE (info), str);                     \
+        }                                                                      \
+    } while (0)
+
+#define CELL_INFO_SET_UINT(VALUE, UNKNOWN, SETTER, CELL_TYPE) do { \
+        if (VALUE != UNKNOWN) {                                    \
+            mm_cell_info_##SETTER (CELL_TYPE (info), VALUE);       \
+        }                                                          \
+    } while (0)
+
+#define CELL_INFO_SET_INT_DOUBLE(VALUE, UNKNOWN, SETTER, CELL_TYPE) do { \
+        if (VALUE != (gint)UNKNOWN) {                                    \
+            mm_cell_info_##SETTER (CELL_TYPE (info), (gdouble)VALUE);    \
+        }                                                                \
+    } while (0)
+
+#define CELL_INFO_SET_UINT_DOUBLE_SCALED(VALUE, UNKNOWN, SCALE, SETTER, CELL_TYPE) do { \
+        if (VALUE != UNKNOWN) {                                                  \
+            mm_cell_info_##SETTER (CELL_TYPE (info), (gdouble)(VALUE + SCALE));        \
+        }                                                                              \
+    } while (0)
+
+    if (gsm_serving_cell) {
+        info = mm_cell_info_gsm_new_from_dictionary (NULL);
+        mm_cell_info_set_serving (info, TRUE);
+
+        CELL_INFO_SET_STR    (gsm_serving_cell->provider_id,                        gsm_set_operator_id,     MM_CELL_INFO_GSM);
+        CELL_INFO_SET_HEXSTR (gsm_serving_cell->location_area_code, 0xFFFFFFFF, "", gsm_set_lac,             MM_CELL_INFO_GSM);
+        CELL_INFO_SET_HEXSTR (gsm_serving_cell->cell_id,            0xFFFFFFFF, "", gsm_set_ci,              MM_CELL_INFO_GSM);
+        CELL_INFO_SET_UINT   (gsm_serving_cell->timing_advance,     0xFFFFFFFF,     gsm_set_timing_advance,  MM_CELL_INFO_GSM);
+        CELL_INFO_SET_UINT   (gsm_serving_cell->arfcn,              0xFFFFFFFF,     gsm_set_arfcn,           MM_CELL_INFO_GSM);
+        CELL_INFO_SET_HEXSTR (gsm_serving_cell->base_station_id,    0xFFFFFFFF, "", gsm_set_base_station_id, MM_CELL_INFO_GSM);
+        CELL_INFO_SET_UINT   (gsm_serving_cell->rx_level,           0xFFFFFFFF,     gsm_set_rx_level,        MM_CELL_INFO_GSM);
+
+        list = g_list_append (list, g_steal_pointer (&info));
+    }
+
+    if (gsm_neighboring_cells_count && gsm_neighboring_cells) {
+        guint i;
+
+        for (i = 0; i < gsm_neighboring_cells_count; i++) {
+            info = mm_cell_info_gsm_new_from_dictionary (NULL);
+            mm_cell_info_set_serving (info, FALSE);
+
+            CELL_INFO_SET_STR    (gsm_neighboring_cells[i]->provider_id,                        gsm_set_operator_id,     MM_CELL_INFO_GSM);
+            CELL_INFO_SET_HEXSTR (gsm_neighboring_cells[i]->location_area_code, 0xFFFFFFFF, "", gsm_set_lac,             MM_CELL_INFO_GSM);
+            CELL_INFO_SET_HEXSTR (gsm_neighboring_cells[i]->cell_id,            0xFFFFFFFF, "", gsm_set_ci,              MM_CELL_INFO_GSM);
+            CELL_INFO_SET_UINT   (gsm_neighboring_cells[i]->arfcn,              0xFFFFFFFF,     gsm_set_arfcn,           MM_CELL_INFO_GSM);
+            CELL_INFO_SET_HEXSTR (gsm_neighboring_cells[i]->base_station_id,    0xFFFFFFFF, "", gsm_set_base_station_id, MM_CELL_INFO_GSM);
+            CELL_INFO_SET_UINT   (gsm_neighboring_cells[i]->rx_level,           0xFFFFFFFF,     gsm_set_rx_level,        MM_CELL_INFO_GSM);
+
+            list = g_list_append (list, g_steal_pointer (&info));
+        }
+    }
+
+    if (umts_serving_cell) {
+        info = mm_cell_info_umts_new_from_dictionary (NULL);
+        mm_cell_info_set_serving (info, TRUE);
+
+        CELL_INFO_SET_STR        (umts_serving_cell->provider_id,                             umts_set_operator_id,      MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_HEXSTR     (umts_serving_cell->location_area_code,      0xFFFFFFFF, "", umts_set_lac,              MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_HEXSTR     (umts_serving_cell->cell_id,                 0xFFFFFFFF, "", umts_set_ci,               MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_UINT       (umts_serving_cell->frequency_info_ul,       0xFFFFFFFF,     umts_set_frequency_fdd_ul, MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_UINT       (umts_serving_cell->frequency_info_dl,       0xFFFFFFFF,     umts_set_frequency_fdd_dl, MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_UINT       (umts_serving_cell->frequency_info_nt,       0xFFFFFFFF,     umts_set_frequency_tdd,    MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_UINT       (umts_serving_cell->uarfcn,                  0xFFFFFFFF,     umts_set_uarfcn,           MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_UINT       (umts_serving_cell->primary_scrambling_code, 0xFFFFFFFF,     umts_set_psc,              MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_INT_DOUBLE (umts_serving_cell->rscp,                    0,              umts_set_rscp,             MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_INT_DOUBLE (umts_serving_cell->ecno,                    1,              umts_set_ecio,             MM_CELL_INFO_UMTS);
+        CELL_INFO_SET_UINT       (umts_serving_cell->path_loss,               0xFFFFFFFF,     umts_set_path_loss,        MM_CELL_INFO_UMTS);
+
+        list = g_list_append (list, g_steal_pointer (&info));
+    }
+
+    if (umts_neighboring_cells_count && umts_neighboring_cells) {
+        guint i;
+
+        for (i = 0; i < umts_neighboring_cells_count; i++) {
+            info = mm_cell_info_umts_new_from_dictionary (NULL);
+            mm_cell_info_set_serving (info, FALSE);
+
+            CELL_INFO_SET_STR        (umts_neighboring_cells[i]->provider_id,                             umts_set_operator_id, MM_CELL_INFO_UMTS);
+            CELL_INFO_SET_HEXSTR     (umts_neighboring_cells[i]->location_area_code,      0xFFFFFFFF, "", umts_set_lac,         MM_CELL_INFO_UMTS);
+            CELL_INFO_SET_HEXSTR     (umts_neighboring_cells[i]->cell_id,                 0xFFFFFFFF, "", umts_set_ci,          MM_CELL_INFO_UMTS);
+            CELL_INFO_SET_UINT       (umts_neighboring_cells[i]->uarfcn,                  0xFFFFFFFF,     umts_set_uarfcn,      MM_CELL_INFO_UMTS);
+            CELL_INFO_SET_UINT       (umts_neighboring_cells[i]->primary_scrambling_code, 0xFFFFFFFF,     umts_set_psc,         MM_CELL_INFO_UMTS);
+            CELL_INFO_SET_INT_DOUBLE (umts_neighboring_cells[i]->rscp,                    0,              umts_set_rscp,        MM_CELL_INFO_UMTS);
+            CELL_INFO_SET_INT_DOUBLE (umts_neighboring_cells[i]->ecno,                    1,              umts_set_ecio,        MM_CELL_INFO_UMTS);
+            CELL_INFO_SET_UINT       (umts_neighboring_cells[i]->path_loss,               0xFFFFFFFF,     umts_set_path_loss,   MM_CELL_INFO_UMTS);
+
+            list = g_list_append (list, g_steal_pointer (&info));
+        }
+    }
+
+    if (tdscdma_serving_cell) {
+        info = mm_cell_info_tdscdma_new_from_dictionary (NULL);
+        mm_cell_info_set_serving (info, TRUE);
+
+        CELL_INFO_SET_STR        (tdscdma_serving_cell->provider_id,                        tdscdma_set_operator_id,       MM_CELL_INFO_TDSCDMA);
+        CELL_INFO_SET_HEXSTR     (tdscdma_serving_cell->location_area_code, 0xFFFFFFFF, "", tdscdma_set_lac,               MM_CELL_INFO_TDSCDMA);
+        CELL_INFO_SET_HEXSTR     (tdscdma_serving_cell->cell_id,            0xFFFFFFFF, "", tdscdma_set_ci,                MM_CELL_INFO_TDSCDMA);
+        CELL_INFO_SET_UINT       (tdscdma_serving_cell->uarfcn,             0xFFFFFFFF,     tdscdma_set_uarfcn,            MM_CELL_INFO_TDSCDMA);
+        CELL_INFO_SET_UINT       (tdscdma_serving_cell->cell_parameter_id,  0xFFFFFFFF,     tdscdma_set_cell_parameter_id, MM_CELL_INFO_TDSCDMA);
+        CELL_INFO_SET_UINT       (tdscdma_serving_cell->timing_advance,     0xFFFFFFFF,     tdscdma_set_timing_advance,    MM_CELL_INFO_TDSCDMA);
+        CELL_INFO_SET_INT_DOUBLE (tdscdma_serving_cell->rscp,               0xFFFFFFFF,     tdscdma_set_rscp,              MM_CELL_INFO_TDSCDMA);
+        CELL_INFO_SET_UINT       (tdscdma_serving_cell->path_loss,          0xFFFFFFFF,     tdscdma_set_path_loss,         MM_CELL_INFO_TDSCDMA);
+
+        list = g_list_append (list, g_steal_pointer (&info));
+    }
+
+    if (tdscdma_neighboring_cells_count && tdscdma_neighboring_cells) {
+        guint i;
+
+        for (i = 0; i < tdscdma_neighboring_cells_count; i++) {
+            info = mm_cell_info_tdscdma_new_from_dictionary (NULL);
+            mm_cell_info_set_serving (info, FALSE);
+
+            CELL_INFO_SET_STR        (tdscdma_neighboring_cells[i]->provider_id,                        tdscdma_set_operator_id,       MM_CELL_INFO_TDSCDMA);
+            CELL_INFO_SET_HEXSTR     (tdscdma_neighboring_cells[i]->location_area_code, 0xFFFFFFFF, "", tdscdma_set_lac,               MM_CELL_INFO_TDSCDMA);
+            CELL_INFO_SET_HEXSTR     (tdscdma_neighboring_cells[i]->cell_id,            0xFFFFFFFF, "", tdscdma_set_ci,                MM_CELL_INFO_TDSCDMA);
+            CELL_INFO_SET_UINT       (tdscdma_neighboring_cells[i]->uarfcn,             0xFFFFFFFF,     tdscdma_set_uarfcn,            MM_CELL_INFO_TDSCDMA);
+            CELL_INFO_SET_UINT       (tdscdma_neighboring_cells[i]->cell_parameter_id,  0xFFFFFFFF,     tdscdma_set_cell_parameter_id, MM_CELL_INFO_TDSCDMA);
+            CELL_INFO_SET_UINT       (tdscdma_neighboring_cells[i]->timing_advance,     0xFFFFFFFF,     tdscdma_set_timing_advance,    MM_CELL_INFO_TDSCDMA);
+            CELL_INFO_SET_INT_DOUBLE (tdscdma_neighboring_cells[i]->rscp,               0xFFFFFFFF,     tdscdma_set_rscp,              MM_CELL_INFO_TDSCDMA);
+            CELL_INFO_SET_UINT       (tdscdma_neighboring_cells[i]->path_loss,          0xFFFFFFFF,     tdscdma_set_path_loss,         MM_CELL_INFO_TDSCDMA);
+
+            list = g_list_append (list, g_steal_pointer (&info));
+        }
+    }
+
+    if (lte_serving_cell) {
+        info = mm_cell_info_lte_new_from_dictionary (NULL);
+        mm_cell_info_set_serving (info, TRUE);
+
+        CELL_INFO_SET_STR        (lte_serving_cell->provider_id,                      lte_set_operator_id,    MM_CELL_INFO_LTE);
+        CELL_INFO_SET_HEXSTR     (lte_serving_cell->tac,              0xFFFFFFFF, "", lte_set_tac,            MM_CELL_INFO_LTE);
+        CELL_INFO_SET_HEXSTR     (lte_serving_cell->cell_id,          0xFFFFFFFF, "", lte_set_ci,             MM_CELL_INFO_LTE);
+        CELL_INFO_SET_HEXSTR     (lte_serving_cell->physical_cell_id, 0xFFFFFFFF, "", lte_set_physical_ci,    MM_CELL_INFO_LTE);
+        CELL_INFO_SET_UINT       (lte_serving_cell->earfcn,           0xFFFFFFFF,     lte_set_earfcn,         MM_CELL_INFO_LTE);
+        CELL_INFO_SET_INT_DOUBLE (lte_serving_cell->rsrp,             0xFFFFFFFF,     lte_set_rsrp,           MM_CELL_INFO_LTE);
+        CELL_INFO_SET_INT_DOUBLE (lte_serving_cell->rsrq,             0xFFFFFFFF,     lte_set_rsrq,           MM_CELL_INFO_LTE);
+        CELL_INFO_SET_UINT       (lte_serving_cell->timing_advance,   0xFFFFFFFF,     lte_set_timing_advance, MM_CELL_INFO_LTE);
+
+        list = g_list_append (list, g_steal_pointer (&info));
+    }
+
+    if (lte_neighboring_cells_count && lte_neighboring_cells) {
+        guint i;
+
+        for (i = 0; i < lte_neighboring_cells_count; i++) {
+            info = mm_cell_info_lte_new_from_dictionary (NULL);
+            mm_cell_info_set_serving (info, FALSE);
+
+            CELL_INFO_SET_STR        (lte_neighboring_cells[i]->provider_id,                      lte_set_operator_id, MM_CELL_INFO_LTE);
+            CELL_INFO_SET_HEXSTR     (lte_neighboring_cells[i]->tac,              0xFFFFFFFF, "", lte_set_tac,         MM_CELL_INFO_LTE);
+            CELL_INFO_SET_HEXSTR     (lte_neighboring_cells[i]->cell_id,          0xFFFFFFFF, "", lte_set_ci,          MM_CELL_INFO_LTE);
+            CELL_INFO_SET_HEXSTR     (lte_neighboring_cells[i]->physical_cell_id, 0xFFFFFFFF, "", lte_set_physical_ci, MM_CELL_INFO_LTE);
+            CELL_INFO_SET_UINT       (lte_neighboring_cells[i]->earfcn,           0xFFFFFFFF,     lte_set_earfcn,      MM_CELL_INFO_LTE);
+            CELL_INFO_SET_INT_DOUBLE (lte_neighboring_cells[i]->rsrp,             0xFFFFFFFF,     lte_set_rsrp,        MM_CELL_INFO_LTE);
+            CELL_INFO_SET_INT_DOUBLE (lte_neighboring_cells[i]->rsrq,             0xFFFFFFFF,     lte_set_rsrq,        MM_CELL_INFO_LTE);
+
+            list = g_list_append (list, g_steal_pointer (&info));
+        }
+    }
+
+    if (cdma_cells_count && cdma_cells) {
+        guint i;
+
+        for (i = 0; i < cdma_cells_count; i++) {
+            info = mm_cell_info_cdma_new_from_dictionary (NULL);
+            mm_cell_info_set_serving (info, cdma_cells[i]->serving_cell_flag);
+
+            CELL_INFO_SET_HEXSTR     (cdma_cells[i]->nid,              0xFFFFFFFF, "", cdma_set_nid,             MM_CELL_INFO_CDMA);
+            CELL_INFO_SET_HEXSTR     (cdma_cells[i]->sid,              0xFFFFFFFF, "", cdma_set_sid,             MM_CELL_INFO_CDMA);
+            CELL_INFO_SET_HEXSTR     (cdma_cells[i]->base_station_id,  0xFFFFFFFF, "", cdma_set_base_station_id, MM_CELL_INFO_CDMA);
+            CELL_INFO_SET_HEXSTR     (cdma_cells[i]->ref_pn,           0xFFFFFFFF, "", cdma_set_ref_pn,          MM_CELL_INFO_CDMA);
+            CELL_INFO_SET_UINT       (cdma_cells[i]->pilot_strength,   0xFFFFFFFF,     cdma_set_pilot_strength,  MM_CELL_INFO_CDMA);
+
+            list = g_list_append (list, g_steal_pointer (&info));
+        }
+    }
+
+    if (nr_serving_cells_count && nr_serving_cells) {
+        guint i;
+
+        for (i = 0; i < nr_serving_cells_count; i++) {
+            info = mm_cell_info_nr5g_new_from_dictionary (NULL);
+            mm_cell_info_set_serving (info, TRUE);
+
+            CELL_INFO_SET_STR                (nr_serving_cells[i]->provider_id,                                             nr5g_set_operator_id,    MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->tac,              0xFFFFFFFF,         "",                nr5g_set_tac,            MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->nci,              0xFFFFFFFFFFFFFFFF, G_GINT64_MODIFIER, nr5g_set_ci,             MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_serving_cells[i]->physical_cell_id, 0xFFFFFFFF,         "",                nr5g_set_physical_ci,    MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT               (nr_serving_cells[i]->nrarfcn,          0xFFFFFFFF,                            nr5g_set_nrarfcn,        MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->rsrp,             0xFFFFFFFF,         -156,              nr5g_set_rsrp,           MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->rsrq,             0xFFFFFFFF,         -43,               nr5g_set_rsrq,           MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_serving_cells[i]->sinr,             0xFFFFFFFF,         -23,               nr5g_set_sinr,           MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT               (nr_serving_cells[i]->timing_advance,   0xFFFFFFFFFFFFFFFF,                    nr5g_set_timing_advance, MM_CELL_INFO_NR5G);
+
+            list = g_list_append (list, g_steal_pointer (&info));
+        }
+    }
+
+    if (nr_neighboring_cells_count && nr_neighboring_cells) {
+        guint i;
+
+        for (i = 0; i < nr_neighboring_cells_count; i++) {
+            info = mm_cell_info_nr5g_new_from_dictionary (NULL);
+            mm_cell_info_set_serving (info, FALSE);
+
+            CELL_INFO_SET_STR                (nr_neighboring_cells[i]->provider_id,                        nr5g_set_operator_id, MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_neighboring_cells[i]->tac,              0xFFFFFFFF, "",   nr5g_set_tac,         MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_STR                (nr_neighboring_cells[i]->cell_id,                            nr5g_set_ci,          MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_HEXSTR             (nr_neighboring_cells[i]->physical_cell_id, 0xFFFFFFFF, "",   nr5g_set_physical_ci, MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_neighboring_cells[i]->rsrp,             0xFFFFFFFF, -156, nr5g_set_rsrp,        MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_neighboring_cells[i]->rsrq,             0xFFFFFFFF, -43,  nr5g_set_rsrq,        MM_CELL_INFO_NR5G);
+            CELL_INFO_SET_UINT_DOUBLE_SCALED (nr_neighboring_cells[i]->sinr,             0xFFFFFFFF, -23,  nr5g_set_sinr,        MM_CELL_INFO_NR5G);
+
+            list = g_list_append (list, g_steal_pointer (&info));
+        }
+    }
+
+#undef CELL_INFO_SET_STR
+#undef CELL_INFO_SET_HEXSTR
+#undef CELL_INFO_SET_UINT
+#undef CELL_INFO_SET_INT_DOUBLE
+#undef CELL_INFO_SET_UINT_DOUBLE_SCALED
+
+    g_task_return_pointer (task, list, (GDestroyNotify)cell_info_list_free);
+    g_object_unref (task);
+}
+
+static void
+modem_get_cell_info (MMIfaceModem        *_self,
+                     GAsyncReadyCallback  callback,
+                     gpointer             user_data)
+{
+    MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
+    GTask                *task;
+    MbimDevice           *device;
+    MbimMessage          *message;
+
+    if (!peek_device (self, &device, callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (!self->priv->is_base_stations_info_supported) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "base stations info is not supported");
+        g_object_unref (task);
+        return;
+    }
+
+    /* Default capacity is 15 */
+    if (mbim_device_check_ms_mbimex_version (device, 3, 0))
+        message = mbim_message_ms_basic_connect_extensions_v3_base_stations_info_query_new (15, 15, 15, 15, 15, 15, NULL);
+    else
+        message = mbim_message_ms_basic_connect_extensions_base_stations_info_query_new (15, 15, 15, 15, 15, NULL);
+
+    mbim_device_command (device,
+                         message,
+                         300,
+                         NULL,
+                         (GAsyncReadyCallback)base_stations_info_query_ready,
+                         task);
+}
+
+/*****************************************************************************/
 /* Create Bearer (Modem interface) */
 
 static MMBaseBearer *
@@ -2635,6 +3030,9 @@ query_device_services_ready (MbimDevice   *device,
                     } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_REGISTRATION_PARAMETERS) {
                         mm_obj_dbg (self, "5GNR registration settings are supported");
                         self->priv->is_nr5g_registration_settings_supported = TRUE;
+                    } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_BASE_STATIONS_INFO) {
+                        mm_obj_dbg (self, "Base stations info is supported");
+                        self->priv->is_base_stations_info_supported = TRUE;
                     } else if (device_services[i]->cids[j] == MBIM_CID_MS_BASIC_CONNECT_EXTENSIONS_PROVISIONED_CONTEXTS) {
                         if (mm_context_get_test_mbimex_profile_management ()) {
                             mm_obj_dbg (self, "Profile management extension is supported");
@@ -8675,6 +9073,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Additional actions */
     iface->load_signal_quality = modem_load_signal_quality;
     iface->load_signal_quality_finish = modem_load_signal_quality_finish;
+    iface->get_cell_info = modem_get_cell_info;
+    iface->get_cell_info_finish = modem_get_cell_info_finish;
 
     /* Unneeded things */
     iface->modem_after_power_up = NULL;
