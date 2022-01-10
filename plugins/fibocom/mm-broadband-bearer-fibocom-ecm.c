@@ -87,20 +87,50 @@ dial_3gpp_finish (MMBroadbandBearer *self,
 }
 
 static void
+gtrndis_verify_ready (MMBaseModem  *modem,
+                      GAsyncResult *res,
+                      GTask        *task)
+{
+    DialContext *ctx;
+    GError      *error = NULL;
+    const gchar *response;
+
+    ctx = g_task_get_task_data (task);
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+
+    if (!response)
+        g_task_return_error (task, error);
+    else {
+        response = mm_strip_tag (response, "+GTRNDIS:");
+        if (strtol (response, NULL, 10) != 1)
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Connection status verification failed");
+        else
+            g_task_return_pointer (task, g_object_ref (ctx->data), g_object_unref);
+    }
+
+    g_object_unref (task);
+}
+
+static void
 gtrndis_activate_ready (MMBaseModem  *modem,
                         GAsyncResult *res,
                         GTask        *task)
 {
-    DialContext *ctx;
-    GError      *error = NULL;
+    GError *error = NULL;
 
-    ctx = g_task_get_task_data (task);
-
-    if (!mm_base_modem_at_command_finish (modem, res, &error))
+    if (!mm_base_modem_at_command_finish (modem, res, &error)) {
         g_task_return_error (task, error);
-    else
-        g_task_return_pointer (task, g_object_ref (ctx->data), g_object_unref);
-    g_object_unref (task);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_base_modem_at_command (modem,
+                              "+GTRNDIS?",
+                              6, /* timeout [s] */
+                              FALSE, /* allow_cached */
+                              (GAsyncReadyCallback) gtrndis_verify_ready,
+                              task);
 }
 
 static void
