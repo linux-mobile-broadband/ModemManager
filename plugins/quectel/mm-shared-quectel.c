@@ -30,6 +30,10 @@
 #include "mm-shared-quectel.h"
 #include "mm-modem-helpers-quectel.h"
 
+#if defined WITH_MBIM
+#include "mm-broadband-modem-mbim.h"
+#endif
+
 /*****************************************************************************/
 /* Private context */
 
@@ -143,17 +147,32 @@ mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *s
     return g_task_propagate_pointer (G_TASK (res), error);
 }
 
+static gboolean
+quectel_is_firehose_supported (MMBaseModem *modem)
+{
+    guint16 vid = mm_base_modem_get_vendor_id (modem);
+    guint16 pid = mm_base_modem_get_product_id (modem);
+
+    /* EM120 and EM160 */
+    if (vid == 0x1eac && (pid == 0x1001 || pid == 0x1002))
+        return TRUE;
+    /* EM05-G and EM05-CE */
+    if (vid == 0x2c7c && (pid == 0x030a || pid == 0x0127))
+        return TRUE;
+
+    return FALSE;
+}
+
 static void
-quectel_get_firmware_version_ready (MMBaseModem  *modem,
-                                    GAsyncResult *res,
-                                    GTask        *task)
+quectel_at_port_get_firmware_version_ready (MMBaseModem  *modem,
+                                            GAsyncResult *res,
+                                            GTask        *task)
 {
     MMFirmwareUpdateSettings *update_settings;
     const gchar              *version;
 
     update_settings = g_task_get_task_data (task);
 
-    /* Set full firmware version */
     version = mm_base_modem_at_command_finish (modem, res, NULL);
     if (version)
         mm_firmware_update_settings_set_version (update_settings, version);
@@ -161,6 +180,30 @@ quectel_get_firmware_version_ready (MMBaseModem  *modem,
     g_task_return_pointer (task, g_object_ref (update_settings), g_object_unref);
     g_object_unref (task);
 }
+
+#if defined WITH_MBIM
+static void
+quectel_mbim_port_get_firmware_version_ready (MbimDevice   *device,
+                                              GAsyncResult *res,
+                                              GTask        *task)
+{
+    g_autoptr(MbimMessage)    response = NULL;
+    guint32                   version_id;
+    g_autofree gchar         *version_str = NULL;
+    MMFirmwareUpdateSettings *update_settings;
+
+    update_settings = g_task_get_task_data (task);
+
+    response = mbim_device_command_finish (device, res, NULL);
+    if (response && mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, NULL) &&
+        mbim_message_qdu_quectel_read_version_response_parse (response, &version_id, &version_str, NULL)) {
+        mm_firmware_update_settings_set_version (update_settings, version_str);
+    }
+
+    g_task_return_pointer (task, g_object_ref (update_settings), g_object_unref);
+    g_object_unref (task);
+}
+#endif
 
 static void
 qfastboot_test_ready (MMBaseModem  *self,
@@ -170,20 +213,19 @@ qfastboot_test_ready (MMBaseModem  *self,
     MMFirmwareUpdateSettings *update_settings;
 
     /* Set update method */
-    if (!mm_base_modem_at_command_finish (self, res, NULL))
-        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
-    else {
+    if (mm_base_modem_at_command_finish (self, res, NULL)) {
         update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
         mm_firmware_update_settings_set_fastboot_at (update_settings, "AT+QFASTBOOT");
-    }
+    } else
+        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
 
-    /* Get full firmware version */
     g_task_set_task_data (task, update_settings, g_object_unref);
+    /* Fetch full firmware info */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+QGMR?",
                               3,
                               FALSE,
-                              (GAsyncReadyCallback) quectel_get_firmware_version_ready,
+                              (GAsyncReadyCallback) quectel_at_port_get_firmware_version_ready,
                               task);
 }
 
@@ -193,14 +235,68 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
                                                  gpointer              user_data)
 {
     GTask *task;
+    MMFirmwareUpdateSettings *update_settings;
+    MMPortSerialAt *at_port;
+#if defined WITH_MBIM
+    MMPortMbim *mbim;
+#endif
 
     task = g_task_new (self, NULL, callback, user_data);
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "AT+QFASTBOOT=?",
-                              3,
-                              TRUE,
-                              (GAsyncReadyCallback)qfastboot_test_ready,
-                              task);
+
+    at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
+    if (at_port) {
+        if (quectel_is_firehose_supported (MM_BASE_MODEM (self))) {
+            /* Firehose modems */
+            update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE);
+            g_task_set_task_data (task, update_settings, g_object_unref);
+            /* Fetch full firmware info */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "+QGMR?",
+                                      3,
+                                      FALSE,
+                                      (GAsyncReadyCallback) quectel_at_port_get_firmware_version_ready,
+                                      task);
+        } else {
+            /* Check fastboot support */
+            mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                      "AT+QFASTBOOT=?",
+                                      3,
+                                      TRUE,
+                                      (GAsyncReadyCallback)qfastboot_test_ready,
+                                      task);
+        }
+        return;
+    }
+
+#if defined WITH_MBIM
+    mbim = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (mbim) {
+        g_autoptr(MbimMessage) message = NULL;
+
+        /* Set update method */
+        if (quectel_is_firehose_supported (MM_BASE_MODEM (self)))
+            update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE);
+        else
+            update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
+
+        /* Fetch firmware info */
+        g_task_set_task_data (task, update_settings, g_object_unref);
+        message = mbim_message_qdu_quectel_read_version_set_new (MBIM_QDU_QUECTEL_VERSION_TYPE_FW_BUILD_ID, NULL);
+        mbim_device_command (mm_port_mbim_peek_device (mbim),
+                             message,
+                             5,
+                             NULL,
+                             (GAsyncReadyCallback) quectel_mbim_port_get_firmware_version_ready,
+                             task);
+        return;
+    }
+#endif
+
+    g_task_return_new_error (task,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Couldn't find a port to fetch firmware info");
+    g_object_unref (task);
 }
 
 /*****************************************************************************/

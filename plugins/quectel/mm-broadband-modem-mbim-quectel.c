@@ -35,51 +35,6 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimQuectel, mm_broadband_modem_mbim_que
                         G_IMPLEMENT_INTERFACE (MM_TYPE_SHARED_QUECTEL, shared_quectel_init))
 
 /*****************************************************************************/
-/* Firmware update settings */
-
-static MMFirmwareUpdateSettings *
-firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
-                                      GAsyncResult          *res,
-                                      GError               **error)
-{
-    return g_task_propagate_pointer (G_TASK (res), error);
-}
-
-static void
-quectel_get_firmware_version_ready (MMBaseModem  *modem,
-                                    GAsyncResult *res,
-                                    GTask        *task)
-{
-    MMFirmwareUpdateSettings *update_settings;
-    const gchar              *version;
-
-    update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE);
-
-    version = mm_base_modem_at_command_finish (modem, res, NULL);
-    if (version)
-        mm_firmware_update_settings_set_version (update_settings, version);
-    g_task_return_pointer (task, update_settings, g_object_unref);
-    g_object_unref (task);
-}
-
-static void
-firmware_load_update_settings (MMIfaceModemFirmware *self,
-                               GAsyncReadyCallback   callback,
-                               gpointer              user_data)
-{
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+QGMR?",
-                              3,
-                              FALSE,
-                              (GAsyncReadyCallback) quectel_get_firmware_version_ready,
-                              task);
-}
-
-/*****************************************************************************/
 
 MMBroadbandModemMbimQuectel *
 mm_broadband_modem_mbim_quectel_new (const gchar  *device,
@@ -110,8 +65,8 @@ mm_broadband_modem_mbim_quectel_init (MMBroadbandModemMbimQuectel *self)
 static void
 iface_modem_firmware_init (MMIfaceModemFirmware *iface)
 {
-    iface->load_update_settings        = firmware_load_update_settings;
-    iface->load_update_settings_finish = firmware_load_update_settings_finish;
+    iface->load_update_settings        = mm_shared_quectel_firmware_load_update_settings;
+    iface->load_update_settings_finish = mm_shared_quectel_firmware_load_update_settings_finish;
 }
 
 static void
