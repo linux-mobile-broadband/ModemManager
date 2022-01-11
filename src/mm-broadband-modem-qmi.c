@@ -1821,15 +1821,7 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
     ctx = g_task_get_task_data (self->priv->set_operating_mode_task);
 
     output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
-    if (!output) {
-        g_prefix_error (&error, "QMI operation failed: ");
-        /* If unsupported, just complete without errors */
-        if (g_error_matches (error, QMI_CORE_ERROR, QMI_CORE_ERROR_UNSUPPORTED)) {
-            mm_obj_dbg (self, "device doesn't support operating mode setting: ignoring power update");
-            g_clear_error (&error);
-        }
-    } else if (!qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
-        g_prefix_error (&error, "Couldn't set operating mode: ");
+    if (!output || !qmi_message_dms_set_operating_mode_output_get_result (output, &error)) {
         /*
          * Some new devices, like the Dell DW5770, will return an internal error when
          * trying to bring the power mode to online.
@@ -1846,10 +1838,16 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
               g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_TRANSITION)))) {
             g_clear_error (&error);
             error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_RETRY, "Invalid transition");
-        }
+        } else
+            g_prefix_error (&error, "Couldn't set operating mode: ");
     }
 
-    if (error)
+    /* If unsupported, just complete without errors */
+    if (g_error_matches (error, QMI_CORE_ERROR, QMI_CORE_ERROR_UNSUPPORTED)) {
+        mm_obj_dbg (self, "device doesn't support operating mode setting: ignoring power update");
+        g_clear_error (&error);
+        set_operating_mode_complete (self, NULL);
+    } else if (error)
         set_operating_mode_complete (self, error);
     else
         mm_obj_dbg (self, "operating mode request sent, waiting for power update indication");
