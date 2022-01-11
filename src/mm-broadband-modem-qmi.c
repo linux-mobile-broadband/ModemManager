@@ -1994,7 +1994,7 @@ common_power_up_down_off (MMIfaceModem        *_self,
     g_task_set_task_data (task, GUINT_TO_POINTER (mode), NULL);
 
     if (self->priv->set_operating_mode_task) {
-        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS, "Another Operation in Progress");
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS, "Another operation in progress");
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
