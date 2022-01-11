@@ -1793,7 +1793,6 @@ power_event_report_indication_cb (QmiClientDms                      *client,
                              MM_CORE_ERROR_FAILED,
                              "Invalid power indication received");
         dms_set_operating_mode_complete (self, error);
-        g_object_unref (self);
         return;
     }
 
@@ -1804,7 +1803,6 @@ power_event_report_indication_cb (QmiClientDms                      *client,
     if (mode == state) {
         mm_obj_dbg (self, "Requested mode and mode received by indication matched");
         dms_set_operating_mode_complete (self, NULL);
-        g_object_unref (self);
         return;
     }
 
@@ -1812,7 +1810,6 @@ power_event_report_indication_cb (QmiClientDms                      *client,
                          MM_CORE_ERROR_FAILED,
                          "Requested mode and mode received by indication did not match");
     dms_set_operating_mode_complete (self, error);
-    g_object_unref (self);
 }
 
 static void
@@ -1932,7 +1929,7 @@ dms_set_event_report_operating_mode_activate_ready (QmiClientDms        *client,
         g_signal_connect (client,
                           "event-report",
                           G_CALLBACK (power_event_report_indication_cb),
-                          g_object_ref (self));
+                          self);
 
     g_assert (self->priv->set_operating_mode_task != NULL);
     mm_obj_dbg (self, "Power operation is pending");
