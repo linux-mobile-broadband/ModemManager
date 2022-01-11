@@ -1776,7 +1776,6 @@ dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
                          MM_CORE_ERROR_FAILED,
                          "Operation timed out. Did not get any indication");
     dms_set_operating_mode_complete (self, error);
-    g_object_unref (self);
 }
 
 static void
@@ -1976,7 +1975,7 @@ dms_set_operating_mode (MMBroadbandModemQmi *self)
     mm_obj_dbg (self, "Starting timeout for indication receiving for 10 seconds");
     self->priv->set_operating_timeout_id = g_timeout_add_seconds (10,
                                                                   (GSourceFunc) dms_set_operating_mode_timeout_cb,
-                                                                  g_object_ref (self));
+                                                                  self);
 }
 
 static void
