@@ -2000,7 +2000,6 @@ common_power_up_down_off (MMIfaceModem        *_self,
         return;
     }
     self->priv->set_operating_mode_task = task;
-    g_assert (self->priv->set_operating_mode_task != NULL);
     modem_power_indication_register (self);
 }
 
