@@ -1770,9 +1770,7 @@ dms_set_operating_mode_timeout_cb (MMBroadbandModemQmi *self)
 {
     GError *error = NULL;
 
-    error = g_error_new (MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Operation timed out. Did not get any indication");
+    error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Power update operation timed out");
     dms_set_operating_mode_complete (self, error);
 }
 
@@ -1786,29 +1784,25 @@ power_event_report_indication_cb (QmiClientDms                      *client,
     GError              *error = NULL;
     QmiDmsOperatingMode  mode;
 
-    mm_obj_dbg (self, "Power indication received");
-
     if (!qmi_indication_dms_event_report_output_get_operating_mode (output, &state, NULL)) {
-        error = g_error_new (MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Invalid power indication received");
+        error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Invalid power indication received");
         dms_set_operating_mode_complete (self, error);
         return;
     }
 
-    mm_obj_dbg (self, "Power state update: '%s'",
-                qmi_dms_operating_mode_get_string (state));
     task = self->priv->set_operating_mode_task;
     mode = GPOINTER_TO_UINT (g_task_get_task_data (task));
     if (mode == state) {
-        mm_obj_dbg (self, "Requested mode and mode received by indication matched");
+        mm_obj_dbg (self, "Power state successfully updated: '%s'", qmi_dms_operating_mode_get_string (state));
         dms_set_operating_mode_complete (self, NULL);
         return;
     }
 
     error = g_error_new (MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
-                         "Requested mode and mode received by indication did not match");
+                         "Requested mode (%s) and mode received (%s) did not match",
+                         qmi_dms_operating_mode_get_string (mode),
+                         qmi_dms_operating_mode_get_string (state));
     dms_set_operating_mode_complete (self, error);
 }
 
@@ -1824,10 +1818,11 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
 
     task = self->priv->set_operating_mode_task;
     if (task == NULL) {
-        mm_obj_dbg (self, "Indication received before response. Task returned.");
+        /* We completed the operation already via indication */
         g_object_unref (self);
         return;
     }
+
     mode = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
     output = qmi_client_dms_set_operating_mode_finish (client, res, &error);
@@ -1862,7 +1857,7 @@ dms_set_operating_mode_ready (QmiClientDms        *client,
     if (error)
         dms_set_operating_mode_complete (self, error);
     else
-        mm_obj_dbg (self, "Waiting for power indication to send success for the task");
+        mm_obj_dbg (self, "operating mode request sent, waiting for power update indication");
 
     g_object_unref (self);
 }
