@@ -148,19 +148,10 @@ mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *s
 }
 
 static gboolean
-quectel_is_firehose_supported (MMBaseModem *modem)
+quectel_is_firehose_supported (MMBaseModem *modem,
+                               MMPort      *port)
 {
-    guint16 vid = mm_base_modem_get_vendor_id (modem);
-    guint16 pid = mm_base_modem_get_product_id (modem);
-
-    /* EM120 and EM160 */
-    if (vid == 0x1eac && (pid == 0x1001 || pid == 0x1002))
-        return TRUE;
-    /* EM05-G and EM05-CE */
-    if (vid == 0x2c7c && (pid == 0x030a || pid == 0x0127))
-        return TRUE;
-
-    return FALSE;
+    return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_QUECTEL_FIREHOSE");
 }
 
 static void
@@ -245,7 +236,7 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
 
     at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
     if (at_port) {
-        if (quectel_is_firehose_supported (MM_BASE_MODEM (self))) {
+        if (quectel_is_firehose_supported (MM_BASE_MODEM (self), MM_PORT (at_port))) {
             /* Firehose modems */
             update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE);
             g_task_set_task_data (task, update_settings, g_object_unref);
@@ -274,7 +265,7 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
         g_autoptr(MbimMessage) message = NULL;
 
         /* Set update method */
-        if (quectel_is_firehose_supported (MM_BASE_MODEM (self)))
+        if (quectel_is_firehose_supported (MM_BASE_MODEM (self), MM_PORT (mbim)))
             update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE);
         else
             update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
