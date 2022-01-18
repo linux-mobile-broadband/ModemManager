@@ -158,9 +158,8 @@ quectel_get_firmware_version_ready (MMBaseModem  *modem,
     if (version)
         mm_firmware_update_settings_set_version (update_settings, version);
 
-    g_task_return_pointer (task, update_settings, g_object_unref);
+    g_task_return_pointer (task, g_object_ref (update_settings), g_object_unref);
     g_object_unref (task);
-    g_object_ref(update_settings);
 }
 
 static void
