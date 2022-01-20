@@ -33,21 +33,21 @@
 #include "mm-iface-modem-location.h"
 #include "mm-broadband-modem-mbim-foxconn.h"
 
-#if defined WITH_QMI
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 # include "mm-iface-modem-firmware.h"
 # include "mm-shared-qmi.h"
 #endif
 
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
 
-#if defined WITH_QMI
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 static void iface_modem_firmware_init (MMIfaceModemFirmware *iface);
 #endif
 
 static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemMbimFoxconn, mm_broadband_modem_mbim_foxconn, MM_TYPE_BROADBAND_MODEM_MBIM, 0,
-#if defined WITH_QMI
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_FIRMWARE, iface_modem_firmware_init)
 #endif
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init))
@@ -63,7 +63,7 @@ struct _MMBroadbandModemMbimFoxconnPrivate {
 };
 
 
-#if defined WITH_QMI
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
 /*****************************************************************************/
 /* Firmware update settings
@@ -500,7 +500,7 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
     iface->disable_location_gathering_finish = disable_location_gathering_finish;
 }
 
-#if defined WITH_QMI
+#if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
 static void
 iface_modem_firmware_init (MMIfaceModemFirmware *iface)
