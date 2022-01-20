@@ -148,10 +148,33 @@ mm_shared_quectel_firmware_load_update_settings_finish (MMIfaceModemFirmware  *s
 }
 
 static gboolean
+quectel_is_sahara_supported (MMBaseModem *modem,
+                             MMPort      *port)
+{
+    return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_QUECTEL_SAHARA");
+}
+
+static gboolean
 quectel_is_firehose_supported (MMBaseModem *modem,
                                MMPort      *port)
 {
     return mm_kernel_device_get_global_property_as_boolean (mm_port_peek_kernel_device (port), "ID_MM_QUECTEL_FIREHOSE");
+}
+
+static MMModemFirmwareUpdateMethod
+quectel_get_firmware_update_methods (MMBaseModem *modem,
+                                     MMPort      *port)
+{
+    MMModemFirmwareUpdateMethod update_methods;
+
+    update_methods = MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE;
+
+    if (quectel_is_firehose_supported (modem, port))
+        update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE;
+    if (quectel_is_sahara_supported (modem, port))
+        update_methods |= MM_MODEM_FIRMWARE_UPDATE_METHOD_SAHARA;
+
+    return update_methods;
 }
 
 static void
@@ -227,6 +250,7 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
 {
     GTask *task;
     MMFirmwareUpdateSettings *update_settings;
+    MMModemFirmwareUpdateMethod update_methods;
     MMPortSerialAt *at_port;
 #if defined WITH_MBIM
     MMPortMbim *mbim;
@@ -236,9 +260,11 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
 
     at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
     if (at_port) {
-        if (quectel_is_firehose_supported (MM_BASE_MODEM (self), MM_PORT (at_port))) {
+        update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
+
+        if (update_methods & MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE) {
             /* Firehose modems */
-            update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE);
+            update_settings = mm_firmware_update_settings_new (update_methods);
             g_task_set_task_data (task, update_settings, g_object_unref);
             /* Fetch full firmware info */
             mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -264,11 +290,8 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
     if (mbim) {
         g_autoptr(MbimMessage) message = NULL;
 
-        /* Set update method */
-        if (quectel_is_firehose_supported (MM_BASE_MODEM (self), MM_PORT (mbim)))
-            update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE);
-        else
-            update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
+        update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (mbim));
+        update_settings = mm_firmware_update_settings_new (update_methods);
 
         /* Fetch firmware info */
         g_task_set_task_data (task, update_settings, g_object_unref);

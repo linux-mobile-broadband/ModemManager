@@ -70,7 +70,9 @@ ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0800", ENV{.MM_USBIFNUM}=="03", SUBS
 
 # Quectel EM05-G and EM05-CE with firehose support
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="030a", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="030a", ENV{ID_MM_QUECTEL_SAHARA}="1"
 ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0127", ENV{ID_MM_QUECTEL_FIREHOSE}="1"
+ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="0127", ENV{ID_MM_QUECTEL_SAHARA}="1"
 
 GOTO="mm_quectel_end"
 
