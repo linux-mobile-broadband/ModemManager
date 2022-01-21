@@ -34,6 +34,18 @@ ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1010", ENV{.MM_USBIFNUM}=="03", SUBS
 # CE910-DUAL
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1011", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 
+# LE910C1-EUX
+# The following port is ignored since it's a diagnostic port
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1031", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1031", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1031", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
+# LE910C1-EUX (ECM composition)
+# The following port is ignored since it's a diagnostic port
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1033", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1033", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1033", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
 # LE922, LM9x0
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="00", ENV{ID_MM_PORT_IGNORE}="1"
 ATTRS{idVendor}=="1bc7", ATTRS{idProduct}=="1040", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
