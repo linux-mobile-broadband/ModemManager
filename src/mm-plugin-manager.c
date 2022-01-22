@@ -22,6 +22,8 @@
 #include <gmodule.h>
 #include <gio/gio.h>
 
+#include <config.h>
+
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 
@@ -713,8 +715,14 @@ port_context_new (MMPluginManager *self,
 #define MIN_PROBING_TIME_MSECS 2500
 
 /* Additional time to wait for other ports to appear after the last port is
- * exposed in the system. */
-#define EXTRA_PROBING_TIME_MSECS 1500
+ * exposed in the system. Longer time when not using udev, as we rely on
+ * mmcli --report-kernel-event events to report new port additions, e.g.
+ * via openwrt hotplug scripts. */
+#if defined WITH_UDEV
+# define EXTRA_PROBING_TIME_MSECS 1500
+#else
+# define EXTRA_PROBING_TIME_MSECS 3000
+#endif
 
 /* The wait time we define must always be less than the probing time */
 G_STATIC_ASSERT (MIN_WAIT_TIME_MSECS < MIN_PROBING_TIME_MSECS);
