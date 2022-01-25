@@ -68,12 +68,12 @@ mm_kernel_device_get_lower_device_name (const gchar *sysfs_path)
 static gchar *
 build_string_match_pattern (const gchar *str)
 {
-    GString     *regex_pattern;
-    const gchar *str_start;
-    gsize        len;
-    gchar       *aux;
-    gboolean     prefix_match = FALSE;
-    gboolean     suffix_match = FALSE;
+    GString          *regex_pattern;
+    const gchar      *str_start;
+    gsize             len;
+    g_autofree gchar *aux = NULL;
+    gboolean          prefix_match = FALSE;
+    gboolean          suffix_match = FALSE;
 
     /* We allow prefix and suffix matches given as input, by means of the
      * single '*' character given either at the beginning or the end of the
