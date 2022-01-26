@@ -63,12 +63,12 @@ gen_sources += gnome.mkenums(
   fhead: '#include <ModemManager.h>\n#include "mm-errors-types.h"\n',
 )
 
-gdbus_ifaces = [
-  ['bearer', mm_ifaces_bearer, [], false],
-  ['call', mm_ifaces_call, [], false],
-  ['manager', mm_ifaces, [], false],
-  ['sim', mm_ifaces_sim, [], false],
-]
+gdbus_ifaces = {
+  'bearer': {'sources': mm_ifaces_bearer, 'object_manager': false},
+  'call': {'sources':  mm_ifaces_call, 'object_manager': false},
+  'manager': {'sources': mm_ifaces, 'object_manager': false},
+  'sim': {'sources': mm_ifaces_sim, 'object_manager': false},
+}
 
 annotations = [
   ['org.freedesktop.ModemManager1.Modem.ModemCdma', 'org.gtk.GDBus.C.Name', 'ModemCdma'],
@@ -77,22 +77,20 @@ annotations = [
   ['org.freedesktop.ModemManager1.Modem.Modem3gpp.ProfileManager', 'org.gtk.GDBus.C.Name', 'Modem3gppProfileManager'],
 ]
 
-gdbus_ifaces += [['modem', mm_ifaces_modem, annotations, true]]
+gdbus_ifaces += {'modem': {'sources': mm_ifaces_modem, 'annotations': annotations, 'object_manager': true}}
 
 annotations = [['org.freedesktop.ModemManager1.Sms:Data', 'org.gtk.GDBus.C.ForceGVariant', 'True']]
 
-gdbus_ifaces += [['sms', mm_ifaces_sms, annotations, false]]
+gdbus_ifaces += {'sms': {'sources': mm_ifaces_sms, 'annotations': annotations, 'object_manager': false}}
 
-foreach gdbus_iface: gdbus_ifaces
+foreach name, kwargs: gdbus_ifaces
   gdbus_sources = gnome.gdbus_codegen(
-    'mm-gdbus-' + gdbus_iface[0],
-    sources: gdbus_iface[1],
+    'mm-gdbus-' + name,
     interface_prefix: 'org.freedesktop.ModemManager1.',
     namespace: 'MmGdbus',
     docbook: 'mm-gdbus-doc',
-    annotations: gdbus_iface[2],
-    object_manager: gdbus_iface[3],
     autocleanup: 'objects',
+    kwargs: kwargs,
     # FIXME: due to the lack of possibility to add `docbook targets` to the `expand_content_files`.
     build_by_default: true,
     install_header: true,
