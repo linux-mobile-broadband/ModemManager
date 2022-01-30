@@ -1730,8 +1730,8 @@ mm_port_subsys_to_qmi_endpoint_type (MMPortSubsys subsys)
  * as there would be no capability switching support.
  */
 MMModemCapability
-mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx,
-                                                   gpointer                  log_object)
+mm_current_capability_from_qmi_current_capabilities_context (MMQmiCurrentCapabilitiesContext *ctx,
+                                                             gpointer                         log_object)
 {
     MMModemCapability tmp = MM_MODEM_CAPABILITY_NONE;
     g_autofree gchar *nas_ssp_mode_preference_str = NULL;

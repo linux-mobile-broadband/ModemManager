@@ -25,23 +25,20 @@
 #include "mm-log-test.h"
 
 static void
-test_capabilities_expected (MMQmiCapabilitiesContext *ctx,
-                            MMModemCapability expected)
+test_current_capabilities_expected (MMQmiCurrentCapabilitiesContext *ctx,
+                                    MMModemCapability                expected)
 {
-    MMModemCapability built;
-    gchar *expected_str;
-    gchar *built_str;
+    MMModemCapability  built;
+    g_autofree gchar  *expected_str = NULL;
+    g_autofree gchar  *built_str = NULL;
 
-    built = mm_modem_capability_from_qmi_capabilities_context (ctx, NULL);
+    built = mm_current_capability_from_qmi_current_capabilities_context (ctx, NULL);
 
     expected_str = mm_modem_capability_build_string_from_mask (expected);
     built_str = mm_modem_capability_build_string_from_mask (built);
 
     /* compare strings, so that the error shows the string values as well */
     g_assert_cmpstr (built_str, ==, expected_str);
-
-    g_free (expected_str);
-    g_free (built_str);
 }
 
 /*****************************************************************************/
@@ -58,9 +55,9 @@ test_capabilities_expected (MMQmiCapabilitiesContext *ctx,
 */
 
 static void
-test_uml290 (void)
+test_current_capabilities_uml290 (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     /* QCDM -> CDMA/EVDO */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
@@ -69,9 +66,9 @@ test_uml290 (void)
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_CDMA_EVDO |
-                                 MM_MODEM_CAPABILITY_LTE));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE));
 
     /* QCDM -> GSM/UMTS */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_GSM |
@@ -80,9 +77,9 @@ test_uml290 (void)
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_GSM_UMTS |
-                                 MM_MODEM_CAPABILITY_LTE));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_LTE));
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0;
@@ -90,10 +87,10 @@ test_uml290 (void)
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_GSM_UMTS |
-                                 MM_MODEM_CAPABILITY_CDMA_EVDO |
-                                 MM_MODEM_CAPABILITY_LTE));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE));
 }
 
 /*****************************************************************************/
@@ -107,19 +104,19 @@ test_uml290 (void)
  */
 
 static void
-test_adu960s (void)
+test_current_capabilities_adu960s (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     ctx.nas_ssp_mode_preference_mask = 0;
     ctx.nas_tp_mask = 0; /* Unsupported */
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_GSM_UMTS |
-                                 MM_MODEM_CAPABILITY_CDMA_EVDO |
-                                 MM_MODEM_CAPABILITY_LTE));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE));
 }
 
 /*****************************************************************************/
@@ -132,14 +129,14 @@ test_adu960s (void)
  */
 
 static void
-test_gobi1k_gsm (void)
+test_current_capabilities_gobi1k_gsm (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
 /*****************************************************************************/
@@ -152,14 +149,14 @@ test_gobi1k_gsm (void)
  */
 
 static void
-test_gobi1k_cdma (void)
+test_current_capabilities_gobi1k_cdma (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 
 /*****************************************************************************/
@@ -174,27 +171,27 @@ test_gobi1k_cdma (void)
  */
 
 static void
-test_gobi2k_gsm (void)
+test_current_capabilities_gobi2k_gsm (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> UMTS only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> GPRS only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
 /*****************************************************************************/
@@ -209,27 +206,27 @@ test_gobi2k_gsm (void)
  */
 
 static void
-test_gobi2k_cdma (void)
+test_current_capabilities_gobi2k_cdma (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> CDMA only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> EVDO only */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 
 /*****************************************************************************/
@@ -246,9 +243,9 @@ test_gobi2k_cdma (void)
  */
 
 static void
-test_gobi3k_gsm (void)
+test_current_capabilities_gobi3k_gsm (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
@@ -257,19 +254,19 @@ test_gobi3k_gsm (void)
                                         QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> GSM only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_GSM);
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AMPS_OR_GSM);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 
     /* QCDM -> UMTS only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
 /*****************************************************************************/
@@ -286,9 +283,9 @@ test_gobi3k_gsm (void)
  */
 
 static void
-test_gobi3k_cdma (void)
+test_current_capabilities_gobi3k_cdma (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
@@ -297,19 +294,19 @@ test_gobi3k_cdma (void)
                                         QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> CDMA only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X);
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 
     /* QCDM -> EVDO only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO);
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
-    test_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 
 /*****************************************************************************/
@@ -334,9 +331,9 @@ test_gobi3k_cdma (void)
  */
 
 static void
-test_generic_nr5g (void)
+test_current_capabilities_generic_nr5g (void)
 {
-    MMQmiCapabilitiesContext ctx;
+    MMQmiCurrentCapabilitiesContext ctx;
 
     /* QMI -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
@@ -351,11 +348,11 @@ test_generic_nr5g (void)
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE |
                             MM_MODEM_CAPABILITY_5GNR);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_GSM_UMTS |
-                                 MM_MODEM_CAPABILITY_CDMA_EVDO |
-                                 MM_MODEM_CAPABILITY_LTE |
-                                 MM_MODEM_CAPABILITY_5GNR));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
 
     /* QMI -> GSM only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_GSM);
@@ -364,10 +361,10 @@ test_generic_nr5g (void)
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE |
                             MM_MODEM_CAPABILITY_5GNR);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_GSM_UMTS |
-                                 MM_MODEM_CAPABILITY_LTE |
-                                 MM_MODEM_CAPABILITY_5GNR));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
 
     /* QMI -> UMTS only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
@@ -376,10 +373,10 @@ test_generic_nr5g (void)
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE |
                             MM_MODEM_CAPABILITY_5GNR);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_GSM_UMTS |
-                                 MM_MODEM_CAPABILITY_LTE |
-                                 MM_MODEM_CAPABILITY_5GNR));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
 
     /* QMI -> EVDO only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO);
@@ -388,10 +385,10 @@ test_generic_nr5g (void)
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE |
                             MM_MODEM_CAPABILITY_5GNR);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_CDMA_EVDO |
-                                 MM_MODEM_CAPABILITY_LTE |
-                                 MM_MODEM_CAPABILITY_5GNR));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
 
     /* QMI -> CDMA only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X);
@@ -400,10 +397,10 @@ test_generic_nr5g (void)
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE |
                             MM_MODEM_CAPABILITY_5GNR);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_CDMA_EVDO |
-                                 MM_MODEM_CAPABILITY_LTE |
-                                 MM_MODEM_CAPABILITY_5GNR));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
 
     /* QMI -> LTE only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_LTE);
@@ -412,9 +409,9 @@ test_generic_nr5g (void)
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE |
                             MM_MODEM_CAPABILITY_5GNR);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_LTE |
-                                 MM_MODEM_CAPABILITY_5GNR));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
 
     /* QMI -> 5GNR only */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_5GNR);
@@ -423,9 +420,9 @@ test_generic_nr5g (void)
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
                             MM_MODEM_CAPABILITY_LTE |
                             MM_MODEM_CAPABILITY_5GNR);
-    test_capabilities_expected (&ctx,
-                                (MM_MODEM_CAPABILITY_LTE |
-                                 MM_MODEM_CAPABILITY_5GNR));
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
 }
 
 /*****************************************************************************/
@@ -436,15 +433,15 @@ int main (int argc, char **argv)
 
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/QMI/Current-Capabilities/UML290",       test_uml290);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/ADU960S",      test_adu960s);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/Gobi1k/GSM",   test_gobi1k_gsm);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/Gobi1k/CDMA",  test_gobi1k_cdma);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/Gobi2k/GSM",   test_gobi2k_gsm);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/Gobi2k/CDMA",  test_gobi2k_cdma);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/Gobi3k/GSM",   test_gobi3k_gsm);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/Gobi3k/CDMA",  test_gobi3k_cdma);
-    g_test_add_func ("/MM/QMI/Current-Capabilities/Generic/NR5G", test_generic_nr5g);
+    g_test_add_func ("/MM/qmi/current-capabilities/UML290",       test_current_capabilities_uml290);
+    g_test_add_func ("/MM/qmi/current-capabilities/ADU960S",      test_current_capabilities_adu960s);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/GSM",   test_current_capabilities_gobi1k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/CDMA",  test_current_capabilities_gobi1k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/GSM",   test_current_capabilities_gobi2k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/CDMA",  test_current_capabilities_gobi2k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/GSM",   test_current_capabilities_gobi3k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/CDMA",  test_current_capabilities_gobi3k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/generic/NR5G", test_current_capabilities_generic_nr5g);
 
     return g_test_run ();
 }

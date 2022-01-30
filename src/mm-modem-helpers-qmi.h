@@ -160,10 +160,10 @@ typedef struct {
     QmiNasRadioTechnologyPreference nas_tp_mask;
     /* DMS Capabilities */
     MMModemCapability dms_capabilities;
-} MMQmiCapabilitiesContext;
+} MMQmiCurrentCapabilitiesContext;
 
-MMModemCapability mm_modem_capability_from_qmi_capabilities_context (MMQmiCapabilitiesContext *ctx,
-                                                                     gpointer                  log_object);
+MMModemCapability mm_current_capability_from_qmi_current_capabilities_context (MMQmiCurrentCapabilitiesContext *ctx,
+                                                                               gpointer                         log_object);
 
 /*****************************************************************************/
 /* QMI unique id manipulation */
