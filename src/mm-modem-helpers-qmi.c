@@ -25,6 +25,8 @@
 #include "mm-enums-types.h"
 #include "mm-log-object.h"
 
+#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
+
 /*****************************************************************************/
 
 MMModemCapability
@@ -1740,7 +1742,6 @@ mm_current_capability_from_qmi_current_capabilities_context (MMQmiCurrentCapabil
     g_autofree gchar *tmp_str = NULL;
 
     /* If not a multimode device, we're done */
-#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
     if ((ctx->dms_capabilities & MULTIMODE) != MULTIMODE)
         tmp = ctx->dms_capabilities;
     else {
@@ -1781,6 +1782,48 @@ mm_current_capability_from_qmi_current_capabilities_context (MMQmiCurrentCapabil
                 dms_capabilities_str);
 
     return tmp;
+}
+
+/*****************************************************************************/
+/* Utility to build list of supported capabilities */
+
+GArray *
+mm_supported_capabilities_from_qmi_supported_capabilities_context (MMQmiSupportedCapabilitiesContext *ctx,
+                                                                   gpointer                           log_object)
+{
+    GArray *supported_combinations;
+
+    supported_combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 4);
+
+    /* Add all possible supported capability combinations.
+     * In order to avoid unnecessary modem reboots, we will only implement capabilities
+     * switching only when switching GSM/UMTS+CDMA/EVDO multimode devices, and only if
+     * we have support for the commands doing it.
+     */
+    if ((ctx->nas_tp_supported || ctx->nas_ssp_supported) &&
+        ((ctx->dms_capabilities & MULTIMODE) == MULTIMODE)) {
+        MMModemCapability single;
+
+        /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to GSM/UMTS+(LTE/5GNR) device */
+        single = MM_MODEM_CAPABILITY_GSM_UMTS | (MULTIMODE ^ ctx->dms_capabilities);
+        g_array_append_val (supported_combinations, single);
+        /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to CDMA/EVDO+(LTE/5GNR) device */
+        single = MM_MODEM_CAPABILITY_CDMA_EVDO | (MULTIMODE ^ ctx->dms_capabilities);
+        g_array_append_val (supported_combinations, single);
+        /*
+         * Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to (LTE/5GNR) device
+         *
+         * This case is required because we use the same methods and operations to
+         * switch capabilities and modes.
+         */
+        if ((single = (MULTIMODE ^ ctx->dms_capabilities)))
+            g_array_append_val (supported_combinations, single);
+    }
+
+    /* Add the full mask itself */
+    g_array_append_val (supported_combinations, ctx->dms_capabilities);
+
+    return supported_combinations;
 }
 
 /*****************************************************************************/
