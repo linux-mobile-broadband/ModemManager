@@ -1678,14 +1678,11 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
                                     GAsyncReadyCallback  callback,
                                     gpointer             user_data)
 {
-    GTask                  *task;
-    GArray                 *combinations;
-    MMModemModeCombination  mode;
-    Private                *priv;
-    MMModemMode             mask_all;
-    guint                   i;
-    GArray                 *all;
-    GArray                 *filtered;
+    GTask                      *task;
+    Private                    *priv;
+    MMQmiSupportedModesContext  ctx = { 0 };
+    guint                       i;
+    GArray                     *combinations;
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1694,99 +1691,16 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
     g_assert (priv->current_capabilities);
 
     /* Build all, based on the supported radio interfaces */
-    mask_all = MM_MODEM_MODE_NONE;
+    ctx.all = MM_MODEM_MODE_NONE;
     for (i = 0; i < priv->supported_radio_interfaces->len; i++)
-        mask_all |= mm_modem_mode_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i), self);
-    mode.allowed = mask_all;
-    mode.preferred = MM_MODEM_MODE_NONE;
-    all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
-    g_array_append_val (all, mode);
+        ctx.all |= mm_modem_mode_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i), self);
 
-    /* If SSP and TP are not supported, ignore supported mode management */
-    if (priv->feature_nas_ssp == FEATURE_UNSUPPORTED && priv->feature_nas_tp == FEATURE_UNSUPPORTED) {
-        g_task_return_pointer (task, all, (GDestroyNotify) g_array_unref);
-        g_object_unref (task);
-        return;
-    }
+    ctx.nas_ssp_supported = (priv->feature_nas_ssp == FEATURE_SUPPORTED);
+    ctx.nas_tp_supported = (priv->feature_nas_tp == FEATURE_SUPPORTED);
+    ctx.current_capabilities = priv->current_capabilities;
 
-    combinations = g_array_new (FALSE, FALSE, sizeof (MMModemModeCombination));
-
-#define ADD_MODE_PREFERENCE(MODE1, MODE2, MODE3, MODE4) do {            \
-        mode.allowed = MODE1;                                           \
-        if (MODE2 != MM_MODEM_MODE_NONE) {                              \
-            mode.allowed |= MODE2;                                      \
-            if (MODE3 != MM_MODEM_MODE_NONE) {                          \
-                mode.allowed |= MODE3;                                  \
-                if (MODE4 != MM_MODEM_MODE_NONE)                        \
-                    mode.allowed |= MODE4;                              \
-            }                                                           \
-            if (priv->feature_nas_ssp != FEATURE_UNSUPPORTED) {         \
-                if (MODE3 != MM_MODEM_MODE_NONE) {                      \
-                    if (MODE4 != MM_MODEM_MODE_NONE) {                  \
-                        mode.preferred = MODE4;                         \
-                        g_array_append_val (combinations, mode);        \
-                    }                                                   \
-                    mode.preferred = MODE3;                             \
-                    g_array_append_val (combinations, mode);            \
-                }                                                       \
-                mode.preferred = MODE2;                                 \
-                g_array_append_val (combinations, mode);                \
-                mode.preferred = MODE1;                                 \
-                g_array_append_val (combinations, mode);                \
-            } else {                                                    \
-                mode.preferred = MM_MODEM_MODE_NONE;                    \
-                g_array_append_val (combinations, mode);                \
-            }                                                           \
-        } else {                                                        \
-            mode.allowed = MODE1;                                       \
-            mode.preferred = MM_MODEM_MODE_NONE;                        \
-            g_array_append_val (combinations, mode);                    \
-        }                                                               \
-    } while (0)
-#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
-
-    if ((priv->current_capabilities & MULTIMODE)) {
-        /* 2G-only, 3G-only */
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-    }
-
-    if (!(priv->current_capabilities & MULTIMODE)) {
-        /* 4G-only */
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-    }
-
-    if ((priv->current_capabilities & MULTIMODE)) {
-        /* 2G, 3G, 4G combinations */
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_NONE);
-    }
-
-    /* 5G related mode combinations are only supported when NAS SSP is supported,
-     * as there is no 5G support in NAS TP. */
-    if (priv->feature_nas_ssp != FEATURE_UNSUPPORTED) {
-        if (!(priv->current_capabilities & MULTIMODE)) {
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_5G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        }
-        if ((priv->current_capabilities & MULTIMODE)) {
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G);
-        }
-    }
-
-    /* Filter out unsupported modes */
-    filtered = mm_filter_supported_modes (all, combinations, self);
-    g_array_unref (all);
-    g_array_unref (combinations);
-
-    g_task_return_pointer (task, filtered, (GDestroyNotify) g_array_unref);
+    combinations = mm_supported_modes_from_qmi_supported_modes_context (&ctx, self);
+    g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
 }
 
