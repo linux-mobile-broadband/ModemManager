@@ -496,7 +496,7 @@ test_supported_capabilities_gobi3k_cdma (void)
  */
 
 static void
-test_current_capabilities_generic_nr5g (void)
+test_current_capabilities_generic_nr5g_multimode (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
 
@@ -591,7 +591,7 @@ test_current_capabilities_generic_nr5g (void)
 }
 
 static void
-test_supported_capabilities_generic_nr5g (void)
+test_supported_capabilities_generic_nr5g_multimode (void)
 {
     MMQmiSupportedCapabilitiesContext ctx;
     static const MMModemCapability expected_capabilities[] = {
@@ -613,6 +613,228 @@ test_supported_capabilities_generic_nr5g (void)
                                           G_N_ELEMENTS (expected_capabilities));
 }
 
+static void
+test_current_capabilities_generic_nr5g_only (void)
+{
+    MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.nas_ssp_mode_preference_mask = QMI_NAS_RAT_MODE_PREFERENCE_5GNR;
+    ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_5GNR;
+    test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_5GNR);
+}
+
+static void
+test_supported_capabilities_generic_nr5g_only (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_5GNR,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_5GNR;
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
+static void
+test_current_capabilities_generic_nr5g_lte (void)
+{
+    MMQmiCurrentCapabilitiesContext ctx;
+
+    /* QMI -> Automatic */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_LTE |
+                                        QMI_NAS_RAT_MODE_PREFERENCE_5GNR);
+    ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> LTE only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_LTE);
+    ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_LTE);
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> 5GNR only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_5GNR);
+    ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+}
+
+static void
+test_supported_capabilities_generic_nr5g_lte (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
+static void
+test_current_capabilities_generic_nr5g_lte_umts (void)
+{
+    MMQmiCurrentCapabilitiesContext ctx;
+
+    /* QMI -> Automatic */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_UMTS |
+                                        QMI_NAS_RAT_MODE_PREFERENCE_LTE |
+                                        QMI_NAS_RAT_MODE_PREFERENCE_5GNR);
+    ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> UMTS only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_UMTS);
+    ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_CDMA_OR_WCDMA);
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> LTE only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_LTE);
+    ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_LTE);
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> 5GNR only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_5GNR);
+    ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_GSM_UMTS |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+}
+
+static void
+test_supported_capabilities_generic_nr5g_lte_umts (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_GSM_UMTS |MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
+static void
+test_current_capabilities_generic_nr5g_lte_evdo (void)
+{
+    MMQmiCurrentCapabilitiesContext ctx;
+
+    /* QMI -> Automatic */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO |
+                                        QMI_NAS_RAT_MODE_PREFERENCE_LTE |
+                                        QMI_NAS_RAT_MODE_PREFERENCE_5GNR);
+    ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> EVDO only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO);
+    ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR);
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> LTE only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_LTE);
+    ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_LTE);
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+
+    /* QMI -> 5GNR only */
+    ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_5GNR);
+    ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+    test_current_capabilities_expected (&ctx,
+                                        (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                                         MM_MODEM_CAPABILITY_LTE |
+                                         MM_MODEM_CAPABILITY_5GNR));
+}
+
+static void
+test_supported_capabilities_generic_nr5g_lte_evdo (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_CDMA_EVDO |MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
 /*****************************************************************************/
 
 int main (int argc, char **argv)
@@ -621,24 +843,32 @@ int main (int argc, char **argv)
 
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/qmi/current-capabilities/UML290",         test_current_capabilities_uml290);
-    g_test_add_func ("/MM/qmi/supported-capabilities/UML290",       test_supported_capabilities_uml290);
-    g_test_add_func ("/MM/qmi/current-capabilities/ADU960S",        test_current_capabilities_adu960s);
-    g_test_add_func ("/MM/qmi/supported-capabilities/ADU960S",      test_supported_capabilities_adu960s);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/GSM",     test_current_capabilities_gobi1k_gsm);
-    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi1k/GSM",   test_supported_capabilities_gobi1k_gsm);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/CDMA",    test_current_capabilities_gobi1k_cdma);
-    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi1k/CDMA",  test_supported_capabilities_gobi1k_cdma);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/GSM",     test_current_capabilities_gobi2k_gsm);
-    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi2k/GSM",   test_supported_capabilities_gobi2k_gsm);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/CDMA",    test_current_capabilities_gobi2k_cdma);
-    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi2k/CDMA",  test_supported_capabilities_gobi2k_cdma);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/GSM",     test_current_capabilities_gobi3k_gsm);
-    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi3k/GSM",   test_supported_capabilities_gobi3k_gsm);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/CDMA",    test_current_capabilities_gobi3k_cdma);
-    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi3k/CDMA",  test_supported_capabilities_gobi3k_cdma);
-    g_test_add_func ("/MM/qmi/current-capabilities/generic/NR5G",   test_current_capabilities_generic_nr5g);
-    g_test_add_func ("/MM/qmi/supported-capabilities/generic/NR5G", test_supported_capabilities_generic_nr5g);
+    g_test_add_func ("/MM/qmi/current-capabilities/UML290",                   test_current_capabilities_uml290);
+    g_test_add_func ("/MM/qmi/supported-capabilities/UML290",                 test_supported_capabilities_uml290);
+    g_test_add_func ("/MM/qmi/current-capabilities/ADU960S",                  test_current_capabilities_adu960s);
+    g_test_add_func ("/MM/qmi/supported-capabilities/ADU960S",                test_supported_capabilities_adu960s);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/GSM",               test_current_capabilities_gobi1k_gsm);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi1k/GSM",             test_supported_capabilities_gobi1k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/CDMA",              test_current_capabilities_gobi1k_cdma);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi1k/CDMA",            test_supported_capabilities_gobi1k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/GSM",               test_current_capabilities_gobi2k_gsm);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi2k/GSM",             test_supported_capabilities_gobi2k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/CDMA",              test_current_capabilities_gobi2k_cdma);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi2k/CDMA",            test_supported_capabilities_gobi2k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/GSM",               test_current_capabilities_gobi3k_gsm);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi3k/GSM",             test_supported_capabilities_gobi3k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/CDMA",              test_current_capabilities_gobi3k_cdma);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi3k/CDMA",            test_supported_capabilities_gobi3k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/generic/nr5g-multimode",   test_current_capabilities_generic_nr5g_multimode);
+    g_test_add_func ("/MM/qmi/supported-capabilities/generic/nr5g-multimode", test_supported_capabilities_generic_nr5g_multimode);
+    g_test_add_func ("/MM/qmi/current-capabilities/generic/nr5g-only",        test_current_capabilities_generic_nr5g_only);
+    g_test_add_func ("/MM/qmi/supported-capabilities/generic/nr5g-only",      test_supported_capabilities_generic_nr5g_only);
+    g_test_add_func ("/MM/qmi/current-capabilities/generic/nr5g-lte",         test_current_capabilities_generic_nr5g_lte);
+    g_test_add_func ("/MM/qmi/supported-capabilities/generic/nr5g-lte",       test_supported_capabilities_generic_nr5g_lte);
+    g_test_add_func ("/MM/qmi/current-capabilities/generic/nr5g-lte-umts",    test_current_capabilities_generic_nr5g_lte_umts);
+    g_test_add_func ("/MM/qmi/supported-capabilities/generic/nr5g-lte-umts",  test_supported_capabilities_generic_nr5g_lte_umts);
+    g_test_add_func ("/MM/qmi/current-capabilities/generic/nr5g-lte-evdo",    test_current_capabilities_generic_nr5g_lte_evdo);
+    g_test_add_func ("/MM/qmi/supported-capabilities/generic/nr5g-lte-evdo",  test_supported_capabilities_generic_nr5g_lte_evdo);
 
     return g_test_run ();
 }
