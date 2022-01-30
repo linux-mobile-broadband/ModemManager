@@ -1102,12 +1102,11 @@ mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
                                            GAsyncReadyCallback  callback,
                                            gpointer             user_data)
 {
-    GTask             *task;
-    Private           *priv;
-    MMModemCapability  mask;
-    MMModemCapability  single;
-    GArray            *supported_combinations;
-    guint              i;
+    GTask                             *task;
+    Private                           *priv;
+    GArray                            *supported_combinations;
+    guint                              i;
+    MMQmiSupportedCapabilitiesContext  ctx = { 0 };
 
     task = g_task_new (self, NULL, callback, user_data);
 
@@ -1121,41 +1120,15 @@ mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
     }
 
     /* Build mask with all supported capabilities */
-    mask = MM_MODEM_CAPABILITY_NONE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_NONE;
     for (i = 0; i < priv->supported_radio_interfaces->len; i++)
-        mask |= mm_modem_capability_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i), self);
+        ctx.dms_capabilities |= mm_modem_capability_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i), self);
 
-    supported_combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemCapability), 3);
+    ctx.nas_tp_supported = (priv->feature_nas_tp == FEATURE_SUPPORTED);
+    ctx.nas_ssp_supported = (priv->feature_nas_ssp == FEATURE_SUPPORTED);
 
-    /* Add all possible supported capability combinations.
-     * In order to avoid unnecessary modem reboots, we will only implement capabilities
-     * switching only when switching GSM/UMTS+CDMA/EVDO multimode devices, and only if
-     * we have support for the commands doing it.
-     */
-#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
-    if (priv->feature_nas_tp == FEATURE_SUPPORTED || priv->feature_nas_ssp == FEATURE_SUPPORTED) {
-        if ((mask & MULTIMODE) == MULTIMODE) {
-            /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to GSM/UMTS+(LTE/5GNR) device */
-            single = MM_MODEM_CAPABILITY_GSM_UMTS | (MULTIMODE ^ mask);
-            g_array_append_val (supported_combinations, single);
-            /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to CDMA/EVDO+(LTE/5GNR) device */
-            single = MM_MODEM_CAPABILITY_CDMA_EVDO | (MULTIMODE ^ mask);
-            g_array_append_val (supported_combinations, single);
-            /*
-             * Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to (LTE/5GNR) device
-             *
-             * This case is required because we use the same methods and operations to
-             * switch capabilities and modes.
-            */
-            if ((single = (MULTIMODE ^ mask)))
-                g_array_append_val (supported_combinations, single);
-        }
-    }
-
-    /* Add the full mask itself */
-    single = mask;
-    g_array_append_val (supported_combinations, single);
-
+    /* Build list of supported combinations */
+    supported_combinations = mm_supported_capabilities_from_qmi_supported_capabilities_context (&ctx, self);
     g_task_return_pointer (task, supported_combinations, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
 }

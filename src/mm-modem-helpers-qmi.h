@@ -172,6 +172,21 @@ MMModemCapability mm_current_capability_from_qmi_current_capabilities_context (M
                                                                                gpointer                         log_object);
 
 /*****************************************************************************/
+/* Utility to build list of supported capabilities from various sources */
+
+typedef struct {
+    /* NAS System Selection Preference */
+    gboolean nas_ssp_supported;
+    /* NAS Technology Preference */
+    gboolean nas_tp_supported;
+    /* DMS Capabilities */
+    MMModemCapability dms_capabilities;
+} MMQmiSupportedCapabilitiesContext;
+
+GArray *mm_supported_capabilities_from_qmi_supported_capabilities_context (MMQmiSupportedCapabilitiesContext *ctx,
+                                                                           gpointer                           log_object);
+
+/*****************************************************************************/
 /* QMI unique id manipulation */
 
 gchar  *mm_qmi_unique_id_to_firmware_unique_id (GArray       *qmi_unique_id,
