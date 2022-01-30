@@ -798,10 +798,10 @@ typedef enum {
 } LoadCurrentCapabilitiesStep;
 
 typedef struct {
-    QmiClientNas                *nas_client;
-    QmiClientDms                *dms_client;
-    LoadCurrentCapabilitiesStep  step;
-    MMQmiCapabilitiesContext     capabilities_context;
+    QmiClientNas                    *nas_client;
+    QmiClientDms                    *dms_client;
+    LoadCurrentCapabilitiesStep      step;
+    MMQmiCurrentCapabilitiesContext  capabilities_context;
 } LoadCurrentCapabilitiesContext;
 
 MMModemCapability
@@ -1023,7 +1023,7 @@ load_current_capabilities_step (GTask *task)
     case LOAD_CURRENT_CAPABILITIES_STEP_LAST:
         g_assert (priv->feature_nas_tp != FEATURE_UNKNOWN);
         g_assert (priv->feature_nas_ssp != FEATURE_UNKNOWN);
-        priv->current_capabilities = mm_modem_capability_from_qmi_capabilities_context (&ctx->capabilities_context, self);
+        priv->current_capabilities = mm_current_capability_from_qmi_current_capabilities_context (&ctx->capabilities_context, self);
         g_task_return_int (task, priv->current_capabilities);
         g_object_unref (task);
         return;
