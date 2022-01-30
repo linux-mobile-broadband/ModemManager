@@ -181,6 +181,23 @@ GArray *mm_supported_capabilities_from_qmi_supported_capabilities_context (MMQmi
                                                                            gpointer                           log_object);
 
 /*****************************************************************************/
+/* Utility to build list of supported modes from various sources */
+
+typedef struct {
+    /* NAS System Selection Preference */
+    gboolean nas_ssp_supported;
+    /* NAS Technology Preference */
+    gboolean nas_tp_supported;
+    /* Mask with all supported modes */
+    MMModemMode all;
+    /* Current Capabilities */
+    MMModemCapability current_capabilities;
+} MMQmiSupportedModesContext;
+
+GArray *mm_supported_modes_from_qmi_supported_modes_context (MMQmiSupportedModesContext *ctx,
+                                                             gpointer                    log_object);
+
+/*****************************************************************************/
 /* QMI unique id manipulation */
 
 gchar  *mm_qmi_unique_id_to_firmware_unique_id (GArray       *qmi_unique_id,
