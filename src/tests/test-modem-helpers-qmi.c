@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <locale.h>
 
+#include <ModemManager.h>
+#define _LIBMM_INSIDE_MM
+#include <libmm-glib.h>
+
 #include "mm-enums-types.h"
 #include "mm-modem-helpers-qmi.h"
 #include "mm-log-test.h"
@@ -36,6 +40,24 @@ test_current_capabilities_expected (MMQmiCurrentCapabilitiesContext *ctx,
 
     expected_str = mm_modem_capability_build_string_from_mask (expected);
     built_str = mm_modem_capability_build_string_from_mask (built);
+
+    /* compare strings, so that the error shows the string values as well */
+    g_assert_cmpstr (built_str, ==, expected_str);
+}
+
+static void
+test_supported_capabilities_expected (MMQmiSupportedCapabilitiesContext *ctx,
+                                      const MMModemCapability           *expected_capabilities,
+                                      guint                              n_expected_capabilities)
+{
+    g_autoptr(GArray)  built = NULL;
+    g_autofree gchar  *expected_str = NULL;
+    g_autofree gchar  *built_str = NULL;
+
+    built = mm_supported_capabilities_from_qmi_supported_capabilities_context (ctx, NULL);
+
+    expected_str = mm_common_build_capabilities_string (expected_capabilities, n_expected_capabilities);
+    built_str = mm_common_build_capabilities_string ((MMModemCapability *)built->data, built->len);
 
     /* compare strings, so that the error shows the string values as well */
     g_assert_cmpstr (built_str, ==, expected_str);
@@ -93,6 +115,28 @@ test_current_capabilities_uml290 (void)
                                          MM_MODEM_CAPABILITY_LTE));
 }
 
+static void
+test_supported_capabilities_uml290 (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE,
+        MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE,
+        MM_MODEM_CAPABILITY_LTE,
+        MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = FALSE;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE);
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
 /*****************************************************************************/
 /* ADU960S:
  * ∘ +GCAP: +CGSM,+DS,+ES
@@ -108,7 +152,7 @@ test_current_capabilities_adu960s (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
 
-    ctx.nas_ssp_mode_preference_mask = 0;
+    ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = 0; /* Unsupported */
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
                             MM_MODEM_CAPABILITY_CDMA_EVDO |
@@ -117,6 +161,25 @@ test_current_capabilities_adu960s (void)
                                         (MM_MODEM_CAPABILITY_GSM_UMTS |
                                          MM_MODEM_CAPABILITY_CDMA_EVDO |
                                          MM_MODEM_CAPABILITY_LTE));
+}
+
+static void
+test_supported_capabilities_adu960s (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE,
+    };
+
+    ctx.nas_ssp_supported = FALSE;
+    ctx.nas_tp_supported = FALSE;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE);
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
 }
 
 /*****************************************************************************/
@@ -139,6 +202,23 @@ test_current_capabilities_gobi1k_gsm (void)
     test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
+static void
+test_supported_capabilities_gobi1k_gsm (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_GSM_UMTS,
+    };
+
+    ctx.nas_ssp_supported = FALSE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
 /*****************************************************************************/
 /* Gobi 1K with EVDO firmware:
  * ∘ +GCAP: didn't respond to AT commands
@@ -157,6 +237,23 @@ test_current_capabilities_gobi1k_cdma (void)
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+}
+
+static void
+test_supported_capabilities_gobi1k_cdma (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_CDMA_EVDO,
+    };
+
+    ctx.nas_ssp_supported = FALSE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
 }
 
 /*****************************************************************************/
@@ -194,6 +291,23 @@ test_current_capabilities_gobi2k_gsm (void)
     test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
+static void
+test_supported_capabilities_gobi2k_gsm (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_GSM_UMTS,
+    };
+
+    ctx.nas_ssp_supported = FALSE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
 /*****************************************************************************/
 /* Gobi 2K with CDMA firmware:
  * ∘ +GCAP: +CIS707-A, CIS-856, CIS-856-A, CIS707,+MS, +ES, +DS, +FCL
@@ -227,6 +341,23 @@ test_current_capabilities_gobi2k_cdma (void)
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+}
+
+static void
+test_supported_capabilities_gobi2k_cdma (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_CDMA_EVDO,
+    };
+
+    ctx.nas_ssp_supported = FALSE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
 }
 
 /*****************************************************************************/
@@ -269,6 +400,23 @@ test_current_capabilities_gobi3k_gsm (void)
     test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_GSM_UMTS);
 }
 
+static void
+test_supported_capabilities_gobi3k_gsm (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_GSM_UMTS,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
 /*****************************************************************************/
 /* Gobi 3K with CDMA firmware:
  * ∘ +GCAP: +CIS707-A, CIS-856, CIS-856-A, CIS707,+MS, +ES, +DS, +FCL
@@ -307,6 +455,23 @@ test_current_capabilities_gobi3k_cdma (void)
     ctx.nas_tp_mask = (QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_3GPP2 | QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_HDR);
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
     test_current_capabilities_expected (&ctx, MM_MODEM_CAPABILITY_CDMA_EVDO);
+}
+
+static void
+test_supported_capabilities_gobi3k_cdma (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_CDMA_EVDO,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
 }
 
 /*****************************************************************************/
@@ -425,6 +590,29 @@ test_current_capabilities_generic_nr5g (void)
                                          MM_MODEM_CAPABILITY_5GNR));
 }
 
+static void
+test_supported_capabilities_generic_nr5g (void)
+{
+    MMQmiSupportedCapabilitiesContext ctx;
+    static const MMModemCapability expected_capabilities[] = {
+        MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
+        MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
+        MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
+        MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
+    };
+
+    ctx.nas_ssp_supported = TRUE;
+    ctx.nas_tp_supported = TRUE;
+    ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
+                            MM_MODEM_CAPABILITY_CDMA_EVDO |
+                            MM_MODEM_CAPABILITY_LTE |
+                            MM_MODEM_CAPABILITY_5GNR);
+
+    test_supported_capabilities_expected (&ctx,
+                                          expected_capabilities,
+                                          G_N_ELEMENTS (expected_capabilities));
+}
+
 /*****************************************************************************/
 
 int main (int argc, char **argv)
@@ -433,15 +621,24 @@ int main (int argc, char **argv)
 
     g_test_init (&argc, &argv, NULL);
 
-    g_test_add_func ("/MM/qmi/current-capabilities/UML290",       test_current_capabilities_uml290);
-    g_test_add_func ("/MM/qmi/current-capabilities/ADU960S",      test_current_capabilities_adu960s);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/GSM",   test_current_capabilities_gobi1k_gsm);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/CDMA",  test_current_capabilities_gobi1k_cdma);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/GSM",   test_current_capabilities_gobi2k_gsm);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/CDMA",  test_current_capabilities_gobi2k_cdma);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/GSM",   test_current_capabilities_gobi3k_gsm);
-    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/CDMA",  test_current_capabilities_gobi3k_cdma);
-    g_test_add_func ("/MM/qmi/current-capabilities/generic/NR5G", test_current_capabilities_generic_nr5g);
+    g_test_add_func ("/MM/qmi/current-capabilities/UML290",         test_current_capabilities_uml290);
+    g_test_add_func ("/MM/qmi/supported-capabilities/UML290",       test_supported_capabilities_uml290);
+    g_test_add_func ("/MM/qmi/current-capabilities/ADU960S",        test_current_capabilities_adu960s);
+    g_test_add_func ("/MM/qmi/supported-capabilities/ADU960S",      test_supported_capabilities_adu960s);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/GSM",     test_current_capabilities_gobi1k_gsm);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi1k/GSM",   test_supported_capabilities_gobi1k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi1k/CDMA",    test_current_capabilities_gobi1k_cdma);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi1k/CDMA",  test_supported_capabilities_gobi1k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/GSM",     test_current_capabilities_gobi2k_gsm);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi2k/GSM",   test_supported_capabilities_gobi2k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi2k/CDMA",    test_current_capabilities_gobi2k_cdma);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi2k/CDMA",  test_supported_capabilities_gobi2k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/GSM",     test_current_capabilities_gobi3k_gsm);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi3k/GSM",   test_supported_capabilities_gobi3k_gsm);
+    g_test_add_func ("/MM/qmi/current-capabilities/Gobi3k/CDMA",    test_current_capabilities_gobi3k_cdma);
+    g_test_add_func ("/MM/qmi/supported-capabilities/Gobi3k/CDMA",  test_supported_capabilities_gobi3k_cdma);
+    g_test_add_func ("/MM/qmi/current-capabilities/generic/NR5G",   test_current_capabilities_generic_nr5g);
+    g_test_add_func ("/MM/qmi/supported-capabilities/generic/NR5G", test_supported_capabilities_generic_nr5g);
 
     return g_test_run ();
 }
