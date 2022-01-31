@@ -3389,7 +3389,7 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     if ((self->priv->last_ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
          ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) ||
         (self->priv->last_ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
-               ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
+         ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
         /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
         mm_obj_dbg (self, "SIM hot swap detected");
         mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
