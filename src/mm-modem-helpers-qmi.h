@@ -24,6 +24,8 @@
 
 #include "mm-port.h"
 
+#define MM_MODEM_CAPABILITY_MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
+
 /*****************************************************************************/
 /* QMI/DMS to MM translations */
 
@@ -160,6 +162,8 @@ gboolean mm_error_from_qmi_loc_indication_status (QmiLocIndicationStatus   statu
 /* Utility to gather current capabilities from various sources */
 
 typedef struct {
+    /* Whether this is a multimode device or not */
+    gboolean multimode;
     /* NAS System Selection Preference */
     QmiNasRatModePreference nas_ssp_mode_preference_mask;
     /* NAS Technology Preference */
@@ -175,6 +179,8 @@ MMModemCapability mm_current_capability_from_qmi_current_capabilities_context (M
 /* Utility to build list of supported capabilities from various sources */
 
 typedef struct {
+    /* Whether this is a multimode device or not */
+    gboolean multimode;
     /* NAS System Selection Preference */
     gboolean nas_ssp_supported;
     /* NAS Technology Preference */
@@ -190,6 +196,8 @@ GArray *mm_supported_capabilities_from_qmi_supported_capabilities_context (MMQmi
 /* Utility to build list of supported modes from various sources */
 
 typedef struct {
+    /* Whether this is a multimode device or not */
+    gboolean multimode;
     /* NAS System Selection Preference */
     gboolean nas_ssp_supported;
     /* NAS Technology Preference */

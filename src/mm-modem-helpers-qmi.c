@@ -26,8 +26,6 @@
 #include "mm-enums-types.h"
 #include "mm-log-object.h"
 
-#define MULTIMODE (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)
-
 /*****************************************************************************/
 
 MMModemCapability
@@ -1844,7 +1842,7 @@ mm_current_capability_from_qmi_current_capabilities_context (MMQmiCurrentCapabil
     g_autofree gchar *tmp_str = NULL;
 
     /* If not a multimode device, we're done */
-    if ((ctx->dms_capabilities & MULTIMODE) != MULTIMODE)
+    if (!ctx->multimode)
         tmp = ctx->dms_capabilities;
     else {
         /* We have a multimode CDMA/EVDO+GSM/UMTS device, check SSP and TP */
@@ -1865,7 +1863,7 @@ mm_current_capability_from_qmi_current_capabilities_context (MMQmiCurrentCapabil
         if (tmp == MM_MODEM_CAPABILITY_NONE)
             tmp = ctx->dms_capabilities;
         else
-            tmp = (tmp & MULTIMODE) | (MULTIMODE ^ ctx->dms_capabilities);
+            tmp = (tmp & MM_MODEM_CAPABILITY_MULTIMODE) | (MM_MODEM_CAPABILITY_MULTIMODE ^ ctx->dms_capabilities);
     }
 
     /* Log about the logic applied */
@@ -1902,15 +1900,14 @@ mm_supported_capabilities_from_qmi_supported_capabilities_context (MMQmiSupporte
      * switching only when switching GSM/UMTS+CDMA/EVDO multimode devices, and only if
      * we have support for the commands doing it.
      */
-    if ((ctx->nas_tp_supported || ctx->nas_ssp_supported) &&
-        ((ctx->dms_capabilities & MULTIMODE) == MULTIMODE)) {
+    if ((ctx->nas_tp_supported || ctx->nas_ssp_supported) && ctx->multimode) {
         MMModemCapability single;
 
         /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to GSM/UMTS+(LTE/5GNR) device */
-        single = MM_MODEM_CAPABILITY_GSM_UMTS | (MULTIMODE ^ ctx->dms_capabilities);
+        single = MM_MODEM_CAPABILITY_GSM_UMTS | (MM_MODEM_CAPABILITY_MULTIMODE ^ ctx->dms_capabilities);
         g_array_append_val (supported_combinations, single);
         /* Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to CDMA/EVDO+(LTE/5GNR) device */
-        single = MM_MODEM_CAPABILITY_CDMA_EVDO | (MULTIMODE ^ ctx->dms_capabilities);
+        single = MM_MODEM_CAPABILITY_CDMA_EVDO | (MM_MODEM_CAPABILITY_MULTIMODE ^ ctx->dms_capabilities);
         g_array_append_val (supported_combinations, single);
         /*
          * Multimode GSM/UMTS+CDMA/EVDO+(LTE/5GNR) device switched to (LTE/5GNR) device
@@ -1918,7 +1915,7 @@ mm_supported_capabilities_from_qmi_supported_capabilities_context (MMQmiSupporte
          * This case is required because we use the same methods and operations to
          * switch capabilities and modes.
          */
-        if ((single = (MULTIMODE ^ ctx->dms_capabilities)))
+        if ((single = (MM_MODEM_CAPABILITY_MULTIMODE ^ ctx->dms_capabilities)))
             g_array_append_val (supported_combinations, single);
     }
 
@@ -1984,40 +1981,44 @@ mm_supported_modes_from_qmi_supported_modes_context (MMQmiSupportedModesContext 
         }                                                               \
     } while (0)
 
-    if ((ctx->current_capabilities & MULTIMODE)) {
-        /* 2G-only, 3G-only */
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-    }
+    /* 2G-only, 3G-only */
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
 
-    if (!(ctx->current_capabilities & MULTIMODE)) {
+    /*
+     * This case is required because we use the same methods and operations to
+     * switch capabilities and modes. For the LTE capability there is a direct
+     * related 4G mode, and so we cannot select a '4G only' mode in this device
+     * because we wouldn't be able to know the full list of current capabilities
+     * if the device was rebooted, as we would only see LTE capability. So,
+     * handle this special case so that the LTE/4G-only mode can exclusively be
+     * selected as capability switching in this kind of devices.
+     */
+    if (!ctx->multimode || !(ctx->current_capabilities & MM_MODEM_CAPABILITY_MULTIMODE)) {
         /* 4G-only */
         ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
     }
 
-    if ((ctx->current_capabilities & MULTIMODE)) {
-        /* 2G, 3G, 4G combinations */
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_NONE);
-    }
+    /* 2G, 3G, 4G combinations */
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+    ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_NONE);
 
     /* 5G related mode combinations are only supported when NAS SSP is supported,
      * as there is no 5G support in NAS TP. */
     if (ctx->nas_ssp_supported) {
-        if (!(ctx->current_capabilities & MULTIMODE)) {
+        /* Same reasoning as for the special 4G-only case above */
+        if (!ctx->multimode || !(ctx->current_capabilities & MM_MODEM_CAPABILITY_MULTIMODE)) {
             ADD_MODE_PREFERENCE (MM_MODEM_MODE_5G, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
             ADD_MODE_PREFERENCE (MM_MODEM_MODE_4G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
         }
-        if ((ctx->current_capabilities & MULTIMODE)) {
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
-            ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G);
-        }
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE, MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_3G, MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G,   MM_MODEM_MODE_NONE);
+        ADD_MODE_PREFERENCE (MM_MODEM_MODE_2G, MM_MODEM_MODE_3G,   MM_MODEM_MODE_4G,   MM_MODEM_MODE_5G);
     }
 
     /* Filter out unsupported modes */
