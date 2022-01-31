@@ -4641,6 +4641,15 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
     if (ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED)
         mm_iface_modem_update_own_numbers (MM_IFACE_MODEM (self), telephone_numbers);
 
+    if ((self->priv->last_ready_state != MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE &&
+         ready_state == MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE) ||
+        (self->priv->last_ready_state == MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE &&
+         ready_state != MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE)) {
+        /* eSIM profiles have been added or removed, re-probe to ensure correct interfaces are exposed */
+        mm_obj_dbg (self, "eSIM profile updates detected");
+        mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+    }
+
     if ((self->priv->last_ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
          ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED) ||
         (self->priv->last_ready_state == MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
