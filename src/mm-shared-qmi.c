@@ -1700,6 +1700,14 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
     for (i = 0; i < priv->supported_radio_interfaces->len; i++)
         ctx.all |= mm_modem_mode_from_qmi_radio_interface (g_array_index (priv->supported_radio_interfaces, QmiDmsRadioInterface, i), self);
 
+    /* Filter out those unsupported by the current capabilities */
+    if (!(priv->current_capabilities & (MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO)))
+        ctx.all &= ~(MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    else if (!(priv->current_capabilities & MM_MODEM_CAPABILITY_LTE))
+        ctx.all &= ~MM_MODEM_MODE_4G;
+    else if (!(priv->current_capabilities & MM_MODEM_CAPABILITY_5GNR))
+        ctx.all &= ~MM_MODEM_MODE_5G;
+
     ctx.nas_ssp_supported = (priv->feature_nas_ssp == FEATURE_SUPPORTED);
     ctx.nas_tp_supported = (priv->feature_nas_tp == FEATURE_SUPPORTED);
     ctx.current_capabilities = priv->current_capabilities;
