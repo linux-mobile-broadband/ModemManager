@@ -99,6 +99,8 @@ test_current_capabilities_uml290 (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
 
+    ctx.multimode = TRUE;
+
     /* QCDM -> CDMA/EVDO */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
                                         QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO);
@@ -144,6 +146,7 @@ test_supported_capabilities_uml290 (void)
         MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE,
     };
 
+    ctx.multimode = TRUE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = FALSE;
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
@@ -174,6 +177,7 @@ test_supported_modes_uml290_cdma_evdo_gsm_umts_lte (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, .preferred = MM_MODEM_MODE_2G },
     };
 
+    ctx.multimode = TRUE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = FALSE;
@@ -205,6 +209,7 @@ test_supported_modes_uml290_cdma_evdo_lte (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, .preferred = MM_MODEM_MODE_2G },
     };
 
+    ctx.multimode = TRUE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = FALSE;
@@ -235,6 +240,7 @@ test_supported_modes_uml290_gsm_umts_lte (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, .preferred = MM_MODEM_MODE_2G },
     };
 
+    ctx.multimode = TRUE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = FALSE;
@@ -255,6 +261,7 @@ test_supported_modes_uml290_lte (void)
         { .allowed = MM_MODEM_MODE_4G, .preferred = MM_MODEM_MODE_NONE },
     };
 
+    ctx.multimode = TRUE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = FALSE;
@@ -280,6 +287,7 @@ test_current_capabilities_adu960s (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
 
+    ctx.multimode = TRUE;
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = 0; /* Unsupported */
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
@@ -299,6 +307,7 @@ test_supported_capabilities_adu960s (void)
         MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE,
     };
 
+    ctx.multimode = TRUE;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = FALSE;
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
@@ -318,6 +327,7 @@ test_supported_modes_adu960s (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G, .preferred = MM_MODEM_MODE_NONE },
     };
 
+    ctx.multimode = TRUE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = FALSE;
@@ -343,6 +353,7 @@ test_current_capabilities_gobi1k_gsm (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
@@ -357,6 +368,7 @@ test_supported_capabilities_gobi1k_gsm (void)
         MM_MODEM_CAPABILITY_GSM_UMTS,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
@@ -376,6 +388,7 @@ test_supported_modes_gobi1k_gsm (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, .preferred = MM_MODEM_MODE_NONE },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
@@ -400,6 +413,7 @@ test_current_capabilities_gobi1k_cdma (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
@@ -414,6 +428,7 @@ test_supported_capabilities_gobi1k_cdma (void)
         MM_MODEM_CAPABILITY_CDMA_EVDO,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
@@ -433,6 +448,7 @@ test_supported_modes_gobi1k_cdma (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, .preferred = MM_MODEM_MODE_NONE },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
@@ -458,6 +474,8 @@ static void
 test_current_capabilities_gobi2k_gsm (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = FALSE;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
@@ -486,6 +504,7 @@ test_supported_capabilities_gobi2k_gsm (void)
         MM_MODEM_CAPABILITY_GSM_UMTS,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
@@ -505,6 +524,7 @@ test_supported_modes_gobi2k_gsm (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, .preferred = MM_MODEM_MODE_NONE },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
@@ -530,6 +550,8 @@ static void
 test_current_capabilities_gobi2k_cdma (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = FALSE;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = 0; /* Unsupported */
@@ -558,6 +580,7 @@ test_supported_capabilities_gobi2k_cdma (void)
         MM_MODEM_CAPABILITY_CDMA_EVDO,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
@@ -577,6 +600,7 @@ test_supported_modes_gobi2k_cdma (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, .preferred = MM_MODEM_MODE_NONE },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
     ctx.nas_ssp_supported = FALSE;
     ctx.nas_tp_supported = TRUE;
@@ -604,6 +628,8 @@ static void
 test_current_capabilities_gobi3k_gsm (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = FALSE;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
@@ -635,6 +661,7 @@ test_supported_capabilities_gobi3k_gsm (void)
         MM_MODEM_CAPABILITY_GSM_UMTS,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_GSM_UMTS;
@@ -655,6 +682,7 @@ test_supported_modes_gobi3k_gsm (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, .preferred = MM_MODEM_MODE_2G },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
@@ -682,6 +710,8 @@ static void
 test_current_capabilities_gobi3k_cdma (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = FALSE;
 
     /* QCDM -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
@@ -713,6 +743,7 @@ test_supported_capabilities_gobi3k_cdma (void)
         MM_MODEM_CAPABILITY_CDMA_EVDO,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_CDMA_EVDO;
@@ -733,6 +764,7 @@ test_supported_modes_gobi3k_cdma (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G, .preferred = MM_MODEM_MODE_2G },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
@@ -768,6 +800,8 @@ static void
 test_current_capabilities_generic_nr5g_multimode (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = TRUE;
 
     /* QMI -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1X |
@@ -870,6 +904,7 @@ test_supported_capabilities_generic_nr5g_multimode (void)
         MM_MODEM_CAPABILITY_GSM_UMTS | MM_MODEM_CAPABILITY_CDMA_EVDO | MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
     };
 
+    ctx.multimode = TRUE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
@@ -927,6 +962,7 @@ test_supported_modes_generic_nr5g_multimode (void)
         { .allowed = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G, .preferred = MM_MODEM_MODE_2G },
     };
 
+    ctx.multimode = TRUE;
     ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
@@ -945,6 +981,7 @@ test_current_capabilities_generic_nr5g_only (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_mode_preference_mask = QMI_NAS_RAT_MODE_PREFERENCE_5GNR;
     ctx.nas_tp_mask = QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_5GNR;
@@ -959,6 +996,7 @@ test_supported_capabilities_generic_nr5g_only (void)
         MM_MODEM_CAPABILITY_5GNR,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = MM_MODEM_CAPABILITY_5GNR;
@@ -976,6 +1014,7 @@ test_supported_modes_generic_nr5g_only (void)
         { .allowed = MM_MODEM_MODE_5G, .preferred = MM_MODEM_MODE_NONE },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_5G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
@@ -990,6 +1029,8 @@ static void
 test_current_capabilities_generic_nr5g_lte (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = FALSE;
 
     /* QMI -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_LTE |
@@ -1028,6 +1069,7 @@ test_supported_capabilities_generic_nr5g_lte (void)
         MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_LTE |
@@ -1049,6 +1091,7 @@ test_supported_modes_generic_nr5g_lte (void)
         { .allowed = MM_MODEM_MODE_4G | MM_MODEM_MODE_5G, .preferred = MM_MODEM_MODE_4G },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_4G | MM_MODEM_MODE_5G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
@@ -1064,6 +1107,8 @@ static void
 test_current_capabilities_generic_nr5g_lte_umts (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = FALSE;
 
     /* QMI -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_UMTS |
@@ -1120,6 +1165,7 @@ test_supported_capabilities_generic_nr5g_lte_umts (void)
         MM_MODEM_CAPABILITY_GSM_UMTS |MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_GSM_UMTS |
@@ -1158,6 +1204,7 @@ test_supported_modes_generic_nr5g_lte_umts (void)
         { .allowed = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G, .preferred = MM_MODEM_MODE_3G },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
@@ -1174,6 +1221,8 @@ static void
 test_current_capabilities_generic_nr5g_lte_evdo (void)
 {
     MMQmiCurrentCapabilitiesContext ctx;
+
+    ctx.multimode = FALSE;
 
     /* QMI -> Automatic */
     ctx.nas_ssp_mode_preference_mask = (QMI_NAS_RAT_MODE_PREFERENCE_CDMA_1XEVDO |
@@ -1230,6 +1279,7 @@ test_supported_capabilities_generic_nr5g_lte_evdo (void)
         MM_MODEM_CAPABILITY_CDMA_EVDO |MM_MODEM_CAPABILITY_LTE | MM_MODEM_CAPABILITY_5GNR,
     };
 
+    ctx.multimode = FALSE;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;
     ctx.dms_capabilities = (MM_MODEM_CAPABILITY_CDMA_EVDO |
@@ -1268,6 +1318,7 @@ test_supported_modes_generic_nr5g_lte_evdo (void)
         { .allowed = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G, .preferred = MM_MODEM_MODE_3G },
     };
 
+    ctx.multimode = FALSE;
     ctx.all = MM_MODEM_MODE_3G | MM_MODEM_MODE_4G | MM_MODEM_MODE_5G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = TRUE;

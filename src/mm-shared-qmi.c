@@ -69,6 +69,7 @@ config_info_clear (ConfigInfo *config_info)
 
 typedef struct {
     /* Capabilities & modes helpers */
+    gboolean           multimode;
     MMModemCapability  current_capabilities;
     GArray            *supported_radio_interfaces;
     Feature            feature_nas_tp;
@@ -1022,7 +1023,13 @@ load_current_capabilities_step (GTask *task)
     case LOAD_CURRENT_CAPABILITIES_STEP_LAST:
         g_assert (priv->feature_nas_tp != FEATURE_UNKNOWN);
         g_assert (priv->feature_nas_ssp != FEATURE_UNKNOWN);
+
+        /* At this point we can already know if this is a multimode device or not */
+        if ((ctx->capabilities_context.dms_capabilities & MM_MODEM_CAPABILITY_MULTIMODE) == MM_MODEM_CAPABILITY_MULTIMODE)
+            priv->multimode = ctx->capabilities_context.multimode = TRUE;
+
         priv->current_capabilities = mm_current_capability_from_qmi_current_capabilities_context (&ctx->capabilities_context, self);
+
         g_task_return_int (task, priv->current_capabilities);
         g_object_unref (task);
         return;
@@ -1125,6 +1132,7 @@ mm_shared_qmi_load_supported_capabilities (MMIfaceModem        *self,
 
     ctx.nas_tp_supported = (priv->feature_nas_tp == FEATURE_SUPPORTED);
     ctx.nas_ssp_supported = (priv->feature_nas_ssp == FEATURE_SUPPORTED);
+    ctx.multimode = priv->multimode;
 
     /* Build list of supported combinations */
     supported_combinations = mm_supported_capabilities_from_qmi_supported_capabilities_context (&ctx, self);
@@ -1695,6 +1703,7 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
     ctx.nas_ssp_supported = (priv->feature_nas_ssp == FEATURE_SUPPORTED);
     ctx.nas_tp_supported = (priv->feature_nas_tp == FEATURE_SUPPORTED);
     ctx.current_capabilities = priv->current_capabilities;
+    ctx.multimode = priv->multimode;
 
     combinations = mm_supported_modes_from_qmi_supported_modes_context (&ctx, self);
     g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
