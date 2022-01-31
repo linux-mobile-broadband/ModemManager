@@ -262,7 +262,7 @@ test_supported_modes_uml290_lte (void)
     };
 
     ctx.multimode = TRUE;
-    ctx.all = MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G;
+    ctx.all = MM_MODEM_MODE_4G;
     ctx.nas_ssp_supported = TRUE;
     ctx.nas_tp_supported = FALSE;
     ctx.current_capabilities = MM_MODEM_CAPABILITY_LTE;
