@@ -276,7 +276,10 @@ load_imsi_finish (MMBaseSim     *_self,
         g_propagate_error (error, g_error_copy (self->priv->preload_error));
         return NULL;
     }
-    g_assert (self->priv->imsi);
+    if (!self->priv->imsi) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "SIM imsi not available");
+        return NULL;
+    }
     return g_strdup (self->priv->imsi);
 }
 
