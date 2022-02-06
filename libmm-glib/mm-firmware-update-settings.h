@@ -87,10 +87,12 @@ MMFirmwareUpdateSettings *mm_firmware_update_settings_new_from_variant (GVariant
 GVariant *mm_firmware_update_settings_get_variant (MMFirmwareUpdateSettings *self);
 
 /* Generic */
-void mm_firmware_update_settings_set_device_ids (MMFirmwareUpdateSettings  *self,
-                                                 const gchar              **device_ids);
-void mm_firmware_update_settings_set_version    (MMFirmwareUpdateSettings  *self,
-                                                 const gchar               *version);
+void mm_firmware_update_settings_set_device_ids (MMFirmwareUpdateSettings     *self,
+                                                 const gchar                 **device_ids);
+void mm_firmware_update_settings_set_version    (MMFirmwareUpdateSettings     *self,
+                                                 const gchar                  *version);
+void mm_firmware_update_settings_set_method     (MMFirmwareUpdateSettings     *self,
+                                                 MMModemFirmwareUpdateMethod   method);
 
 /* Fastboot specific */
 void mm_firmware_update_settings_set_fastboot_at (MMFirmwareUpdateSettings *self,
