@@ -325,10 +325,9 @@ add_generic_version (MMBaseModem               *self,
     return TRUE;
 }
 
-static gboolean
-add_generic_device_ids (MMBaseModem               *self,
-                        MMFirmwareUpdateSettings  *update_settings,
-                        GError                   **error)
+GPtrArray *
+mm_iface_firmware_build_generic_device_ids (MMIfaceModemFirmware  *self,
+                                            GError               **error)
 {
     static const gchar   *supported_subsystems[] = { "USB", "PCI" };
     guint16               vid;
@@ -341,8 +340,8 @@ add_generic_device_ids (MMBaseModem               *self,
     guint                 i;
     gboolean              ignore_carrier = FALSE;
 
-    vid = mm_base_modem_get_vendor_id (self);
-    pid = mm_base_modem_get_product_id (self);
+    vid = mm_base_modem_get_vendor_id (MM_BASE_MODEM (self));
+    pid = mm_base_modem_get_product_id (MM_BASE_MODEM (self));
 
 #if defined WITH_QMI
     if (MM_IS_BROADBAND_MODEM_QMI (self))
@@ -353,16 +352,15 @@ add_generic_device_ids (MMBaseModem               *self,
         primary = MM_PORT (mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self)));
 #endif
     if (!primary)
-        primary = MM_PORT (mm_base_modem_peek_port_primary (self));
+        primary = MM_PORT (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)));
     g_assert (primary != NULL);
     rid = mm_kernel_device_get_physdev_revision (mm_port_peek_kernel_device (primary));
-
 
     subsystem = mm_kernel_device_get_physdev_subsystem (mm_port_peek_kernel_device (primary));
     if (!subsystem) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Unknown device subsystem");
-        return FALSE;
+        return NULL;
     }
 
     for (i = 0; i < G_N_ELEMENTS (supported_subsystems); i++) {
@@ -372,7 +370,7 @@ add_generic_device_ids (MMBaseModem               *self,
     if (i == G_N_ELEMENTS (supported_subsystems)) {
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Unsupported subsystem: %s", subsystem);
-        return FALSE;
+        return NULL;
     }
 
     g_object_get (self,
@@ -398,8 +396,7 @@ add_generic_device_ids (MMBaseModem               *self,
                                            supported_subsystems[i], vid));
     g_ptr_array_add (ids, NULL);
 
-    mm_firmware_update_settings_set_device_ids (update_settings, (const gchar **)ids->pdata);
-    return TRUE;
+    return g_steal_pointer (&ids);
 }
 
 static void
@@ -411,6 +408,7 @@ load_update_settings_ready (MMIfaceModemFirmware *self,
     MMFirmwareUpdateSettings *update_settings;
     GError                   *error = NULL;
     GVariant                 *variant = NULL;
+    g_autoptr(GPtrArray)      ids = NULL;
 
     ctx = g_task_get_task_data (task);
 
@@ -422,12 +420,17 @@ load_update_settings_ready (MMIfaceModemFirmware *self,
     }
 
     /* If the plugin didn't specify custom device ids, add the default ones ourselves */
-    if (!mm_firmware_update_settings_get_device_ids (update_settings) &&
-        !add_generic_device_ids (MM_BASE_MODEM (self), update_settings, &error)) {
-        mm_obj_warn (self, "couldn't build device ids: %s", error->message);
-        g_error_free (error);
-        g_clear_object (&update_settings);
-        goto out;
+    if (!mm_firmware_update_settings_get_device_ids (update_settings)) {
+        mm_obj_dbg (self, "No device ids set by plugin, adding generic ids");
+        ids = mm_iface_firmware_build_generic_device_ids (self, &error);
+        if (error) {
+            mm_obj_warn (self, "couldn't build device ids: %s", error->message);
+            g_error_free (error);
+            g_clear_object (&update_settings);
+            goto out;
+        }
+
+        mm_firmware_update_settings_set_device_ids (update_settings, (const gchar **)ids->pdata);
     }
 
     /* If the plugin didn't specify custom version, add the default one ourselves */
