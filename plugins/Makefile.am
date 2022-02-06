@@ -891,6 +891,13 @@ libmm_plugin_intel_la_SOURCES = \
     intel/mm-plugin-intel.c \
     intel/mm-plugin-intel.h \
     $(NULL)
+if WITH_MBIM
+libmm_plugin_intel_la_SOURCES += \
+    intel/mm-broadband-modem-mbim-intel.h \
+    intel/mm-broadband-modem-mbim-intel.c \
+    $(NULL)
+endif
+
 libmm_plugin_intel_la_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS) \
 	-DMM_MODULE_NAME=\"intel\" \

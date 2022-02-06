@@ -24,7 +24,7 @@
 #include "mm-broadband-modem.h"
 
 #if defined WITH_MBIM
-#include "mm-broadband-modem-mbim.h"
+#include "mm-broadband-modem-mbim-intel.h"
 #endif
 
 G_DEFINE_TYPE (MMPluginIntel, mm_plugin_intel, MM_TYPE_PLUGIN)
@@ -44,7 +44,7 @@ create_modem (MMPlugin      *self,
 #if defined WITH_MBIM
     if (mm_port_probe_list_has_mbim_port (probes)) {
         mm_obj_dbg (self, "MBIM-powered Intel modem found...");
-        return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
+        return MM_BASE_MODEM (mm_broadband_modem_mbim_intel_new (uid,
                               drivers,
                               mm_plugin_get_name (self),
                               vendor,

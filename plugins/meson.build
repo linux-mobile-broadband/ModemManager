@@ -462,6 +462,10 @@ if plugins_options['intel']
     'intel/mm-plugin-intel.c',
   )
 
+  if enable_mbim
+    sources += files('intel/mm-broadband-modem-mbim-intel.c')
+  endif
+
   common_c_args = '-DMM_MODULE_NAME="intel"'
 
   plugins += {'plugin-intel': {
