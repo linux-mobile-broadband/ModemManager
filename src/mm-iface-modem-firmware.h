@@ -72,6 +72,10 @@ struct _MMIfaceModemFirmware {
 GType mm_iface_modem_firmware_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MMIfaceModemFirmware, g_object_unref)
 
+/* Get generic device ids */
+GPtrArray *mm_iface_firmware_build_generic_device_ids (MMIfaceModemFirmware  *self,
+                                                       GError               **error);
+
 /* Initialize Firmware interface (async) */
 void     mm_iface_modem_firmware_initialize        (MMIfaceModemFirmware *self,
                                                     GCancellable *cancellable,
