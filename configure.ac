@@ -519,6 +519,7 @@ MM_ENABLE_PLUGIN([foxconn],
 MM_ENABLE_PLUGIN([gosuncn])
 MM_ENABLE_PLUGIN([haier])
 MM_ENABLE_PLUGIN([huawei])
+MM_ENABLE_PLUGIN([intel])
 MM_ENABLE_PLUGIN([iridium])
 MM_ENABLE_PLUGIN([linktop])
 MM_ENABLE_PLUGIN([longcheer])

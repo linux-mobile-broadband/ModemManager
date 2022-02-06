@@ -39,6 +39,7 @@ option('plugin_foxconn', type: 'feature', value: 'auto', description: 'enable fo
 option('plugin_gosuncn', type: 'feature', value: 'auto', description: 'enable gosuncn plugin support')
 option('plugin_haier', type: 'feature', value: 'auto', description: 'enable haier plugin support')
 option('plugin_huawei', type: 'feature', value: 'auto', description: 'enable huawei plugin support')
+option('plugin_intel', type: 'feature', value: 'auto', description: 'enable intel plugin support')
 option('plugin_iridium', type: 'feature', value: 'auto', description: 'enable iridium plugin support')
 option('plugin_linktop', type: 'feature', value: 'auto', description: 'enable linktop plugin support')
 option('plugin_longcheer', type: 'feature', value: 'auto', description: 'enable longcheer plugin support')

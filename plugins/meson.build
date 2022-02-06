@@ -456,6 +456,20 @@ if plugins_options['huawei']
   plugins_udev_rules += files('huawei/77-mm-huawei-net-port-types.rules')
 endif
 
+# plugin: intel
+if plugins_options['intel']
+  sources = files(
+    'intel/mm-plugin-intel.c',
+  )
+
+  common_c_args = '-DMM_MODULE_NAME="intel"'
+
+  plugins += {'plugin-intel': {
+    'plugin': true,
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
+  }}
+endif
+
 # plugin: iridium
 if plugins_options['iridium']
   sources = files(

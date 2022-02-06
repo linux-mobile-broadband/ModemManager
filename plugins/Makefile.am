@@ -881,6 +881,25 @@ AM_CFLAGS += -DTESTUDEVRULESDIR_HUAWEI=\"${srcdir}/huawei\"
 endif
 
 ################################################################################
+# plugin: intel
+################################################################################
+
+if ENABLE_PLUGIN_INTEL
+
+pkglib_LTLIBRARIES += libmm-plugin-intel.la
+libmm_plugin_intel_la_SOURCES = \
+    intel/mm-plugin-intel.c \
+    intel/mm-plugin-intel.h \
+    $(NULL)
+libmm_plugin_intel_la_CPPFLAGS = \
+	$(PLUGIN_COMMON_COMPILER_FLAGS) \
+	-DMM_MODULE_NAME=\"intel\" \
+	$(NULL)
+libmm_plugin_intel_la_LDFLAGS  = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+endif
+
+################################################################################
 # plugin: iridium
 ################################################################################
 

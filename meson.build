@@ -302,6 +302,7 @@ plugins_options_reqs = {
   'gosuncn': {'available': true, 'shared': []},
   'haier': {'available': true, 'shared': []},
   'huawei': {'available': true, 'shared': []},
+  'intel': {'available': true, 'shared': []},
   'iridium': {'available': true, 'shared': []},
   'linktop': {'available': true, 'shared': []},
   'longcheer': {'available': true, 'shared': []},
