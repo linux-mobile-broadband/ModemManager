@@ -70,6 +70,18 @@ mm_firmware_update_settings_get_method (MMFirmwareUpdateSettings *self)
     return self->priv->method;
 }
 
+/**
+ * mm_firmware_update_settings_set_method: (skip)
+ */
+void
+mm_firmware_update_settings_set_method (MMFirmwareUpdateSettings    *self,
+                                        MMModemFirmwareUpdateMethod  method)
+{
+    g_return_if_fail (MM_IS_FIRMWARE_UPDATE_SETTINGS (self));
+
+    self->priv->method = method;
+}
+
 /*****************************************************************************/
 
 /**
