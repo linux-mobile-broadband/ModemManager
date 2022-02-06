@@ -226,14 +226,15 @@ qfastboot_test_ready (MMBaseModem  *self,
 {
     MMFirmwareUpdateSettings *update_settings;
 
+    update_settings = g_task_get_task_data (task);
+
     /* Set update method */
     if (mm_base_modem_at_command_finish (self, res, NULL)) {
-        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
+        mm_firmware_update_settings_set_method (update_settings, MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT);
         mm_firmware_update_settings_set_fastboot_at (update_settings, "AT+QFASTBOOT");
     } else
-        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
+        mm_firmware_update_settings_set_method (update_settings, MM_MODEM_FIRMWARE_UPDATE_METHOD_NONE);
 
-    g_task_set_task_data (task, update_settings, g_object_unref);
     /* Fetch full firmware info */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+QGMR?",
@@ -243,15 +244,71 @@ qfastboot_test_ready (MMBaseModem  *self,
                               task);
 }
 
+static void
+quectel_at_port_get_firmware_revision_ready (MMBaseModem  *self,
+                                             GAsyncResult *res,
+                                             GTask        *task)
+{
+    MMFirmwareUpdateSettings    *update_settings;
+    MMModemFirmwareUpdateMethod  update_methods;
+    const gchar                 *revision;
+    const gchar                 *name;
+    const gchar                 *id;
+    g_autoptr(GPtrArray)         ids = NULL;
+    GError                      *error = NULL;
+
+    update_settings = g_task_get_task_data (task);
+    update_methods = mm_firmware_update_settings_get_method (update_settings);
+
+    /* Set device ids */
+    ids = mm_iface_firmware_build_generic_device_ids (MM_IFACE_MODEM_FIRMWARE (self), &error);
+    if (error) {
+        mm_obj_warn (self, "failed to build generic device ids: %s", error->message);
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Add device id based on modem name */
+    revision = mm_base_modem_at_command_finish (self, res, NULL);
+    if (revision && g_utf8_validate (revision, -1, NULL)) {
+        name = g_strndup (revision, 7);
+        mm_obj_dbg (self, "revision %s converted to modem name %s", revision, name);
+        id = (const gchar *) g_ptr_array_index (ids, 0);
+        g_ptr_array_insert (ids, 0, g_strdup_printf ("%s&NAME_%s", id, name));
+    }
+
+    mm_firmware_update_settings_set_device_ids (update_settings, (const gchar **)ids->pdata);
+
+    /* Set update methods */
+    if (update_methods & MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE) {
+        /* Fetch full firmware info */
+        mm_base_modem_at_command (self,
+                                  "+QGMR?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback) quectel_at_port_get_firmware_version_ready,
+                                  task);
+    } else {
+        /* Check fastboot support */
+        mm_base_modem_at_command (self,
+                                  "AT+QFASTBOOT=?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback) qfastboot_test_ready,
+                                  task);
+    }
+}
+
 void
 mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
                                                  GAsyncReadyCallback   callback,
                                                  gpointer              user_data)
 {
     GTask *task;
-    MMFirmwareUpdateSettings *update_settings;
-    MMModemFirmwareUpdateMethod update_methods;
     MMPortSerialAt *at_port;
+    MMModemFirmwareUpdateMethod update_methods;
+    MMFirmwareUpdateSettings *update_settings;
 #if defined WITH_MBIM
     MMPortMbim *mbim;
 #endif
@@ -260,28 +317,18 @@ mm_shared_quectel_firmware_load_update_settings (MMIfaceModemFirmware *self,
 
     at_port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL);
     if (at_port) {
-        update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
+    	update_methods = quectel_get_firmware_update_methods (MM_BASE_MODEM (self), MM_PORT (at_port));
+        update_settings = mm_firmware_update_settings_new (update_methods);
+        g_task_set_task_data (task, update_settings, g_object_unref);
 
-        if (update_methods & MM_MODEM_FIRMWARE_UPDATE_METHOD_FIREHOSE) {
-            /* Firehose modems */
-            update_settings = mm_firmware_update_settings_new (update_methods);
-            g_task_set_task_data (task, update_settings, g_object_unref);
-            /* Fetch full firmware info */
-            mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                      "+QGMR?",
-                                      3,
-                                      FALSE,
-                                      (GAsyncReadyCallback) quectel_at_port_get_firmware_version_ready,
-                                      task);
-        } else {
-            /* Check fastboot support */
-            mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                      "AT+QFASTBOOT=?",
-                                      3,
-                                      TRUE,
-                                      (GAsyncReadyCallback)qfastboot_test_ready,
-                                      task);
-        }
+        /* Fetch modem name */
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CGMR",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback) quectel_at_port_get_firmware_revision_ready,
+                                  task);
+
         return;
     }
 
