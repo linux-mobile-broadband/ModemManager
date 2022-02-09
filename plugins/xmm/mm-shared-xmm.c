@@ -1018,14 +1018,18 @@ gps_engine_start (GTask *task)
     /* Look for an AT port to use for GPS. Prefer secondary port if there is one,
      * otherwise use primary */
     g_assert (!priv->gps_port);
-    priv->gps_port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    priv->gps_port = mm_base_modem_get_port_gps_control (MM_BASE_MODEM (self));
     if (!priv->gps_port) {
-        priv->gps_port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+        priv->gps_port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
         if (!priv->gps_port) {
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "No valid port found to control GPS");
-            g_object_unref (task);
-            return;
+            priv->gps_port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+            if (!priv->gps_port) {
+                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                         "No valid port found to control GPS");
+                g_object_unref (task);
+                return;
+            }
         }
     }
 
