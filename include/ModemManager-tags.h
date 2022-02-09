@@ -130,6 +130,19 @@
 #define ID_MM_PORT_TYPE_AT_SECONDARY "ID_MM_PORT_TYPE_AT_SECONDARY"
 
 /**
+ * ID_MM_PORT_TYPE_AT_GPS_CONTROL:
+ *
+ * This is a port-specific tag applied to TTYs that we know in advance
+ * are AT ports to be used for GPS control. Depending on the device,
+ * this may or may not mean the same port is also used fo GPS data.
+ *
+ * This tag will also proevent QCDM probing on the port.
+ *
+ * Since: 1.20
+ */
+#define ID_MM_PORT_TYPE_AT_GPS_CONTROL "ID_MM_PORT_TYPE_AT_GPS_CONTROL"
+
+/**
  * ID_MM_PORT_TYPE_AT_PPP:
  *
  * This is a port-specific tag applied to TTYs that we know in advance

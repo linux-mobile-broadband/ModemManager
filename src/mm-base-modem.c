@@ -391,6 +391,13 @@ base_modem_internal_grab_port (MMBaseModem         *self,
                 mm_obj_dbg (port, "AT port flagged as PPP");
                 at_pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
             }
+
+            /* Additionally, the ports may also be flagged as GPS control explicitly, if there is
+             * one specific port to be used for that purpose */
+            if (mm_kernel_device_get_property_as_boolean (kernel_device, ID_MM_PORT_TYPE_AT_GPS_CONTROL)) {
+                mm_obj_dbg (port, "AT port flagged as GPS control");
+                at_pflags = MM_PORT_SERIAL_AT_FLAG_GPS_CONTROL;
+            }
         }
         /* The plugin may specify NONE_NO_GENERIC to avoid the generic
          * port type hints from being applied. */
