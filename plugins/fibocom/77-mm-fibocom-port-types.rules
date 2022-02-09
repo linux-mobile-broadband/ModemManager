@@ -8,6 +8,9 @@ LABEL="mm_fibocom_port_types"
 
 SUBSYSTEMS=="usb", ATTRS{bInterfaceNumber}=="?*", ENV{.MM_USBIFNUM}="$attr{bInterfaceNumber}"
 
+# Fibocom L850-GL attach APN with toggle modem power
+ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0007", ENV{ID_MM_FIBOCOM_INITIAL_EPS_OFF_ON}="1"
+
 # Fibocom L850-GL
 #  ttyACM0 (if #2): AT port
 #  ttyACM1 (if #4): debug port (ignore)

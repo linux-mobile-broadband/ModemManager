@@ -697,6 +697,12 @@ libmm_plugin_fibocom_la_SOURCES = \
 	fibocom/mm-plugin-fibocom.c \
 	fibocom/mm-plugin-fibocom.h \
 	$(NULL)
+if WITH_MBIM
+libmm_plugin_fibocom_la_SOURCES += \
+	fibocom/mm-broadband-modem-mbim-xmm-fibocom.c \
+	fibocom/mm-broadband-modem-mbim-xmm-fibocom.h \
+	$(NULL)
+endif
 libmm_plugin_fibocom_la_CPPFLAGS = \
 	$(PLUGIN_COMMON_COMPILER_FLAGS) \
 	$(XMM_COMMON_COMPILER_FLAGS) \
