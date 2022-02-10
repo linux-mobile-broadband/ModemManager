@@ -795,6 +795,31 @@ mm_shared_xmm_signal_load_values (MMIfaceModemSignal  *self,
 }
 
 /*****************************************************************************/
+/* Get GPS control port (Location interface)
+ *
+ * This port is an AT port that will also be used for NMEA data.
+ */
+
+static MMPortSerialAt *
+shared_xmm_get_gps_control_port (MMSharedXmm  *self,
+                                 GError      **error)
+{
+    MMPortSerialAt *gps_port = NULL;
+
+    gps_port = mm_base_modem_get_port_gps_control (MM_BASE_MODEM (self));
+    if (!gps_port) {
+        gps_port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+        if (!gps_port)
+            gps_port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    }
+
+    if (!gps_port)
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "No valid port found to control GPS");
+    return gps_port;
+}
+
+/*****************************************************************************/
 /* Load capabilities (Location interface) */
 
 MMModemLocationSource
@@ -1007,6 +1032,7 @@ gps_engine_start (GTask *task)
     GpsEngineState  state;
     MMSharedXmm    *self;
     Private        *priv;
+    GError         *error = NULL;
     guint           transport_protocol = 0;
     guint           pos_mode = 0;
     gchar          *cmd;
@@ -1015,22 +1041,12 @@ gps_engine_start (GTask *task)
     priv  = get_private (self);
     state = GPOINTER_TO_UINT (g_task_get_task_data (task));
 
-    /* Look for an AT port to use for GPS. Prefer secondary port if there is one,
-     * otherwise use primary */
     g_assert (!priv->gps_port);
-
-    priv->gps_port = mm_base_modem_get_port_gps_control (MM_BASE_MODEM (self));
+    priv->gps_port = shared_xmm_get_gps_control_port (self, &error);
     if (!priv->gps_port) {
-        priv->gps_port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-        if (!priv->gps_port) {
-            priv->gps_port = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-            if (!priv->gps_port) {
-                g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                         "No valid port found to control GPS");
-                g_object_unref (task);
-                return;
-            }
-        }
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
     }
 
     switch (state) {
@@ -1493,9 +1509,8 @@ mm_shared_xmm_location_set_supl_server (MMIfaceModemLocation   *self,
 void
 mm_shared_xmm_setup_ports (MMBroadbandModem *self)
 {
-    Private        *priv;
-    MMPortSerialAt *ports[2];
-    guint           i;
+    Private                   *priv;
+    g_autoptr(MMPortSerialAt)  gps_port = NULL;
 
     priv = get_private (MM_SHARED_XMM (self));
     g_assert (priv->broadband_modem_class_parent);
@@ -1504,26 +1519,19 @@ mm_shared_xmm_setup_ports (MMBroadbandModem *self)
     /* Parent setup first always */
     priv->broadband_modem_class_parent->setup_ports (self);
 
-    ports[0] = mm_base_modem_peek_port_primary   (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
-
-    /* Setup primary and secondary ports */
-    for (i = 0; i < G_N_ELEMENTS (ports); i++) {
-        if (!ports[i])
-            continue;
-
+    /* Then, setup the GPS port */
+    gps_port = shared_xmm_get_gps_control_port (MM_SHARED_XMM (self), NULL);
+    if (gps_port) {
         /* After running AT+XLSRSTOP we may get an unsolicited response
          * reporting its status, we just ignore it. */
         mm_port_serial_at_add_unsolicited_msg_handler (
-            ports[i],
+            gps_port,
             priv->xlsrstop_regex,
             NULL, NULL, NULL);
 
-
-
         /* make sure GPS is stopped in case it was left enabled */
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
-                                       ports[i],
+                                       gps_port,
                                        "+XLSRSTOP",
                                        3, FALSE, FALSE, NULL, NULL, NULL);
     }
