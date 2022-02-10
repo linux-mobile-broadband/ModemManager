@@ -47,6 +47,7 @@ mm_broadband_modem_mbim_intel_new (const gchar  *device,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
                          /* MBIM bearer supports NET only */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
+                         MM_BASE_MODEM_DATA_TTY_SUPPORTED, FALSE,
                          NULL);
 }
 
