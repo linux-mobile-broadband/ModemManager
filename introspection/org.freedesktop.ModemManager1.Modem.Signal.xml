@@ -15,7 +15,7 @@
 
       This interface provides access to extended signal quality information.
 
-      This interface will only be available once the modem is ready to be
+      This interface will only be functional once the modem is ready to be
       registered in the cellular network. 3GPP devices will require a valid
       unlocked SIM card before any of the features in the interface can be
       used.
@@ -27,6 +27,10 @@
 
       Both Setup() and SetupThresholds() can also be used at the same time if
       required, e.g. if they report different signal quality measurement types.
+
+      The thresholds and polling setup will only be in effect if the modem is
+      in enabled state. Changing the settings with Setup() or SetupThresholds()
+      is also possible while in disabled state, though.
   -->
   <interface name="org.freedesktop.ModemManager1.Modem.Signal">
 
