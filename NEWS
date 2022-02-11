@@ -1,4 +1,47 @@
 
+ModemManager 1.18.6
+-------------------------------------------
+
+ * Build:
+   ** meson: fix gdbus code generation with meson 0.61.
+   ** meson: fix i18n.merge_file() call with meson 0.60.
+
+ * Core:
+   ** plugin-manager: longer extra probing time when not using udev.
+   ** filter: added 'option' driver name to the TTY driver filter list.
+   ** udev: avoid wrong [0-9]* as shell globbing patterns.
+
+ * QMI:
+   ** Added new ID_MM_QMI_FACILITY_LOCK_QUERY_REDUCED udev flag to reduce the
+      facility lock querying operations on devices that don't support it
+      properly.
+   ** Fixed capabilities and modes loading in multimode devices.
+   ** Improved capabilities and modes handling for devices with 5G capabilities.
+
+ * MBIM:
+   ** Fixed logic reporting the number of remaining unlock attempts.
+
+ * 3GPP interface:
+   ** Fix memleak in network scan result building.
+
+ * libmm-glib:
+   ** Fix memleak when processing network scan results.
+
+ * mmcli:
+   ** Fixed operator mcc/mnc field names in human output of location info.
+
+ * Plugins:
+   ** telit: added port type hints for LE910C1-EUX.
+   ** fibocom: added port type hints for FM101.
+   ** foxconn: firmware info loading only of MBIM-QMUX is enabled in libqmi.
+   ** quectel: ignore carrier revision.
+   ** quectel: use +QGMR to set version.
+   ** quectel: add new 'NAME' tag in device ids, so that firmware updates can be
+      performed differently depending on the device name.
+
+ * Several other improvements and fixes.
+
+
 ModemManager 1.18.4
 -------------------------------------------
 
