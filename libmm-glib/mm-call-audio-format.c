@@ -167,25 +167,24 @@ mm_call_audio_format_get_dictionary (MMCallAudioFormat *self)
         return NULL;
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-    if (self) {
-        if (self->priv->encoding)
-            g_variant_builder_add (&builder,
-                                   "{sv}",
-                                   PROPERTY_ENCODING,
-                                   g_variant_new_string (self->priv->encoding));
 
-        if (self->priv->resolution)
-            g_variant_builder_add (&builder,
-                                   "{sv}",
-                                   PROPERTY_RESOLUTION,
-                                   g_variant_new_string (self->priv->resolution));
+    if (self->priv->encoding)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_ENCODING,
+                               g_variant_new_string (self->priv->encoding));
 
-        if (self->priv->rate)
-            g_variant_builder_add (&builder,
-                                   "{sv}",
-                                   PROPERTY_RATE,
-                                   g_variant_new_uint32 (self->priv->rate));
-    }
+    if (self->priv->resolution)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_RESOLUTION,
+                               g_variant_new_string (self->priv->resolution));
+
+    if (self->priv->rate)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_RATE,
+                               g_variant_new_uint32 (self->priv->rate));
 
     return g_variant_builder_end (&builder);
 }
