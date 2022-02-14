@@ -127,8 +127,10 @@ sources = files(
 
 deps = [include_dep]
 
+libname = 'mm-glib'
+
 libmm_glib = shared_library(
-  'mm-glib',
+  libname,
   version: mm_glib_version,
   sources: sources,
   include_directories: top_inc,
@@ -147,7 +149,7 @@ libmm_glib_dep = declare_dependency(
 pkg.generate(
   libraries: libmm_glib,
   version: mm_version,
-  name: 'mm-glib',
+  name: libname,
   description: 'Library to control and monitor the ModemManager',
   subdirs: mm_glib_name,
   # FIXME: produced by the inhability of meson to use internal dependencies
@@ -180,7 +182,7 @@ if enable_gir
     symbol_prefix: gir_prefix.to_lower(),
     extra_args: args,
     header: 'libmm-glib.h',
-    export_packages: gir_ns,
+    export_packages: libname,
     install: true,
   )
 
