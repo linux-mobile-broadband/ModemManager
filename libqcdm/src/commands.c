@@ -156,7 +156,7 @@ nv_mode_pref_from_qcdm (uint8_t qcdm)
 static char *
 bin2hexstr (const uint8_t *bytes, int len)
 {
-    static char hex_digits[] = "0123456789abcdef";
+    const char hex_digits[] = "0123456789abcdef";
     char *result;
     int i;
     size_t buflen = (len * 2) + 1;
