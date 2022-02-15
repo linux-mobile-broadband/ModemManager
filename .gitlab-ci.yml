@@ -265,7 +265,7 @@ build-meson-release:
     - ninja -C build
     - ninja -C build install
     - popd
-    - meson setup build --buildtype=release --prefix=/usr -Dwerror=true -Dgtk_doc=false -Dpolkit=strict -Dsystemdsystemunitdir=/lib/systemd/system
+    - meson setup build --buildtype=release --prefix=/usr -Dwerror=true -Dgtk_doc=true -Dpolkit=strict -Dsystemdsystemunitdir=/lib/systemd/system
     - ninja -C build
     - ninja -C build test
     - ninja -C build install
