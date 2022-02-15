@@ -51,6 +51,7 @@ MMModem3gppNetworkAvailability mm_modem_3gpp_network_availability_from_mbim_prov
 GList *mm_3gpp_network_info_list_from_mbim_providers (const MbimProvider *const *providers, guint n_providers);
 
 MbimPinType mbim_pin_type_from_mm_modem_3gpp_facility (MMModem3gppFacility facility);
+MMModem3gppFacility mm_modem_3gpp_facility_from_mbim_pin_type (MbimPinType pin_type);
 
 GError *mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error,
                                                       gpointer    log_object);

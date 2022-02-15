@@ -340,6 +340,44 @@ mbim_pin_type_from_mm_modem_3gpp_facility (MMModem3gppFacility facility)
 
 /*****************************************************************************/
 
+MMModem3gppFacility
+mm_modem_3gpp_facility_from_mbim_pin_type (MbimPinType pin_type)
+{
+    switch (pin_type) {
+    case MBIM_PIN_TYPE_PIN1:
+    case MBIM_PIN_TYPE_PUK1:
+        return MM_MODEM_3GPP_FACILITY_SIM;
+    case MBIM_PIN_TYPE_PIN2:
+    case MBIM_PIN_TYPE_PUK2:
+        return MM_MODEM_3GPP_FACILITY_FIXED_DIALING;
+    case MBIM_PIN_TYPE_DEVICE_SIM_PIN:
+        return MM_MODEM_3GPP_FACILITY_PH_SIM;
+    case MBIM_PIN_TYPE_DEVICE_FIRST_SIM_PIN:
+    case MBIM_PIN_TYPE_DEVICE_FIRST_SIM_PUK:
+        return MM_MODEM_3GPP_FACILITY_PH_FSIM;
+    case MBIM_PIN_TYPE_NETWORK_PIN:
+    case MBIM_PIN_TYPE_NETWORK_PUK:
+        return MM_MODEM_3GPP_FACILITY_NET_PERS;
+    case MBIM_PIN_TYPE_NETWORK_SUBSET_PIN:
+    case MBIM_PIN_TYPE_NETWORK_SUBSET_PUK:
+        return MM_MODEM_3GPP_FACILITY_NET_SUB_PERS;
+    case MBIM_PIN_TYPE_SERVICE_PROVIDER_PIN:
+    case MBIM_PIN_TYPE_SERVICE_PROVIDER_PUK:
+        return MM_MODEM_3GPP_FACILITY_PROVIDER_PERS;
+    case MBIM_PIN_TYPE_CORPORATE_PIN:
+    case MBIM_PIN_TYPE_CORPORATE_PUK:
+        return MM_MODEM_3GPP_FACILITY_CORP_PERS;
+    case MBIM_PIN_TYPE_UNKNOWN:
+    case MBIM_PIN_TYPE_CUSTOM:
+    case MBIM_PIN_TYPE_SUBSIDY_PIN:
+    default:
+        return MM_MODEM_3GPP_FACILITY_NONE;
+    }
+}
+
+/*****************************************************************************/
+
+
 static const MMMobileEquipmentError mbim_nw_errors[] = {
     [MBIM_NW_ERROR_IMSI_UNKNOWN_IN_HLR] = MM_MOBILE_EQUIPMENT_ERROR_IMSI_UNKNOWN_IN_HSS,
     [MBIM_NW_ERROR_ILLEGAL_MS] = MM_MOBILE_EQUIPMENT_ERROR_ILLEGAL_UE,
