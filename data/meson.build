@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2021 Iñigo Martinez <inigomartinez@gmail.com>
 
+subdir('tests')
+
 service_conf = {
   'sbindir': mm_prefix / mm_sbindir,
   'MM_POLKIT_SERVICE': (enable_polkit ? 'polkit.service' : ''),

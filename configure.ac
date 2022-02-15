@@ -221,6 +221,12 @@ if test "x$with_systemdsystemunitdir" != xno; then
 fi
 AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$SYSTEMD_UNIT_DIR" -a "$SYSTEMD_UNIT_DIR" != xno ])
 
+
+dnl subdir where plugins are built w.r.t abs_top_builddir, just because it's
+dnl different to what meson does
+PLUGIN_BUILD_SUBDIR="plugins/.libs"
+AC_SUBST(PLUGIN_BUILD_SUBDIR)
+
 dnl-----------------------------------------------------------------------------
 dnl udev support (enabled by default)
 dnl
