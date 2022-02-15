@@ -23,8 +23,8 @@ void
 _qcdm_log (const char *file,
            int line,
            const char *func,
-           int level,
            int domain,
+           int level,
            const char *format,
            ...)
 {
