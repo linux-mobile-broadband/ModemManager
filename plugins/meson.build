@@ -21,7 +21,7 @@ libmm_test_common = shared_library(
   sources: sources,
   include_directories: top_inc,
   dependencies: deps + [gio_unix_dep],
-  c_args: '-DTEST_SERVICES="@0@"'.format(source_root / 'data/tests'),
+  c_args: '-DTEST_SERVICES="@0@"'.format(build_root / 'data/tests'),
 )
 
 libmm_test_common_dep = declare_dependency(
@@ -374,24 +374,6 @@ endif
 
 # plugin: generic
 if plugins_options['generic']
-  # FIXME
-  '''
-  15/16 test-service-generic                FAIL            0.02s   killed by signal 5 SIGTRAP
-  >>> MALLOC_PERTURB_=124 /ModemManager/_build/plugins/test-service-generic
-  ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――― ✀  ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
-  stdout:
-  # random seed: R02S5d0d577043f61f2806f319a6510e83a4
-  1..1
-  # Start of MM tests
-  # Start of Service tests
-  # Start of Generic tests
-  Bail out! FATAL-ERROR: Error starting ModemManager in test bus: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.ModemManager1 was not provided by any .service files
-  stderr:
-
-  ** (/ModemManager/_build/plugins/test-service-generic:36444): ERROR **: 21:06:16.248: Error starting ModemManager in test bus: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.ModemManager1 was not provided by any .service files
-  cleaning up pid 36446
-  '''
-
   plugins += {'plugin-generic': {
     'plugin': true,
     'module': {'sources': files('generic/mm-plugin-generic.c'), 'include_directories': plugins_incs, 'c_args': '-DMM_MODULE_NAME="generic"'},
