@@ -315,8 +315,8 @@ ModemManager_SOURCES = \
 	mm-auth-provider.c \
 	mm-dispatcher.h \
 	mm-dispatcher.c \
-	mm-fcc-unlock-dispatcher.h \
-	mm-fcc-unlock-dispatcher.c \
+	mm-dispatcher-fcc-unlock.h \
+	mm-dispatcher-fcc-unlock.c \
 	mm-filter.h \
 	mm-filter.c \
 	mm-base-manager.c \

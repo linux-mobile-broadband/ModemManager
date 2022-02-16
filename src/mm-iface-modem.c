@@ -28,7 +28,7 @@
 #include "mm-private-boxed-types.h"
 #include "mm-log-object.h"
 #include "mm-context.h"
-#include "mm-fcc-unlock-dispatcher.h"
+#include "mm-dispatcher-fcc-unlock.h"
 #if defined WITH_QMI
 # include "mm-broadband-modem-qmi.h"
 #endif
@@ -3844,7 +3844,7 @@ modem_after_power_up_ready (MMIfaceModem *self,
 }
 
 static void
-fcc_unlock_dispatcher_ready (MMFccUnlockDispatcher *dispatcher,
+dispatcher_fcc_unlock_ready (MMDispatcherFccUnlock *dispatcher,
                              GAsyncResult          *res,
                              GTask                 *task)
 {
@@ -3855,7 +3855,7 @@ fcc_unlock_dispatcher_ready (MMFccUnlockDispatcher *dispatcher,
     self = g_task_get_source_object (task);
     ctx = g_task_get_task_data (task);
 
-    if (!mm_fcc_unlock_dispatcher_run_finish (dispatcher, res, &error))
+    if (!mm_dispatcher_fcc_unlock_run_finish (dispatcher, res, &error))
         mm_obj_dbg (self, "couldn't run FCC unlock: %s", error->message);
 
     /* always retry, even on reported error */
@@ -3867,7 +3867,7 @@ static void
 fcc_unlock (GTask *task)
 {
     MMIfaceModem          *self;
-    MMFccUnlockDispatcher *dispatcher;
+    MMDispatcherFccUnlock *dispatcher;
     MMModemPortInfo       *port_infos;
     guint                  n_port_infos = 0;
     guint                  i;
@@ -3876,7 +3876,7 @@ fcc_unlock (GTask *task)
 
     self = g_task_get_source_object (task);
 
-    dispatcher = mm_fcc_unlock_dispatcher_get ();
+    dispatcher = mm_dispatcher_fcc_unlock_get ();
 
     aux = g_ptr_array_new ();
     port_infos = mm_base_modem_get_port_infos (MM_BASE_MODEM (self), &n_port_infos);
@@ -3901,13 +3901,13 @@ fcc_unlock (GTask *task)
     g_ptr_array_add (aux, NULL);
     modem_ports = (GStrv) g_ptr_array_free (aux, FALSE);
 
-    mm_fcc_unlock_dispatcher_run (dispatcher,
+    mm_dispatcher_fcc_unlock_run (dispatcher,
                                   mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
                                   mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
                                   g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
                                   modem_ports,
                                   g_task_get_cancellable (task),
-                                  (GAsyncReadyCallback)fcc_unlock_dispatcher_ready,
+                                  (GAsyncReadyCallback)dispatcher_fcc_unlock_ready,
                                   task);
 }
 

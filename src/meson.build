@@ -201,7 +201,7 @@ sources = files(
   'mm-context.c',
   'mm-device.c',
   'mm-dispatcher.c',
-  'mm-fcc-unlock-dispatcher.c',
+  'mm-dispatcher-fcc-unlock.c',
   'mm-filter.c',
   'mm-iface-modem-3gpp.c',
   'mm-iface-modem-3gpp-profile-manager.c',
