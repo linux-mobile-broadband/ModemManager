@@ -313,6 +313,8 @@ ModemManager_SOURCES = \
 	mm-private-boxed-types.c \
 	mm-auth-provider.h \
 	mm-auth-provider.c \
+	mm-dispatcher.h \
+	mm-dispatcher.c \
 	mm-fcc-unlock-dispatcher.h \
 	mm-fcc-unlock-dispatcher.c \
 	mm-filter.h \
