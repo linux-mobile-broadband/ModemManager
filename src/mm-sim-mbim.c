@@ -475,9 +475,13 @@ check_uicc_apdu_ready (MbimDevice   *device,
             &apdu_response,
             &error))
         ctx->saved_error = error;
-    else
+    else {
         ctx->eid = mm_decode_eid ((const gchar *)(apdu_response + EID_APDU_HEADER),
                                   apdu_response_size - EID_APDU_HEADER);
+        if (!ctx->eid)
+            ctx->saved_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                                            "Invalid APDU response: unable to decode EID");
+    }
 
     /* always go on to the close channel step, even on error */
     ctx->step++;
