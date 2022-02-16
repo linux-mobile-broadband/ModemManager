@@ -1186,14 +1186,16 @@ mm_sim_mbim_new (MMBaseModem *modem,
 
 MMBaseSim *
 mm_sim_mbim_new_initialized (MMBaseModem *modem,
-                             guint        slot_number,
-                             gboolean     active,
-                             const gchar *sim_identifier,
-                             const gchar *imsi,
-                             const gchar *eid,
-                             const gchar *operator_identifier,
-                             const gchar *operator_name,
-                             const GStrv  emergency_numbers)
+                             guint            slot_number,
+                             gboolean         active,
+                             MMSimType        sim_type,
+                             MMSimEsimStatus  esim_status,
+                             const gchar     *sim_identifier,
+                             const gchar     *imsi,
+                             const gchar     *eid,
+                             const gchar     *operator_identifier,
+                             const gchar     *operator_name,
+                             const GStrv      emergency_numbers)
 {
     MMBaseSim *sim;
 
@@ -1201,6 +1203,8 @@ mm_sim_mbim_new_initialized (MMBaseModem *modem,
                                      MM_BASE_SIM_MODEM,       modem,
                                      MM_BASE_SIM_SLOT_NUMBER, slot_number,
                                      "active",                active,
+                                     "sim-type",              sim_type,
+                                     "esim-status",           esim_status,
                                      "sim-identifier",        sim_identifier,
                                      "eid",                   eid,
                                      "operator-identifier",   operator_identifier,
