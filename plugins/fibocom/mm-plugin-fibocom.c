@@ -42,22 +42,6 @@ MM_PLUGIN_DEFINE_MINOR_VERSION
 
 /*****************************************************************************/
 
-#if defined WITH_MBIM
-static gboolean
-mm_port_probe_list_has_initial_eps_off_on_tag (GList *probes)
-{
-    GList *l;
-
-    for (l = probes; l; l = g_list_next (l)) {
-        if (mm_kernel_device_get_global_property_as_boolean (mm_port_probe_peek_port (MM_PORT_PROBE (l->data)),
-                                                             "ID_MM_FIBOCOM_INITIAL_EPS_OFF_ON"))
-            return TRUE;
-    }
-
-    return FALSE;
-}
-#endif
-
 static MMBaseModem *
 create_modem (MMPlugin     *self,
               const gchar  *uid,
@@ -71,20 +55,11 @@ create_modem (MMPlugin     *self,
     if (mm_port_probe_list_has_mbim_port (probes)) {
         if (mm_port_probe_list_is_xmm (probes)) {
             mm_obj_dbg (self, "MBIM-powered XMM-based Fibocom modem found...");
-            if (mm_port_probe_list_has_initial_eps_off_on_tag (probes)) {
-                mm_obj_dbg (self, "initial eps need to toggle modem power");
-                return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_fibocom_new (uid,
-                                                                               drivers,
-                                                                               mm_plugin_get_name (self),
-                                                                               vendor,
-                                                                               product));
-            }
-
-            return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_new (uid,
-                                                                   drivers,
-                                                                   mm_plugin_get_name (self),
-                                                                   vendor,
-                                                                   product));
+            return MM_BASE_MODEM (mm_broadband_modem_mbim_xmm_fibocom_new (uid,
+                                                                           drivers,
+                                                                           mm_plugin_get_name (self),
+                                                                           vendor,
+                                                                           product));
         }
         mm_obj_dbg (self, "MBIM-powered Fibocom modem found...");
         return MM_BASE_MODEM (mm_broadband_modem_mbim_new (uid,
