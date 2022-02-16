@@ -102,14 +102,14 @@ before_attach_apn_modem_power_down_ready (MMIfaceModem *self,
     }
 
     mm_obj_dbg (self, "success toggling modem power down before attach APN");
-    if (iface_modem_3gpp_parent->set_initial_eps_bearer_settings &&
-        iface_modem_3gpp_parent->set_initial_eps_bearer_settings_finish) {
-        iface_modem_3gpp_parent->set_initial_eps_bearer_settings (MM_IFACE_MODEM_3GPP (self),
-                                                                  config,
-                                                                  (GAsyncReadyCallback)parent_set_initial_eps_bearer_settings_ready,
-                                                                  task);
-        return;
-    }
+
+    g_assert (iface_modem_3gpp_parent->set_initial_eps_bearer_settings);
+    g_assert (iface_modem_3gpp_parent->set_initial_eps_bearer_settings_finish);
+
+    iface_modem_3gpp_parent->set_initial_eps_bearer_settings (MM_IFACE_MODEM_3GPP (self),
+                                                              config,
+                                                              (GAsyncReadyCallback)parent_set_initial_eps_bearer_settings_ready,
+                                                              task);
 }
 
 static void
