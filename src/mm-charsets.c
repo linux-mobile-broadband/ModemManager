@@ -865,11 +865,18 @@ mm_modem_charset_bytearray_to_utf8 (GByteArray      *bytearray,
             g_assert_not_reached ();
     }
 
-    if (utf8 && g_utf8_validate (utf8, -1, NULL))
-        return g_steal_pointer (&utf8);
+    if (!utf8) {
+        g_prefix_error (error, "Invalid conversion from %s to UTF-8: ", settings->gsm_name);
+        return NULL;
+    }
 
-    g_prefix_error (error, "Invalid conversion from %s to UTF-8: ", settings->gsm_name);
-    return NULL;
+    if (!g_utf8_validate (utf8, -1, NULL)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Invalid conversion from %s: invalid UTF-8", settings->gsm_name);
+        return NULL;
+    }
+
+    return g_steal_pointer (&utf8);
 }
 
 gchar *
