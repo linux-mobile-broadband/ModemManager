@@ -19,6 +19,15 @@
 #include <glib.h>
 #include "ModemManager.h"
 
+typedef enum {
+    MM_TELIT_MODEL_DEFAULT,
+    MM_TELIT_MODEL_FN980,
+    MM_TELIT_MODEL_LE910C1,
+    MM_TELIT_MODEL_LM940,
+    MM_TELIT_MODEL_LM960,
+    MM_TELIT_MODEL_LN920,
+} MMTelitModel;
+
 /* #BND response parsers and request builder */
 GArray *mm_telit_parse_bnd_query_response (const gchar  *response,
                                            gboolean      modem_is_2g,
@@ -66,5 +75,7 @@ typedef enum { /*< underscore_name=mm_telit_csim_lock_state >*/
 GArray *mm_telit_build_modes_list (void);
 
 gchar *mm_telit_parse_swpkgv_response (const gchar *response);
+
+MMTelitModel mm_telit_model_from_revision (const gchar *revision);
 
 #endif  /* MM_MODEM_HELPERS_TELIT_H */

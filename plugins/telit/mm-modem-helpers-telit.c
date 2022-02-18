@@ -903,3 +903,31 @@ mm_telit_parse_swpkgv_response (const gchar *response)
 
     return version;
 }
+
+/*****************************************************************************/
+/* MM Telit Model from revision string */
+
+MMTelitModel
+mm_telit_model_from_revision (const gchar *revision)
+{
+    guint i;
+    static const struct {
+        const gchar *revision_prefix;
+        MMTelitModel model;
+    } revision_to_model_map [] = {
+        {"24.01", MM_TELIT_MODEL_LM940},
+        {"25.", MM_TELIT_MODEL_LE910C1},
+        {"32.", MM_TELIT_MODEL_LM960},
+        {"38.", MM_TELIT_MODEL_FN980},
+        {"40.", MM_TELIT_MODEL_LN920}
+    };
+
+    g_assert (revision);
+
+    for (i = 0; i < G_N_ELEMENTS (revision_to_model_map); ++i) {
+        if (g_str_has_prefix (revision, revision_to_model_map[i].revision_prefix))
+            return revision_to_model_map[i].model;
+    }
+
+    return MM_TELIT_MODEL_DEFAULT;
+}

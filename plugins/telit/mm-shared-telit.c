@@ -43,6 +43,7 @@ typedef struct {
     gboolean      ext_4g_bands;
     GArray       *supported_bands;
     GArray       *supported_modes;
+    gchar        *software_package_version;
 } Private;
 
 static void
@@ -52,6 +53,7 @@ private_free (Private *priv)
         g_array_unref (priv->supported_bands);
     if (priv->supported_modes)
         g_array_unref (priv->supported_modes);
+    g_free (priv->software_package_version);
     g_slice_free (Private, priv);
 }
 
@@ -623,14 +625,31 @@ mm_shared_telit_modem_load_revision_finish (MMIfaceModem *self,
                                             GAsyncResult *res,
                                             GError **error)
 {
-    GVariant *result;
-    gchar *revision = NULL;
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
 
-    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
-    if (result) {
+static void
+load_revision_ready (MMBaseModem *self,
+                     GAsyncResult *res,
+                     GTask *task)
+{
+    GError *error;
+    GVariant *result;
+
+    result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
+    if (!result) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+    } else {
+        gchar *revision = NULL;
+        Private *priv;
+
+        priv = get_private (MM_SHARED_TELIT (self));
         revision = g_variant_dup_string (result, NULL);
+        priv->software_package_version = g_strdup (revision);
+        g_task_return_pointer (task, revision, g_free);
+        g_object_unref (task);
     }
-    return revision;
 }
 
 /*
@@ -689,14 +708,28 @@ mm_shared_telit_modem_load_revision (MMIfaceModem *self,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
 {
+    GTask *task;
+    Private *priv;
+
+    task = g_task_new (self, NULL, callback, user_data);
+    priv = get_private (MM_SHARED_TELIT (self));
+
     mm_obj_dbg (self, "loading revision...");
+    if (priv->software_package_version) {
+        g_task_return_pointer (task,
+                               g_strdup (priv->software_package_version),
+                               g_free);
+        g_object_unref (task);
+        return;
+    }
+
     mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
         revisions,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        callback,
-        user_data);
+        (GAsyncReadyCallback) load_revision_ready,
+        task);
 }
 
 /*****************************************************************************/
