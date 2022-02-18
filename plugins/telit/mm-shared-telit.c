@@ -616,6 +616,90 @@ mm_shared_telit_set_current_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Revision loading */
+
+gchar *
+mm_shared_telit_modem_load_revision_finish (MMIfaceModem *self,
+                                            GAsyncResult *res,
+                                            GError **error)
+{
+    GVariant *result;
+    gchar *revision = NULL;
+
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
+    if (result) {
+        revision = g_variant_dup_string (result, NULL);
+    }
+    return revision;
+}
+
+/*
+ * parse AT#SWPKGV command
+ * Execution command returns the software package version without #SWPKGV: command echo.
+ * The response is as follows:
+ *
+ * AT#SWPKGV
+ * <Telit Software Package Version>-<Production Parameters Version>
+ * <Modem FW Version> (Usually the same value returned by AT+GMR)
+ * <Production Parameters Version>
+ * <Application FW Version>
+ */
+static MMBaseModemAtResponseProcessorResult
+software_package_version_ready (MMBaseModem   *self,
+                                gpointer       none,
+                                const gchar   *command,
+                                const gchar   *response,
+                                gboolean       last_command,
+                                const GError  *error,
+                                GVariant     **result,
+                                GError       **result_error)
+{
+    gchar *version = NULL;
+
+    if (error) {
+        *result = NULL;
+
+        /* Ignore AT errors (ie, ERROR or CMx ERROR) */
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command) {
+            *result_error = g_error_copy (error);
+            return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_FAILURE;
+        }
+
+        *result_error = NULL;
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
+    }
+
+    version = mm_telit_parse_swpkgv_response (response);
+    if (!version)
+        return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_CONTINUE;
+
+    *result = g_variant_new_take_string (version);
+    return MM_BASE_MODEM_AT_RESPONSE_PROCESSOR_RESULT_SUCCESS;
+}
+
+static const MMBaseModemAtCommand revisions[] = {
+    { "#SWPKGV",  3, TRUE, software_package_version_ready },
+    { "+CGMR",   3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
+    { "+GMR",   3, TRUE, mm_base_modem_response_processor_string_ignore_at_errors },
+    { NULL }
+};
+
+void
+mm_shared_telit_modem_load_revision (MMIfaceModem *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    mm_obj_dbg (self, "loading revision...");
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        revisions,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        callback,
+        user_data);
+}
+
+/*****************************************************************************/
 
 static void
 shared_telit_init (gpointer g_iface)

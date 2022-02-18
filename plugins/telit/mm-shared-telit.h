@@ -90,4 +90,12 @@ void        mm_shared_telit_modem_set_current_bands     (MMIfaceModem *self,
                                                          GAsyncReadyCallback callback,
                                                          gpointer user_data);
 
+void       mm_shared_telit_modem_load_revision          (MMIfaceModem *self,
+                                                         GAsyncReadyCallback callback,
+                                                         gpointer user_data);
+
+gchar *   mm_shared_telit_modem_load_revision_finish    (MMIfaceModem *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
+
 #endif  /* MM_SHARED_TELIT_H */

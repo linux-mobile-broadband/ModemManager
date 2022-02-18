@@ -611,6 +611,33 @@ test_telit_parse_qss_query (void)
     }
 }
 
+static void
+test_telit_parse_swpkgv_response (void)
+{
+    static struct {
+        const gchar *response;
+        const gchar *expected;
+    } tt [] = {
+        {"\n\r12.34.567\n\rM0F.223004-B001\n\rP0F.224700\n\rA0F.223004-B001\n\r\n\rOK\n\r", "12.34.567"},
+        {"\n\r13.35.568-A123\n\rM0F.223004-B001\n\rP0F.224700\n\rA0F.223004-B001\n\r\n\rOK\n\r", "13.35.568-A123"},
+        {"\n\r14.36.569-B124\n\rM0F.223004-B001\n\rP0F.224700\n\rA0F.223004-B001\n\r\n\rOK\n\r", "14.36.569-B124"},
+        {"\n\r15.37.570-T125\n\rM0F.223004-B001\n\rP0F.224700\n\rA0F.223004-B001\n\r\n\rOK\n\r", "15.37.570-T125"},
+        {"\n\r16.38.571-P0F.224700\n\rM0F.223004-B001\n\rP0F.224700\n\rA0F.223004-B001\n\r\n\rOK\n\r", "16.38.571-P0F.224700"},
+        /* real example from LE910C1-EUX */
+        {"\n\r25.30.224-B001-P0F.224700\n\rM0F.223004-B001\n\rP0F.224700\n\rA0F.223004-B001\n\r\n\rOK\n\r", "25.30.224-B001-P0F.224700"},
+    };
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (tt); i++) {
+        gchar *actual = NULL;
+
+        actual = mm_telit_parse_swpkgv_response(tt[i].response);
+
+        g_assert_cmpstr (tt[i].expected, ==, actual);
+        g_free (actual);
+    }
+}
+
 /******************************************************************************/
 
 int main (int argc, char **argv)
@@ -625,5 +652,6 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/telit/bands/current/set_bands/3g", test_telit_get_3g_bnd_flag);
     g_test_add_func ("/MM/telit/bands/current/set_bands/4g", test_telit_get_4g_bnd_flag);
     g_test_add_func ("/MM/telit/qss/query", test_telit_parse_qss_query);
+    g_test_add_func ("/MM/telit/swpkv/parse_response", test_telit_parse_swpkgv_response);
     return g_test_run ();
 }

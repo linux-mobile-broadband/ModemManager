@@ -852,3 +852,54 @@ mm_telit_build_modes_list (void)
 
     return combinations;
 }
+
+/*****************************************************************************/
+/* Software Package version response parser */
+
+gchar *
+mm_telit_parse_swpkgv_response (const gchar *response)
+{
+    gchar *version = NULL;
+    g_autofree gchar *base_version = NULL;
+    g_autofree gchar *ext_version = NULL;
+    g_autofree gchar *production_version = NULL;
+    g_autoptr(GRegex) r = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
+    guint matches;
+
+    /* We are interested only in the first line: "Telit Software Package version"
+     * which is composed by up to three parts:
+     * - base version: "ab.cde.fgh"
+     * - extended version (e.g. alpha, beta, test version): "Axyz", "Bxyz", or "Txyz"
+     * - production parameter version (e.g. P0F.012345)
+     */
+    r = g_regex_new ("(?P<Base>\\d{2}.\\d{2}.\\d{3})(?P<Ext>-[ABT]\\d{3})?(?P<Prod>-\\w\\d\\w\\.\\d+)?",
+                     G_REGEX_RAW | G_REGEX_MULTILINE | G_REGEX_NEWLINE_CRLF,
+                     G_REGEX_MATCH_NEWLINE_CR,
+                     NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+        return NULL;
+    }
+
+    matches = g_match_info_get_match_count (match_info);
+    if (matches < 2 || matches > 4) {
+        return NULL;
+    }
+
+    base_version = g_match_info_fetch_named (match_info, "Base");
+    ext_version = g_match_info_fetch_named (match_info, "Ext");
+    production_version = g_match_info_fetch_named (match_info, "Prod");
+
+    if (base_version && !ext_version && !production_version)
+        version = g_strdup (base_version);
+    else if (base_version && ext_version && !production_version)
+        version = g_strdup_printf("%s%s", base_version, ext_version);
+    else if (base_version && !ext_version && production_version)
+        version = g_strdup_printf("%s%s", base_version, production_version);
+    else if (base_version && ext_version && production_version)
+        version = g_strdup_printf("%s%s%s", base_version, ext_version, production_version);
+
+    return version;
+}
