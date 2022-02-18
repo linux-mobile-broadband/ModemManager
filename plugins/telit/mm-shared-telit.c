@@ -57,6 +57,13 @@ private_free (Private *priv)
     g_slice_free (Private, priv);
 }
 
+static gboolean
+is_bnd_4g_format_hex (MMBaseModem *self,
+                      const gchar *revision)
+{
+    return mm_telit_model_from_revision (revision) == MM_TELIT_MODEL_LE910C1;
+}
+
 static void
 initialize_alternate_3g_band (MMSharedTelit *self,
                               Private       *priv)
@@ -221,6 +228,7 @@ load_supported_bands_ready (MMBaseModem  *self,
                                                   mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
                                                   mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
                                                   priv->alternate_3g_bands,
+                                                  is_bnd_4g_format_hex (self, priv->software_package_version),
                                                   &priv->ext_4g_bands,
                                                   self,
                                                   &error);
@@ -326,6 +334,7 @@ load_current_bands_ready (MMBaseModem  *self,
                                                    mm_iface_modem_is_3g (MM_IFACE_MODEM (self)),
                                                    mm_iface_modem_is_4g (MM_IFACE_MODEM (self)),
                                                    priv->alternate_3g_bands,
+                                                   is_bnd_4g_format_hex (self, priv->software_package_version),
                                                    priv->ext_4g_bands,
                                                    self,
                                                    &error);
