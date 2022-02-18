@@ -82,9 +82,9 @@ firmware_load_update_settings_finish (MMIfaceModemFirmware  *self,
 }
 
 static void
-foxconn_get_firmware_version_ready (QmiClientDms *client,
-                                    GAsyncResult *res,
-                                    GTask        *task)
+foxconn_get_firmware_version_over_dms_service_ready (QmiClientDms *client,
+                                                     GAsyncResult *res,
+                                                     GTask        *task)
 {
     QmiMessageDmsFoxconnGetFirmwareVersionOutput *output;
     GError                                       *error = NULL;
@@ -130,17 +130,61 @@ foxconn_get_firmware_version_ready (QmiClientDms *client,
 }
 
 static void
-firmware_load_update_settings (MMIfaceModemFirmware *self,
-                               GAsyncReadyCallback   callback,
-                               gpointer              user_data)
+foxconn_get_firmware_version_over_fox_service_ready (QmiClientFox *client,
+                                                     GAsyncResult *res,
+                                                     GTask        *task)
 {
-    GTask                                       *task;
+    QmiMessageFoxGetFirmwareVersionOutput *output;
+    GError                                *error = NULL;
+    MMFirmwareUpdateSettings              *update_settings = NULL;
+    const gchar                           *str;
+    MMIfaceModemFirmware                  *self;
+    guint                                  vendor_id;
+    guint                                  product_id;
+
+    output = qmi_client_fox_get_firmware_version_finish (client, res, &error);
+    if (!output || !qmi_message_fox_get_firmware_version_output_get_result (output, &error))
+        goto out;
+
+    /* Create update settings now:
+     * 0x105b is the T99W175 module, T99W175 supports QDU,
+     * T99W265(0x0489:0xe0da ; 0x0489:0xe0db): supports QDU
+     * else support FASTBOOT and QMI PDC.
+     */
+    self = g_task_get_source_object (task);
+    vendor_id = mm_base_modem_get_vendor_id (MM_BASE_MODEM (self));
+    product_id = mm_base_modem_get_product_id (MM_BASE_MODEM (self));
+    if (vendor_id == 0x105b || (vendor_id == 0x0489 && (product_id  == 0xe0da || product_id == 0xe0db)))
+        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_MBIM_QDU);
+    else {
+        update_settings = mm_firmware_update_settings_new (MM_MODEM_FIRMWARE_UPDATE_METHOD_FASTBOOT |
+                                                           MM_MODEM_FIRMWARE_UPDATE_METHOD_QMI_PDC);
+        mm_firmware_update_settings_set_fastboot_at (update_settings, "AT^FASTBOOT");
+    }
+
+    qmi_message_fox_get_firmware_version_output_get_version (output, &str, NULL);
+    mm_firmware_update_settings_set_version (update_settings, str);
+
+ out:
+    if (error)
+        g_task_return_error (task, error);
+    else {
+        g_assert (update_settings);
+        g_task_return_pointer (task, update_settings, g_object_unref);
+    }
+    g_object_unref (task);
+    if (output)
+        qmi_message_fox_get_firmware_version_output_unref (output);
+}
+
+static void
+firmware_load_update_settings_over_dms_service (MMIfaceModemFirmware *self,
+                                                GTask                *task)
+{
     QmiMessageDmsFoxconnGetFirmwareVersionInput *input = NULL;
     QmiClient                                   *client = NULL;
     guint                                        vendor_id;
     guint                                        product_id;
-
-    task = g_task_new (self, NULL, callback, user_data);
 
     client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
                                         QMI_SERVICE_DMS,
@@ -148,7 +192,7 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
                                         NULL);
     if (!client) {
         g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                 "Unable to load version info: no QMI DMS client available");
+                                 "Unable to load version info: no QMI FOX and DMS client available");
         g_object_unref (task);
         return;
     }
@@ -172,9 +216,57 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
         input,
         10,
         NULL,
-        (GAsyncReadyCallback)foxconn_get_firmware_version_ready,
+        (GAsyncReadyCallback)foxconn_get_firmware_version_over_dms_service_ready,
         task);
     qmi_message_dms_foxconn_get_firmware_version_input_unref (input);
+}
+
+static void
+firmware_load_update_settings (MMIfaceModemFirmware *self,
+                               GAsyncReadyCallback   callback,
+                               gpointer              user_data)
+{
+    GTask                                *task;
+    QmiMessageFoxGetFirmwareVersionInput *input = NULL;
+    QmiClient                            *client = NULL;
+    guint                                 vendor_id;
+    guint                                 product_id;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* Try to get firmware version over fox service, if it failed to peek client, try dms service. */
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (self),
+                                        QMI_SERVICE_FOX,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        NULL);
+    if (!client) {
+        qmi_message_fox_get_firmware_version_input_unref (input);
+        firmware_load_update_settings_over_dms_service (self, task);
+        return;
+    }
+
+    vendor_id = mm_base_modem_get_vendor_id (MM_BASE_MODEM (self));
+    product_id = mm_base_modem_get_product_id (MM_BASE_MODEM (self));
+    input = qmi_message_fox_get_firmware_version_input_new ();
+    /* 0x105b is the T99W175 module, T99W175/T99W265 need to compare the apps version. */
+    if (vendor_id == 0x105b || (vendor_id == 0x0489 && (product_id  == 0xe0da || product_id == 0xe0db)))
+        qmi_message_fox_get_firmware_version_input_set_version_type (
+            input,
+            QMI_FOX_FIRMWARE_VERSION_TYPE_FIRMWARE_MCFG_APPS,
+            NULL);
+    else
+        qmi_message_fox_get_firmware_version_input_set_version_type (
+            input,
+            QMI_FOX_FIRMWARE_VERSION_TYPE_FIRMWARE_MCFG,
+            NULL);
+    qmi_client_fox_get_firmware_version (
+        QMI_CLIENT_FOX (client),
+        input,
+        10,
+        NULL,
+        (GAsyncReadyCallback)foxconn_get_firmware_version_over_fox_service_ready,
+        task);
+    qmi_message_fox_get_firmware_version_input_unref (input);
 }
 
 #endif
