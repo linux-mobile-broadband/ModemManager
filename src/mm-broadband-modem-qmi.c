@@ -1359,18 +1359,15 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
                                 gint16 nr5g_rsrp,
                                 gint16 nr5g_snr,
                                 gint16 nr5g_rsrq,
-                                guint8 *out_quality,
-                                MMModemAccessTechnology *out_act)
+                                guint8 *out_quality)
 {
     gint8 rssi_max = -125;
     gint8 signal_quality = -1;
     /* Valid nr5g signal quality will be in percentage [0,100].
      * It is minimum of (rsrp, snr, rsrq) signal quality for 5G. */
     guint8 nr5g_signal_quality_min = 101;
-    QmiNasRadioInterface signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_UNKNOWN;
 
     g_assert (out_quality != NULL);
-    g_assert (out_act != NULL);
 
     /* We do not report per-technology signal quality, so just get the highest
      * one of the ones reported. TODO: When several technologies are in use, if
@@ -1380,63 +1377,50 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
 
     if (cdma1x_rssi < 0) {
         mm_obj_dbg (self, "RSSI (CDMA): %d dBm", cdma1x_rssi);
-        if (qmi_dbm_valid (cdma1x_rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X)) {
+        if (qmi_dbm_valid (cdma1x_rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1X))
             rssi_max = MAX (cdma1x_rssi, rssi_max);
-            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_CDMA_1X;
-        }
     }
 
     if (evdo_rssi < 0) {
         mm_obj_dbg (self, "RSSI (HDR): %d dBm", evdo_rssi);
-        if (qmi_dbm_valid (evdo_rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO)) {
+        if (qmi_dbm_valid (evdo_rssi, QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO))
             rssi_max = MAX (evdo_rssi, rssi_max);
-            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_CDMA_1XEVDO;
-        }
     }
 
     if (gsm_rssi < 0) {
         mm_obj_dbg (self, "RSSI (GSM): %d dBm", gsm_rssi);
-        if (qmi_dbm_valid (gsm_rssi, QMI_NAS_RADIO_INTERFACE_GSM)) {
+        if (qmi_dbm_valid (gsm_rssi, QMI_NAS_RADIO_INTERFACE_GSM))
             rssi_max = MAX (gsm_rssi, rssi_max);
-            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_GSM;
-        }
     }
 
     if (wcdma_rssi < 0) {
         mm_obj_dbg (self, "RSSI (WCDMA): %d dBm", wcdma_rssi);
-        if (qmi_dbm_valid (wcdma_rssi, QMI_NAS_RADIO_INTERFACE_UMTS)) {
+        if (qmi_dbm_valid (wcdma_rssi, QMI_NAS_RADIO_INTERFACE_UMTS))
             rssi_max = MAX (wcdma_rssi, rssi_max);
-            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_UMTS;
-        }
     }
 
     if (lte_rssi < 0) {
         mm_obj_dbg (self, "RSSI (LTE): %d dBm", lte_rssi);
-        if (qmi_dbm_valid (lte_rssi, QMI_NAS_RADIO_INTERFACE_LTE)) {
+        if (qmi_dbm_valid (lte_rssi, QMI_NAS_RADIO_INTERFACE_LTE))
             rssi_max = MAX (lte_rssi, rssi_max);
-            signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_LTE;
-        }
     }
 
     if (nr5g_rsrp <= RSRP_MAX && nr5g_rsrp >= RSRP_MIN) {
         mm_obj_dbg (self, "RSRP (5G): %d dBm", nr5g_rsrp);
         nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
                                        (guint8)((nr5g_rsrp - RSRP_MIN) * 100 / (RSRP_MAX - RSRP_MIN)));
-        signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_5GNR;
     }
 
     if (nr5g_snr <= SNR_MAX && nr5g_snr >= SNR_MIN) {
         mm_obj_dbg (self, "SNR (5G): %d dB", nr5g_snr);
         nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
                                        (guint8)((nr5g_snr - SNR_MIN) * 100 / (SNR_MAX - SNR_MIN)));
-        signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_5GNR;
     }
 
     if (nr5g_rsrq <= RSRQ_MAX && nr5g_rsrq >= RSRQ_MIN) {
         mm_obj_dbg (self, "RSRQ (5G): %d dB", nr5g_rsrq);
         nr5g_signal_quality_min = MIN (nr5g_signal_quality_min,
                                        (guint8)((nr5g_rsrq - RSRQ_MIN) * 100 / (RSRQ_MAX - RSRQ_MIN)));
-        signal_info_radio_interface = QMI_NAS_RADIO_INTERFACE_5GNR;
     }
 
     if (rssi_max < 0 && rssi_max > -125) {
@@ -1452,7 +1436,6 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
 
     if (signal_quality >= 0) {
         *out_quality = signal_quality;
-        *out_act = mm_modem_access_technology_from_qmi_radio_interface (signal_info_radio_interface);
         return TRUE;
     }
 
@@ -1462,8 +1445,7 @@ common_signal_info_get_quality (MMBroadbandModemQmi *self,
 static gboolean
 signal_info_get_quality (MMBroadbandModemQmi *self,
                          QmiMessageNasGetSignalInfoOutput *output,
-                         guint8 *out_quality,
-                         MMModemAccessTechnology *out_act)
+                         guint8 *out_quality)
 {
     gint8 cdma1x_rssi = 0;
     gint8 evdo_rssi = 0;
@@ -1496,20 +1478,17 @@ signal_info_get_quality (MMBroadbandModemQmi *self,
                                            nr5g_rsrp,
                                            nr5g_snr,
                                            nr5g_rsrq,
-                                           out_quality,
-                                           out_act);
+                                           out_quality);
 }
 
 static gboolean
-signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
-                                             QmiMessageNasGetSignalStrengthOutput *output,
-                                             guint8 *o_quality,
-                                             MMModemAccessTechnology *o_act)
+signal_strength_get_quality (MMBroadbandModemQmi *self,
+                             QmiMessageNasGetSignalStrengthOutput *output,
+                             guint8 *o_quality)
 {
     GArray *array = NULL;
     gint8 signal_max = 0;
     QmiNasRadioInterface main_interface;
-    MMModemAccessTechnology act;
 
     /* We do not report per-technology signal quality, so just get the highest
      * one of the ones reported. */
@@ -1523,8 +1502,6 @@ signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
     /* Treat results as invalid if main signal strength is invalid */
     if (!qmi_dbm_valid (signal_max, main_interface))
         return FALSE;
-
-    act = mm_modem_access_technology_from_qmi_radio_interface (main_interface);
 
     /* On multimode devices we may get more */
     if (qmi_message_nas_get_signal_strength_output_get_strength_list (output, &array, NULL)) {
@@ -1541,7 +1518,6 @@ signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
 
             if (qmi_dbm_valid (element->strength, element->radio_interface)) {
                 signal_max = MAX (element->strength, signal_max);
-                act |= mm_modem_access_technology_from_qmi_radio_interface (element->radio_interface);
             }
         }
     }
@@ -1549,7 +1525,6 @@ signal_strength_get_quality_and_access_tech (MMBroadbandModemQmi *self,
     if (signal_max < 0) {
         /* This signal strength comes as negative dBms */
         *o_quality = MM_RSSI_TO_QUALITY (signal_max);
-        *o_act = act;
 
         mm_obj_dbg (self, "signal strength: %d dBm --> %u%%", signal_max, *o_quality);
     }
@@ -1566,7 +1541,6 @@ get_signal_strength_ready (QmiClientNas *client,
     QmiMessageNasGetSignalStrengthOutput *output;
     GError *error = NULL;
     guint8 quality = 0;
-    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
     output = qmi_client_nas_get_signal_strength_finish (client, res, &error);
     if (!output) {
@@ -1584,7 +1558,7 @@ get_signal_strength_ready (QmiClientNas *client,
 
     self = g_task_get_source_object (task);
 
-    if (!signal_strength_get_quality_and_access_tech (self, output, &quality, &act)) {
+    if (!signal_strength_get_quality (self, output, &quality)) {
         qmi_message_nas_get_signal_strength_output_unref (output);
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
@@ -1593,13 +1567,6 @@ get_signal_strength_ready (QmiClientNas *client,
         g_object_unref (task);
         return;
     }
-
-    /* We update the access technologies directly here when loading signal
-     * quality. It goes a bit out of context, but we can do it nicely */
-    mm_iface_modem_update_access_technologies (
-        MM_IFACE_MODEM (self),
-        act,
-        (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
 
     g_task_return_int (task, quality);
     g_object_unref (task);
@@ -1616,7 +1583,6 @@ get_signal_info_ready (QmiClientNas *client,
     QmiMessageNasGetSignalInfoOutput *output;
     GError *error = NULL;
     guint8 quality = 0;
-    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
     self = g_task_get_source_object (task);
 
@@ -1658,7 +1624,7 @@ get_signal_info_ready (QmiClientNas *client,
         return;
     }
 
-    if (!signal_info_get_quality (self, output, &quality, &act)) {
+    if (!signal_info_get_quality (self, output, &quality)) {
         qmi_message_nas_get_signal_info_output_unref (output);
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
@@ -1667,13 +1633,6 @@ get_signal_info_ready (QmiClientNas *client,
         g_object_unref (task);
         return;
     }
-
-    /* We update the access technologies directly here when loading signal
-     * quality. It goes a bit out of context, but we can do it nicely */
-    mm_iface_modem_update_access_technologies (
-        MM_IFACE_MODEM (self),
-        act,
-        (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
 
     g_task_return_int (task, quality);
     g_object_unref (task);
@@ -3259,7 +3218,7 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
         mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                            (mm_access_technologies & MM_MODEM_ACCESS_TECHNOLOGY_5GNR) ?
                                                            mm_ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
-
+    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), mm_access_technologies);
 
     /* Get 3GPP location LAC/TAC and CI */
     lac = 0;
@@ -3282,9 +3241,6 @@ common_process_serving_system_3gpp (MMBroadbandModemQmi *self,
      * operator name and code is propagated to the DBus interface */
     if (operator_updated)
         mm_iface_modem_3gpp_reload_current_registration_info (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
-
-    /* Note: don't update access technologies with the ones retrieved here; they
-     * are not really the 'current' access technologies */
 }
 
 static void
@@ -3418,7 +3374,8 @@ process_gsm_info (MMBroadbandModemQmi *self,
                   MMModem3gppRegistrationState *mm_ps_registration_state,
                   guint16 *mm_lac,
                   guint32 *mm_cid,
-                  gchar **mm_operator_id)
+                  gchar **mm_operator_id,
+                  MMModemAccessTechnology *mm_act)
 {
     QmiNasServiceStatus service_status;
     gboolean domain_valid;
@@ -3511,6 +3468,8 @@ process_gsm_info (MMBroadbandModemQmi *self,
         return FALSE;
     }
 
+    *mm_act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+
     return TRUE;
 }
 
@@ -3522,7 +3481,8 @@ process_wcdma_info (MMBroadbandModemQmi *self,
                     MMModem3gppRegistrationState *mm_ps_registration_state,
                     guint16 *mm_lac,
                     guint32 *mm_cid,
-                    gchar **mm_operator_id)
+                    gchar **mm_operator_id,
+                    MMModemAccessTechnology *mm_act)
 {
     QmiNasServiceStatus service_status;
     gboolean domain_valid;
@@ -3619,6 +3579,8 @@ process_wcdma_info (MMBroadbandModemQmi *self,
         return FALSE;
     }
 
+    *mm_act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+
     return TRUE;
 }
 
@@ -3631,7 +3593,8 @@ process_lte_info (MMBroadbandModemQmi *self,
                   guint16 *mm_lac,
                   guint16 *mm_tac,
                   guint32 *mm_cid,
-                  gchar **mm_operator_id)
+                  gchar **mm_operator_id,
+                  MMModemAccessTechnology *mm_act)
 {
     QmiNasServiceStatus service_status;
     gboolean domain_valid;
@@ -3649,6 +3612,7 @@ process_lte_info (MMBroadbandModemQmi *self,
     gboolean network_id_valid;
     const gchar *mcc;
     const gchar *mnc;
+    gboolean endc_available;
 
     g_assert ((response_output != NULL && indication_output == NULL) ||
               (response_output == NULL && indication_output != NULL));
@@ -3683,6 +3647,11 @@ process_lte_info (MMBroadbandModemQmi *self,
             mm_obj_dbg (self, "no LTE service reported");
             return FALSE;
         }
+
+        qmi_message_nas_get_system_info_output_get_eutra_with_nr5g_availability (
+            response_output,
+            &endc_available,
+            NULL);
     } else {
         if (!qmi_indication_nas_system_info_output_get_lte_service_status (
                 indication_output,
@@ -3705,6 +3674,11 @@ process_lte_info (MMBroadbandModemQmi *self,
             mm_obj_dbg (self, "no LTE service reported");
             return FALSE;
         }
+
+        qmi_indication_nas_system_info_output_get_eutra_with_nr5g_availability (
+            indication_output,
+            &endc_available,
+            NULL);
     }
 
     if (!process_common_info (service_status,
@@ -3725,19 +3699,24 @@ process_lte_info (MMBroadbandModemQmi *self,
         return FALSE;
     }
 
+    *mm_act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    if (endc_available)
+        *mm_act |= MM_MODEM_ACCESS_TECHNOLOGY_5GNR;
+
     return TRUE;
 }
 
 static gboolean
 process_nr5g_info (MMBroadbandModemQmi *self,
-                  QmiMessageNasGetSystemInfoOutput *response_output,
-                  QmiIndicationNasSystemInfoOutput *indication_output,
-                  MMModem3gppRegistrationState *mm_cs_registration_state,
-                  MMModem3gppRegistrationState *mm_ps_registration_state,
-                  guint16 *mm_lac,
-                  guint16 *mm_tac,
-                  guint32 *mm_cid,
-                  gchar **mm_operator_id)
+                   QmiMessageNasGetSystemInfoOutput *response_output,
+                   QmiIndicationNasSystemInfoOutput *indication_output,
+                   MMModem3gppRegistrationState *mm_cs_registration_state,
+                   MMModem3gppRegistrationState *mm_ps_registration_state,
+                   guint16 *mm_lac,
+                   guint16 *mm_tac,
+                   guint32 *mm_cid,
+                   gchar **mm_operator_id,
+                   MMModemAccessTechnology *mm_act)
 {
     QmiNasServiceStatus service_status;
     gboolean domain_valid;
@@ -3831,6 +3810,8 @@ process_nr5g_info (MMBroadbandModemQmi *self,
         return FALSE;
     }
 
+    *mm_act |= MM_MODEM_ACCESS_TECHNOLOGY_5GNR;
+
     return TRUE;
 }
 
@@ -3841,6 +3822,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
 {
     MMModem3gppRegistrationState cs_registration_state;
     MMModem3gppRegistrationState ps_registration_state;
+    MMModemAccessTechnology act;
     guint16 lac;
     guint16 tac;
     guint32 cid;
@@ -3850,6 +3832,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
 
     ps_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     cs_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     lac = 0;
     tac = 0;
     cid = 0;
@@ -3865,26 +3848,30 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
                                              &lac,
                                              &tac,
                                              &cid,
-                                             &operator_id)) &&
+                                             &operator_id,
+                                             &act)) &&
         !(has_lte_info = process_lte_info (self, response_output, indication_output,
                                            &cs_registration_state,
                                            &ps_registration_state,
                                            &lac,
                                            &tac,
                                            &cid,
-                                           &operator_id)) &&
+                                           &operator_id,
+                                           &act)) &&
         !process_wcdma_info (self, response_output, indication_output,
                              &cs_registration_state,
                              &ps_registration_state,
                              &lac,
                              &cid,
-                             &operator_id) &&
+                             &operator_id,
+                             &act) &&
         !process_gsm_info (self, response_output, indication_output,
                            &cs_registration_state,
                            &ps_registration_state,
                            &lac,
                            &cid,
-                           &operator_id)) {
+                           &operator_id,
+                           &act)) {
         mm_obj_dbg (self, "no service (GSM, WCDMA, LTE or NR5G) reported");
     }
 
@@ -3903,6 +3890,7 @@ common_process_system_info_3gpp (MMBroadbandModemQmi *self,
     mm_iface_modem_3gpp_update_5gs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                        has_nr5g_info ?
                                                        ps_registration_state : MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+    mm_iface_modem_3gpp_update_access_technologies (MM_IFACE_MODEM_3GPP (self), act);
     mm_iface_modem_3gpp_update_location (MM_IFACE_MODEM_3GPP (self), lac, tac, cid);
 }
 
@@ -4337,9 +4325,8 @@ common_process_serving_system_cdma (MMBroadbandModemQmi *self,
                                                           nid);
     mm_iface_modem_cdma_update_evdo_registration_state (MM_IFACE_MODEM_CDMA (self),
                                                         mm_evdo_registration_state);
-
-    /* Note: don't update access technologies with the ones retrieved here; they
-     * are not really the 'current' access technologies */
+    mm_iface_modem_cdma_update_access_technologies (MM_IFACE_MODEM_CDMA (self),
+                                                    mm_access_technologies);
 
     /* Longitude and latitude given in units of 0.25 secs
      * Note that multiplying by 0.25 is like dividing by 4, so 60*60*4=14400 */
@@ -5756,10 +5743,6 @@ nas_event_report_indication_cb (QmiClientNas                      *client,
                         quality);
 
             mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
-            mm_iface_modem_update_access_technologies (
-                MM_IFACE_MODEM (self),
-                mm_modem_access_technology_from_qmi_radio_interface (signal_strength_radio_interface),
-                (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
         } else {
             mm_obj_dbg (self, "ignoring invalid signal strength (%s): %d dBm",
                         qmi_nas_radio_interface_get_string (signal_strength_radio_interface),
@@ -5784,7 +5767,6 @@ nas_signal_info_indication_cb (QmiClientNas                     *client,
     gint16 nr5g_snr = 10 * SNR_MAX + 10;
     gint16 nr5g_rsrq = RSRQ_MAX + 1;
     guint8 quality;
-    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
     qmi_indication_nas_signal_info_output_get_cdma_signal_strength (output, &cdma1x_rssi, NULL, NULL);
     qmi_indication_nas_signal_info_output_get_hdr_signal_strength (output, &evdo_rssi, NULL, NULL, NULL, NULL);
@@ -5806,13 +5788,8 @@ nas_signal_info_indication_cb (QmiClientNas                     *client,
                                         nr5g_rsrp,
                                         nr5g_snr,
                                         nr5g_rsrq,
-                                        &quality,
-                                        &act)) {
+                                        &quality)) {
         mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), quality);
-        mm_iface_modem_update_access_technologies (
-            MM_IFACE_MODEM (self),
-            act,
-            (MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK | MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK));
     }
 }
 
