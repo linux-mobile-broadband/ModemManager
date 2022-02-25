@@ -19,15 +19,15 @@ shift
 # second and next arguments are control port names
 for PORT in "$@"; do
   # match port name
-  [[ $PORT == *"cdc-wdm"* ]] && {
+  echo "$PORT" | grep -q cdc-wdm && {
     CDC_WDM_PORT=$PORT
     break
   }
 done
 
 # fail if no cdc-wdm port exposed
-[ -n "${CDC_WDM_PORT}" ] || exit 2
+[ -n "$CDC_WDM_PORT" ] || exit 2
 
 # run qmicli operation
-qmicli --device-open-proxy --device=/dev/${CDC_WDM_PORT} --dms-set-fcc-authentication
+qmicli --device-open-proxy --device="/dev/$CDC_WDM_PORT" --dms-set-fcc-authentication
 exit $?
