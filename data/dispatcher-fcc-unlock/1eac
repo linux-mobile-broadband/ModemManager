@@ -15,20 +15,20 @@ shift
 # second and next arguments are control port names
 for PORT in "$@"; do
   # match port type in Linux 5.14 and newer
-  grep -q MBIM /sys/class/wwan/${PORT}/type 2>/dev/null && {
+  grep -q MBIM "/sys/class/wwan/$PORT/type" 2>/dev/null && {
     MBIM_PORT=$PORT
     break
   }
   # match port name in Linux 5.13
-  [[ $PORT == *"MBIM"* ]] && {
+  echo "$PORT" | grep -q MBIM && {
     MBIM_PORT=$PORT
     break
   }
 done
 
 # fail if no MBIM port exposed
-[ -n "${MBIM_PORT}" ] || exit 2
+[ -n "$MBIM_PORT" ] || exit 2
 
 # run mbimcli operation
-mbimcli --device-open-proxy --device=/dev/${MBIM_PORT} --quectel-set-radio-state=on
+mbimcli --device-open-proxy --device="/dev/$MBIM_PORT" --quectel-set-radio-state=on
 exit $?
