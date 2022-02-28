@@ -11048,21 +11048,20 @@ get_next_image_info (GTask *task)
 
     /* Now, load additional optional information for the PRI image */
     if (!ctx->skip_image_info) {
-        QmiMessageDmsGetStoredImageInfoInputImage  image_id;
-        QmiMessageDmsGetStoredImageInfoInput      *input;
+        g_autoptr(QmiMessageDmsGetStoredImageInfoInput) input = NULL;
 
-        image_id.type = QMI_DMS_FIRMWARE_IMAGE_TYPE_PRI;
-        image_id.unique_id = ctx->current_pair->pri_unique_id;
-        image_id.build_id = ctx->current_pair->build_id;
         input = qmi_message_dms_get_stored_image_info_input_new ();
-        qmi_message_dms_get_stored_image_info_input_set_image (input, &image_id, NULL);
+        qmi_message_dms_get_stored_image_info_input_set_image_details (input,
+                                                                       QMI_DMS_FIRMWARE_IMAGE_TYPE_PRI,
+                                                                       ctx->current_pair->pri_unique_id,
+                                                                       ctx->current_pair->build_id,
+                                                                       NULL);
         qmi_client_dms_get_stored_image_info (ctx->client,
                                               input,
                                               10,
                                               NULL,
                                               (GAsyncReadyCallback)get_pri_image_info_ready,
                                               task);
-        qmi_message_dms_get_stored_image_info_input_unref (input);
         return;
     }
 
