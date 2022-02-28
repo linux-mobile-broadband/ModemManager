@@ -2657,21 +2657,17 @@ setup_carrier_config_step (GTask *task)
         /* fall-through */
 
     case SETUP_CARRIER_CONFIG_STEP_UPDATE_CURRENT: {
-        QmiMessagePdcSetSelectedConfigInput *input;
-        ConfigInfo                          *requested_config;
-        ConfigInfo                          *active_config;
-        QmiConfigTypeAndId                   type_and_id;
+        g_autoptr(QmiMessagePdcSetSelectedConfigInput)  input = NULL;
+        ConfigInfo                                     *requested_config;
+        ConfigInfo                                     *active_config;
 
         requested_config = &g_array_index (priv->config_list, ConfigInfo, ctx->config_requested_i);
         active_config = (priv->config_active_default ? NULL : &g_array_index (priv->config_list, ConfigInfo, priv->config_active_i));
         mm_obj_warn (self, "carrier config switching needed: '%s' -> '%s'",
                      active_config ? active_config->description : DEFAULT_CONFIG_DESCRIPTION, requested_config->description);
 
-        type_and_id.config_type = requested_config->config_type;;
-        type_and_id.id = requested_config->id;
-
         input = qmi_message_pdc_set_selected_config_input_new ();
-        qmi_message_pdc_set_selected_config_input_set_type_with_id (input, &type_and_id, NULL);
+        qmi_message_pdc_set_selected_config_input_set_type_with_id_v2 (input, requested_config->config_type, requested_config->id, NULL);
         qmi_message_pdc_set_selected_config_input_set_token (input, ctx->token++, NULL);
         qmi_client_pdc_set_selected_config (ctx->client,
                                             input,
@@ -2679,13 +2675,12 @@ setup_carrier_config_step (GTask *task)
                                             NULL,
                                             (GAsyncReadyCallback)set_selected_config_ready,
                                             task);
-        qmi_message_pdc_set_selected_config_input_unref (input);
         return;
     }
 
     case SETUP_CARRIER_CONFIG_STEP_ACTIVATE_CURRENT: {
-        QmiMessagePdcActivateConfigInput *input;
-        ConfigInfo                       *requested_config;
+        g_autoptr(QmiMessagePdcActivateConfigInput)  input = NULL;
+        ConfigInfo                                  *requested_config;
 
         requested_config = &g_array_index (priv->config_list, ConfigInfo, ctx->config_requested_i);
 
@@ -2698,7 +2693,6 @@ setup_carrier_config_step (GTask *task)
                                         NULL,
                                         (GAsyncReadyCallback) activate_config_ready,
                                         task);
-        qmi_message_pdc_activate_config_input_unref (input);
         return;
     }
 
@@ -3098,8 +3092,7 @@ list_configs_indication (QmiClientPdc                      *client,
     for (i = 0; i < configs->len; i++) {
         ConfigInfo                                      *current_info;
         QmiIndicationPdcListConfigsOutputConfigsElement *element;
-        QmiConfigTypeAndId                               type_with_id;
-        QmiMessagePdcGetConfigInfoInput                 *input;
+        g_autoptr(QmiMessagePdcGetConfigInfoInput)       input = NULL;
 
         element = &g_array_index (configs, QmiIndicationPdcListConfigsOutputConfigsElement, i);
 
@@ -3109,12 +3102,9 @@ list_configs_indication (QmiClientPdc                      *client,
         current_info->config_type = element->config_type;
 
         input = qmi_message_pdc_get_config_info_input_new ();
-        type_with_id.config_type = element->config_type;
-        type_with_id.id = current_info->id;
-        qmi_message_pdc_get_config_info_input_set_type_with_id (input, &type_with_id, NULL);
+        qmi_message_pdc_get_config_info_input_set_type_with_id_v2 (input, element->config_type, current_info->id, NULL);
         qmi_message_pdc_get_config_info_input_set_token (input, current_info->token, NULL);
         qmi_client_pdc_get_config_info (ctx->client, input, 10, NULL, NULL, NULL); /* ignore response! */
-        qmi_message_pdc_get_config_info_input_unref (input);
     }
 }
 
