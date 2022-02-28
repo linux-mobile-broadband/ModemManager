@@ -3316,7 +3316,7 @@ uim_get_slot_status_ready (QmiClientUim *client,
     /* It's fine if we don't have EID information, but it should be well-formed if present. If it's malformed,
      * there is probably a modem firmware bug. */
     if (qmi_message_uim_get_slot_status_output_get_physical_slot_information (output, &ext_information, NULL) &&
-        qmi_message_uim_get_slot_status_output_get_slot_eid_information (output, &slot_eids, NULL) &&
+        qmi_message_uim_get_slot_status_output_get_slot_eid (output, &slot_eids, NULL) &&
         (ext_information->len != physical_slots->len || slot_eids->len != physical_slots->len)) {
         g_task_return_new_error (task,
                                  MM_CORE_ERROR,
@@ -3372,11 +3372,11 @@ uim_get_slot_status_ready (QmiClientUim *client,
         if (ext_information && slot_eids) {
             slot_info = &g_array_index (ext_information, QmiPhysicalSlotInformationSlot, i);
             if (slot_info->is_euicc) {
-                GArray *slot_eid;
+                QmiSlotEidElement *slot_eid_element;
 
-                slot_eid = g_array_index (slot_eids, GArray *, i);
-                if (slot_eid->len)
-                    eid = mm_decode_eid (slot_eid->data, slot_eid->len);
+                slot_eid_element = &g_array_index (slot_eids, QmiSlotEidElement, i);
+                if (slot_eid_element->eid->len)
+                    eid = mm_decode_eid (slot_eid_element->eid->data, slot_eid_element->eid->len);
                 if (!eid)
                     mm_obj_dbg (self, "SIM in slot %d is marked as eUICC, but has malformed EID", i + 1);
             }
