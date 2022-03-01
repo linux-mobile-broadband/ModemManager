@@ -225,14 +225,15 @@ sources = files(
 
 enums_types = 'mm-daemon-enums-types'
 
-sources += gnome.mkenums(
+daemon_enums_sources = []
+daemon_enums_sources += gnome.mkenums(
   enums_types + '.c',
   sources: headers,
   c_template: build_aux_dir / enums_types + '.c.template',
   fhead: '#include "mm-daemon-enums-types.h"',
 )
 
-sources += gnome.mkenums(
+daemon_enums_sources += gnome.mkenums(
   enums_types + '.h',
   sources: headers,
   h_template: build_aux_dir / enums_types + '.h.template',
@@ -296,7 +297,7 @@ endif
 
 executable(
   'ModemManager',
-  sources: sources,
+  sources: sources + daemon_enums_sources,
   include_directories: top_inc,
   dependencies: deps,
   c_args: c_args,
