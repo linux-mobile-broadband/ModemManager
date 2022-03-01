@@ -19,7 +19,6 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
-#include "mm-port-enums-types.h"
 #include "mm-log-object.h"
 #include "mm-plugin-tplink.h"
 #include "mm-broadband-modem.h"
