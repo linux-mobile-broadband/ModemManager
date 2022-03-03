@@ -343,7 +343,10 @@ if plugins_options['fibocom']
     'fibocom/mm-plugin-fibocom.c',
   )
   if enable_mbim
-    sources += files('fibocom/mm-broadband-modem-mbim-xmm-fibocom.c')
+    sources += files(
+      'fibocom/mm-broadband-modem-mbim-xmm-fibocom.c',
+      'fibocom/mm-broadband-modem-mbim-fibocom.c',
+    )
   endif
   plugins += {'plugin-fibocom': {
     'plugin': true,

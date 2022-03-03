@@ -701,6 +701,8 @@ if WITH_MBIM
 libmm_plugin_fibocom_la_SOURCES += \
 	fibocom/mm-broadband-modem-mbim-xmm-fibocom.c \
 	fibocom/mm-broadband-modem-mbim-xmm-fibocom.h \
+	fibocom/mm-broadband-modem-mbim-fibocom.c \
+	fibocom/mm-broadband-modem-mbim-fibocom.h \
 	$(NULL)
 endif
 libmm_plugin_fibocom_la_CPPFLAGS = \
