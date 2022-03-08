@@ -163,6 +163,30 @@ modem_create_bearer (MMIfaceModem       *_self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+modem_reset_finish (MMIfaceModem *self,
+                    GAsyncResult *res,
+                    GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_reset (MMIfaceModem *self,
+             GAsyncReadyCallback callback,
+             gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CFUN=15",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemFibocom *
 mm_broadband_modem_fibocom_new (const gchar  *device,
@@ -197,6 +221,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->reset = modem_reset;
+    iface->reset_finish = modem_reset_finish;
 }
 
 static void
