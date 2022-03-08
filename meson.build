@@ -280,6 +280,7 @@ enable_gtk_doc = get_option('gtk_doc')
 enable_plugins = not get_option('auto_features').disabled()
 
 plugins_shared_reqs = {
+  'fibocom': enable_mbim,
   'foxconn': enable_mbim,
   'icera': true,
   'novatel': true,
@@ -296,7 +297,7 @@ plugins_options_reqs = {
   'cinterion': {'available': true, 'shared': []},
   'dell': {'available': true, 'shared': ['foxconn', 'novatel', 'sierra', 'telit', 'xmm']},
   'dlink': {'available': true, 'shared': []},
-  'fibocom': {'available': true, 'shared': ['xmm']},
+  'fibocom': {'available': true, 'shared': ['fibocom', 'xmm']},
   'foxconn': {'available': true, 'shared': ['foxconn']},
   'generic': {'available': true, 'shared': []},
   'gosuncn': {'available': true, 'shared': []},

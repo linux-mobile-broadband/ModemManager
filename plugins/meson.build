@@ -53,6 +53,23 @@ if enable_qmi
   plugins_deps += qmi_glib_dep
 endif
 
+# common Fibocom support library (MBIM only)
+if plugins_shared['fibocom']
+  fibocom_inc = include_directories('fibocom')
+
+  c_args = '-DMM_MODULE_NAME="shared-fibocom"'
+
+  sources = files(
+    'fibocom/mm-shared.c',
+    'fibocom/mm-shared-fibocom.c',
+  )
+
+  plugins += {'shared-fibocom': {
+    'plugin': false,
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+  }}
+endif
+
 # Common Foxconn modem support library (MBIM only)
 if plugins_shared['foxconn']
   foxconn_inc = include_directories('foxconn')
@@ -350,7 +367,7 @@ if plugins_options['fibocom']
   endif
   plugins += {'plugin-fibocom': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc], 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc] + [fibocom_inc], 'c_args': c_args},
   }}
 
   plugins_udev_rules += files('fibocom/77-mm-fibocom-port-types.rules')
