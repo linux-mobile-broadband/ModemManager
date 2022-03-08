@@ -62,17 +62,6 @@ struct _MMBroadbandBearerClass {
                                                      GAsyncResult *res,
                                                      GError **error);
 
-    /* CID selection sub-part of 3GPP connection */
-    void  (* cid_selection_3gpp)        (MMBroadbandBearer *self,
-                                         MMBaseModem *modem,
-                                         MMPortSerialAt *primary,
-                                         GCancellable *cancellable,
-                                         GAsyncReadyCallback callback,
-                                         gpointer user_data);
-    guint (* cid_selection_3gpp_finish) (MMBroadbandBearer *self,
-                                         GAsyncResult *res,
-                                         GError **error);
-
     /* Dialing sub-part of 3GPP connection */
     void     (* dial_3gpp)        (MMBroadbandBearer *self,
                                    MMBaseModem *modem,
