@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <config.h>
@@ -1031,7 +1031,12 @@ load_current_capabilities_step (GTask *task)
 
         priv->current_capabilities = mm_current_capability_from_qmi_current_capabilities_context (&ctx->capabilities_context, self);
 
-        g_task_return_int (task, priv->current_capabilities);
+        if (priv->current_capabilities == MM_MODEM_CAPABILITY_NONE)
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "modem has no current capabilities");
+        else
+            g_task_return_int (task, priv->current_capabilities);
+
         g_object_unref (task);
         return;
 
@@ -1696,7 +1701,7 @@ mm_shared_qmi_load_supported_modes (MMIfaceModem        *self,
 
     priv = get_private (MM_SHARED_QMI (self));
     g_assert (priv->supported_radio_interfaces);
-    g_assert (priv->current_capabilities);
+    g_assert (priv->current_capabilities != MM_MODEM_CAPABILITY_NONE);
 
     /* Build all, based on the supported radio interfaces */
     ctx.all = MM_MODEM_MODE_NONE;
