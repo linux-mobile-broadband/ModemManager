@@ -3090,18 +3090,6 @@ before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
             }
         }
 
-        auth = mm_bearer_properties_get_allowed_auth (config);
-        if (auth == MM_BEARER_ALLOWED_AUTH_UNKNOWN)
-            configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
-        else {
-            configurations[i]->auth_protocol = mm_bearer_allowed_auth_to_mbim_auth_protocol (auth, self, &error);
-            if (error) {
-                configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
-                mm_obj_warn (self, "unexpected auth settings requested: %s", error->message);
-                g_clear_error (&error);
-            }
-        }
-
         g_clear_pointer (&(configurations[i]->access_string), g_free);
         configurations[i]->access_string = g_strdup (mm_bearer_properties_get_apn (config));
 
@@ -3110,6 +3098,18 @@ before_set_lte_attach_configuration_query_ready (MbimDevice   *device,
 
         g_clear_pointer (&(configurations[i]->password), g_free);
         configurations[i]->password = g_strdup (mm_bearer_properties_get_password (config));
+
+        auth = mm_bearer_properties_get_allowed_auth (config);
+        if ((auth != MM_BEARER_ALLOWED_AUTH_UNKNOWN) || configurations[i]->user_name || configurations[i]->password) {
+            configurations[i]->auth_protocol = mm_bearer_allowed_auth_to_mbim_auth_protocol (auth, self, &error);
+            if (error) {
+                configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
+                mm_obj_warn (self, "unexpected auth settings requested: %s", error->message);
+                g_clear_error (&error);
+            }
+        } else {
+            configurations[i]->auth_protocol = MBIM_AUTH_PROTOCOL_NONE;
+        }
 
         configurations[i]->source = MBIM_CONTEXT_SOURCE_USER;
         configurations[i]->compression = MBIM_COMPRESSION_NONE;
