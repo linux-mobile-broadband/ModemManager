@@ -871,9 +871,13 @@ cmp_allowed_auth (MMBearerAllowedAuth        a,
     if (a == b)
         return TRUE;
     /* Additional loose match UNKNOWN == NONE */
+    /* MBIM and QMI fallback to CHAP when a username or password is present,
+       but no authentication type was provided */
     if (flags & MM_BEARER_PROPERTIES_CMP_FLAGS_LOOSE) {
         if ((a == MM_BEARER_ALLOWED_AUTH_UNKNOWN && b == MM_BEARER_ALLOWED_AUTH_NONE) ||
-            (b == MM_BEARER_ALLOWED_AUTH_UNKNOWN && a == MM_BEARER_ALLOWED_AUTH_NONE))
+            (b == MM_BEARER_ALLOWED_AUTH_UNKNOWN && a == MM_BEARER_ALLOWED_AUTH_NONE) ||
+            (a == MM_BEARER_ALLOWED_AUTH_UNKNOWN && b == MM_BEARER_ALLOWED_AUTH_CHAP) ||
+            (b == MM_BEARER_ALLOWED_AUTH_UNKNOWN && a == MM_BEARER_ALLOWED_AUTH_CHAP) )
             return TRUE;
     }
     return FALSE;
