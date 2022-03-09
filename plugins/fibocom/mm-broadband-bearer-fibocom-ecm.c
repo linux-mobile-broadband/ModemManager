@@ -19,8 +19,205 @@
 #include "mm-broadband-modem-fibocom.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-log.h"
 
 G_DEFINE_TYPE (MMBroadbandBearerFibocomEcm, mm_broadband_bearer_fibocom_ecm, MM_TYPE_BROADBAND_BEARER)
+
+/*****************************************************************************/
+/* Common helper functions                                                   */
+
+static gboolean
+parse_gtrndis_read_response (const gchar *response,
+                             guint       *state,
+                             guint       *cid,
+                             GError     **error)
+{
+    g_autoptr(GRegex)     r = NULL;
+    g_autoptr(GMatchInfo) match_info = NULL;
+
+    r = g_regex_new ("\\+GTRNDIS:\\s*(\\d+)(?:,(\\d+))?",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW, 0, NULL);
+    g_assert (r != NULL);
+
+    if (!g_regex_match (r, response, 0, &match_info)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Invalid +GTRNDIS response: %s", response);
+        return FALSE;
+    }
+    if (!mm_get_uint_from_match_info (match_info, 1, state)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Failed to match state in +GTRNDIS response: %s", response);
+        return FALSE;
+    }
+
+    if (state) {
+        if (!mm_get_uint_from_match_info (match_info, 2, cid)) {
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Failed to match cid in +GTRNDIS response: %s", response);
+            return FALSE;
+        }
+    } else {
+        *cid = 0;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* 3GPP Connect                                                              */
+
+typedef struct {
+    MMBroadbandModem *modem;
+    MMPortSerialAt   *primary;
+    MMPortSerialAt   *secondary;
+    MMBearerIpFamily  ip_family;
+} ConnectContext;
+
+static void
+connect_context_free (ConnectContext *ctx)
+{
+    g_clear_object (&ctx->modem);
+    g_clear_object (&ctx->primary);
+    g_clear_object (&ctx->secondary);
+    g_slice_free (ConnectContext, ctx);
+}
+
+static MMBearerConnectResult *
+connect_3gpp_finish (MMBroadbandBearer  *self,
+                     GAsyncResult       *res,
+                     GError            **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+parent_connect_3gpp_ready (MMBroadbandBearer *self,
+                           GAsyncResult      *res,
+                           GTask             *task)
+{
+    GError                *error = NULL;
+    MMBearerConnectResult *result;
+
+    result = MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_fibocom_ecm_parent_class)->connect_3gpp_finish (self, res, &error);
+    if (result)
+        g_task_return_pointer (task, result, (GDestroyNotify) mm_bearer_connect_result_unref);
+    else
+        g_task_return_error (task, error);
+    g_object_unref (task);
+}
+
+static void
+disconnect_3gpp_ready (MMBroadbandBearer *self,
+                       GAsyncResult      *res,
+                       GTask             *task)
+{
+    GError         *error = NULL;
+    gboolean        result;
+    ConnectContext *ctx;
+
+    result = MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_3gpp_finish (self, res, &error);
+    if (!result) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    ctx = g_task_get_task_data (task);
+    MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_fibocom_ecm_parent_class)->connect_3gpp (
+        self,
+        ctx->modem,
+        ctx->primary,
+        ctx->secondary,
+        g_task_get_cancellable (task),
+        (GAsyncReadyCallback) parent_connect_3gpp_ready,
+        task);
+}
+
+static void
+gtrndis_check_ready (MMBaseModem  *modem,
+                     GAsyncResult *res,
+                     GTask        *task)
+{
+    MMBroadbandBearer *self;
+    ConnectContext    *ctx;
+    GError            *error = NULL;
+    const gchar       *response;
+    guint              state;
+    guint              cid;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (!response) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (!parse_gtrndis_read_response (response, &state, &cid, &error)) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    if (state) {
+        /* RNDIS is already active, disconnect first. */
+        mm_obj_dbg (self, "RNDIS active, tearing down existing connection...");
+        MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_3gpp (
+            MM_BROADBAND_BEARER (self),
+            ctx->modem,
+            ctx->primary,
+            ctx->secondary,
+            NULL, /* data port */
+            cid,
+            (GAsyncReadyCallback) disconnect_3gpp_ready,
+            task);
+        return;
+    }
+
+    /* Execute the regular connection flow if RNDIS is inactive. */
+    mm_obj_dbg (self, "RNDIS inactive");
+    MM_BROADBAND_BEARER_CLASS (mm_broadband_bearer_fibocom_ecm_parent_class)->connect_3gpp (
+        MM_BROADBAND_BEARER (self),
+        ctx->modem,
+        ctx->primary,
+        ctx->secondary,
+        g_task_get_cancellable (task),
+        (GAsyncReadyCallback) parent_connect_3gpp_ready,
+        task);
+}
+
+static void
+connect_3gpp (MMBroadbandBearer   *self,
+              MMBroadbandModem    *modem,
+              MMPortSerialAt      *primary,
+              MMPortSerialAt      *secondary,
+              GCancellable        *cancellable,
+              GAsyncReadyCallback  callback,
+              gpointer             user_data)
+{
+    ConnectContext *ctx;
+    GTask          *task;
+
+    ctx            = g_slice_new0 (ConnectContext);
+    ctx->modem     = g_object_ref (modem);
+    ctx->primary   = g_object_ref (primary);
+    ctx->secondary = secondary ? g_object_ref (secondary) : NULL;
+    ctx->ip_family = mm_bearer_properties_get_ip_type (mm_base_bearer_peek_config (MM_BASE_BEARER (self)));
+    mm_3gpp_normalize_ip_family (&ctx->ip_family);
+
+    task = g_task_new (self, cancellable, callback, user_data);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) connect_context_free);
+
+    /* First, we must check whether RNDIS is already active */
+    mm_base_modem_at_command (MM_BASE_MODEM (modem),
+                              "+GTRNDIS?",
+                              3,
+                              FALSE, /* allow_cached */
+                              (GAsyncReadyCallback) gtrndis_check_ready,
+                              task);
+}
 
 /*****************************************************************************/
 /* Dial context and task                                                     */
@@ -263,6 +460,8 @@ mm_broadband_bearer_fibocom_ecm_class_init (MMBroadbandBearerFibocomEcmClass *kl
 {
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
+    broadband_bearer_class->connect_3gpp = connect_3gpp;
+    broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
