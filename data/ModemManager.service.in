@@ -2,6 +2,7 @@
 Description=Modem Manager
 After=@MM_POLKIT_SERVICE@
 Requires=@MM_POLKIT_SERVICE@
+ConditionVirtualization=!container
 
 [Service]
 Type=dbus
