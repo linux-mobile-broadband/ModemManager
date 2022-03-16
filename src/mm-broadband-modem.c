@@ -4496,6 +4496,7 @@ modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
                                            NULL, /* format */
                                            &operator_code,
                                            NULL, /* act */
+                                           self,
                                            error))
         return NULL;
 
@@ -4535,6 +4536,7 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
                                            NULL, /* format */
                                            &operator_name,
                                            NULL, /* act */
+                                           self,
                                            error))
         return NULL;
 

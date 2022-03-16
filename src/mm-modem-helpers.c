@@ -1124,11 +1124,34 @@ mm_3gpp_network_info_list_free (GList *info_list)
     g_list_free_full (info_list, (GDestroyNotify) mm_3gpp_network_info_free);
 }
 
+static MMModem3gppNetworkAvailability
+get_mm_network_availability_from_3gpp_network_availability (guint    val,
+                                                            gpointer log_object)
+{
+    /* The network availability status in the MM API and in the 3GPP specs take the
+     * same numeric values, but we map them with an enum as it's much safer if new
+     * values are defined by 3GPP in the future. */
+    switch (val) {
+    case 1:
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE;
+    case 2:
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT;
+    case 3:
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN;
+    default:
+        break;
+    }
+
+    mm_obj_warn (log_object, "unknown network availability value: %u", val);
+    return MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN;
+}
+
 static MMModemAccessTechnology
-get_mm_access_tech_from_etsi_access_tech (guint act)
+get_mm_access_tech_from_etsi_access_tech (guint    val,
+                                          gpointer log_object)
 {
     /* See ETSI TS 27.007 */
-    switch (act) {
+    switch (val) {
     case 0: /* GSM */
     case 8: /* EC-GSM-IoT (A/Gb mode) */
         return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
@@ -1154,40 +1177,11 @@ get_mm_access_tech_from_etsi_access_tech (guint act)
     case 13: /* E-UTRA-NR dual connectivity */
         return (MM_MODEM_ACCESS_TECHNOLOGY_5GNR | MM_MODEM_ACCESS_TECHNOLOGY_LTE);
     default:
-        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    }
-}
-
-static MMModem3gppNetworkAvailability
-parse_network_status (const gchar *str,
-                      gpointer     log_object)
-{
-    /* Expecting a value between '0' and '3' inclusive */
-    if (!str ||
-        strlen (str) != 1 ||
-        str[0] < '0' ||
-        str[0] > '3') {
-        mm_obj_warn (log_object, "cannot parse network status value '%s'", str);
-        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN;
+        break;
     }
 
-    return (MMModem3gppNetworkAvailability) (str[0] - '0');
-}
-
-static MMModemAccessTechnology
-parse_access_tech (const gchar *str,
-                   gpointer     log_object)
-{
-    /* Recognized access technologies are between '0' and '7' inclusive... */
-    if (!str ||
-        strlen (str) != 1 ||
-        str[0] < '0' ||
-        str[0] > '7') {
-        mm_obj_warn (log_object, "cannot parse access technology value '%s'", str);
-        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    }
-
-    return get_mm_access_tech_from_etsi_access_tech (str[0] - '0');
+    mm_obj_warn (log_object, "unknown access technology value: %u", val);
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 }
 
 GList *
@@ -1260,14 +1254,14 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
     /* Parse the results */
     while (g_match_info_matches (match_info)) {
         MM3gppNetworkInfo *info;
-        gchar *tmp;
-        gboolean valid = FALSE;
+        guint              net_value = 0;
+        gboolean           valid = FALSE;
 
         info = g_new0 (MM3gppNetworkInfo, 1);
 
-        tmp = mm_get_string_unquoted_from_match_info (match_info, 1);
-        info->status = parse_network_status (tmp, log_object);
-        g_free (tmp);
+        /* the regex makes sure this is a number, it won't fail */
+        mm_get_uint_from_match_info (match_info, 1, &net_value);
+        info->status = get_mm_network_availability_from_3gpp_network_availability (net_value, log_object);
 
         info->operator_long = mm_get_string_unquoted_from_match_info (match_info, 2);
         info->operator_short = mm_get_string_unquoted_from_match_info (match_info, 3);
@@ -1280,13 +1274,14 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
 
         /* Only try for access technology with UMTS-format matches.
          * If none give, assume GSM */
-        tmp = (umts_format ?
-               mm_get_string_unquoted_from_match_info (match_info, 5) :
-               NULL);
-        info->access_tech = (tmp ?
-                             parse_access_tech (tmp, log_object) :
-                             MM_MODEM_ACCESS_TECHNOLOGY_GSM);
-        g_free (tmp);
+        if (umts_format) {
+            guint act_value = 0;
+
+            /* the regex makes sure this is a number, it won't fail */
+            mm_get_uint_from_match_info (match_info, 5, &act_value);
+            info->access_tech = get_mm_access_tech_from_etsi_access_tech (act_value, log_object);
+        } else
+            info->access_tech = MM_MODEM_ACCESS_TECHNOLOGY_GSM;
 
         /* If the operator number isn't valid (ie, at least 5 digits),
          * ignore the scan result; it's probably the parameter stuff at the
@@ -1294,6 +1289,8 @@ mm_3gpp_parse_cops_test_response (const gchar     *reply,
          * but there's no good way to ignore it.
          */
         if (info->operator_code && (strlen (info->operator_code) >= 5)) {
+            gchar *tmp;
+
             valid = TRUE;
             tmp = info->operator_code;
             while (*tmp) {
@@ -1337,6 +1334,7 @@ mm_3gpp_parse_cops_read_response (const gchar              *response,
                                   guint                    *out_format,
                                   gchar                   **out_operator,
                                   MMModemAccessTechnology  *out_act,
+                                  gpointer                  log_object,
                                   GError                  **error)
 {
     GRegex *r;
@@ -1388,7 +1386,7 @@ mm_3gpp_parse_cops_read_response (const gchar              *response,
             inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Error parsing AcT");
             goto out;
         }
-        act = get_mm_access_tech_from_etsi_access_tech (actval);
+        act = get_mm_access_tech_from_etsi_access_tech (actval, log_object);
     }
 
 out:
@@ -2127,7 +2125,9 @@ mm_3gpp_parse_creg_response (GMatchInfo                    *info,
         /* Don't fill in lac/ci/act if the device's state is unknown */
         *out_lac = (gulong)lac;
         *out_ci  = (gulong)ci;
-        *out_act = (act >= 0 ? get_mm_access_tech_from_etsi_access_tech (act) : MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        *out_act = (act >= 0 ?
+                    get_mm_access_tech_from_etsi_access_tech (act, log_object) :
+                    MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
     }
     return TRUE;
 }
