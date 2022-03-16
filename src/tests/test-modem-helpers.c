@@ -912,6 +912,28 @@ test_cops_response_ublox_lara (void *f, gpointer d)
 }
 
 static void
+test_cops_response_em9191 (void *f, gpointer d)
+{
+    const char *reply =
+        "+COPS: "
+        "(1,\"Telekom.de\",\"TDG\",\"26201\",12),"
+        "(1,\"Telekom.de\",\"Telekom.\",\"26201\",7),"
+        "(1,\"o2 - de\",\"o2 - de\",\"26203\",7),"
+        "(1,\"vodafone.de\",\"Vodafone\",\"26202\",7)"
+        /* these next ones will be ignored */
+        "(0,1,2,3,4),"
+        "(0,1,2)";
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, (gchar *) "Telekom.de",  (gchar *) "TDG",      (gchar *) "26201", MM_MODEM_ACCESS_TECHNOLOGY_5GNR },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, (gchar *) "Telekom.de",  (gchar *) "Telekom.", (gchar *) "26201", MM_MODEM_ACCESS_TECHNOLOGY_LTE  },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, (gchar *) "o2 - de",     (gchar *) "o2 - de",  (gchar *) "26203", MM_MODEM_ACCESS_TECHNOLOGY_LTE  },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, (gchar *) "vodafone.de", (gchar *) "Vodafone", (gchar *) "26202", MM_MODEM_ACCESS_TECHNOLOGY_LTE  },
+    };
+
+    test_cops_results ("EM9191", reply, MM_MODEM_CHARSET_GSM, &expected[0], G_N_ELEMENTS (expected));
+}
+
+static void
 test_cops_response_gsm_invalid (void *f, gpointer d)
 {
     const gchar *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
@@ -4660,6 +4682,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_samsung_z810, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_ublox_lara, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_em9191, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
     g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
