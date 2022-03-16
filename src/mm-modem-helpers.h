@@ -169,6 +169,7 @@ gboolean mm_3gpp_parse_cops_read_response (const gchar              *response,
                                            guint                    *out_format,
                                            gchar                   **out_operator,
                                            MMModemAccessTechnology  *out_act,
+                                           gpointer                  log_object,
                                            GError                  **error);
 
 /* Logic to compare two APN names */

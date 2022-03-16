@@ -961,6 +961,7 @@ test_cops_query_data (const CopsQueryData *item)
                                                &format,
                                                &operator,
                                                &act,
+                                               NULL,
                                                &error);
     g_assert_no_error (error);
     g_assert (result);
