@@ -57,13 +57,14 @@ load_supported_modes_ready (MMIfaceModem *self,
 {
     MMModemModeCombination modes_combination;
     MMModemMode modes_mask = MM_MODEM_MODE_NONE;
-    const gchar *response;
-    GArray      *modes;
-    GArray      *all;
-    GArray      *combinations;
-    GArray      *filtered;
-    GError      *error = NULL;
-    guint        i;
+    const gchar   *response;
+    GArray        *modes;
+    GArray        *all;
+    GArray        *combinations;
+    GArray        *filtered;
+    GError        *error = NULL;
+    MMSharedTelit *shared = MM_SHARED_TELIT (self);
+    guint          i;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
@@ -107,6 +108,7 @@ load_supported_modes_ready (MMIfaceModem *self,
     g_array_unref (all);
     g_array_unref (combinations);
 
+    mm_shared_telit_store_supported_modes (shared, filtered);
     g_task_return_pointer (task, filtered, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
 }

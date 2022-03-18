@@ -1263,10 +1263,11 @@ parent_load_supported_modes_ready (MMIfaceModem *self,
                                    GAsyncResult *res,
                                    GTask *task)
 {
-    GError *error = NULL;
-    GArray *all;
-    GArray *combinations;
-    GArray *filtered;
+    GError        *error = NULL;
+    GArray        *all;
+    GArray        *combinations;
+    GArray        *filtered;
+    MMSharedTelit *shared = MM_SHARED_TELIT (self);
 
     all = iface_modem_parent->load_supported_modes_finish (self, res, &error);
     if (!all) {
@@ -1288,6 +1289,7 @@ parent_load_supported_modes_ready (MMIfaceModem *self,
     g_array_unref (all);
     g_array_unref (combinations);
 
+    mm_shared_telit_store_supported_modes (shared, filtered);
     g_task_return_pointer (task, filtered, (GDestroyNotify) g_array_unref);
     g_object_unref (task);
 }

@@ -42,6 +42,9 @@ struct _MMSharedTelit {
 
 GType mm_shared_telit_get_type (void);
 
+void        mm_shared_telit_store_supported_modes       (MMSharedTelit *self,
+                                                         GArray *modes);
+
 gboolean    mm_shared_telit_load_current_modes_finish   (MMIfaceModem *self,
                                                          GAsyncResult *res,
                                                          MMModemMode *allowed,

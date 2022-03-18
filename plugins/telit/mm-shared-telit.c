@@ -42,6 +42,7 @@ typedef struct {
     gboolean      alternate_3g_bands;
     gboolean      ext_4g_bands;
     GArray       *supported_bands;
+    GArray       *supported_modes;
 } Private;
 
 static void
@@ -49,6 +50,8 @@ private_free (Private *priv)
 {
     if (priv->supported_bands)
         g_array_unref (priv->supported_bands);
+    if (priv->supported_modes)
+        g_array_unref (priv->supported_modes);
     g_slice_free (Private, priv);
 }
 
@@ -91,6 +94,16 @@ get_private (MMSharedTelit *self)
     }
 
     return priv;
+}
+
+void
+mm_shared_telit_store_supported_modes (MMSharedTelit *self,
+                                       GArray        *modes)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+    priv->supported_modes = g_array_ref (modes);
 }
 
 /*****************************************************************************/
@@ -529,11 +542,28 @@ mm_shared_telit_set_current_modes (MMIfaceModem *self,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
-    GTask *task;
-    gchar *command;
-    gint ws46_mode = -1;
+    GTask   *task;
+    gchar   *command;
+    Private *priv;
+    gint     ws46_mode = -1;
 
+    priv = get_private (MM_SHARED_TELIT (self));
     task = g_task_new (self, NULL, callback, user_data);
+
+    if (allowed == MM_MODEM_MODE_ANY && priv->supported_modes) {
+        guint i;
+
+        allowed = MM_MODEM_MODE_NONE;
+        /* Process list of modes to gather supported ones */
+        for (i = 0; i < priv->supported_modes->len; i++) {
+            if (g_array_index (priv->supported_modes, MMModemMode, i) & MM_MODEM_MODE_2G)
+                allowed |= MM_MODEM_MODE_2G;
+            if (g_array_index (priv->supported_modes, MMModemMode, i) & MM_MODEM_MODE_3G)
+                allowed |= MM_MODEM_MODE_3G;
+            if (g_array_index (priv->supported_modes, MMModemMode, i) & MM_MODEM_MODE_4G)
+                allowed |= MM_MODEM_MODE_4G;
+        }
+    }
 
     if (allowed == MM_MODEM_MODE_2G)
         ws46_mode = 12;
@@ -550,8 +580,7 @@ mm_shared_telit_set_current_modes (MMIfaceModem *self,
         ws46_mode = 30;
     else if (allowed == (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G))
         ws46_mode = 31;
-    else if (allowed == (MM_MODEM_MODE_2G  | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G) ||
-             allowed == MM_MODEM_MODE_ANY)
+    else if (allowed == (MM_MODEM_MODE_2G  | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G))
         ws46_mode = 25;
 
     /* Telit modems do not support preferred mode selection */
