@@ -3795,6 +3795,11 @@ uim_slot_status_indication_cb (QmiClientUim                     *client,
     priv = get_private (self);
     mm_obj_dbg (self, "received slot status indication");
 
+    if (!priv->slots_status) {
+        mm_obj_dbg (self, "initial slot status is not loaded yet");
+        return;
+    }
+
     if (!qmi_indication_uim_slot_status_output_get_physical_slot_status (output,
                                                                          &new_slots_status,
                                                                          &error)) {
