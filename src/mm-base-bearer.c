@@ -39,6 +39,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
 #include "mm-bearer-stats.h"
+#include "mm-dispatcher-connection.h"
 
 /* We require up to 20s to get a proper IP when using PPP */
 #define BEARER_IP_TIMEOUT_DEFAULT 20
@@ -463,6 +464,43 @@ bearer_stats_start (MMBaseBearer *self)
 /*****************************************************************************/
 
 static void
+dispatcher_connection_run_ready (MMDispatcherConnection *dispatcher,
+                                 GAsyncResult           *res,
+                                 MMBaseBearer           *self)
+{
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_dispatcher_connection_run_finish (dispatcher, res, &error))
+        mm_obj_warn (self, "errors detected in dispatcher: %s", error->message);
+
+    g_object_unref (self);
+}
+
+static void
+bearer_run_dispatcher_scripts (MMBaseBearer *self,
+                               gboolean      connected)
+{
+    MMDispatcherConnection *dispatcher;
+    const gchar *interface;
+
+    interface = mm_gdbus_bearer_get_interface (MM_GDBUS_BEARER (self));
+    if (!self->priv->modem || !self->priv->path || !interface)
+        return;
+
+    dispatcher = mm_dispatcher_connection_get ();
+    mm_dispatcher_connection_run (dispatcher,
+                                  g_dbus_object_get_object_path (G_DBUS_OBJECT (self->priv->modem)),
+                                  self->priv->path,
+                                  interface,
+                                  connected,
+                                  NULL, /* cancellable */
+                                  (GAsyncReadyCallback)dispatcher_connection_run_ready,
+                                  g_object_ref (self));
+}
+
+/*****************************************************************************/
+
+static void
 bearer_reset_interface_status (MMBaseBearer *self)
 {
     mm_gdbus_bearer_set_profile_id (MM_GDBUS_BEARER (self), MM_3GPP_PROFILE_ID_UNKNOWN);
@@ -497,6 +535,9 @@ bearer_update_status (MMBaseBearer *self,
      * interface when going into disconnected state. */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
         g_autoptr(GString) report = NULL;
+
+        /* Report disconnection via dispatcher scripts, before reseting the interface */
+        bearer_run_dispatcher_scripts (self, FALSE);
 
         bearer_reset_interface_status (self);
         /* Cleanup flag to ignore disconnection reports */
@@ -560,6 +601,9 @@ bearer_update_status_connected (MMBaseBearer     *self,
 
     /* Start connection monitor, if supported */
     connection_monitor_start (self);
+
+    /* Run dispatcher scripts */
+    bearer_run_dispatcher_scripts (self, TRUE);
 }
 
 /*****************************************************************************/
