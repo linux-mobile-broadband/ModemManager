@@ -1,5 +1,5 @@
 
-SUBDIRS = . dispatcher-fcc-unlock tests
+SUBDIRS = . dispatcher-connection dispatcher-fcc-unlock tests
 
 edit = @sed \
        -e 's|@sbindir[@]|$(sbindir)|g' \
