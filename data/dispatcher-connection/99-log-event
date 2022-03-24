@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# SPDX-License-Identifier: CC0-1.0
+# 2022 Aleksander Morgado <aleksander@aleksander.es>
+#
+# Example connection info dispatcher script
+#
+
+# require program name and at least 4 arguments
+[ $# -lt 4 ] && exit 1
+
+MODEM_PATH="$1"
+BEARER_PATH="$2"
+INTERFACE="$3"
+STATE="$4"
+
+MODEM_ID=$(basename ${MODEM_PATH})
+BEARER_ID=$(basename ${BEARER_PATH})
+
+# report in syslog the event
+logger -t "connection-dispatch" "modem${MODEM_ID}: bearer${BEARER_ID}: interface ${INTERFACE} ${STATE}"
+exit $?

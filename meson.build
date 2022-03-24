@@ -364,6 +364,7 @@ version_conf = {
 
 subdir('po')
 subdir('data')
+subdir('data/dispatcher-connection')
 subdir('data/dispatcher-fcc-unlock')
 subdir('introspection')
 subdir('include')
