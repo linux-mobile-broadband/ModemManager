@@ -240,7 +240,6 @@ firmware_load_update_settings (MMIfaceModemFirmware *self,
                                         MM_PORT_QMI_FLAG_DEFAULT,
                                         NULL);
     if (!client) {
-        qmi_message_fox_get_firmware_version_input_unref (input);
         firmware_load_update_settings_over_dms_service (self, task);
         return;
     }
