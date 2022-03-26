@@ -485,19 +485,24 @@ endif
 
 # plugin: linktop
 if plugins_options['linktop']
-  common_c_args = '-DMM_MODULE_NAME="linktop"'
-
   sources = files(
     'linktop/mm-plugin-linktop.c',
     'linktop/mm-broadband-modem-linktop.c',
   )
 
+  c_args = [
+    '-DMM_MODULE_NAME="linktop"',
+    '-DTESTUDEVRULESDIR_LINKTOP="@0@"'.format(plugins_dir / 'linktop'),
+  ]
+
   plugins += {'plugin-linktop': {
     'plugin': true,
-    'helper': {'sources': files('linktop/mm-modem-helpers-linktop.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
+    'helper': {'sources': files('linktop/mm-modem-helpers-linktop.c'), 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
     'test': {'sources': files('linktop/tests/test-modem-helpers-linktop.c'), 'include_directories': include_directories('linktop'), 'dependencies': libhelpers_dep},
   }}
+
+  plugins_udev_rules += files('linktop/77-mm-linktop-port-types.rules')
 endif
 
 # plugin: longcheer (and rebranded dongles)
