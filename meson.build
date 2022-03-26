@@ -353,6 +353,7 @@ foreach plugin_name, plugin_reqs: plugins_options_reqs
         break
       endif
     endforeach
+    config_h.set('ENABLE_PLUGIN_' + plugin_name.underscorify().to_upper(), true)
   endif
   plugins_options += {plugin_name: plugin_enabled}
 endforeach

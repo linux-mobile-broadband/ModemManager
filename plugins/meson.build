@@ -34,6 +34,8 @@ libmm_test_common_dep = declare_dependency(
 plugins = {}
 plugins_data = []
 plugins_udev_rules = []
+plugins_test_udev_rules_dir_c_args = []
+plugins_test_keyfile_c_args = []
 
 # never include static libs as deps when building
 # plugins or shared utils modules
@@ -264,14 +266,12 @@ endif
 
 # plugin: broadmobi
 if plugins_options['broadmobi']
-  c_args = [
-    '-DMM_MODULE_NAME="broadmobi"',
-    '-DTESTUDEVRULESDIR_BROADMOBI="@0@"'.format(plugins_dir / 'broadmobi'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_BROADMOBI="@0@"'.format(plugins_dir / 'broadmobi')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   plugins += {'plugin-broadmobi': {
     'plugin': true,
-    'module': {'sources': files('broadmobi/mm-plugin-broadmobi.c'), 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': files('broadmobi/mm-plugin-broadmobi.c'), 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="broadmobi"']},
   }}
 
   plugins_udev_rules += files('broadmobi/77-mm-broadmobi-port-types.rules')
@@ -279,10 +279,10 @@ endif
 
 # plugin: cinterion (previously siemens)
 if plugins_options['cinterion']
-  common_c_args = [
-    '-DMM_MODULE_NAME="cinterion"',
-    '-DTESTUDEVRULESDIR_CINTERION="@0@"'.format(plugins_dir / 'cinterion'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_CINTERION="@0@"'.format(plugins_dir / 'cinterion')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  common_c_args = test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="cinterion"']
 
   sources = files(
     'cinterion/mm-broadband-bearer-cinterion.c',
@@ -311,6 +311,9 @@ endif
 
 # plugin: dell
 if plugins_options['dell']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_DELL="@0@"'.format(plugins_dir / 'dell')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   incs = plugins_incs + [
     foxconn_inc,
     novatel_inc,
@@ -319,14 +322,9 @@ if plugins_options['dell']
     xmm_inc,
   ]
 
-  c_args = [
-    '-DMM_MODULE_NAME="dell"',
-    '-DTESTUDEVRULESDIR_DELL="@0@"'.format(plugins_dir / 'dell'),
-  ]
-
   plugins += {'plugin-dell': {
     'plugin': true,
-    'module': {'sources': files('dell/mm-plugin-dell.c'), 'include_directories': incs, 'c_args': c_args}
+    'module': {'sources': files('dell/mm-plugin-dell.c'), 'include_directories': incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="dell"']},
   }}
 
   plugins_udev_rules += files('dell/77-mm-dell-port-types.rules')
@@ -334,14 +332,12 @@ endif
 
 # plugin: dlink
 if plugins_options['dlink']
-  c_args = [
-    '-DMM_MODULE_NAME="d-link"',
-    '-DTESTUDEVRULESDIR_DLINK="@0@"'.format(plugins_dir / 'dlink'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_DLINK="@0@"'.format(plugins_dir / 'dlink')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   plugins += {'plugin-dlink': {
     'plugin': true,
-    'module': {'sources': files('dlink/mm-plugin-dlink.c'), 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': files('dlink/mm-plugin-dlink.c'), 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="d-link"']},
   }}
 
   plugins_udev_rules += files('dlink/77-mm-dlink-port-types.rules')
@@ -349,10 +345,8 @@ endif
 
 # plugin: fibocom
 if plugins_options['fibocom']
-  c_args = [
-    '-DMM_MODULE_NAME="fibocom"',
-    '-DTESTUDEVRULESDIR_FIBOCOM="@0@"'.format(plugins_dir / 'fibocom'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_FIBOCOM="@0@"'.format(plugins_dir / 'fibocom')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   sources = files(
     'fibocom/mm-broadband-bearer-fibocom-ecm.c',
@@ -367,7 +361,7 @@ if plugins_options['fibocom']
   endif
   plugins += {'plugin-fibocom': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc] + [fibocom_inc], 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs + [xmm_inc] + [fibocom_inc], 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="fibocom"']},
   }}
 
   plugins_udev_rules += files('fibocom/77-mm-fibocom-port-types.rules')
@@ -377,15 +371,15 @@ endif
 if plugins_options['foxconn']
   foxconn_dir = plugins_dir / 'foxconn'
 
-  c_args = [
-    '-DMM_MODULE_NAME="foxconn"',
-    '-DTESTUDEVRULESDIR_FOXCONN="@0@"'.format(foxconn_dir),
-	'-DTESTKEYFILE_FOXCONN_T77W968="@0@"'.format(foxconn_dir / 'mm-foxconn-t77w968-carrier-mapping.conf'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_FOXCONN="@0@"'.format(foxconn_dir)]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  test_keyfile_c_args = ['-DTESTKEYFILE_FOXCONN_T77W968="@0@"'.format(foxconn_dir / 'mm-foxconn-t77w968-carrier-mapping.conf')]
+  plugins_test_keyfile_c_args += test_keyfile_c_args
 
   plugins += {'plugin-foxconn': {
     'plugin': true,
-    'module': {'sources': files('foxconn/mm-plugin-foxconn.c'), 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': files('foxconn/mm-plugin-foxconn.c'), 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + test_keyfile_c_args + ['-DMM_MODULE_NAME="foxconn"']},
   }}
 
   plugins_data += files(
@@ -405,14 +399,12 @@ endif
 
 # plugin: gosuncn
 if plugins_options['gosuncn']
-  c_args = [
-    '-DMM_MODULE_NAME="gosuncn"',
-    '-DTESTUDEVRULESDIR_GOSUNCN="@0@"'.format(plugins_dir / 'gosuncn'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_GOSUNCN="@0@"'.format(plugins_dir / 'gosuncn')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   plugins += {'plugin-gosuncn': {
     'plugin': true,
-    'module': {'sources': files('gosuncn/mm-plugin-gosuncn.c'), 'include_directories': plugins_incs, 'c_args': c_args}
+    'module': {'sources': files('gosuncn/mm-plugin-gosuncn.c'), 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="gosuncn"']},
   }}
 
   plugins_udev_rules += files('gosuncn/77-mm-gosuncn-port-types.rules')
@@ -420,14 +412,12 @@ endif
 
 # plugin: haier
 if plugins_options['haier']
-  c_args = [
-    '-DMM_MODULE_NAME="haier"',
-    '-DTESTUDEVRULESDIR_HAIER="@0@"'.format(plugins_dir / 'haier'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_HAIER="@0@"'.format(plugins_dir / 'haier')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   plugins += {'plugin-haier': {
     'plugin': true,
-    'module': {'sources': files('haier/mm-plugin-haier.c'), 'include_directories': plugins_incs, 'c_args': c_args}
+    'module': {'sources': files('haier/mm-plugin-haier.c'), 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="haier"']},
   }}
 
   plugins_udev_rules += files('haier/77-mm-haier-port-types.rules')
@@ -437,7 +427,10 @@ endif
 if plugins_options['huawei']
   huawei_inc = include_directories('huawei')
 
-  common_c_args = ['-DTESTUDEVRULESDIR_HUAWEI="@0@"'.format(plugins_dir / 'huawei')]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_HUAWEI="@0@"'.format(plugins_dir / 'huawei')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  common_c_args = test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="huawei"']
 
   headers = files('huawei/mm-modem-helpers-huawei.h')
 
@@ -468,8 +461,8 @@ if plugins_options['huawei']
 
   plugins += {'plugin-huawei': {
     'plugin': true,
-    'helper': {'sources': files('huawei/mm-modem-helpers-huawei.c') + daemon_enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args + ['-DMM_MODULE_NAME="huawei"']},
-    'module': {'sources': sources + enums_sources + port_enums_sources + daemon_enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args + ['-DMM_MODULE_NAME="huawei"']},
+    'helper': {'sources': files('huawei/mm-modem-helpers-huawei.c') + daemon_enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args},
+    'module': {'sources': sources + enums_sources + port_enums_sources + daemon_enums_sources, 'include_directories': plugins_incs + [huawei_inc], 'c_args': common_c_args},
     'test': {'sources': files('huawei/tests/test-modem-helpers-huawei.c') + enums_sources, 'include_directories': huawei_inc, 'dependencies': libhelpers_dep},
   }}
 
@@ -511,20 +504,20 @@ endif
 
 # plugin: linktop
 if plugins_options['linktop']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_LINKTOP="@0@"'.format(plugins_dir / 'linktop')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  common_c_args = test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="linktop"']
+
   sources = files(
     'linktop/mm-plugin-linktop.c',
     'linktop/mm-broadband-modem-linktop.c',
   )
 
-  c_args = [
-    '-DMM_MODULE_NAME="linktop"',
-    '-DTESTUDEVRULESDIR_LINKTOP="@0@"'.format(plugins_dir / 'linktop'),
-  ]
-
   plugins += {'plugin-linktop': {
     'plugin': true,
-    'helper': {'sources': files('linktop/mm-modem-helpers-linktop.c'), 'include_directories': plugins_incs, 'c_args': c_args},
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+    'helper': {'sources': files('linktop/mm-modem-helpers-linktop.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
     'test': {'sources': files('linktop/tests/test-modem-helpers-linktop.c'), 'include_directories': include_directories('linktop'), 'dependencies': libhelpers_dep},
   }}
 
@@ -533,19 +526,17 @@ endif
 
 # plugin: longcheer (and rebranded dongles)
 if plugins_options['longcheer']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_LONGCHEER="@0@"'.format(plugins_dir / 'longcheer')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   sources = files(
     'longcheer/mm-broadband-modem-longcheer.c',
     'longcheer/mm-plugin-longcheer.c',
   )
 
-  c_args = [
-    '-DMM_MODULE_NAME="longcheer"',
-    '-DTESTUDEVRULESDIR_LONGCHEER="@0@"'.format(plugins_dir / 'longcheer'),
-  ]
-
   plugins += {'plugin-longcheer': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="longcheer"']},
   }}
 
   plugins_udev_rules += files('longcheer/77-mm-longcheer-port-types.rules')
@@ -553,7 +544,10 @@ endif
 
 # plugin: ericsson mbm
 if plugins_options['mbm']
-  common_c_args = ['-DTESTUDEVRULESDIR_MBM="@0@"'.format(plugins_dir / 'mbm')]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_MBM="@0@"'.format(plugins_dir / 'mbm')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  common_c_args = test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="ericsson-mbm"']
 
   sources = files(
     'mbm/mm-broadband-bearer-mbm.c',
@@ -564,8 +558,8 @@ if plugins_options['mbm']
 
   plugins += {'plugin-ericsson-mbm': {
     'plugin': true,
-    'helper': {'sources': files('mbm/mm-modem-helpers-mbm.c'), 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="ericsson-mbm"']},
-    'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="ericsson-mbm"']},
+    'helper': {'sources': files('mbm/mm-modem-helpers-mbm.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
+    'module': {'sources': sources + daemon_enums_sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
     'test': {'sources': files('mbm/tests/test-modem-helpers-mbm.c'), 'include_directories': plugins_incs + [include_directories('mbm')], 'dependencies': libhelpers_dep},
   }}
 
@@ -587,19 +581,17 @@ endif
 
 # plugin: mtk
 if plugins_options['mtk']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_MTK="@0@"'.format(plugins_dir / 'mtk')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   sources = files(
     'mtk/mm-broadband-modem-mtk.c',
     'mtk/mm-plugin-mtk.c',
   )
 
-  c_args = [
-    '-DMM_MODULE_NAME="motorola"',
-    '-DTESTUDEVRULESDIR_MTK="@0@"'.format(plugins_dir / 'mtk'),
-  ]
-
   plugins += {'plugin-mtk': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="motorola"']},
   }}
 
   plugins_udev_rules += files('mtk/77-mm-mtk-port-types.rules')
@@ -621,14 +613,12 @@ endif
 
 # plugin: nokia (icera)
 if plugins_options['nokia-icera']
-  c_args = [
-    '-DMM_MODULE_NAME="nokia-icera"',
-    '-DTESTUDEVRULESDIR_NOKIA_ICERA="@0@"'.format(plugins_dir / 'nokia'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_NOKIA_ICERA="@0@"'.format(plugins_dir / 'nokia')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   plugins += {'plugin-nokia-icera': {
     'plugin': true,
-    'module': {'sources': files('nokia/mm-plugin-nokia-icera.c'), 'include_directories': plugins_incs + [icera_inc], 'c_args': c_args},
+    'module': {'sources': files('nokia/mm-plugin-nokia-icera.c'), 'include_directories': plugins_incs + [icera_inc], 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="nokia-icera"']},
   }}
 
   plugins_udev_rules += files('nokia/77-mm-nokia-port-types.rules')
@@ -695,19 +685,17 @@ endif
 
 # plugin: qcom-soc
 if plugins_options['qcom-soc']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_QCOM_SOC="@0@"'.format(plugins_dir / 'qcom-soc')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   sources = files(
     'qcom-soc/mm-broadband-modem-qmi-qcom-soc.c',
     'qcom-soc/mm-plugin-qcom-soc.c',
   )
 
-  c_args = [
-    '-DMM_MODULE_NAME="qcom-soc"',
-    '-DTESTUDEVRULESDIR_QCOM_SOC="@0@"'.format(plugins_dir / 'qcom-soc'),
-  ]
-
   plugins += {'plugin-qcom-soc': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="qcom-soc"']},
   }}
 
   plugins_udev_rules += files('qcom-soc/77-mm-qcom-soc.rules')
@@ -715,7 +703,10 @@ endif
 
 # plugin: quectel
 if plugins_options['quectel']
-  common_c_args = ['-DTESTUDEVRULESDIR_QUECTEL="@0@"'.format(plugins_dir / 'quectel')]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_QUECTEL="@0@"'.format(plugins_dir / 'quectel')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  common_c_args = test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="quectel"']
 
   sources = files(
     'quectel/mm-broadband-modem-quectel.c',
@@ -733,8 +724,8 @@ if plugins_options['quectel']
 
   plugins += {'plugin-quectel': {
     'plugin': true,
-    'helper': {'sources': files('quectel/mm-modem-helpers-quectel.c'), 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="quectel"']},
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="quectel"']},
+    'helper': {'sources': files('quectel/mm-modem-helpers-quectel.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
     'test': {'sources': files('quectel/tests/test-modem-helpers-quectel.c'), 'include_directories': include_directories('quectel'), 'dependencies': libhelpers_dep},
   }}
 
@@ -779,7 +770,10 @@ endif
 
 # plugin: simtech
 if plugins_options['simtech']
-  common_c_args = ['-DTESTUDEVRULESDIR_SIMTECH="@0@"'.format(plugins_dir / 'simtech')]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_SIMTECH="@0@"'.format(plugins_dir / 'simtech')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
+  common_c_args = test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="simtech"']
 
   sources = files(
     'simtech/mm-broadband-modem-simtech.c',
@@ -793,8 +787,8 @@ if plugins_options['simtech']
 
   plugins += {'plugin-simtech': {
     'plugin': true,
-    'helper': {'sources': files('simtech/mm-modem-helpers-simtech.c'), 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="simtech"']},
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="quectel"']},
+    'helper': {'sources': files('simtech/mm-modem-helpers-simtech.c'), 'include_directories': plugins_incs, 'c_args': common_c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args},
     'test': {'sources': files('simtech/tests/test-modem-helpers-simtech.c'), 'include_directories': plugins_incs + [include_directories('simtech')], 'dependencies': libport_dep},
   }}
 
@@ -803,14 +797,12 @@ endif
 
 # plugin: telit
 if plugins_options['telit']
-  c_args = [
-    '-DMM_MODULE_NAME="telit"',
-    '-DTESTUDEVRULESDIR_TELIT="@0@"'.format(plugins_dir / 'telit'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_TELIT="@0@"'.format(plugins_dir / 'telit')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   plugins += {'plugin-telit': {
     'plugin': true,
-    'module': {'sources': files('telit/mm-plugin-telit.c'), 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': files('telit/mm-plugin-telit.c'), 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="telit"']},
   }}
 
   plugins_udev_rules += files('telit/77-mm-telit-port-types.rules')
@@ -835,14 +827,12 @@ endif
 
 # plugin: tplink
 if plugins_options['tplink']
-  c_args = [
-    '-DMM_MODULE_NAME="tp-link"',
-    '-DTESTUDEVRULESDIR_TPLINK="@0@"'.format(plugins_dir / 'tplink'),
-  ]
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_TPLINK="@0@"'.format(plugins_dir / 'tplink')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
 
   plugins += {'plugin-tplink': {
     'plugin': true,
-    'module': {'sources': files('tplink/mm-plugin-tplink.c'), 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': files('tplink/mm-plugin-tplink.c'), 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="tp-link"']},
   }}
 
   plugins_udev_rules += files('tplink/77-mm-tplink-port-types.rules')
@@ -918,19 +908,17 @@ endif
 
 # plugin: alcatel/TCT/JRD x220D and possibly others
 if plugins_options['x22x']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_X22X="@0@"'.format(plugins_dir / 'x22x')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   sources = files(
     'x22x/mm-broadband-modem-x22x.c',
     'x22x/mm-plugin-x22x.c',
   )
 
-  c_args = [
-    '-DMM_MODULE_NAME="x22x"',
-    '-DTESTUDEVRULESDIR_X22X="@0@"'.format(plugins_dir / 'x22x'),
-  ]
-
   plugins += {'plugin-x22x': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="x22x"']},
   }}
 
   plugins_udev_rules += files('x22x/77-mm-x22x-port-types.rules')
@@ -938,6 +926,9 @@ endif
 
 # plugin: zte
 if plugins_options['zte']
+  test_udev_rules_dir_c_args = ['-DTESTUDEVRULESDIR_ZTE="@0@"'.format(plugins_dir / 'zte')]
+  plugins_test_udev_rules_dir_c_args += test_udev_rules_dir_c_args
+
   sources = files(
     'zte/mm-broadband-modem-zte.c',
     'zte/mm-broadband-modem-zte-icera.c',
@@ -945,14 +936,9 @@ if plugins_options['zte']
     'zte/mm-plugin-zte.c',
   )
 
-  c_args = [
-    '-DMM_MODULE_NAME="zte"',
-    '-DTESTUDEVRULESDIR_ZTE="@0@"'.format(plugins_dir / 'zte'),
-  ]
-
   plugins += {'plugin-zte': {
     'plugin': true,
-    'module': {'sources': sources, 'include_directories': plugins_incs + [icera_inc], 'c_args': c_args},
+    'module': {'sources': sources, 'include_directories': plugins_incs + [icera_inc], 'c_args': test_udev_rules_dir_c_args + ['-DMM_MODULE_NAME="zte"']},
   }}
 
   plugins_udev_rules += files('zte/77-mm-zte-port-types.rules')
@@ -1010,8 +996,8 @@ install_data(
 
 # udev-rules and keyfiles tests
 test_units = {
-  'udev-rules': {'include_directories': top_inc, 'dependencies': libkerneldevice_dep},
-  'keyfiles': {'include_directories': [top_inc, src_inc], 'dependencies': libmm_glib_dep},
+  'udev-rules': {'include_directories': top_inc, 'dependencies': libkerneldevice_dep, 'c_args': plugins_test_udev_rules_dir_c_args},
+  'keyfiles': {'include_directories': [top_inc, src_inc], 'dependencies': libmm_glib_dep, 'c_args': plugins_test_keyfile_c_args},
 }
 
 foreach name, data: test_units
