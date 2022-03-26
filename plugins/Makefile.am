@@ -1002,6 +1002,10 @@ libmm_plugin_linktop_la_CPPFLAGS = \
 libmm_plugin_linktop_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_linktop_la_LIBADD = $(builddir)/libhelpers-linktop.la
 
+dist_udevrules_DATA += linktop/77-mm-linktop-port-types.rules
+
+AM_CFLAGS += -DTESTUDEVRULESDIR_LINKTOP=\"${srcdir}/linktop\"
+
 endif
 
 ################################################################################

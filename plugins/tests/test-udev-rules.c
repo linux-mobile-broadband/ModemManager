@@ -184,6 +184,14 @@ test_qcom_soc (void)
 }
 #endif
 
+#if defined ENABLE_PLUGIN_LINKTOP
+static void
+test_linktop (void)
+{
+    common_test (TESTUDEVRULESDIR_LINKTOP);
+}
+#endif
+
 /************************************************************/
 
 int main (int argc, char **argv)
@@ -240,6 +248,9 @@ int main (int argc, char **argv)
 #endif
 #if defined ENABLE_PLUGIN_QCOM_SOC && defined WITH_QMI
     g_test_add_func ("/MM/test-udev-rules/qcom-soc", test_qcom_soc);
+#endif
+#if defined ENABLE_PLUGIN_LINKTOP
+    g_test_add_func ("/MM/test-udev-rules/linktop", test_linktop);
 #endif
 
     return g_test_run ();
