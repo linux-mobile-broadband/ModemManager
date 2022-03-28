@@ -98,7 +98,7 @@ append_netlink_attribute (NetlinkMessage *msg,
     memset ((char *) msg->data + old_len, 0, msg->len - old_len);
 
     new_attr.rta_type = type;
-    new_attr.rta_len = attr_len;
+    new_attr.rta_len = RTA_LENGTH (len);
     next_attr_abs_pos = (char *) msg->data + next_attr_rel_pos;
     memcpy (next_attr_abs_pos, &new_attr, sizeof (struct rtattr));
 
