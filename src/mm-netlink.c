@@ -136,8 +136,6 @@ netlink_message_new (guint   ifindex,
     hdr->msghdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
     hdr->ifreq.ifi_family = AF_UNSPEC;
     hdr->ifreq.ifi_index = ifindex;
-    hdr->ifreq.ifi_flags = 0;
-    hdr->ifreq.ifi_change = 0xFFFFFFFF;
 
     return msg;
 }
@@ -154,7 +152,7 @@ netlink_message_new_setlink (guint    ifindex,
     hdr = netlink_message_header (msg);
 
     hdr->ifreq.ifi_flags = up ? IFF_UP : 0;
-    hdr->ifreq.ifi_change = 0xFFFFFFFF;
+    hdr->ifreq.ifi_change = IFF_UP;
 
     if (mtu)
         append_netlink_attribute_uint32 (msg, IFLA_MTU, mtu);
