@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2012 Google, Inc.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc.
  */
 
 #ifndef MM_MODEM_HELPERS_QMI_H

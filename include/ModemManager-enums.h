@@ -12,7 +12,7 @@
  *
  * Copyright (C) 2011 Red Hat, Inc.
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc.
  */
 
 #ifndef _MODEMMANAGER_ENUMS_H_

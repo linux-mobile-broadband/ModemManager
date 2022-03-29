@@ -12,7 +12,7 @@
  *
  * Copyright (C) 2012 Google Inc.
  * Copyright (C) 2014 Aleksander Morgado <aleksander@aleksander.es>
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc.
  */
 
 #include <config.h>
