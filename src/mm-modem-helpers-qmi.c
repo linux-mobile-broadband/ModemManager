@@ -1842,9 +1842,17 @@ mm_current_capability_from_qmi_current_capabilities_context (MMQmiCurrentCapabil
     g_autofree gchar *tmp_str = NULL;
 
     /* If not a multimode device, we're done */
-    if (!ctx->multimode)
-        tmp = ctx->dms_capabilities;
-    else {
+    if (!ctx->multimode) {
+        if (ctx->dms_capabilities != MM_MODEM_CAPABILITY_NONE)
+            tmp = ctx->dms_capabilities;
+        /* SSP logic to gather capabilities uses the Mode Preference TLV if available */
+        else if (ctx->nas_ssp_mode_preference_mask)
+            tmp = mm_modem_capability_from_qmi_rat_mode_preference (ctx->nas_ssp_mode_preference_mask);
+        /* If no value retrieved from SSP, check TP. We only process TP
+         * values if not 'auto' (0). */
+        else if (ctx->nas_tp_mask != QMI_NAS_RADIO_TECHNOLOGY_PREFERENCE_AUTO)
+            tmp = mm_modem_capability_from_qmi_radio_technology_preference (ctx->nas_tp_mask);
+    } else {
         /* We have a multimode CDMA/EVDO+GSM/UMTS device, check SSP and TP */
 
         /* SSP logic to gather capabilities uses the Mode Preference TLV if available */
