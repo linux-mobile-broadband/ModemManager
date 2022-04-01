@@ -41,6 +41,7 @@ const gchar *mm_context_get_log_file                (void);
 gboolean     mm_context_get_log_journal             (void);
 gboolean     mm_context_get_log_timestamps          (void);
 gboolean     mm_context_get_log_relative_timestamps (void);
+gboolean     mm_context_get_log_personal_info       (void);
 
 /* Testing support */
 gboolean     mm_context_get_test_session           (void);

@@ -134,6 +134,7 @@ static const gchar *log_file;
 static gboolean     log_journal;
 static gboolean     log_show_ts;
 static gboolean     log_rel_ts;
+static gboolean     log_personal_info;
 
 static const GOptionEntry log_entries[] = {
     {
@@ -161,6 +162,11 @@ static const GOptionEntry log_entries[] = {
     {
         "log-relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &log_rel_ts,
         "Use relative timestamps (from MM start)",
+        NULL
+    },
+    {
+        "log-personal-info", 0, 0, G_OPTION_ARG_NONE, &log_personal_info,
+        "Show personal info in logs",
         NULL
     },
     { NULL }
@@ -208,6 +214,12 @@ gboolean
 mm_context_get_log_relative_timestamps (void)
 {
     return log_rel_ts;
+}
+
+gboolean
+mm_context_get_log_personal_info (void)
+{
+    return log_personal_info;
 }
 
 /*****************************************************************************/

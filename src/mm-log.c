@@ -310,6 +310,7 @@ mm_log_setup (const char *level,
               gboolean log_journal,
               gboolean show_timestamps,
               gboolean rel_timestamps,
+              gboolean show_personal_info,
               GError **error)
 {
     /* levels */
@@ -366,6 +367,7 @@ mm_log_setup (const char *level,
 #endif
 
 #if defined WITH_MBIM
+    mbim_utils_set_show_personal_info (show_personal_info);
     g_log_set_handler ("Mbim",
                        G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
                        log_handler,

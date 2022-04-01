@@ -237,7 +237,7 @@ config_h.set('WITH_AT_COMMAND_VIA_DBUS', enable_at_command_via_dbus)
 # MBIM support (enabled by default)
 enable_mbim = get_option('mbim')
 if enable_mbim
-  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.27.3')
+  mbim_glib_dep = dependency('mbim-glib', version: '>= 1.27.6')
 endif
 config_h.set('WITH_MBIM', enable_mbim)
 

@@ -60,6 +60,7 @@ gboolean mm_log_setup (const char *level,
                        gboolean log_journal,
                        gboolean show_ts,
                        gboolean rel_ts,
+                       gboolean show_personal_info,
                        GError **error);
 
 void mm_log_shutdown (void);
