@@ -1017,13 +1017,6 @@ common_input_available (MMPortSerial *self,
         serial_debug (self, "<--", buf, bytes_read);
         g_byte_array_append (self->priv->response, (const guint8 *) buf, bytes_read);
 
-        /* Make sure the response doesn't grow too long */
-        if ((self->priv->response->len > SERIAL_BUF_SIZE) && self->priv->spew_control) {
-            /* Notify listeners and then trim the buffer */
-            g_signal_emit (self, signals[BUFFER_FULL], 0, self->priv->response);
-            g_byte_array_remove_range (self->priv->response, 0, (SERIAL_BUF_SIZE / 2));
-        }
-
         /* See if we can parse anything. The response parsing may actually
          * schedule the completion of a serial command, and that in turn may end
          * up fully disposing this serial port object. In order to cope with
@@ -1032,6 +1025,13 @@ common_input_available (MMPortSerial *self,
          * we should be keeping this socket/iochannel source or not. */
         g_object_ref (self);
         {
+            /* Make sure the response doesn't grow too long */
+            if ((self->priv->response->len > SERIAL_BUF_SIZE) && self->priv->spew_control) {
+                /* Notify listeners and then trim the buffer */
+                g_signal_emit (self, signals[BUFFER_FULL], 0, self->priv->response);
+                g_byte_array_remove_range (self->priv->response, 0, (SERIAL_BUF_SIZE / 2));
+            }
+
             parse_response_buffer (self);
 
             /* If we didn't end up closing the iochannel/socket in the previous
