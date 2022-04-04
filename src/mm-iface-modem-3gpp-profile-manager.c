@@ -1016,8 +1016,6 @@ handle_set_auth_ready (MMBaseModem      *self,
     const gchar              *index_field;
     GError                   *error = NULL;
     g_autoptr(MM3gppProfile)  profile_requested = NULL;
-    gint                      profile_id = MM_3GPP_PROFILE_ID_UNKNOWN;
-    MMBearerApnType           apn_type = MM_BEARER_APN_TYPE_NONE;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -1047,24 +1045,6 @@ handle_set_auth_ready (MMBaseModem      *self,
     }
 
     index_field = mm_gdbus_modem3gpp_profile_manager_get_index_field (ctx->skeleton);
-    if (g_strcmp0 (index_field, "profile-id") == 0) {
-        profile_id = mm_3gpp_profile_get_profile_id (profile_requested);
-        if (profile_id == MM_3GPP_PROFILE_ID_UNKNOWN) {
-            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                                           "Missing index field ('profile-id') in profile settings");
-            handle_set_context_free (ctx);
-            return;
-        }
-    } else if (g_strcmp0 (index_field, "apn-type") == 0) {
-        apn_type = mm_3gpp_profile_get_apn_type (profile_requested);
-        if (apn_type == MM_BEARER_APN_TYPE_NONE) {
-            g_dbus_method_invocation_return_error_literal (ctx->invocation, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
-                                                           "Missing index field ('apn-type') in profile settings");
-            handle_set_context_free (ctx);
-            return;
-        }
-    } else
-        g_assert_not_reached ();
 
     /* Don't call the class callback directly, use the common helper method
      * that is also used by other internal operations. */
