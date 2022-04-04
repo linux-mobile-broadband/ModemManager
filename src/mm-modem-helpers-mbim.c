@@ -290,21 +290,24 @@ GError *
 mm_mobile_equipment_error_from_mbim_nw_error (MbimNwError nw_error,
                                               gpointer    log_object)
 {
-    MMMobileEquipmentError  error_code;
     const gchar            *msg;
 
-    /* convert to mobile equipment error */
-    error_code = mbim_nw_errors[nw_error];
-    if (error_code)
-        return mm_mobile_equipment_error_for_code (error_code, log_object);
+    if (nw_error < G_N_ELEMENTS (mbim_nw_errors)) {
+        MMMobileEquipmentError  error_code;
 
-    /* provide a nicer error message on unmapped errors */
-    msg = mbim_nw_error_get_string (nw_error);
-    if (msg)
-        return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                            MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
-                            "Unsupported error (%u): %s",
-                            nw_error, msg);
+        /* convert to mobile equipment error */
+        error_code = mbim_nw_errors[nw_error];
+        if (error_code)
+            return mm_mobile_equipment_error_for_code (error_code, log_object);
+
+        /* provide a nicer error message on unmapped errors */
+        msg = mbim_nw_error_get_string (nw_error);
+        if (msg)
+            return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                                MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
+                                "Unsupported error (%u): %s",
+                                nw_error, msg);
+    }
 
     /* fallback */
     return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR,
