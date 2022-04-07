@@ -404,39 +404,6 @@ location_load_capabilities (MMIfaceModemLocation *self,
 }
 
 /*****************************************************************************/
-/* After Sim Unlock (Modem interface) */
-
-static gboolean
-modem_after_sim_unlock_finish (MMIfaceModem *self,
-                               GAsyncResult *res,
-                               GError **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
-
-static gboolean
-after_sim_unlock_ready (GTask *task)
-{
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-    return G_SOURCE_REMOVE;
-}
-
-static void
-modem_after_sim_unlock (MMIfaceModem *self,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
-{
-    GTask *task;
-
-    task = g_task_new (self, NULL, callback, user_data);
-
-    /* A short delay is necessary with some SIMs when
-    they have just been unlocked. Using 1 second as secure margin. */
-    g_timeout_add_seconds (1, (GSourceFunc) after_sim_unlock_ready, task);
-}
-
-/*****************************************************************************/
 /* Setup SIM hot swap (Modem interface) */
 
 typedef enum {
@@ -1440,8 +1407,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_modes_finish = mm_shared_telit_load_current_modes_finish;
     iface->set_current_modes = mm_shared_telit_set_current_modes;
     iface->set_current_modes_finish = mm_shared_telit_set_current_modes_finish;
-    iface->modem_after_sim_unlock = modem_after_sim_unlock;
-    iface->modem_after_sim_unlock_finish = modem_after_sim_unlock_finish;
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
 }
