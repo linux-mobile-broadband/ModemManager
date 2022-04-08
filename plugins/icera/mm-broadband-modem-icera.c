@@ -1569,6 +1569,7 @@ parse_tlts_query_reply (const gchar *response,
                         MMNetworkTimezone **tz,
                         GError **error)
 {
+    gboolean ret = TRUE;
     gint year;
     gint month;
     gint day;
@@ -1649,11 +1650,13 @@ parse_tlts_query_reply (const gchar *response,
                                         g_date_time_get_minute (adjusted),
                                         g_date_time_get_second (adjusted),
                                         TRUE,
-                                        offset);
+                                        offset,
+                                        error);
+        ret = (*iso8601 != NULL);
     }
 
     g_date_time_unref (adjusted);
-    return TRUE;
+    return ret;
 }
 
 static MMNetworkTimezone *

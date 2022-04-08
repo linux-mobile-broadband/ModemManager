@@ -161,7 +161,8 @@ sms_decode_address (const guint8  *address,
 }
 
 static gchar *
-sms_decode_timestamp (const guint8 *timestamp)
+sms_decode_timestamp (const guint8 *timestamp,
+                      GError **error)
 {
     /* ISO8601 format: YYYY-MM-DDTHH:MM:SS+HHMM */
     guint year, month, day, hour, minute, second;
@@ -179,7 +180,7 @@ sms_decode_timestamp (const guint8 *timestamp)
         offset_minutes = -1 * offset_minutes;
 
     return mm_new_iso8601_time (year, month, day, hour,
-                                minute, second, TRUE, offset_minutes);
+                                minute, second, TRUE, offset_minutes, error);
 }
 
 static MMSmsEncoding
@@ -509,6 +510,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
     /* Get timestamps and indexes for TP-PID, TP-DCS and TP-UDL/TP-UD */
 
     if (pdu_type == SMS_TP_MTI_SMS_DELIVER) {
+        gchar *str = NULL;
         PDU_SIZE_CHECK (offset + 9,
                         "cannot read PID/DCS/Timestamp"); /* 1+1+7=9 */
 
@@ -519,8 +521,13 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
         tp_dcs_offset = offset++;
 
         /* ------ Timestamp (7 bytes) ------ */
+        str = sms_decode_timestamp (&pdu[offset], error);
+        if (!str) {
+            mm_sms_part_free (sms_part);
+            return NULL;
+        }
         mm_sms_part_take_timestamp (sms_part,
-                                    sms_decode_timestamp (&pdu[offset]));
+                                    str);
         offset += 7;
 
         tp_user_data_len_offset = offset;
@@ -564,6 +571,7 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
         tp_user_data_len_offset = offset;
     }
     else if (pdu_type == SMS_TP_MTI_SMS_STATUS_REPORT) {
+        gchar *str = NULL;
         /* We have 2 timestamps in status report PDUs:
          *  first, the timestamp for when the PDU was received in the SMSC
          *  second, the timestamp for when the PDU was forwarded by the SMSC
@@ -571,13 +579,21 @@ mm_sms_part_3gpp_new_from_binary_pdu (guint         index,
         PDU_SIZE_CHECK (offset + 15, "cannot read Timestamps/TP-STATUS"); /* 7+7+1=15 */
 
         /* ------ Timestamp (7 bytes) ------ */
-        mm_sms_part_take_timestamp (sms_part,
-                                    sms_decode_timestamp (&pdu[offset]));
+        str = sms_decode_timestamp (&pdu[offset], error);
+        if (!str) {
+            mm_sms_part_free (sms_part);
+            return NULL;
+        }
+        mm_sms_part_take_timestamp (sms_part, str);
         offset += 7;
 
         /* ------ Discharge Timestamp (7 bytes) ------ */
-        mm_sms_part_take_discharge_timestamp (sms_part,
-                                              sms_decode_timestamp (&pdu[offset]));
+        str = sms_decode_timestamp (&pdu[offset], error);
+        if (!str) {
+            mm_sms_part_free (sms_part);
+            return NULL;
+        }
+        mm_sms_part_take_discharge_timestamp (sms_part, str);
         offset += 7;
 
         /* ----- TP-STATUS (1 byte) ------ */

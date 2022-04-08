@@ -1201,6 +1201,7 @@ mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
                              MMNetworkTimezone **tzp,
                              GError            **error)
 {
+    gboolean ret = TRUE;
     guint year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0, dst = 0;
     gint tz = 0;
 
@@ -1229,7 +1230,9 @@ mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
         /* Return ISO-8601 format date/time string */
         *iso8601p = mm_new_iso8601_time (year, month, day, hour,
                                          minute, second,
-                                         TRUE, tz * 15);
+                                         TRUE, tz * 15,
+                                         error);
+        ret = (*iso8601p != NULL);
     }
 
     if (tzp) {
@@ -1245,7 +1248,7 @@ mm_cinterion_parse_ctzu_urc (GMatchInfo         *match_info,
     if (tzp && mm_get_uint_from_match_info (match_info, 8, &dst))
         mm_network_timezone_set_dst_offset (*tzp, dst * 60);
 
-    return TRUE;
+    return ret;
 }
 
 /*****************************************************************************/
