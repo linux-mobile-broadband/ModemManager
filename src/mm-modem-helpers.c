@@ -5112,14 +5112,16 @@ mm_parse_cclk_response (const char *response,
         mm_network_timezone_set_offset (*tzp, tz * 15);
     }
 
+    ret = TRUE;
+
     if (iso8601p) {
         /* Return ISO-8601 format date/time string */
         *iso8601p = mm_new_iso8601_time (year, month, day, hour,
                                          minute, second,
-                                         TRUE, (tz * 15));
+                                         TRUE, (tz * 15),
+                                         error);
+        ret = (*iso8601p != NULL);
     }
-
-    ret = TRUE;
 
  out:
     g_match_info_free (match_info);

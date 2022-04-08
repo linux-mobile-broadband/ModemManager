@@ -216,7 +216,8 @@ gchar    *mm_new_iso8601_time                    (guint    year,
                                                   guint    minute,
                                                   guint    second,
                                                   gboolean have_offset,
-                                                  gint     offset_minutes);
+                                                  gint     offset_minutes,
+                                                  GError **error);
 
 /******************************************************************************/
 /* Type checkers and conversion utilities */

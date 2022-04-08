@@ -1431,13 +1431,13 @@ parse_nwltime_reply (const char *response,
             mm_get_int_from_match_info (match_info, 8, &utc_offset)) {
 
             result = mm_new_iso8601_time (year, month, day, hour, minute, second,
-                                          TRUE, utc_offset * 60);
+                                          TRUE, utc_offset * 60, error);
             if (out_tz) {
                 *out_tz = mm_network_timezone_new ();
                 mm_network_timezone_set_offset (*out_tz, utc_offset * 60);
             }
 
-            success = TRUE;
+            success = (result != NULL);
         } else {
             g_set_error_literal (error,
                                  MM_CORE_ERROR,

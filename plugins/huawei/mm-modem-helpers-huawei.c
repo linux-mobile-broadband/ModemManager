@@ -1228,6 +1228,9 @@ gboolean mm_huawei_parse_nwtime_response (const gchar *response,
             mm_get_uint_from_match_info (match_info, 6, &second) &&
             mm_get_int_from_match_info  (match_info, 7, &tz) &&
             mm_get_uint_from_match_info (match_info, 8, &dt)) {
+
+            ret = TRUE;
+
             /* adjust year */
             if (year < 100)
                 year += 2000;
@@ -1240,7 +1243,9 @@ gboolean mm_huawei_parse_nwtime_response (const gchar *response,
                 /* Return ISO-8601 format date/time string */
                 *iso8601p = mm_new_iso8601_time (year, month, day, hour,
                                                  minute, second,
-                                                 TRUE, (tz * 15) + (dt * 60));
+                                                 TRUE, (tz * 15) + (dt * 60),
+                                                 error);
+                ret = (*iso8601p != NULL);
             }
             if (tzp) {
                 *tzp = mm_network_timezone_new ();
@@ -1248,7 +1253,6 @@ gboolean mm_huawei_parse_nwtime_response (const gchar *response,
                 mm_network_timezone_set_dst_offset (*tzp, dt * 60);
             }
 
-            ret = TRUE;
         } else {
             g_set_error_literal (error,
                                  MM_CORE_ERROR,
@@ -1312,14 +1316,19 @@ gboolean mm_huawei_parse_time_response (const gchar *response,
             mm_get_uint_from_match_info (match_info, 4, &hour) &&
             mm_get_uint_from_match_info (match_info, 5, &minute) &&
             mm_get_uint_from_match_info (match_info, 6, &second)) {
+            ret = TRUE;
+
             /* adjust year */
             if (year < 100)
                 year += 2000;
+
             /* Return ISO-8601 format date/time string */
-            if (iso8601p)
+            if (iso8601p) {
                 *iso8601p = mm_new_iso8601_time (year, month, day, hour,
-                                                 minute, second, FALSE, 0);
-            ret = TRUE;
+                                                 minute, second, FALSE, 0,
+                                                 error);
+                ret = (*iso8601p != NULL);
+            }
         } else {
             g_set_error_literal (error,
                                  MM_CORE_ERROR,
