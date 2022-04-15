@@ -31,4 +31,7 @@ ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="1506", ENV{ID_MM_HUAWEI_NDISDUP_SUPP
 # R215, Disable CPOL based features
 ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="1588", ENV{ID_MM_PREFERRED_NETWORKS_CPOL_DISABLED}="1"
 
+# E226, Disable CPOL based features
+ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="1003", ENV{ID_MM_PREFERRED_NETWORKS_CPOL_DISABLED}="1"
+
 LABEL="mm_huawei_port_types_end"
