@@ -27,6 +27,8 @@
 #define _LIBMM_INSIDE_MM
 #include <libmm-glib.h>
 
+#include <ModemManager-tags.h>
+
 #include "mm-plugin-common.h"
 #include "mm-broadband-modem-cinterion.h"
 #include "mm-log-object.h"
@@ -45,8 +47,9 @@ MM_DEFINE_PLUGIN (CINTERION, cinterion, Cinterion)
 /*****************************************************************************/
 /* Custom init */
 
-#define TAG_CINTERION_APP_PORT   "cinterion-app-port"
-#define TAG_CINTERION_MODEM_PORT "cinterion-modem-port"
+/* helps shorten a long if */
+#define CHECK_PORT_HAS_TAG(p, t) ( \
+        mm_kernel_device_get_property_as_boolean (mm_port_probe_peek_port (p), t) )
 
 static gboolean
 cinterion_custom_init_finish (MMPortProbe   *probe,
@@ -54,6 +57,21 @@ cinterion_custom_init_finish (MMPortProbe   *probe,
                               GError       **error)
 {
     return g_task_propagate_boolean (G_TASK (result), error);
+}
+
+/* is_port_already_tagged checks whether a port provided by probe has
+ * already tags assigned. */
+gboolean
+is_port_already_tagged (MMPortProbe *probe)
+{
+    if (CHECK_PORT_HAS_TAG (probe, ID_MM_PORT_TYPE_AT_PRIMARY) ||
+        CHECK_PORT_HAS_TAG (probe, ID_MM_PORT_TYPE_AT_SECONDARY) ||
+        CHECK_PORT_HAS_TAG (probe, ID_MM_PORT_TYPE_AT_PPP) ||
+        CHECK_PORT_HAS_TAG (probe, ID_MM_PORT_TYPE_GPS) ) {
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 static void
@@ -73,9 +91,9 @@ sqport_ready (MMPortSerialAt *port,
         mm_port_probe_set_result_at (probe, TRUE);
 
         if (strstr (response, "Application"))
-            g_object_set_data (G_OBJECT (probe), TAG_CINTERION_APP_PORT, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (probe), ID_MM_PORT_TYPE_AT_PRIMARY, GUINT_TO_POINTER (TRUE));
         else if (strstr (response, "Modem"))
-            g_object_set_data (G_OBJECT (probe), TAG_CINTERION_MODEM_PORT, GUINT_TO_POINTER (TRUE));
+            g_object_set_data (G_OBJECT (probe), ID_MM_PORT_TYPE_AT_PPP, GUINT_TO_POINTER (TRUE));
     }
 
     g_task_return_boolean (task, TRUE);
@@ -93,6 +111,17 @@ cinterion_custom_init (MMPortProbe         *probe,
 
     task = g_task_new (probe, cancellable, callback, user_data);
 
+    /* if the port is already tagged then it means that, most likely, udev
+     * has sorted things out. in that case it is not needed to run SQPORT?
+     * to try to guess whether this is AT-capable port. lets skip it. */
+    if (is_port_already_tagged (probe)) {
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+    }
+
+    /* alright, no tags on this port whatsoever so lets figure things out
+     * using SQPORT? */
     mm_port_serial_at_command (
         port,
         "AT^SQPORT?",
@@ -156,17 +185,17 @@ grab_port (MMPlugin *self,
 
     ptype = mm_port_probe_get_port_type (probe);
 
-    if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_APP_PORT)) {
-        mm_obj_dbg (self, "port '%s/%s' flagged as primary",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
+    if (g_object_get_data (G_OBJECT (probe), ID_MM_PORT_TYPE_AT_PRIMARY)) {
+        mm_obj_dbg ("(%s/%s)' Port flagged as primary",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PRIMARY;
-    } else if (g_object_get_data (G_OBJECT (probe), TAG_CINTERION_MODEM_PORT)) {
-        mm_obj_dbg (self, "port '%s/%s' flagged as PPP",
-                    mm_port_probe_get_port_subsys (probe),
-                    mm_port_probe_get_port_name (probe));
+    } else if (g_object_get_data (G_OBJECT (probe), ID_MM_PORT_TYPE_AT_PPP)) {
+        mm_obj_dbg ("(%s/%s)' Port flagged as PPP",
+                mm_port_probe_get_port_subsys (probe),
+                mm_port_probe_get_port_name (probe));
         pflags = MM_PORT_SERIAL_AT_FLAG_PPP;
-    }
+    } /* else unknown or set via generic udev tags */
 
     return mm_base_modem_grab_port (modem,
                                     mm_port_probe_peek_port (probe),
