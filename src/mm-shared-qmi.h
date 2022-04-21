@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2018 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #ifndef MM_SHARED_QMI_H
@@ -64,14 +65,21 @@ gboolean   mm_shared_qmi_ensure_client (MMSharedQmi          *self,
 
 /* Shared QMI 3GPP operations */
 
-void     mm_shared_qmi_3gpp_register_in_network        (MMIfaceModem3gpp     *self,
-                                                        const gchar          *operator_id,
-                                                        GCancellable         *cancellable,
-                                                        GAsyncReadyCallback   callback,
-                                                        gpointer              user_data);
-gboolean mm_shared_qmi_3gpp_register_in_network_finish (MMIfaceModem3gpp     *self,
-                                                        GAsyncResult         *res,
-                                                        GError              **error);
+void     mm_shared_qmi_3gpp_register_in_network        (MMIfaceModem3gpp               *self,
+                                                        const gchar                    *operator_id,
+                                                        GCancellable                   *cancellable,
+                                                        GAsyncReadyCallback             callback,
+                                                        gpointer                        user_data);
+gboolean mm_shared_qmi_3gpp_register_in_network_finish (MMIfaceModem3gpp               *self,
+                                                        GAsyncResult                   *res,
+                                                        GError                        **error);
+void     mm_shared_qmi_set_packet_service_state        (MMIfaceModem3gpp               *self,
+                                                        MMModem3gppPacketServiceState   packet_service_state,
+                                                        GAsyncReadyCallback             callback,
+                                                        gpointer                        user_data);
+gboolean mm_shared_qmi_set_packet_service_state_finish (MMIfaceModem3gpp               *self,
+                                                        GAsyncResult                   *res,
+                                                        GError                        **error);
 
 /* Shared QMI device management support */
 

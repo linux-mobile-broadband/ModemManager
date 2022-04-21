@@ -13128,6 +13128,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->set_initial_eps_bearer_settings_finish = modem_3gpp_set_initial_eps_bearer_settings_finish;
     iface->disable_facility_lock = modem_3gpp_disable_facility_lock;
     iface->disable_facility_lock_finish = modem_3gpp_disable_facility_lock_finish;
+    iface->set_packet_service_state = mm_shared_qmi_set_packet_service_state;
+    iface->set_packet_service_state_finish = mm_shared_qmi_set_packet_service_state_finish;
 }
 
 static void

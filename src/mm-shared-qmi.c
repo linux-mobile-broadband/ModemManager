@@ -4255,6 +4255,194 @@ mm_shared_qmi_setup_sim_hot_swap (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
+/* Set packet service state (3GPP interface)  */
+
+typedef struct {
+    QmiClientNas                  *client;
+    MMModem3gppPacketServiceState  packet_service_state;
+} SetPacketServiceStateContext;
+
+static void
+set_packet_service_state_context_free (SetPacketServiceStateContext *ctx)
+{
+    if (ctx->client)
+        g_object_unref (ctx->client);
+    g_slice_free (SetPacketServiceStateContext, ctx);
+}
+
+gboolean
+mm_shared_qmi_set_packet_service_state_finish (MMIfaceModem3gpp  *self,
+                                 GAsyncResult      *res,
+                                 GError           **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
+}
+
+static void
+set_packet_service_state_ia_ready (QmiClientNas *client,
+                                   GAsyncResult *res,
+                                   GTask        *task)
+{
+    GError                          *error = NULL;
+    QmiMessageNasAttachDetachOutput *output;
+
+    output = qmi_client_nas_attach_detach_finish (client, res, &error);
+    if (!output || !qmi_message_nas_attach_detach_output_get_result (output, &error)) {
+        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_prefix_error (&error, "Couldn't set packet service state: ");
+            g_task_return_error (task, error);
+            goto out;
+        }
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+
+out:
+    g_object_unref (task);
+
+    if (output)
+        qmi_message_nas_attach_detach_output_unref (output);
+}
+
+static void
+set_packet_service_state_ia (GTask *task)
+{
+    QmiMessageNasAttachDetachInput *input;
+    SetPacketServiceStateContext   *ctx;
+
+    input = qmi_message_nas_attach_detach_input_new ();
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->packet_service_state) {
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED:
+        qmi_message_nas_attach_detach_input_set_action (
+            input,
+            QMI_NAS_PS_ATTACH_ACTION_ATTACH,
+            NULL);
+        break;
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED:
+        qmi_message_nas_attach_detach_input_set_action (
+            input,
+            QMI_NAS_PS_ATTACH_ACTION_DETACH,
+            NULL);
+        break;
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN:
+    default:
+        g_assert_not_reached ();
+    }
+
+    qmi_client_nas_attach_detach (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)set_packet_service_state_ia_ready,
+        task);
+
+    qmi_message_nas_attach_detach_input_unref (input);
+}
+
+static void
+set_packet_service_state_sssp_ready (QmiClientNas *client,
+                                     GAsyncResult *res,
+                                     GTask        *task)
+{
+    GError                                          *error = NULL;
+    QmiMessageNasSetSystemSelectionPreferenceOutput *output;
+
+    output = qmi_client_nas_set_system_selection_preference_finish (client, res, &error);
+    if (!output || !qmi_message_nas_set_system_selection_preference_output_get_result (output, &error)) {
+        if (!g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NO_EFFECT)) {
+            g_prefix_error (&error, "Couldn't set packet service state: ");
+            g_task_return_error (task, error);
+            goto out;
+        }
+        g_error_free (error);
+    }
+
+    g_task_return_boolean (task, TRUE);
+
+out:
+    g_object_unref (task);
+
+    if (output)
+        qmi_message_nas_set_system_selection_preference_output_unref (output);
+}
+
+static void
+set_packet_service_state_sssp (GTask *task)
+{
+    QmiMessageNasSetSystemSelectionPreferenceInput *input;
+    SetPacketServiceStateContext                   *ctx;
+
+    input = qmi_message_nas_set_system_selection_preference_input_new ();
+    ctx = g_task_get_task_data (task);
+
+    switch (ctx->packet_service_state) {
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED:
+        qmi_message_nas_set_system_selection_preference_input_set_service_domain_preference (
+            input,
+            QMI_NAS_SERVICE_DOMAIN_PREFERENCE_PS_ATTACH,
+            NULL);
+        break;
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED:
+        qmi_message_nas_set_system_selection_preference_input_set_service_domain_preference (
+            input,
+            QMI_NAS_SERVICE_DOMAIN_PREFERENCE_PS_DETACH,
+            NULL);
+        break;
+    case MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN:
+    default:
+        g_assert_not_reached ();
+    }
+
+    qmi_client_nas_set_system_selection_preference (
+        ctx->client,
+        input,
+        5,
+        NULL,
+        (GAsyncReadyCallback)set_packet_service_state_sssp_ready,
+        task);
+
+    qmi_message_nas_set_system_selection_preference_input_unref (input);
+}
+
+void
+mm_shared_qmi_set_packet_service_state (MMIfaceModem3gpp              *self,
+                                        MMModem3gppPacketServiceState  packet_service_state,
+                                        GAsyncReadyCallback            callback,
+                                        gpointer                       user_data)
+{
+    GTask                        *task;
+    SetPacketServiceStateContext *ctx;
+    QmiClient                    *client = NULL;
+    Private                      *priv = NULL;
+
+    g_assert ((packet_service_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED) ||
+              (packet_service_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED));
+
+    /* Get NAS client */
+    if (!mm_shared_qmi_ensure_client (MM_SHARED_QMI (self),
+                                      QMI_SERVICE_NAS, &client,
+                                      callback, user_data))
+        return;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    ctx = g_slice_new0 (SetPacketServiceStateContext);
+    ctx->client = QMI_CLIENT_NAS (g_object_ref (client));
+    ctx->packet_service_state = packet_service_state;
+    g_task_set_task_data (task, ctx, (GDestroyNotify)set_packet_service_state_context_free);
+
+    priv = get_private (MM_SHARED_QMI (self));
+    if (priv->feature_nas_ssp == FEATURE_SUPPORTED)
+        set_packet_service_state_sssp (task);
+    else
+        set_packet_service_state_ia (task);
+}
+
+/*****************************************************************************/
 /* Location: Set SUPL server */
 
 typedef struct {
