@@ -20,6 +20,7 @@
   <xi:include href="org.freedesktop.ModemManager1.Modem.Sar.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Signal.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Oma.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Simple.xml"/>
 
   <!--xi:include href="wip-org.freedesktop.ModemManager1.Modem.Contacts.xml"/-->
 
