@@ -768,7 +768,7 @@ if plugins_options['simtech']
   plugins += {'plugin-simtech': {
     'plugin': true,
     'helper': {'sources': files('simtech/mm-modem-helpers-simtech.c'), 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="simtech"']},
-    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="quectel"']},
+    'module': {'sources': sources, 'include_directories': plugins_incs, 'c_args': common_c_args + ['-DMM_MODULE_NAME="simtech"']},
     'test': {'sources': files('simtech/tests/test-modem-helpers-simtech.c'), 'include_directories': plugins_incs + [include_directories('simtech')], 'dependencies': libport_dep},
   }}
 
