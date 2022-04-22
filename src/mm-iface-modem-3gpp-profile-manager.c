@@ -27,8 +27,8 @@
 #include "mm-base-modem.h"
 #include "mm-log-object.h"
 
-#define SUPPORT_CHECKED_TAG "3gpp-ussd-support-checked-tag"
-#define SUPPORTED_TAG       "3gpp-ussd-supported-tag"
+#define SUPPORT_CHECKED_TAG "3gpp-profile-manager-support-checked-tag"
+#define SUPPORTED_TAG       "3gpp-profile-manager-supported-tag"
 
 static GQuark support_checked_quark;
 static GQuark supported_quark;
