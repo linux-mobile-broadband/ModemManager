@@ -918,7 +918,7 @@ get_current_settings (GTask *task, QmiClientWds *client)
 {
     ConnectContext *ctx;
     QmiMessageWdsGetCurrentSettingsInput *input;
-    QmiWdRequestedSettings requested;
+    QmiWdsRequestedSettings requested;
 
     ctx = g_task_get_task_data (task);
     g_assert (ctx->running_ipv4 || ctx->running_ipv6);
