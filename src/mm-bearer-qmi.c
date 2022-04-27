@@ -918,18 +918,18 @@ get_current_settings (GTask *task, QmiClientWds *client)
 {
     ConnectContext *ctx;
     QmiMessageWdsGetCurrentSettingsInput *input;
-    QmiWdsGetCurrentSettingsRequestedSettings requested;
+    QmiWdRequestedSettings requested;
 
     ctx = g_task_get_task_data (task);
     g_assert (ctx->running_ipv4 || ctx->running_ipv6);
 
-    requested = QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_DNS_ADDRESS |
-                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_GRANTED_QOS |
-                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_IP_ADDRESS |
-                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_GATEWAY_INFO |
-                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_MTU |
-                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_DOMAIN_NAME_LIST |
-                QMI_WDS_GET_CURRENT_SETTINGS_REQUESTED_SETTINGS_IP_FAMILY;
+    requested = QMI_WDS_REQUESTED_SETTINGS_DNS_ADDRESS |
+                QMI_WDS_REQUESTED_SETTINGS_GRANTED_QOS |
+                QMI_WDS_REQUESTED_SETTINGS_IP_ADDRESS |
+                QMI_WDS_REQUESTED_SETTINGS_GATEWAY_INFO |
+                QMI_WDS_REQUESTED_SETTINGS_MTU |
+                QMI_WDS_REQUESTED_SETTINGS_DOMAIN_NAME_LIST |
+                QMI_WDS_REQUESTED_SETTINGS_IP_FAMILY;
 
     input = qmi_message_wds_get_current_settings_input_new ();
     qmi_message_wds_get_current_settings_input_set_requested_settings (input, requested, NULL);
