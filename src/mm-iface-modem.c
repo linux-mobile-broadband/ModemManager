@@ -4228,7 +4228,23 @@ mm_iface_modem_disable (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GTask *task;
+    MmGdbusModem *skeleton = NULL;
+    GTask        *task;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    /*
+     * Set signal quality to 0% and access technologies to unknown since modem is disabled
+     */
+    if (skeleton) {
+        mm_gdbus_modem_set_signal_quality (MM_GDBUS_MODEM (skeleton),
+                                           g_variant_new ("(ub)", 0, TRUE));
+        mm_gdbus_modem_set_access_technologies (MM_GDBUS_MODEM (skeleton),
+                                                MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+        g_object_unref (skeleton);
+    }
 
     /* Just complete, nothing to do */
     task = g_task_new (self, NULL, callback, user_data);
