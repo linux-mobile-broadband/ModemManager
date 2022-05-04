@@ -99,6 +99,7 @@ const gchar     *mm_device_get_uid              (MMDevice       *self);
 const gchar    **mm_device_get_drivers          (MMDevice       *self);
 guint16          mm_device_get_vendor           (MMDevice       *self);
 guint16          mm_device_get_product          (MMDevice       *self);
+guint16          mm_device_get_subsystem_vendor (MMDevice       *self);
 void             mm_device_set_plugin           (MMDevice       *self,
                                                  GObject        *plugin);
 GObject         *mm_device_peek_plugin          (MMDevice       *self);

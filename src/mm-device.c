@@ -66,6 +66,8 @@ struct _MMDevicePrivate {
     /* If USB, device vid/pid */
     guint16 vendor;
     guint16 product;
+    /* Subsystem vendor ID for PCI devices */
+    guint16 subsystem_vendor;
 
     /* Kernel drivers managing this device */
     gchar **drivers;
@@ -241,6 +243,9 @@ mm_device_grab_port (MMDevice       *self,
         self->priv->product = mm_kernel_device_get_physdev_pid (kernel_port);
     }
 
+    if (!self->priv->subsystem_vendor)
+        self->priv->subsystem_vendor  = mm_kernel_device_get_physdev_subsystem_vid (kernel_port);
+
     /* Add new port driver */
     add_port_driver (self, kernel_port);
 
@@ -363,6 +368,9 @@ export_modem (MMDevice *self)
     mm_obj_dbg (self, "    vid:pid: 0x%04X:0x%04X",
                 (mm_base_modem_get_vendor_id (self->priv->modem) & 0xFFFF),
                 (mm_base_modem_get_product_id (self->priv->modem) & 0xFFFF));
+    if (mm_base_modem_get_subsystem_vendor_id (self->priv->modem))
+        mm_obj_dbg (self, "    subsystem vid: 0x%04X",
+                    (mm_base_modem_get_subsystem_vendor_id (self->priv->modem) & 0xFFFF));
     if (self->priv->virtual)
         mm_obj_dbg (self, "    virtual");
 
@@ -513,6 +521,12 @@ guint16
 mm_device_get_product (MMDevice *self)
 {
     return self->priv->product;
+}
+
+guint16
+mm_device_get_subsystem_vendor (MMDevice *self)
+{
+    return self->priv->subsystem_vendor;
 }
 
 void

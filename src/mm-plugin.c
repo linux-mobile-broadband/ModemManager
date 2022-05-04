@@ -924,6 +924,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                                                       drivers,
                                                       mm_device_get_vendor (device),
                                                       mm_device_get_product (device),
+                                                      mm_device_get_subsystem_vendor (device),
                                                       port_probes,
                                                       error);
     if (!modem)

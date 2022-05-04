@@ -111,6 +111,7 @@ struct _MMPluginClass {
                                   const gchar **drivers,
                                   guint16 vendor,
                                   guint16 product,
+                                  guint16 subsystem_vendor,
                                   GList *probes,
                                   GError **error);
 
