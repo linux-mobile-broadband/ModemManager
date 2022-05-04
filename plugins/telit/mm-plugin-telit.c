@@ -71,7 +71,8 @@ create_modem (MMPlugin *self,
                                                                  drivers,
                                                                  mm_plugin_get_name (self),
                                                                  vendor,
-                                                                 product));
+                                                                 product,
+                                                                 subsystem_vendor));
     }
 #endif
 
@@ -87,9 +88,13 @@ create_modem (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usbmisc", "wwan", NULL };
     /* Vendors: Telit */
     static const guint16 vendor_ids[] = { 0x1bc7, 0 };
+    static const mm_uint16_pair subsystem_vendor_ids[] = {
+        { 0x17cb, 0x1c5d }, /* FN990 */
+        { 0, 0 }
+    };
     static const gchar *vendor_strings[] = { "telit", NULL };
     /* Custom init for port identification */
     static const MMAsyncMethod custom_init = {
@@ -99,14 +104,15 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_TELIT,
-                      MM_PLUGIN_NAME,                   MM_MODULE_NAME,
-                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,     subsystems,
-                      MM_PLUGIN_ALLOWED_VENDOR_IDS,     vendor_ids,
-                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS, vendor_strings,
-                      MM_PLUGIN_ALLOWED_AT,             TRUE,
-                      MM_PLUGIN_ALLOWED_QMI,            TRUE,
-                      MM_PLUGIN_ALLOWED_MBIM,           TRUE,
-                      MM_PLUGIN_CUSTOM_INIT,            &custom_init,
+                      MM_PLUGIN_NAME,                         MM_MODULE_NAME,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,           subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,           vendor_ids,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEM_VENDOR_IDS, subsystem_vendor_ids,
+                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS,       vendor_strings,
+                      MM_PLUGIN_ALLOWED_AT,                   TRUE,
+                      MM_PLUGIN_ALLOWED_QMI,                  TRUE,
+                      MM_PLUGIN_ALLOWED_MBIM,                 TRUE,
+                      MM_PLUGIN_CUSTOM_INIT,                  &custom_init,
                       NULL));
 }
 

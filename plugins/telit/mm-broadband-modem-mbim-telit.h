@@ -42,6 +42,7 @@ MMBroadbandModemMbimTelit *mm_broadband_modem_mbim_telit_new (const gchar  *devi
                                                               const gchar **drivers,
                                                               const gchar  *plugin,
                                                               guint16       vendor_id,
-                                                              guint16       product_id);
+                                                              guint16       product_id,
+                                                              guint16       subsystem_vendor_id);
 
 #endif /* MM_BROADBAND_MODEM_TELIT_H */

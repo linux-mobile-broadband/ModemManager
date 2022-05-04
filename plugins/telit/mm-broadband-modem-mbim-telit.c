@@ -136,14 +136,16 @@ mm_broadband_modem_mbim_telit_new (const gchar  *device,
                                    const gchar **drivers,
                                    const gchar  *plugin,
                                    guint16       vendor_id,
-                                   guint16       product_id)
+                                   guint16       product_id,
+                                   guint16       subsystem_vendor_id)
 {
     return g_object_new (MM_TYPE_BROADBAND_MODEM_MBIM_TELIT,
-                         MM_BASE_MODEM_DEVICE,     device,
-                         MM_BASE_MODEM_DRIVERS,    drivers,
-                         MM_BASE_MODEM_PLUGIN,     plugin,
-                         MM_BASE_MODEM_VENDOR_ID,  vendor_id,
-                         MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_BASE_MODEM_DEVICE,              device,
+                         MM_BASE_MODEM_DRIVERS,             drivers,
+                         MM_BASE_MODEM_PLUGIN,              plugin,
+                         MM_BASE_MODEM_VENDOR_ID,           vendor_id,
+                         MM_BASE_MODEM_PRODUCT_ID,          product_id,
+                         MM_BASE_MODEM_SUBSYSTEM_VENDOR_ID, subsystem_vendor_id,
                          /* MBIM bearer supports NET only */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, FALSE,
