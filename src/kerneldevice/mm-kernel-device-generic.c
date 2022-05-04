@@ -68,6 +68,7 @@ struct _MMKernelDeviceGenericPrivate {
     gchar   *physdev_sysfs_path;
     guint16  physdev_vid;
     guint16  physdev_pid;
+    guint16  physdev_subsystem_vid;
     guint16  physdev_revision;
     gchar   *physdev_manufacturer;
     gchar   *physdev_product;
@@ -401,6 +402,7 @@ preload_contents_pci (MMKernelDeviceGeneric *self)
             self->priv->physdev_sysfs_path = g_strdup (iter);
             self->priv->physdev_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "vendor");
             self->priv->physdev_pid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "device");
+            self->priv->physdev_subsystem_vid = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "subsystem_vendor");
             self->priv->physdev_revision = read_sysfs_attribute_as_hex (self->priv->physdev_sysfs_path, "revision");
             /* stop traversing as soon as the physical device is found */
             break;
@@ -582,6 +584,8 @@ preload_contents (MMKernelDeviceGeneric *self)
         mm_obj_dbg (self, "  vendor: %04x", self->priv->physdev_vid);
     if (self->priv->physdev_pid)
         mm_obj_dbg (self, "  product: %04x", self->priv->physdev_pid);
+    if (self->priv->physdev_subsystem_vid)
+        mm_obj_dbg (self, "  subsystem vendor: %04x", self->priv->physdev_subsystem_vid);
     if (self->priv->physdev_revision)
         mm_obj_dbg (self, "  revision: %04x", self->priv->physdev_revision);
     if (self->priv->physdev_manufacturer)
@@ -693,6 +697,12 @@ static guint16
 kernel_device_get_physdev_pid (MMKernelDevice *self)
 {
     return MM_KERNEL_DEVICE_GENERIC (self)->priv->physdev_pid;
+}
+
+static guint16
+kernel_device_get_physdev_subsystem_vid (MMKernelDevice *self)
+{
+    return MM_KERNEL_DEVICE_GENERIC (self)->priv->physdev_subsystem_vid;
 }
 
 static guint16
@@ -808,13 +818,16 @@ check_condition (MMKernelDeviceGeneric *self,
         g_strdelimit (attribute, "{}", ' ');
         g_strstrip (attribute);
 
-        /* VID/PID directly from our API */
+        /* VID/PID/SUBSYSTEM VID directly from our API */
         if (g_str_equal (attribute, "idVendor") || g_str_equal (attribute, "vendor"))
             result = ((mm_get_uint_from_hex_str (match->value, &val)) &&
                       ((mm_kernel_device_get_physdev_vid (MM_KERNEL_DEVICE (self)) == val) == condition_equal));
         else if (g_str_equal (attribute, "idProduct") || g_str_equal (attribute, "device"))
             result = ((mm_get_uint_from_hex_str (match->value, &val)) &&
                       ((mm_kernel_device_get_physdev_pid (MM_KERNEL_DEVICE (self)) == val) == condition_equal));
+        else if (g_str_equal (attribute, "subsystem_vendor"))
+            result = ((mm_get_uint_from_hex_str (match->value, &val)) &&
+                      ((mm_kernel_device_get_physdev_subsystem_vid (MM_KERNEL_DEVICE (self)) == val) == condition_equal));
         /* manufacturer in the physdev */
         else if (g_str_equal (attribute, "manufacturer"))
             result = ((self->priv->physdev_manufacturer && g_str_equal (self->priv->physdev_manufacturer, match->value)) == condition_equal);
@@ -1201,6 +1214,7 @@ mm_kernel_device_generic_class_init (MMKernelDeviceGenericClass *klass)
     kernel_device_class->get_physdev_uid           = kernel_device_get_physdev_uid;
     kernel_device_class->get_physdev_vid           = kernel_device_get_physdev_vid;
     kernel_device_class->get_physdev_pid           = kernel_device_get_physdev_pid;
+    kernel_device_class->get_physdev_subsystem_vid = kernel_device_get_physdev_subsystem_vid;
     kernel_device_class->get_physdev_revision      = kernel_device_get_physdev_revision;
     kernel_device_class->get_physdev_sysfs_path    = kernel_device_get_physdev_sysfs_path;
     kernel_device_class->get_physdev_subsystem     = kernel_device_get_physdev_subsystem;

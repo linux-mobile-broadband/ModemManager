@@ -106,6 +106,18 @@ mm_kernel_device_get_physdev_vid (MMKernelDevice *self)
 }
 
 guint16
+mm_kernel_device_get_physdev_subsystem_vid (MMKernelDevice *self)
+{
+    /* when a lower device is available, physdev info taken from it */
+    if (self->priv->lower_device)
+        return mm_kernel_device_get_physdev_subsystem_vid (self->priv->lower_device);
+
+    return (MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_subsystem_vid ?
+            MM_KERNEL_DEVICE_GET_CLASS (self)->get_physdev_subsystem_vid (self) :
+            0);
+}
+
+guint16
 mm_kernel_device_get_physdev_pid (MMKernelDevice *self)
 {
     /* when a lower device is available, physdev info taken from it */

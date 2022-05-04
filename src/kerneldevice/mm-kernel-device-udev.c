@@ -48,6 +48,7 @@ struct _MMKernelDeviceUdevPrivate {
     GUdevDevice *physdev;
     guint16      vendor;
     guint16      product;
+    guint16      subsystem_vendor;
     guint16      revision;
     gchar       *driver;
 
@@ -186,6 +187,7 @@ preload_contents_pci (MMKernelDeviceUdev *self)
         if (!self->priv->physdev && (g_strcmp0 (g_udev_device_get_subsystem (iter), "pci") == 0)) {
             self->priv->vendor = udev_device_get_sysfs_attr_as_hex (iter, "vendor");
             self->priv->product = udev_device_get_sysfs_attr_as_hex (iter, "device");
+            self->priv->subsystem_vendor = udev_device_get_sysfs_attr_as_hex (iter, "subsystem_vendor");
             self->priv->revision = udev_device_get_sysfs_attr_as_hex (iter, "revision");
             self->priv->physdev = g_object_ref (iter);
             /* stop traversing as soon as the physical device is found */
@@ -296,6 +298,8 @@ preload_contents (MMKernelDeviceUdev *self)
         mm_obj_dbg (self, "  vendor: %04x", self->priv->vendor);
     if (self->priv->product)
         mm_obj_dbg (self, "  product: %04x", self->priv->product);
+    if (self->priv->subsystem_vendor)
+        mm_obj_dbg (self, "  subsystem vendor: %04x", self->priv->subsystem_vendor);
     if (self->priv->revision)
         mm_obj_dbg (self, "  revision: %04x", self->priv->revision);
 }
@@ -405,6 +409,12 @@ static guint16
 kernel_device_get_physdev_pid (MMKernelDevice *self)
 {
     return MM_KERNEL_DEVICE_UDEV (self)->priv->product;
+}
+
+static guint16
+kernel_device_get_physdev_subsystem_vid (MMKernelDevice *self)
+{
+    return MM_KERNEL_DEVICE_UDEV (self)->priv->subsystem_vendor;
 }
 
 static guint16
@@ -805,6 +815,7 @@ mm_kernel_device_udev_class_init (MMKernelDeviceUdevClass *klass)
     kernel_device_class->get_physdev_uid           = kernel_device_get_physdev_uid;
     kernel_device_class->get_physdev_vid           = kernel_device_get_physdev_vid;
     kernel_device_class->get_physdev_pid           = kernel_device_get_physdev_pid;
+    kernel_device_class->get_physdev_subsystem_vid = kernel_device_get_physdev_subsystem_vid;
     kernel_device_class->get_physdev_revision      = kernel_device_get_physdev_revision;
     kernel_device_class->get_physdev_sysfs_path    = kernel_device_get_physdev_sysfs_path;
     kernel_device_class->get_physdev_subsystem     = kernel_device_get_physdev_subsystem;
