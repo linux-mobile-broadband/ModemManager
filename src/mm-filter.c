@@ -41,6 +41,7 @@ struct _MMFilterPrivate {
     GList        *plugin_allowlist_tags;
     GArray       *plugin_allowlist_vendor_ids;
     GArray       *plugin_allowlist_product_ids;
+    GArray       *plugin_allowlist_subsystem_vendor_ids;
 };
 
 /*****************************************************************************/
@@ -101,6 +102,31 @@ mm_filter_register_plugin_allowlist_product_id (MMFilter *self,
     mm_obj_dbg (self, "registered plugin allowlist product id: %04x:%04x", vid, pid);
 }
 
+void
+mm_filter_register_plugin_allowlist_subsystem_vendor_id (MMFilter *self,
+                                                         guint16   vid,
+                                                         guint16   subsystem_vid)
+{
+    mm_uint16_pair new_item;
+    guint          i;
+
+    if (!self->priv->plugin_allowlist_subsystem_vendor_ids)
+        self->priv->plugin_allowlist_subsystem_vendor_ids = g_array_sized_new (FALSE, FALSE, sizeof (mm_uint16_pair), 10);
+
+    for (i = 0; i < self->priv->plugin_allowlist_subsystem_vendor_ids->len; i++) {
+        mm_uint16_pair *item;
+
+        item = &g_array_index (self->priv->plugin_allowlist_subsystem_vendor_ids, mm_uint16_pair, i);
+        if (item->l == vid && item->r == subsystem_vid)
+            return;
+    }
+
+    new_item.l = vid;
+    new_item.r = subsystem_vid;
+    g_array_append_val (self->priv->plugin_allowlist_subsystem_vendor_ids, new_item);
+    mm_obj_dbg (self, "registered plugin allowlist subsystem vendor id: %04x:%04x", vid, subsystem_vid);
+}
+
 /*****************************************************************************/
 
 gboolean
@@ -136,6 +162,7 @@ mm_filter_port (MMFilter        *self,
         GList   *l;
         guint16  vid = 0;
         guint16  pid = 0;
+        guint16  subsystem_vid = 0;
 
         for (l = self->priv->plugin_allowlist_tags; l; l = g_list_next (l)) {
             if (mm_kernel_device_get_global_property_as_boolean (port, (const gchar *)(l->data)) ||
@@ -146,8 +173,10 @@ mm_filter_port (MMFilter        *self,
         }
 
         vid = mm_kernel_device_get_physdev_vid (port);
-        if (vid)
+        if (vid) {
             pid = mm_kernel_device_get_physdev_pid (port);
+            subsystem_vid = mm_kernel_device_get_physdev_subsystem_vid (port);
+        }
 
         if (vid && pid && self->priv->plugin_allowlist_product_ids) {
             guint i;
@@ -172,6 +201,20 @@ mm_filter_port (MMFilter        *self,
                 item = g_array_index (self->priv->plugin_allowlist_vendor_ids, guint16, i);
                 if (item == vid) {
                     mm_obj_dbg (self, "(%s/%s) port allowed: device is allowlisted by plugin (vid)", subsystem, name);
+                    return TRUE;
+                }
+            }
+        }
+
+        if (vid && subsystem_vid && self->priv->plugin_allowlist_subsystem_vendor_ids) {
+            guint i;
+
+            for (i = 0; i < self->priv->plugin_allowlist_subsystem_vendor_ids->len; i++) {
+                mm_uint16_pair *item;
+
+                item = &g_array_index (self->priv->plugin_allowlist_subsystem_vendor_ids, mm_uint16_pair, i);
+                if (item->l == vid && item->r == subsystem_vid) {
+                    mm_obj_dbg (self, "(%s/%s) port allowed: device is allowlisted by plugin (vid/subsystem vid)", subsystem, name);
                     return TRUE;
                 }
             }
@@ -517,6 +560,7 @@ finalize (GObject *object)
 
     g_clear_pointer (&self->priv->plugin_allowlist_vendor_ids, g_array_unref);
     g_clear_pointer (&self->priv->plugin_allowlist_product_ids, g_array_unref);
+    g_clear_pointer (&self->priv->plugin_allowlist_subsystem_vendor_ids, g_array_unref);
     g_list_free_full (self->priv->plugin_allowlist_tags, g_free);
 
     G_OBJECT_CLASS (mm_filter_parent_class)->finalize (object);

@@ -1666,6 +1666,21 @@ register_plugin_allowlist_product_ids (MMPluginManager *self,
         mm_filter_register_plugin_allowlist_product_id (self->priv->filter, product_ids[i].l, product_ids[i].r);
 }
 
+static void
+register_plugin_allowlist_subsystem_vendor_ids (MMPluginManager *self,
+                                                MMPlugin        *plugin)
+{
+    const mm_uint16_pair *subsystem_vendor_ids;
+    guint                 i;
+
+    if (!mm_filter_check_rule_enabled (self->priv->filter, MM_FILTER_RULE_PLUGIN_ALLOWLIST))
+        return;
+
+    subsystem_vendor_ids = mm_plugin_get_allowed_subsystem_vendor_ids (plugin);
+    for (i = 0; subsystem_vendor_ids && subsystem_vendor_ids[i].l; i++)
+        mm_filter_register_plugin_allowlist_subsystem_vendor_id (self->priv->filter, subsystem_vendor_ids[i].l, subsystem_vendor_ids[i].r);
+}
+
 static MMPlugin *
 load_plugin (MMPluginManager *self,
              const gchar     *path)
@@ -1869,9 +1884,10 @@ load_plugins (MMPluginManager  *self,
         }
 
         /* Register plugin allowlist rules in filter, if any */
-        register_plugin_allowlist_tags        (self, plugin);
-        register_plugin_allowlist_vendor_ids  (self, plugin);
-        register_plugin_allowlist_product_ids (self, plugin);
+        register_plugin_allowlist_tags                 (self, plugin);
+        register_plugin_allowlist_vendor_ids           (self, plugin);
+        register_plugin_allowlist_product_ids          (self, plugin);
+        register_plugin_allowlist_subsystem_vendor_ids (self, plugin);
     }
 
     /* Check the generic plugin once all looped */
