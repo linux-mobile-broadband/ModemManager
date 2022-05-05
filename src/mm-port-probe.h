@@ -117,6 +117,7 @@ void     mm_port_probe_run        (MMPortProbe *self,
                                    gboolean at_send_lf,
                                    const MMPortProbeAtCommand *at_custom_probe,
                                    const MMAsyncMethod *at_custom_init,
+                                   gboolean qcdm_required,
                                    GCancellable *cancellable,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);

@@ -91,6 +91,7 @@ struct _MMPluginPrivate {
     gboolean at;
     gboolean single_at;
     gboolean qcdm;
+    gboolean qcdm_required;
     gboolean qmi;
     gboolean mbim;
     gboolean icera_probe;
@@ -124,6 +125,7 @@ enum {
     PROP_ALLOWED_AT,
     PROP_ALLOWED_SINGLE_AT,
     PROP_ALLOWED_QCDM,
+    PROP_REQUIRED_QCDM,
     PROP_ALLOWED_QMI,
     PROP_ALLOWED_MBIM,
     PROP_ICERA_PROBE,
@@ -802,7 +804,7 @@ mm_plugin_supports_port (MMPlugin            *self,
             probe_run_flags |= MM_PORT_PROBE_AT;
         else if (self->priv->single_at)
             probe_run_flags |= MM_PORT_PROBE_AT;
-        if (self->priv->qcdm)
+        if (self->priv->qcdm || self->priv->qcdm_required)
             probe_run_flags |= MM_PORT_PROBE_QCDM;
     } else if (g_str_equal (mm_kernel_device_get_subsystem (port), "usbmisc")) {
         if (self->priv->qmi && !g_strcmp0 (mm_kernel_device_get_driver (port), "qmi_wwan"))
@@ -821,7 +823,7 @@ mm_plugin_supports_port (MMPlugin            *self,
             probe_run_flags |= MM_PORT_PROBE_MBIM;
         if (self->priv->qmi)
             probe_run_flags |= MM_PORT_PROBE_QMI;
-        if (self->priv->qcdm)
+        if (self->priv->qcdm || self->priv->qcdm_required)
             probe_run_flags |= MM_PORT_PROBE_QCDM;
         if (self->priv->at)
             probe_run_flags |= MM_PORT_PROBE_AT;
@@ -893,6 +895,7 @@ mm_plugin_supports_port (MMPlugin            *self,
                        self->priv->send_lf,
                        self->priv->custom_at_probe,
                        self->priv->custom_init,
+                       self->priv->qcdm_required,
                        cancellable,
                        (GAsyncReadyCallback) port_probe_run_ready,
                        task);
@@ -1238,6 +1241,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->qcdm = g_value_get_boolean (value);
         break;
+    case PROP_REQUIRED_QCDM:
+        /* Construct only */
+        self->priv->qcdm_required = g_value_get_boolean (value);
+        break;
     case PROP_ALLOWED_QMI:
         /* Construct only */
         self->priv->qmi = g_value_get_boolean (value);
@@ -1349,6 +1356,9 @@ get_property (GObject *object,
         break;
     case PROP_ALLOWED_QCDM:
         g_value_set_boolean (value, self->priv->qcdm);
+        break;
+    case PROP_REQUIRED_QCDM:
+        g_value_set_boolean (value, self->priv->qcdm_required);
         break;
     case PROP_ALLOWED_QMI:
         g_value_set_boolean (value, self->priv->qmi);
@@ -1580,6 +1590,14 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boolean (MM_PLUGIN_ALLOWED_QCDM,
                                "Allowed QCDM",
                                "Whether QCDM ports are allowed in this plugin",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_REQUIRED_QCDM,
+         g_param_spec_boolean (MM_PLUGIN_REQUIRED_QCDM,
+                               "Required QCDM",
+                               "Whether QCDM ports are required in this plugin",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
