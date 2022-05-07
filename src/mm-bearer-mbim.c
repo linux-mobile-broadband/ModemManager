@@ -614,13 +614,14 @@ connect_set_ready (MbimDevice   *device,
     ctx  = g_task_get_task_data (task);
 
     response = mbim_device_command_finish (device, res, &error);
-    if (!response ||
-        (!mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error) &&
-         (error->code != MBIM_STATUS_ERROR_FAILURE))) {
+    if (!response) {
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
+
+    /* always parse, because on failure we also check the NwError */
+    mbim_message_response_get_result (response, MBIM_MESSAGE_TYPE_COMMAND_DONE, &error);
 
     if (mbim_device_check_ms_mbimex_version (device, 3, 0)) {
         if (!mbim_message_ms_basic_connect_v3_connect_response_parse (
