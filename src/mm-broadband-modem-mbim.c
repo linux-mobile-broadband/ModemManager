@@ -176,22 +176,17 @@ struct _MMBroadbandModemMbimPrivate {
 /*****************************************************************************/
 
 static gboolean
-peek_device (gpointer self,
-             MbimDevice **o_device,
-             GAsyncReadyCallback callback,
-             gpointer user_data)
+peek_device (gpointer              self,
+             MbimDevice          **o_device,
+             GAsyncReadyCallback   callback,
+             gpointer              user_data)
 {
     MMPortMbim *port;
 
     port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
     if (!port) {
-        g_task_report_new_error (self,
-                                 callback,
-                                 user_data,
-                                 peek_device,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "Couldn't peek MBIM port");
+        g_task_report_new_error (self, callback, user_data, peek_device,
+                                 MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't peek MBIM port");
         return FALSE;
     }
 
@@ -8602,9 +8597,9 @@ query_sys_caps_ready (MbimDevice   *device,
 static void
 load_sim_slots_mbim (GTask *task)
 {
-    MMBroadbandModemMbim *self;
-    MbimDevice           *device;
-    MbimMessage          *message;
+    MMBroadbandModemMbim   *self;
+    MbimDevice             *device;
+    g_autoptr(MbimMessage)  message = NULL;
 
     self = g_task_get_source_object (task);
 
@@ -8618,7 +8613,6 @@ load_sim_slots_mbim (GTask *task)
                          NULL,
                          (GAsyncReadyCallback)query_sys_caps_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
@@ -8725,7 +8719,6 @@ set_device_slot_mappings_ready (MbimDevice   *device,
     g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND,
                                  "Can't find executor index '%u'", self->priv->executor_index);
     g_object_unref (task);
-    return;
 }
 
 static void
@@ -8793,9 +8786,9 @@ before_set_query_device_slot_mappings_ready (MbimDevice   *device,
 static void
 set_primary_sim_slot_mbim (GTask *task)
 {
-    MMBroadbandModemMbim *self;
-    MbimDevice           *device;
-    MbimMessage          *message;
+    MMBroadbandModemMbim   *self;
+    MbimDevice             *device;
+    g_autoptr(MbimMessage)  message = NULL;
 
     self = g_task_get_source_object (task);
 
@@ -8809,7 +8802,6 @@ set_primary_sim_slot_mbim (GTask *task)
                          NULL,
                          (GAsyncReadyCallback)before_set_query_device_slot_mappings_ready,
                          task);
-    mbim_message_unref (message);
 }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
