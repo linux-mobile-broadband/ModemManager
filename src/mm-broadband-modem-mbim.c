@@ -180,6 +180,25 @@ peek_device (gpointer              self,
     return TRUE;
 }
 
+static gboolean
+peek_device_in_task (gpointer     self,
+                     MbimDevice **o_device,
+                     GTask       *task)
+
+{
+    MMPortMbim *port;
+
+    port = mm_broadband_modem_mbim_peek_port_mbim (MM_BROADBAND_MODEM_MBIM (self));
+    if (!port) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Couldn't peek MBIM port");
+        g_object_unref (task);
+        return FALSE;
+    }
+
+    *o_device = mm_port_mbim_peek_device (port);
+    return TRUE;
+}
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
 
 static QmiClient *
@@ -6515,7 +6534,7 @@ load_sim_slots_mbim (GTask *task)
 
     self = g_task_get_source_object (task);
 
-    if (!peek_device (self, &device, NULL, NULL))
+    if (!peek_device_in_task (self, &device, task))
         return;
 
     message = mbim_message_ms_basic_connect_extensions_sys_caps_query_new (NULL);
@@ -6704,7 +6723,7 @@ set_primary_sim_slot_mbim (GTask *task)
 
     self = g_task_get_source_object (task);
 
-    if (!peek_device (self, &device, NULL, NULL))
+    if (!peek_device_in_task (self, &device, task))
         return;
 
     message = mbim_message_ms_basic_connect_extensions_device_slot_mappings_query_new (NULL);
