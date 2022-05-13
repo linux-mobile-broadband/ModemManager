@@ -6609,7 +6609,7 @@ set_device_slot_mappings_ready (MbimDevice   *device,
 {
     MMBroadbandModemMbim    *self;
     g_autoptr(MbimMessage)   response = NULL;
-    g_autoptr(GError)        error = NULL;
+    GError                  *error = NULL;
     guint32                  map_count = 0;
     g_autoptr(MbimSlotArray) slot_mappings = NULL;
     guint                    i;
