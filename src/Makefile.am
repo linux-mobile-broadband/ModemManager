@@ -399,7 +399,17 @@ nodist_ModemManager_SOURCES = $(DAEMON_ENUMS_GENERATED)
 
 # Additional suspend/resume support via systemd
 if WITH_SYSTEMD_SUSPEND_RESUME
-ModemManager_SOURCES += mm-sleep-monitor.h mm-sleep-monitor.c
+ModemManager_SOURCES += \
+	mm-sleep-monitor.h \
+	mm-sleep-monitor-systemd.c \
+	$(NULL)
+endif
+
+if WITH_POWERD_SUSPEND_RESUME
+ModemManager_SOURCES += \
+	mm-sleep-monitor.h \
+	mm-sleep-monitor-powerd.c \
+	$(NULL)
 endif
 
 # Additional QMI support in ModemManager

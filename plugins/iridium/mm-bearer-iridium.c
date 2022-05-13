@@ -259,7 +259,7 @@ mm_bearer_iridium_class_init (MMBearerIridiumClass *klass)
     base_bearer_class->connect_finish = connect_finish;
     base_bearer_class->load_connection_status = NULL;
     base_bearer_class->load_connection_status_finish = NULL;
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     base_bearer_class->reload_connection_status = NULL;
     base_bearer_class->reload_connection_status_finish = NULL;
 #endif

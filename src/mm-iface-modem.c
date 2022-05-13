@@ -4472,7 +4472,7 @@ mm_iface_modem_enable (MMIfaceModem *self,
 /*****************************************************************************/
 /* MODEM SYNCHRONIZATION */
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 typedef struct _SyncingContext SyncingContext;
 static void interface_syncing_step (GTask *task);

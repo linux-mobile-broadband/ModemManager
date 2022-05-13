@@ -728,7 +728,7 @@ mm_iface_modem_time_enable (MMIfaceModemTime *self,
 
 /*****************************************************************************/
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 typedef struct _SyncingContext SyncingContext;
 static void interface_syncing_step (GTask *task);

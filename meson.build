@@ -197,6 +197,9 @@ endif
 
 # Suspend/resume support
 enable_systemd_suspend_resume = get_option('systemd_suspend_resume')
+enable_powerd_suspend_resume = get_option('powerd_suspend_resume')
+assert(not (enable_systemd_suspend_resume and enable_powerd_suspend_resume), 'systemd_suspend_resume and powerd_suspend_resume are not supported at the same time')
+
 # systemd journal support
 enable_systemd_journal = get_option('systemd_journal')
 
@@ -213,7 +216,7 @@ if enable_systemd_suspend_resume or enable_systemd_journal
     endif
   endif
 endif
-config_h.set('WITH_SYSTEMD_SUSPEND_RESUME', enable_systemd_suspend_resume)
+config_h.set('WITH_SUSPEND_RESUME', enable_systemd_suspend_resume or enable_powerd_suspend_resume)
 config_h.set('WITH_SYSTEMD_JOURNAL', enable_systemd_journal)
 
 # PolicyKit
@@ -419,6 +422,7 @@ summary({
   'qmi': enable_qmi,
   'qrtr': enable_qrtr,
   'systemd suspend/resume': enable_systemd_suspend_resume,
+  'powerd suspend/resume': enable_powerd_suspend_resume,
   'systemd journal': enable_systemd_journal,
   'at command via dbus': enable_at_command_via_dbus,
 }, section: 'Features')

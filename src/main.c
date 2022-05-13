@@ -31,7 +31,7 @@
 #include "mm-base-manager.h"
 #include "mm-context.h"
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 # include "mm-sleep-monitor.h"
 #endif
 
@@ -56,7 +56,7 @@ quit_cb (gpointer user_data)
     return FALSE;
 }
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 static void
 sleeping_cb (MMSleepMonitor *sleep_monitor)
@@ -193,7 +193,7 @@ main (int argc, char *argv[])
                               name_lost_cb,
                               NULL,
                               NULL);
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     {
         MMSleepMonitor *sleep_monitor;
 

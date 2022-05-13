@@ -629,7 +629,7 @@ mm_base_modem_wait_link_port (MMBaseModem         *self,
 
 /******************************************************************************/
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 gboolean
 mm_base_modem_sync_finish (MMBaseModem   *self,
@@ -675,7 +675,7 @@ mm_base_modem_sync (MMBaseModem         *self,
                                           task);
 }
 
-#endif /* WITH_SYSTEMD_SUSPEND_RESUME */
+#endif /* WITH_SUSPEND_RESUME */
 
 /******************************************************************************/
 

@@ -231,7 +231,7 @@ static gchar    *test_plugin_dir;
 #if defined WITH_UDEV
 static gboolean  test_no_udev;
 #endif
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 static gboolean  test_no_suspend_resume;
 static gboolean  test_quick_suspend_resume;
 #endif
@@ -266,7 +266,7 @@ static const GOptionEntry test_entries[] = {
         NULL
     },
 #endif
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     {
         "test-no-suspend-resume", 0, 0, G_OPTION_ARG_NONE, &test_no_suspend_resume,
         "Disable suspend/resume support at runtime even if available",
@@ -340,7 +340,7 @@ mm_context_get_test_no_udev (void)
 }
 #endif
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 gboolean
 mm_context_get_test_no_suspend_resume (void)
 {

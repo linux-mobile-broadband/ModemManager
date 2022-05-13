@@ -262,6 +262,10 @@ AC_ARG_WITH(systemd-suspend-resume,
             AS_HELP_STRING([--with-systemd-suspend-resume=no|yes],
                            [Enable systemd suspend/resume support [[default=auto]]]),,
             [with_systemd_suspend_resume=auto])
+AC_ARG_WITH(powerd-suspend-resume,
+            AS_HELP_STRING([--with-powerd-suspend-resume=no|yes],
+                           [Enable powerd suspend/resume support [[default=no]]]),,
+            [with_powerd_suspend_resume=no])
 
 if test "x$with_systemd_suspend_resume" = "xauto"; then
     if test "x$have_libsystemd" = "xyes" || test "x$have_libsystemd_login" = "xyes" || test "x$have_elogind" = "xyes"; then
@@ -275,15 +279,23 @@ case $with_systemd_suspend_resume in
     yes)
         if test "x$have_libsystemd" = "xno" && test "x$have_libsystemd_login" = "xno" && test "x$have_elogind" = "xno"; then
 		    AC_MSG_WARN(libsystemd, libsystemd-login or elogind must be available at runtime for suspend/resume support)
-	    fi
-        AC_DEFINE(WITH_SYSTEMD_SUSPEND_RESUME, 1, [Define if you have systemd suspend-resume support])
+        fi
         ;;
     *)
         with_systemd_suspend_resume=no
         ;;
 esac
 
+if test "x$with_systemd_suspend_resume" = "xyes" && test "x$with_powerd_suspend_resume" = "xyes"; then
+    AC_MSG_ERROR(--with_systemd_suspend_resume and --with_powerd_suspend_resume should not be selected at the same time)
+fi
+
+if test "x$with_systemd_suspend_resume" = "xyes" || test "x$with_powerd_suspend_resume" = "xyes"; then
+    AC_DEFINE(WITH_SUSPEND_RESUME, 1, [Define if you have systemd or powerd suspend-resume support])
+fi
+
 AM_CONDITIONAL(WITH_SYSTEMD_SUSPEND_RESUME, test "x$with_systemd_suspend_resume" = "xyes")
+AM_CONDITIONAL(WITH_POWERD_SUSPEND_RESUME, test "x$with_powerd_suspend_resume" = "xyes")
 
 dnl-----------------------------------------------------------------------------
 dnl systemd journal support

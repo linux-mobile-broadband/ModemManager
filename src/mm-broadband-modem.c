@@ -12064,7 +12064,7 @@ enable (MMBaseModem *self,
 }
 /*****************************************************************************/
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 typedef enum {
     SYNCING_STEP_FIRST,
@@ -13640,7 +13640,7 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     base_modem_class->disable = disable;
     base_modem_class->disable_finish = disable_finish;
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     base_modem_class->sync = synchronize;
     base_modem_class->sync_finish = synchronize_finish;
 #endif

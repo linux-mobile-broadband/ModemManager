@@ -277,7 +277,7 @@ mm_bearer_list_disconnect_all_bearers (MMBearerList *self,
 
 /*****************************************************************************/
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 typedef struct {
     GList        *pending;

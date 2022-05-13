@@ -859,7 +859,7 @@ mm_broadband_bearer_icera_class_init (MMBroadbandBearerIceraClass *klass)
     base_bearer_class->report_connection_status = report_connection_status;
     base_bearer_class->load_connection_status = NULL;
     base_bearer_class->load_connection_status_finish = NULL;
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     base_bearer_class->reload_connection_status = NULL;
     base_bearer_class->reload_connection_status_finish = NULL;
 #endif

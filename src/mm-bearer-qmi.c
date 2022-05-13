@@ -2680,7 +2680,7 @@ mm_bearer_qmi_class_init (MMBearerQmiClass *klass)
     base_bearer_class->reload_stats_finish = reload_stats_finish;
     base_bearer_class->load_connection_status = load_connection_status;
     base_bearer_class->load_connection_status_finish = load_connection_status_finish;
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     base_bearer_class->reload_connection_status = reload_connection_status;
     base_bearer_class->reload_connection_status_finish = reload_connection_status_finish;
 #endif

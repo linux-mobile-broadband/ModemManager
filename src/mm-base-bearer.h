@@ -149,7 +149,7 @@ struct _MMBaseBearerClass {
                                                                 GAsyncResult *res,
                                                                 GError **error);
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
     /* Reload connection status:
      *
@@ -226,7 +226,7 @@ void mm_base_bearer_report_speeds (MMBaseBearer *self,
                                    guint64       uplink_speed,
                                    guint64       downlink_speed);
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 /* Sync Broadband Bearer (async) */
 void     mm_base_bearer_sync        (MMBaseBearer *self,

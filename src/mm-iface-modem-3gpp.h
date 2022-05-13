@@ -302,7 +302,7 @@ gboolean mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp *self,
                                              GAsyncResult *res,
                                              GError **error);
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 /* Sync 3GPP interface (async) */
 void     mm_iface_modem_3gpp_sync           (MMIfaceModem3gpp *self,

@@ -109,7 +109,7 @@ struct _MMBaseModemClass {
                                 GAsyncResult *res,
                                 GError **error);
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     /* Modem synchronization.
      * When resuming in quick suspend/resume mode,
      * this method triggers a synchronization of all modem interfaces */
@@ -245,7 +245,7 @@ gboolean mm_base_modem_disable_finish (MMBaseModem *self,
                                        GAsyncResult *res,
                                        GError **error);
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 void     mm_base_modem_sync           (MMBaseModem *self,
                                        GAsyncReadyCallback callback,

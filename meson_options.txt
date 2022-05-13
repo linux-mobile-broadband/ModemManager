@@ -7,7 +7,8 @@ option('udevdir', type: 'string', value: '', description: 'udev base directory')
 option('dbus_policy_dir', type: 'string', value: '', description: 'd-bus system policy directory')
 
 option('systemdsystemunitdir', type: 'string', value: '', description: 'systemd system units directory')
-option('systemd_suspend_resume', type: 'boolean', value: true, description: 'enable suspend/resume support')
+option('systemd_suspend_resume', type: 'boolean', value: true, description: 'enable suspend/resume support with systemd')
+option('powerd_suspend_resume', type: 'boolean', value: false, description: 'enable suspend/resume support with powerd')
 option('systemd_journal', type: 'boolean', value: true, description: 'enable systemd journal support')
 
 option('polkit', type: 'combo', choices: ['strict', 'permissive', 'no'], value: 'strict', description: 'User auth-polkit configuration option.')

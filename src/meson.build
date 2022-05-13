@@ -266,12 +266,17 @@ endif
 
 # Additional suspend/resume support via systemd
 if enable_systemd_suspend_resume
-  sources += files('mm-sleep-monitor.c')
+  sources += files('mm-sleep-monitor-systemd.c')
 
   deps += [
     gio_unix_dep,
     libsystemd_dep,
   ]
+endif
+
+#suspend/resume support via powerd
+if enable_powerd_suspend_resume
+  sources += files('mm-sleep-monitor-powerd.c')
 endif
 
 if enable_polkit

@@ -727,7 +727,7 @@ mm_base_manager_num_modems (MMBaseManager *self)
 /*****************************************************************************/
 /* Quick resume synchronization */
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 static void
 base_modem_sync_ready (MMBaseModem  *self,

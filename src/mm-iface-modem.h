@@ -481,7 +481,7 @@ void mm_iface_modem_shutdown (MMIfaceModem *self);
 gboolean mm_iface_modem_abort_invocation_if_state_not_reached (MMIfaceModem          *self,
                                                                GDBusMethodInvocation *invocation,
                                                                MMModemState           minimum_required);
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 /* Sync Modem interface (async) */
 void     mm_iface_modem_sync           (MMIfaceModem *self,

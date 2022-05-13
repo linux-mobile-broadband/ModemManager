@@ -1709,7 +1709,7 @@ report_connection_status (MMBaseBearer             *self,
 
 /*****************************************************************************/
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 static MMBearerConnectionStatus
 reload_connection_status_finish (MMBaseBearer  *self,
@@ -1845,7 +1845,7 @@ reload_connection_status (MMBaseBearer        *self,
                          task);
 }
 
-#endif /* WITH_SYSTEMD_SUSPEND_RESUME */
+#endif /* WITH_SUSPEND_RESUME */
 
 /*****************************************************************************/
 
@@ -1906,7 +1906,7 @@ mm_bearer_mbim_class_init (MMBearerMbimClass *klass)
     base_bearer_class->reload_stats_finish = reload_stats_finish;
     base_bearer_class->load_connection_status = NULL;
     base_bearer_class->load_connection_status_finish = NULL;
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
     base_bearer_class->reload_connection_status = reload_connection_status;
     base_bearer_class->reload_connection_status_finish = reload_connection_status_finish;
 #endif

@@ -86,7 +86,7 @@ gboolean mm_bearer_list_disconnect_all_bearers_finish (MMBearerList *self,
                                                        GAsyncResult *res,
                                                        GError **error);
 
-#if defined WITH_SYSTEMD_SUSPEND_RESUME
+#if defined WITH_SUSPEND_RESUME
 
 void     mm_bearer_list_sync_all_bearers        (MMBearerList *self,
                                                  GAsyncReadyCallback callback,
