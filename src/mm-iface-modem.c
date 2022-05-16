@@ -42,10 +42,8 @@
 #define SIGNAL_CHECK_INITIAL_TIMEOUT_SEC  3
 #define SIGNAL_CHECK_TIMEOUT_SEC          30
 
-#define SIGNAL_CHECK_CONTEXT_TAG          "signal-check-context-tag"
 #define RESTART_INITIALIZE_IDLE_TAG       "restart-initialize-tag"
 
-static GQuark signal_check_context_quark;
 static GQuark restart_initialize_idle_quark;
 
 /*****************************************************************************/
@@ -60,6 +58,20 @@ typedef struct {
 
     /* Signal quality recent flag handling */
     guint signal_quality_recent_timeout_source;
+
+    /* If both signal and access tech polling are either unsupported
+     * or disabled, we'll automatically stop polling */
+    gboolean signal_quality_polling_supported;
+    gboolean signal_quality_polling_disabled;
+    gboolean access_technology_polling_supported;
+    gboolean access_technology_polling_disabled;
+
+    /* Signal quality and access tech polling support */
+    gboolean signal_check_enabled;
+    guint    signal_check_timeout_source;
+    guint    signal_check_initial_retries;
+    gboolean signal_check_initial_done;
+    gboolean signal_check_running;
 } Private;
 
 static void
@@ -69,6 +81,8 @@ private_free (Private *priv)
         g_array_unref (priv->subsystem_states);
     if (priv->signal_quality_recent_timeout_source)
         g_source_remove (priv->signal_quality_recent_timeout_source);
+    if (priv->signal_check_timeout_source)
+        g_source_remove (priv->signal_check_timeout_source);
     g_slice_free (Private, priv);
 }
 
@@ -83,6 +97,25 @@ get_private (MMIfaceModem *self)
     priv = g_object_get_qdata (G_OBJECT (self), private_quark);
     if (!priv) {
         priv = g_slice_new0 (Private);
+
+        /* Initially assume supported if load_access_technologies() is
+         * implemented. If the plugin reports an UNSUPPORTED error we'll clear
+         * this flag and no longer poll. */
+        priv->access_technology_polling_supported = (MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies &&
+                                                     MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies_finish);
+
+        /* Initially assume supported if load_signal_quality() is
+         * implemented. If the plugin reports an UNSUPPORTED error we'll clear
+         * this flag and no longer poll. */
+        priv->signal_quality_polling_supported = (MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality &&
+                                                  MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish);
+
+        /* Get plugin-specific setup for the polling logic */
+        g_object_get (self,
+                      MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      &priv->signal_quality_polling_disabled,
+                      MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, &priv->access_technology_polling_disabled,
+                      NULL);
+
         g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
     }
 
@@ -1530,7 +1563,6 @@ mm_iface_modem_update_signal_quality (MMIfaceModem *self,
 /* Signal info (quality and access technology) polling */
 
 typedef enum {
-    SIGNAL_CHECK_STEP_NONE,
     SIGNAL_CHECK_STEP_FIRST,
     SIGNAL_CHECK_STEP_SIGNAL_QUALITY,
     SIGNAL_CHECK_STEP_ACCESS_TECHNOLOGIES,
@@ -1538,92 +1570,30 @@ typedef enum {
 } SignalCheckStep;
 
 typedef struct {
-    gboolean enabled;
-    guint    timeout_source;
-
-    /* We first attempt an initial loading, and once it's done we
-     * setup polling */
-    guint    initial_retries;
-    gboolean initial_check_done;
-
     /* Values polled in this iteration */
     guint                   signal_quality;
     MMModemAccessTechnology access_technologies;
     guint                   access_technologies_mask;
-
-    /* If both signal and access tech polling are either unsupported
-     * or disabled, we'll automatically stop polling */
-    gboolean signal_quality_polling_supported;
-    gboolean signal_quality_polling_disabled;
-    gboolean access_technology_polling_supported;
-    gboolean access_technology_polling_disabled;
-
     /* Steps triggered when polling active */
     SignalCheckStep running_step;
 } SignalCheckContext;
 
-static void
-signal_check_context_free (SignalCheckContext *ctx)
-{
-    if (ctx->timeout_source)
-        g_source_remove (ctx->timeout_source);
-    g_slice_free (SignalCheckContext, ctx);
-}
-
-static SignalCheckContext *
-get_signal_check_context (MMIfaceModem *self)
-{
-    SignalCheckContext *ctx;
-
-    if (G_UNLIKELY (!signal_check_context_quark))
-        signal_check_context_quark = (g_quark_from_static_string (
-                                          SIGNAL_CHECK_CONTEXT_TAG));
-
-    ctx = g_object_get_qdata (G_OBJECT (self), signal_check_context_quark);
-    if (!ctx) {
-        /* Create context and attach it to the object */
-        ctx = g_slice_new0 (SignalCheckContext);
-        ctx->running_step = SIGNAL_CHECK_STEP_NONE;
-
-        /* Initially assume supported if load_access_technologies() is
-         * implemented. If the plugin reports an UNSUPPORTED error we'll clear
-         * this flag and no longer poll. */
-        ctx->access_technology_polling_supported = (MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies &&
-                                                    MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies_finish);
-
-        /* Initially assume supported if load_signal_quality() is
-         * implemented. If the plugin reports an UNSUPPORTED error we'll clear
-         * this flag and no longer poll. */
-        ctx->signal_quality_polling_supported = (MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality &&
-                                                 MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish);
-
-        /* Get plugin-specific setup for the polling logic */
-        g_object_get (self,
-                      MM_IFACE_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,      &ctx->signal_quality_polling_disabled,
-                      MM_IFACE_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED, &ctx->access_technology_polling_disabled,
-                      NULL);
-
-        g_object_set_qdata_full (G_OBJECT (self), signal_check_context_quark,
-                                 ctx, (GDestroyNotify) signal_check_context_free);
-    }
-
-    g_assert (ctx);
-    return ctx;
-}
-
 static void     periodic_signal_check_disable (MMIfaceModem *self,
                                                gboolean      clear);
-static gboolean periodic_signal_check_cb      (MMIfaceModem *self);
-static void     periodic_signal_check_step    (MMIfaceModem *self);
+static gboolean periodic_signal_check_run     (MMIfaceModem *self);
+static void     periodic_signal_check_step    (GTask        *task);
 
 static void
-access_technologies_check_ready (MMIfaceModem *self,
-                                 GAsyncResult *res)
+load_access_technologies_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GTask        *task)
 {
-    GError             *error = NULL;
+    g_autoptr(GError)   error = NULL;
+    Private            *priv;
     SignalCheckContext *ctx;
 
-    ctx = get_signal_check_context (self);
+    priv = get_private (self);
+    ctx  = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies_finish (
             self,
@@ -1634,95 +1604,96 @@ access_technologies_check_ready (MMIfaceModem *self,
         /* Did the plugin report that polling access technology is unsupported? */
         if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
             mm_obj_dbg (self, "polling to refresh access technologies is unsupported");
-            ctx->access_technology_polling_supported = FALSE;
+            priv->access_technology_polling_supported = FALSE;
         }
         /* Ignore logging any message if the error is in 'in-progress' */
         else if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS))
             mm_obj_dbg (self, "couldn't refresh access technologies: %s", error->message);
-        g_error_free (error);
     }
     /* We may have been disabled while this command was running. */
-    else if (ctx->enabled)
+    else if (priv->signal_check_enabled)
         mm_iface_modem_update_access_technologies (self, ctx->access_technologies, ctx->access_technologies_mask);
 
     /* Go on */
     ctx->running_step++;
-    periodic_signal_check_step (self);
+    periodic_signal_check_step (task);
 }
 
 static void
-signal_quality_check_ready (MMIfaceModem *self,
-                            GAsyncResult *res)
+load_signal_quality_ready (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GTask        *task)
 {
-    GError             *error = NULL;
+    g_autoptr(GError)   error = NULL;
+    Private            *priv;
     SignalCheckContext *ctx;
 
-    ctx = get_signal_check_context (self);
+    priv = get_private (self);
+    ctx  = g_task_get_task_data (task);
 
     ctx->signal_quality = MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish (self, res, &error);
     if (error) {
         /* Did the plugin report that polling signal quality is unsupported? */
         if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
             mm_obj_dbg (self, "polling to refresh signal quality is unsupported");
-            ctx->signal_quality_polling_supported = FALSE;
+            priv->signal_quality_polling_supported = FALSE;
         }
         /* Ignore logging any message if the error is in 'in-progress' */
         else if (!g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_IN_PROGRESS))
             mm_obj_dbg (self, "couldn't refresh signal quality: %s", error->message);
-        g_error_free (error);
     }
     /* We may have been disabled while this command was running. */
-    else if (ctx->enabled)
+    else if (priv->signal_check_enabled)
         update_signal_quality (self, ctx->signal_quality, TRUE);
 
     /* Go on */
     ctx->running_step++;
-    periodic_signal_check_step (self);
+    periodic_signal_check_step (task);
 }
 
 static void
-periodic_signal_check_step (MMIfaceModem *self)
+periodic_signal_check_step (GTask *task)
 {
+    MMIfaceModem       *self;
+    Private            *priv;
     SignalCheckContext *ctx;
 
-    ctx = get_signal_check_context (self);
+    self = g_task_get_source_object (task);
+    priv = get_private (self);
+    ctx  = g_task_get_task_data (task);
 
     switch (ctx->running_step) {
-    case SIGNAL_CHECK_STEP_NONE:
-        g_assert_not_reached ();
-
     case SIGNAL_CHECK_STEP_FIRST:
         ctx->running_step++;
         /* fall-through */
 
     case SIGNAL_CHECK_STEP_SIGNAL_QUALITY:
-        if (ctx->enabled && ctx->signal_quality_polling_supported &&
-            (!ctx->initial_check_done || !ctx->signal_quality_polling_disabled)) {
+        if (priv->signal_check_enabled && priv->signal_quality_polling_supported &&
+            (!priv->signal_check_initial_done || !priv->signal_quality_polling_disabled)) {
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
-                self, (GAsyncReadyCallback)signal_quality_check_ready, NULL);
+                self, (GAsyncReadyCallback)load_signal_quality_ready, task);
             return;
         }
         ctx->running_step++;
         /* fall-through */
 
     case SIGNAL_CHECK_STEP_ACCESS_TECHNOLOGIES:
-        if (ctx->enabled && ctx->access_technology_polling_supported &&
-            (!ctx->initial_check_done || !ctx->access_technology_polling_disabled)) {
+        if (priv->signal_check_enabled && priv->access_technology_polling_supported &&
+            (!priv->signal_check_initial_done || !priv->access_technology_polling_disabled)) {
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_access_technologies (
-                self, (GAsyncReadyCallback)access_technologies_check_ready, NULL);
+                self, (GAsyncReadyCallback)load_access_technologies_ready, task);
             return;
         }
         ctx->running_step++;
         /* fall-through */
 
     case SIGNAL_CHECK_STEP_LAST:
-        /* Flag as sequence finished */
-        ctx->running_step = SIGNAL_CHECK_STEP_NONE;
-
         /* If we have been disabled while we were running the steps, we don't
          * do anything else. */
-        if (!ctx->enabled) {
+        if (!priv->signal_check_enabled) {
             mm_obj_dbg (self, "periodic signal quality and access technology checks not rescheduled: disabled");
+            g_task_return_boolean (task, FALSE);
+            g_object_unref (task);
             return;
         }
 
@@ -1731,38 +1702,40 @@ periodic_signal_check_step (MMIfaceModem *self)
          * quality and access technology values. As soon as we get them, OR if
          * we made too many retries at a high frequency, we fallback to the
          * slower polling. */
-        if (!ctx->initial_check_done) {
+        if (!priv->signal_check_initial_done) {
             gboolean signal_quality_ready;
             gboolean access_technology_ready;
 
             /* Signal quality is ready if unsupported or if we got a valid
              * value reported */
-            signal_quality_ready = (!ctx->signal_quality_polling_supported || (ctx->signal_quality != 0));
+            signal_quality_ready = (!priv->signal_quality_polling_supported || (ctx->signal_quality != 0));
 
             /* Access technology is ready if unsupported or if we got a valid
              * value reported */
-            access_technology_ready = (!ctx->access_technology_polling_supported ||
+            access_technology_ready = (!priv->access_technology_polling_supported ||
                                        ((ctx->access_technologies & ctx->access_technologies_mask) != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN));
 
-            ctx->initial_check_done = ((signal_quality_ready && access_technology_ready) || (--ctx->initial_retries == 0));
+            priv->signal_check_initial_done = ((signal_quality_ready && access_technology_ready) || (--priv->signal_check_initial_retries == 0));
         }
 
         /* After running the initial check, if both signal quality and access tech
          * loading are either disabled or unsupported, we'll stop polling completely,
          * because they may be loaded asynchronously by unsolicited messages */
-        if (ctx->initial_check_done &&
-            (!ctx->signal_quality_polling_supported    || ctx->signal_quality_polling_disabled) &&
-            (!ctx->access_technology_polling_supported || ctx->access_technology_polling_disabled)) {
+        if (priv->signal_check_initial_done &&
+            (!priv->signal_quality_polling_supported    || priv->signal_quality_polling_disabled) &&
+            (!priv->access_technology_polling_supported || priv->access_technology_polling_disabled)) {
             mm_obj_dbg (self, "periodic signal quality and access technology checks not rescheduled: unneeded or unsupported");
             periodic_signal_check_disable (self, FALSE);
-            return;
+        } else {
+            mm_obj_dbg (self, "periodic signal quality and access technology checks scheduled");
+            g_assert (!priv->signal_check_timeout_source);
+            priv->signal_check_timeout_source = g_timeout_add_seconds (priv->signal_check_initial_done ? SIGNAL_CHECK_TIMEOUT_SEC : SIGNAL_CHECK_INITIAL_TIMEOUT_SEC,
+                                                                       (GSourceFunc) periodic_signal_check_run,
+                                                                       self);
         }
 
-        mm_obj_dbg (self, "periodic signal quality and access technology checks scheduled");
-        g_assert (!ctx->timeout_source);
-        ctx->timeout_source = g_timeout_add_seconds (ctx->initial_check_done ? SIGNAL_CHECK_TIMEOUT_SEC : SIGNAL_CHECK_INITIAL_TIMEOUT_SEC,
-                                                     (GSourceFunc) periodic_signal_check_cb,
-                                                     self);
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
         return;
 
     default:
@@ -1771,71 +1744,78 @@ periodic_signal_check_step (MMIfaceModem *self)
 }
 
 static gboolean
-periodic_signal_check_cb (MMIfaceModem *self)
+periodic_signal_check_run (MMIfaceModem *self)
 {
+    GTask              *task;
     SignalCheckContext *ctx;
+    Private            *priv;
 
-    ctx = get_signal_check_context (self);
-    g_assert (ctx->enabled);
+    priv = get_private (self);
 
-    /* Start the sequence */
+    task = g_task_new (self, NULL, NULL, NULL);
+
+    ctx = g_new0 (SignalCheckContext, 1);
     ctx->running_step             = SIGNAL_CHECK_STEP_FIRST;
     ctx->signal_quality           = 0;
     ctx->access_technologies      = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     ctx->access_technologies_mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
-    periodic_signal_check_step (self);
+    g_task_set_task_data (task, ctx, (GDestroyNotify) g_free);
 
-    /* Remove the timeout and clear the source id */
-    if (ctx->timeout_source)
-        ctx->timeout_source = 0;
+    periodic_signal_check_step (task);
+
+    /* Reset the source id as we're removing the timeout source */
+    if (priv->signal_check_timeout_source)
+        priv->signal_check_timeout_source = 0;
     return G_SOURCE_REMOVE;
 }
 
 void
 mm_iface_modem_refresh_signal (MMIfaceModem *self)
 {
-    SignalCheckContext *ctx;
+    Private *priv;
 
-    ctx = get_signal_check_context (self);
+    priv = get_private (self);
 
     /* Don't refresh polling if we're not enabled */
-    if (!ctx->enabled) {
+    if (!priv->signal_check_enabled) {
         mm_obj_dbg (self, "periodic signal check refresh ignored: checks not enabled");
         return;
     }
 
     /* Don't refresh if we're already doing it */
-    if (ctx->running_step != SIGNAL_CHECK_STEP_NONE) {
+    if (priv->signal_check_running) {
         mm_obj_dbg (self, "periodic signal check refresh ignored: check already running");
         return;
     }
 
     mm_obj_dbg (self, "periodic signal check refresh requested");
+    priv->signal_check_running = TRUE;
 
     /* Remove the scheduled timeout as we're going to refresh
      * right away */
-    if (ctx->timeout_source) {
-        g_source_remove (ctx->timeout_source);
-        ctx->timeout_source = 0;
+    if (priv->signal_check_timeout_source) {
+        g_source_remove (priv->signal_check_timeout_source);
+        priv->signal_check_timeout_source = 0;
     }
 
     /* Reset refresh rate and initial retries when we're asked to refresh signal
      * so that we poll at a higher frequency */
-    ctx->initial_retries    = SIGNAL_CHECK_INITIAL_RETRIES;
-    ctx->initial_check_done = FALSE;
+    priv->signal_check_initial_retries = SIGNAL_CHECK_INITIAL_RETRIES;
+    priv->signal_check_initial_done    = FALSE;
 
     /* Start sequence */
-    periodic_signal_check_cb (self);
+    periodic_signal_check_run (self);
 }
 
 static void
 periodic_signal_check_disable (MMIfaceModem *self,
                                gboolean      clear)
 {
-    SignalCheckContext *ctx;
+    Private *priv;
 
-    ctx = get_signal_check_context (self);
-    if (!ctx->enabled)
+    priv = get_private (self);
+
+    if (!priv->signal_check_enabled)
         return;
 
     /* Clear access technology and signal quality */
@@ -1847,33 +1827,33 @@ periodic_signal_check_disable (MMIfaceModem *self,
     }
 
     /* Remove scheduled timeout */
-    if (ctx->timeout_source) {
-        g_source_remove (ctx->timeout_source);
-        ctx->timeout_source = 0;
+    if (priv->signal_check_timeout_source) {
+        g_source_remove (priv->signal_check_timeout_source);
+        priv->signal_check_timeout_source = 0;
     }
 
-    ctx->enabled = FALSE;
+    priv->signal_check_enabled = FALSE;
     mm_obj_dbg (self, "periodic signal checks disabled");
 }
 
 static void
 periodic_signal_check_enable (MMIfaceModem *self)
 {
-    SignalCheckContext *ctx;
+    Private *priv;
 
-    ctx = get_signal_check_context (self);
+    priv = get_private (self);
 
     /* If polling access technology and signal quality not supported, don't even
      * bother trying. */
-    if (!ctx->signal_quality_polling_supported && !ctx->access_technology_polling_supported) {
+    if (!priv->signal_quality_polling_supported && !priv->access_technology_polling_supported) {
         mm_obj_dbg (self, "not enabling periodic signal checks: unsupported");
         return;
     }
 
     /* Log and flag as enabled */
-    if (!ctx->enabled) {
+    if (!priv->signal_check_enabled) {
         mm_obj_dbg (self, "periodic signal checks enabled");
-        ctx->enabled = TRUE;
+        priv->signal_check_enabled = TRUE;
     }
 
     /* And refresh, which will trigger the first check at high frequency */
