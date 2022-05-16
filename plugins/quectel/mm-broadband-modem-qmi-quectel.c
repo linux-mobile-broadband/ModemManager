@@ -57,8 +57,7 @@ mm_broadband_modem_qmi_quectel_new (const gchar  *device,
                          /* QMI bearer supports NET only */
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, FALSE,
-                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,  TRUE,
-                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
+                         MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
                          NULL);
 }
 

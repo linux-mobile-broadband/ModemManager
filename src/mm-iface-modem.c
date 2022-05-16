@@ -71,6 +71,9 @@ typedef struct {
 
     /* Initialization restart support */
     guint restart_initialize_idle_id;
+
+    /* SIM hot swap setup done flag */
+    gboolean sim_hot_swap_configured;
 } Private;
 
 static void
@@ -5019,19 +5022,19 @@ setup_sim_hot_swap_ready (MMIfaceModem *self,
                           GAsyncResult *res,
                           GTask        *task)
 {
+    Private               *priv;
     InitializationContext *ctx;
     g_autoptr(GError)      error = NULL;
 
-    ctx = g_task_get_task_data (task);
+    priv = get_private (self);
+    ctx  = g_task_get_task_data (task);
 
     MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish (self, res, &error);
     if (error)
         mm_obj_warn (self, "SIM hot swap setup failed: %s", error->message);
     else {
         mm_obj_dbg (self, "SIM hot swap setup succeeded");
-        g_object_set (self,
-                      MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, TRUE,
-                      NULL);
+        priv->sim_hot_swap_configured = TRUE;
     }
 
     /* Go on to next step */
@@ -5775,12 +5778,10 @@ interface_initialization_step (GTask *task)
         /* fall-through */
 
     case INITIALIZATION_STEP_SIM_HOT_SWAP: {
-        gboolean sim_hot_swap_configured = FALSE;
+        Private *priv;
 
-        g_object_get (self,
-                      MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &sim_hot_swap_configured,
-                      NULL);
-        if (!sim_hot_swap_configured &&
+        priv = get_private (self);
+        if (!priv->sim_hot_swap_configured &&
             MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap &&
             MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap_finish) {
             MM_IFACE_MODEM_GET_INTERFACE (self)->setup_sim_hot_swap (
@@ -6426,14 +6427,6 @@ iface_modem_init (gpointer g_iface)
          g_param_spec_boolean (MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,
                                "Sim Hot Swap Supported",
                                "Whether the modem supports sim hot swap or not.",
-                               FALSE,
-                               G_PARAM_READWRITE));
-
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_boolean (MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED,
-                               "Sim Hot Swap Configured",
-                               "Whether the sim hot swap support is configured correctly.",
                                FALSE,
                                G_PARAM_READWRITE));
 

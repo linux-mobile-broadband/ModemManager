@@ -2888,7 +2888,6 @@ mm_broadband_modem_cinterion_new (const gchar *device,
                          MM_BASE_MODEM_DATA_NET_SUPPORTED, TRUE,
                          MM_BASE_MODEM_DATA_TTY_SUPPORTED, TRUE,
                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, TRUE,
-                         MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, FALSE,
                          NULL);
 }
 

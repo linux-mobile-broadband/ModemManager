@@ -129,7 +129,6 @@ enum {
     PROP_MODEM_VOICE_CALL_LIST,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
-    PROP_MODEM_SIM_HOT_SWAP_CONFIGURED,
     PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
     PROP_MODEM_PERIODIC_ACCESS_TECH_CHECK_DISABLED,
     PROP_MODEM_PERIODIC_CALL_LIST_CHECK_DISABLED,
@@ -156,7 +155,6 @@ struct _MMBroadbandModemPrivate {
     PortsContext *in_call_ports_ctx;
     gboolean modem_init_run;
     gboolean sim_hot_swap_supported;
-    gboolean sim_hot_swap_configured;
     gboolean periodic_signal_check_disabled;
     gboolean periodic_access_tech_check_disabled;
 
@@ -12632,33 +12630,25 @@ initialize_step (GTask *task)
          * (we may be re-running the initialization step after SIM-PIN unlock) */
         if (!ctx->self->priv->sim_hot_swap_ports_ctx) {
             gboolean is_sim_hot_swap_supported = FALSE;
-            gboolean is_sim_hot_swap_configured = FALSE;
 
             g_object_get (ctx->self,
-                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED,  &is_sim_hot_swap_supported,
-                          MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
+                          MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
                           NULL);
 
             if (is_sim_hot_swap_supported) {
+                PortsContext      *ports;
+                g_autoptr(GError)  error = NULL;
 
-                if (!is_sim_hot_swap_configured) {
-                    mm_obj_warn (ctx->self, "SIM hot swap supported but not configured. Skipping opening ports");
+                mm_obj_dbg (ctx->self, "creating ports context for SIM hot swap");
+                ports = ports_context_new ();
+                if (!ports_context_open (ctx->self, ports, FALSE, FALSE, FALSE, &error)) {
+                    mm_obj_warn (ctx->self, "couldn't open ports during modem SIM hot swap enabling: %s",
+                                 error ? error->message : "unknown reason");
                 } else {
-                    PortsContext *ports;
-                    GError *error = NULL;
-
-                    mm_obj_dbg (ctx->self, "creating ports context for SIM hot swap");
-                    ports = ports_context_new ();
-                    if (!ports_context_open (ctx->self, ports, FALSE, FALSE, FALSE, &error)) {
-                        mm_obj_warn (ctx->self, "couldn't open ports during Modem SIM hot swap enabling: %s",
-                                     error ? error->message : "unknown reason");
-                        g_error_free (error);
-                    } else {
-                        ctx->self->priv->sim_hot_swap_ports_ctx = ports_context_ref (ports);
-                    }
-
-                    ports_context_unref (ports);
+                    ctx->self->priv->sim_hot_swap_ports_ctx = ports_context_ref (ports);
                 }
+
+                ports_context_unref (ports);
             }
         } else
             mm_obj_dbg (ctx->self, "ports context for SIM hot swap already available");
@@ -12686,21 +12676,17 @@ initialize_step (GTask *task)
             } else {
                 /* Fatal SIM, firmware, or modem failure :-( */
                 gboolean is_sim_hot_swap_supported = FALSE;
-                gboolean is_sim_hot_swap_configured = FALSE;
                 MMModemStateFailedReason reason;
 
                 reason = mm_gdbus_modem_get_state_failed_reason (MM_GDBUS_MODEM (ctx->self->priv->modem_dbus_skeleton));
 
                 g_object_get (ctx->self,
                               MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
-                              MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
                               NULL);
 
                 if (reason == MM_MODEM_STATE_FAILED_REASON_SIM_MISSING) {
                     if (!is_sim_hot_swap_supported) {
                         mm_obj_dbg (ctx->self, "SIM is missing, but this modem does not support SIM hot swap.");
-                    } else if (!is_sim_hot_swap_configured) {
-                        mm_obj_warn (ctx->self, "SIM is missing, but SIM hot swap could not be configured.");
                     } else if (!ctx->self->priv->sim_hot_swap_ports_ctx) {
                         mm_obj_err (ctx->self, "SIM is missing and SIM hot swap is configured, but ports are not opened.");
                     } else {
@@ -13058,9 +13044,6 @@ set_property (GObject *object,
     case PROP_MODEM_SIM_HOT_SWAP_SUPPORTED:
         self->priv->sim_hot_swap_supported = g_value_get_boolean (value);
         break;
-    case PROP_MODEM_SIM_HOT_SWAP_CONFIGURED:
-        self->priv->sim_hot_swap_configured = g_value_get_boolean (value);
-        break;
     case PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED:
         self->priv->periodic_signal_check_disabled = g_value_get_boolean (value);
         break;
@@ -13207,9 +13190,6 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_SIM_HOT_SWAP_SUPPORTED:
         g_value_set_boolean (value, self->priv->sim_hot_swap_supported);
-        break;
-    case PROP_MODEM_SIM_HOT_SWAP_CONFIGURED:
-        g_value_set_boolean (value, self->priv->sim_hot_swap_configured);
         break;
     case PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED:
         g_value_set_boolean (value, self->priv->periodic_signal_check_disabled);
@@ -13858,10 +13838,6 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM_HOT_SWAP_SUPPORTED,
                                       MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED);
-
-    g_object_class_override_property (object_class,
-                                      PROP_MODEM_SIM_HOT_SWAP_CONFIGURED,
-                                      MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_PERIODIC_SIGNAL_CHECK_DISABLED,
