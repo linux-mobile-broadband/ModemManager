@@ -42,11 +42,9 @@
 #define SIGNAL_CHECK_INITIAL_TIMEOUT_SEC  3
 #define SIGNAL_CHECK_TIMEOUT_SEC          30
 
-#define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG "signal-quality-update-context-tag"
 #define SIGNAL_CHECK_CONTEXT_TAG          "signal-check-context-tag"
 #define RESTART_INITIALIZE_IDLE_TAG       "restart-initialize-tag"
 
-static GQuark signal_quality_update_context_quark;
 static GQuark signal_check_context_quark;
 static GQuark restart_initialize_idle_quark;
 
@@ -59,6 +57,9 @@ static GQuark private_quark;
 typedef struct {
     /* Subsystem specific states */
     GArray *subsystem_states;
+
+    /* Signal quality recent flag handling */
+    guint signal_quality_recent_timeout_source;
 } Private;
 
 static void
@@ -66,6 +67,8 @@ private_free (Private *priv)
 {
     if (priv->subsystem_states)
         g_array_unref (priv->subsystem_states);
+    if (priv->signal_quality_recent_timeout_source)
+        g_source_remove (priv->signal_quality_recent_timeout_source);
     g_slice_free (Private, priv);
 }
 
@@ -1422,23 +1425,23 @@ mm_iface_modem_update_access_technologies (MMIfaceModem *self,
 
 /*****************************************************************************/
 
-typedef struct {
-    guint recent_timeout_source;
-} SignalQualityUpdateContext;
-
 static void
-signal_quality_update_context_free (SignalQualityUpdateContext *ctx)
+signal_quality_recent_timeout_disable (MMIfaceModem *self)
 {
-    if (ctx->recent_timeout_source)
-        g_source_remove (ctx->recent_timeout_source);
-    g_free (ctx);
+    Private *priv;
+
+    priv = get_private (self);
+    if (priv->signal_quality_recent_timeout_source) {
+        g_source_remove (priv->signal_quality_recent_timeout_source);
+        priv->signal_quality_recent_timeout_source = 0;
+    }
 }
 
 static gboolean
 expire_signal_quality (MMIfaceModem *self)
 {
-    MmGdbusModem *skeleton = NULL;
-    SignalQualityUpdateContext *ctx;
+    g_autoptr(MmGdbusModemSkeleton)  skeleton = NULL;
+    Private                         *priv;
 
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
@@ -1446,10 +1449,10 @@ expire_signal_quality (MMIfaceModem *self)
 
     if (skeleton) {
         GVariant *old;
-        guint signal_quality = 0;
-        gboolean recent = FALSE;
+        guint     signal_quality = 0;
+        gboolean  recent = FALSE;
 
-        old = mm_gdbus_modem_get_signal_quality (skeleton);
+        old = mm_gdbus_modem_get_signal_quality (MM_GDBUS_MODEM (skeleton));
         g_variant_get (old,
                        "(ub)",
                        &signal_quality,
@@ -1459,28 +1462,26 @@ expire_signal_quality (MMIfaceModem *self)
         if (recent) {
             mm_obj_dbg (self, "signal quality value not updated in %us, marking as not being recent",
                         SIGNAL_QUALITY_RECENT_TIMEOUT_SEC);
-            mm_gdbus_modem_set_signal_quality (skeleton,
+            mm_gdbus_modem_set_signal_quality (MM_GDBUS_MODEM (skeleton),
                                                g_variant_new ("(ub)",
                                                               signal_quality,
                                                               FALSE));
         }
-
-        g_object_unref (skeleton);
     }
 
     /* Remove source id */
-    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
-    ctx->recent_timeout_source = 0;
+    priv = get_private (self);
+    priv->signal_quality_recent_timeout_source = 0;
     return G_SOURCE_REMOVE;
 }
 
 static void
 update_signal_quality (MMIfaceModem *self,
-                       guint signal_quality,
-                       gboolean expire)
+                       guint         signal_quality,
+                       gboolean      expire)
 {
-    SignalQualityUpdateContext *ctx;
-    MmGdbusModem *skeleton = NULL;
+    g_autoptr(MmGdbusModemSkeleton)  skeleton = NULL;
+    Private                         *priv;
 
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
@@ -1490,27 +1491,14 @@ update_signal_quality (MMIfaceModem *self,
     if (!skeleton)
         return;
 
-    if (G_UNLIKELY (!signal_quality_update_context_quark))
-        signal_quality_update_context_quark = (g_quark_from_static_string (
-                                                   SIGNAL_QUALITY_UPDATE_CONTEXT_TAG));
-
-    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
-    if (!ctx) {
-        /* Create context and keep it as object data */
-        ctx = g_new0 (SignalQualityUpdateContext, 1);
-        g_object_set_qdata_full (
-            G_OBJECT (self),
-            signal_quality_update_context_quark,
-            ctx,
-            (GDestroyNotify)signal_quality_update_context_free);
-    }
+    priv = get_private (self);
 
     /* Note: we always set the new value, even if the signal quality level
      * is the same, in order to provide an up to date 'recent' flag.
      * The only exception being if 'expire' is FALSE; in that case we assume
      * the value won't expire and therefore can be considered obsolete
      * already. */
-    mm_gdbus_modem_set_signal_quality (skeleton,
+    mm_gdbus_modem_set_signal_quality (MM_GDBUS_MODEM (skeleton),
                                        g_variant_new ("(ub)",
                                                       signal_quality,
                                                       expire));
@@ -1518,24 +1506,22 @@ update_signal_quality (MMIfaceModem *self,
     mm_obj_dbg (self, "signal quality updated (%u)", signal_quality);
 
     /* Remove any previous expiration refresh timeout */
-    if (ctx->recent_timeout_source) {
-        g_source_remove (ctx->recent_timeout_source);
-        ctx->recent_timeout_source = 0;
+    if (priv->signal_quality_recent_timeout_source) {
+        g_source_remove (priv->signal_quality_recent_timeout_source);
+        priv->signal_quality_recent_timeout_source = 0;
     }
 
     /* If we got a new expirable value, setup new timeout */
     if (expire)
-        ctx->recent_timeout_source = (g_timeout_add_seconds (
-                                          SIGNAL_QUALITY_RECENT_TIMEOUT_SEC,
-                                          (GSourceFunc)expire_signal_quality,
-                                          self));
-
-    g_object_unref (skeleton);
+        priv->signal_quality_recent_timeout_source = (g_timeout_add_seconds (
+                                                          SIGNAL_QUALITY_RECENT_TIMEOUT_SEC,
+                                                          (GSourceFunc)expire_signal_quality,
+                                                          self));
 }
 
 void
 mm_iface_modem_update_signal_quality (MMIfaceModem *self,
-                                      guint signal_quality)
+                                      guint         signal_quality)
 {
     update_signal_quality (self, signal_quality, TRUE);
 }
@@ -6131,13 +6117,8 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
      * we're shutting down the interface anyway. */
     periodic_signal_check_disable (self, FALSE);
 
-    /* Remove SignalQualityUpdateContext object to make sure any pending
-     * invocation of expire_signal_quality is canceled before the DBus skeleton
-     * is removed. */
-    if (G_LIKELY (signal_quality_update_context_quark))
-        g_object_set_qdata (G_OBJECT (self),
-                            signal_quality_update_context_quark,
-                            NULL);
+    /* Make sure recent flag handling is disabled. */
+    signal_quality_recent_timeout_disable (self);
 
     /* Remove running restart initialization idle, if any */
     if (G_LIKELY (restart_initialize_idle_quark))
