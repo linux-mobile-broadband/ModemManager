@@ -5717,6 +5717,8 @@ enable_subscriber_info_unsolicited_events_ready (MMBroadbandModemMbim *self,
         /* reset setup flags if enabling failed */
         self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
         common_setup_cleanup_unsolicited_events_sync (self, ctx->device, FALSE);
+        /* and also reset enable flags */
+        self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     }
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
