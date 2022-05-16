@@ -147,6 +147,9 @@ struct _MMBroadbandModemMbimPrivate {
     /* USSD helpers */
     GTask *pending_ussd_action;
 
+    /* SIM hot swap setup */
+    gboolean sim_hot_swap_configured;
+
     /* Access technology and registration updates */
     MbimDataClass available_data_classes;
     MbimDataClass highest_available_data_class;
@@ -5394,6 +5397,12 @@ cleanup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
 
+    /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
+     * events and via SIM hot swap setup. We only really cleanup the
+     * indication if SIM hot swap context is not using it. */
+    if (!self->priv->sim_hot_swap_configured)
+        self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
     self->priv->setup_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
@@ -5413,9 +5422,12 @@ setup_unsolicited_events_3gpp (MMIfaceModem3gpp *_self,
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
 
+    /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
+     * events and via SIM hot swap setup. */
+    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_CONNECT;
-    self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->setup_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
@@ -5776,16 +5788,15 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *_self,
                                        gpointer user_data)
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
-    gboolean is_sim_hot_swap_configured = FALSE;
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_SIM_HOT_SWAP_CONFIGURED, &is_sim_hot_swap_configured,
-                  NULL);
+    /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
+     * events and via SIM hot swap setup. We only really disable the
+     * indication if SIM hot swap context is not using it. */
+    if (!self->priv->sim_hot_swap_configured)
+        self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
 
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_CONNECT;
-    if (is_sim_hot_swap_configured)
-        self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->enable_flags &= ~PROCESS_NOTIFICATION_FLAG_PCO;
@@ -5803,9 +5814,12 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *_self,
 {
     MMBroadbandModemMbim *self = MM_BROADBAND_MODEM_MBIM (_self);
 
+    /* NOTE: FLAG_SUBSCRIBER_INFO is managed both via 3GPP unsolicited
+     * events and via SIM hot swap setup. */
+    self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
+
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SIGNAL_QUALITY;
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_CONNECT;
-    self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_SUBSCRIBER_INFO;
     self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PACKET_SERVICE;
     if (self->priv->is_pco_supported)
         self->priv->enable_flags |= PROCESS_NOTIFICATION_FLAG_PCO;
