@@ -42,10 +42,6 @@
 #define SIGNAL_CHECK_INITIAL_TIMEOUT_SEC  3
 #define SIGNAL_CHECK_TIMEOUT_SEC          30
 
-#define RESTART_INITIALIZE_IDLE_TAG       "restart-initialize-tag"
-
-static GQuark restart_initialize_idle_quark;
-
 /*****************************************************************************/
 /* Private data context */
 
@@ -72,6 +68,9 @@ typedef struct {
     guint    signal_check_initial_retries;
     gboolean signal_check_initial_done;
     gboolean signal_check_running;
+
+    /* Initialization restart support */
+    guint restart_initialize_idle_id;
 } Private;
 
 static void
@@ -83,6 +82,8 @@ private_free (Private *priv)
         g_source_remove (priv->signal_quality_recent_timeout_source);
     if (priv->signal_check_timeout_source)
         g_source_remove (priv->signal_check_timeout_source);
+    if (priv->restart_initialize_idle_id)
+        g_source_remove (priv->restart_initialize_idle_id);
     g_slice_free (Private, priv);
 }
 
@@ -3446,42 +3447,52 @@ handle_set_current_modes (MmGdbusModem *skeleton,
 /*****************************************************************************/
 
 static void
-reinitialize_ready (MMBaseModem *self,
+reinitialize_ready (MMBaseModem  *self,
                     GAsyncResult *res)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     mm_base_modem_initialize_finish (self, res, &error);
-    if (error) {
+    if (error)
         mm_obj_warn (self, "reinitialization failed: %s", error->message);
-        g_error_free (error);
-    }
 }
 
 static gboolean
 restart_initialize_idle (MMIfaceModem *self)
 {
-    g_object_set_qdata (G_OBJECT (self), restart_initialize_idle_quark, NULL);
+    Private *priv;
 
-    /* If no wait needed, just go on */
+    priv = get_private (self);
+
     mm_base_modem_initialize (MM_BASE_MODEM (self),
                               (GAsyncReadyCallback) reinitialize_ready,
                               NULL);
+
+    priv->restart_initialize_idle_id = 0;
     return G_SOURCE_REMOVE;
 }
 
 static void
-restart_initialize_idle_cancel (gpointer idp)
+restart_initialize_idle_disable (MMIfaceModem *self)
 {
-    g_source_remove (GPOINTER_TO_UINT (idp));
+    Private *priv;
+
+    priv = get_private (self);
+    if (priv->restart_initialize_idle_id) {
+        g_source_remove (priv->restart_initialize_idle_id);
+        priv->restart_initialize_idle_id = 0;
+    }
 }
 
 static void
 set_lock_status (MMIfaceModem *self,
                  MmGdbusModem *skeleton,
-                 MMModemLock lock)
+                 MMModemLock   lock)
 {
-    MMModemLock old_lock;
+    MMModemLock  old_lock;
+    Private     *priv;
+
+    priv = get_private (self);
 
     old_lock = mm_gdbus_modem_get_unlock_required (skeleton);
     mm_gdbus_modem_set_unlock_required (skeleton, lock);
@@ -3501,25 +3512,19 @@ set_lock_status (MMIfaceModem *self,
              * If this is the case, we do NOT update the state yet, we wait
              * to be completely re-initialized to do so. */
             if (old_lock != MM_MODEM_LOCK_UNKNOWN) {
-                guint id;
-
-                if (G_UNLIKELY (!restart_initialize_idle_quark))
-                    restart_initialize_idle_quark = (g_quark_from_static_string (RESTART_INITIALIZE_IDLE_TAG));
-
-                id = g_idle_add ((GSourceFunc)restart_initialize_idle, self);
-                g_object_set_qdata_full (G_OBJECT (self),
-                                         restart_initialize_idle_quark,
-                                         GUINT_TO_POINTER (id),
-                                         (GDestroyNotify)restart_initialize_idle_cancel);
+                if (priv->restart_initialize_idle_id)
+                    g_source_remove (priv->restart_initialize_idle_id);
+                priv->restart_initialize_idle_id = g_idle_add ((GSourceFunc)restart_initialize_idle, self);
             }
         }
-    } else {
-        if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
-            /* Notify transition from INITIALIZING to LOCKED */
-            mm_iface_modem_update_state (self,
-                                         MM_MODEM_STATE_LOCKED,
-                                         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-        }
+        return;
+    }
+
+    if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
+        /* Notify transition from INITIALIZING to LOCKED */
+        mm_iface_modem_update_state (self,
+                                     MM_MODEM_STATE_LOCKED,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
     }
 }
 
@@ -6101,10 +6106,7 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
     signal_quality_recent_timeout_disable (self);
 
     /* Remove running restart initialization idle, if any */
-    if (G_LIKELY (restart_initialize_idle_quark))
-        g_object_set_qdata (G_OBJECT (self),
-                            restart_initialize_idle_quark,
-                            NULL);
+    restart_initialize_idle_disable (self);
 
     /* Remove SIM object */
     g_object_set (self,
