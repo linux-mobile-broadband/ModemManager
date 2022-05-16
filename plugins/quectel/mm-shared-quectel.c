@@ -435,11 +435,12 @@ mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem        *self,
                                       GAsyncReadyCallback  callback,
                                       gpointer             user_data)
 {
-    Private        *priv;
-    MMPortSerialAt *ports[2];
-    GTask          *task;
-    GRegex         *pattern;
-    guint           i;
+    Private           *priv;
+    MMPortSerialAt    *ports[2];
+    GTask             *task;
+    GRegex            *pattern;
+    guint              i;
+    g_autoptr(GError)  error = NULL;
 
     priv = get_private (MM_SHARED_QUECTEL (self));
 
@@ -464,6 +465,9 @@ mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem        *self,
     g_regex_unref (pattern);
     mm_obj_dbg (self, "+QUSIM detection set up");
 
+    if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))
+        mm_obj_warn (self, "failed to initialize SIM hot swap ports context: %s", error->message);
+
     /* Now, if available, setup parent logic */
     if (priv->iface_modem_parent->setup_sim_hot_swap &&
         priv->iface_modem_parent->setup_sim_hot_swap_finish) {
@@ -476,6 +480,15 @@ mm_shared_quectel_setup_sim_hot_swap (MMIfaceModem        *self,
     /* Otherwise, we're done */
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
+}
+
+/*****************************************************************************/
+/* SIM hot swap cleanup (Modem interface) */
+
+void
+mm_shared_quectel_cleanup_sim_hot_swap (MMIfaceModem *self)
+{
+    mm_broadband_modem_sim_hot_swap_ports_context_reset (MM_BROADBAND_MODEM (self));
 }
 
 /*****************************************************************************/

@@ -1681,28 +1681,6 @@ mm_base_modem_get_product_id (MMBaseModem *self)
 
 /*****************************************************************************/
 
-static void
-after_sim_switch_disable_ready (MMBaseModem  *self,
-                                GAsyncResult *res)
-{
-    g_autoptr(GError) error = NULL;
-
-    mm_base_modem_disable_finish (self, res, &error);
-    if (error)
-        mm_obj_err (self, "failed to disable after SIM switch event: %s", error->message);
-    else
-        mm_base_modem_set_valid (self, FALSE);
-}
-
-void
-mm_base_modem_process_sim_event (MMBaseModem *self)
-{
-    mm_base_modem_set_reprobe (self, TRUE);
-    mm_base_modem_disable (self, (GAsyncReadyCallback) after_sim_switch_disable_ready, NULL);
-}
-
-/*****************************************************************************/
-
 static gboolean
 base_modem_invalid_idle (MMBaseModem *self)
 {

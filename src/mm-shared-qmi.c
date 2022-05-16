@@ -3817,7 +3817,7 @@ uim_slot_status_indication_cb (QmiClientUim                     *client,
      * active slot's status changed */
     if (!slot_array_status_equal (priv->slots_status, new_slots_status, TRUE)) {
         mm_obj_dbg (self, "An active slot had a status change, will reprobe the modem");
-        mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
         return;
     }
 

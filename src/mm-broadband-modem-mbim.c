@@ -4712,7 +4712,7 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
          ready_state != MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE)) {
         /* eSIM profiles have been added or removed, re-probe to ensure correct interfaces are exposed */
         mm_obj_dbg (self, "eSIM profile updates detected");
-        mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
     }
 
     if ((self->priv->last_ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED &&
@@ -4721,7 +4721,7 @@ basic_connect_notification_subscriber_ready_status (MMBroadbandModemMbim *self,
          ready_state != MBIM_SUBSCRIBER_READY_STATE_SIM_NOT_INSERTED)) {
         /* SIM has been removed or reinserted, re-probe to ensure correct interfaces are exposed */
         mm_obj_dbg (self, "SIM hot swap detected");
-        mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
     }
 
     self->priv->last_ready_state = ready_state;
@@ -5227,11 +5227,10 @@ ms_basic_connect_extensions_notification_slot_info_status (MMBroadbandModemMbim 
         return;
     }
 
-
     if (self->priv->active_slot_index == slot_index + 1) {
         /* Major SIM event on the active slot, will request reprobing the
          * modem from scratch. */
-        mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
     } else {
         /* Modifies SIM object at the given slot based on the reported state,
          * when the slot is not the active one. */

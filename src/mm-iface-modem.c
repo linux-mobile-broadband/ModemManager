@@ -209,6 +209,8 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
     g_object_unref (task);
 }
 
+/*****************************************************************************/
+
 static void
 sim_slot_free (MMBaseSim *sim)
 {
@@ -273,6 +275,34 @@ mm_iface_modem_modify_sim (MMIfaceModem  *self,
                   sim_slots_new,
                   NULL);
     mm_gdbus_modem_set_sim_slots (MM_GDBUS_MODEM (skeleton), (const gchar *const *) sim_slot_paths);
+}
+
+/*****************************************************************************/
+
+static void
+after_sim_event_disable_ready (MMBaseModem  *self,
+                               GAsyncResult *res)
+{
+    g_autoptr(GError) error = NULL;
+
+    mm_base_modem_disable_finish (self, res, &error);
+    if (error)
+        mm_obj_err (self, "failed to disable after SIM switch event: %s", error->message);
+
+    /* set invalid either way, so that it's reprobed */
+    mm_base_modem_set_valid (self, FALSE);
+}
+
+void
+mm_iface_modem_process_sim_event (MMIfaceModem *self)
+{
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->cleanup_sim_hot_swap)
+        MM_IFACE_MODEM_GET_INTERFACE (self)->cleanup_sim_hot_swap (self);
+
+    mm_base_modem_set_reprobe (MM_BASE_MODEM (self), TRUE);
+    mm_base_modem_disable (MM_BASE_MODEM (self),
+                           (GAsyncReadyCallback) after_sim_event_disable_ready,
+                           NULL);
 }
 
 /*****************************************************************************/
@@ -1234,7 +1264,7 @@ set_primary_sim_slot_ready (MMIfaceModem                   *self,
         /* Notify about the SIM swap, which will disable and reprobe the device.
          * There is no need to update the PrimarySimSlot property, as this value will be
          * reloaded automatically during the reprobe. */
-        mm_base_modem_process_sim_event (MM_BASE_MODEM (self));
+        mm_iface_modem_process_sim_event (self);
     }
 
     mm_gdbus_modem_complete_set_primary_sim_slot (ctx->skeleton, ctx->invocation);
@@ -6108,6 +6138,10 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
 
     /* Remove running restart initialization idle, if any */
     restart_initialize_idle_disable (self);
+
+    /* Cleanup SIM hot swap, if any */
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->cleanup_sim_hot_swap)
+        MM_IFACE_MODEM_GET_INTERFACE (self)->cleanup_sim_hot_swap (self);
 
     /* Remove SIM object */
     g_object_set (self,

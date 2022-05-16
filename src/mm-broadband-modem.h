@@ -122,6 +122,8 @@ void     mm_broadband_modem_unlock_sms_storages      (MMBroadbandModem *self,
                                                       gboolean mem1,
                                                       gboolean mem2);
 /* Helper to update SIM hot swap */
-void mm_broadband_modem_sim_hot_swap_detected (MMBroadbandModem *self);
+gboolean mm_broadband_modem_sim_hot_swap_ports_context_init  (MMBroadbandModem  *self,
+                                                              GError           **error);
+void     mm_broadband_modem_sim_hot_swap_ports_context_reset (MMBroadbandModem  *self);
 
 #endif /* MM_BROADBAND_MODEM_H */

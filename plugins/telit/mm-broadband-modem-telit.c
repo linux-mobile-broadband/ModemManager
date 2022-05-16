@@ -474,7 +474,7 @@ telit_qss_unsolicited_handler (MMPortSerialAt *port,
     if ((prev_qss_status == QSS_STATUS_SIM_REMOVED && cur_qss_status != QSS_STATUS_SIM_REMOVED) ||
         (prev_qss_status > QSS_STATUS_SIM_REMOVED && cur_qss_status == QSS_STATUS_SIM_REMOVED)) {
         mm_obj_info (self, "QSS handler: SIM swap detected");
-        mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
     }
 }
 
@@ -649,14 +649,19 @@ qss_setup_step (GTask *task)
         case QSS_SETUP_STEP_LAST:
             /* If all enabling actions failed (either both, or only primary if
              * there is no secondary), then we return an error */
-            if (ctx->primary_error &&
-                (ctx->secondary_error || !ctx->secondary))
+            if (ctx->primary_error && (ctx->secondary_error || !ctx->secondary)) {
                 g_task_return_new_error (task,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
                                          "QSS: couldn't enable unsolicited");
-            else
+            } else {
+                g_autoptr(GError) error = NULL;
+
+                if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))
+                    mm_obj_warn (self, "failed to initialize SIM hot swap ports context: %s", error->message);
+
                 g_task_return_boolean (task, TRUE);
+            }
             g_object_unref (task);
             break;
 
@@ -682,6 +687,15 @@ modem_setup_sim_hot_swap (MMIfaceModem *self,
 
     g_task_set_task_data (task, ctx, (GDestroyNotify) qss_setup_context_free);
     qss_setup_step (task);
+}
+
+/*****************************************************************************/
+/* SIM hot swap cleanup (Modem interface) */
+
+static void
+modem_cleanup_sim_hot_swap (MMIfaceModem *self)
+{
+    mm_broadband_modem_sim_hot_swap_ports_context_reset (MM_BROADBAND_MODEM (self));
 }
 
 /*****************************************************************************/
@@ -1408,6 +1422,7 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_current_modes_finish = mm_shared_telit_set_current_modes_finish;
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
+    iface->cleanup_sim_hot_swap = modem_cleanup_sim_hot_swap;
 }
 
 static void

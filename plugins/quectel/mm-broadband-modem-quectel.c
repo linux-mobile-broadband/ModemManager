@@ -71,6 +71,7 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->setup_sim_hot_swap = mm_shared_quectel_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = mm_shared_quectel_setup_sim_hot_swap_finish;
+    iface->cleanup_sim_hot_swap = mm_shared_quectel_cleanup_sim_hot_swap;
 }
 
 static MMIfaceModem *

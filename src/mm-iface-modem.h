@@ -376,14 +376,14 @@ struct _MMIfaceModem {
     /* Create new bearer list object */
     MMBearerList * (* create_bearer_list) (MMIfaceModem *self);
 
-    /* Setup SIM hot swap */
-    void (*setup_sim_hot_swap) (MMIfaceModem *self,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data);
-
-    gboolean (*setup_sim_hot_swap_finish) (MMIfaceModem *self,
-                                            GAsyncResult *res,
-                                            GError **error);
+    /* Setup/cleanup SIM hot swap */
+    void     (* setup_sim_hot_swap)          (MMIfaceModem         *self,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
+    gboolean (* setup_sim_hot_swap_finish)   (MMIfaceModem         *self,
+                                              GAsyncResult         *res,
+                                              GError              **error);
+    void     (* cleanup_sim_hot_swap)        (MMIfaceModem         *self);
 
     /* Load carrier config */
     void     (* load_carrier_config)        (MMIfaceModem         *self,
@@ -608,5 +608,8 @@ gboolean mm_iface_modem_check_for_sim_swap_finish (MMIfaceModem *self,
 void mm_iface_modem_modify_sim (MMIfaceModem *self,
                                 guint slot_index,
                                 MMBaseSim *new_sim);
+
+void mm_iface_modem_process_sim_event (MMIfaceModem *self);
+
 
 #endif /* MM_IFACE_MODEM_H */

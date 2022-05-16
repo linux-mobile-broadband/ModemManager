@@ -2639,7 +2639,7 @@ cinterion_scks_unsolicited_handler (MMPortSerialAt *port,
             break;
     }
 
-    mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+    mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
 }
 
 static gboolean
@@ -2651,18 +2651,18 @@ modem_setup_sim_hot_swap_finish (MMIfaceModem *self,
 }
 
 static void
-cinterion_hot_swap_init_ready (MMBaseModem *_self,
+cinterion_hot_swap_init_ready (MMBaseModem  *_self,
                                GAsyncResult *res,
-                               GTask *task)
+                               GTask        *task)
 {
     MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
-    GError *error = NULL;
-    MMPortSerialAt *primary;
-    MMPortSerialAt *secondary;
+    g_autoptr(GError)          error = NULL;
+    MMPortSerialAt            *primary;
+    MMPortSerialAt            *secondary;
 
     if (!mm_base_modem_at_command_finish (_self, res, &error)) {
         g_prefix_error (&error, "Could not enable SCKS: ");
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
@@ -2686,6 +2686,9 @@ cinterion_hot_swap_init_ready (MMBaseModem *_self,
             self,
             NULL);
 
+    if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))
+        mm_obj_warn (self, "failed to initialize SIM hot swap ports context: %s", error->message);
+
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -2707,6 +2710,15 @@ modem_setup_sim_hot_swap (MMIfaceModem *self,
                               FALSE,
                               (GAsyncReadyCallback) cinterion_hot_swap_init_ready,
                               task);
+}
+
+/*****************************************************************************/
+/* SIM hot swap cleanup (Modem interface) */
+
+static void
+modem_cleanup_sim_hot_swap (MMIfaceModem *self)
+{
+    mm_broadband_modem_sim_hot_swap_ports_context_reset (MM_BROADBAND_MODEM (self));
 }
 
 /*****************************************************************************/
@@ -2972,6 +2984,7 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_off_finish = modem_power_off_finish;
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
+    iface->cleanup_sim_hot_swap = modem_cleanup_sim_hot_swap;
 }
 
 static MMIfaceModem *

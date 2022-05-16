@@ -254,6 +254,4 @@ gboolean mm_base_modem_sync_finish    (MMBaseModem *self,
 
 #endif
 
-void mm_base_modem_process_sim_event (MMBaseModem *self);
-
 #endif /* MM_BASE_MODEM_H */

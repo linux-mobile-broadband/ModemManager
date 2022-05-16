@@ -1079,7 +1079,7 @@ common_voice_enable_disable_unsolicited_events (MMBroadbandModemUblox *self,
 }
 
 /*****************************************************************************/
-/* Hotplug configure (Modem interface) */
+/* SIM hot swap setup (Modem interface) */
 
 typedef enum {
     CIEV_SIM_STATUS_UNKNOWN = -1,
@@ -1110,7 +1110,7 @@ ublox_ciev_unsolicited_handler (MMPortSerialAt *port,
     mm_obj_info (self, "CIEV: sim hot swap detected '%d'", sim_insert_status);
     if (sim_insert_status == CIEV_SIM_STATUS_INSERTED ||
         sim_insert_status == CIEV_SIM_STATUS_REMOVED) {
-        mm_broadband_modem_sim_hot_swap_detected (MM_BROADBAND_MODEM (self));
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
     } else {
         mm_obj_warn (self, "(%s) CIEV: unable to determine sim insert status: %d",
                      mm_port_get_device (MM_PORT (port)),
@@ -1155,21 +1155,26 @@ ublox_setup_ciev_handler (MMIfaceModem *self,
 }
 
 static void
-process_cind_verbosity_response (MMBaseModem *self,
+process_cind_verbosity_response (MMBaseModem  *self,
                                  GAsyncResult *res,
-                                 GTask *task)
+                                 GTask        *task)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     mm_base_modem_at_command_finish (self, res, &error);
 
     if (error) {
         mm_obj_warn (self, "CIND: verbose mode is not configured: %s", error->message);
-        g_task_return_error (task, error);
+        g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
+
     mm_obj_info (self, "CIND unsolicited response codes processing verbosity configured successfully");
+
+    if (!mm_broadband_modem_sim_hot_swap_ports_context_init (MM_BROADBAND_MODEM (self), &error))
+        mm_obj_warn (self, "failed to initialize SIM hot swap ports context: %s", error->message);
+
     g_task_return_boolean (task, TRUE);
     g_object_unref (task);
 }
@@ -1237,6 +1242,15 @@ modem_setup_sim_hot_swap (MMIfaceModem *self,
                               TRUE,
                               (GAsyncReadyCallback) cind_simind_format_check_ready,
                               task);
+}
+
+/*****************************************************************************/
+/* SIM hot swap cleanup (Modem interface) */
+
+static void
+modem_cleanup_sim_hot_swap (MMIfaceModem *self)
+{
+    mm_broadband_modem_sim_hot_swap_ports_context_reset (MM_BROADBAND_MODEM (self));
 }
 
 /*****************************************************************************/
@@ -2031,6 +2045,7 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_current_bands_finish = common_set_current_modes_bands_finish;
     iface->setup_sim_hot_swap = modem_setup_sim_hot_swap;
     iface->setup_sim_hot_swap_finish = modem_setup_sim_hot_swap_finish;
+    iface->cleanup_sim_hot_swap = modem_cleanup_sim_hot_swap;
 }
 
 static void

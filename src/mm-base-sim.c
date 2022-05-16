@@ -98,7 +98,7 @@ reprobe_if_puk_discovered (MMBaseSim *self,
                          MM_MOBILE_EQUIPMENT_ERROR,
                          MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK)) {
         mm_obj_dbg (self, "Discovered PUK lock, discarding old modem...");
-        mm_base_modem_process_sim_event (self->priv->modem);
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self->priv->modem));
     }
 }
 
@@ -905,7 +905,7 @@ handle_send_puk_ready (MMBaseSim *self,
 
     if (sim_error) {
         mm_obj_info (self, "Received critical sim error. SIM might be permanently blocked. Reprobing...");
-        mm_base_modem_process_sim_event (self->priv->modem);
+        mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self->priv->modem));
     }
 
     handle_send_puk_context_free (ctx);
