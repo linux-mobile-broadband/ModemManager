@@ -42,15 +42,49 @@
 #define SIGNAL_CHECK_INITIAL_TIMEOUT_SEC  3
 #define SIGNAL_CHECK_TIMEOUT_SEC          30
 
-#define STATE_UPDATE_CONTEXT_TAG          "state-update-context-tag"
 #define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG "signal-quality-update-context-tag"
 #define SIGNAL_CHECK_CONTEXT_TAG          "signal-check-context-tag"
 #define RESTART_INITIALIZE_IDLE_TAG       "restart-initialize-tag"
 
-static GQuark state_update_context_quark;
 static GQuark signal_quality_update_context_quark;
 static GQuark signal_check_context_quark;
 static GQuark restart_initialize_idle_quark;
+
+/*****************************************************************************/
+/* Private data context */
+
+#define PRIVATE_TAG "modem-private-tag"
+static GQuark private_quark;
+
+typedef struct {
+    /* Subsystem specific states */
+    GArray *subsystem_states;
+} Private;
+
+static void
+private_free (Private *priv)
+{
+    if (priv->subsystem_states)
+        g_array_unref (priv->subsystem_states);
+    g_slice_free (Private, priv);
+}
+
+static Private *
+get_private (MMIfaceModem *self)
+{
+    Private *priv;
+
+    if (G_UNLIKELY (!private_quark))
+        private_quark = g_quark_from_static_string (PRIVATE_TAG);
+
+    priv = g_object_get_qdata (G_OBJECT (self), private_quark);
+    if (!priv) {
+        priv = g_slice_new0 (Private);
+        g_object_set_qdata_full (G_OBJECT (self), private_quark, priv, (GDestroyNotify)private_free);
+    }
+
+    return priv;
+}
 
 /*****************************************************************************/
 
@@ -1982,23 +2016,14 @@ mm_iface_modem_update_failed_state (MMIfaceModem             *self,
 /*****************************************************************************/
 
 typedef struct {
-    gchar *subsystem;
-    MMModemState state;
+    gchar        *subsystem;
+    MMModemState  state;
 } SubsystemState;
 
 static void
-subsystem_state_array_free (GArray *array)
+subsystem_state_clear (SubsystemState *s)
 {
-    guint i;
-
-    for (i = 0; i < array->len; i++) {
-        SubsystemState *s;
-
-        s = &g_array_index (array, SubsystemState, i);
-        g_free (s->subsystem);
-    }
-
-    g_array_free (array, TRUE);
+    g_free (s->subsystem);
 }
 
 static MMModemState
@@ -2007,27 +2032,22 @@ get_consolidated_subsystem_state (MMIfaceModem *self)
     /* Use as initial state ENABLED, which is the minimum one expected. Do not
      * use the old modem state as initial state, as that would disallow reporting
      * e.g. ENABLED if the old state was REGISTERED (as ENABLED < REGISTERED). */
-    MMModemState consolidated = MM_MODEM_STATE_ENABLED;
-    GArray *subsystem_states;
+    MMModemState  consolidated = MM_MODEM_STATE_ENABLED;
+    Private      *priv;
 
-    if (G_UNLIKELY (!state_update_context_quark))
-        state_update_context_quark = (g_quark_from_static_string (
-                                          STATE_UPDATE_CONTEXT_TAG));
-
-    subsystem_states = g_object_get_qdata (G_OBJECT (self),
-                                           state_update_context_quark);
+    priv = get_private (self);
 
     /* Build consolidated state, expected fixes are:
      *  - Enabled (meaning unregistered) --> Searching|Registered
      *  - Searching --> Registered
      */
-    if (subsystem_states) {
+    if (priv->subsystem_states) {
         guint i;
 
-        for (i = 0; i < subsystem_states->len; i++) {
+        for (i = 0; i < priv->subsystem_states->len; i++) {
             SubsystemState *s;
 
-            s = &g_array_index (subsystem_states, SubsystemState, i);
+            s = &g_array_index (priv->subsystem_states, SubsystemState, i);
             if (s->state > consolidated)
                 consolidated = s->state;
         }
@@ -2038,12 +2058,14 @@ get_consolidated_subsystem_state (MMIfaceModem *self)
 
 static MMModemState
 get_updated_consolidated_state (MMIfaceModem *self,
-                                MMModemState modem_state,
-                                const gchar *subsystem,
-                                MMModemState subsystem_state)
+                                MMModemState  modem_state,
+                                const gchar  *subsystem,
+                                MMModemState  subsystem_state)
 {
-    guint i;
-    GArray *subsystem_states;
+    guint    i;
+    Private *priv;
+
+    priv = get_private (self);
 
     /* Reported subsystem states will be REGISTRATION-related. This means
      * that we would only expect a subset of the states being reported for
@@ -2052,28 +2074,16 @@ get_updated_consolidated_state (MMIfaceModem *self,
                     subsystem_state == MM_MODEM_STATE_SEARCHING ||
                     subsystem_state == MM_MODEM_STATE_REGISTERED);
 
-    if (G_UNLIKELY (!state_update_context_quark))
-        state_update_context_quark = (g_quark_from_static_string (
-                                          STATE_UPDATE_CONTEXT_TAG));
-
-    subsystem_states = g_object_get_qdata (G_OBJECT (self),
-                                           state_update_context_quark);
-    if (!subsystem_states) {
-        subsystem_states = g_array_sized_new (FALSE,
-                                              FALSE,
-                                              sizeof (SubsystemState),
-                                              2);
-        g_object_set_qdata_full (G_OBJECT (self),
-                                 state_update_context_quark,
-                                 subsystem_states,
-                                 (GDestroyNotify)subsystem_state_array_free);
+    if (!priv->subsystem_states) {
+        priv->subsystem_states = g_array_sized_new (FALSE, FALSE, sizeof (SubsystemState), 2);
+        g_array_set_clear_func (priv->subsystem_states, (GDestroyNotify)subsystem_state_clear);
     }
 
     /* Store new subsystem state */
-    for (i = 0; i < subsystem_states->len; i++) {
+    for (i = 0; i < priv->subsystem_states->len; i++) {
         SubsystemState *s;
 
-        s = &g_array_index (subsystem_states, SubsystemState, i);
+        s = &g_array_index (priv->subsystem_states, SubsystemState, i);
         if (g_str_equal (s->subsystem, subsystem)) {
             s->state = subsystem_state;
             break;
@@ -2081,13 +2091,13 @@ get_updated_consolidated_state (MMIfaceModem *self,
     }
 
     /* If not found, insert new element */
-    if (i == subsystem_states->len) {
+    if (i == priv->subsystem_states->len) {
         SubsystemState s;
 
         mm_obj_dbg (self, "will start keeping track of state for subsystem '%s'", subsystem);
         s.subsystem = g_strdup (subsystem);
         s.state = subsystem_state;
-        g_array_append_val (subsystem_states, s);
+        g_array_append_val (priv->subsystem_states, s);
     }
 
     return get_consolidated_subsystem_state (self);
