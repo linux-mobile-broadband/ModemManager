@@ -638,6 +638,94 @@ out:
 }
 
 /*****************************************************************************/
+/* ^SXRAT test parser
+ *
+ * Example (ELS61-E2):
+ *   AT^SXRAT=?
+ *   ^SXRAT: (0-6),(0,2,3),(0,2,3)
+ */
+
+gboolean
+mm_cinterion_parse_sxrat_test (const gchar *response,
+                               GArray **supported_rat,
+                               GArray **supported_pref1,
+                               GArray **supported_pref2,
+                               GError **error)
+{
+    g_autoptr(GRegex)      r = NULL;
+    g_autoptr(GMatchInfo)  match_info = NULL;
+    GError                *inner_error = NULL;
+    GArray                *tmp_supported_rat = NULL;
+    GArray                *tmp_supported_pref1 = NULL;
+    GArray                *tmp_supported_pref2 = NULL;
+
+    if (!response) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED, "Missing response");
+        return FALSE;
+    }
+
+    r = g_regex_new ("\\^SXRAT:\\s*\\(([^\\)]*)\\),\\(([^\\)]*)\\)(,\\(([^\\)]*)\\))?(?:\\r\\n)?",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                     0, NULL);
+
+    g_assert (r != NULL);
+
+    g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, &inner_error);
+
+    if (!inner_error && g_match_info_matches (match_info)) {
+        if (supported_rat) {
+            g_autofree gchar *str = NULL;
+
+            str = mm_get_string_unquoted_from_match_info (match_info, 1);
+            tmp_supported_rat = mm_parse_uint_list (str, &inner_error);
+
+            if (inner_error)
+                goto out;
+        }
+        if (supported_pref1) {
+            g_autofree gchar *str = NULL;
+
+            str = mm_get_string_unquoted_from_match_info (match_info, 2);
+            tmp_supported_pref1 = mm_parse_uint_list (str, &inner_error);
+
+            if (inner_error)
+                goto out;
+        }
+        if (supported_pref2) {
+            g_autofree gchar *str = NULL;
+
+            /* this match is optional */
+            str = mm_get_string_unquoted_from_match_info (match_info, 4);
+            if (str) {
+                tmp_supported_pref2 = mm_parse_uint_list (str, &inner_error);
+
+                if (inner_error)
+                    goto out;
+            }
+        }
+    }
+
+out:
+
+    if (inner_error) {
+        g_clear_pointer (&tmp_supported_rat,   g_array_unref);
+        g_clear_pointer (&tmp_supported_pref1, g_array_unref);
+        g_clear_pointer (&tmp_supported_pref2, g_array_unref);
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    if (supported_rat)
+        *supported_rat = tmp_supported_rat;
+    if (supported_pref1)
+        *supported_pref1 = tmp_supported_pref1;
+    if (supported_pref2)
+        *supported_pref2 = tmp_supported_pref2;
+
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* Build Cinterion-specific band value */
 
 gboolean
@@ -1650,4 +1738,67 @@ mm_cinterion_build_auth_string (gpointer                log_object,
                             encoded_auth,
                             quoted_passwd,
                             quoted_user);
+}
+
+/*****************************************************************************/
+/* ^SXRAT set command builder */
+
+/* Index of the array is the centerion-specific sxrat value */
+static const MMModemMode sxrat_combinations[] = {
+    [0] = ( MM_MODEM_MODE_2G ),
+    [1] = ( MM_MODEM_MODE_2G | MM_MODEM_MODE_3G ),
+    [2] = (                    MM_MODEM_MODE_3G ),
+    [3] = (                                       MM_MODEM_MODE_4G ),
+    [4] = (                    MM_MODEM_MODE_3G | MM_MODEM_MODE_4G ),
+    [5] = ( MM_MODEM_MODE_2G |                    MM_MODEM_MODE_4G ),
+    [6] = ( MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G ),
+};
+
+static gboolean
+append_sxrat_rat_value (GString      *str,
+                        MMModemMode   mode,
+                        GError      **error)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (sxrat_combinations); i++) {
+        if (sxrat_combinations[i] == mode) {
+            g_string_append_printf (str, "%u", i);
+            return TRUE;
+        }
+    }
+
+    g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                 "No AcT value matches requested mode");
+    return FALSE;
+}
+
+gchar *
+mm_cinterion_build_sxrat_set_command (MMModemMode allowed,
+                                      MMModemMode preferred,
+                                      GError **error)
+{
+    GString *command;
+
+    command = g_string_new ("^SXRAT=");
+    if (!append_sxrat_rat_value (command, allowed, error)) {
+        g_string_free (command, TRUE);
+        return NULL;
+    }
+
+    if (preferred != MM_MODEM_MODE_NONE) {
+        if (mm_count_bits_set (preferred) != 1) {
+            *error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                  "AcT preferred value should be a single AcT");
+            g_string_free (command, TRUE);
+            return NULL;
+        }
+        g_string_append (command, ",");
+        if (!append_sxrat_rat_value (command, preferred, error)) {
+            g_string_free (command, TRUE);
+            return NULL;
+        }
+    }
+
+    return g_string_free (command, FALSE);
 }

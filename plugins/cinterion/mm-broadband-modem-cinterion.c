@@ -88,6 +88,10 @@ struct _MMBroadbandModemCinterionPrivate {
     GArray *cnmi_supported_ds;
     GArray *cnmi_supported_bfr;
 
+    /* Cached supported rats for SXRAT */
+    GArray *sxrat_supported_rat;
+    GArray *sxrat_supported_pref1;
+
     /* ignore regex */
     GRegex *sysstart_regex;
     /* +CIEV indications as configured via AT^SIND */
@@ -100,6 +104,10 @@ struct _MMBroadbandModemCinterionPrivate {
     FeatureSupport sind_psinfo_support;
     FeatureSupport smoni_support;
     FeatureSupport sind_simstatus_support;
+    FeatureSupport sxrat_support;
+
+    /* Mode combination to apply if "any" requested */
+    MMModemMode any_allowed;
 
     /* Flags for model-based behaviors */
     MMCinterionModemFamily modem_family;
@@ -1797,15 +1805,186 @@ parent_load_supported_modes_ready (MMIfaceModem *self,
 }
 
 static void
-load_supported_modes (MMIfaceModem *self,
+sxrat_load_supported_modes_ready (MMBroadbandModemCinterion *self,
+                                  GTask        *task)
+{
+    GArray *combinations;
+    MMModemModeCombination mode;
+
+    g_assert (self->priv->sxrat_supported_rat);
+    g_assert (self->priv->sxrat_supported_pref1);
+
+    /* Build list of combinations */
+    combinations = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 3);
+
+    if (value_supported (self->priv->sxrat_supported_rat, 0)) {
+        /* 2G only */
+        mode.allowed = MM_MODEM_MODE_2G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+    if (value_supported (self->priv->sxrat_supported_rat, 1)) {
+        /* 2G+3G with none preferred */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+
+        self->priv->any_allowed = mode.allowed;
+
+        if (value_supported (self->priv->sxrat_supported_pref1, 0)) {
+            /* 2G preferred */
+            mode.preferred = MM_MODEM_MODE_2G;
+            g_array_append_val (combinations, mode);
+        }
+        if (value_supported (self->priv->sxrat_supported_pref1, 2)) {
+            /* 3G preferred */
+            mode.preferred = MM_MODEM_MODE_3G;
+            g_array_append_val (combinations, mode);
+        }
+    }
+    if (value_supported (self->priv->sxrat_supported_rat, 2)) {
+        /* 3G only */
+        mode.allowed = MM_MODEM_MODE_3G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+    if (value_supported (self->priv->sxrat_supported_rat, 3)) {
+        /* 4G only */
+        mode.allowed = MM_MODEM_MODE_4G;
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+    }
+    if (value_supported (self->priv->sxrat_supported_rat, 4)) {
+        /* 3G+4G with none preferred */
+        mode.allowed = (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+
+        self->priv->any_allowed = mode.allowed;
+
+        if (value_supported (self->priv->sxrat_supported_pref1, 2)) {
+            /* 3G preferred */
+            mode.preferred = MM_MODEM_MODE_3G;
+            g_array_append_val (combinations, mode);
+        }
+        if (value_supported (self->priv->sxrat_supported_pref1, 3)) {
+            /* 4G preferred */
+            mode.preferred = MM_MODEM_MODE_4G;
+            g_array_append_val (combinations, mode);
+        }
+    }
+    if (value_supported (self->priv->sxrat_supported_rat, 5)) {
+        /* 2G+4G with none preferred */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+
+        self->priv->any_allowed = mode.allowed;
+
+        if (value_supported (self->priv->sxrat_supported_pref1, 0)) {
+            /* 2G preferred */
+            mode.preferred = MM_MODEM_MODE_2G;
+            g_array_append_val (combinations, mode);
+        }
+        if (value_supported (self->priv->sxrat_supported_pref1, 3)) {
+            /* 4G preferred */
+            mode.preferred = MM_MODEM_MODE_4G;
+            g_array_append_val (combinations, mode);
+        }
+    }
+    if (value_supported (self->priv->sxrat_supported_rat, 6)) {
+        /* 2G+3G+4G with none preferred */
+        mode.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        mode.preferred = MM_MODEM_MODE_NONE;
+        g_array_append_val (combinations, mode);
+
+        self->priv->any_allowed = mode.allowed;
+
+        if (value_supported (self->priv->sxrat_supported_pref1, 0)) {
+            /* 2G preferred */
+            mode.preferred = MM_MODEM_MODE_2G;
+            g_array_append_val (combinations, mode);
+        }
+        if (value_supported (self->priv->sxrat_supported_pref1, 2)) {
+            /* 3G preferred */
+            mode.preferred = MM_MODEM_MODE_3G;
+            g_array_append_val (combinations, mode);
+        }
+        if (value_supported (self->priv->sxrat_supported_pref1, 3)) {
+            /* 4G preferred */
+            mode.preferred = MM_MODEM_MODE_4G;
+            g_array_append_val (combinations, mode);
+        }
+    }
+
+    g_task_return_pointer (task, combinations, (GDestroyNotify) g_array_unref);
+    g_object_unref (task);
+}
+
+static void
+sxrat_test_ready (MMBaseModem *_self,
+                  GAsyncResult *res,
+                  GTask *task)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    g_autoptr(GError)          error = NULL;
+    const gchar               *response;
+
+    response = mm_base_modem_at_command_finish (_self, res, &error);
+    if (!error) {
+        mm_cinterion_parse_sxrat_test (response,
+                                       &self->priv->sxrat_supported_rat,
+                                       &self->priv->sxrat_supported_pref1,
+                                       NULL,
+                                       &error);
+        if (!error) {
+            self->priv->sxrat_support = FEATURE_SUPPORTED;
+            sxrat_load_supported_modes_ready (self, task);
+            return;
+        }
+        mm_obj_warn (self, "error reading SXRAT response: %s", error->message);
+    }
+
+    self->priv->sxrat_support = FEATURE_NOT_SUPPORTED;
+
+    /* Run parent's loading in case SXRAT is not supported */
+    iface_modem_parent->load_supported_modes (
+        MM_IFACE_MODEM (self),
+        (GAsyncReadyCallback)parent_load_supported_modes_ready,
+        task);
+}
+
+static void
+load_supported_modes (MMIfaceModem *_self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    /* First check SXRAT support, if not already done */
+    if (self->priv->sxrat_support == FEATURE_SUPPORT_UNKNOWN) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "^SXRAT=?",
+                                  3,
+                                  TRUE,
+                                  (GAsyncReadyCallback)sxrat_test_ready,
+                                  task);
+        return;
+    }
+
+    if (self->priv->sxrat_support == FEATURE_SUPPORTED) {
+        sxrat_load_supported_modes_ready (self, task);
+        return;
+    }
+
     /* Run parent's loading */
     iface_modem_parent->load_supported_modes (
         MM_IFACE_MODEM (self),
         (GAsyncReadyCallback)parent_load_supported_modes_ready,
-        g_task_new (self, NULL, callback, user_data));
+        task);
 }
 
 /*****************************************************************************/
@@ -1849,19 +2028,14 @@ allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
 }
 
 static void
-set_current_modes (MMIfaceModem        *_self,
-                   MMModemMode          allowed,
-                   MMModemMode          preferred,
-                   GAsyncReadyCallback  callback,
-                   gpointer             user_data)
+cops_set_current_modes (MMBroadbandModemCinterion *self,
+                        MMModemMode allowed,
+                        MMModemMode preferred,
+                        GTask *task)
 {
-    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
-    gchar                     *command;
-    GTask                     *task;
+    gchar *command;
 
     g_assert (preferred == MM_MODEM_MODE_NONE);
-
-    task = g_task_new (self, NULL, callback, user_data);
 
     /* We will try to simulate the possible allowed modes here. The
      * Cinterion devices do not seem to allow setting preferred access
@@ -1874,11 +2048,11 @@ set_current_modes (MMIfaceModem        *_self,
      *   which is based on the quality of the connection.
      */
 
-    if (mm_iface_modem_is_4g (_self) && allowed == MM_MODEM_MODE_4G)
+    if (mm_iface_modem_is_4g (MM_IFACE_MODEM (self)) && allowed == MM_MODEM_MODE_4G)
         command = g_strdup ("+COPS=,,,7");
-    else if (mm_iface_modem_is_3g (_self) && allowed == MM_MODEM_MODE_3G)
+    else if (mm_iface_modem_is_3g (MM_IFACE_MODEM (self)) && allowed == MM_MODEM_MODE_3G)
         command = g_strdup ("+COPS=,,,2");
-    else if (mm_iface_modem_is_2g (_self) && allowed == MM_MODEM_MODE_2G)
+    else if (mm_iface_modem_is_2g (MM_IFACE_MODEM (self)) && allowed == MM_MODEM_MODE_2G)
         command = g_strdup ("+COPS=,,,0");
     else {
         /* For any other combination (e.g. ANY or  no AcT given, defaults to Auto. For this case, we cannot provide
@@ -1900,6 +2074,60 @@ set_current_modes (MMIfaceModem        *_self,
         task);
 
     g_free (command);
+}
+
+static void
+sxrat_set_current_modes (MMBroadbandModemCinterion *self,
+                         MMModemMode allowed,
+                         MMModemMode preferred,
+                         GTask *task)
+{
+    gchar *command;
+    GError *error = NULL;
+
+    g_assert (self->priv->any_allowed != MM_MODEM_MODE_NONE);
+
+    /* Handle ANY */
+    if (allowed == MM_MODEM_MODE_ANY)
+        allowed = self->priv->any_allowed;
+
+    command = mm_cinterion_build_sxrat_set_command (allowed, preferred, &error);
+
+    if (!command) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        30,
+        FALSE,
+        (GAsyncReadyCallback)allowed_access_technology_update_ready,
+        task);
+
+    g_free (command);
+}
+
+static void
+set_current_modes (MMIfaceModem        *_self,
+                   MMModemMode          allowed,
+                   MMModemMode          preferred,
+                   GAsyncReadyCallback  callback,
+                   gpointer             user_data)
+{
+    MMBroadbandModemCinterion *self = MM_BROADBAND_MODEM_CINTERION (_self);
+    GTask                     *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    if (self->priv->sxrat_support == FEATURE_SUPPORTED)
+        sxrat_set_current_modes (self, allowed, preferred, task);
+    else if (self->priv->sxrat_support == FEATURE_NOT_SUPPORTED)
+        cops_set_current_modes (self, allowed, preferred, task);
+    else
+        g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -2917,6 +3145,7 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
     self->priv->swwan_support          = FEATURE_SUPPORT_UNKNOWN;
     self->priv->smoni_support          = FEATURE_SUPPORT_UNKNOWN;
     self->priv->sind_simstatus_support = FEATURE_SUPPORT_UNKNOWN;
+    self->priv->sxrat_support          = FEATURE_SUPPORT_UNKNOWN;
 
     self->priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV:\\s*([a-z]+),(\\d+)\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -2924,6 +3153,8 @@ mm_broadband_modem_cinterion_init (MMBroadbandModemCinterion *self)
                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->scks_regex = g_regex_new ("\\^SCKS:\\s*([0-3])\\r\\n",
                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    self->priv->any_allowed = MM_MODEM_MODE_NONE;
 }
 
 static void
@@ -2943,6 +3174,10 @@ finalize (GObject *object)
         g_array_unref (self->priv->cnmi_supported_ds);
     if (self->priv->cnmi_supported_bfr)
         g_array_unref (self->priv->cnmi_supported_bfr);
+    if (self->priv->sxrat_supported_rat)
+        g_array_unref (self->priv->sxrat_supported_rat);
+    if (self->priv->sxrat_supported_pref1)
+        g_array_unref (self->priv->sxrat_supported_pref1);
 
     g_regex_unref (self->priv->ciev_regex);
     g_regex_unref (self->priv->sysstart_regex);

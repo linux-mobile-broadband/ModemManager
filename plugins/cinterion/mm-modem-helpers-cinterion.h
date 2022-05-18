@@ -84,6 +84,15 @@ gboolean mm_cinterion_parse_cnmi_test (const gchar *response,
                                        GError **error);
 
 /*****************************************************************************/
+/* ^SXRAT test parser */
+
+gboolean mm_cinterion_parse_sxrat_test (const gchar *response,
+                                        GArray **supported_rat,
+                                        GArray **supported_pref1,
+                                        GArray **supported_pref2,
+                                        GError **error);
+
+/*****************************************************************************/
 /* Build Cinterion-specific band value */
 
 gboolean mm_cinterion_build_band (GArray                       *bands,
@@ -191,5 +200,12 @@ gchar *mm_cinterion_build_auth_string (gpointer                log_object,
                                        MMCinterionModemFamily  modem_family,
                                        MMBearerProperties     *config,
                                        guint                   cid);
+
+/*****************************************************************************/
+/* ^SXRAT set command helper */
+
+gchar *mm_cinterion_build_sxrat_set_command (MMModemMode allowed,
+                                             MMModemMode preferred,
+                                             GError **error);
 
 #endif  /* MM_MODEM_HELPERS_CINTERION_H */
