@@ -234,6 +234,27 @@ mm_device_grab_port (MMDevice       *self,
                         error->message);
         return;
     }
+    if (!g_strcmp0 ("net", mm_kernel_device_get_subsystem (kernel_port)) &&
+        mm_kernel_device_get_wwandev_sysfs_path (kernel_port)) {
+        /* This is a wwan netdevice, possibly a multiplexed one.
+         * Multiplexed wwan netdevices do not have a lower device, so they won't fall in the
+         * previous check verified for virtual ports, but require the same management.
+         * However, we need to make sure that the arrived netdevice is not the default one that
+         * instead requires the standard flow: for doing this we check that the name of the
+         * arrived netdevice is not the default one, found in the wwandev_sysfs_path */
+        if (!g_strstr_len (mm_kernel_device_get_wwandev_sysfs_path (kernel_port),
+                           -1,
+                           mm_kernel_device_get_name (kernel_port))) {
+            g_autoptr(GError) error = NULL;
+
+            mm_obj_dbg (self, "grabbing wwan multiplexed device %s", mm_kernel_device_get_name (kernel_port));
+            if (self->priv->modem && !mm_base_modem_grab_link_port (self->priv->modem, kernel_port, &error))
+                mm_obj_dbg (self, "fully ignoring link port %s from now on: %s",
+                            mm_kernel_device_get_name (kernel_port),
+                            error->message);
+            return;
+        }
+    }
 
     /* Get the vendor/product IDs out of the first one that gives us
      * some valid value (it seems we may get NULL reported for VID in QMI
