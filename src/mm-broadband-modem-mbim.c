@@ -929,7 +929,6 @@ load_supported_modes_mbim (GTask      *task,
 {
     MMBroadbandModemMbim   *self;
     GArray                 *all;
-    GArray                 *combinations;
     GArray                 *filtered;
     MMModemMode             mask_all;
     MMModemModeCombination  mode = {
@@ -955,12 +954,14 @@ load_supported_modes_mbim (GTask      *task,
     all = g_array_sized_new (FALSE, FALSE, sizeof (MMModemModeCombination), 1);
     g_array_append_val (all, mode);
 
-    combinations = g_array_new (FALSE, FALSE, sizeof (MMModemModeCombination));
-
     /* When using MBIMEx we can enable the mode switching operation because
      * we'll be able to know if the modes requested are the ones configured
      * as preferred after the operation. */
     if (mbim_device_check_ms_mbimex_version (device, 2, 0)) {
+        GArray *combinations;
+
+        combinations = g_array_new (FALSE, FALSE, sizeof (MMModemModeCombination));
+
 #define ADD_MODE_PREFERENCE(MODE_MASK) do {                             \
             mode.allowed = MODE_MASK;                                   \
             mode.preferred = MM_MODEM_MODE_NONE;                        \
