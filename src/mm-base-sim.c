@@ -2568,7 +2568,8 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_PREFERRED_NETWORKS:
-        if (MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks &&
+        if (mm_gdbus_sim_get_preferred_networks (MM_GDBUS_SIM (self)) == NULL &&
+            MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks &&
             MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_preferred_networks (
                 self,
@@ -2580,7 +2581,8 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_SIM_TYPE:
-        if (MM_BASE_SIM_GET_CLASS (self)->load_sim_type &&
+        if (mm_gdbus_sim_get_sim_type (MM_GDBUS_SIM (self)) == MM_SIM_TYPE_UNKNOWN &&
+            MM_BASE_SIM_GET_CLASS (self)->load_sim_type &&
             MM_BASE_SIM_GET_CLASS (self)->load_sim_type_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_sim_type (
                 self,
@@ -2592,7 +2594,8 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_ESIM_STATUS:
-        if (MM_BASE_SIM_GET_CLASS (self)->load_esim_status &&
+        if (mm_gdbus_sim_get_esim_status (MM_GDBUS_SIM (self)) == MM_SIM_ESIM_STATUS_UNKNOWN &&
+            MM_BASE_SIM_GET_CLASS (self)->load_esim_status &&
             MM_BASE_SIM_GET_CLASS (self)->load_esim_status_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_esim_status (
                 self,
@@ -2604,7 +2607,8 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_REMOVABILITY:
-        if (MM_BASE_SIM_GET_CLASS (self)->load_removability &&
+        if (mm_gdbus_sim_get_removability (MM_GDBUS_SIM (self)) == MM_SIM_REMOVABILITY_UNKNOWN &&
+            MM_BASE_SIM_GET_CLASS (self)->load_removability &&
             MM_BASE_SIM_GET_CLASS (self)->load_removability_finish) {
             MM_BASE_SIM_GET_CLASS (self)->load_removability (
                 self,
