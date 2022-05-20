@@ -2490,9 +2490,6 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_SIM_IDENTIFIER:
-        /* SIM ID is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
         if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (self)) == NULL &&
             MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier &&
             MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier_finish) {
@@ -2506,9 +2503,6 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_IMSI:
-        /* IMSI is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
         if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (self)) == NULL &&
             MM_BASE_SIM_GET_CLASS (self)->load_imsi &&
             MM_BASE_SIM_GET_CLASS (self)->load_imsi_finish) {
@@ -2522,9 +2516,6 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_EID:
-        /* EID is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
         if (mm_gdbus_sim_get_eid (MM_GDBUS_SIM (self)) == NULL &&
             MM_BASE_SIM_GET_CLASS (self)->load_eid &&
             MM_BASE_SIM_GET_CLASS (self)->load_eid_finish) {
@@ -2538,9 +2529,6 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_OPERATOR_ID:
-        /* Operator ID is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
         if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (self)) == NULL &&
             MM_BASE_SIM_GET_CLASS (self)->load_operator_identifier &&
             MM_BASE_SIM_GET_CLASS (self)->load_operator_identifier_finish) {
@@ -2554,9 +2542,6 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_OPERATOR_NAME:
-        /* Operator Name is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
         if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (self)) == NULL &&
             MM_BASE_SIM_GET_CLASS (self)->load_operator_name &&
             MM_BASE_SIM_GET_CLASS (self)->load_operator_name_finish) {
@@ -2570,9 +2555,6 @@ interface_initialization_step (GTask *task)
         /* Fall through */
 
     case INITIALIZATION_STEP_EMERGENCY_NUMBERS:
-        /* Emergency Numbers are meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
         if (mm_gdbus_sim_get_emergency_numbers (MM_GDBUS_SIM (self)) == NULL &&
             MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers &&
             MM_BASE_SIM_GET_CLASS (self)->load_emergency_numbers_finish) {
