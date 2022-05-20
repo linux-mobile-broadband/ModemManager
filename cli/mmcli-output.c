@@ -567,13 +567,17 @@ mmcli_output_listitem (MmcF         field,
 /* (Custom) Signal quality output */
 
 void
-mmcli_output_signal_quality (guint    value,
-                             gboolean recent)
+mmcli_output_signal_quality (MMModemState state,
+                             guint        value,
+                             gboolean     recent)
 {
     /* Merge value and recent flag in a single item in human output */
     if (selected_type == MMC_OUTPUT_TYPE_HUMAN) {
-        output_item_new_take_single (MMC_F_STATUS_SIGNAL_QUALITY_VALUE,
-                                     g_strdup_printf ("%u%% (%s)", value, recent ? "recent" : "cached"));
+        if (state >= MM_MODEM_STATE_ENABLED)
+            output_item_new_take_single (MMC_F_STATUS_SIGNAL_QUALITY_VALUE,
+                                         g_strdup_printf ("%u%% (%s)", value, recent ? "recent" : "cached"));
+        else
+            output_item_new_take_single (MMC_F_STATUS_SIGNAL_QUALITY_VALUE, NULL);
         return;
     }
 

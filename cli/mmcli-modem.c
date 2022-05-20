@@ -377,7 +377,7 @@ print_modem_info (void)
     mmcli_output_state            (mm_modem_get_state (ctx->modem), mm_modem_get_state_failed_reason (ctx->modem));
     mmcli_output_string           (MMC_F_STATUS_POWER_STATE,              mm_modem_power_state_get_string (mm_modem_get_power_state (ctx->modem)));
     mmcli_output_string_list      (MMC_F_STATUS_ACCESS_TECH,              access_technologies_string);
-    mmcli_output_signal_quality   (signal_quality, signal_quality_recent);
+    mmcli_output_signal_quality   (mm_modem_get_state (ctx->modem), signal_quality, signal_quality_recent);
 
     mmcli_output_string_multiline (MMC_F_MODES_SUPPORTED,                 supported_modes_string);
     mmcli_output_string_take      (MMC_F_MODES_CURRENT,                   g_strdup_printf ("allowed: %s; preferred: %s",
