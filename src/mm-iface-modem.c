@@ -6054,10 +6054,9 @@ interface_initialization_step (GTask *task)
             mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (self),
                                                 MM_GDBUS_MODEM (ctx->skeleton));
 
-        if (ctx->fatal_error) {
-            g_task_return_error (task, ctx->fatal_error);
-            ctx->fatal_error = NULL;
-        } else
+        if (ctx->fatal_error)
+            g_task_return_error (task, g_steal_pointer (&ctx->fatal_error));
+        else
             g_task_return_boolean (task, TRUE);
 
         g_object_unref (task);
