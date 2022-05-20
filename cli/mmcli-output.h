@@ -381,7 +381,8 @@ void mmcli_output_listitem              (MmcF           field,
 /******************************************************************************/
 /* Custom output management */
 
-void mmcli_output_signal_quality     (guint                      value,
+void mmcli_output_signal_quality     (MMModemState               state,
+                                      guint                      value,
                                       gboolean                   recent);
 void mmcli_output_start_date         (guint64                    value);
 void mmcli_output_state              (MMModemState               state,
