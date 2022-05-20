@@ -1922,28 +1922,23 @@ bearer_list_count_connected (MMBaseBearer *bearer,
 }
 
 static void
-update_state_internal (MMIfaceModem *self,
-                       MMModemState new_state,
-                       MMModemStateChangeReason reason,
-                       MMModemStateFailedReason failed_reason)
+update_state_internal (MMIfaceModem             *self,
+                       MMModemState              new_state,
+                       MMModemStateChangeReason  reason,
+                       MMModemStateFailedReason  failed_reason)
 {
-    MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
-    MmGdbusModem *skeleton = NULL;
-    MMBearerList *bearer_list = NULL;
+    MMModemState                    old_state = MM_MODEM_STATE_UNKNOWN;
+    g_autoptr(MmGdbusModemSkeleton) skeleton = NULL;
+    g_autoptr(MMBearerList)         bearer_list = NULL;
 
     g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &old_state,
+                  MM_IFACE_MODEM_STATE,         &old_state,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
+                  MM_IFACE_MODEM_BEARER_LIST,   &bearer_list,
                   NULL);
 
-    if (!skeleton || !bearer_list) {
-        if (skeleton)
-            g_object_unref (skeleton);
-        if (bearer_list)
-            g_object_unref (bearer_list);
+    if (!skeleton)
         return;
-    }
 
     /* While connected we don't want registration status changes to change
      * the modem's state away from CONNECTED. */
@@ -1981,17 +1976,14 @@ update_state_internal (MMIfaceModem *self,
         /* Signal status change */
         if (skeleton) {
             /* Set failure reason */
-            if (failed_reason != mm_gdbus_modem_get_state_failed_reason (skeleton))
-                mm_gdbus_modem_set_state_failed_reason (skeleton, failed_reason);
+            if (failed_reason != mm_gdbus_modem_get_state_failed_reason (MM_GDBUS_MODEM (skeleton)))
+                mm_gdbus_modem_set_state_failed_reason (MM_GDBUS_MODEM (skeleton), failed_reason);
 
             /* Flush current change before signaling the state change,
              * so that clients get the proper state already in the
              * state-changed callback */
             g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (skeleton));
-            mm_gdbus_modem_emit_state_changed (skeleton,
-                                               old_state,
-                                               new_state,
-                                               reason);
+            mm_gdbus_modem_emit_state_changed (MM_GDBUS_MODEM (skeleton), old_state, new_state, reason);
         }
 
         /* If we go to a registered/connected state (from unregistered), setup
@@ -2003,11 +1995,6 @@ update_state_internal (MMIfaceModem *self,
         else if (old_state >= MM_MODEM_STATE_REGISTERED && new_state < MM_MODEM_STATE_REGISTERED)
             periodic_signal_check_disable (self, TRUE);
     }
-
-    if (skeleton)
-        g_object_unref (skeleton);
-    if (bearer_list)
-        g_object_unref (bearer_list);
 }
 
 void
