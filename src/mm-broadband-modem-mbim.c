@@ -1585,8 +1585,7 @@ unlock_required_subscriber_ready_state_ready (MbimDevice   *device,
 
     /* Initialized */
     if (ready_state == MBIM_SUBSCRIBER_READY_STATE_DEVICE_LOCKED ||
-        ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED ||
-        ready_state == MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE) {
+        ready_state == MBIM_SUBSCRIBER_READY_STATE_INITIALIZED) {
         MbimMessage *message;
 
         /* Query which lock is to unlock */
@@ -1601,7 +1600,12 @@ unlock_required_subscriber_ready_state_ready (MbimDevice   *device,
         return;
     }
 
-    g_assert_not_reached ();
+    /* When initialized but there are not profile set, assume no lock is
+     * applied. */
+    mm_obj_dbg (self, "eSIM without profiles: assuming no lock is required");
+    g_assert (ready_state == MBIM_SUBSCRIBER_READY_STATE_NO_ESIM_PROFILE);
+    g_task_return_int (task, MM_MODEM_LOCK_NONE);
+    g_object_unref (task);
 }
 
 static gboolean
