@@ -1233,29 +1233,21 @@ static void
 initialize_ready (MMBaseModem *self,
                   GAsyncResult *res)
 {
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
-    if (mm_base_modem_initialize_finish (self, res, &error)) {
+    if (!mm_base_modem_initialize_finish (self, res, &error)) {
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_ABORTED)) {
+            /* FATAL error, won't even be exported in DBus */
+            mm_obj_err (self, "fatal error initializing: %s", error->message);
+        } else {
+            /* non-fatal error */
+            mm_obj_warn (self, "error initializing: %s", error->message);
+            mm_base_modem_set_valid (self, TRUE);
+        }
+    } else {
         mm_obj_dbg (self, "modem initialized");
         mm_base_modem_set_valid (self, TRUE);
-        return;
     }
-
-    /* Wrong state is returned when modem is found locked */
-    if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE)) {
-        /* Even with initialization errors, we do set the state to valid, so
-         * that the modem gets exported and the failure notified to the user.
-         */
-        mm_obj_dbg (self, "couldn't finish initialization in the current state: '%s'", error->message);
-        g_error_free (error);
-        mm_base_modem_set_valid (self, TRUE);
-        return;
-    }
-
-    /* Really fatal, we cannot even export the failed modem (e.g. error before
-     * even trying to enable the Modem interface */
-    mm_obj_warn (self, "couldn't initialize: '%s'", error->message);
-    g_error_free (error);
 }
 
 static inline void

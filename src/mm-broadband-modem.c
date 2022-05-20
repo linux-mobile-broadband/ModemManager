@@ -12665,28 +12665,19 @@ initialize_step (GTask *task)
         if (ctx->self->priv->modem_state == MM_MODEM_STATE_FAILED) {
             GError *error = NULL;
 
-            if (ctx->self->priv->modem_dbus_skeleton) {
+            if (!ctx->self->priv->modem_dbus_skeleton) {
+                /* ABORTED here specifies an extremely fatal error that will make the modem
+                 * not even exported in DBus */
+                error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_ABORTED,
+                                     "Fatal error: modem is unusable");
+            } else {
                 /* Fatal SIM, firmware, or modem failure :-( */
-                gboolean is_sim_hot_swap_supported = FALSE;
                 MMModemStateFailedReason reason;
 
                 reason = mm_gdbus_modem_get_state_failed_reason (MM_GDBUS_MODEM (ctx->self->priv->modem_dbus_skeleton));
-
-                g_object_get (ctx->self,
-                              MM_IFACE_MODEM_SIM_HOT_SWAP_SUPPORTED, &is_sim_hot_swap_supported,
-                              NULL);
-
-                if (reason == MM_MODEM_STATE_FAILED_REASON_SIM_MISSING) {
-                    if (!is_sim_hot_swap_supported) {
-                        mm_obj_dbg (ctx->self, "SIM is missing, but this modem does not support SIM hot swap.");
-                    } else {
-                        mm_obj_dbg (ctx->self, "SIM is missing, but SIM hot swap is enabled; waiting for SIM...");
-                        error = g_error_new (MM_CORE_ERROR,
-                                             MM_CORE_ERROR_WRONG_STATE,
-                                             "Modem is unusable due to SIM missing, "
-                                             "cannot fully initialize, waiting for SIM insertion.");
-                    }
-                }
+                error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
+                                     "Modem in failed state: %s",
+                                     mm_modem_state_failed_reason_get_string (reason));
 
                 /* Ensure we only leave the Modem, Voice and Firmware interfaces
                  * around. A failure could be caused by firmware issues, which
@@ -12704,11 +12695,6 @@ initialize_step (GTask *task)
                 mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
                 mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
             }
-
-            if (!error)
-                error = g_error_new (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_ABORTED,
-                                     "Modem is unusable, cannot fully initialize");
 
             g_task_return_error (task, error);
             g_object_unref (task);
