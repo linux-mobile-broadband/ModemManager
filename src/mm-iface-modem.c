@@ -5394,10 +5394,7 @@ interface_initialization_step (GTask *task)
     /* Don't run new steps if we're cancelled */
     if (g_task_return_error_if_cancelled (task)) {
         /* Simply ignore any fatal error encountered as the initialization is cancelled anyway. */
-        if (ctx->fatal_error) {
-            g_error_free (ctx->fatal_error);
-            ctx->fatal_error = NULL;
-        }
+        g_clear_error (&ctx->fatal_error);
         g_object_unref (task);
         return;
     }
@@ -5823,7 +5820,7 @@ interface_initialization_step (GTask *task)
         ctx->step++;
     } /* fall-through */
 
-        case INITIALIZATION_STEP_SIM_SLOTS:
+    case INITIALIZATION_STEP_SIM_SLOTS:
         /* If the modem doesn't need any SIM (not implemented by plugin, or not
          * needed in CDMA-only modems), or if we don't know how to query
          * for SIM slots */
