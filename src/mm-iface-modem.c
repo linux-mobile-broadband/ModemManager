@@ -1448,6 +1448,23 @@ handle_get_cell_info (MmGdbusModem          *skeleton,
 /*****************************************************************************/
 
 void
+mm_iface_modem_update_own_numbers (MMIfaceModem *self,
+                                   const GStrv own_numbers)
+{
+    MmGdbusModem *skeleton = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (skeleton) {
+        mm_gdbus_modem_set_own_numbers (skeleton, (const gchar * const *)own_numbers);
+        g_object_unref (skeleton);
+    }
+}
+
+/*****************************************************************************/
+
+void
 mm_iface_modem_update_access_technologies (MMIfaceModem *self,
                                            MMModemAccessTechnology new_access_tech,
                                            guint32 mask)
@@ -5269,21 +5286,6 @@ load_carrier_config_ready (MMIfaceModem *self,
     /* Go on to next step */
     ctx->step++;
     interface_initialization_step (task);
-}
-
-void
-mm_iface_modem_update_own_numbers (MMIfaceModem *self,
-                                   const GStrv own_numbers)
-{
-    MmGdbusModem *skeleton = NULL;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                  NULL);
-    if (skeleton) {
-        mm_gdbus_modem_set_own_numbers (skeleton, (const gchar * const *)own_numbers);
-        g_object_unref (skeleton);
-    }
 }
 
 static void
