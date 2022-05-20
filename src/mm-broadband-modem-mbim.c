@@ -5209,6 +5209,12 @@ create_sim_from_slot_state (MMBroadbandModemMbim *self,
         return NULL;
     }
 
+    mm_obj_dbg (self, "found %s SIM in slot %u: %s (%s)",
+                active ? "active" : "inactive",
+                slot_index,
+                mm_sim_type_get_string (sim_type),
+                (sim_type == MM_SIM_TYPE_ESIM) ? mm_sim_esim_status_get_string (esim_status) : "n/a");
+
     return MM_BASE_SIM (mm_sim_mbim_new_initialized (MM_BASE_MODEM (self),
                                                      slot_index,
                                                      active,
