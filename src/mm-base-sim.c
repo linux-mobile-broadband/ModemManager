@@ -264,6 +264,16 @@ handle_change_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    if (IS_ESIM_WITHOUT_PROFILES (ctx->self)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot change PIN: "
+                                               "eSIM without profiles");
+        handle_change_pin_context_free (ctx);
+        return;
+    }
+
     MM_BASE_SIM_GET_CLASS (ctx->self)->change_pin (ctx->self,
                                                    ctx->old_pin,
                                                    ctx->new_pin,
@@ -441,6 +451,16 @@ handle_enable_pin_auth_ready (MMBaseModem *modem,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot enable/disable PIN: "
                                                "SIM not currently active");
+        handle_enable_pin_context_free (ctx);
+        return;
+    }
+
+    if (IS_ESIM_WITHOUT_PROFILES (ctx->self)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot enable/disable PIN: "
+                                               "eSIM without profiles");
         handle_enable_pin_context_free (ctx);
         return;
     }
@@ -847,6 +867,16 @@ handle_send_pin_auth_ready (MMBaseModem *modem,
         return;
     }
 
+    if (IS_ESIM_WITHOUT_PROFILES (ctx->self)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot send PIN: "
+                                               "eSIM without profiles");
+        handle_send_pin_context_free (ctx);
+        return;
+    }
+
     mm_base_sim_send_pin (ctx->self,
                           ctx->pin,
                           (GAsyncReadyCallback)handle_send_pin_ready,
@@ -942,6 +972,16 @@ handle_send_puk_auth_ready (MMBaseModem *modem,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot send PUK: "
                                                "SIM not currently active");
+        handle_send_puk_context_free (ctx);
+        return;
+    }
+
+    if (IS_ESIM_WITHOUT_PROFILES (ctx->self)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot send PUK: "
+                                               "eSIM without profiles");
         handle_send_puk_context_free (ctx);
         return;
     }
@@ -1495,6 +1535,16 @@ handle_set_preferred_networks_auth_ready (MMBaseModem *modem,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot set preferred networks: "
                                                "SIM not currently active");
+        handle_set_preferred_networks_context_free (ctx);
+        return;
+    }
+
+    if (IS_ESIM_WITHOUT_PROFILES (ctx->self)) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot set preferred networks: "
+                                               "eSIM without profiles");
         handle_set_preferred_networks_context_free (ctx);
         return;
     }
