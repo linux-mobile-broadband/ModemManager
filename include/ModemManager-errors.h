@@ -101,26 +101,28 @@
  * @MM_CORE_ERROR_NOT_FOUND: Item not found.
  * @MM_CORE_ERROR_RETRY: Operation cannot yet be performed, retry later.
  * @MM_CORE_ERROR_EXISTS: Item already exists.
+ * @MM_CORE_ERROR_WRONG_SIM_STATE: Operation cannot be executed in the current SIM state. Since 1.20.
  *
  * Common errors that may be reported by ModemManager.
  *
  * Since: 1.0
  */
 typedef enum { /*< underscore_name=mm_core_error >*/
-    MM_CORE_ERROR_FAILED       = 0,  /*< nick=Failed       >*/
-    MM_CORE_ERROR_CANCELLED    = 1,  /*< nick=Cancelled    >*/
-    MM_CORE_ERROR_ABORTED      = 2,  /*< nick=Aborted      >*/
-    MM_CORE_ERROR_UNSUPPORTED  = 3,  /*< nick=Unsupported  >*/
-    MM_CORE_ERROR_NO_PLUGINS   = 4,  /*< nick=NoPlugins    >*/
-    MM_CORE_ERROR_UNAUTHORIZED = 5,  /*< nick=Unauthorized >*/
-    MM_CORE_ERROR_INVALID_ARGS = 6,  /*< nick=InvalidArgs  >*/
-    MM_CORE_ERROR_IN_PROGRESS  = 7,  /*< nick=InProgress   >*/
-    MM_CORE_ERROR_WRONG_STATE  = 8,  /*< nick=WrongState   >*/
-    MM_CORE_ERROR_CONNECTED    = 9,  /*< nick=Connected    >*/
-    MM_CORE_ERROR_TOO_MANY     = 10, /*< nick=TooMany      >*/
-    MM_CORE_ERROR_NOT_FOUND    = 11, /*< nick=NotFound     >*/
-    MM_CORE_ERROR_RETRY        = 12, /*< nick=Retry        >*/
-    MM_CORE_ERROR_EXISTS       = 13, /*< nick=Exists       >*/
+    MM_CORE_ERROR_FAILED          = 0,  /*< nick=Failed        >*/
+    MM_CORE_ERROR_CANCELLED       = 1,  /*< nick=Cancelled     >*/
+    MM_CORE_ERROR_ABORTED         = 2,  /*< nick=Aborted       >*/
+    MM_CORE_ERROR_UNSUPPORTED     = 3,  /*< nick=Unsupported   >*/
+    MM_CORE_ERROR_NO_PLUGINS      = 4,  /*< nick=NoPlugins     >*/
+    MM_CORE_ERROR_UNAUTHORIZED    = 5,  /*< nick=Unauthorized  >*/
+    MM_CORE_ERROR_INVALID_ARGS    = 6,  /*< nick=InvalidArgs   >*/
+    MM_CORE_ERROR_IN_PROGRESS     = 7,  /*< nick=InProgress    >*/
+    MM_CORE_ERROR_WRONG_STATE     = 8,  /*< nick=WrongState    >*/
+    MM_CORE_ERROR_CONNECTED       = 9,  /*< nick=Connected     >*/
+    MM_CORE_ERROR_TOO_MANY        = 10, /*< nick=TooMany       >*/
+    MM_CORE_ERROR_NOT_FOUND       = 11, /*< nick=NotFound      >*/
+    MM_CORE_ERROR_RETRY           = 12, /*< nick=Retry         >*/
+    MM_CORE_ERROR_EXISTS          = 13, /*< nick=Exists        >*/
+    MM_CORE_ERROR_WRONG_SIM_STATE = 14, /*< nick=WrongSimState >*/
 } MMCoreError;
 
 /**

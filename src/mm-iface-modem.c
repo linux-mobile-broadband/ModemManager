@@ -4711,6 +4711,7 @@ typedef enum {
     INITIALIZATION_STEP_SIM,
     INITIALIZATION_STEP_SETUP_CARRIER_CONFIG,
     INITIALIZATION_STEP_OWN_NUMBERS,
+    INITIALIZATION_STEP_VALIDATE_ESIM_STATUS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -6010,6 +6011,24 @@ interface_initialization_step (GTask *task)
         }
         ctx->step++;
         /* fall-through */
+
+    case INITIALIZATION_STEP_VALIDATE_ESIM_STATUS: {
+        g_autoptr(MMBaseSim) sim = NULL;
+
+        g_object_get (self,
+                      MM_IFACE_MODEM_SIM, &sim,
+                      NULL);
+
+        /* If the current SIM is an eSIM without profiles, we transition to FAILED
+         * status because the modem is really unusable. */
+        if (sim && mm_base_sim_is_esim_without_profiles (sim)) {
+            g_clear_error (&ctx->fatal_error);
+            ctx->fatal_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_WRONG_SIM_STATE,
+                                            "eSIM without profiles detected");
+        }
+
+        ctx->step++;
+    } /* fall-through */
 
     case INITIALIZATION_STEP_LAST:
         /* Setup all method handlers */

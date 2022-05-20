@@ -12389,6 +12389,10 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
                                   MM_MOBILE_EQUIPMENT_ERROR,
                                   MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG))
             failed_reason = MM_MODEM_STATE_FAILED_REASON_SIM_MISSING;
+        else if (g_error_matches (error,
+                                  MM_CORE_ERROR,
+                                  MM_CORE_ERROR_WRONG_SIM_STATE))
+            failed_reason = MM_MODEM_STATE_FAILED_REASON_ESIM_WITHOUT_PROFILES;
 
         g_error_free (error);
 
