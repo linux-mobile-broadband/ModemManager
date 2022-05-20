@@ -12393,6 +12393,10 @@ iface_modem_initialize_ready (MMBroadbandModem *self,
                                   MM_CORE_ERROR,
                                   MM_CORE_ERROR_WRONG_SIM_STATE))
             failed_reason = MM_MODEM_STATE_FAILED_REASON_ESIM_WITHOUT_PROFILES;
+        else if (g_error_matches (error,
+                                  MM_CORE_ERROR,
+                                  MM_CORE_ERROR_UNSUPPORTED))
+            failed_reason = MM_MODEM_STATE_FAILED_REASON_UNKNOWN_CAPABILITIES;
 
         g_error_free (error);
 

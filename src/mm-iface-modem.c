@@ -4833,14 +4833,15 @@ load_current_capabilities_ready (MMIfaceModem *self,
 {
     InitializationContext *ctx;
     MMModemCapability caps;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     caps = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish (self, res, &error);
     if (error) {
-        g_propagate_error (&ctx->fatal_error, error);
-        g_prefix_error (&ctx->fatal_error, "couldn't load current capabilities: ");
+        ctx->fatal_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                        "Failed to load current capabilities: %s",
+                                        error->message);
         /* Jump to the last step */
         ctx->step = INITIALIZATION_STEP_LAST;
         interface_initialization_step (task);
@@ -4904,14 +4905,15 @@ load_supported_capabilities_ready (MMIfaceModem *self,
 {
     InitializationContext *ctx;
     GArray *supported_capabilities;
-    GError *error = NULL;
+    g_autoptr(GError) error = NULL;
 
     ctx = g_task_get_task_data (task);
 
     supported_capabilities = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_capabilities_finish (self, res, &error);
     if (error) {
-        g_propagate_error (&ctx->fatal_error, error);
-        g_prefix_error (&ctx->fatal_error, "couldn't load supported capabilities: ");
+        ctx->fatal_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                        "Failed to load supported capabilities: %s",
+                                        error->message);
         /* Jump to the last step */
         ctx->step = INITIALIZATION_STEP_LAST;
         interface_initialization_step (task);
