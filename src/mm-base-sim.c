@@ -85,6 +85,12 @@ static guint signals[SIGNAL_LAST] = { 0 };
 #define IS_ESIM_WITHOUT_PROFILES(self)                                  \
     (IS_ESIM (self) && (mm_gdbus_sim_get_esim_status (MM_GDBUS_SIM (self)) == MM_SIM_ESIM_STATUS_NO_PROFILES))
 
+gboolean
+mm_base_sim_is_esim_without_profiles (MMBaseSim *self)
+{
+    return IS_ESIM_WITHOUT_PROFILES (self);
+}
+
 /*****************************************************************************/
 
 void

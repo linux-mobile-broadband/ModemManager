@@ -254,4 +254,6 @@ gchar       *mm_base_sim_load_sim_identifier_finish (MMBaseSim *self,
 gboolean     mm_base_sim_is_emergency_number (MMBaseSim   *self,
                                               const gchar *number);
 
+gboolean     mm_base_sim_is_esim_without_profiles (MMBaseSim *self);
+
 #endif /* MM_BASE_SIM_H */

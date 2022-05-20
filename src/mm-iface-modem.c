@@ -5960,8 +5960,8 @@ interface_initialization_step (GTask *task)
         if (!mm_iface_modem_is_cdma_only (self) &&
             MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config &&
             MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config_finish) {
-            MMBaseSim *sim = NULL;
-            gchar     *carrier_config_mapping = NULL;
+            g_autoptr(MMBaseSim)  sim = NULL;
+            g_autofree gchar     *carrier_config_mapping = NULL;
 
             g_object_get (self,
                           MM_IFACE_MODEM_SIM, &sim,
@@ -5972,26 +5972,25 @@ interface_initialization_step (GTask *task)
              * validate whether we're already using the best config or not. */
             if (!sim)
                 mm_obj_dbg (self, "not setting up carrier config: SIM not found");
+            else if (!mm_base_sim_is_esim_without_profiles (sim))
+                mm_obj_dbg (self, "not setting up carrier config: eSIM without profiles");
             else if (!carrier_config_mapping)
                 mm_obj_dbg (self, "not setting up carrier config: mapping file not configured");
             else {
                 const gchar *imsi;
 
                 imsi = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (sim));
-                if (imsi) {
+                if (!imsi)
+                    mm_obj_dbg (self, "not setting up carrier config: unknown IMSI");
+                else {
                     MM_IFACE_MODEM_GET_INTERFACE (self)->setup_carrier_config (self,
                                                                                imsi,
                                                                                carrier_config_mapping,
                                                                                (GAsyncReadyCallback)setup_carrier_config_ready,
                                                                                task);
-                    g_object_unref (sim);
-                    g_free (carrier_config_mapping);
                     return;
                 }
-                mm_obj_warn (self, "couldn't setup carrier config: unknown IMSI");
             }
-            g_clear_object (&sim);
-            g_free (carrier_config_mapping);
         }
         ctx->step++;
         /* fall-through */
