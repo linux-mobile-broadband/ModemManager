@@ -803,6 +803,13 @@ mm_base_sim_load_sim_identifier (MMBaseSim *self,
         return;
     }
 
+    if (IS_ESIM_WITHOUT_PROFILES (self)) {
+        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                 "no SIM identifier in eSIM without profiles");
+        g_object_unref (task);
+        return;
+    }
+
     MM_BASE_SIM_GET_CLASS (self)->load_sim_identifier (
             self,
             (GAsyncReadyCallback)load_sim_identifier_ready,
