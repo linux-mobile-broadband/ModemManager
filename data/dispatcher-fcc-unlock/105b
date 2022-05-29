@@ -2,8 +2,13 @@
 
 # SPDX-License-Identifier: CC0-1.0
 # 2021 Aleksander Morgado <aleksander@aleksander.es>
+# 2022 Thilo-Alexander Ginkel <thilo@ginkel.com>
+# 2022 Bjørn Mork <bjorn@mork.no>
 #
-# Foxconn SDX55 FCC unlock operation
+# Foxconn SDX55 (Lenovo T99W175) FCC unlock operation
+#
+# The script will first try to unlock the WWAN modem using the new (hash-based)
+# v2 method and fall back to the old (v1) method if that fails
 #
 
 # require program name and at least 2 arguments
@@ -29,6 +34,66 @@ done
 # fail if no MBIM port exposed
 [ -n "$MBIM_PORT" ] || exit 2
 
-# run qmicli operation over MBIM
-qmicli --device-open-proxy --device="/dev/$MBIM_PORT" --dms-foxconn-set-fcc-authentication=0
-exit $?
+log_v2_failure() {
+    echo "$1. Falling back to old unlock method" >&2
+}
+
+FIRMWARE_VERSION=$(qmicli --device-open-proxy --device="/dev/$MBIM_PORT" \
+  --dms-foxconn-get-firmware-version=firmware-mcfg \
+  | grep "Version:" \
+  | grep -o "'.*'" \
+  | sed "s/'//g" \
+  | sed -e 's/\.[^.]*\.[^.]*$//')
+
+if [ -n "${FIRMWARE_VERSION}" ]; then
+  FIRMWARE_APPS_VERSION=$(qmicli --device-open-proxy --device="/dev/$MBIM_PORT" \
+    --dms-foxconn-get-firmware-version=apps \
+    | grep "Version:" \
+    | grep -o "'.*'" \
+    | sed "s/'//g")
+
+  if [ -n "${FIRMWARE_APPS_VERSION}" ]; then
+    IMEI=$(qmicli --device-open-proxy --device="/dev/$MBIM_PORT" --dms-get-ids \
+      | grep "IMEI:" \
+      | grep -o "'.*'" \
+      | sed "s/'//g")
+
+    if [ -n "${IMEI}" ]; then
+      SALT="salt" # use a static salt for now
+      MAGIC="foxc"
+      HASH="${SALT}$(printf "%s%s%s%s%s" "${FIRMWARE_VERSION}" \
+        "${FIRMWARE_APPS_VERSION}" "${IMEI}" "${SALT}" "${MAGIC}" \
+        | md5sum \
+        | head -c 32)"
+    else
+      log_v2_failure "Could not determine SDX55 IMEI"
+    fi
+  else
+    log_v2_failure "Could not determine SDX55 firmware apps version"
+  fi
+else
+  log_v2_failure "Could not determine SDX55 firmware version"
+fi
+
+UNLOCK_RESULT=1
+if [ -n "${HASH}" ]; then
+  qmicli --device-open-proxy --device="/dev/$MBIM_PORT" \
+    --dms-foxconn-set-fcc-authentication-v2="${HASH},48"
+  UNLOCK_RESULT=$?
+
+  if [ $UNLOCK_RESULT -ne 0 ]; then
+    log_v2_failure "SDX55 FCC unlock v2 failed"
+  fi
+fi
+
+if [ $UNLOCK_RESULT -ne 0 ]; then
+  qmicli --device-open-proxy --device="/dev/$MBIM_PORT" \
+    --dms-foxconn-set-fcc-authentication=0
+  UNLOCK_RESULT=$?
+
+  if [ $UNLOCK_RESULT -ne 0 ]; then
+    echo "SDX55 FCC unlock v1 failed" >&2
+  fi
+fi
+
+exit $UNLOCK_RESULT
