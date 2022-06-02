@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #ifndef MM_IFACE_MODEM_H
@@ -291,6 +292,7 @@ struct _MMIfaceModem {
      * not get the relevant notifications from the modem. */
     void (*check_for_sim_swap) (MMIfaceModem *self,
                                 const gchar *iccid,
+                                const gchar *imsi,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data);
     gboolean (*check_for_sim_swap_finish) (MMIfaceModem *self,
@@ -599,6 +601,7 @@ void mm_iface_modem_bind_simple_status (MMIfaceModem *self,
 void     mm_iface_modem_check_for_sim_swap        (MMIfaceModem *self,
                                                    guint slot_index,
                                                    const gchar *iccid,
+                                                   const gchar *imsi,
                                                    GAsyncReadyCallback callback,
                                                    gpointer user_data);
 gboolean mm_iface_modem_check_for_sim_swap_finish (MMIfaceModem *self,

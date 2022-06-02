@@ -15,6 +15,7 @@
  * Copyright (C) 2015 Marco Bascetta <marco.bascetta@sadel.it>
  * Copyright (C) 2019 Purism SPC
  * Copyright (C) 2011 - 2021 Google, Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #include <config.h>
@@ -4126,12 +4127,22 @@ modem_power_up (MMIfaceModem *self,
 /*****************************************************************************/
 /* Reprobing the modem if the SIM changed across a power-off or power-down */
 
-typedef struct {
-    MMBaseSim *sim;
-    guint      retries;
-} SimSwapContext;
+#define SIM_SWAP_CHECK_LOAD_RETRIES_MAX 3
 
-static gboolean load_sim_identifier (GTask *task);
+typedef enum {
+    SIM_SWAP_CHECK_STEP_FIRST,
+    SIM_SWAP_CHECK_STEP_ICCID_CHANGED,
+    SIM_SWAP_CHECK_STEP_IMSI_CHANGED,
+    SIM_SWAP_CHECK_STEP_LAST,
+} SimSwapCheckStep;
+
+typedef struct {
+    MMBaseSim        *sim;
+    guint             retries;
+    gchar            *iccid;
+    gchar            *imsi;
+    SimSwapCheckStep  step;
+} SimSwapContext;
 
 static void
 sim_swap_context_free (SimSwapContext *ctx)
@@ -4148,46 +4159,82 @@ modem_check_for_sim_swap_finish (MMIfaceModem  *self,
     return g_task_propagate_boolean (G_TASK (res), error);
 }
 
+static gboolean load_sim_identifier (GTask *task);
+static gboolean load_sim_imsi       (GTask *task);
+static void     sim_swap_check_step (GTask *task);
+
 static void
 complete_sim_swap_check (GTask       *task,
-                         const gchar *current_simid)
+                         const gchar *current)
 {
     MMBroadbandModem *self;
     SimSwapContext   *ctx;
-    const gchar      *cached_simid;
+    const gchar      *cached;
+    const gchar      *str;
 
-    g_assert (current_simid);
+    g_assert (current);
 
     self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
-    cached_simid = mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->sim));
 
-    if (g_strcmp0 (current_simid, cached_simid) != 0) {
-        mm_obj_info (self, "SIM identifier has changed: %s -> %s - possible SIM swap",
-                     cached_simid ? cached_simid : "<none>", current_simid);
+    switch (ctx->step) {
+    case SIM_SWAP_CHECK_STEP_ICCID_CHANGED:
+        cached = mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->sim));
+        str = "identifier";
+        break;
+    case SIM_SWAP_CHECK_STEP_IMSI_CHANGED:
+        cached = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->sim));
+        str = "imsi";
+        break;
+    case SIM_SWAP_CHECK_STEP_FIRST:
+    case SIM_SWAP_CHECK_STEP_LAST:
+    default:
+        g_assert_not_reached();
+    }
+
+    if (g_strcmp0 (current, cached) != 0) {
+        mm_obj_info (self, "SIM %s has changed: %s -> %s",
+                     str, cached ? cached : "<none>", current);
         mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
-    } else
-        mm_obj_dbg (self, "SIM identifier has not changed");
+        ctx->step = SIM_SWAP_CHECK_STEP_LAST;
+    } else {
+        mm_obj_dbg (self, "SIM %s has not changed", str);
+        ctx->step++;
+    }
 
-    g_task_return_boolean (task, TRUE);
-    g_object_unref (task);
-}
+    sim_swap_check_step (task);
+ }
 
 static void
-load_sim_identifier_ready (MMBaseSim    *sim,
-                           GAsyncResult *res,
-                           GTask        *task)
+load_sim_step_ready (MMBaseSim    *sim,
+                     GAsyncResult *res,
+                     GTask        *task)
 {
     MMBroadbandModem *self;
     SimSwapContext   *ctx;
 
-    g_autofree gchar *current_simid = NULL;
+    g_autofree gchar *current = NULL;
     GError           *error = NULL;
+    const gchar      *str;
 
     self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
-    current_simid = mm_base_sim_load_sim_identifier_finish (sim, res, &error);
+    switch (ctx->step) {
+    case SIM_SWAP_CHECK_STEP_ICCID_CHANGED:
+        current = mm_base_sim_load_sim_identifier_finish (sim, res, &error);
+        str = "identifier";
+        break;
+    case SIM_SWAP_CHECK_STEP_IMSI_CHANGED:
+        current = MM_BASE_SIM_GET_CLASS (sim)->load_imsi_finish (sim, res, &error);
+        str = "imsi";
+        break;
+    case SIM_SWAP_CHECK_STEP_FIRST:
+    case SIM_SWAP_CHECK_STEP_LAST:
+    default:
+        g_assert_not_reached();
+    }
+
     if (error) {
         if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
             g_task_return_error (task, error);
@@ -4196,22 +4243,25 @@ load_sim_identifier_ready (MMBaseSim    *sim,
         }
 
         if (ctx->retries > 0) {
-            mm_obj_warn (self, "could not load SIM identifier: %s (%d retries left)",
-                         error->message, ctx->retries);
+            mm_obj_warn (self, "could not load SIM %s: %s (%d retries left)",
+                         str, error->message, ctx->retries);
             --ctx->retries;
             g_clear_error (&error);
-            g_timeout_add_seconds (1, (GSourceFunc) load_sim_identifier, task);
+            if (ctx->step == SIM_SWAP_CHECK_STEP_ICCID_CHANGED)
+                g_timeout_add_seconds (1, (GSourceFunc) load_sim_identifier, task);
+            else
+                g_timeout_add_seconds (1, (GSourceFunc) load_sim_imsi, task);
             return;
         }
 
-        mm_obj_warn (self, "could not load SIM identifier: %s", error->message);
+        mm_obj_warn (self, "could not load SIM %s: %s", str, error->message);
         g_task_return_error (task, error);
         g_object_unref (task);
         return;
     }
 
-    complete_sim_swap_check (task, current_simid);
-}
+    complete_sim_swap_check (task, current);
+ }
 
 static gboolean
 load_sim_identifier (GTask *task)
@@ -4219,15 +4269,79 @@ load_sim_identifier (GTask *task)
     SimSwapContext *ctx = g_task_get_task_data (task);
 
     mm_base_sim_load_sim_identifier (ctx->sim,
-                                     (GAsyncReadyCallback)load_sim_identifier_ready,
+                                     (GAsyncReadyCallback)load_sim_step_ready,
                                      task);
 
     return G_SOURCE_REMOVE;
 }
 
+static gboolean
+load_sim_imsi (GTask *task)
+{
+    SimSwapContext *ctx = g_task_get_task_data (task);
+
+    if (!MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi ||
+        !MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi_finish) {
+        g_task_return_new_error (task,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "sim imsi could not be loaded");
+        g_object_unref (task);
+        return G_SOURCE_REMOVE;
+    }
+
+    MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi (
+        ctx->sim,
+        (GAsyncReadyCallback)load_sim_step_ready,
+        task);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+sim_swap_check_step (GTask *task)
+{
+    SimSwapContext *ctx;
+
+    ctx  = g_task_get_task_data (task);
+
+    switch (ctx->step) {
+    case SIM_SWAP_CHECK_STEP_FIRST:
+        ctx->step++;
+        /* fall-through */
+
+    case SIM_SWAP_CHECK_STEP_ICCID_CHANGED:
+        ctx->retries = SIM_SWAP_CHECK_LOAD_RETRIES_MAX;
+        /* We may or may not get the new SIM identifier (iccid). In case
+         * we've got it, the load_sim_identifier phase can be skipped. */
+        if (ctx->iccid)
+            complete_sim_swap_check (task, ctx->iccid);
+        else
+            load_sim_identifier (task);
+        return;
+
+    case SIM_SWAP_CHECK_STEP_IMSI_CHANGED:
+        ctx->retries = SIM_SWAP_CHECK_LOAD_RETRIES_MAX;
+
+        if (ctx->imsi)
+            complete_sim_swap_check (task, ctx->imsi);
+        else
+            load_sim_imsi (task);
+        return;
+
+    case SIM_SWAP_CHECK_STEP_LAST:
+        g_task_return_boolean (task, TRUE);
+        g_object_unref (task);
+        return;
+
+    default:
+        g_assert_not_reached ();
+    }
+}
+
 static void
 modem_check_for_sim_swap (MMIfaceModem        *self,
                           const gchar         *iccid,
+                          const gchar         *imsi,
                           GAsyncReadyCallback  callback,
                           gpointer             user_data)
 {
@@ -4238,7 +4352,9 @@ modem_check_for_sim_swap (MMIfaceModem        *self,
 
     task = g_task_new (self, NULL, callback, user_data);
     ctx = g_slice_new0 (SimSwapContext);
-    ctx->retries = 3;
+    ctx->step = SIM_SWAP_CHECK_STEP_FIRST;
+    ctx->iccid = g_strdup (iccid);
+    ctx->imsi = g_strdup (imsi);
     g_task_set_task_data (task, ctx, (GDestroyNotify)sim_swap_context_free);
 
     g_object_get (self,
@@ -4264,14 +4380,7 @@ modem_check_for_sim_swap (MMIfaceModem        *self,
         return;
     }
 
-    /* We may or may not get the new SIM identifier (iccid). In case
-     * we've got it, the load_sim_identifier phase can be skipped. */
-    if (iccid) {
-        complete_sim_swap_check (task, iccid);
-        return;
-    }
-
-    load_sim_identifier (task);
+    sim_swap_check_step (task);
 }
 
 /*****************************************************************************/

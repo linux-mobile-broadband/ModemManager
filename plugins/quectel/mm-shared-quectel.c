@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2018-2020 Aleksander Morgado <aleksander@aleksander.es>
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #include <config.h>
@@ -396,6 +397,7 @@ quectel_qusim_unsolicited_handler (MMPortSerialAt *port,
     mm_obj_dbg (self, "checking SIM swap");
     MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
         self,
+        NULL,
         NULL,
         (GAsyncReadyCallback)quectel_qusim_check_for_sim_swap_ready,
         NULL);

@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #include <ModemManager.h>
@@ -157,6 +158,7 @@ void
 mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
                                    guint slot_index,
                                    const gchar *iccid,
+                                   const gchar *imsi,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
@@ -185,7 +187,7 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
         primary_slot = mm_gdbus_modem_get_primary_sim_slot (MM_GDBUS_MODEM (skeleton));
         g_object_unref (skeleton);
 
-        /* Check that it's really the primary slot whose iccid has changed */
+        /* Check that it's really the primary slot whose iccid or imsi has changed */
         if (primary_slot && primary_slot != slot_index) {
             mm_obj_dbg (self, "checking for SIM swap ignored: status changed in slot %u, but primary is %u", slot_index, primary_slot);
             g_task_return_boolean (task, TRUE);
@@ -200,6 +202,7 @@ mm_iface_modem_check_for_sim_swap (MMIfaceModem *self,
         MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
             self,
             iccid,
+            imsi,
             (GAsyncReadyCallback)explicit_check_for_sim_swap_ready,
             task);
         return;
@@ -4407,6 +4410,7 @@ interface_enabling_step (GTask *task)
             MM_IFACE_MODEM_GET_INTERFACE (self)->check_for_sim_swap (
                 self,
                 NULL,
+                NULL,
                 (GAsyncReadyCallback)check_for_sim_swap_ready,
                 task);
             return;
@@ -4602,6 +4606,7 @@ interface_syncing_step (GTask *task)
         mm_iface_modem_check_for_sim_swap (
             self,
             0,
+            NULL,
             NULL,
             (GAsyncReadyCallback)sync_detect_sim_swap_ready,
             task);
