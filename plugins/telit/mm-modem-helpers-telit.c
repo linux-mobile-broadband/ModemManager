@@ -943,7 +943,8 @@ mm_telit_model_from_revision (const gchar *revision)
         {"40.", MM_TELIT_MODEL_LN920}
     };
 
-    g_assert (revision);
+    if (!revision)
+        return MM_TELIT_MODEL_DEFAULT;
 
     for (i = 0; i < G_N_ELEMENTS (revision_to_model_map); ++i) {
         if (g_str_has_prefix (revision, revision_to_model_map[i].revision_prefix))
