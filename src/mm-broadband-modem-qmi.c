@@ -3612,7 +3612,7 @@ process_lte_info (MMBroadbandModemQmi *self,
     gboolean network_id_valid;
     const gchar *mcc;
     const gchar *mnc;
-    gboolean endc_available;
+    gboolean endc_available = FALSE;
 
     g_assert ((response_output != NULL && indication_output == NULL) ||
               (response_output == NULL && indication_output != NULL));
