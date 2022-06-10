@@ -272,6 +272,23 @@ common_dial_operation_ready (MMBaseModem  *modem,
 }
 
 static void
+swwan_dial_operation_ready (MMBaseModem                *modem,
+                            GAsyncResult               *res,
+                            MMBroadbandBearerCinterion *self) /* full ref! */
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (modem, res, &error)) {
+        mm_obj_warn (self, "data connection attempt failed: %s", error->message);
+        mm_base_bearer_report_connection_status (MM_BASE_BEARER (self),
+                                                 MM_BEARER_CONNECTION_STATUS_DISCONNECTED);
+        g_error_free (error);
+    }
+
+    g_object_unref (self);
+}
+
+static void
 handle_cancel_dial (GTask *task)
 {
     Dial3gppContext *ctx;
@@ -299,6 +316,8 @@ dial_3gpp_context_step (GTask *task)
 {
     MMBroadbandBearerCinterion *self;
     Dial3gppContext            *ctx;
+    MMCinterionModemFamily      modem_family;
+    gboolean                    default_swwan_behavior;
 
     self = g_task_get_source_object (task);
     ctx  = g_task_get_task_data (task);
@@ -310,16 +329,19 @@ dial_3gpp_context_step (GTask *task)
         return;
     }
 
+    modem_family = mm_broadband_modem_cinterion_get_family (MM_BROADBAND_MODEM_CINTERION (ctx->modem));
+    default_swwan_behavior = modem_family == MM_CINTERION_MODEM_FAMILY_DEFAULT;
+
     switch (ctx->step) {
     case DIAL_3GPP_CONTEXT_STEP_FIRST:
         ctx->step++;
         /* fall through */
 
     case DIAL_3GPP_CONTEXT_STEP_AUTH: {
-        gchar *command;
+        g_autofree gchar *command = NULL;
 
         command = mm_cinterion_build_auth_string (self,
-                                                  mm_broadband_modem_cinterion_get_family (MM_BROADBAND_MODEM_CINTERION (ctx->modem)),
+                                                  modem_family,
                                                   mm_base_bearer_peek_config (MM_BASE_BEARER (ctx->self)),
                                                   ctx->cid);
 
@@ -336,7 +358,6 @@ dial_3gpp_context_step (GTask *task)
                                            NULL,
                                            (GAsyncReadyCallback) common_dial_operation_ready,
                                            task);
-            g_free (command);
             return;
         }
 
@@ -345,13 +366,31 @@ dial_3gpp_context_step (GTask *task)
     } /* fall through */
 
     case DIAL_3GPP_CONTEXT_STEP_START_SWWAN: {
-        gchar *command;
+        g_autofree gchar *command = NULL;
 
         mm_obj_dbg (self, "dial step %u/%u: starting SWWAN interface %u connection...",
                     ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         command = g_strdup_printf ("^SWWAN=1,%u,%u",
                                    ctx->cid,
                                    usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
+
+        if (default_swwan_behavior) {
+            mm_base_modem_at_command_full (ctx->modem,
+                                           ctx->primary,
+                                           command,
+                                           MM_BASE_BEARER_DEFAULT_CONNECTION_TIMEOUT,
+                                           FALSE,
+                                           FALSE,
+                                           NULL,
+                                           (GAsyncReadyCallback) common_dial_operation_ready,
+                                           task);
+            return;
+        }
+
+        /* We "jump" to the last step here here since the modem expects the
+         * DHCP discover packet while ^SWWAN runs. If the command fails,
+         * we'll mark the bearer disconnected later in the callback.
+         */
         mm_base_modem_at_command_full (ctx->modem,
                                        ctx->primary,
                                        command,
@@ -359,13 +398,15 @@ dial_3gpp_context_step (GTask *task)
                                        FALSE,
                                        FALSE,
                                        NULL,
-                                       (GAsyncReadyCallback) common_dial_operation_ready,
-                                       task);
-        g_free (command);
+                                       (GAsyncReadyCallback) swwan_dial_operation_ready,
+                                       g_object_ref (self));
+        ctx->step = DIAL_3GPP_CONTEXT_STEP_LAST;
+        dial_3gpp_context_step (task);
         return;
     }
 
     case DIAL_3GPP_CONTEXT_STEP_VALIDATE_CONNECTION:
+        g_assert (default_swwan_behavior);
         mm_obj_dbg (self, "dial step %u/%u: checking SWWAN interface %u status...",
                     ctx->step, DIAL_3GPP_CONTEXT_STEP_LAST, usb_interface_configs[ctx->usb_interface_config_index].swwan_index);
         load_connection_status_by_cid (ctx->self,
