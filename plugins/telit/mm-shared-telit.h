@@ -98,4 +98,7 @@ gchar *   mm_shared_telit_modem_load_revision_finish    (MMIfaceModem *self,
                                                          GAsyncResult *res,
                                                          GError **error);
 
+void      mm_shared_telit_store_revision                (MMSharedTelit *self,
+                                                         const gchar   *revision);
+
 #endif  /* MM_SHARED_TELIT_H */

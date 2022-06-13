@@ -115,6 +115,17 @@ mm_shared_telit_store_supported_modes (MMSharedTelit *self,
     priv->supported_modes = g_array_ref (modes);
 }
 
+void
+mm_shared_telit_store_revision (MMSharedTelit *self,
+                                const gchar   *revision)
+{
+    Private *priv;
+
+    priv = get_private (MM_SHARED_TELIT (self));
+    g_clear_pointer (&priv->software_package_version, g_free);
+    priv->software_package_version = g_strdup (revision);
+}
+
 /*****************************************************************************/
 /* Load current mode (Modem interface) */
 
@@ -651,11 +662,9 @@ load_revision_ready (MMBaseModem *self,
         g_object_unref (task);
     } else {
         gchar *revision = NULL;
-        Private *priv;
 
-        priv = get_private (MM_SHARED_TELIT (self));
         revision = g_variant_dup_string (result, NULL);
-        priv->software_package_version = g_strdup (revision);
+        mm_shared_telit_store_revision (MM_SHARED_TELIT (self), revision);
         g_task_return_pointer (task, revision, g_free);
         g_object_unref (task);
     }
