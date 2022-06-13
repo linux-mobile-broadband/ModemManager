@@ -130,6 +130,51 @@ load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load revision (Modem interface) */
+
+static gchar *
+load_revision_finish (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GError      **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+parent_load_revision_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GTask        *task)
+{
+    GError *error = NULL;
+    gchar  *revision = NULL;
+
+    revision = iface_modem_parent->load_revision_finish (self, res, &error);
+    if (!revision) {
+        g_task_return_error (task, error);
+        g_object_unref (task);
+        return;
+    }
+    mm_shared_telit_store_revision (MM_SHARED_TELIT (self), revision);
+    g_task_return_pointer (task, revision, g_free);
+    g_object_unref (task);
+}
+
+static void
+load_revision (MMIfaceModem        *self,
+               GAsyncReadyCallback  callback,
+               gpointer             user_data)
+{
+    /* Run parent's loading */
+    /* Telit's custom revision loading (in telit/mm-shared) is AT-only and the
+     * MBIM modem might not have an AT port available, so we call the parent's
+     * load_revision and store the revision taken from the firmware info capabilities. */
+    iface_modem_parent->load_revision (
+        MM_IFACE_MODEM (self),
+        (GAsyncReadyCallback)parent_load_revision_ready,
+        g_task_new (self, NULL, callback, user_data));
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemMbimTelit *
 mm_broadband_modem_mbim_telit_new (const gchar  *device,
@@ -175,6 +220,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_modes_finish = mm_shared_telit_load_current_modes_finish;
     iface->set_current_modes = mm_shared_telit_set_current_modes;
     iface->set_current_modes_finish = mm_shared_telit_set_current_modes_finish;
+    iface->load_revision_finish = load_revision_finish;
+    iface->load_revision = load_revision;
 }
 
 static MMIfaceModem *
