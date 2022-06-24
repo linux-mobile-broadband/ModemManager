@@ -252,6 +252,14 @@ sms_decode_text (const guint8   *text,
                  gpointer        log_object,
                  GError        **error)
 {
+    if (!text || len == 0) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Skipping SMS text: SMS text has no elements to decode");
+        return NULL;
+    }
+
     if (encoding == MM_SMS_ENCODING_GSM7) {
         g_autoptr(GByteArray)  unpacked_array = NULL;
         guint8                *unpacked = NULL;
