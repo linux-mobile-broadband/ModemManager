@@ -1,4 +1,31 @@
 
+ModemManager 1.18.10
+-------------------------------------------
+
+ * Build:
+   ** Require libqmi 1.30.8.
+
+ * FCC unlock:
+   ** Updated SDX55 unlock script to handle the new method introduced in
+      the latest firmware releases.
+
+ * Modem interface:
+   ** Set signal quality to 0% on shutdown.
+   ** Set signal quality as recent on init.
+
+ * MBIM:
+   ** Fix task completion when peeking device fails.
+   ** Fix several GError double-frees.
+
+ * mmcli:
+   ** Don't print signal quality until modem is enabled.
+
+ * Plugins:
+   ** foxconn: remove carrier mapping table for T99W175.
+
+ * Several other minor improvements and fixes.
+
+
 ModemManager 1.18.8
 -------------------------------------------
 
