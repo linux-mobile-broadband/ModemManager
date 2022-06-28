@@ -50,7 +50,7 @@ parse_gtrndis_read_response (const gchar *response,
         return FALSE;
     }
 
-    if (state) {
+    if (*state) {
         if (!mm_get_uint_from_match_info (match_info, 2, cid)) {
             g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                          "Failed to match cid in +GTRNDIS response: %s", response);
