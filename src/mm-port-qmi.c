@@ -64,6 +64,8 @@ struct _MMPortQmiPrivate {
     QrtrNode  *node;
 #endif
 
+    /* timeout monitoring */
+    gulong timeout_monitoring_id;
     /* endpoint info */
     gulong              endpoint_info_signal_id;
     QmiDataEndpointType endpoint_type;
@@ -185,6 +187,41 @@ guint
 mm_port_qmi_get_endpoint_interface_number (MMPortQmi *self)
 {
     return self->priv->endpoint_interface_number;
+}
+
+/*****************************************************************************/
+
+static void
+reset_timeout_monitoring (MMPortQmi *self,
+                          QmiDevice *qmi_device)
+{
+    if (self->priv->timeout_monitoring_id && qmi_device) {
+        g_signal_handler_disconnect (qmi_device, self->priv->timeout_monitoring_id);
+        self->priv->timeout_monitoring_id = 0;
+    }
+}
+
+static void
+consecutive_timeouts_updated_cb (MMPortQmi  *self,
+                                 GParamSpec *pspec,
+                                 QmiDevice  *qmi_device)
+{
+    g_signal_emit_by_name (self, MM_PORT_SIGNAL_TIMED_OUT, qmi_device_get_consecutive_timeouts (qmi_device));
+}
+
+static void
+setup_timeout_monitoring (MMPortQmi *self,
+                          QmiDevice *qmi_device)
+{
+    g_assert (qmi_device);
+
+    reset_timeout_monitoring (self, qmi_device);
+
+    g_assert (!self->priv->timeout_monitoring_id);
+    self->priv->timeout_monitoring_id = g_signal_connect_swapped (qmi_device,
+                                                                  "notify::" QMI_DEVICE_CONSECUTIVE_TIMEOUTS,
+                                                                  G_CALLBACK (consecutive_timeouts_updated_cb),
+                                                                  self);
 }
 
 /*****************************************************************************/
@@ -2491,6 +2528,7 @@ port_open_step (GTask *task)
         g_assert (ctx->device);
         g_assert (!self->priv->qmi_device);
         self->priv->qmi_device = g_object_ref (ctx->device);
+        setup_timeout_monitoring (self, ctx->device);
         self->priv->in_progress = FALSE;
         g_task_return_boolean (task, TRUE);
         g_object_unref (task);
@@ -2628,6 +2666,9 @@ mm_port_qmi_close (MMPortQmi           *self,
     ctx = g_slice_new0 (PortQmiCloseContext);
     ctx->qmi_device = g_steal_pointer (&self->priv->qmi_device);
     g_task_set_task_data (task, ctx, (GDestroyNotify)port_qmi_close_context_free);
+
+    /* Reset timeout monitoring logic */
+    reset_timeout_monitoring (self, ctx->qmi_device);
 
     /* Release all allocated clients */
     for (l = self->priv->services; l; l = g_list_next (l)) {
@@ -2769,6 +2810,7 @@ dispose (GObject *object)
     g_clear_object (&self->priv->node);
 #endif
     /* Clear device object */
+    reset_timeout_monitoring (self, self->priv->qmi_device);
     g_clear_object (&self->priv->qmi_device);
 
     g_clear_pointer (&self->priv->net_driver, g_free);
