@@ -207,7 +207,7 @@ base_modem_create_tty_port (MMBaseModem        *self,
     /* Enable port timeout checks if requested to do so */
     if (self->priv->max_timeouts > 0)
         g_signal_connect (port,
-                          "timed-out",
+                          MM_PORT_SIGNAL_TIMED_OUT,
                           G_CALLBACK (serial_port_timed_out_cb),
                           self);
 

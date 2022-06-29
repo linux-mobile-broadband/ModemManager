@@ -37,6 +37,14 @@ enum {
     LAST_PROP
 };
 
+
+enum {
+    TIMED_OUT,
+    LAST_SIGNAL
+};
+
+static guint signals[LAST_SIGNAL] = { 0 };
+
 struct _MMPortPrivate {
     gchar *device;
     MMPortSubsys subsys;
@@ -270,4 +278,13 @@ mm_port_class_init (MMPortClass *klass)
                               "kernel device object",
                               MM_TYPE_KERNEL_DEVICE,
                               G_PARAM_READWRITE));
+
+    signals[TIMED_OUT] =
+        g_signal_new (MM_PORT_SIGNAL_TIMED_OUT,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMPortClass, timed_out),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 1, G_TYPE_UINT);
 }

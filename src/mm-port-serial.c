@@ -65,9 +65,7 @@ enum {
 
 enum {
     BUFFER_FULL,
-    TIMED_OUT,
     FORCED_CLOSE,
-
     LAST_SIGNAL
 };
 
@@ -604,7 +602,7 @@ port_serial_process_command (MMPortSerial *self,
             if (ctx->eagain_count <= 0) {
                 /* If we reach the limit of EAGAIN errors, treat as a timeout error. */
                 self->priv->n_consecutive_timeouts++;
-                g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
+                g_signal_emit_by_name (self, MM_PORT_SIGNAL_TIMED_OUT, self->priv->n_consecutive_timeouts);
 
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                              "Sending command failed: '%s'", g_strerror (errno));
@@ -640,7 +638,7 @@ port_serial_process_command (MMPortSerial *self,
             if (ctx->eagain_count <= 0) {
                 /* If we reach the limit of EAGAIN errors, treat as a timeout error. */
                 self->priv->n_consecutive_timeouts++;
-                g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
+                g_signal_emit_by_name (self, MM_PORT_SIGNAL_TIMED_OUT, self->priv->n_consecutive_timeouts);
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                              "Sending command failed: '%s'", g_strerror (errno));
                 return FALSE;
@@ -786,7 +784,7 @@ port_serial_timed_out (gpointer data)
 
         /* Emit a timed out signal, used by upper layers to identify a disconnected
          * serial port */
-        g_signal_emit (self, signals[TIMED_OUT], 0, self->priv->n_consecutive_timeouts);
+        g_signal_emit_by_name (self, MM_PORT_SIGNAL_TIMED_OUT, self->priv->n_consecutive_timeouts);
     }
     g_object_unref (self);
 
@@ -2176,15 +2174,6 @@ mm_port_serial_class_init (MMPortSerialClass *klass)
                       NULL, NULL,
                       g_cclosure_marshal_generic,
                       G_TYPE_NONE, 1, G_TYPE_POINTER);
-
-    signals[TIMED_OUT] =
-        g_signal_new ("timed-out",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_FIRST,
-                      G_STRUCT_OFFSET (MMPortSerialClass, timed_out),
-                      NULL, NULL,
-                      g_cclosure_marshal_generic,
-                      G_TYPE_NONE, 1, G_TYPE_UINT);
 
     signals[FORCED_CLOSE] =
         g_signal_new ("forced-close",
