@@ -147,9 +147,9 @@ mm_base_modem_get_dbus_id (MMBaseModem *self)
 /******************************************************************************/
 
 static void
-serial_port_timed_out_cb (MMPortSerial *port,
-                          guint         n_consecutive_timeouts,
-                          MMBaseModem  *self)
+port_timed_out_cb (MMPort       *port,
+                   guint         n_consecutive_timeouts,
+                   MMBaseModem  *self)
 {
     /* If reached the maximum number of timeouts, invalidate modem */
     if (n_consecutive_timeouts >= self->priv->max_timeouts) {
@@ -203,13 +203,6 @@ base_modem_create_tty_port (MMBaseModem        *self,
 
     if (!port)
         return NULL;
-
-    /* Enable port timeout checks if requested to do so */
-    if (self->priv->max_timeouts > 0)
-        g_signal_connect (port,
-                          MM_PORT_SIGNAL_TIMED_OUT,
-                          G_CALLBACK (serial_port_timed_out_cb),
-                          self);
 
     /* Optional user-provided baudrate */
     if (mm_kernel_device_has_property (kernel_device, ID_MM_TTY_BAUDRATE))
@@ -367,6 +360,37 @@ base_modem_internal_grab_port (MMBaseModem         *self,
         g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
                      "Cannot add port '%s/%s', unhandled port type", subsys, name);
         return NULL;
+    }
+
+    /* Setup consecutive timeout watcher in all control ports */
+    if (self->priv->max_timeouts > 0) {
+        gboolean timeout_monitoring = FALSE;
+
+        if (MM_IS_PORT_SERIAL_AT (port)) {
+            mm_obj_dbg (port, "timeout monitoring enabled in AT port");
+            timeout_monitoring = TRUE;
+        } else if (MM_IS_PORT_SERIAL_QCDM (port)) {
+            mm_obj_dbg (port, "timeout monitoring enabled in QCDM port");
+            timeout_monitoring = TRUE;
+        }
+#if defined WITH_QMI
+        else if (MM_IS_PORT_QMI (port)) {
+            mm_obj_dbg (port, "timeout monitoring enabled in QMI port");
+            timeout_monitoring = TRUE;
+        }
+#endif
+#if defined WITH_MBIM
+        else if (MM_IS_PORT_MBIM (port)) {
+            mm_obj_dbg (port, "timeout monitoring enabled in MBIM port");
+            timeout_monitoring = TRUE;
+        }
+#endif
+
+        if (timeout_monitoring)
+            g_signal_connect (port,
+                              MM_PORT_SIGNAL_TIMED_OUT,
+                              G_CALLBACK (port_timed_out_cb),
+                              self);
     }
 
     /* Store kernel device */
@@ -1719,11 +1743,8 @@ cleanup_modem_port (MMBaseModem *self,
                 mm_port_subsys_get_string (mm_port_get_subsys (MM_PORT (port))),
                 mm_port_get_device (MM_PORT (port)));
 
-    /* Cleanup for serial ports */
-    if (MM_IS_PORT_SERIAL (port)) {
-        g_signal_handlers_disconnect_by_func (port, serial_port_timed_out_cb, self);
-        return;
-    }
+    /* Cleanup on all control ports */
+    g_signal_handlers_disconnect_by_func (port, port_timed_out_cb, self);
 
 #if defined WITH_MBIM
     /* We need to close the MBIM port cleanly when disposing the modem object */
