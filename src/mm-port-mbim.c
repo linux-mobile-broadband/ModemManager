@@ -34,6 +34,10 @@ G_DEFINE_TYPE (MMPortMbim, mm_port_mbim, MM_TYPE_PORT)
 struct _MMPortMbimPrivate {
     gboolean    in_progress;
     MbimDevice *mbim_device;
+
+    /* timeout monitoring */
+    gulong timeout_monitoring_id;
+
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     gboolean    qmi_supported;
     QmiDevice  *qmi_device;
@@ -387,6 +391,41 @@ mm_port_mbim_reset (MMPortMbim          *self,
 
 /*****************************************************************************/
 
+static void
+reset_timeout_monitoring (MMPortMbim *self,
+                          MbimDevice *mbim_device)
+{
+    if (self->priv->timeout_monitoring_id && mbim_device) {
+        g_signal_handler_disconnect (mbim_device, self->priv->timeout_monitoring_id);
+        self->priv->timeout_monitoring_id = 0;
+    }
+}
+
+static void
+consecutive_timeouts_updated_cb (MMPortMbim *self,
+                                 GParamSpec *pspec,
+                                 MbimDevice *mbim_device)
+{
+    g_signal_emit_by_name (self, MM_PORT_SIGNAL_TIMED_OUT, mbim_device_get_consecutive_timeouts (mbim_device));
+}
+
+static void
+setup_timeout_monitoring (MMPortMbim *self,
+                          MbimDevice *mbim_device)
+{
+    g_assert (mbim_device);
+
+    reset_timeout_monitoring (self, mbim_device);
+
+    g_assert (!self->priv->timeout_monitoring_id);
+    self->priv->timeout_monitoring_id = g_signal_connect_swapped (mbim_device,
+                                                                  "notify::" MBIM_DEVICE_CONSECUTIVE_TIMEOUTS,
+                                                                  G_CALLBACK (consecutive_timeouts_updated_cb),
+                                                                  self);
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_port_mbim_open_finish (MMPortMbim    *self,
                           GAsyncResult  *res,
@@ -561,6 +600,7 @@ mbim_device_open_ready (MbimDevice   *mbim_device,
     }
 
     mm_obj_dbg (self, "MBIM device is now open");
+    setup_timeout_monitoring (self, mbim_device);
 
 #if defined WITH_QMI && QMI_MBIM_QMUX_SUPPORTED
     if (self->priv->qmi_supported) {
@@ -699,6 +739,7 @@ mbim_device_close_ready (MbimDevice   *mbim_device,
 
     g_assert (!self->priv->mbim_device);
     self->priv->in_progress = FALSE;
+    reset_timeout_monitoring (self, mbim_device);
 
     if (!mbim_device_close_finish (mbim_device, res, &error))
         g_task_return_error (task, error);
@@ -855,6 +896,7 @@ dispose (GObject *object)
 #endif
 
     /* Clear device object */
+    reset_timeout_monitoring (self, self->priv->mbim_device);
     g_clear_object (&self->priv->mbim_device);
 
     G_OBJECT_CLASS (mm_port_mbim_parent_class)->dispose (object);
