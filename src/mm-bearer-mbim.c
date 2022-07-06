@@ -1405,6 +1405,14 @@ disconnect_set_ready (MbimDevice   *device,
         goto out;
     }
 
+    if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_SIM_NOT_INSERTED)) {
+        g_clear_error (&error);
+        g_clear_error (&inner_error);
+        mm_obj_dbg (self, "SIM card not inserted: already disconnected");
+        /* success */
+        goto out;
+    }
+
     if (g_error_matches (error, MBIM_STATUS_ERROR, MBIM_STATUS_ERROR_FAILURE) && parsed_result && nw_error != 0) {
         g_assert (!inner_error);
         g_error_free (error);
