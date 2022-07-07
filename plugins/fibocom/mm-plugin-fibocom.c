@@ -107,7 +107,7 @@ mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", "net", "usbmisc", NULL };
     static const guint16 vendor_ids[] = { 0x2cb7, 0x1782, 0 };
-    static const gchar *drivers[] = { "cdc_mbim", "qmi_wwan", "cdc_ether", NULL };
+    static const gchar *drivers[] = { "cdc_mbim", "qmi_wwan", "cdc_ether", "option", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_FIBOCOM,

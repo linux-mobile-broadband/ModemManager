@@ -65,7 +65,23 @@ ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0106", ENV{.MM_USBIFNUM}=="00", ENV{
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0106", ENV{.MM_USBIFNUM}=="01", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
 ATTRS{idVendor}=="2cb7", ATTRS{idProduct}=="0106", ENV{.MM_USBIFNUM}=="02", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
 
-# Fibocom L610 (GTUSBMODE=32)
+# Fibocom L610 (GTUSBMODE=31)
+#  ttyUSB0 (if #0): AT port
+#  ttyUSB1 (if #1): NV
+#  ttyUSB2 (if #2): MOS
+#  ttyUSB3 (if #3): Diagnostic
+#  ttyUSB4 (if #4): Logging
+#  ttyUSB5 (if #5): AT port
+#  ttyUSB6 (if #6): AT port
+ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d10", ENV{.MM_USBIFNUM}=="00", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_PRIMARY}="1"
+ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d10", ENV{.MM_USBIFNUM}=="01", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d10", ENV{.MM_USBIFNUM}=="02", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d10", ENV{.MM_USBIFNUM}=="03", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d10", ENV{.MM_USBIFNUM}=="04", ENV{ID_MM_PORT_IGNORE}="1"
+ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d10", ENV{.MM_USBIFNUM}=="05", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+ATTRS{idVendor}=="1782", ATTRS{idProduct}=="4d10", ENV{.MM_USBIFNUM}=="06", SUBSYSTEM=="tty", ENV{ID_MM_PORT_TYPE_AT_SECONDARY}="1"
+
+# Fibocom L610 (GTUSBMODE={32,33} - ECM/RNDIS)
 #  ttyUSB0 (if #2): AT port
 #  ttyUSB1 (if #3): NV
 #  ttyUSB2 (if #4): MOS
