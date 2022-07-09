@@ -86,7 +86,7 @@ ensure_qmi_client (MMCallQmi            *self,
 }
 
 /*****************************************************************************/
-/* Start the CALL */
+/* Start the call */
 
 static gboolean
 call_start_finish (MMBaseCall    *self,
