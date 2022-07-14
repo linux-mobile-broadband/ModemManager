@@ -306,10 +306,14 @@ profile_manager_check_activated_profile_ready (MMIfaceModem3gppProfileManager *s
     ctx = g_task_get_task_data (task);
 
     if (!MM_IFACE_MODEM_3GPP_PROFILE_MANAGER_GET_INTERFACE (self)->check_activated_profile_finish (self, res, &activated, &error)) {
-        mm_obj_dbg (self, "couldn't check if profile '%s' is activated: %s", ctx->index_field_value_str, error->message);
-        ctx->step = SET_PROFILE_STEP_DEACTIVATE_PROFILE;
-    }
-    else if (activated) {
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_NOT_FOUND)) {
+            mm_obj_dbg (self, "profile '%s' is not activated: %s", ctx->index_field_value_str, error->message);
+            ctx->step = SET_PROFILE_STEP_STORE_PROFILE;
+        } else {
+            mm_obj_dbg (self, "couldn't check if profile '%s' is activated: %s", ctx->index_field_value_str, error->message);
+            ctx->step = SET_PROFILE_STEP_DEACTIVATE_PROFILE;
+        }
+    } else if (activated) {
         mm_obj_dbg (self, "profile '%s' is activated", ctx->index_field_value_str);
         ctx->step = SET_PROFILE_STEP_DEACTIVATE_PROFILE;
     } else {
