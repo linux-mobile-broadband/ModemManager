@@ -29,6 +29,7 @@
 #include "mm-log-object.h"
 #include "mm-sim-qmi.h"
 #include "mm-modem-helpers-qmi.h"
+#include "mm-shared-qmi.h"
 
 G_DEFINE_TYPE (MMSimQmi, mm_sim_qmi, MM_TYPE_BASE_SIM)
 
@@ -54,33 +55,24 @@ ensure_qmi_client (GTask       *task,
 {
     MMBaseModem *modem = NULL;
     QmiClient *client;
-    MMPortQmi *port;
+    g_autoptr(GError) error = NULL;
 
     g_object_get (self,
                   MM_BASE_SIM_MODEM, &modem,
                   NULL);
     g_assert (MM_IS_BASE_MODEM (modem));
 
-    port = mm_broadband_modem_qmi_peek_port_qmi (MM_BROADBAND_MODEM_QMI (modem));
+    g_assert (MM_IS_SHARED_QMI (modem));
+    client = mm_shared_qmi_peek_client (MM_SHARED_QMI (modem),
+                                        service,
+                                        MM_PORT_QMI_FLAG_DEFAULT,
+                                        &error);
+
     g_object_unref (modem);
 
-    if (!port) {
-        if (task) {
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "Couldn't peek QMI port");
-            g_object_unref (task);
-        }
-        return FALSE;
-    }
-
-    client = mm_port_qmi_peek_client (port,
-                                      service,
-                                      MM_PORT_QMI_FLAG_DEFAULT);
     if (!client) {
         if (task) {
-            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                                     "Couldn't peek client for service '%s'",
-                                     qmi_service_get_string (service));
+            g_task_return_error (task, g_steal_pointer (&error));
             g_object_unref (task);
         }
         return FALSE;
