@@ -3571,6 +3571,7 @@ typedef enum {
     SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL,
     SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ICCID,
     SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_IMSI,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION,
     SETUP_SIM_HOT_SWAP_STEP_LAST,
 } SetupSimHotSwapStep;
 
@@ -3885,18 +3886,14 @@ uim_refresh_register_file_ready (QmiClientUim *client,
         g_task_return_new_error (task, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
                                  "SIM hot swap detection not supported by modem");
         g_object_unref (task);
-    } else {
-        mm_obj_dbg (self, "file refresh registered using 'refresh register'");
-        if (!priv->uim_refresh_indication_id)
-            priv->uim_refresh_indication_id =
-                g_signal_connect (client,
-                                  "refresh",
-                                  G_CALLBACK (uim_refresh_indication_cb),
-                                  self);
-        /* Go on to next step */
-        ctx->step++;
-        setup_sim_hot_swap_step (task);
+        return;
     }
+
+    mm_obj_dbg (self, "file refresh registered using 'refresh register'");
+
+    /* Go on to next step */
+    ctx->step++;
+    setup_sim_hot_swap_step (task);
 }
 
 /* This is the last resort if 'refresh register all' does not work. It works
@@ -3994,17 +3991,14 @@ uim_refresh_register_all_ready (QmiClientUim *client,
         g_clear_object (&priv->uim_client);
         g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
-    } else {
-        mm_obj_dbg (self, "registered for all SIM refresh events");
-        priv->uim_refresh_indication_id =
-            g_signal_connect (client,
-                              "refresh",
-                              G_CALLBACK (uim_refresh_indication_cb),
-                              self);
-        /* Go to last step */
-        ctx->step = SETUP_SIM_HOT_SWAP_STEP_LAST;
-        setup_sim_hot_swap_step (task);
+        return;
     }
+
+    mm_obj_dbg (self, "registered for all SIM refresh events");
+
+    /* Jump to setup refresh indication signal */
+    ctx->step = SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION;
+    setup_sim_hot_swap_step (task);
 }
 
 static void
@@ -4134,8 +4128,6 @@ setup_sim_hot_swap_step (GTask *task)
         g_autoptr(QmiMessageUimRefreshRegisterAllInput) refresh_register_all_input = NULL;
         g_autoptr(GArray)                               placeholder_aid = NULL;
 
-        g_assert (!priv->uim_refresh_indication_id);
-
         placeholder_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
         refresh_register_all_input = qmi_message_uim_refresh_register_all_input_new ();
 
@@ -4171,6 +4163,16 @@ setup_sim_hot_swap_step (GTask *task)
         uim_refresh_register_file (task, 0x6F07, file_path, G_N_ELEMENTS (file_path));
         return;
 	}
+
+    case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION:
+        g_assert (!priv->uim_refresh_indication_id);
+        priv->uim_refresh_indication_id =
+            g_signal_connect (priv->uim_client,
+                              "refresh",
+                              G_CALLBACK (uim_refresh_indication_cb),
+                              self);
+        ctx->step++;
+        /* fall-through */
 
     case SETUP_SIM_HOT_SWAP_STEP_LAST:
         g_task_return_boolean (task, TRUE);
