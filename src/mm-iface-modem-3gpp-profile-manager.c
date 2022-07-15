@@ -1608,7 +1608,10 @@ profile_manager_list_profiles_check_ready (MMIfaceModem3gppProfileManager *self,
     if (!mm_iface_modem_3gpp_profile_manager_list_profiles_finish (self, res, NULL, &error))
         mm_obj_dbg (self, "profile management support check failed: couldn't load profile list: %s", error->message);
     else {
-        /* profile management is supported! */
+        /* profile management is supported!
+         * We are here because the modem type did not define the check_support functions,
+         * but we need anyway to set index_field, so let's use "profile-id" as default */
+        mm_gdbus_modem3gpp_profile_manager_set_index_field (ctx->skeleton, "profile-id");
         g_object_set_qdata (G_OBJECT (self), supported_quark, GUINT_TO_POINTER (TRUE));
     }
 
