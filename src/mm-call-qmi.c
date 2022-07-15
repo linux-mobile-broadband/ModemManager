@@ -104,7 +104,7 @@ voice_dial_call_ready (QmiClientVoice *client,
     QmiMessageVoiceDialCallOutput *output;
     GError                        *error = NULL;
     MMBaseCall                    *self;
-    
+
     self = MM_BASE_CALL (g_task_get_source_object (task));
 
     output = qmi_client_voice_dial_call_finish (client, res, &error);
@@ -128,7 +128,7 @@ voice_dial_call_ready (QmiClientVoice *client,
             g_task_return_boolean (task, TRUE);
         }
     }
-    
+
     if (output)
         qmi_message_voice_dial_call_output_unref (output);
 
@@ -198,7 +198,7 @@ voice_answer_call_ready (QmiClientVoice *client,
     } else {
         g_task_return_boolean (task, TRUE);
     }
-    
+
     if (output)
         qmi_message_voice_answer_call_output_unref (output);
 
@@ -278,7 +278,7 @@ voice_end_call_ready (QmiClientVoice *client,
     } else {
         g_task_return_boolean (task, TRUE);
     }
-    
+
     if (output)
         qmi_message_voice_end_call_output_unref (output);
 
