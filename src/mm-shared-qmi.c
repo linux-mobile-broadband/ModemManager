@@ -4165,7 +4165,15 @@ setup_sim_hot_swap_step (GTask *task)
         /* fall-through */
 
     case SETUP_SIM_HOT_SWAP_STEP_LAST:
-        g_task_return_boolean (task, TRUE);
+        if (ctx->refresh_all_supported  ||
+            ctx->refresh_file_supported ||
+            (ctx->register_slot_status_supported && ctx->get_slot_status_supported)) {
+            /* at least one method was supported, return success */
+            g_task_return_boolean (task, TRUE);
+        } else {
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Couldn't setup SIM hot swap");
+        }
         g_object_unref (task);
         return;
 
