@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2020-09-18 10:30+0200\n"
+"POT-Creation-Date: 2022-07-16 14:32+0200\n"
 "PO-Revision-Date: 2019-04-13 22:08+0300\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -17,8 +17,8 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 2.2.1\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && (n%100<11 || n%100>19) ? 0 : n"
-"%10>=2 && n%10<=9 && (n%100<11 || n%100>19) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && (n%100<11 || n%100>19) ? 0 : "
+"n%10>=2 && n%10<=9 && (n%100<11 || n%100>19) ? 1 : 2);\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
 msgid "Control the Modem Manager daemon"
@@ -117,6 +117,6 @@ msgstr ""
 "Sistemos politika neleidžia užklausti ar tvarkyti šio įrenginio programinę "
 "aparatinę įrangą."
 
-#: src/mm-sleep-monitor.c:125
+#: src/mm-sleep-monitor-systemd.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager turi atstatyti įrenginius"

@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Modem Manager\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2020-09-18 10:30+0200\n"
+"POT-Creation-Date: 2022-07-16 14:32+0200\n"
 "PO-Revision-Date: 2019-11-10 14:35+0200\n"
 "Last-Translator: Yuri Chornoivan <yurchor@ukr.net>\n"
 "Language-Team: Ukrainian <kde-i18n-uk@kde.org>\n"
@@ -16,8 +16,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
-"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Generator: Lokalize 19.11.70\n"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:13
@@ -115,6 +115,6 @@ msgstr ""
 "Правила системи перешкоджають опитуванню або керування мікропрограмою цього "
 "пристрою."
 
-#: src/mm-sleep-monitor.c:125
+#: src/mm-sleep-monitor-systemd.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager потребує відновлення початкового стану пристроїв"

@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: ModemManager main\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2022-03-27 15:27+0000\n"
+"POT-Creation-Date: 2022-07-16 14:32+0200\n"
 "PO-Revision-Date: 2022-03-27 20:42+0200\n"
 "Last-Translator: Nathan Follens <nfollens@gnome.org>\n"
 "Language-Team: Dutch <gnome-nl-list@gnome.org>\n"
@@ -112,6 +112,6 @@ msgstr ""
 "Systeembeleid verbiedt het ophalen of beheren van de firmware van dit "
 "apparaat."
 
-#: src/mm-sleep-monitor.c:125
+#: src/mm-sleep-monitor-systemd.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "Modembeheer moet apparaten opnieuw instellen"

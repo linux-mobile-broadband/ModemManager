@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: ModemManager master\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2021-11-19 15:29+0000\n"
+"POT-Creation-Date: 2022-07-16 14:32+0200\n"
 "PO-Revision-Date: 2021-11-19 22:43+0100\n"
 "Last-Translator: Fran Dieguez <fran.dieguez@gnome.org>\n"
 "Language-Team: Galician <proxecto@trasno.gal>\n"
@@ -110,6 +110,6 @@ msgid "System policy prevents querying or managing this device's firmware."
 msgstr ""
 "A normativa do sistema prevén a consulta e xesión do firmware do dispositivo."
 
-#: src/mm-sleep-monitor.c:125
+#: src/mm-sleep-monitor-systemd.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "ModemManager precisa reiniciar os dispositivos"

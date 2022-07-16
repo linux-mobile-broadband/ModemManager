@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Modem Manager\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2020-09-18 10:30+0200\n"
+"POT-Creation-Date: 2022-07-16 14:32+0200\n"
 "PO-Revision-Date: 2020-02-08 18:14+0200\n"
 "Last-Translator: Yaron Shahrabani <sh.yaron@gmail.com>\n"
 "Language-Team: Hebrew <kde-i18n-he@kde.org>\n"
@@ -32,7 +32,8 @@ msgid "Unlock and control a mobile broadband device"
 msgstr "שחרור ושליטה במכשיר לרשת תקשורת סלולרית"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:23
-msgid "System policy prevents unlocking or controlling the mobile broadband device."
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
 msgstr "מדיניות המערכת מונעת שחרור או שליטה בהתקן רשת התקשורת האלחוטית."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:31
@@ -51,8 +52,7 @@ msgstr "שליחה, שמירה, עריכה ומחיקה של הודעות טקס
 #: data/org.freedesktop.ModemManager1.policy.in.in:41
 msgid ""
 "System policy prevents sending or manipulating this device's text messages."
-msgstr ""
-"מדיניות המערכת מונעת שליחה או עריכה של המסרונים בהתקן הזה."
+msgstr "מדיניות המערכת מונעת שליחה או עריכה של המסרונים בהתקן הזה."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:49
 msgid "Accept incoming voice calls or start outgoing voice calls."
@@ -72,14 +72,12 @@ msgstr "מדיניות מערכת מונעת תשאול פרטי זמן מהרש
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:67
 msgid "Enable and view geographic location and positioning information"
-msgstr ""
-"להפעיל ולהציג פרטי מיקום גאוגרפי"
+msgstr "להפעיל ולהציג פרטי מיקום גאוגרפי"
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:68
 msgid ""
 "System policy prevents enabling or viewing geographic location information."
-msgstr ""
-"מדיניות מערכת מונעת הפעלה או הצגה של פרטי מיקום גאוגרפי."
+msgstr "מדיניות מערכת מונעת הפעלה או הצגה של פרטי מיקום גאוגרפי."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:76
 msgid "Query and utilize network information and services"
@@ -89,8 +87,7 @@ msgstr "תשאול ושימוש בשירותי ומידע על הרשת"
 msgid ""
 "System policy prevents querying or utilizing network information and "
 "services."
-msgstr ""
-"מדיניות המערכת מונעת תשאול או שימוש במידע על הרשת או שירותים שלה."
+msgstr "מדיניות המערכת מונעת תשאול או שימוש במידע על הרשת או שירותים שלה."
 
 #: data/org.freedesktop.ModemManager1.policy.in.in:85
 msgid "Query and manage firmware on a mobile broadband device"
@@ -100,6 +97,6 @@ msgstr "תשאול וניהול קושחה על התקן רשת תקשורת ס�
 msgid "System policy prevents querying or managing this device's firmware."
 msgstr "מדיניות המערכת מונעת תשאול או ניהול של קושחת ההתקן הזה."
 
-#: src/mm-sleep-monitor.c:125
+#: src/mm-sleep-monitor-systemd.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "על ModemManager לאפס התקנים"

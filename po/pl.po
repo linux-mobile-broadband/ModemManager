@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: ModemManager\n"
 "Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
 "ModemManager/issues\n"
-"POT-Creation-Date: 2020-09-18 10:30+0200\n"
+"POT-Creation-Date: 2022-07-16 14:32+0200\n"
 "PO-Revision-Date: 2019-09-28 15:02+0200\n"
 "Last-Translator: Piotr Drąg <piotrdrag@gmail.com>\n"
 "Language-Team: Polish <community-poland@mozilla.org>\n"
@@ -114,6 +114,6 @@ msgstr ""
 "Ustawienia systemu uniemożliwiają odpytywanie lub zarządzanie "
 "oprogramowaniem sprzętowym tego urządzenia."
 
-#: src/mm-sleep-monitor.c:125
+#: src/mm-sleep-monitor-systemd.c:125
 msgid "ModemManager needs to reset devices"
 msgstr "Usługa ModemManager musi ponownie uruchomić urządzenia"
