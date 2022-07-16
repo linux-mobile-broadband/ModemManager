@@ -4075,6 +4075,8 @@ setup_sim_hot_swap_step (GTask *task)
     case SETUP_SIM_HOT_SWAP_STEP_UIM_REGISTER_SLOT_STATUS: {
         g_autoptr(QmiMessageUimRegisterEventsInput) register_events_input = NULL;
 
+        mm_obj_dbg (self, "setup SIM hot swap (%u/%u): registering for slot status indications...",
+                    ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
         register_events_input = qmi_message_uim_register_events_input_new ();
         qmi_message_uim_register_events_input_set_event_registration_mask (register_events_input,
                                                                            QMI_UIM_EVENT_REGISTRATION_FLAG_PHYSICAL_SLOT_STATUS,
@@ -4090,6 +4092,8 @@ setup_sim_hot_swap_step (GTask *task)
 
     case SETUP_SIM_HOT_SWAP_STEP_UIM_CHECK_SLOT_STATUS:
         if (ctx->register_slot_status_supported) {
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): checking slot status support...",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
             /* Successful registration does not mean that the modem actually sends
              * physical slot status indications; invoke Get Slot Status to find out if
              * the modem really supports slot status. */
@@ -4101,17 +4105,22 @@ setup_sim_hot_swap_step (GTask *task)
                                             task);
             return;
         }
+        mm_obj_dbg (self, "setup SIM hot swap (%u/%u): no need to check for slot status support...",
+                    ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
         ctx->step++;
         /* fall-through */
 
     case SETUP_SIM_HOT_SWAP_STEP_UIM_SLOT_STATUS_INDICATION:
         if (ctx->register_slot_status_supported && ctx->get_slot_status_supported) {
-            mm_obj_dbg (self, "monitoring slot status indications");
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): monitoring slot status indications...",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
             ctx->uim_slot_status_indication_id = g_signal_connect (ctx->uim_client,
                                                                    "slot-status",
                                                                    G_CALLBACK (uim_slot_status_indication_cb),
                                                                    self);
-        }
+        } else
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): no need to monitor for slot status indications...",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
         ctx->step++;
         /* fall-through */
 
@@ -4119,6 +4128,8 @@ setup_sim_hot_swap_step (GTask *task)
         g_autoptr(QmiMessageUimRefreshRegisterAllInput) refresh_register_all_input = NULL;
         g_autoptr(GArray)                               placeholder_aid = NULL;
 
+        mm_obj_dbg (self, "setup SIM hot swap (%u/%u): registering for all refresh events...",
+                    ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
         placeholder_aid = g_array_new (FALSE, FALSE, sizeof (guint8));
         refresh_register_all_input = qmi_message_uim_refresh_register_all_input_new ();
 
@@ -4144,10 +4155,13 @@ setup_sim_hot_swap_step (GTask *task)
         if (!ctx->refresh_all_supported) {
             const guint16 file_path[] = { 0x3F00 };
 
-            mm_obj_dbg (self, "register for change in sim iccid");
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): registering for SIM ICCID refresh events...",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
             uim_refresh_register_file (task, 0x2FE2, file_path, G_N_ELEMENTS (file_path));
             return;
         }
+        mm_obj_dbg (self, "setup SIM hot swap (%u/%u): no need to register for SIM ICCID refresh events",
+                    ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
         ctx->step++;
         /* fall-through */
 
@@ -4156,21 +4170,29 @@ setup_sim_hot_swap_step (GTask *task)
         if (!ctx->refresh_all_supported) {
             const guint16 file_path[] = { 0x3F00, 0x7FFF };
 
-            mm_obj_dbg (self, "register for change in sim imsi");
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): registering for SIM IMSI refresh events...",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
             uim_refresh_register_file (task, 0x6F07, file_path, G_N_ELEMENTS (file_path));
             return;
         }
+        mm_obj_dbg (self, "setup SIM hot swap (%u/%u): no need to register for SIM IMSI refresh events...",
+                    ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
         ctx->step++;
         /* fall-through */
 
     case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION:
         if (ctx->refresh_all_supported || ctx->refresh_file_supported) {
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): monitoring refresh indications...",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
             ctx->uim_refresh_indication_id =
                 g_signal_connect (ctx->uim_client,
                                   "refresh",
                                   G_CALLBACK (uim_refresh_indication_cb),
                                   self);
-        }
+        } else
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): no need to monitor for refresh indications...",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
+
         ctx->step++;
         /* fall-through */
 
@@ -4192,8 +4214,12 @@ setup_sim_hot_swap_step (GTask *task)
                 priv->uim_refresh_indication_id = ctx->uim_refresh_indication_id;
                 ctx->uim_refresh_indication_id = 0;
             }
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): successfully finished",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
             g_task_return_boolean (task, TRUE);
         } else {
+            mm_obj_dbg (self, "setup SIM hot swap (%u/%u): failed",
+                        ctx->step, SETUP_SIM_HOT_SWAP_STEP_LAST);
             g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                      "Couldn't setup SIM hot swap");
         }
