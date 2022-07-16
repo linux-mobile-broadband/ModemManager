@@ -4147,6 +4147,8 @@ typedef struct {
 static void
 sim_swap_context_free (SimSwapContext *ctx)
 {
+    g_free (ctx->iccid);
+    g_free (ctx->imsi);
     g_clear_object (&ctx->sim);
     g_slice_free (SimSwapContext, ctx);
 }
