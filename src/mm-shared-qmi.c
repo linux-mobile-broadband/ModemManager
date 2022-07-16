@@ -3971,35 +3971,23 @@ uim_refresh_register_all_ready (QmiClientUim *client,
     g_autoptr(QmiMessageUimRefreshRegisterAllOutput)  output = NULL;
     g_autoptr(GError)                                 error = NULL;
     MMIfaceModem                                     *self;
-    Private                                          *priv;
     SetupSimHotSwapContext                           *ctx;
 
     self = g_task_get_source_object (task);
-    priv = get_private (MM_SHARED_QMI (self));
     ctx  = g_task_get_task_data (task);
 
     output = qmi_client_uim_refresh_register_all_finish (client, res, &error);
     if (!output || !qmi_message_uim_refresh_register_all_output_get_result (output, &error)) {
-        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NOT_SUPPORTED) ||
-            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
-            /* As last resort, if 'refresh register all' fails, try a plain 'refresh register'.
-             * Some older modems may not support 'refresh register all'. */
-            ctx->step++;
-            setup_sim_hot_swap_step (task);
-            return;
-        }
-
+        /* As last resort, if 'refresh register all' fails, try a plain 'refresh register'.
+         * Some older modems may not support 'refresh register all'. */
         mm_obj_dbg (self, "refresh register all operation failed: %s", error->message);
-        g_clear_object (&priv->uim_client);
-        g_task_return_error (task, g_steal_pointer (&error));
-        g_object_unref (task);
-        return;
+        ctx->step++;
+    } else {
+        /* Jump to setup refresh indication signal */
+        mm_obj_dbg (self, "registered for all SIM refresh events");
+        ctx->step = SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION;
     }
 
-    mm_obj_dbg (self, "registered for all SIM refresh events");
-
-    /* Jump to setup refresh indication signal */
-    ctx->step = SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION;
     setup_sim_hot_swap_step (task);
 }
 
