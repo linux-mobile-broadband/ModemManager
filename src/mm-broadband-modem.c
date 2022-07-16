@@ -4140,7 +4140,9 @@ typedef struct {
     MMBaseSim        *sim;
     guint             retries;
     gchar            *iccid;
+    gboolean          iccid_check_done;
     gchar            *imsi;
+    gboolean          imsi_check_done;
     SimSwapCheckStep  step;
 } SimSwapContext;
 
@@ -4179,20 +4181,16 @@ complete_sim_swap_check (GTask       *task,
     self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
-    switch (ctx->step) {
-    case SIM_SWAP_CHECK_STEP_ICCID_CHANGED:
+    if (ctx->step == SIM_SWAP_CHECK_STEP_ICCID_CHANGED) {
+        ctx->iccid_check_done = TRUE;
         cached = mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->sim));
         str = "identifier";
-        break;
-    case SIM_SWAP_CHECK_STEP_IMSI_CHANGED:
+    } else if (ctx->step == SIM_SWAP_CHECK_STEP_IMSI_CHANGED) {
+        ctx->imsi_check_done = TRUE;
         cached = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->sim));
         str = "imsi";
-        break;
-    case SIM_SWAP_CHECK_STEP_FIRST:
-    case SIM_SWAP_CHECK_STEP_LAST:
-    default:
+    } else
         g_assert_not_reached();
-    }
 
     if (g_strcmp0 (current, cached) != 0) {
         mm_obj_info (self, "SIM %s has changed: %s -> %s",
@@ -4222,25 +4220,20 @@ load_sim_step_ready (MMBaseSim    *sim,
     self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
-    switch (ctx->step) {
-    case SIM_SWAP_CHECK_STEP_ICCID_CHANGED:
+    if (ctx->step == SIM_SWAP_CHECK_STEP_ICCID_CHANGED) {
         current = mm_base_sim_load_sim_identifier_finish (sim, res, &error);
         str = "identifier";
-        break;
-    case SIM_SWAP_CHECK_STEP_IMSI_CHANGED:
+    } else if (ctx->step == SIM_SWAP_CHECK_STEP_IMSI_CHANGED) {
         current = MM_BASE_SIM_GET_CLASS (sim)->load_imsi_finish (sim, res, &error);
         str = "imsi";
-        break;
-    case SIM_SWAP_CHECK_STEP_FIRST:
-    case SIM_SWAP_CHECK_STEP_LAST:
-    default:
+    } else
         g_assert_not_reached();
-    }
 
     if (error) {
         if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
-            g_task_return_error (task, error);
-            g_object_unref (task);
+            /* Skip checking this field right away */
+            ctx->step++;
+            sim_swap_check_step (task);
             return;
         }
 
@@ -4251,14 +4244,16 @@ load_sim_step_ready (MMBaseSim    *sim,
             g_clear_error (&error);
             if (ctx->step == SIM_SWAP_CHECK_STEP_ICCID_CHANGED)
                 g_timeout_add_seconds (1, (GSourceFunc) load_sim_identifier, task);
-            else
+            else if (ctx->step == SIM_SWAP_CHECK_STEP_IMSI_CHANGED)
                 g_timeout_add_seconds (1, (GSourceFunc) load_sim_imsi, task);
+            else
+                g_assert_not_reached();
             return;
         }
 
         mm_obj_warn (self, "could not load SIM %s: %s", str, error->message);
-        g_task_return_error (task, error);
-        g_object_unref (task);
+        ctx->step++;
+        sim_swap_check_step (task);
         return;
     }
 
@@ -4268,7 +4263,9 @@ load_sim_step_ready (MMBaseSim    *sim,
 static gboolean
 load_sim_identifier (GTask *task)
 {
-    SimSwapContext *ctx = g_task_get_task_data (task);
+    SimSwapContext *ctx;
+
+    ctx = g_task_get_task_data (task);
 
     mm_base_sim_load_sim_identifier (ctx->sim,
                                      (GAsyncReadyCallback)load_sim_step_ready,
@@ -4280,22 +4277,20 @@ load_sim_identifier (GTask *task)
 static gboolean
 load_sim_imsi (GTask *task)
 {
-    SimSwapContext *ctx = g_task_get_task_data (task);
+    SimSwapContext *ctx;
 
-    if (!MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi ||
-        !MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi_finish) {
-        g_task_return_new_error (task,
-                                 MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "sim imsi could not be loaded");
-        g_object_unref (task);
-        return G_SOURCE_REMOVE;
+    ctx = g_task_get_task_data (task);
+
+    if (MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi &&
+        MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi_finish) {
+        MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi (ctx->sim,
+                                                     (GAsyncReadyCallback)load_sim_step_ready,
+                                                     task);
+    } else {
+        ctx->step++;
+        sim_swap_check_step (task);
     }
 
-    MM_BASE_SIM_GET_CLASS (ctx->sim)->load_imsi (
-        ctx->sim,
-        (GAsyncReadyCallback)load_sim_step_ready,
-        task);
     return G_SOURCE_REMOVE;
 }
 
@@ -4323,7 +4318,6 @@ sim_swap_check_step (GTask *task)
 
     case SIM_SWAP_CHECK_STEP_IMSI_CHANGED:
         ctx->retries = SIM_SWAP_CHECK_LOAD_RETRIES_MAX;
-
         if (ctx->imsi)
             complete_sim_swap_check (task, ctx->imsi);
         else
@@ -4331,7 +4325,11 @@ sim_swap_check_step (GTask *task)
         return;
 
     case SIM_SWAP_CHECK_STEP_LAST:
-        g_task_return_boolean (task, TRUE);
+        if (!ctx->iccid_check_done && !ctx->imsi_check_done)
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                     "Couldn't do either ICCID or IMSI check");
+        else
+            g_task_return_boolean (task, TRUE);
         g_object_unref (task);
         return;
 
