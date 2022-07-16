@@ -3579,6 +3579,10 @@ typedef enum {
 
 typedef struct {
     SetupSimHotSwapStep step;
+    gboolean            register_slot_status_supported;
+    gboolean            get_slot_status_supported;
+    gboolean            refresh_all_supported;
+    gboolean            refresh_file_supported;
 } SetupSimHotSwapContext;
 
 static void setup_sim_hot_swap_step (GTask *task);
@@ -3872,35 +3876,26 @@ uim_refresh_register_file_ready (QmiClientUim *client,
                                  GTask        *task)
 {
     MMSharedQmi                                   *self;
-    Private                                       *priv;
     g_autoptr(QmiMessageUimRefreshRegisterOutput)  output = NULL;
     g_autoptr(GError)                              error = NULL;
     SetupSimHotSwapContext                        *ctx;
 
     self = g_task_get_source_object (task);
-    priv = get_private (self);
     ctx  = g_task_get_task_data (task);
 
     output = qmi_client_uim_refresh_register_finish (client, res, &error);
-    if (!output || !qmi_message_uim_refresh_register_output_get_result (output, &error)) {
+    if (!output || !qmi_message_uim_refresh_register_output_get_result (output, &error))
         mm_obj_dbg (self, "file refresh registration using 'refresh register' failed: %s", error->message);
-        g_clear_object (&priv->uim_client);
-        g_task_return_new_error (task, MM_MOBILE_EQUIPMENT_ERROR, MM_MOBILE_EQUIPMENT_ERROR_NOT_SUPPORTED,
-                                 "SIM hot swap detection not supported by modem");
-        g_object_unref (task);
-        return;
+    else {
+        mm_obj_dbg (self, "file refresh registered using 'refresh register'");
+        ctx->refresh_file_supported = TRUE;
     }
-
-    mm_obj_dbg (self, "file refresh registered using 'refresh register'");
 
     /* Go on to next step */
     ctx->step++;
     setup_sim_hot_swap_step (task);
 }
 
-/* This is the last resort if 'refresh register all' does not work. It works
- * on some older modems. Those modems may not also support QMI_UIM_SESSION_TYPE_CARD_SLOT_1
- * so we'll use QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING */
 static void
 uim_refresh_register_file (GTask         *task,
                            guint16        file_id,
@@ -3919,6 +3914,10 @@ uim_refresh_register_file (GTask         *task,
 
     self = g_task_get_source_object (task);
     priv = get_private (MM_SHARED_QMI (self));
+
+    /* This is the last resort if 'refresh register all' does not work. It works
+     * on some older modems. Those modems may not also support QMI_UIM_SESSION_TYPE_CARD_SLOT_1
+     * so we'll use QMI_UIM_SESSION_TYPE_PRIMARY_GW_PROVISIONING */
 
     mm_obj_dbg (self, "register for refresh file indication");
 
@@ -3978,16 +3977,14 @@ uim_refresh_register_all_ready (QmiClientUim *client,
 
     output = qmi_client_uim_refresh_register_all_finish (client, res, &error);
     if (!output || !qmi_message_uim_refresh_register_all_output_get_result (output, &error)) {
-        /* As last resort, if 'refresh register all' fails, try a plain 'refresh register'.
-         * Some older modems may not support 'refresh register all'. */
         mm_obj_dbg (self, "refresh register all operation failed: %s", error->message);
-        ctx->step++;
     } else {
         /* Jump to setup refresh indication signal */
         mm_obj_dbg (self, "registered for all SIM refresh events");
-        ctx->step = SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION;
+        ctx->refresh_all_supported = TRUE;
     }
 
+    ctx->step++;
     setup_sim_hot_swap_step (task);
 }
 
@@ -4006,15 +4003,14 @@ uim_check_get_slot_status_ready (QmiClientUim *client,
 
     output = qmi_client_uim_get_slot_status_finish (client, res, &error);
     if (!output || !qmi_message_uim_get_slot_status_output_get_result (output, &error)) {
-        /* Jump to refresh events registration */
         mm_obj_dbg (self, "slot status retrieval failed: %s", error->message);
-        ctx->step = SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL;
     } else {
         /* Go on to next step */
         mm_obj_dbg (self, "slot status retrieval succeeded");
-        ctx->step++;
+        ctx->get_slot_status_supported = TRUE;
     }
 
+    ctx->step++;
     setup_sim_hot_swap_step (task);
 }
 
@@ -4035,15 +4031,14 @@ uim_register_events_ready (QmiClientUim *client,
      * we cannot use slot status indications to detect eUICC profile switches. */
     output = qmi_client_uim_register_events_finish (client, res, &error);
     if (!output || !qmi_message_uim_register_events_output_get_result (output, &error)) {
-        /* Jump to refresh events registration */
         mm_obj_dbg (self, "not registered for slot status indications: %s", error->message);
-        ctx->step = SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL;
     } else {
-        /* Go on to next step */
         mm_obj_dbg (self, "registered for slot status indications");
-        ctx->step++;
+        ctx->register_slot_status_supported = TRUE;
     }
 
+    /* Go on to next step */
+    ctx->step++;
     setup_sim_hot_swap_step (task);
 }
 
@@ -4082,24 +4077,30 @@ setup_sim_hot_swap_step (GTask *task)
     }
 
     case SETUP_SIM_HOT_SWAP_STEP_UIM_CHECK_SLOT_STATUS:
-        /* Successful registration does not mean that the modem actually sends
-         * physical slot status indications; invoke Get Slot Status to find out if
-         * the modem really supports slot status. */
-        qmi_client_uim_get_slot_status (QMI_CLIENT_UIM (priv->uim_client),
-                                        NULL,
-                                        10,
-                                        NULL,
-                                        (GAsyncReadyCallback) uim_check_get_slot_status_ready,
-                                        task);
-        return;
+        if (ctx->register_slot_status_supported) {
+            /* Successful registration does not mean that the modem actually sends
+             * physical slot status indications; invoke Get Slot Status to find out if
+             * the modem really supports slot status. */
+            qmi_client_uim_get_slot_status (QMI_CLIENT_UIM (priv->uim_client),
+                                            NULL,
+                                            10,
+                                            NULL,
+                                            (GAsyncReadyCallback) uim_check_get_slot_status_ready,
+                                            task);
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
 
     case SETUP_SIM_HOT_SWAP_STEP_UIM_SLOT_STATUS_INDICATION:
-        mm_obj_dbg (self, "monitoring slot status indications");
-        g_assert (!priv->uim_slot_status_indication_id);
-        priv->uim_slot_status_indication_id = g_signal_connect (priv->uim_client,
-                                                                "slot-status",
-                                                                G_CALLBACK (uim_slot_status_indication_cb),
-                                                                self);
+        if (ctx->register_slot_status_supported && ctx->get_slot_status_supported) {
+            mm_obj_dbg (self, "monitoring slot status indications");
+            g_assert (!priv->uim_slot_status_indication_id);
+            priv->uim_slot_status_indication_id = g_signal_connect (priv->uim_client,
+                                                                    "slot-status",
+                                                                    G_CALLBACK (uim_slot_status_indication_cb),
+                                                                    self);
+        }
         ctx->step++;
         /* fall-through */
 
@@ -4127,29 +4128,39 @@ setup_sim_hot_swap_step (GTask *task)
         return;
     }
 
-    case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ICCID: {
-        const guint16 file_path[] = { 0x3F00 };
+    case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ICCID:
+        /* If refresh all not supported, register for a single file refresh notification */
+        if (!ctx->refresh_all_supported) {
+            const guint16 file_path[] = { 0x3F00 };
 
-        mm_obj_dbg (self, "register for change in sim iccid");
-        uim_refresh_register_file (task, 0x2FE2, file_path, G_N_ELEMENTS (file_path));
-        return;
-    }
+            mm_obj_dbg (self, "register for change in sim iccid");
+            uim_refresh_register_file (task, 0x2FE2, file_path, G_N_ELEMENTS (file_path));
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
 
-    case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_IMSI: {
-        const guint16 file_path[] = { 0x3F00, 0x7FFF };
+    case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_IMSI:
+        /* If refresh all not supported, register for a single file refresh notification */
+        if (!ctx->refresh_all_supported) {
+            const guint16 file_path[] = { 0x3F00, 0x7FFF };
 
-        mm_obj_dbg (self, "register for change in sim imsi");
-        uim_refresh_register_file (task, 0x6F07, file_path, G_N_ELEMENTS (file_path));
-        return;
-	}
+            mm_obj_dbg (self, "register for change in sim imsi");
+            uim_refresh_register_file (task, 0x6F07, file_path, G_N_ELEMENTS (file_path));
+            return;
+        }
+        ctx->step++;
+        /* fall-through */
 
     case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION:
-        g_assert (!priv->uim_refresh_indication_id);
-        priv->uim_refresh_indication_id =
-            g_signal_connect (priv->uim_client,
-                              "refresh",
-                              G_CALLBACK (uim_refresh_indication_cb),
-                              self);
+        if (ctx->refresh_all_supported || ctx->refresh_file_supported) {
+            g_assert (!priv->uim_refresh_indication_id);
+            priv->uim_refresh_indication_id =
+                g_signal_connect (priv->uim_client,
+                                  "refresh",
+                                  G_CALLBACK (uim_refresh_indication_cb),
+                                  self);
+        }
         ctx->step++;
         /* fall-through */
 
