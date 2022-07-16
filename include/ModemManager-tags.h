@@ -136,7 +136,7 @@
  * are AT ports to be used for GPS control. Depending on the device,
  * this may or may not mean the same port is also used fo GPS data.
  *
- * This tag will also proevent QCDM probing on the port.
+ * This tag will also prevent QCDM probing on the port.
  *
  * Since: 1.20
  */
