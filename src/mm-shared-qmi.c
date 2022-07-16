@@ -3568,6 +3568,7 @@ mm_shared_qmi_set_primary_sim_slot (MMIfaceModem        *self,
 typedef enum {
     SETUP_SIM_HOT_SWAP_STEP_FIRST,
     SETUP_SIM_HOT_SWAP_STEP_UIM_REGISTER_SLOT_STATUS,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_CHECK_SLOT_STATUS,
     SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL,
     SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ICCID,
     SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_IMSI,
@@ -4018,28 +4019,16 @@ uim_check_get_slot_status_ready (QmiClientUim *client,
 
     output = qmi_client_uim_get_slot_status_finish (client, res, &error);
     if (!output || !qmi_message_uim_get_slot_status_output_get_result (output, &error)) {
-        if (priv->uim_slot_status_indication_id) {
-            g_signal_handler_disconnect (client, priv->uim_slot_status_indication_id);
-            priv->uim_slot_status_indication_id = 0;
-        }
-
-        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NOT_SUPPORTED) ||
-            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND)) {
-            mm_obj_dbg (self, "slot status not supported by modem");
-            /* Go on to next step */
-            ctx->step++;
-            setup_sim_hot_swap_step (task);
-            return;
-        }
-
         mm_obj_dbg (self, "slot status retrieval failed: %s", error->message);
-        g_clear_object (&priv->uim_client);
-        g_task_return_error (task, g_steal_pointer (&error));
-        g_object_unref (task);
-        return;
+    } else {
+        mm_obj_dbg (self, "slot status retrieval succeeded: monitoring slot status indications");
+        g_assert (!priv->uim_slot_status_indication_id);
+        priv->uim_slot_status_indication_id = g_signal_connect (priv->uim_client,
+                                                                "slot-status",
+                                                                G_CALLBACK (uim_slot_status_indication_cb),
+                                                                self);
     }
 
-    mm_obj_dbg (self, "slot status retrieval succeeded: monitoring slot status indications");
     /* Go on to next step */
     ctx->step++;
     setup_sim_hot_swap_step (task);
@@ -4053,40 +4042,24 @@ uim_register_events_ready (QmiClientUim *client,
     g_autoptr(QmiMessageUimRegisterEventsOutput)  output = NULL;
     g_autoptr(GError)                             error = NULL;
     MMIfaceModem                                 *self;
-    Private                                      *priv;
     SetupSimHotSwapContext                       *ctx;
 
     self = g_task_get_source_object (task);
-    priv = get_private (MM_SHARED_QMI (self));
     ctx  = g_task_get_task_data (task);
 
     /* If event registration fails, go on with initialization. In that case
      * we cannot use slot status indications to detect eUICC profile switches. */
     output = qmi_client_uim_register_events_finish (client, res, &error);
-    if (output && qmi_message_uim_register_events_output_get_result (output, &error)) {
-        g_assert (!priv->uim_slot_status_indication_id);
-        priv->uim_slot_status_indication_id = g_signal_connect (priv->uim_client,
-                                                                "slot-status",
-                                                                G_CALLBACK (uim_slot_status_indication_cb),
-                                                                self);
+    if (!output || !qmi_message_uim_register_events_output_get_result (output, &error)) {
+        mm_obj_dbg (self, "not registered for slot status indications: %s", error->message);
+        /* Jump to refresh events registration */
+        ctx->step = SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL;
+    } else {
         mm_obj_dbg (self, "registered for slot status indications");
-
-        /* Successful registration does not mean that the modem actually sends
-         * physical slot status indications; invoke Get Slot Status to find out if
-         * the modem really supports slot status. */
-        qmi_client_uim_get_slot_status (client,
-                                        NULL,
-                                        10,
-                                        NULL,
-                                        (GAsyncReadyCallback) uim_check_get_slot_status_ready,
-                                        task);
-        return;
+        /* Go on to next step */
+        ctx->step++;
     }
 
-    mm_obj_dbg (self, "not registered for slot status indications: %s", error->message);
-
-    /* Go on to next step */
-    ctx->step++;
     setup_sim_hot_swap_step (task);
 }
 
@@ -4123,6 +4096,18 @@ setup_sim_hot_swap_step (GTask *task)
                                         task);
         return;
     }
+
+    case SETUP_SIM_HOT_SWAP_STEP_UIM_CHECK_SLOT_STATUS:
+        /* Successful registration does not mean that the modem actually sends
+         * physical slot status indications; invoke Get Slot Status to find out if
+         * the modem really supports slot status. */
+        qmi_client_uim_get_slot_status (QMI_CLIENT_UIM (priv->uim_client),
+                                        NULL,
+                                        10,
+                                        NULL,
+                                        (GAsyncReadyCallback) uim_check_get_slot_status_ready,
+                                        task);
+        return;
 
     case SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL: {
         g_autoptr(QmiMessageUimRefreshRegisterAllInput) refresh_register_all_input = NULL;
