@@ -3561,45 +3561,9 @@ mm_shared_qmi_set_primary_sim_slot (MMIfaceModem        *self,
 }
 
 /*****************************************************************************/
-/* SIM hot swap detection */
+/* UIM refresh indication handling */
 
 #define REFRESH_START_TIMEOUT_SECS  3
-
-typedef enum {
-    SETUP_SIM_HOT_SWAP_STEP_FIRST,
-    SETUP_SIM_HOT_SWAP_STEP_UIM_REGISTER_SLOT_STATUS,
-    SETUP_SIM_HOT_SWAP_STEP_UIM_CHECK_SLOT_STATUS,
-    SETUP_SIM_HOT_SWAP_STEP_UIM_SLOT_STATUS_INDICATION,
-    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL,
-    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ICCID,
-    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_IMSI,
-    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION,
-    SETUP_SIM_HOT_SWAP_STEP_LAST,
-} SetupSimHotSwapStep;
-
-typedef struct {
-    SetupSimHotSwapStep step;
-    gboolean            register_slot_status_supported;
-    gboolean            get_slot_status_supported;
-    gboolean            refresh_all_supported;
-    gboolean            refresh_file_supported;
-} SetupSimHotSwapContext;
-
-static void setup_sim_hot_swap_step (GTask *task);
-
-static void
-setup_sim_hot_swap_context_free (SetupSimHotSwapContext *ctx)
-{
-    g_slice_free (SetupSimHotSwapContext, ctx);
-}
-
-gboolean
-mm_shared_qmi_setup_sim_hot_swap_finish (MMIfaceModem  *self,
-                                         GAsyncResult  *res,
-                                         GError       **error)
-{
-    return g_task_propagate_boolean (G_TASK (res), error);
-}
 
 static void
 uim_refresh_complete (QmiClientUim      *client,
@@ -3711,6 +3675,9 @@ uim_refresh_indication_cb (QmiClientUim                  *client,
         }
     }
 }
+
+/*****************************************************************************/
+/* UIM slot status indication handling */
 
 /* Modifies the sim at slot == index+1, based on the content of slot_status.
  * Primarily used when a hotswap occurs on the inactive slot */
@@ -3868,6 +3835,45 @@ uim_slot_status_indication_cb (QmiClientUim                     *client,
 
     g_clear_pointer (&priv->slots_status, g_array_unref);
     priv->slots_status = g_array_ref (new_slots_status);
+}
+
+/*****************************************************************************/
+/* SIM hot swap setup */
+
+typedef enum {
+    SETUP_SIM_HOT_SWAP_STEP_FIRST,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_REGISTER_SLOT_STATUS,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_CHECK_SLOT_STATUS,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_SLOT_STATUS_INDICATION,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ALL,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_ICCID,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_REGISTER_IMSI,
+    SETUP_SIM_HOT_SWAP_STEP_UIM_REFRESH_INDICATION,
+    SETUP_SIM_HOT_SWAP_STEP_LAST,
+} SetupSimHotSwapStep;
+
+typedef struct {
+    SetupSimHotSwapStep step;
+    gboolean            register_slot_status_supported;
+    gboolean            get_slot_status_supported;
+    gboolean            refresh_all_supported;
+    gboolean            refresh_file_supported;
+} SetupSimHotSwapContext;
+
+static void setup_sim_hot_swap_step (GTask *task);
+
+static void
+setup_sim_hot_swap_context_free (SetupSimHotSwapContext *ctx)
+{
+    g_slice_free (SetupSimHotSwapContext, ctx);
+}
+
+gboolean
+mm_shared_qmi_setup_sim_hot_swap_finish (MMIfaceModem  *self,
+                                         GAsyncResult  *res,
+                                         GError       **error)
+{
+    return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 static void
