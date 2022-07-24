@@ -343,20 +343,18 @@ handle_store_ready (MMBaseSms *self,
     GError *error = NULL;
 
     if (!MM_BASE_SMS_GET_CLASS (self)->store_finish (self, res, &error)) {
-        /* On error, clear up the parts we generated */
-        g_list_free_full (self->priv->parts, (GDestroyNotify)mm_sms_part_free);
-        self->priv->parts = NULL;
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    } else {
-        mm_gdbus_sms_set_storage (MM_GDBUS_SMS (ctx->self), ctx->storage);
-
-        /* Transition from Unknown->Stored for SMS which were created by the user */
-        if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN)
-            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_STORED);
-
-        mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+        handle_store_context_free (ctx);
+        return;
     }
 
+    mm_gdbus_sms_set_storage (MM_GDBUS_SMS (ctx->self), ctx->storage);
+
+    /* Transition from Unknown->Stored for SMS which were created by the user */
+    if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN)
+        mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_STORED);
+
+    mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
     handle_store_context_free (ctx);
 }
 
@@ -524,26 +522,25 @@ handle_send_ready (MMBaseSms *self,
     GError *error = NULL;
 
     if (!MM_BASE_SMS_GET_CLASS (self)->send_finish (self, res, &error)) {
-        /* On error, clear up the parts we generated */
-        g_list_free_full (self->priv->parts, (GDestroyNotify)mm_sms_part_free);
-        self->priv->parts = NULL;
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    } else {
-        /* Transition from Unknown->Sent or Stored->Sent */
-        if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN ||
-            mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_STORED) {
-            GList *l;
-
-            /* Update state */
-            mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_SENT);
-            /* Grab last message reference */
-            l = g_list_last (mm_base_sms_get_parts (ctx->self));
-            mm_gdbus_sms_set_message_reference (MM_GDBUS_SMS (ctx->self),
-                                                mm_sms_part_get_message_reference ((MMSmsPart *)l->data));
-        }
-        mm_gdbus_sms_complete_send (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+        handle_send_context_free (ctx);
+        return;
     }
 
+    /* Transition from Unknown->Sent or Stored->Sent */
+    if (mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_UNKNOWN ||
+        mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self)) == MM_SMS_STATE_STORED) {
+        GList *l;
+
+        /* Update state */
+        mm_gdbus_sms_set_state (MM_GDBUS_SMS (ctx->self), MM_SMS_STATE_SENT);
+        /* Grab last message reference */
+        l = g_list_last (mm_base_sms_get_parts (ctx->self));
+        mm_gdbus_sms_set_message_reference (MM_GDBUS_SMS (ctx->self),
+                                            mm_sms_part_get_message_reference ((MMSmsPart *)l->data));
+    }
+
+    mm_gdbus_sms_complete_send (MM_GDBUS_SMS (ctx->self), ctx->invocation);
     handle_send_context_free (ctx);
 }
 
