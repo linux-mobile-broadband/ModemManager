@@ -12,11 +12,14 @@ SUBDIRS = \
 	cli \
 	vapi \
 	introspection \
-	test \
 	tools \
 	examples \
 	docs \
 	$(NULL)
+
+if WITH_TESTS
+SUBDIRS += test
+endif
 
 ChangeLog:
 	$(AM_V_GEN) if test -d "$(srcdir)/.git"; then \

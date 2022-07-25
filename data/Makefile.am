@@ -1,5 +1,12 @@
 
-SUBDIRS = . dispatcher-connection dispatcher-fcc-unlock tests
+SUBDIRS = \
+	. \
+	dispatcher-connection \
+	dispatcher-fcc-unlock
+
+if WITH_TESTS
+SUBDIRS += tests
+endif
 
 edit = @sed \
        -e 's|@sbindir[@]|$(sbindir)|g' \

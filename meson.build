@@ -88,6 +88,9 @@ cc_args = cc.get_supported_arguments([
   '-Wno-missing-field-initializers',
 ])
 
+# tests are enabled by default
+enable_tests = get_option('tests')
+
 # strict flags to use in debug builds
 if get_option('buildtype').contains('debug')
   cc_args += cc.get_supported_arguments([
@@ -266,7 +269,9 @@ if dist_version != ''
   config_h.set('MM_DIST_VERSION', dist_version)
 endif
 
-util_dep = cc.find_library('util')
+if enable_tests
+  util_dep = cc.find_library('util')
+endif
 
 # introspection support
 enable_gir = get_option('introspection')
@@ -376,14 +381,19 @@ subdir('introspection')
 subdir('include')
 
 subdir('libqcdm/src')
-subdir('libqcdm/tests')
+if enable_tests
+  subdir('libqcdm/tests')
+endif
 
 subdir('libmm-glib')
 subdir('src')
 subdir('plugins')
 subdir('cli')
-subdir('test')
-subdir('tools/tests')
+
+if enable_tests
+  subdir('test')
+  subdir('tools/tests')
+endif
 
 subdir('examples/sms-c')
 

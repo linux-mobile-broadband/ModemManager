@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2021 Iñigo Martinez <inigomartinez@gmail.com>
 
-subdir('tests')
+if enable_tests
+  subdir('tests')
+endif
 
 service_conf = {
   'sbindir': mm_prefix / mm_sbindir,

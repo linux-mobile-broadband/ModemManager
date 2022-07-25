@@ -196,4 +196,6 @@ if enable_gir
   endif
 endif
 
-subdir('tests')
+if enable_tests
+  subdir('tests')
+endif

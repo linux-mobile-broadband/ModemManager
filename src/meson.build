@@ -329,4 +329,6 @@ install_data(
   install_dir: udev_rulesdir,
 )
 
-subdir('tests')
+if enable_tests
+  subdir('tests')
+endif

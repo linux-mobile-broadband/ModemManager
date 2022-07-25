@@ -3,7 +3,9 @@
 
 # DBus Introspection files
 mm_ifaces_all = files('all.xml')
-mm_ifaces_test = files('tests/org.freedesktop.ModemManager1.Test.xml')
+if enable_tests
+  mm_ifaces_test = files('tests/org.freedesktop.ModemManager1.Test.xml')
+endif
 
 mm_ifaces = files('org.freedesktop.ModemManager1.xml')
 
