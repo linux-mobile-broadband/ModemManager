@@ -1,0 +1,111 @@
+# Georgian translation for ModemManager.
+# Copyright (C) 2022 ModemManager's COPYRIGHT HOLDER
+# This file is distributed under the same license as the ModemManager package.
+# Temuri Doghonadze <temuri.doghonadze@gmail.com>, 2022
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: https://gitlab.freedesktop.org/mobile-broadband/"
+"ModemManager/issues\n"
+"POT-Creation-Date: 2022-07-25 15:26+0000\n"
+"PO-Revision-Date: 2022-07-25 21:43+0200\n"
+"Last-Translator: Temuri Doghonadze <temuri.doghonadze@gmail.com>\n"
+"Language-Team: \n"
+"Language: ka\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.1.1\n"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:13
+msgid "Control the Modem Manager daemon"
+msgstr "ModemManager-ის დემონის კონტროლი"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:14
+msgid "System policy prevents controlling the Modem Manager."
+msgstr "სისტემის პოლიტიკა გიკრძალავთ ModemManager-ის კონტროლს."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:22
+msgid "Unlock and control a mobile broadband device"
+msgstr "განბლოკეთ და აკონტროლეთ მობილური ფართოზოლოვანი მოწყობილობა"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:23
+msgid ""
+"System policy prevents unlocking or controlling the mobile broadband device."
+msgstr ""
+"სისტემის პოლიტიკა გიკრძალავთ მობილური ფართოზოლოვანი მოწყობილობის განბლოკვას "
+"და კონტროლს."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:31
+msgid "Add, modify, and delete mobile broadband contacts"
+msgstr "დაამატეთ, ჩაასწორეთ და წაშალეთ მობილური კონტაქტები"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:32
+msgid ""
+"System policy prevents adding, modifying, or deleting this device's contacts."
+msgstr ""
+"სისტემის პოლიტიკა გიკრძალავთ ამ მოწყობილობის კონტაქტებიდაამატოთ, ჩაასწოროთ "
+"ან წაშალოთ."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:40
+msgid "Send, save, modify, and delete text messages"
+msgstr "გააგზავნეთ, შეინახეთ, ჩაასწორეთ და წაშალეთ ტექსტური შეტყობინებები"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:41
+msgid ""
+"System policy prevents sending or manipulating this device's text messages."
+msgstr ""
+"სისტემის პოლიტიკა გიკრძალავთ მოწყობილობის ტექსტური შეტყობინებების გაგზავნას "
+"და მანიპულაციას."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:49
+msgid "Accept incoming voice calls or start outgoing voice calls."
+msgstr "შემომავალი ხმოვანი ზარების მიღება ან გამავალი ზარის დაწყება."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:50
+msgid "System policy prevents voice calls."
+msgstr "სისტემური პოლიტიკა გიკრძალავთ ხმოვან ზარებს."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:58
+msgid "Query network time and timezone information"
+msgstr "ქსელური დროისა და დროის სარტყლის გამოთხოვა"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:59
+msgid "System policy prevents querying network time information."
+msgstr "სისტემური პოლიტიკა გიკრძალავთ ქსელური დროის ინფორმაციის გამოთხოვას."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:67
+msgid "Enable and view geographic location and positioning information"
+msgstr "ჩართეთ და ნახეთ გეოგრაფიული მდებარეობა"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:68
+msgid ""
+"System policy prevents enabling or viewing geographic location information."
+msgstr ""
+"სისტემური პოლიტიკა გიკრძალავთ გეოგრაფიული მდებარეობის ჩართვასა და "
+"გამოყენებას."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:76
+msgid "Query and utilize network information and services"
+msgstr "ქსელის ინფორმაციის და სერვისების მოთხოვა და გამოყენება"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:77
+msgid ""
+"System policy prevents querying or utilizing network information and "
+"services."
+msgstr "სისტემური პოლიტიკა გიკრძალავთ სერვისების პოვნასა და გამოყენებას."
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:85
+msgid "Query and manage firmware on a mobile broadband device"
+msgstr "მობილურ მოწყობილობაზე მიკროკოდის გამოთხოვა და მართვა"
+
+#: data/org.freedesktop.ModemManager1.policy.in.in:86
+msgid "System policy prevents querying or managing this device's firmware."
+msgstr ""
+"სისტემური პოლიტიკა გიკრძალავთ მოწყობილობის მიკროკოდის გამოთხოვას და მართვას."
+
+#: src/mm-sleep-monitor-systemd.c:125
+msgid "ModemManager needs to reset devices"
+msgstr "ModemManager -ს მოწყობილობის გადატვირთვა სჭირდება"
