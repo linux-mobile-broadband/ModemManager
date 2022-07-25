@@ -164,20 +164,23 @@ mm_modem_access_technology_from_mbim_data_class (MbimDataClass data_class)
 MMModem3gppNetworkAvailability
 mm_modem_3gpp_network_availability_from_mbim_provider_state (MbimProviderState state)
 {
-    switch (state) {
-    case MBIM_PROVIDER_STATE_HOME:
-    case MBIM_PROVIDER_STATE_PREFERRED:
-    case MBIM_PROVIDER_STATE_VISIBLE:
-    case MBIM_PROVIDER_STATE_PREFERRED_MULTICARRIER:
-        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE;
-    case MBIM_PROVIDER_STATE_REGISTERED:
+    /* MbimProviderState is a bitmask!
+     *
+     * We don't explicitly process MBIM_PROVIDER_STATE_PREFERRED,
+     * MBIM_PROVIDER_STATE_PREFERRED_MULTICARRIER or MBIM_PROVIDER_STATE_HOME,
+     * so we don't report at MM level the type of operator it is (home,
+     * preferred or non-preferred), just its availability.
+     */
+    if (state & MBIM_PROVIDER_STATE_REGISTERED)
         return MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT;
-    case MBIM_PROVIDER_STATE_FORBIDDEN:
+
+    if (state & MBIM_PROVIDER_STATE_FORBIDDEN)
         return MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN;
-    case MBIM_PROVIDER_STATE_UNKNOWN:
-    default:
-        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN;
-    }
+
+    if (state & MBIM_PROVIDER_STATE_VISIBLE)
+        return MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE;
+
+    return MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN;
 }
 
 /*****************************************************************************/
