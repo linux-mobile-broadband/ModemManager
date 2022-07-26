@@ -3320,7 +3320,7 @@ uim_get_slot_status_ready (QmiClientUim *client,
     LoadSimSlotsContext *ctx;
     MMIfaceModem        *self;
     Private             *priv;
-    GError              *error = NULL;
+    g_autoptr(GError)    error = NULL;
     GArray              *physical_slots = NULL;
     GArray              *ext_information = NULL;
     GArray              *slot_eids = NULL;
@@ -3334,7 +3334,13 @@ uim_get_slot_status_ready (QmiClientUim *client,
     if (!output ||
         !qmi_message_uim_get_slot_status_output_get_result (output, &error) ||
         !qmi_message_uim_get_slot_status_output_get_physical_slot_status (output, &physical_slots, &error)) {
-        g_task_return_error (task, error);
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_DEVICE_UNSUPPORTED) ||
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND) ||
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NOT_SUPPORTED))
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                     "QMI SIM slot switch operation not supported");
+        else
+            g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }
@@ -3503,13 +3509,13 @@ uim_switch_get_slot_status_ready (QmiClientUim *client,
 {
     g_autoptr(QmiMessageUimGetSlotStatusOutput) output = NULL;
     g_autoptr(QmiMessageUimSwitchSlotInput)     input = NULL;
-    MMIfaceModem *self;
-    GError       *error = NULL;
-    GArray       *physical_slots = NULL;
-    guint         i;
-    guint         active_logical_id = 0;
-    guint         active_slot_number;
-    guint         slot_number;
+    MMIfaceModem      *self;
+    g_autoptr(GError)  error = NULL;
+    GArray            *physical_slots = NULL;
+    guint              i;
+    guint              active_logical_id = 0;
+    guint              active_slot_number;
+    guint              slot_number;
 
     self = g_task_get_source_object (task);
     slot_number = GPOINTER_TO_UINT (g_task_get_task_data (task));
@@ -3518,7 +3524,13 @@ uim_switch_get_slot_status_ready (QmiClientUim *client,
     if (!output ||
         !qmi_message_uim_get_slot_status_output_get_result (output, &error) ||
         !qmi_message_uim_get_slot_status_output_get_physical_slot_status (output, &physical_slots, &error)) {
-        g_task_return_error (task, error);
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_DEVICE_UNSUPPORTED) ||
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_INVALID_QMI_COMMAND) ||
+            g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_NOT_SUPPORTED))
+            g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED,
+                                     "QMI SIM slot switch operation not supported");
+        else
+            g_task_return_error (task, g_steal_pointer (&error));
         g_object_unref (task);
         return;
     }

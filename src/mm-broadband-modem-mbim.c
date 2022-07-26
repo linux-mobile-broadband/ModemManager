@@ -8968,8 +8968,16 @@ shared_qmi_set_primary_sim_slot_ready (MMIfaceModem *self,
                                        GAsyncResult *res,
                                        GTask        *task)
 {
-    if (!mm_shared_qmi_set_primary_sim_slot_finish (self, res, NULL)) {
-        set_primary_sim_slot_mbim (task);
+    g_autoptr(GError) error = NULL;
+
+    if (!mm_shared_qmi_set_primary_sim_slot_finish (self, res, &error)) {
+        /* Fallback to MBIM */
+        if (g_error_matches (error, MM_CORE_ERROR, MM_CORE_ERROR_UNSUPPORTED)) {
+            set_primary_sim_slot_mbim (task);
+            return;
+        }
+        g_task_return_error (task, g_steal_pointer (&error));
+        g_object_unref (task);
         return;
     }
 
