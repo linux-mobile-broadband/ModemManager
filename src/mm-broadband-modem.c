@@ -119,6 +119,7 @@ enum {
     PROP_MODEM_3GPP_5GS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_IGNORED_FACILITY_LOCKS,
     PROP_MODEM_3GPP_INITIAL_EPS_BEARER,
+    PROP_MODEM_3GPP_PACKET_SERVICE_STATE,
     PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
     PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE,
     PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
@@ -207,6 +208,7 @@ struct _MMBroadbandModemPrivate {
     GPtrArray *modem_3gpp_registration_regex;
     MMModem3gppFacility modem_3gpp_ignored_facility_locks;
     MMBaseBearer *modem_3gpp_initial_eps_bearer;
+    MMModem3gppPacketServiceState modem_3gpp_packet_service_state;
 
     /*<--- Modem 3GPP Profile Manager interface --->*/
     /* Properties */
@@ -13079,6 +13081,9 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_3gpp_initial_eps_bearer);
         self->priv->modem_3gpp_initial_eps_bearer = g_value_dup_object (value);
         break;
+    case PROP_MODEM_3GPP_PACKET_SERVICE_STATE:
+        self->priv->modem_3gpp_packet_service_state = g_value_get_enum (value);
+        break;
     case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
         self->priv->modem_cdma_cdma1x_registration_state = g_value_get_enum (value);
         break;
@@ -13229,6 +13234,9 @@ get_property (GObject *object,
     case PROP_MODEM_3GPP_INITIAL_EPS_BEARER:
         g_value_set_object (value, self->priv->modem_3gpp_initial_eps_bearer);
         break;
+    case PROP_MODEM_3GPP_PACKET_SERVICE_STATE:
+        g_value_set_enum (value, self->priv->modem_3gpp_packet_service_state);
+        break;
     case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
         g_value_set_enum (value, self->priv->modem_cdma_cdma1x_registration_state);
         break;
@@ -13308,6 +13316,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_3gpp_eps_network_supported = FALSE;
     self->priv->modem_3gpp_5gs_network_supported = FALSE;
     self->priv->modem_3gpp_ignored_facility_locks = MM_MODEM_3GPP_FACILITY_NONE;
+    self->priv->modem_3gpp_packet_service_state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
     self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_cdma1x_network_supported = TRUE;
@@ -13865,6 +13874,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_INITIAL_EPS_BEARER,
                                       MM_IFACE_MODEM_3GPP_INITIAL_EPS_BEARER);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_3GPP_PACKET_SERVICE_STATE,
+                                      MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,

@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2011 - 2012 Google, Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #include <stdlib.h>
@@ -103,6 +104,139 @@ get_private (MMIfaceModem3gpp *self)
     }
 
     return priv;
+}
+
+/*****************************************************************************/
+/* Helper method to wait for a final packet service state */
+
+typedef struct {
+    MMModem3gppPacketServiceState final_state;
+    gulong packet_service_state_changed_id;
+    guint packet_service_state_changed_wait_id;
+} WaitForPacketServiceStateContext;
+
+MMModem3gppPacketServiceState
+mm_iface_modem_3gpp_wait_for_packet_service_state_finish (MMIfaceModem3gpp  *self,
+                                                          GAsyncResult      *res,
+                                                          GError           **error)
+{
+    GError *inner_error = NULL;
+    gssize  value;
+
+    value = g_task_propagate_int (G_TASK (res), &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+    }
+    return (MMModem3gppPacketServiceState)value;
+}
+
+static void
+wait_for_packet_service_state_context_complete (GTask                         *task,
+                                                MMModem3gppPacketServiceState  state,
+                                                GError                        *error)
+{
+    MMIfaceModem3gpp                 *self;
+    WaitForPacketServiceStateContext *ctx;
+
+    self = g_task_get_source_object (task);
+    ctx = g_task_get_task_data (task);
+
+    if (ctx->packet_service_state_changed_id) {
+        if (g_signal_handler_is_connected (self, ctx->packet_service_state_changed_id))
+            g_signal_handler_disconnect (self, ctx->packet_service_state_changed_id);
+        ctx->packet_service_state_changed_id = 0;
+    }
+
+    if (ctx->packet_service_state_changed_wait_id) {
+        g_source_remove (ctx->packet_service_state_changed_wait_id);
+        ctx->packet_service_state_changed_wait_id = 0;
+    }
+
+    if (error)
+        g_task_return_error (task, error);
+    else
+        g_task_return_int (task, state);
+
+    g_object_unref (task);
+}
+
+static gboolean
+packet_service_state_changed_wait_expired (GTask *task)
+{
+    GError *error;
+
+    error = g_error_new (MM_CORE_ERROR,
+                         MM_CORE_ERROR_RETRY,
+                         "Too much time waiting to get to a final packet service state");
+    wait_for_packet_service_state_context_complete (task, MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN, error);
+    return G_SOURCE_REMOVE;
+}
+
+static void
+packet_service_state_changed (MMIfaceModem3gpp *self,
+                              GParamSpec       *spec,
+                              GTask            *task)
+{
+    WaitForPacketServiceStateContext *ctx;
+    MMModem3gppPacketServiceState     state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &state,
+                  NULL);
+
+    ctx = g_task_get_task_data (task);
+
+    /* If we want a specific final state and this is not the one we were
+     * looking for, then skip */
+    if ((ctx->final_state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) &&
+        (state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN) &&
+        (state != ctx->final_state))
+        return;
+
+    /* Done! */
+    wait_for_packet_service_state_context_complete (task, state, NULL);
+}
+
+void
+mm_iface_modem_3gpp_wait_for_packet_service_state (MMIfaceModem3gpp              *self,
+                                                   MMModem3gppPacketServiceState  final_state,
+                                                   GAsyncReadyCallback            callback,
+                                                   gpointer                       user_data)
+{
+    MMModem3gppPacketServiceState     state = MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN;
+    WaitForPacketServiceStateContext *ctx;
+    GTask                            *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, &state,
+                  NULL);
+
+    /* Is this the state we actually wanted? */
+    if (final_state == MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN ||
+        (state != MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN && state == final_state)) {
+        g_task_return_int (task, state);
+        g_object_unref (task);
+        return;
+    }
+
+    /* Otherwise, we'll need to wait for the exact one we want */
+    ctx = g_new0 (WaitForPacketServiceStateContext, 1);
+    ctx->final_state = final_state;
+
+    g_task_set_task_data (task, ctx, g_free);
+
+    /* Want to get notified when packet service state changes */
+    ctx->packet_service_state_changed_id = g_signal_connect (self,
+                                                             "notify::" MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE,
+                                                             G_CALLBACK (packet_service_state_changed),
+                                                             task);
+    /* But we don't want to wait forever */
+    ctx->packet_service_state_changed_wait_id = g_timeout_add_seconds (10,
+                                                                       (GSourceFunc)packet_service_state_changed_wait_expired,
+                                                                       task);
 }
 
 /*****************************************************************************/
@@ -3338,6 +3472,11 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
                                 skeleton, "registration-state",
                                 G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
+        /* Bind our packet service state property */
+        g_object_bind_property (self, MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE,
+                                skeleton, "packet-service-state",
+                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
         g_object_set (self,
                       MM_IFACE_MODEM_3GPP_DBUS_SKELETON, skeleton,
                       NULL);
@@ -3439,6 +3578,15 @@ iface_modem_3gpp_init (gpointer g_iface)
                               "Initial EPS bearer",
                               "Initial EPS bearer setup during registration",
                               MM_TYPE_BASE_BEARER,
+                              G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_enum   (MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE,
+                              "PacketServiceState",
+                              "Packet service state of the modem",
+                              MM_TYPE_MODEM_3GPP_PACKET_SERVICE_STATE,
+                              MM_MODEM_3GPP_PACKET_SERVICE_STATE_UNKNOWN,
                               G_PARAM_READWRITE));
 
     initialized = TRUE;

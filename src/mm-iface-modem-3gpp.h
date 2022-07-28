@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2011-2012 Google, Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  */
 
 #ifndef MM_IFACE_MODEM_3GPP_H
@@ -37,6 +38,7 @@
 #define MM_IFACE_MODEM_3GPP_5GS_NETWORK_SUPPORTED   "iface-modem-3gpp-5gs-network-supported"
 #define MM_IFACE_MODEM_3GPP_IGNORED_FACILITY_LOCKS  "iface-modem-3gpp-ignored-facility-locks"
 #define MM_IFACE_MODEM_3GPP_INITIAL_EPS_BEARER      "iface-modem-3gpp-initial-eps-bearer"
+#define MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE    "iface-modem-3gpp-packet-service-state"
 
 #define MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK    \
     (MM_MODEM_ACCESS_TECHNOLOGY_GSM |                       \
@@ -378,6 +380,14 @@ void     mm_iface_modem_3gpp_reregister_in_network        (MMIfaceModem3gpp     
 gboolean mm_iface_modem_3gpp_reregister_in_network_finish (MMIfaceModem3gpp     *self,
                                                            GAsyncResult         *res,
                                                            GError              **error);
+
+void                          mm_iface_modem_3gpp_wait_for_packet_service_state        (MMIfaceModem3gpp              *self,
+                                                                                        MMModem3gppPacketServiceState  final_state,
+                                                                                        GAsyncReadyCallback            callback,
+                                                                                        gpointer                       user_data);
+MMModem3gppPacketServiceState mm_iface_modem_3gpp_wait_for_packet_service_state_finish (MMIfaceModem3gpp  *self,
+                                                                                        GAsyncResult      *res,
+                                                                                        GError           **error);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
