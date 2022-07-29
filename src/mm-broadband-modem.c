@@ -12117,13 +12117,13 @@ syncing_step (GTask *task)
         return;
 
     case SYNCING_STEP_IFACE_3GPP:
-        /*
-         * Start interface 3GPP synchronization.
+        /* Start 3GPP interface synchronization, only if modem was enabled.
          * We hardly depend on the registration and bearer status,
          * therefore we cannot continue with the other steps until
          * this one is finished.
          */
-        if (self->priv->modem_3gpp_dbus_skeleton) {
+        if (self->priv->modem_3gpp_dbus_skeleton &&
+            (self->priv->modem_state >= MM_MODEM_STATE_ENABLED)) {
             mm_obj_info (self, "resume synchronization state (%d/%d): 3GPP interface sync",
                          ctx->step, SYNCING_STEP_LAST);
             mm_iface_modem_3gpp_sync (MM_IFACE_MODEM_3GPP (self), (GAsyncReadyCallback)iface_modem_3gpp_sync_ready, task);
@@ -12133,10 +12133,9 @@ syncing_step (GTask *task)
         /* fall through */
 
     case SYNCING_STEP_IFACE_TIME:
-        /*
-         * Synchronize asynchronously the Time interface.
-         */
-        if (self->priv->modem_time_dbus_skeleton) {
+        /* Start Time interface synchronization, only if modem was enabled */
+        if (self->priv->modem_time_dbus_skeleton &&
+            (self->priv->modem_state >= MM_MODEM_STATE_ENABLED)) {
             mm_obj_info (self, "resume synchronization state (%d/%d): time interface sync",
                          ctx->step, SYNCING_STEP_LAST);
             mm_iface_modem_time_sync (MM_IFACE_MODEM_TIME (self), (GAsyncReadyCallback)iface_modem_time_sync_ready, task);
@@ -12170,17 +12169,6 @@ synchronize (MMBaseModem         *self,
     GTask          *task;
 
     task = g_task_new (MM_BROADBAND_MODEM (self), NULL, callback, user_data);
-
-    /* Synchronization after resume is not needed on modems that have never
-     * been enabled.
-     */
-    if (MM_BROADBAND_MODEM (self)->priv->modem_state < MM_MODEM_STATE_ENABLED) {
-        g_task_return_new_error (task, MM_CORE_ERROR, MM_CORE_ERROR_WRONG_STATE,
-                                 "Synchronization after resume not needed in modem state '%s'",
-                                 mm_modem_state_get_string (MM_BROADBAND_MODEM (self)->priv->modem_state));
-        g_object_unref (task);
-        return;
-    }
 
     /* Create SyncingContext */
     ctx = g_new0 (SyncingContext, 1);
