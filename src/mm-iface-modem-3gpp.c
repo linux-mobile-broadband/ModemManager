@@ -2008,21 +2008,6 @@ mm_iface_modem_3gpp_update_location (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 
 static void
-update_packet_service_state (MMIfaceModem3gpp              *self,
-                             MMModem3gppPacketServiceState  state)
-{
-    g_autoptr(MmGdbusModem3gppSkeleton) skeleton = NULL;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
-                  NULL);
-    if (skeleton)
-        mm_gdbus_modem3gpp_set_packet_service_state (MM_GDBUS_MODEM3GPP (skeleton), state);
-}
-
-/*****************************************************************************/
-
-static void
 update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *self,
                                                             GAsyncResult     *res,
                                                             gpointer          user_data)
@@ -2043,13 +2028,11 @@ update_registration_reload_current_registration_info_ready (MMIfaceModem3gpp *se
                 mm_modem_3gpp_registration_state_get_string (priv->state_5gs),
                 mm_modem_3gpp_registration_state_get_string (new_state));
 
-    /* Packet service state refresh */
-    update_packet_service_state (self, get_consolidated_packet_service_state (self));
-
-    /* The property in the interface is bound to the property
+    /* The properties in the interface are bound to the properties
      * in the skeleton, so just updating here is enough */
     g_object_set (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,   new_state,
+                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, get_consolidated_packet_service_state (self),
                   NULL);
 
     mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
@@ -2068,13 +2051,11 @@ update_non_registered_state (MMIfaceModem3gpp             *self,
     /* Not registered neither in home nor roaming network */
     mm_iface_modem_3gpp_clear_current_operator (self);
 
-    /* Packet service detached */
-    update_packet_service_state (self, MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED);
-
     /* The property in the interface is bound to the property
      * in the skeleton, so just updating here is enough */
     g_object_set (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,   new_state,
+                  MM_IFACE_MODEM_3GPP_PACKET_SERVICE_STATE, MM_MODEM_3GPP_PACKET_SERVICE_STATE_DETACHED,
                   NULL);
 
     mm_iface_modem_update_subsystem_state (
