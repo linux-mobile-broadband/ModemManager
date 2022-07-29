@@ -317,9 +317,9 @@ create_bearer_ready (MMIfaceModem *self,
 }
 
 static void
-wait_for_packet_service_attach_ready (MMIfaceModem3gpp  *self,
-                                      GAsyncResult      *res,
-                                      ConnectionContext *ctx)
+wait_for_packet_service_state_ready (MMIfaceModem3gpp  *self,
+                                     GAsyncResult      *res,
+                                     ConnectionContext *ctx)
 {
     GError *error = NULL;
 
@@ -624,11 +624,16 @@ connection_step (ConnectionContext *ctx)
     case CONNECTION_STEP_PACKET_SERVICE_ATTACH:
         mm_obj_info (ctx->self, "simple connect state (%d/%d): wait to get packet service state attached",
                      ctx->step, CONNECTION_STEP_LAST);
-        mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (ctx->self),
-                                                           MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED, /* attached state */
-                                                           (GAsyncReadyCallback)wait_for_packet_service_attach_ready,
-                                                           ctx);
-        return;
+        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
+            mm_iface_modem_3gpp_wait_for_packet_service_state (MM_IFACE_MODEM_3GPP (ctx->self),
+                                                               MM_MODEM_3GPP_PACKET_SERVICE_STATE_ATTACHED,
+                                                               (GAsyncReadyCallback)wait_for_packet_service_state_ready,
+                                                               ctx);
+            return;
+        }
+        /* If not 3GPP, just go on */
+        ctx->step++;
+        /* fall through */
 
     case CONNECTION_STEP_BEARER: {
         g_autoptr(MMBearerProperties) bearer_properties = NULL;
