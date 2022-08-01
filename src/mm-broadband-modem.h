@@ -12,8 +12,8 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
- * Copyright (C) 2011 Google, Inc.
  * Copyright (C) 2015 - Marco Bascetta <marco.bascetta@sadel.it>
+ * Copyright (C) 2011 - 2022 Google, Inc.
  */
 
 #ifndef MM_BROADBAND_MODEM_H
@@ -41,6 +41,10 @@ typedef struct _MMBroadbandModemPrivate MMBroadbandModemPrivate;
 
 #define MM_BROADBAND_MODEM_FLOW_CONTROL        "broadband-modem-flow-control"
 #define MM_BROADBAND_MODEM_INDICATORS_DISABLED "broadband-modem-indicators-disabled"
+
+#if defined WITH_SUSPEND_RESUME
+# define MM_BROADBAND_MODEM_SIGNAL_SYNC_NEEDED  "broadband-modem-sync-needed"
+#endif
 
 struct _MMBroadbandModem {
     MMBaseModem parent;
@@ -85,10 +89,14 @@ struct _MMBroadbandModemClass {
                                              GAsyncResult *res,
                                              GError **error);
 
-
     /* Last disabling step */
     gboolean (* disabling_stopped) (MMBroadbandModem *self,
                                     GError **error);
+
+#if defined WITH_SUSPEND_RESUME
+    /* signals */
+    void (* sync_needed) (MMBroadbandModem *self);
+#endif
 };
 
 GType mm_broadband_modem_get_type (void);
