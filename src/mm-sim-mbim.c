@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2013 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2022 Google Inc.
  */
 
 #include <config.h>
@@ -42,6 +43,10 @@ struct _MMSimMbimPrivate {
     MMSimType          sim_type;
     MMSimEsimStatus    esim_status;
     MMSimRemovability  removability;
+
+    /* need to get notified when a full sync of the info
+     * is needed, so that we clear the preloaded data. */
+    guint modem_sync_needed_id;
 };
 
 /*****************************************************************************/
@@ -97,7 +102,63 @@ update_modem_unlock_retries (MMSimMbim *self,
 }
 
 /*****************************************************************************/
+/* Monitor modem sync signal */
+
+#if defined WITH_SUSPEND_RESUME
+
+static void reset_subscriber_info (MMSimMbim *self);
+
+static void
+clear_modem_sync_monitor (MMSimMbim *self)
+{
+    g_autoptr(MMBaseModem) modem = NULL;
+
+    if (!self->priv->modem_sync_needed_id)
+        return;
+
+    g_object_get (G_OBJECT (self),
+                  MM_BASE_SIM_MODEM, &modem,
+                  NULL);
+    if (g_signal_handler_is_connected (modem, self->priv->modem_sync_needed_id))
+        g_signal_handler_disconnect (modem, self->priv->modem_sync_needed_id);
+    self->priv->modem_sync_needed_id = 0;
+}
+
+static void
+setup_modem_sync_monitor (MMSimMbim *self)
+{
+    g_autoptr(MMBaseModem) modem = NULL;
+
+    if (self->priv->modem_sync_needed_id)
+        return;
+
+    g_object_get (G_OBJECT (self),
+                  MM_BASE_SIM_MODEM, &modem,
+                  NULL);
+
+    self->priv->modem_sync_needed_id = g_signal_connect_swapped (modem,
+                                                                 MM_BROADBAND_MODEM_SIGNAL_SYNC_NEEDED,
+                                                                 G_CALLBACK (reset_subscriber_info),
+                                                                 self);
+}
+
+#endif /* WITH_SUSPEND_RESUME */
+
+/*****************************************************************************/
 /* Preload subscriber info */
+
+static void
+reset_subscriber_info (MMSimMbim *self)
+{
+    self->priv->preload = FALSE;
+    g_clear_error (&self->priv->preload_error);
+    g_clear_pointer (&self->priv->imsi, g_free);
+    g_clear_pointer (&self->priv->iccid, g_free);
+    g_clear_error (&self->priv->iccid_error);
+    self->priv->sim_type = MM_SIM_TYPE_UNKNOWN;
+    self->priv->esim_status = MM_SIM_ESIM_STATUS_UNKNOWN;
+    self->priv->removability = MM_SIM_REMOVABILITY_UNKNOWN;
+}
 
 static gboolean
 preload_subscriber_info_finish (MMSimMbim     *self,
@@ -211,6 +272,9 @@ preload_subscriber_info (MMSimMbim           *self,
         return;
     }
     self->priv->preload = TRUE;
+
+    /* If modem reports sync needed, we will reset the preloaded info */
+    setup_modem_sync_monitor (self);
 
     message = mbim_message_subscriber_ready_status_query_new (NULL);
     mbim_device_command (device,
@@ -1223,9 +1287,7 @@ mm_sim_mbim_init (MMSimMbim *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
                                               MM_TYPE_SIM_MBIM,
                                               MMSimMbimPrivate);
-    self->priv->sim_type = MM_SIM_TYPE_UNKNOWN;
-    self->priv->esim_status = MM_SIM_ESIM_STATUS_UNKNOWN;
-    self->priv->removability = MM_SIM_REMOVABILITY_UNKNOWN;
+    reset_subscriber_info (self);
 }
 
 static void
@@ -1233,12 +1295,20 @@ finalize (GObject *object)
 {
     MMSimMbim *self = MM_SIM_MBIM (object);
 
-    g_clear_error (&self->priv->preload_error);
-    g_free (self->priv->imsi);
-    g_free (self->priv->iccid);
-    g_clear_error (&self->priv->iccid_error);
+    reset_subscriber_info (self);
 
     G_OBJECT_CLASS (mm_sim_mbim_parent_class)->finalize (object);
+}
+
+static void
+dispose (GObject *object)
+{
+#if defined WITH_SUSPEND_RESUME
+    MMSimMbim *self = MM_SIM_MBIM (object);
+
+    clear_modem_sync_monitor (self);
+#endif
+    G_OBJECT_CLASS (mm_sim_mbim_parent_class)->dispose (object);
 }
 
 static void
@@ -1250,6 +1320,7 @@ mm_sim_mbim_class_init (MMSimMbimClass *klass)
     g_type_class_add_private (object_class, sizeof (MMSimMbimPrivate));
 
     object_class->finalize = finalize;
+    object_class->dispose = dispose;
     base_sim_class->load_sim_identifier = load_sim_identifier;
     base_sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
     base_sim_class->load_imsi = load_imsi;
