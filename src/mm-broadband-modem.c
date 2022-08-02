@@ -4187,8 +4187,6 @@ complete_sim_swap_check (GTask       *task,
     const gchar      *cached;
     const gchar      *str;
 
-    g_assert (current);
-
     self = MM_BROADBAND_MODEM (g_task_get_source_object (task));
     ctx = g_task_get_task_data (task);
 
@@ -4205,7 +4203,7 @@ complete_sim_swap_check (GTask       *task,
 
     if (g_strcmp0 (current, cached) != 0) {
         mm_obj_info (self, "SIM %s has changed: %s -> %s",
-                     str, cached ? cached : "<none>", current);
+                     str, cached ? cached : "<none>", current ? current : "<none>");
         mm_iface_modem_process_sim_event (MM_IFACE_MODEM (self));
         ctx->step = SIM_SWAP_CHECK_STEP_LAST;
     } else {
@@ -4263,8 +4261,7 @@ load_sim_step_ready (MMBaseSim    *sim,
         }
 
         mm_obj_warn (self, "could not load SIM %s: %s", str, error->message);
-        ctx->step++;
-        sim_swap_check_step (task);
+        complete_sim_swap_check (task, NULL);
         return;
     }
 
