@@ -556,6 +556,87 @@ load_imsi (MMBaseSim           *_self,
 }
 
 /*****************************************************************************/
+/* Load GID1 and GID2 */
+
+static GByteArray *
+common_load_gid_finish (MMBaseSim     *self,
+                        GAsyncResult  *res,
+                        GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+static void
+uim_get_gid_ready (QmiClientUim *client,
+                   GAsyncResult *res,
+                   GTask        *task)
+{
+    GError *error = NULL;
+    GArray *read_result;
+
+    read_result = uim_read_finish (client, res, &error);
+    if (!read_result)
+        g_task_return_error (task, error);
+    else
+        g_task_return_pointer (task,
+                               g_byte_array_append (g_byte_array_sized_new (read_result->len),
+                                                    (const guint8 *)(read_result->data),
+                                                    read_result->len),
+                               (GDestroyNotify)g_byte_array_unref);
+    g_object_unref (task);
+}
+
+static void
+common_load_gid (MMBaseSim           *self,
+                 guint16              file_id,
+                 GAsyncReadyCallback  callback,
+                 gpointer             user_data)
+{
+    GTask *task;
+
+    task = g_task_new (self, NULL, callback, user_data);
+
+    uim_read (MM_SIM_QMI (self),
+              file_id,
+              adf_file_path,
+              G_N_ELEMENTS (adf_file_path),
+              (GAsyncReadyCallback)uim_get_gid_ready,
+              task);
+}
+
+static GByteArray *
+load_gid1_finish (MMBaseSim     *self,
+                  GAsyncResult  *res,
+                  GError       **error)
+{
+    return common_load_gid_finish (self, res, error);
+}
+
+static void
+load_gid1 (MMBaseSim           *self,
+           GAsyncReadyCallback  callback,
+           gpointer             user_data)
+{
+    common_load_gid (self, 0x6F3E, callback, user_data);
+}
+
+static GByteArray *
+load_gid2_finish (MMBaseSim     *self,
+                  GAsyncResult  *res,
+                  GError       **error)
+{
+    return common_load_gid_finish (self, res, error);
+}
+
+static void
+load_gid2 (MMBaseSim           *self,
+           GAsyncReadyCallback  callback,
+           gpointer             user_data)
+{
+    common_load_gid (self, 0x6F3F, callback, user_data);
+}
+
+/*****************************************************************************/
 /* Load operator identifier */
 
 static gboolean
@@ -1868,6 +1949,10 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
     base_sim_class->load_operator_identifier_finish = load_operator_identifier_finish;
     base_sim_class->load_operator_name = load_operator_name;
     base_sim_class->load_operator_name_finish = load_operator_name_finish;
+    base_sim_class->load_gid1 = load_gid1;
+    base_sim_class->load_gid1_finish = load_gid1_finish;
+    base_sim_class->load_gid2 = load_gid2;
+    base_sim_class->load_gid2_finish = load_gid2_finish;
     base_sim_class->load_preferred_networks = load_preferred_networks;
     base_sim_class->load_preferred_networks_finish = load_preferred_networks_finish;
     base_sim_class->set_preferred_networks = set_preferred_networks;
