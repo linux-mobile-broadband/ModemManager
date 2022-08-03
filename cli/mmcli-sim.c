@@ -164,7 +164,11 @@ mmcli_sim_shutdown (void)
 static void
 print_sim_info (MMSim *sim)
 {
-    GList *preferred_nets_list;
+    GList         *preferred_nets_list;
+    const guint8  *gid1bin;
+    gsize          gid1bin_size;
+    const guint8  *gid2bin;
+    gsize          gid2bin_size;
 
     mmcli_output_string       (MMC_F_SIM_GENERAL_DBUS_PATH,            mm_sim_get_path (sim));
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_ACTIVE,            mm_sim_get_active (sim) ? "yes" : "no");
@@ -174,9 +178,16 @@ print_sim_info (MMSim *sim)
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_OPERATOR_ID,       mm_sim_get_operator_identifier (sim));
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_OPERATOR_NAME,     mm_sim_get_operator_name (sim));
     mmcli_output_string_array (MMC_F_SIM_PROPERTIES_EMERGENCY_NUMBERS, (const gchar **) mm_sim_get_emergency_numbers (sim), FALSE);
+
     preferred_nets_list = mm_sim_get_preferred_networks (sim);
     mmcli_output_preferred_networks (preferred_nets_list);
     g_list_free_full (preferred_nets_list, (GDestroyNotify) mm_sim_preferred_network_free);
+
+    gid1bin = mm_sim_get_gid1 (sim, &gid1bin_size);
+    gid2bin = mm_sim_get_gid2 (sim, &gid2bin_size);
+    mmcli_output_string_take  (MMC_F_SIM_PROPERTIES_GID1,              gid1bin ? mm_utils_bin2hexstr (gid1bin, gid1bin_size) : NULL);
+    mmcli_output_string_take  (MMC_F_SIM_PROPERTIES_GID2,              gid2bin ? mm_utils_bin2hexstr (gid2bin, gid2bin_size) : NULL);
+
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_SIM_TYPE,          mm_sim_type_get_string (mm_sim_get_sim_type (sim)));
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_ESIM_STATUS,       mm_sim_esim_status_get_string (mm_sim_get_esim_status (sim)));
     mmcli_output_string       (MMC_F_SIM_PROPERTIES_REMOVABILITY,      mm_sim_removability_get_string (mm_sim_get_removability (sim)));
