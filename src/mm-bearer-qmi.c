@@ -493,6 +493,7 @@ typedef struct {
     MMPort      *data;
     MMPortQmi   *qmi;
     QmiSioPort   sio_port;
+    gboolean     sio_port_failed;
 
     gint                  profile_id;
     MMBearerIpMethod      ip_method;
@@ -1363,6 +1364,15 @@ bind_data_port_ready (QmiClientWds *client,
 
     output = qmi_client_wds_bind_data_port_finish (client, res, &error);
     if (!output || !qmi_message_wds_bind_data_port_output_get_result (output, &error)) {
+        if (g_error_matches (error, QMI_PROTOCOL_ERROR, QMI_PROTOCOL_ERROR_DEVICE_UNSUPPORTED)) {
+            /* Some firmwares only support this through "Bind Mux Data Port",
+             * even if multiplexing is disabled. Try again with that. */
+            g_error_free (error);
+            ctx->sio_port_failed = TRUE;
+            connect_context_step (task);
+            return;
+        }
+
         g_prefix_error (&error, "Couldn't bind data port: ");
         complete_connect (task, NULL, error);
         return;
@@ -1810,7 +1820,7 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_BIND_DATA_PORT_IPV4:
         /* If SIO port given, bind client to it */
-        if (ctx->sio_port != QMI_SIO_PORT_NONE) {
+        if (!ctx->sio_port_failed && ctx->sio_port != QMI_SIO_PORT_NONE) {
             g_autoptr(QmiMessageWdsBindDataPortInput) input = NULL;
 
             mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->sio_port));
@@ -1826,7 +1836,7 @@ connect_context_step (GTask *task)
         }
 
         /* If mux id given, bind mux data port */
-        if (ctx->mux_id != QMI_DEVICE_MUX_ID_UNBOUND) {
+        if (ctx->sio_port_failed || ctx->mux_id != QMI_DEVICE_MUX_ID_UNBOUND) {
             g_autoptr(QmiMessageWdsBindMuxDataPortInput) input = NULL;
 
             mm_obj_dbg (self, "binding to mux id %d", ctx->mux_id);
@@ -1946,7 +1956,7 @@ connect_context_step (GTask *task)
 
     case CONNECT_STEP_BIND_DATA_PORT_IPV6:
         /* If SIO port given, bind client to it */
-        if (ctx->sio_port != QMI_SIO_PORT_NONE) {
+        if (!ctx->sio_port_failed && ctx->sio_port != QMI_SIO_PORT_NONE) {
             g_autoptr(QmiMessageWdsBindDataPortInput) input = NULL;
 
             mm_obj_dbg (self, "binding to data port: %s", qmi_sio_port_get_string (ctx->sio_port));
@@ -1962,7 +1972,7 @@ connect_context_step (GTask *task)
         }
 
         /* If mux id given, bind mux data port */
-        if (ctx->mux_id != QMI_DEVICE_MUX_ID_UNBOUND) {
+        if (ctx->sio_port_failed || ctx->mux_id != QMI_DEVICE_MUX_ID_UNBOUND) {
             g_autoptr(QmiMessageWdsBindMuxDataPortInput) input = NULL;
 
             mm_obj_dbg (self, "binding to mux id %d", ctx->mux_id);
