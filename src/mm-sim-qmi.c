@@ -45,6 +45,9 @@ struct _MMSimQmiPrivate {
     gboolean dms_uim_deprecated;
 };
 
+static const guint16 mf_file_path[]  = { 0x3F00 };
+static const guint16 adf_file_path[] = { 0x3F00, 0x7FFF };
+
 /*****************************************************************************/
 
 static gboolean
@@ -355,12 +358,10 @@ static void
 uim_get_iccid (MMSimQmi *self,
                GTask    *task)
 {
-    static const guint16 file_path[] = { 0x3F00 };
-
     uim_read (self,
               0x2FE2,
-              file_path,
-              G_N_ELEMENTS (file_path),
+              mf_file_path,
+              G_N_ELEMENTS (mf_file_path),
               (GAsyncReadyCallback)uim_get_iccid_ready,
               task);
 }
@@ -481,12 +482,10 @@ static void
 uim_get_imsi (MMSimQmi *self,
               GTask    *task)
 {
-    static const guint16 file_path[] = { 0x3F00, 0x7FFF };
-
     uim_read (self,
               0x6F07,
-              file_path,
-              G_N_ELEMENTS (file_path),
+              adf_file_path,
+              G_N_ELEMENTS (adf_file_path),
               (GAsyncReadyCallback)uim_get_imsi_ready,
               task);
 }
