@@ -116,6 +116,22 @@ struct _MMBaseSimClass {
                                                 GAsyncResult *res,
                                                 GError **error);
 
+    /* Load GID1 (async) */
+    void         (* load_gid1)         (MMBaseSim            *self,
+                                        GAsyncReadyCallback   callback,
+                                        gpointer              user_data);
+    GByteArray * (* load_gid1_finish)  (MMBaseSim            *self,
+                                        GAsyncResult         *res,
+                                        GError              **error);
+
+    /* Load GID2 (async) */
+    void         (* load_gid2)         (MMBaseSim            *self,
+                                        GAsyncReadyCallback   callback,
+                                        gpointer              user_data);
+    GByteArray * (* load_gid2_finish)  (MMBaseSim            *self,
+                                        GAsyncResult         *res,
+                                        GError              **error);
+
     /* Load sim type (async) */
     void      (* load_sim_type)        (MMBaseSim            *self,
                                         GAsyncReadyCallback   callback,

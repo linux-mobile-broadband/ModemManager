@@ -2333,6 +2333,8 @@ typedef enum {
     INITIALIZATION_STEP_OPERATOR_NAME,
     INITIALIZATION_STEP_EMERGENCY_NUMBERS,
     INITIALIZATION_STEP_PREFERRED_NETWORKS,
+    INITIALIZATION_STEP_GID1,
+    INITIALIZATION_STEP_GID2,
     INITIALIZATION_STEP_EID,
     INITIALIZATION_STEP_REMOVABILITY,
     INITIALIZATION_STEP_LAST
@@ -2420,8 +2422,38 @@ initable_init_finish (GAsyncInitable  *initable,
         interface_initialization_step (task);                           \
     }
 
+#define BYTEARRAY_REPLY_READY_FN(NAME,DISPLAY)                                    \
+    static void                                                                   \
+    init_load_##NAME##_ready (MMBaseSim    *self,                                 \
+                              GAsyncResult *res,                                  \
+                              GTask        *task)                                 \
+    {                                                                             \
+        InitAsyncContext      *ctx;                                               \
+        g_autoptr(GError)      error = NULL;                                      \
+        g_autoptr(GByteArray)  bytearray = NULL;                                  \
+                                                                                  \
+        bytearray = MM_BASE_SIM_GET_CLASS (self)->load_##NAME##_finish (self, res, &error); \
+        mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self),                             \
+                                 (bytearray ?                                     \
+                                  g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE, \
+                                                             bytearray->data,     \
+                                                             bytearray->len,      \
+                                                             sizeof (guint8)) :   \
+                                  NULL));                                         \
+                                                                                  \
+        if (error)                                                                \
+            mm_obj_warn (self, "couldn't load %s: %s", DISPLAY, error->message);  \
+                                                                                  \
+        /* Go on to next step */                                                  \
+        ctx = g_task_get_task_data (task);                                        \
+        ctx->step++;                                                              \
+        interface_initialization_step (task);                                     \
+    }
+
 UINT_REPLY_READY_FN (removability, "removability")
 STR_REPLY_READY_FN  (eid, "EID")
+BYTEARRAY_REPLY_READY_FN (gid2, "GID2")
+BYTEARRAY_REPLY_READY_FN (gid1, "GID1")
 
 static void
 init_load_preferred_networks_ready (MMBaseSim    *self,
@@ -2702,6 +2734,42 @@ interface_initialization_step (GTask *task)
         ctx->step++;
         /* Fall through */
 
+    case INITIALIZATION_STEP_GID1:
+        /* Don't load GID1 if the SIM is known to be an eSIM without profiles;
+         * otherwise (if physical SIM, or if eSIM with profile, or if
+         * SIM type unknown) try to load it. */
+        if (IS_ESIM_WITHOUT_PROFILES (self))
+            mm_obj_dbg (self, "not loading GID1 in eSIM without profiles");
+        else if (mm_gdbus_sim_get_gid1 (MM_GDBUS_SIM (self)) == NULL &&
+                 MM_BASE_SIM_GET_CLASS (self)->load_gid1 &&
+                 MM_BASE_SIM_GET_CLASS (self)->load_gid1_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_gid1 (
+                self,
+                (GAsyncReadyCallback)init_load_gid1_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
+    case INITIALIZATION_STEP_GID2:
+        /* Don't load GID2 if the SIM is known to be an eSIM without profiles;
+         * otherwise (if physical SIM, or if eSIM with profile, or if
+         * SIM type unknown) try to load it. */
+        if (IS_ESIM_WITHOUT_PROFILES (self))
+            mm_obj_dbg (self, "not loading GID2 in eSIM without profiles");
+        else if (mm_gdbus_sim_get_gid1 (MM_GDBUS_SIM (self)) == NULL &&
+                 MM_BASE_SIM_GET_CLASS (self)->load_gid1 &&
+                 MM_BASE_SIM_GET_CLASS (self)->load_gid1_finish) {
+            MM_BASE_SIM_GET_CLASS (self)->load_gid2 (
+                self,
+                (GAsyncReadyCallback)init_load_gid2_ready,
+                task);
+            return;
+        }
+        ctx->step++;
+        /* Fall through */
+
     case INITIALIZATION_STEP_EID:
         /* Don't load EID if the SIM is known to be a physical SIM; otherwise
          * (if eSIM with or without profiles) try to load it. */
@@ -2782,6 +2850,8 @@ initable_init_async (GAsyncInitable *initable,
     mm_gdbus_sim_set_eid (MM_GDBUS_SIM (initable), NULL);
     mm_gdbus_sim_set_operator_identifier (MM_GDBUS_SIM (initable), NULL);
     mm_gdbus_sim_set_operator_name (MM_GDBUS_SIM (initable), NULL);
+    mm_gdbus_sim_set_gid1 (MM_GDBUS_SIM (initable), NULL);
+    mm_gdbus_sim_set_gid2 (MM_GDBUS_SIM (initable), NULL);
 
     common_init_async (initable, cancellable, callback, user_data);
 }
