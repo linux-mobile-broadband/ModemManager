@@ -175,7 +175,7 @@ print_sms_info (MMSms *sms)
 
     mmcli_output_string           (MMC_F_SMS_GENERAL_DBUS_PATH,           mm_sms_get_path (sms));
     mmcli_output_string           (MMC_F_SMS_CONTENT_NUMBER,              mm_sms_get_number (sms));
-    mmcli_output_string (MMC_F_SMS_CONTENT_TEXT,                mm_sms_get_text (sms));
+    mmcli_output_string           (MMC_F_SMS_CONTENT_TEXT,                mm_sms_get_text (sms));
     mmcli_output_string_take      (MMC_F_SMS_CONTENT_DATA,                data);
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_PDU_TYPE,         mm_sms_pdu_type_get_string (pdu_type));
     mmcli_output_string           (MMC_F_SMS_PROPERTIES_STATE,            mm_sms_state_get_string (mm_sms_get_state (sms)));
