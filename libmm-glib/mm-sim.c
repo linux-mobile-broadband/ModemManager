@@ -383,6 +383,8 @@ mm_sim_dup_emergency_numbers (MMSim *self)
     return mm_gdbus_sim_dup_emergency_numbers (MM_GDBUS_SIM (self));
 }
 
+/*****************************************************************************/
+
 /**
  * mm_sim_get_preferred_networks:
  * @self: A #MMSim.
@@ -411,6 +413,8 @@ mm_sim_get_preferred_networks (MMSim *self)
     return network_list;
 }
 
+/*****************************************************************************/
+
 /**
  * mm_sim_get_sim_type:
  * @self: A #MMSim.
@@ -428,6 +432,8 @@ mm_sim_get_sim_type (MMSim *self)
 
     return mm_gdbus_sim_get_sim_type (MM_GDBUS_SIM (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sim_get_esim_status:
@@ -448,6 +454,8 @@ mm_sim_get_esim_status (MMSim *self)
 
     return mm_gdbus_sim_get_esim_status (MM_GDBUS_SIM (self));
 }
+
+/*****************************************************************************/
 
 /**
  * mm_sim_get_removability:
