@@ -186,6 +186,28 @@
     <property name="PreferredNetworks" type="a(su)" access="read" />
 
     <!--
+        Gid1:
+
+        Group identifier 1evel 1.
+
+        Since: 1.20
+    -->
+    <property name="Gid1" type="ay" access="read">
+      <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
+    </property>
+
+    <!--
+        Gid2:
+
+        Group identifier 1evel 2.
+
+        Since: 1.20
+    -->
+    <property name="Gid2" type="ay" access="read">
+      <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
+    </property>
+
+    <!--
         SimType:
 
         Indicates whether the current primary SIM is a ESIM or a physical SIM,
