@@ -1611,6 +1611,10 @@ mm_sim_dup_operator_name
 mm_sim_get_emergency_numbers
 mm_sim_dup_emergency_numbers
 mm_sim_get_preferred_networks
+mm_sim_get_gid1
+mm_sim_dup_gid1
+mm_sim_get_gid2
+mm_sim_dup_gid2
 mm_sim_get_sim_type
 mm_sim_get_esim_status
 mm_sim_get_removability

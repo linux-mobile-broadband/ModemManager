@@ -416,6 +416,118 @@ mm_sim_get_preferred_networks (MMSim *self)
 /*****************************************************************************/
 
 /**
+ * mm_sim_get_gid1:
+ * @self: A #MMSim.
+ * @data_len: (out): Size of the output data, if any given.
+ *
+ * Gets the Group Identifier Level 1 of the #MMSim object.
+ *
+ * Returns: (transfer none) (array length=data_len) (element-type guint8): The
+ * GID1 data, or %NULL if unknown.
+ *
+ * Since: 1.20
+ */
+const guint8 *
+mm_sim_get_gid1 (MMSim *self,
+                 gsize *data_len)
+{
+    GVariant *value;
+
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+    g_return_val_if_fail (data_len != NULL, NULL);
+
+    value = mm_gdbus_sim_get_gid1 (MM_GDBUS_SIM (self));
+    return (value ?
+            g_variant_get_fixed_array (value, data_len, sizeof (guint8)) :
+            NULL);
+}
+
+/**
+ * mm_sim_dup_gid1:
+ * @self: A #MMSim.
+ * @data_len: (out): Size of the output data, if any given.
+ *
+ * Gets the Group Identifier Level 1 of the #MMSim object.
+ *
+ * Returns: (transfer full) (array length=data_len) (element-type guint8): The
+ * GID1 data, or %NULL if unknown.
+ *
+ * Since: 1.20
+ */
+guint8 *
+mm_sim_dup_gid1 (MMSim *self,
+                 gsize *data_len)
+{
+    g_autoptr(GVariant) value = NULL;
+
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+    g_return_val_if_fail (data_len != NULL, NULL);
+
+    value = mm_gdbus_sim_dup_gid1 (MM_GDBUS_SIM (self));
+    return (value ?
+            g_memdup (g_variant_get_fixed_array (value, data_len, sizeof (guint8)), *data_len) :
+            NULL);
+}
+
+/*****************************************************************************/
+
+/**
+ * mm_sim_get_gid2:
+ * @self: A #MMSim.
+ * @data_len: (out): Size of the output data, if any given.
+ *
+ * Gets the Group Identifier Level 2 of the #MMSim object.
+ *
+ * Returns: (transfer none) (array length=data_len) (element-type guint8): The
+ * GID2 data, or %NULL if unknown.
+ *
+ * Since: 1.20
+ */
+const guint8 *
+mm_sim_get_gid2 (MMSim *self,
+                 gsize *data_len)
+{
+    GVariant *value;
+
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+    g_return_val_if_fail (data_len != NULL, NULL);
+
+    value = mm_gdbus_sim_get_gid2 (MM_GDBUS_SIM (self));
+    return (value ?
+            g_variant_get_fixed_array (value, data_len, sizeof (guint8)) :
+            NULL);
+}
+
+/**
+ * mm_sim_dup_gid2:
+ * @self: A #MMSim.
+ * @data_len: (out): Size of the output data, if any given.
+ *
+ * Gets the Group Identifier Level 2 of the #MMSim object.
+ *
+ * Returns: (transfer full) (array length=data_len) (element-type guint8): The
+ * GID2 data, or %NULL if unknown.
+ *
+ * Since: 1.20
+ */
+guint8 *
+mm_sim_dup_gid2 (MMSim *self,
+                 gsize *data_len)
+{
+    g_autoptr(GVariant) value = NULL;
+
+    g_return_val_if_fail (MM_IS_SIM (self), NULL);
+    g_return_val_if_fail (data_len != NULL, NULL);
+
+    value = mm_gdbus_sim_dup_gid2 (MM_GDBUS_SIM (self));
+    return (value ?
+            g_memdup (g_variant_get_fixed_array (value, data_len, sizeof (guint8)), *data_len) :
+            NULL);
+}
+
+/*****************************************************************************/
+
+/**
  * mm_sim_get_sim_type:
  * @self: A #MMSim.
  *

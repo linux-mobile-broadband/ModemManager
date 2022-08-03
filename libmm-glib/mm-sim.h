@@ -89,6 +89,15 @@ gchar               **mm_sim_dup_emergency_numbers (MMSim *self);
 
 GList*       mm_sim_get_preferred_networks  (MMSim *self);
 
+const guint8 *mm_sim_get_gid1 (MMSim *self,
+                               gsize *data_len);
+guint8       *mm_sim_dup_gid1 (MMSim *self,
+                               gsize *data_len);
+const guint8 *mm_sim_get_gid2 (MMSim *self,
+                               gsize *data_len);
+guint8       *mm_sim_dup_gid2 (MMSim *self,
+                               gsize *data_len);
+
 MMSimType         mm_sim_get_sim_type     (MMSim *self);
 MMSimEsimStatus   mm_sim_get_esim_status  (MMSim *self);
 MMSimRemovability mm_sim_get_removability (MMSim *self);
